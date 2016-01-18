@@ -1,13 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
-	"github.com/docker/docker/reference"
-	engineTypes "github.com/docker/engine-api/types"
 )
 
 const (
@@ -16,27 +15,15 @@ const (
 )
 
 var inspectCmd = func(c *cli.Context) {
-	ref, err := reference.ParseNamed(c.Args().First())
+	imgInspect, err := inspect(c)
 	if err != nil {
 		logrus.Fatal(err)
 	}
-
-	var (
-		authConfig engineTypes.AuthConfig
-		username   = c.GlobalString("username")
-		password   = c.GlobalString("password")
-	)
-	if username != "" && password != "" {
-		authConfig = engineTypes.AuthConfig{
-			Username: username,
-			Password: password,
-		}
-	}
-	imgInspect, err := inspect(ref, authConfig)
+	data, err := json.Marshal(imgInspect)
 	if err != nil {
 		logrus.Fatal(err)
 	}
-	fmt.Println(imgInspect)
+	fmt.Println(string(data))
 }
 
 func main() {
