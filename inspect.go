@@ -2,13 +2,16 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/docker/distribution/digest"
 	"github.com/docker/docker/api"
+	"github.com/docker/docker/image"
 	"github.com/docker/docker/reference"
 	"github.com/docker/docker/registry"
-	engineTypes "github.com/docker/engine-api/types"
+	types "github.com/docker/engine-api/types"
 	containerTypes "github.com/docker/engine-api/types/container"
 	"golang.org/x/net/context"
 )
@@ -34,8 +37,7 @@ type manifestFetcher interface {
 }
 
 type imageInspect struct {
-	// I shouldn't need json tag here...
-	ID              string `json:"Id"`
+	V1ID            string `json:"V1Id"`
 	RepoTags        []string
 	RepoDigests     []string
 	Parent          string
@@ -185,7 +187,7 @@ func newManifestFetcher(endpoint registry.APIEndpoint, repoInfo *registry.Reposi
 	return nil, fmt.Errorf("unknown version %d for registry %s", endpoint.Version, endpoint.URL)
 }
 
-func getAuthConfig(c *cli.Context, ref reference.Named) (engineTypes.AuthConfig, error) {
+func getAuthConfig(c *cli.Context, ref reference.Named) (types.AuthConfig, error) {
 
 	// use docker/cliconfig
 	// if no /.docker -> docker not installed fallback to require username|password
@@ -203,7 +205,7 @@ func getAuthConfig(c *cli.Context, ref reference.Named) (engineTypes.AuthConfig,
 	//}
 	//}
 
-	return engineTypes.AuthConfig{}, nil
+	return types.AuthConfig{}, nil
 }
 
 func validateRepoName(name string) error {
@@ -214,4 +216,42 @@ func validateRepoName(name string) error {
 		return fmt.Errorf("'%s' is a reserved name", api.NoBaseImageSpecifier)
 	}
 	return nil
+}
+
+func makeImageInspect(repoInfo *registry.RepositoryInfo, img *image.Image, tag string, dgst digest.Digest) *imageInspect {
+	var repoTags = make([]string, 0, 1)
+	if tagged, isTagged := repoInfo.Named.(reference.NamedTagged); isTagged || tag != "" {
+		if !isTagged {
+			newTagged, err := reference.WithTag(repoInfo, tag)
+			if err == nil {
+				tagged = newTagged
+			}
+		}
+		if tagged != nil {
+			repoTags = append(repoTags, tagged.String())
+		}
+	}
+
+	var repoDigests = make([]string, 0, 1)
+	if err := dgst.Validate(); err == nil {
+		repoDigests = append(repoDigests, dgst.String())
+	}
+
+	return &imageInspect{
+		V1ID:            img.V1Image.ID,
+		RepoTags:        repoTags,
+		RepoDigests:     repoDigests,
+		Parent:          img.Parent.String(),
+		Comment:         img.Comment,
+		Created:         img.Created.Format(time.RFC3339Nano),
+		Container:       img.Container,
+		ContainerConfig: &img.ContainerConfig,
+		DockerVersion:   img.DockerVersion,
+		Author:          img.Author,
+		Config:          img.Config,
+		Architecture:    img.Architecture,
+		Os:              img.OS,
+		Size:            img.Size,
+		Registry:        repoInfo.Index.Name,
+	}
 }
