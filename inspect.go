@@ -60,21 +60,21 @@ func inspect(c *cli.Context) (*imageInspect, error) {
 		return nil, err
 	}
 
+	authConfig, err := getAuthConfig(c, ref)
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		ii *imageInspect
 	)
 
 	if ref.Hostname() != "" {
-		ii, err = getData(ref)
+		ii, err = getData(ref, authConfig)
 		if err != nil {
 			return nil, err
 		}
 		return ii, nil
-	}
-
-	authConfig, err := getAuthConfig(c, ref)
-	if err != nil {
-		return nil, err
 	}
 
 	_ = authConfig
@@ -84,7 +84,7 @@ func inspect(c *cli.Context) (*imageInspect, error) {
 	return nil, nil
 }
 
-func getData(ref reference.Named) (*imageInspect, error) {
+func getData(ref reference.Named, authConfig types.AuthConfig) (*imageInspect, error) {
 	repoInfo, err := registry.ParseRepositoryInfo(ref)
 	if err != nil {
 		return nil, err
@@ -124,7 +124,7 @@ func getData(ref reference.Named) (*imageInspect, error) {
 		logrus.Debugf("Trying to fetch image manifest of %s repository from %s %s", repoInfo.Name(), endpoint.URL, endpoint.Version)
 
 		//fetcher, err := newManifestFetcher(endpoint, repoInfo, config)
-		fetcher, err := newManifestFetcher(endpoint, repoInfo)
+		fetcher, err := newManifestFetcher(endpoint, repoInfo, authConfig, registryService)
 		if err != nil {
 			lastErr = err
 			continue
@@ -169,13 +169,14 @@ func getData(ref reference.Named) (*imageInspect, error) {
 	return nil, lastErr
 }
 
-func newManifestFetcher(endpoint registry.APIEndpoint, repoInfo *registry.RepositoryInfo) (manifestFetcher, error) {
+func newManifestFetcher(endpoint registry.APIEndpoint, repoInfo *registry.RepositoryInfo, authConfig types.AuthConfig, registryService *registry.Service) (manifestFetcher, error) {
 	switch endpoint.Version {
 	case registry.APIVersion2:
 		return &v2ManifestFetcher{
-			endpoint: endpoint,
-			//config:   config,
-			repoInfo: repoInfo,
+			endpoint:   endpoint,
+			authConfig: authConfig,
+			service:    registryService,
+			repoInfo:   repoInfo,
 		}, nil
 		//case registry.APIVersion1:
 		//return &v1ManifestFetcher{
@@ -193,19 +194,20 @@ func getAuthConfig(c *cli.Context, ref reference.Named) (types.AuthConfig, error
 	// if no /.docker -> docker not installed fallback to require username|password
 	// maybe prompt user:passwd?
 
-	//var (
-	//authConfig engineTypes.AuthConfig
-	//username   = c.GlobalString("username")
-	//password   = c.GlobalString("password")
-	//)
-	//if username != "" && password != "" {
-	//authConfig = engineTypes.AuthConfig{
-	//Username: username,
-	//Password: password,
-	//}
-	//}
+	var (
+		authConfig types.AuthConfig
+		username   = c.GlobalString("username")
+		password   = c.GlobalString("password")
+	)
+	if username != "" && password != "" {
+		authConfig = types.AuthConfig{
+			Username: username,
+			Password: password,
+			Email:    "antonio.murdaca@gmail.com",
+		}
+	}
 
-	return types.AuthConfig{}, nil
+	return authConfig, nil
 }
 
 func validateRepoName(name string) error {
