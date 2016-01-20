@@ -202,6 +202,7 @@ func newManifestFetcher(endpoint registry.APIEndpoint, repoInfo *registry.Reposi
 
 func getAuthConfig(c *cli.Context, ref reference.Named) (types.AuthConfig, error) {
 
+	// TODO(runcom):
 	// use docker/cliconfig
 	// if no /.docker -> docker not installed fallback to require username|password
 	// maybe prompt user:passwd?
