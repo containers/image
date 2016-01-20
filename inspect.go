@@ -64,24 +64,18 @@ func inspect(c *cli.Context) (*imageInspect, error) {
 	if err != nil {
 		return nil, err
 	}
-	var (
-		ii *imageInspect
-	)
 	// TODO(runcom): remove docker.io case cause unqualified images
 	// can be from additional registry below
 	// tweak the ParseNamed above so I can know if its unqualified
-	if ref.Hostname() != "" {
-		ii, err = getData(ref, authConfig)
-		if err != nil {
-			return nil, err
-		}
-		return ii, nil
+	// EDIT(runcom): it's probably better to expose an additional registries REST
+	// route in projectatomic fork of docker and let the magic happen in projectatomic/docker
+	//if ref.Hostname() != "" {
+	//}
+	imgInspect, err := getData(ref, authConfig)
+	if err != nil {
+		return nil, err
 	}
-
-	// TODO(runcom): ...
-	// both authConfig and unqualified images
-
-	return nil, nil
+	return imgInspect, nil
 }
 
 func getData(ref reference.Named, authConfig types.AuthConfig) (*imageInspect, error) {
@@ -221,7 +215,7 @@ func getAuthConfig(c *cli.Context, ref reference.Named) (types.AuthConfig, error
 		authConfig = types.AuthConfig{
 			Username: username,
 			Password: password,
-			Email:    "antonio.murdaca@gmail.com",
+			Email:    "stub@example.com",
 		}
 	}
 
