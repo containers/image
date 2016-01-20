@@ -51,7 +51,6 @@ type imageInspect struct {
 	Config          *containerTypes.Config
 	Architecture    string
 	Os              string
-	Size            int64
 	Registry        string
 }
 
@@ -247,7 +246,6 @@ func makeImageInspect(img *image.Image, index, tag string, tagList []string) *im
 		Config:          img.Config,
 		Architecture:    img.Architecture,
 		Os:              img.OS,
-		Size:            img.Size,
 		Registry:        index,
 	}
 }
