@@ -49,3 +49,6 @@ $ sudo make install
 License
 -
 MIT
+TODO
+-
+- get rid of Docker (meaning make this work w/o needing Docker installed)
