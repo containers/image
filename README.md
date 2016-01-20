@@ -10,6 +10,7 @@ an image before pulling it (and use disk space).
 
 Example:
 ```sh
+# show image's labels
 $ skopeo registry.access.redhat.com/rhel7 | jq '.Config.Labels'
 {
   "Architecture": "x86_64",
@@ -21,6 +22,18 @@ $ skopeo registry.access.redhat.com/rhel7 | jq '.Config.Labels'
   "Vendor": "Red Hat, Inc.",
   "Version": "7.2"
 }
+
+# show image's tags
+$ skopeo fedora | jq '.RepoTags'
+[
+  "20",
+  "21",
+  "22",
+  "23",
+  "heisenbug",
+  "latest",
+  "rawhide"
+]
 ```
 Building
 -
