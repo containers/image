@@ -24,7 +24,7 @@ $ skopeo registry.access.redhat.com/rhel7 | jq '.Config.Labels'
 }
 
 # show image's tags
-$ skopeo fedora | jq '.RepoTags'
+$ skopeo docker.io/fedora | jq '.RepoTags'
 [
   "20",
   "21",
