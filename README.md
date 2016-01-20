@@ -54,3 +54,6 @@ TODO
 - get rid of Docker (meaning make this work w/o needing Docker installed)
 - require image argument to be fully qualified (not the Docker way)
 - drop the `Registry` field in the response because of the point above :)
+NOT TODO
+-
+- provide a _format_ flag - just use the awesome [jq](https://stedolan.github.io/jq/)
