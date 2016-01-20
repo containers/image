@@ -7,6 +7,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/docker/distribution/digest"
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/image"
 	"github.com/docker/docker/opts"
@@ -39,12 +40,11 @@ type manifestFetcher interface {
 }
 
 type imageInspect struct {
-	Tag      string
-	RepoTags []string
-	//RepoDigests     []string
+	Tag             string
+	Digest          string
+	RepoTags        []string
 	Comment         string
 	Created         string
-	Container       string
 	ContainerConfig *containerTypes.Config
 	DockerVersion   string
 	Author          string
@@ -232,14 +232,17 @@ func validateRepoName(name string) error {
 	return nil
 }
 
-func makeImageInspect(img *image.Image, index, tag string, tagList []string) *imageInspect {
+func makeImageInspect(img *image.Image, index, tag string, dgst digest.Digest, tagList []string) *imageInspect {
+	var digest string
+	if err := dgst.Validate(); err == nil {
+		digest = dgst.String()
+	}
 	return &imageInspect{
-		Tag:      tag,
-		RepoTags: tagList,
-		//RepoDigests: repoDigests,
+		Tag:             tag,
+		Digest:          digest,
+		RepoTags:        tagList,
 		Comment:         img.Comment,
 		Created:         img.Created.Format(time.RFC3339Nano),
-		Container:       img.Container,
 		ContainerConfig: &img.ContainerConfig,
 		DockerVersion:   img.DockerVersion,
 		Author:          img.Author,
