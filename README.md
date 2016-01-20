@@ -51,6 +51,8 @@ License
 MIT
 TODO
 -
+- provide a glossary (e.g. repository, image, layers, manifest, etc)
+- show repo tags via flag or when reference isn't tagged or digested
 - add tests (integration with deployed registries in container - Docker-like)
 - get rid of Docker (meaning make this work w/o needing Docker installed)
 - require image argument to be fully qualified (not the Docker way)
