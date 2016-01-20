@@ -7,7 +7,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
-	"github.com/docker/distribution/digest"
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/image"
 	"github.com/docker/docker/opts"
@@ -40,11 +39,9 @@ type manifestFetcher interface {
 }
 
 type imageInspect struct {
-	V1ID            string `json:"V1Id"`
-	Tag             string
-	RepoTags        []string
-	RepoDigests     []string
-	Parent          string
+	Tag      string
+	RepoTags []string
+	//RepoDigests     []string
 	Comment         string
 	Created         string
 	Container       string
@@ -247,18 +244,11 @@ func validateRepoName(name string) error {
 	return nil
 }
 
-func makeImageInspect(repoInfo *registry.RepositoryInfo, img *image.Image, tag string, tagList []string, dgst digest.Digest) *imageInspect {
-	var repoDigests = make([]string, 0, 1)
-	if err := dgst.Validate(); err == nil {
-		repoDigests = append(repoDigests, dgst.String())
-	}
-
+func makeImageInspect(img *image.Image, index, tag string, tagList []string) *imageInspect {
 	return &imageInspect{
-		V1ID:            img.V1Image.ID,
-		Tag:             tag,
-		RepoTags:        tagList,
-		RepoDigests:     repoDigests,
-		Parent:          img.Parent.String(),
+		Tag:      tag,
+		RepoTags: tagList,
+		//RepoDigests: repoDigests,
 		Comment:         img.Comment,
 		Created:         img.Created.Format(time.RFC3339Nano),
 		Container:       img.Container,
@@ -269,7 +259,7 @@ func makeImageInspect(repoInfo *registry.RepositoryInfo, img *image.Image, tag s
 		Architecture:    img.Architecture,
 		Os:              img.OS,
 		Size:            img.Size,
-		Registry:        repoInfo.Index.Name,
+		Registry:        index,
 	}
 }
 

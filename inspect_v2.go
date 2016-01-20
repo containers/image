@@ -146,7 +146,10 @@ func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref refere
 		return nil, errors.New("unsupported manifest format")
 	}
 
-	return makeImageInspect(mf.repoInfo, image, tag, tagList, manifestDigest), nil
+	// TODO(runcom): why show manifest digest from remote?
+	_ = manifestDigest
+
+	return makeImageInspect(image, mf.repoInfo.Index.Name, tag, tagList), nil
 }
 
 func (mf *v2ManifestFetcher) pullSchema1(ctx context.Context, ref reference.Named, unverifiedManifest *schema1.SignedManifest) (img *image.Image, manifestDigest digest.Digest, err error) {
