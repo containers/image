@@ -125,20 +125,14 @@ func getData(ref reference.Named, authConfig types.AuthConfig) (*imageInspect, e
 	)
 
 	for _, endpoint := range endpoints {
-		// TODO(runcom):
-		//
-		// always try to login first so the registry is pinged and we can return timeout
-		// instead of trying every v version (like push,pull and others do in docker)
-		//
-		//./skopeo --debug --username runcom --password 20121990cia0@! myreg.com:4000/rhel7
-		//DEBU[0000] hostDir: /etc/docker/certs.d/https:/index.docker.io/v1
-		//FATA[0000] open /etc/docker/certs.d/https:/index.docker.io/v1: permission denied
-		//
-		//status, err := registryService.Auth(&authConfig)
-		//if err != nil {
-		//return nil, err
-		//}
-		//logrus.Debug(status)
+		// make sure I can reach the registry, same as docker pull does
+		v1endpoint, err := endpoint.ToV1Endpoint(nil)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := v1endpoint.Ping(); err != nil {
+			return nil, err
+		}
 
 		if confirmedV2 && endpoint.Version == registry.APIVersion1 {
 			logrus.Debugf("Skipping v1 endpoint %s because v2 registry was detected", endpoint.URL)
