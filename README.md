@@ -52,3 +52,5 @@ MIT
 TODO
 -
 - get rid of Docker (meaning make this work w/o needing Docker installed)
+- require image argument to be fully qualified (not the Docker way)
+- drop the `Registry` field in the response because of the point above :)
