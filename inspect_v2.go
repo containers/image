@@ -9,6 +9,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/digest"
+	"github.com/docker/distribution/manifest/manifestlist"
 	"github.com/docker/distribution/manifest/schema1"
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/docker/distribution/registry/api/errcode"
@@ -136,11 +137,11 @@ func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref refere
 		if err != nil {
 			return nil, err
 		}
-	//case *manifestlist.DeserializedManifestList:
-	//image, manifestDigest, err = mf.pullManifestList(ctx, ref, v)
-	//if err != nil {
-	//return nil, err
-	//}
+	case *manifestlist.DeserializedManifestList:
+		image, manifestDigest, err = mf.pullManifestList(ctx, ref, v)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, errors.New("unsupported manifest format")
 	}
@@ -415,4 +416,60 @@ func schema2ManifestDigest(ref reference.Named, mfst distribution.Manifest) (dig
 	}
 
 	return digest.FromBytes(canonical), nil
+}
+
+// pullManifestList handles "manifest lists" which point to various
+// platform-specifc manifests.
+func (mf *v2ManifestFetcher) pullManifestList(ctx context.Context, ref reference.Named, mfstList *manifestlist.DeserializedManifestList) (img *image.Image, manifestListDigest digest.Digest, err error) {
+	manifestListDigest, err = schema2ManifestDigest(ref, mfstList)
+	if err != nil {
+		return nil, "", err
+	}
+
+	var manifestDigest digest.Digest
+	for _, manifestDescriptor := range mfstList.Manifests {
+		// TODO(aaronl): The manifest list spec supports optional
+		// "features" and "variant" fields. These are not yet used.
+		// Once they are, their values should be interpreted here.
+		if manifestDescriptor.Platform.Architecture == runtime.GOARCH && manifestDescriptor.Platform.OS == runtime.GOOS {
+			manifestDigest = manifestDescriptor.Digest
+			break
+		}
+	}
+
+	if manifestDigest == "" {
+		return nil, "", errors.New("no supported platform found in manifest list")
+	}
+
+	manSvc, err := mf.repo.Manifests(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+
+	manifest, err := manSvc.Get(ctx, manifestDigest)
+	if err != nil {
+		return nil, "", err
+	}
+
+	manifestRef, err := reference.WithDigest(ref, manifestDigest)
+	if err != nil {
+		return nil, "", err
+	}
+
+	switch v := manifest.(type) {
+	case *schema1.SignedManifest:
+		img, _, err = mf.pullSchema1(ctx, manifestRef, v)
+		if err != nil {
+			return nil, "", err
+		}
+	case *schema2.DeserializedManifest:
+		img, _, err = mf.pullSchema2(ctx, manifestRef, v)
+		if err != nil {
+			return nil, "", err
+		}
+	default:
+		return nil, "", errors.New("unsupported manifest format")
+	}
+
+	return img, manifestListDigest, err
 }
