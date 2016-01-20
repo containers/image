@@ -15,25 +15,13 @@ const (
 )
 
 var inspectCmd = func(c *cli.Context) {
-	var out []byte
-	if c.GlobalBool("tags") {
-		tags, err := tags(c)
-		if err != nil {
-			logrus.Fatal(err)
-		}
-		out, err = json.Marshal(tags)
-		if err != nil {
-			logrus.Fatal(err)
-		}
-	} else {
-		imgInspect, err := inspect(c)
-		if err != nil {
-			logrus.Fatal(err)
-		}
-		out, err = json.Marshal(imgInspect)
-		if err != nil {
-			logrus.Fatal(err)
-		}
+	imgInspect, err := inspect(c)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	out, err := json.Marshal(imgInspect)
+	if err != nil {
+		logrus.Fatal(err)
 	}
 	fmt.Println(string(out))
 }
@@ -47,10 +35,6 @@ func main() {
 		cli.BoolFlag{
 			Name:  "debug",
 			Usage: "enable debug output for logging",
-		},
-		cli.BoolFlag{
-			Name:  "tags",
-			Usage: "show tags",
 		},
 		cli.StringFlag{
 			Name:  "username",
