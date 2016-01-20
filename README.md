@@ -6,7 +6,7 @@ _Please be aware `skopeo` is still work in progress_
 `skopeo` is a command line utility which is able to _inspect_ an image from a remote Docker registry.
 By _inspect_ I mean it just fetches the image's manifest and it is able to show you a `docker inspect`-like
 json output. This tool, in constrast to `docker inspect`, helps you gather useful information about
-an image before pulling it (and use disk space).
+an image before pulling it (and use disk space) - e.g. - which tags are available for the given image? which labels the image has?
 
 Example:
 ```sh
