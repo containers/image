@@ -62,6 +62,7 @@ func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref refere
 	var (
 		manifest    distribution.Manifest
 		tagOrDigest string // Used for logging/progress only
+		tagList     = []string{}
 
 		tag string
 	)
@@ -70,6 +71,15 @@ func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref refere
 	if err != nil {
 		return nil, err
 	}
+
+	tagList, err = mf.repo.Tags(ctx).All(ctx)
+	if err != nil {
+		return nil, allowV1Fallback(err)
+	}
+	// The v2 registry knows about this repository, so we will not
+	// allow fallback to the v1 protocol even if we encounter an
+	// error later on.
+	mf.confirmedV2 = true
 
 	if digested, isDigested := ref.(reference.Canonical); isDigested {
 		manifest, err = manSvc.Get(ctx, digested.Digest())
@@ -82,16 +92,6 @@ func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref refere
 			tagOrDigest = tagged.Tag()
 			tag = tagOrDigest
 		} else {
-			tagList, err := mf.repo.Tags(ctx).All(ctx)
-			if err != nil {
-				return nil, allowV1Fallback(err)
-			}
-
-			// The v2 registry knows about this repository, so we will not
-			// allow fallback to the v1 protocol even if we encounter an
-			// error later on.
-			mf.confirmedV2 = true
-
 			for _, t := range tagList {
 				if t == reference.DefaultTag {
 					tag = t
@@ -146,7 +146,7 @@ func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref refere
 		return nil, errors.New("unsupported manifest format")
 	}
 
-	return makeImageInspect(mf.repoInfo, image, tag, manifestDigest), nil
+	return makeImageInspect(mf.repoInfo, image, tag, tagList, manifestDigest), nil
 }
 
 func (mf *v2ManifestFetcher) pullSchema1(ctx context.Context, ref reference.Named, unverifiedManifest *schema1.SignedManifest) (img *image.Image, manifestDigest digest.Digest, err error) {

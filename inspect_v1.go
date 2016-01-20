@@ -89,7 +89,9 @@ func (mf *v1ManifestFetcher) fetchWithSession(ctx context.Context, askedTag stri
 		return nil, fmt.Errorf("No tags available for remote repository %s", mf.repoInfo.FullName())
 	}
 
+	tagList := []string{}
 	for tag, id := range tagsList {
+		tagList = append(tagList, tag)
 		repoData.ImgList[id] = &registry.ImgData{
 			ID:       id,
 			Tag:      tag,
@@ -143,7 +145,7 @@ func (mf *v1ManifestFetcher) fetchWithSession(ctx context.Context, askedTag stri
 		return nil, fmt.Errorf("No such image %s:%s", mf.repoInfo.FullName(), askedTag)
 	}
 
-	return makeImageInspect(mf.repoInfo, pulledImg, askedTag, ""), nil
+	return makeImageInspect(mf.repoInfo, pulledImg, askedTag, tagList, ""), nil
 }
 
 func (mf *v1ManifestFetcher) pullImageJSON(imgID, endpoint string, token []string) (*image.Image, error) {

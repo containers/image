@@ -41,6 +41,7 @@ type manifestFetcher interface {
 
 type imageInspect struct {
 	V1ID            string `json:"V1Id"`
+	Tag             string
 	RepoTags        []string
 	RepoDigests     []string
 	Parent          string
@@ -246,20 +247,7 @@ func validateRepoName(name string) error {
 	return nil
 }
 
-func makeImageInspect(repoInfo *registry.RepositoryInfo, img *image.Image, tag string, dgst digest.Digest) *imageInspect {
-	var repoTags = make([]string, 0, 1)
-	if tagged, isTagged := repoInfo.Named.(reference.NamedTagged); isTagged || tag != "" {
-		if !isTagged {
-			newTagged, err := reference.WithTag(repoInfo, tag)
-			if err == nil {
-				tagged = newTagged
-			}
-		}
-		if tagged != nil {
-			repoTags = append(repoTags, tagged.String())
-		}
-	}
-
+func makeImageInspect(repoInfo *registry.RepositoryInfo, img *image.Image, tag string, tagList []string, dgst digest.Digest) *imageInspect {
 	var repoDigests = make([]string, 0, 1)
 	if err := dgst.Validate(); err == nil {
 		repoDigests = append(repoDigests, dgst.String())
@@ -267,7 +255,8 @@ func makeImageInspect(repoInfo *registry.RepositoryInfo, img *image.Image, tag s
 
 	return &imageInspect{
 		V1ID:            img.V1Image.ID,
-		RepoTags:        repoTags,
+		Tag:             tag,
+		RepoTags:        tagList,
 		RepoDigests:     repoDigests,
 		Parent:          img.Parent.String(),
 		Comment:         img.Comment,
