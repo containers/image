@@ -16,7 +16,6 @@ import (
 	dockerdistribution "github.com/docker/docker/distribution"
 	"github.com/docker/docker/image"
 	"github.com/docker/docker/image/v1"
-	versionPkg "github.com/docker/docker/pkg/version"
 	"github.com/docker/docker/reference"
 	"github.com/docker/docker/registry"
 	"github.com/docker/engine-api/types"
@@ -28,8 +27,9 @@ type v2ManifestFetcher struct {
 	repoInfo    *registry.RepositoryInfo
 	repo        distribution.Repository
 	confirmedV2 bool
-	authConfig  types.AuthConfig
-	service     *registry.Service
+	// wrap in a config?
+	authConfig types.AuthConfig
+	service    *registry.Service
 }
 
 func (mf *v2ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*imageInspect, error) {
@@ -45,21 +45,12 @@ func (mf *v2ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*i
 		return nil, fallbackError{err: err, confirmedV2: mf.confirmedV2}
 	}
 
-	_, err = mf.service.Auth(&mf.authConfig)
-	if err != nil {
-		return nil, err
-	}
-
 	imgInspect, err = mf.fetchWithRepository(ctx, ref)
 	if err != nil {
-		switch t := err.(type) {
-		case errcode.Errors:
-			if len(t) == 1 {
-				err = t[0]
-			}
+		if _, ok := err.(fallbackError); ok {
+			return nil, err
 		}
 		if registry.ContinueOnError(err) {
-			logrus.Debugf("Error trying v2 registry: %v", err)
 			err = fallbackError{err: err, confirmedV2: mf.confirmedV2}
 		}
 	}
@@ -92,8 +83,14 @@ func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref refere
 		} else {
 			tagList, err := mf.repo.Tags(ctx).All(ctx)
 			if err != nil {
-				return nil, err
+				return nil, allowV1Fallback(err)
 			}
+
+			// The v2 registry knows about this repository, so we will not
+			// allow fallback to the v1 protocol even if we encounter an
+			// error later on.
+			mf.confirmedV2 = true
+
 			for _, t := range tagList {
 				if t == reference.DefaultTag {
 					tag = t
@@ -113,15 +110,15 @@ func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref refere
 		if err != nil {
 			return nil, allowV1Fallback(err)
 		}
+
+		// If manSvc.Get succeeded, we can be confident that the registry on
+		// the other side speaks the v2 protocol.
+		mf.confirmedV2 = true
 	}
 
 	if manifest == nil {
 		return nil, fmt.Errorf("image manifest does not exist for tag or digest %q", tagOrDigest)
 	}
-
-	// If manSvc.Get succeeded, we can be confident that the registry on
-	// the other side speaks the v2 protocol.
-	mf.confirmedV2 = true
 
 	var (
 		image          *image.Image
@@ -200,48 +197,6 @@ func (mf *v2ManifestFetcher) pullSchema1(ctx context.Context, ref reference.Name
 	manifestDigest = digest.FromBytes(unverifiedManifest.Canonical)
 
 	return img, manifestDigest, nil
-}
-
-func makeRawConfigFromV1Config(imageJSON []byte, rootfs *image.RootFS, history []image.History) (map[string]*json.RawMessage, error) {
-	var dver struct {
-		DockerVersion string `json:"docker_version"`
-	}
-
-	if err := json.Unmarshal(imageJSON, &dver); err != nil {
-		return nil, err
-	}
-
-	useFallback := versionPkg.Version(dver.DockerVersion).LessThan("1.8.3")
-
-	if useFallback {
-		var v1Image image.V1Image
-		err := json.Unmarshal(imageJSON, &v1Image)
-		if err != nil {
-			return nil, err
-		}
-		imageJSON, err = json.Marshal(v1Image)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	var c map[string]*json.RawMessage
-	if err := json.Unmarshal(imageJSON, &c); err != nil {
-		return nil, err
-	}
-
-	c["rootfs"] = rawJSON(rootfs)
-	c["history"] = rawJSON(history)
-
-	return c, nil
-}
-
-func rawJSON(value interface{}) *json.RawMessage {
-	jsonval, err := json.Marshal(value)
-	if err != nil {
-		return nil
-	}
-	return (*json.RawMessage)(&jsonval)
 }
 
 func verifySchema1Manifest(signedManifest *schema1.SignedManifest, ref reference.Named) (m *schema1.Manifest, err error) {
@@ -431,7 +386,6 @@ func allowV1Fallback(err error) error {
 			return fallbackError{err: err, confirmedV2: false}
 		}
 	}
-
 	return err
 }
 
