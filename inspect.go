@@ -97,20 +97,12 @@ func getData(c *cli.Context, ref reference.Named) (*imageInspect, error) {
 	if err := validateRepoName(repoInfo.Name()); err != nil {
 		return nil, err
 	}
-	// FATA[0000] open /etc/docker/certs.d/myreg.com:4000: permission denied
-	// need to be run as root, really? :(
-	// just pass tlsconfig via cli?!?!?!
-	//
-	// this happens only with private registry, docker.io works out of the box
-	// EDIT: this happens with v1 registries?! no
-	//
-	// TODO(runcom): do not assume docker is installed on the system!
-	// just fallback as for getAuthConfig
 	options := &registry.Options{}
 	options.InsecureRegistries = opts.NewListOpts(nil)
 	options.Mirrors = opts.NewListOpts(nil)
 	options.InsecureRegistries.Set("0.0.0.0/0")
 	registryService := registry.NewService(options)
+	// TODO(runcom): hacky, provide a way of passing tls cert (flag?) to be used to lookup
 	for _, ic := range registryService.Config.IndexConfigs {
 		ic.Secure = false
 	}
