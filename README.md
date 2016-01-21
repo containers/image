@@ -100,6 +100,7 @@ You can also grab a binary, built for _linux x86_64_, from the releases page, or
 ```sh
 $ export RELEASE=0.0.1
 $ wget https://github.com/runcom/skopeo/releases/download/v$RELEASE/skopeo
+$ chmod +x skopeo
 $ sudo mv skopeo /usr/local/bin/skopeo
 ```
 TODO
