@@ -83,7 +83,7 @@ INFO[0000] Docker cli config file not found: stat : no such file or directory, f
 ```
 If your cli config is found but it doesn't contain the necessary credentials for the queried registry
 you'll get an error. You can fix this by either logging in (via `docker login`) or providing `--username`
-and `--password`
+and `--password`.
 Building
 -
 ```sh
