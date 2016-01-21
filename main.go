@@ -7,6 +7,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/docker/docker/cliconfig"
 )
 
 const (
@@ -34,7 +35,7 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "debug",
-			Usage: "enable debug output for logging",
+			Usage: "enable debug output",
 		},
 		cli.StringFlag{
 			Name:  "username",
@@ -45,6 +46,11 @@ func main() {
 			Name:  "password",
 			Value: "",
 			Usage: "registry password",
+		},
+		cli.StringFlag{
+			Name:  "docker-cfg",
+			Value: cliconfig.ConfigDir(),
+			Usage: "Docker's cli config for auth",
 		},
 	}
 	app.Before = func(c *cli.Context) error {

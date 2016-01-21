@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -10,6 +12,7 @@ import (
 	"github.com/docker/distribution/digest"
 	distreference "github.com/docker/distribution/reference"
 	"github.com/docker/docker/api"
+	"github.com/docker/docker/cliconfig"
 	"github.com/docker/docker/image"
 	"github.com/docker/docker/opts"
 	versionPkg "github.com/docker/docker/pkg/version"
@@ -17,6 +20,7 @@ import (
 	"github.com/docker/docker/registry"
 	types "github.com/docker/engine-api/types"
 	containerTypes "github.com/docker/engine-api/types/container"
+	registryTypes "github.com/docker/engine-api/types/registry"
 	"golang.org/x/net/context"
 )
 
@@ -75,19 +79,19 @@ func inspect(c *cli.Context) (*imageInspect, error) {
 	if err != nil {
 		return nil, err
 	}
-	authConfig, err := getAuthConfig(c, ref)
-	if err != nil {
-		return nil, err
-	}
-	imgInspect, err := getData(ref, authConfig)
+	imgInspect, err := getData(c, ref)
 	if err != nil {
 		return nil, err
 	}
 	return imgInspect, nil
 }
 
-func getData(ref reference.Named, authConfig types.AuthConfig) (*imageInspect, error) {
+func getData(c *cli.Context, ref reference.Named) (*imageInspect, error) {
 	repoInfo, err := registry.ParseRepositoryInfo(ref)
+	if err != nil {
+		return nil, err
+	}
+	authConfig, err := getAuthConfig(c, repoInfo.Index)
 	if err != nil {
 		return nil, err
 	}
@@ -207,25 +211,31 @@ func newManifestFetcher(endpoint registry.APIEndpoint, repoInfo *registry.Reposi
 	return nil, fmt.Errorf("unknown version %d for registry %s", endpoint.Version, endpoint.URL)
 }
 
-func getAuthConfig(c *cli.Context, ref reference.Named) (types.AuthConfig, error) {
+func isDockerAvailable() bool {
+	_, err := exec.LookPath("docker")
+	return err == nil
+}
 
-	// TODO(runcom):
-	// use docker/cliconfig
-	// if no /.docker -> docker not installed fallback to require username|password
-	// maybe prompt user:passwd?
-
+func getAuthConfig(c *cli.Context, index *registryTypes.IndexInfo) (types.AuthConfig, error) {
 	var (
-		authConfig types.AuthConfig
-		username   = c.GlobalString("username")
-		password   = c.GlobalString("password")
+		username = c.GlobalString("username")
+		password = c.GlobalString("password")
+		cfg      = c.GlobalString("docker-cfg")
 	)
-	if username != "" && password != "" {
-		authConfig = types.AuthConfig{
+	if _, err := os.Stat(cfg); err != nil {
+		logrus.Infof("Docker cli config file not found: %v, falling back to --username and --password", err)
+		return types.AuthConfig{
 			Username: username,
 			Password: password,
 			Email:    "stub@example.com",
-		}
+		}, nil
 	}
+	confFile, err := cliconfig.Load(cfg)
+	if err != nil {
+		return types.AuthConfig{}, err
+	}
+	authConfig := registry.ResolveAuthConfig(confFile.AuthConfigs, index)
+	logrus.Debugf("authConfig for %s: %v", index.Name, authConfig)
 
 	return authConfig, nil
 }
