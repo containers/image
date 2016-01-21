@@ -1,6 +1,9 @@
 {
 	"ImportPath": "github.com/runcom/skopeo",
 	"GoVersion": "go1.5.3",
+	"Packages": [
+		"."
+	],
 	"Deps": [
 		{
 			"ImportPath": "github.com/Sirupsen/logrus",
@@ -19,6 +22,11 @@
 		},
 		{
 			"ImportPath": "github.com/docker/docker/api",
+			"Comment": "v1.4.1-9391-g5537a92",
+			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/cliconfig",
 			"Comment": "v1.4.1-9391-g5537a92",
 			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
 		},
