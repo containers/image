@@ -146,6 +146,14 @@ func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref refere
 		return nil, errors.New("unsupported manifest format")
 	}
 
+	// TODO(runcom)
+	//var showTags bool
+	//if reference.IsNameOnly(ref) {
+	//showTags = true
+	//logrus.Debug("Using default tag: latest")
+	//ref = reference.WithDefaultTag(ref)
+	//}
+	//_ = showTags
 	return makeImageInspect(image, mf.repoInfo.Index.Name, tag, manifestDigest, tagList), nil
 }
 

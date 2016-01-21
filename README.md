@@ -54,7 +54,6 @@ TODO
 - show repo tags via flag or when reference isn't tagged or digested
 - add tests (integration with deployed registries in container - Docker-like)
 - get rid of Docker (meaning make this work w/o needing Docker installed)
-- require image argument to be fully qualified (not the Docker way)
 - drop the `Registry` field in the response because of the point above :)
 
 NOT TODO

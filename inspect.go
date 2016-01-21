@@ -76,26 +76,10 @@ func inspect(c *cli.Context) (*imageInspect, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO(runcom)
-	//var showTags bool
-	//if reference.IsNameOnly(ref) {
-	//showTags = true
-	//logrus.Debug("Using default tag: latest")
-	//ref = reference.WithDefaultTag(ref)
-	//}
-	//_ = showTags
-
 	authConfig, err := getAuthConfig(c, ref)
 	if err != nil {
 		return nil, err
 	}
-	// TODO(runcom): remove docker.io case cause unqualified images
-	// can be from additional registry below
-	// tweak the ParseNamed above so I can know if its unqualified
-	// EDIT(runcom): it's probably better to expose an additional registries REST
-	// route in projectatomic fork of docker and let the magic happen in projectatomic/docker
-	//if ref.Hostname() != "" {
-	//}
 	imgInspect, err := getData(ref, authConfig)
 	if err != nil {
 		return nil, err
@@ -111,7 +95,6 @@ func getData(ref reference.Named, authConfig types.AuthConfig) (*imageInspect, e
 	if err := validateRepoName(repoInfo.Name()); err != nil {
 		return nil, err
 	}
-
 	// FATA[0000] open /etc/docker/certs.d/myreg.com:4000: permission denied
 	// need to be run as root, really? :(
 	// just pass tlsconfig via cli?!?!?!
