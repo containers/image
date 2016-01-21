@@ -10,7 +10,7 @@ a repository or a tag before pulling it (using disk space) - e.g. - which tags a
 
 Example:
 ```sh
-# show image's labels
+# show repository's labels of rhel7:latest
 $ skopeo registry.access.redhat.com/rhel7 | jq '.Config.Labels'
 {
   "Architecture": "x86_64",
@@ -23,7 +23,7 @@ $ skopeo registry.access.redhat.com/rhel7 | jq '.Config.Labels'
   "Version": "7.2"
 }
 
-# show image's tags
+# show repository's tags
 $ skopeo docker.io/fedora | jq '.RepoTags'
 [
   "20",
@@ -34,6 +34,10 @@ $ skopeo docker.io/fedora | jq '.RepoTags'
   "latest",
   "rawhide"
 ]
+
+# show image's digest
+$ skopeo docker.io/fedora:rawhide | jq '.Digest'
+"sha256:905b4846938c8aef94f52f3e41a11398ae5b40f5855fb0e40ed9c157e721d7f8"
 ```
 Building
 -
