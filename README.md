@@ -111,6 +111,7 @@ TODO
 NOT TODO
 -
 - provide a _format_ flag - just use the awesome [jq](https://stedolan.github.io/jq/)
+
 License
 -
 MIT
