@@ -102,9 +102,6 @@ $ export RELEASE=0.0.1
 $ wget https://github.com/runcom/skopeo/releases/download/v$RELEASE/skopeo
 $ sudo mv skopeo /usr/local/bin/skopeo
 ```
-License
--
-MIT
 TODO
 -
 - show repo tags via flag or when reference isn't tagged or digested
@@ -114,3 +111,6 @@ TODO
 NOT TODO
 -
 - provide a _format_ flag - just use the awesome [jq](https://stedolan.github.io/jq/)
+License
+-
+MIT
