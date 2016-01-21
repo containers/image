@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -209,11 +208,6 @@ func newManifestFetcher(endpoint registry.APIEndpoint, repoInfo *registry.Reposi
 		}, nil
 	}
 	return nil, fmt.Errorf("unknown version %d for registry %s", endpoint.Version, endpoint.URL)
-}
-
-func isDockerAvailable() bool {
-	_, err := exec.LookPath("docker")
-	return err == nil
 }
 
 func getAuthConfig(c *cli.Context, index *registryTypes.IndexInfo) (types.AuthConfig, error) {
