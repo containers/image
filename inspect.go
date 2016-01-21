@@ -8,6 +8,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/docker/distribution/digest"
+	distreference "github.com/docker/distribution/reference"
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/image"
 	"github.com/docker/docker/opts"
@@ -54,11 +55,36 @@ type imageInspect struct {
 	Registry        string
 }
 
+func validateName(name string) error {
+	distref, err := distreference.ParseNamed(name)
+	if err != nil {
+		return err
+	}
+	hostname, _ := distreference.SplitHostname(distref)
+	if hostname == "" {
+		return fmt.Errorf("Please use a fully qualified repository name")
+	}
+	return nil
+}
+
 func inspect(c *cli.Context) (*imageInspect, error) {
-	ref, err := reference.ParseNamed(c.Args().First())
+	name := c.Args().First()
+	if err := validateName(name); err != nil {
+		return nil, err
+	}
+	ref, err := reference.ParseNamed(name)
 	if err != nil {
 		return nil, err
 	}
+	// TODO(runcom)
+	//var showTags bool
+	//if reference.IsNameOnly(ref) {
+	//showTags = true
+	//logrus.Debug("Using default tag: latest")
+	//ref = reference.WithDefaultTag(ref)
+	//}
+	//_ = showTags
+
 	authConfig, err := getAuthConfig(c, ref)
 	if err != nil {
 		return nil, err
