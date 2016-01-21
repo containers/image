@@ -52,7 +52,6 @@ type imageInspect struct {
 	Config          *containerTypes.Config
 	Architecture    string
 	Os              string
-	Registry        string
 }
 
 func validateName(name string) error {
@@ -241,7 +240,7 @@ func validateRepoName(name string) error {
 	return nil
 }
 
-func makeImageInspect(img *image.Image, index, tag string, dgst digest.Digest, tagList []string) *imageInspect {
+func makeImageInspect(img *image.Image, tag string, dgst digest.Digest, tagList []string) *imageInspect {
 	var digest string
 	if err := dgst.Validate(); err == nil {
 		digest = dgst.String()
@@ -258,7 +257,6 @@ func makeImageInspect(img *image.Image, index, tag string, dgst digest.Digest, t
 		Config:          img.Config,
 		Architecture:    img.Architecture,
 		Os:              img.OS,
-		Registry:        index,
 	}
 }
 

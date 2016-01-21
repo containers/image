@@ -154,7 +154,7 @@ func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref refere
 	//ref = reference.WithDefaultTag(ref)
 	//}
 	//_ = showTags
-	return makeImageInspect(image, mf.repoInfo.Index.Name, tag, manifestDigest, tagList), nil
+	return makeImageInspect(image, tag, manifestDigest, tagList), nil
 }
 
 func (mf *v2ManifestFetcher) pullSchema1(ctx context.Context, ref reference.Named, unverifiedManifest *schema1.SignedManifest) (img *image.Image, manifestDigest digest.Digest, err error) {
