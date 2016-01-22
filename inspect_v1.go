@@ -107,7 +107,7 @@ func (mf *v1ManifestFetcher) fetchWithSession(ctx context.Context, ref reference
 	}
 
 	tagList := []string{}
-	for tag, _ := range tagsList {
+	for tag := range tagsList {
 		tagList = append(tagList, tag)
 	}
 
