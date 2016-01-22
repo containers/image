@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -13,7 +14,6 @@ import (
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/cliconfig"
 	"github.com/docker/docker/image"
-	"github.com/docker/docker/opts"
 	versionPkg "github.com/docker/docker/pkg/version"
 	"github.com/docker/docker/reference"
 	"github.com/docker/docker/registry"
@@ -97,15 +97,16 @@ func getData(c *cli.Context, ref reference.Named) (*imageInspect, error) {
 	if err := validateRepoName(repoInfo.Name()); err != nil {
 		return nil, err
 	}
-	options := &registry.Options{}
-	options.InsecureRegistries = opts.NewListOpts(nil)
-	options.Mirrors = opts.NewListOpts(nil)
-	options.InsecureRegistries.Set("0.0.0.0/0")
-	registryService := registry.NewService(options)
-	// TODO(runcom): hacky, provide a way of passing tls cert (flag?) to be used to lookup
-	for _, ic := range registryService.Config.IndexConfigs {
-		ic.Secure = false
-	}
+	//options := &registry.Options{}
+	//options.Mirrors = opts.NewListOpts(nil)
+	//options.InsecureRegistries = opts.NewListOpts(nil)
+	//options.InsecureRegistries.Set("0.0.0.0/0")
+	//registryService := registry.NewService(options)
+	registryService := registry.NewService(nil)
+	//// TODO(runcom): hacky, provide a way of passing tls cert (flag?) to be used to lookup
+	//for _, ic := range registryService.Config.IndexConfigs {
+	//ic.Secure = false
+	//}
 
 	endpoints, err := registryService.LookupPullEndpoints(repoInfo)
 	if err != nil {
@@ -127,7 +128,10 @@ func getData(c *cli.Context, ref reference.Named) (*imageInspect, error) {
 			return nil, err
 		}
 		if _, err := v1endpoint.Ping(); err != nil {
-			return nil, err
+			if strings.Contains(err.Error(), "timeout") {
+				return nil, err
+			}
+			continue
 		}
 
 		if confirmedV2 && endpoint.Version == registry.APIVersion1 {

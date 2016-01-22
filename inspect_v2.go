@@ -63,8 +63,6 @@ func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref refere
 		manifest    distribution.Manifest
 		tagOrDigest string // Used for logging/progress only
 		tagList     = []string{}
-
-		tag string
 	)
 
 	manSvc, err := mf.repo.Manifests(ctx)
@@ -72,53 +70,45 @@ func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref refere
 		return nil, err
 	}
 
-	tagList, err = mf.repo.Tags(ctx).All(ctx)
-	if err != nil {
-		return nil, allowV1Fallback(err)
+	if _, isTagged := ref.(reference.NamedTagged); !isTagged {
+		ref, err = reference.WithTag(ref, reference.DefaultTag)
+		if err != nil {
+			return nil, err
+		}
 	}
-	// The v2 registry knows about this repository, so we will not
-	// allow fallback to the v1 protocol even if we encounter an
-	// error later on.
-	mf.confirmedV2 = true
 
-	if digested, isDigested := ref.(reference.Canonical); isDigested {
+	if tagged, isTagged := ref.(reference.NamedTagged); isTagged {
+		// NOTE: not using TagService.Get, since it uses HEAD requests
+		// against the manifests endpoint, which are not supported by
+		// all registry versions.
+		manifest, err = manSvc.Get(ctx, "", client.WithTag(tagged.Tag()))
+		if err != nil {
+			return nil, allowV1Fallback(err)
+		}
+		tagOrDigest = tagged.Tag()
+	} else if digested, isDigested := ref.(reference.Canonical); isDigested {
 		manifest, err = manSvc.Get(ctx, digested.Digest())
 		if err != nil {
 			return nil, err
 		}
 		tagOrDigest = digested.Digest().String()
 	} else {
-		if tagged, isTagged := ref.(reference.NamedTagged); isTagged {
-			tagOrDigest = tagged.Tag()
-			tag = tagOrDigest
-		} else {
-			for _, t := range tagList {
-				if t == reference.DefaultTag {
-					tag = t
-				}
-			}
-			if tag == "" && len(tagList) > 0 {
-				tag = tagList[0]
-			}
-			if tag == "" {
-				return nil, fmt.Errorf("No tags available for remote repository %s", mf.repoInfo.FullName())
-			}
-		}
-		// NOTE: not using TagService.Get, since it uses HEAD requests
-		// against the manifests endpoint, which are not supported by
-		// all registry versions.
-		manifest, err = manSvc.Get(ctx, "", client.WithTag(tag))
-		if err != nil {
-			return nil, allowV1Fallback(err)
-		}
-
-		// If manSvc.Get succeeded, we can be confident that the registry on
-		// the other side speaks the v2 protocol.
-		mf.confirmedV2 = true
+		return nil, fmt.Errorf("internal error: reference has neither a tag nor a digest: %s", ref.String())
 	}
 
 	if manifest == nil {
 		return nil, fmt.Errorf("image manifest does not exist for tag or digest %q", tagOrDigest)
+	}
+
+	// If manSvc.Get succeeded, we can be confident that the registry on
+	// the other side speaks the v2 protocol.
+	mf.confirmedV2 = true
+
+	tagList, err = mf.repo.Tags(ctx).All(ctx)
+	if err != nil {
+		// If this repository doesn't exist on V2, we should
+		// permit a fallback to V1.
+		return nil, allowV1Fallback(err)
 	}
 
 	var (
@@ -154,7 +144,7 @@ func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref refere
 	//ref = reference.WithDefaultTag(ref)
 	//}
 	//_ = showTags
-	return makeImageInspect(image, tag, manifestDigest, tagList), nil
+	return makeImageInspect(image, tagOrDigest, manifestDigest, tagList), nil
 }
 
 func (mf *v2ManifestFetcher) pullSchema1(ctx context.Context, ref reference.Named, unverifiedManifest *schema1.SignedManifest) (img *image.Image, manifestDigest digest.Digest, err error) {

@@ -17,168 +17,168 @@
 		},
 		{
 			"ImportPath": "github.com/docker/distribution",
-			"Comment": "v2.2.0-199-g0865082",
-			"Rev": "08650825fef9f21ea819972fb2ed875c0832a255"
+			"Comment": "v2.2.0-207-gcaa2001",
+			"Rev": "caa2001e1fa738e14be6ba5f89cd9d41aebcd204"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/api",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/cliconfig",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/daemon/graphdriver",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/distribution",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/dockerversion",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/image",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/layer",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/opts",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/archive",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/chrootarchive",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/fileutils",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/homedir",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/httputils",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/idtools",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/ioutils",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/jsonlog",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/jsonmessage",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/mflag",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/parsers/kernel",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/pools",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/progress",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/promise",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/random",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/reexec",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/stringid",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/system",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/tarsum",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/term",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/useragent",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/version",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/reference",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/registry",
-			"Comment": "v1.4.1-9391-g5537a92",
-			"Rev": "5537a92e450ea56e2002f83ff50bb70fdb2cc25e"
+			"Comment": "v1.4.1-9441-gc3a9ece",
+			"Rev": "c3a9ecedba41eef71e42bed33fc2b462b9ee1c6a"
 		},
 		{
 			"ImportPath": "github.com/docker/engine-api/types",

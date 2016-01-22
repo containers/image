@@ -36,10 +36,6 @@ func (mf *v1ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*i
 		// Allowing fallback, because HTTPS v1 is before HTTP v2
 		return nil, fallbackError{err: registry.ErrNoSupport{errors.New("Cannot pull by digest with v1 registry")}}
 	}
-	tag := ""
-	if tagged, isTagged := ref.(reference.NamedTagged); isTagged {
-		tag = tagged.Tag()
-	}
 	tlsConfig, err := mf.service.TLSConfig(mf.repoInfo.Index.Name)
 	if err != nil {
 		return nil, err
@@ -62,62 +58,60 @@ func (mf *v1ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*i
 		logrus.Debugf("Fallback from error: %s", err)
 		return nil, fallbackError{err: err}
 	}
-	imgInspect, err = mf.fetchWithSession(ctx, tag)
+	imgInspect, err = mf.fetchWithSession(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
 	return imgInspect, nil
 }
 
-func (mf *v1ManifestFetcher) fetchWithSession(ctx context.Context, askedTag string) (*imageInspect, error) {
+func (mf *v1ManifestFetcher) fetchWithSession(ctx context.Context, ref reference.Named) (*imageInspect, error) {
 	repoData, err := mf.session.GetRepositoryData(mf.repoInfo)
 	if err != nil {
 		if strings.Contains(err.Error(), "HTTP code: 404") {
-			return nil, fmt.Errorf("Error: image %s not found", mf.repoInfo.RemoteName)
+			return nil, fmt.Errorf("Error: image %s not found", mf.repoInfo.RemoteName())
 		}
 		// Unexpected HTTP error
 		return nil, err
 	}
 
-	logrus.Debugf("Retrieving the tag list from V1 endpoints")
-	tagsList, err := mf.session.GetRemoteTags(repoData.Endpoints, mf.repoInfo)
+	var tagsList map[string]string
+	tagsList, err = mf.session.GetRemoteTags(repoData.Endpoints, mf.repoInfo)
 	if err != nil {
-		logrus.Errorf("Unable to get remote tags: %s", err)
+		logrus.Errorf("unable to get remote tags: %s", err)
 		return nil, err
 	}
-	if len(tagsList) < 1 {
-		return nil, fmt.Errorf("No tags available for remote repository %s", mf.repoInfo.FullName())
+
+	logrus.Debugf("Retrieving the tag list")
+	tagged, isTagged := ref.(reference.NamedTagged)
+	var tagID, tag string
+	if isTagged {
+		tag = tagged.Tag()
+		tagsList[tagged.Tag()] = tagID
+	} else {
+		ref, err = reference.WithTag(ref, reference.DefaultTag)
+		if err != nil {
+			return nil, err
+		}
+		tagged, _ := ref.(reference.NamedTagged)
+		tag = tagged.Tag()
+		tagsList[tagged.Tag()] = tagID
+	}
+	tagID, err = mf.session.GetRemoteTag(repoData.Endpoints, mf.repoInfo, tag)
+	if err == registry.ErrRepoNotFound {
+		return nil, fmt.Errorf("Tag %s not found in repository %s", tag, mf.repoInfo.FullName())
+	}
+	if err != nil {
+		logrus.Errorf("unable to get remote tags: %s", err)
+		return nil, err
 	}
 
 	tagList := []string{}
-	for tag, id := range tagsList {
+	for tag, _ := range tagsList {
 		tagList = append(tagList, tag)
-		repoData.ImgList[id] = &registry.ImgData{
-			ID:       id,
-			Tag:      tag,
-			Checksum: "",
-		}
 	}
 
-	// If no tag has been specified, choose `latest` if it exists
-	if askedTag == "" {
-		if _, exists := tagsList[reference.DefaultTag]; exists {
-			askedTag = reference.DefaultTag
-		}
-	}
-	if askedTag == "" {
-		// fallback to any tag in the repository
-		for tag := range tagsList {
-			askedTag = tag
-			break
-		}
-	}
-
-	id, exists := tagsList[askedTag]
-	if !exists {
-		return nil, fmt.Errorf("Tag %s not found in repository %s", askedTag, mf.repoInfo.FullName())
-	}
-	img := repoData.ImgList[id]
+	img := repoData.ImgList[tagID]
 
 	var pulledImg *image.Image
 	for _, ep := range mf.repoInfo.Index.Mirrors {
@@ -142,10 +136,10 @@ func (mf *v1ManifestFetcher) fetchWithSession(ctx context.Context, askedTag stri
 		return nil, fmt.Errorf("Error pulling image (%s) from %s, %v", img.Tag, mf.repoInfo.FullName(), err)
 	}
 	if pulledImg == nil {
-		return nil, fmt.Errorf("No such image %s:%s", mf.repoInfo.FullName(), askedTag)
+		return nil, fmt.Errorf("No such image %s:%s", mf.repoInfo.FullName(), tag)
 	}
 
-	return makeImageInspect(pulledImg, askedTag, "", tagList), nil
+	return makeImageInspect(pulledImg, tag, "", tagList), nil
 }
 
 func (mf *v1ManifestFetcher) pullImageJSON(imgID, endpoint string, token []string) (*image.Image, error) {
