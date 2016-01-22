@@ -1,4 +1,4 @@
-export GOPATH:=$(CURDIR)/Godeps/_workspace:$(GOPATH)
+export GO15VENDOREXPERIMENT=1
 
 BINDIR=${DESTDIR}/usr/bin/
 MANDIR=${DESTDIR}/usr/share/man
