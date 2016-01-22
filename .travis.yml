@@ -1,0 +1,19 @@
+---
+  language: go
+  sudo: false
+  notifications:
+    email: false
+  env:
+    global:
+    - GO15VENDOREXPERIMENT=1
+  go:
+    - 1.5
+    - tip
+  install:
+    - go get github.com/golang/lint/golint
+  script:
+    - go vet .
+    - test -z "$(golint . | tee /dev/stderr)"
+    - test -z "$(gofmt -s -l . | tee /dev/stderr)"
+    - go build -o skopeo .
+    - go test -v .
