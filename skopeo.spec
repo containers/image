@@ -13,7 +13,7 @@ BuildRequires: golang >= 1.5
 BuildRequires: golang-github-cpuguy83-go-md2man
 BuildRequires: golang(github.com/Sirupsen/logrus) >= 0.8.4
 BuildRequires: golang(github.com/codegangsta/cli) >= 1.2.0
-BuildRequires: golang-googlecode-net-devel
+BuildRequires: golang(golang.org/x/net/context)
 
 %global debug_package %{nil}
 
@@ -23,13 +23,15 @@ Get information about a Docker image or repository without pulling it
 %prep
 %setup -q -n %{name}-%{version}
 
-find vendor/ -type 'd' | grep -v "github.com/[docker|opencontainers|vbatts|gorilla]"
+rm -rf vendor/github.com/codegangsta
+rm -rf vendor/github.com/Sirupsen
+rm -rf vendor/golang.org
 
 %build
-mkdir -p src/github.com/runcom
-ln -s ../../../ src/github.com/runcom/skopeo
-export GOPATH=$(pwd):%{gopath}
-make %{?_smp_mflags}
+mkdir -p ./_build/src/github.com/runcom
+ln -s $(pwd) ./_build/src/github.com/runcom/skopeo
+export GOPATH=$(pwd)/_build:%{gopath}
+cd $(pwd)/_build/src/github.com/runcom/skopeo && make %{?_smp_mflags}
 
 %install
 mkdir -p $RPM_BUILD_ROOT/%{_mandir}/man1
