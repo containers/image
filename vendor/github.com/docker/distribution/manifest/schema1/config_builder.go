@@ -9,7 +9,6 @@ import (
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/reference"
 	"github.com/docker/libtrust"
 
 	"github.com/docker/distribution/digest"
@@ -40,8 +39,10 @@ type configManifestBuilder struct {
 	// configJSON is configuration supplied when the ManifestBuilder was
 	// created.
 	configJSON []byte
-	// ref contains the name and optional tag provided to NewConfigManifestBuilder.
-	ref reference.Named
+	// name is the name provided to NewConfigManifestBuilder
+	name string
+	// tag is the tag provided to NewConfigManifestBuilder
+	tag string
 	// descriptors is the set of descriptors referencing the layers.
 	descriptors []distribution.Descriptor
 	// emptyTarDigest is set to a valid digest if an empty tar has been
@@ -53,12 +54,13 @@ type configManifestBuilder struct {
 // schema version from an image configuration and a set of descriptors.
 // It takes a BlobService so that it can add an empty tar to the blob store
 // if the resulting manifest needs empty layers.
-func NewConfigManifestBuilder(bs distribution.BlobService, pk libtrust.PrivateKey, ref reference.Named, configJSON []byte) distribution.ManifestBuilder {
+func NewConfigManifestBuilder(bs distribution.BlobService, pk libtrust.PrivateKey, name, tag string, configJSON []byte) distribution.ManifestBuilder {
 	return &configManifestBuilder{
 		bs:         bs,
 		pk:         pk,
 		configJSON: configJSON,
-		ref:        ref,
+		name:       name,
+		tag:        tag,
 	}
 }
 
@@ -188,17 +190,12 @@ func (mb *configManifestBuilder) Build(ctx context.Context) (m distribution.Mani
 
 	history[0].V1Compatibility = string(transformedConfig)
 
-	tag := ""
-	if tagged, isTagged := mb.ref.(reference.Tagged); isTagged {
-		tag = tagged.Tag()
-	}
-
 	mfst := Manifest{
 		Versioned: manifest.Versioned{
 			SchemaVersion: 1,
 		},
-		Name:         mb.ref.Name(),
-		Tag:          tag,
+		Name:         mb.name,
+		Tag:          mb.tag,
 		Architecture: img.Architecture,
 		FSLayers:     fsLayerList,
 		History:      history,

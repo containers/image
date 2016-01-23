@@ -8,7 +8,6 @@ import (
 	"github.com/docker/distribution/context"
 	"github.com/docker/distribution/digest"
 	"github.com/docker/distribution/manifest"
-	"github.com/docker/distribution/reference"
 	"github.com/docker/libtrust"
 )
 
@@ -21,18 +20,13 @@ type referenceManifestBuilder struct {
 
 // NewReferenceManifestBuilder is used to build new manifests for the current
 // schema version using schema1 dependencies.
-func NewReferenceManifestBuilder(pk libtrust.PrivateKey, ref reference.Named, architecture string) distribution.ManifestBuilder {
-	tag := ""
-	if tagged, isTagged := ref.(reference.Tagged); isTagged {
-		tag = tagged.Tag()
-	}
-
+func NewReferenceManifestBuilder(pk libtrust.PrivateKey, name, tag, architecture string) distribution.ManifestBuilder {
 	return &referenceManifestBuilder{
 		Manifest: Manifest{
 			Versioned: manifest.Versioned{
 				SchemaVersion: 1,
 			},
-			Name:         ref.Name(),
+			Name:         name,
 			Tag:          tag,
 			Architecture: architecture,
 		},

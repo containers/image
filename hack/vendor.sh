@@ -10,7 +10,7 @@ clone git github.com/Sirupsen/logrus v0.8.7 # logrus is a common dependency amon
 clone git github.com/docker/docker master
 clone git golang.org/x/net master https://github.com/golang/net.git
 clone git github.com/docker/engine-api master
-clone git github.com/docker/distribution master
+clone git github.com/docker/distribution v2.3.0-rc.1
 clone git github.com/docker/go-connections master
 clone git github.com/docker/go-units master
 clone git github.com/docker/libtrust master
