@@ -1,9 +1,6 @@
-%global commit          7c8a3fdbe04f9d4f60ad951ff2bc0c99000e4110
-%global shortcommit     %(c=%{commit}; echo ${c:0:7})
-
 Name:           skopeo
-Version:        0.1.1
-Release:        1%{?dist}
+Version:        0.1.2
+Release:        0%{?dist}
 Summary:        Inspect Docker images and repositories on registries
 License:        MIT
 URL:            https://github.com/runcom/skopeo
@@ -43,6 +40,8 @@ make DESTDIR=%{buildroot} install
 %doc README.md LICENSE
 
 %changelog
+* Fri Jan 22 2016 Antonio Murdaca <runcom@redhat.com> - 0.1.2
+- v0.1.2
 * Fri Jan 22 2016 Antonio Murdaca <runcom@redhat.com> - 0.1.1
 - v0.1.1
 * Thu Jan 21 2016 Antonio Murdaca <runcom@redhat.com> - 0.1.0
