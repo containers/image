@@ -51,6 +51,8 @@ clean() {
 	)
 	local platforms=( linux/amd64 linux/386 )
 
+	local buildTags=(  )
+
 	echo
 
 	echo -n 'collecting import graph, '
