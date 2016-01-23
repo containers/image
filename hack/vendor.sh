@@ -17,6 +17,7 @@ clone git github.com/docker/libtrust master
 clone git github.com/opencontainers/runc master
 clone git github.com/vbatts/tar-split master
 clone git github.com/gorilla/mux master
+clone git github.com/gorilla/context master
 
 clean
 
