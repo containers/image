@@ -95,6 +95,12 @@ Installing
 ```sh
 $ sudo make install
 ```
+Tests
+-
+_You need to have Docker installed on your system in order to run the test suite_
+```sh
+$ make test-integration
+```
 TODO
 -
 - show repo tags via flag or when reference isn't tagged or digested

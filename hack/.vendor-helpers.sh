@@ -48,6 +48,7 @@ clone() {
 clean() {
 	local packages=(
 		"${PROJECT}" # package main
+		"${PROJECT}/integration" # package main
 	)
 	local platforms=( linux/amd64 linux/386 )
 
