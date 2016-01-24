@@ -12,8 +12,9 @@
   install:
     - go get github.com/golang/lint/golint
   script:
-    - go vet .
-    - test -z "$(golint . | tee /dev/stderr)"
-    - test -z "$(gofmt -s -l . | tee /dev/stderr)"
+    - hack/validate-vet
+    - hack/validate-lint
+    - hack/validate-gofmt
+    - hack/validate-git-marks
     - go build -o skopeo .
     - go test -v .
