@@ -12,9 +12,9 @@
   install:
     - go get github.com/golang/lint/golint
   script:
-    - hack/validate-vet
-    - hack/validate-lint
-    - hack/validate-gofmt
-    - hack/validate-git-marks
+    - hack/make/validate-vet
+    - hack/make/validate-lint
+    - hack/make/validate-gofmt
+    - hack/make/validate-git-marks
     - go build -o skopeo .
     - go test -v .
