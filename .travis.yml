@@ -1,20 +1,11 @@
----
-  language: go
-  sudo: false
-  notifications:
-    email: false
-  env:
-    global:
-    - GO15VENDOREXPERIMENT=1
-  go:
-    - 1.5
-    - tip
-  install:
-    - go get github.com/golang/lint/golint
-  script:
-    - hack/make/validate-vet
-    - hack/make/validate-lint
-    - hack/make/validate-gofmt
-    - hack/make/validate-git-marks
-    - go build -o skopeo .
-    - go test -v .
+sudo: required
+
+services:
+  - docker
+
+notifications:
+  email: false
+
+script:
+  - make validate
+  - make test-integration
