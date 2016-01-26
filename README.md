@@ -89,9 +89,14 @@ Building
 To build `skopeo` you need at least Go 1.5 because it uses the latest `GO15VENDOREXPERIMENT` flag. Also, make sure you clone the repository in your `GOPATH` - otherwise compilation fails.
 ```sh
 $ cd $GOPATH/src/github.com # make sure you have github.com folder otherwise just create it
-$ mkdir -p runcom && cd runcom
 $ git clone https://github.com/runcom/skopeo
-$ make
+$ cd runcom && make binary
+```
+Man:
+-
+To build the man page you need [`go-md2man`](https://github.com/cpuguy83/go-md2man) available on your system, then:
+```
+$ make man
 ```
 Installing
 -
@@ -100,7 +105,7 @@ $ sudo make install
 ```
 Tests
 -
-_You need to have Docker installed on your system in order to run the test suite_
+_You need Docker installed on your system in order to run the test suite_
 ```sh
 $ make test-integration
 ```
