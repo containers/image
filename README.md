@@ -86,7 +86,10 @@ you'll get an error. You can fix this by either logging in (via `docker login`) 
 and `--password`.
 Building
 -
+To build `skopeo` you need at least Go 1.5 because it uses the latest `GO15VENDOREXPERIMENT` flag. Also, make sure you clone the repository in your `GOPATH` - otherwise compilation fails.
 ```sh
+$ cd $GOPATH/src/github.com # make sure you have github.com folder otherwise just create it
+$ mkdir -p runcom && cd runcom
 $ git clone https://github.com/runcom/skopeo
 $ make
 ```
