@@ -25,7 +25,7 @@
 # https://github.com/runcom/skopeo
 %global provider_prefix %{provider}.%{provider_tld}/%{project}/%{repo}
 %global import_path     %{provider_prefix}
-%global commit          572a6b6f537d71f7cabfdcfe185c6d7cb4367272
+%global commit          fdb5cac7f5af50ae5b1e3424965c31600d86232c
 %global shortcommit     %(c=%{commit}; echo ${c:0:7})
 
 Name:           skopeo
@@ -50,7 +50,6 @@ Summary:       %{summary}
 BuildArch:     noarch
 
 %if 0%{?with_check} && ! 0%{?with_bundled}
-BuildRequires: golang >= 1.5
 BuildRequires: golang-github-cpuguy83-go-md2man
 BuildRequires: golang(github.com/Azure/go-ansiterm/winterm)
 BuildRequires: golang(github.com/Sirupsen/logrus)
@@ -128,7 +127,6 @@ BuildRequires: golang(golang.org/x/net/context)
 %endif
 
 %if 0%{?with_bundled}
-BuildRequires: golang >= 1.5
 BuildRequires: golang-github-cpuguy83-go-md2man
 %endif
 
@@ -234,8 +232,5 @@ export GOPATH=%{buildroot}/%{gopath}:$(pwd)/Godeps/_workspace:%{gopath}
 %doc README.md LICENSE
 
 %changelog
-#
-# TODO(runcom): change the commit has below!!!!
-#
-* Thu Jan 28 2016 Antonio Murdaca <amurdaca@redhat.com> - 0.1.3-0.1.git572a6b6
+* Thu Jan 28 2016 Antonio Murdaca <amurdaca@redhat.com> - 0.1.3-0.1.gitfdb5cac
 - First package for Fedora
