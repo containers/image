@@ -1,9 +1,9 @@
 %if 0%{?fedora} || 0%{?rhel} == 6
-%global with_devel 0
+%global with_devel 1
 %global with_bundled 1
-%global with_debug 0
-%global with_check 1
-%global with_unit_test 0
+%global with_debug 1
+%global with_check 0
+%global with_unit_test 1
 %else
 %global with_devel 0
 %global with_bundled 1
@@ -160,11 +160,23 @@ providing packages with %{import_path} prefix.
 %setup -q -n %{repo}-%{commit}
 
 %build
-mkdir -p ./_build/src/github.com/runcom
-ln -s $(pwd) ./_build/src/github.com/runcom/skopeo
-export GOPATH=$(pwd)/_build:%{gopath}
+mkdir -p src/github.com/runcom
+ln -s ../../../ src/github.com/runcom/skopeo
+
+mkdir -p vendor/src
+mv vendor/github.com vendor/src/.
+mv vendor/golang.org vendor/src/.
+
+%if ! 0%{?with_bundled}
+export GOPATH=$(pwd):%{gopath}
+%else
+export GOPATH=$(pwd):$(pwd)/vendor:%{gopath}
+%endif
+
 export GO15VENDOREXPERIMENT=1
-cd $(pwd)/_build/src/github.com/runcom/skopeo && %gobuild -o skopeo .
+%gobuild -o skopeo .
+
+go-md2man -in man/skopeo.1.md -out skopeo.1
 
 %install
 mkdir -p $RPM_BUILD_ROOT/%{_mandir}/man1
@@ -175,7 +187,7 @@ make DESTDIR=%{buildroot} install
 install -d -p %{buildroot}/%{gopath}/src/%{import_path}/
 echo "%%dir %%{gopath}/src/%%{import_path}/." >> devel.file-list
 # find all *.go but no *_test.go files and generate devel.file-list
-for file in $(find . -iname "*.go" \! -iname "*_test.go") ; do
+for file in $(find . -iname "*.go" \! -iname "*_test.go" | grep -v "./vendor") ; do
     echo "%%dir %%{gopath}/src/%%{import_path}/$(dirname $file)" >> devel.file-list
     install -d -p %{buildroot}/%{gopath}/src/%{import_path}/$(dirname $file)
     cp -pav $file %{buildroot}/%{gopath}/src/%{import_path}/$file
@@ -187,7 +199,7 @@ done
 %if 0%{?with_unit_test} && 0%{?with_devel}
 install -d -p %{buildroot}/%{gopath}/src/%{import_path}/
 # find all *_test.go files and generate unit-test.file-list
-for file in $(find . -iname "*_test.go"); do
+for file in $(find . -iname "*_test.go" | grep -v "./vendor"); do
     echo "%%dir %%{gopath}/src/%%{import_path}/$(dirname $file)" >> devel.file-list
     install -d -p %{buildroot}/%{gopath}/src/%{import_path}/$(dirname $file)
     cp -pav $file %{buildroot}/%{gopath}/src/%{import_path}/$file
@@ -204,7 +216,7 @@ sort -u -o devel.file-list devel.file-list
 %if ! 0%{?with_bundled}
 export GOPATH=%{buildroot}/%{gopath}:%{gopath}
 %else
-export GOPATH=%{buildroot}/%{gopath}:$(pwd)/Godeps/_workspace:%{gopath}
+export GOPATH=%{buildroot}/%{gopath}:$(pwd)/vendor:%{gopath}
 %endif
 
 %gotest %{import_path}/integration
