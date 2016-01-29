@@ -2,8 +2,9 @@
 
 export GO15VENDOREXPERIMENT=1
 
-BINDIR=${DESTDIR}/usr/bin/
-MANDIR=${DESTDIR}/usr/share/man
+PREFIX ?= ${DESTDIR}/usr
+INSTALLDIR=${PREFIX}/bin
+MANINSTALLDIR=${PREFIX}/share/man
 
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null)
 DOCKER_IMAGE := skopeo-dev$(if $(GIT_BRANCH),:$(GIT_BRANCH))
@@ -31,11 +32,11 @@ clean:
 	rm -f skopeo.1
 
 install: install-binary
-	install -m 644 skopeo.1 ${MANDIR}/man1/
+	install -m 644 skopeo.1 ${MANINSTALLDIR}/man1/
 
 install-binary:
-	install -d -m 0755 ${BINDIR}
-	install -m 755 skopeo ${BINDIR}
+	install -d -m 0755 ${INSTALLDIR}
+	install -m 755 skopeo ${INSTALLDIR}
 
 man:
 	go-md2man -in man/skopeo.1.md -out skopeo.1
