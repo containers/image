@@ -213,7 +213,7 @@ func getAuthConfig(c *cli.Context, index *registryTypes.IndexInfo) (types.AuthCo
 		cfg      = c.GlobalString("docker-cfg")
 	)
 	if _, err := os.Stat(cfg); err != nil {
-		logrus.Infof("Docker cli config file %q not found: %v, falling back to --username and --password if needed", cfg, err)
+		logrus.Debugf("Docker cli config file %q not found: %v, falling back to --username and --password if needed", cfg, err)
 		return types.AuthConfig{
 			Username: username,
 			Password: password,
