@@ -208,17 +208,30 @@ func newManifestFetcher(endpoint registry.APIEndpoint, repoInfo *registry.Reposi
 
 func getAuthConfig(c *cli.Context, index *registryTypes.IndexInfo) (types.AuthConfig, error) {
 	var (
-		username = c.GlobalString("username")
-		password = c.GlobalString("password")
-		cfg      = c.GlobalString("docker-cfg")
+		username      = c.GlobalString("username")
+		password      = c.GlobalString("password")
+		cfg           = c.GlobalString("docker-cfg")
+		defAuthConfig = types.AuthConfig{
+			Username: c.GlobalString("username"),
+			Password: c.GlobalString("password"),
+			Email:    "stub@example.com",
+		}
 	)
+
+	// TODO(runcom): implement this to opt-in for docker-cfg, no need to make this
+	// work by default with docker's conf
+	//useDockerConf := c.GlobalString("use-docker-cfg")
+
+	if username != "" && password != "" {
+		return defAuthConfig, nil
+	}
+
 	if _, err := os.Stat(cfg); err != nil {
 		logrus.Debugf("Docker cli config file %q not found: %v, falling back to --username and --password if needed", cfg, err)
-		return types.AuthConfig{
-			Username: username,
-			Password: password,
-			Email:    "stub@example.com",
-		}, nil
+		if os.IsNotExist(err) {
+			return defAuthConfig, nil
+		}
+		return types.AuthConfig{}, nil
 	}
 	confFile, err := cliconfig.Load(cfg)
 	if err != nil {
