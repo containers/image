@@ -52,6 +52,11 @@ func main() {
 			Value: cliconfig.ConfigDir(),
 			Usage: "Docker's cli config for auth",
 		},
+		cli.StringFlag{
+			Name:  "img-type",
+			Value: "",
+			Usage: "Either docker or appc",
+		},
 	}
 	app.Before = func(c *cli.Context) error {
 		if c.GlobalBool("debug") {

@@ -1,4 +1,4 @@
-package main
+package docker
 
 import (
 	"encoding/json"
@@ -13,7 +13,8 @@ import (
 	"github.com/docker/docker/image/v1"
 	"github.com/docker/docker/reference"
 	"github.com/docker/docker/registry"
-	"github.com/docker/engine-api/types"
+	engineTypes "github.com/docker/engine-api/types"
+	"github.com/runcom/skopeo/types"
 	"golang.org/x/net/context"
 )
 
@@ -23,14 +24,14 @@ type v1ManifestFetcher struct {
 	repo        distribution.Repository
 	confirmedV2 bool
 	// wrap in a config?
-	authConfig types.AuthConfig
+	authConfig engineTypes.AuthConfig
 	service    *registry.Service
 	session    *registry.Session
 }
 
-func (mf *v1ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*imageInspect, error) {
+func (mf *v1ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*types.ImageInspect, error) {
 	var (
-		imgInspect *imageInspect
+		imgInspect *types.ImageInspect
 	)
 	if _, isCanonical := ref.(reference.Canonical); isCanonical {
 		// Allowing fallback, because HTTPS v1 is before HTTP v2
@@ -65,7 +66,7 @@ func (mf *v1ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*i
 	return imgInspect, nil
 }
 
-func (mf *v1ManifestFetcher) fetchWithSession(ctx context.Context, ref reference.Named) (*imageInspect, error) {
+func (mf *v1ManifestFetcher) fetchWithSession(ctx context.Context, ref reference.Named) (*types.ImageInspect, error) {
 	repoData, err := mf.session.GetRepositoryData(mf.repoInfo)
 	if err != nil {
 		if strings.Contains(err.Error(), "HTTP code: 404") {
