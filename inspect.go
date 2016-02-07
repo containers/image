@@ -27,7 +27,7 @@ func inspect(c *cli.Context) (*types.ImageInspect, error) {
 			return nil, err
 		}
 	case imgTypeAppc:
-		return nil, fmt.Errorf("TODO")
+		return nil, fmt.Errorf("sorry, not implemented yet")
 	default:
 		return nil, fmt.Errorf("%s image type is invalid, please use either 'docker' or 'appc'", imgType)
 	}
