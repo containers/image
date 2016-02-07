@@ -54,7 +54,7 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "img-type",
-			Value: "",
+			Value: imgTypeDocker,
 			Usage: "Either docker or appc",
 		},
 	}

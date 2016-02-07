@@ -8,6 +8,11 @@ import (
 	"github.com/runcom/skopeo/types"
 )
 
+const (
+	imgTypeDocker = "docker"
+	imgTypeAppc   = "appc"
+)
+
 func inspect(c *cli.Context) (*types.ImageInspect, error) {
 	var (
 		imgInspect *types.ImageInspect
@@ -16,12 +21,12 @@ func inspect(c *cli.Context) (*types.ImageInspect, error) {
 		imgType    = c.GlobalString("img-type")
 	)
 	switch imgType {
-	case "docker":
+	case imgTypeDocker:
 		imgInspect, err = docker.GetData(c, name)
 		if err != nil {
 			return nil, err
 		}
-	case "appc":
+	case imgTypeAppc:
 		return nil, fmt.Errorf("TODO")
 	default:
 		return nil, fmt.Errorf("%s image type is invalid, please use either 'docker' or 'appc'", imgType)
