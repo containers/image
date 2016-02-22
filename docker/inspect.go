@@ -197,6 +197,11 @@ func getAuthConfig(c *cli.Context, index *registryTypes.IndexInfo) (engineTypes.
 		}
 	)
 
+	//
+	// FINAL TODO(runcom): avoid returning empty config! just fallthrough and return
+	// the first useful authconfig
+	//
+
 	// TODO(runcom): ??? atomic needs this
 	// TODO(runcom): implement this to opt-in for docker-cfg, no need to make this
 	// work by default with docker's conf
