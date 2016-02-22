@@ -13,7 +13,7 @@ clone git github.com/gorilla/context master
 clone git golang.org/x/net master https://github.com/golang/net.git
 clone git github.com/go-check/check v1
 
-clone git github.com/docker/docker v1.10.1
+clone git github.com/docker/docker v1.10.2
 clone git github.com/docker/engine-api v0.2.3
 clone git github.com/docker/distribution 0f2d99b13ae0cfbcf118eff103e6e680b726b47e
 
