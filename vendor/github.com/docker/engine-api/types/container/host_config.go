@@ -151,11 +151,6 @@ func (rp *RestartPolicy) IsUnlessStopped() bool {
 	return rp.Name == "unless-stopped"
 }
 
-// IsSame compares two RestartPolicy to see if they are the same
-func (rp *RestartPolicy) IsSame(tp *RestartPolicy) bool {
-	return rp.Name == tp.Name && rp.MaximumRetryCount == tp.MaximumRetryCount
-}
-
 // LogConfig represents the logging configuration of the container.
 type LogConfig struct {
 	Type   string
@@ -183,7 +178,7 @@ type Resources struct {
 	KernelMemory         int64           // Kernel memory limit (in bytes)
 	Memory               int64           // Memory limit (in bytes)
 	MemoryReservation    int64           // Memory soft limit (in bytes)
-	MemorySwap           int64           // Total memory usage (memory + swap); set `-1` to enable unlimited swap
+	MemorySwap           int64           // Total memory usage (memory + swap); set `-1` to disable swap
 	MemorySwappiness     *int64          // Tuning container memory swappiness behaviour
 	OomKillDisable       *bool           // Whether to disable OOM Killer or not
 	PidsLimit            int64           // Setting pids limit for a container
@@ -195,7 +190,6 @@ type Resources struct {
 type UpdateConfig struct {
 	// Contains container's resources (cgroups, ulimits)
 	Resources
-	RestartPolicy RestartPolicy
 }
 
 // HostConfig the non-portable Config structure of a container.

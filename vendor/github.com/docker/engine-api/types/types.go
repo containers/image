@@ -142,7 +142,6 @@ type Container struct {
 	SizeRw     int64 `json:",omitempty"`
 	SizeRootFs int64 `json:",omitempty"`
 	Labels     map[string]string
-	State      string
 	Status     string
 	HostConfig struct {
 		NetworkMode string `json:",omitempty"`
@@ -224,6 +223,8 @@ type Info struct {
 	Architecture       string
 	IndexServerAddress string
 	RegistryConfig     *registry.ServiceConfig
+	InitSha1           string
+	InitPath           string
 	NCPU               int
 	MemTotal           int64
 	DockerRootDir      string
@@ -388,7 +389,6 @@ type NetworkResource struct {
 	Scope      string
 	Driver     string
 	IPAM       network.IPAM
-	Internal   bool
 	Containers map[string]EndpointResource
 	Options    map[string]string
 }

@@ -7,7 +7,6 @@ import (
 
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/engine-api/types/filters"
-	"github.com/docker/engine-api/types/image"
 	"github.com/docker/go-units"
 )
 
@@ -127,7 +126,7 @@ type ImageBuildOptions struct {
 	NoCache        bool
 	Remove         bool
 	ForceRemove    bool
-	PullParent     image.PullBehavior
+	PullParent     bool
 	IsolationLevel container.IsolationLevel
 	CPUSetCPUs     string
 	CPUSetMems     string

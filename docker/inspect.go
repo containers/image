@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/docker/docker/registry"
 	engineTypes "github.com/docker/engine-api/types"
 	registryTypes "github.com/docker/engine-api/types/registry"
+	"github.com/opencontainers/runc/libcontainer/user"
 	"github.com/runcom/skopeo/types"
 	"golang.org/x/net/context"
 )
@@ -195,12 +197,23 @@ func getAuthConfig(c *cli.Context, index *registryTypes.IndexInfo) (engineTypes.
 		}
 	)
 
+	// TODO(runcom): ??? atomic needs this
 	// TODO(runcom): implement this to opt-in for docker-cfg, no need to make this
 	// work by default with docker's conf
 	//useDockerConf := c.GlobalString("use-docker-cfg")
 
 	if username != "" && password != "" {
 		return defAuthConfig, nil
+	}
+
+	sudoUserEnv := os.Getenv("SUDO_USER")
+	if sudoUserEnv != "" {
+		sudoUser, err := user.LookupUser(sudoUserEnv)
+		if err != nil {
+			return engineTypes.AuthConfig{}, err
+		}
+		// override the given docker conf file if called with sudo
+		cfg = filepath.Join(sudoUser.Home, ".docker")
 	}
 
 	if _, err := os.Stat(cfg); err != nil {
