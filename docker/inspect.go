@@ -3,8 +3,6 @@ package docker
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,7 +18,6 @@ import (
 	"github.com/docker/docker/registry"
 	engineTypes "github.com/docker/engine-api/types"
 	registryTypes "github.com/docker/engine-api/types/registry"
-	"github.com/opencontainers/runc/libcontainer/user"
 	"github.com/runcom/skopeo/types"
 	"golang.org/x/net/context"
 )
@@ -211,23 +208,6 @@ func getAuthConfig(c *cli.Context, index *registryTypes.IndexInfo) (engineTypes.
 		return defAuthConfig, nil
 	}
 
-	sudoUserEnv := os.Getenv("SUDO_USER")
-	if sudoUserEnv != "" {
-		sudoUser, err := user.LookupUser(sudoUserEnv)
-		if err != nil {
-			return engineTypes.AuthConfig{}, err
-		}
-		// override the given docker conf file if called with sudo
-		cfg = filepath.Join(sudoUser.Home, ".docker")
-	}
-
-	if _, err := os.Stat(cfg); err != nil {
-		logrus.Debugf("Docker cli config file %q not found: %v, falling back to --username and --password if needed", cfg, err)
-		if os.IsNotExist(err) {
-			return defAuthConfig, nil
-		}
-		return engineTypes.AuthConfig{}, nil
-	}
 	confFile, err := cliconfig.Load(cfg)
 	if err != nil {
 		return engineTypes.AuthConfig{}, err
