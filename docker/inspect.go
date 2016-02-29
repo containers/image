@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/cliconfig"
 	"github.com/docker/docker/image"
+	"github.com/docker/docker/opts"
 	versionPkg "github.com/docker/docker/pkg/version"
 	"github.com/docker/docker/reference"
 	"github.com/docker/docker/registry"
@@ -73,21 +74,21 @@ func GetData(c *cli.Context, name string) (*types.ImageInspect, error) {
 	if err := validateRepoName(repoInfo.Name()); err != nil {
 		return nil, err
 	}
-	//options := &registry.Options{}
-	//options.Mirrors = opts.NewListOpts(nil)
-	//options.InsecureRegistries = opts.NewListOpts(nil)
-	//options.InsecureRegistries.Set("0.0.0.0/0")
-	//registryService := registry.NewService(options)
-	registryService := registry.NewService(nil)
-	//// TODO(runcom): hacky, provide a way of passing tls cert (flag?) to be used to lookup
-	//for _, ic := range registryService.Config.IndexConfigs {
-	//ic.Secure = false
-	//}
+	options := &registry.Options{}
+	options.Mirrors = opts.NewListOpts(nil)
+	options.InsecureRegistries = opts.NewListOpts(nil)
+	options.InsecureRegistries.Set("0.0.0.0/0")
+	registryService := registry.NewService(options)
+	// TODO(runcom): hacky, provide a way of passing tls cert (flag?) to be used to lookup
+	for _, ic := range registryService.Config.IndexConfigs {
+		ic.Secure = false
+	}
 
 	endpoints, err := registryService.LookupPullEndpoints(repoInfo)
 	if err != nil {
 		return nil, err
 	}
+	logrus.Debugf("endpoints: %v", endpoints)
 
 	var (
 		ctx                    = context.Background()
