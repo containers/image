@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	version = "0.1.5-dev"
+	version = "0.1.9-dev"
 	usage   = "inspect images on a registry"
 )
 
