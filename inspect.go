@@ -2,34 +2,54 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/codegangsta/cli"
 	"github.com/runcom/skopeo/docker"
 	"github.com/runcom/skopeo/types"
 )
 
+type imgKind int
+
 const (
-	imgTypeDocker = "docker"
-	imgTypeAppc   = "appc"
+	imgTypeDocker = "docker://"
+	imgTypeAppc   = "appc://"
+
+	kindUnknown = iota
+	kindDocker
+	kindAppc
 )
+
+func getImgType(img string) imgKind {
+	if strings.HasPrefix(img, imgTypeDocker) {
+		return kindDocker
+	}
+	if strings.HasPrefix(img, imgTypeAppc) {
+		return kindAppc
+	}
+	// TODO(runcom): v2 will support this
+	//return kindUnknown
+	return kindDocker
+}
 
 func inspect(c *cli.Context) (*types.ImageInspect, error) {
 	var (
 		imgInspect *types.ImageInspect
 		err        error
 		name       = c.Args().First()
-		imgType    = c.GlobalString("img-type")
+		kind       = getImgType(name)
 	)
-	switch imgType {
-	case imgTypeDocker:
-		imgInspect, err = docker.GetData(c, name)
+
+	switch kind {
+	case kindDocker:
+		imgInspect, err = docker.GetData(c, strings.Replace(name, imgTypeDocker, "", -1))
 		if err != nil {
 			return nil, err
 		}
-	case imgTypeAppc:
-		return nil, fmt.Errorf("sorry, not implemented yet")
+	case kindAppc:
+		return nil, fmt.Errorf("not implemented yet")
 	default:
-		return nil, fmt.Errorf("%s image type is invalid, please use either 'docker' or 'appc'", imgType)
+		return nil, fmt.Errorf("%s image is invalid, please use either 'docker://' or 'appc://'", name)
 	}
 	return imgInspect, nil
 }
