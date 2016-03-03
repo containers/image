@@ -79,9 +79,11 @@ Building
 -
 To build `skopeo` you need at least Go 1.5 because it uses the latest `GO15VENDOREXPERIMENT` flag. Also, make sure to clone the repository in your `GOPATH` - otherwise compilation fails.
 ```sh
-$ cd $GOPATH/src/github.com # make sure you have github.com folder otherwise just create it
+$ cd $GOPATH/src
+$ mkdir -p github.com/runcom
+$ cd runcom
 $ git clone https://github.com/runcom/skopeo
-$ cd runcom && make binary
+$ make binary
 ```
 Man:
 -
