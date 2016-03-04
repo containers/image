@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	binaryV1        = "docker-registry"
 	binaryV2        = "registry-v2"
 	binaryV2Schema1 = "registry-v2-schema1"
 )
