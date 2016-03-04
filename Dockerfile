@@ -1,6 +1,8 @@
 FROM fedora
 
-RUN dnf -y update && dnf install -y make git golang golang-github-cpuguy83-go-md2man python-pip m2crypto swig redhat-rpm-config
+RUN dnf -y update && dnf install -y make git golang golang-github-cpuguy83-go-md2man \
+	# registry v1 deps
+	xz-devel python-devel python-pip m2crypto swig redhat-rpm-config openssl-devel patch
 
 # Install three versions of the registry. The first is an older version that
 # only supports schema1 manifests. The second is a newer version that supports
