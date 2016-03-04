@@ -44,7 +44,7 @@ func (mf *v2ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*t
 	mf.repo, mf.confirmedV2, err = dockerdistribution.NewV2Repository(ctx, mf.repoInfo, mf.endpoint, nil, &mf.authConfig, "pull")
 	if err != nil {
 		logrus.Debugf("Error getting v2 registry: %v", err)
-		return nil, fallbackError{err: err, confirmedV2: mf.confirmedV2}
+		return nil, err
 	}
 
 	imgInspect, err = mf.fetchWithRepository(ctx, ref)
@@ -52,8 +52,9 @@ func (mf *v2ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*t
 		if _, ok := err.(fallbackError); ok {
 			return nil, err
 		}
-		if registry.ContinueOnError(err) {
-			err = fallbackError{err: err, confirmedV2: mf.confirmedV2}
+		if continueOnError(err) {
+			logrus.Errorf("Error trying v2 registry: %v", err)
+			return nil, fallbackError{err: err, confirmedV2: mf.confirmedV2, transportOK: true}
 		}
 	}
 	return imgInspect, err
@@ -294,7 +295,7 @@ func (mf *v2ManifestFetcher) pullSchema2(ctx context.Context, ref reference.Name
 	go func() {
 		configJSON, err := mf.pullSchema2ImageConfig(ctx, target.Digest)
 		if err != nil {
-			errChan <- err
+			errChan <- ImageConfigPullError{Err: err}
 			cancel()
 			return
 		}
@@ -369,6 +370,17 @@ func receiveConfig(configChan <-chan []byte, errChan <-chan error) ([]byte, imag
 	}
 }
 
+// ImageConfigPullError is an error pulling the image config blob
+// (only applies to schema2).
+type ImageConfigPullError struct {
+	Err error
+}
+
+// Error returns the error string for ImageConfigPullError.
+func (e ImageConfigPullError) Error() string {
+	return "error pulling image configuration: " + e.Err.Error()
+}
+
 // allowV1Fallback checks if the error is a possible reason to fallback to v1
 // (even if confirmedV2 has been set already), and if so, wraps the error in
 // a fallbackError with confirmedV2 set to false. Otherwise, it returns the
@@ -377,13 +389,13 @@ func allowV1Fallback(err error) error {
 	switch v := err.(type) {
 	case errcode.Errors:
 		if len(v) != 0 {
-			if v0, ok := v[0].(errcode.Error); ok && registry.ShouldV2Fallback(v0) {
-				return fallbackError{err: err, confirmedV2: false}
+			if v0, ok := v[0].(errcode.Error); ok && shouldV2Fallback(v0) {
+				return fallbackError{err: err, confirmedV2: false, transportOK: true}
 			}
 		}
 	case errcode.Error:
-		if registry.ShouldV2Fallback(v) {
-			return fallbackError{err: err, confirmedV2: false}
+		if shouldV2Fallback(v) {
+			return fallbackError{err: err, confirmedV2: false, transportOK: true}
 		}
 	}
 	return err

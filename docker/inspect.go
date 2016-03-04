@@ -4,14 +4,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/docker/distribution/digest"
 	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/distribution/registry/api/errcode"
+	"github.com/docker/distribution/registry/api/v2"
+	"github.com/docker/distribution/registry/client"
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/cliconfig"
+	"github.com/docker/docker/distribution"
+	"github.com/docker/docker/dockerversion"
 	"github.com/docker/docker/image"
 	"github.com/docker/docker/opts"
 	versionPkg "github.com/docker/docker/pkg/version"
@@ -32,6 +38,7 @@ type fallbackError struct {
 	// supports the v2 protocol. This is used to limit fallbacks to the v1
 	// protocol.
 	confirmedV2 bool
+	transportOK bool
 }
 
 // Error renders the FallbackError as a string.
@@ -84,7 +91,7 @@ func GetData(c *cli.Context, name string) (*types.ImageInspect, error) {
 		ic.Secure = false
 	}
 
-	endpoints, err := registryService.LookupPullEndpoints(repoInfo)
+	endpoints, err := registryService.LookupPullEndpoints(repoInfo.Hostname())
 	if err != nil {
 		return nil, err
 	}
@@ -96,11 +103,12 @@ func GetData(c *cli.Context, name string) (*types.ImageInspect, error) {
 		discardNoSupportErrors bool
 		imgInspect             *types.ImageInspect
 		confirmedV2            bool
+		confirmedTLSRegistries = make(map[string]struct{})
 	)
 
 	for _, endpoint := range endpoints {
 		// make sure I can reach the registry, same as docker pull does
-		v1endpoint, err := endpoint.ToV1Endpoint(nil)
+		v1endpoint, err := endpoint.ToV1Endpoint(dockerversion.DockerUserAgent(), nil)
 		if err != nil {
 			return nil, err
 		}
@@ -115,6 +123,14 @@ func GetData(c *cli.Context, name string) (*types.ImageInspect, error) {
 			logrus.Debugf("Skipping v1 endpoint %s because v2 registry was detected", endpoint.URL)
 			continue
 		}
+
+		if endpoint.URL.Scheme != "https" {
+			if _, confirmedTLS := confirmedTLSRegistries[endpoint.URL.Host]; confirmedTLS {
+				logrus.Debugf("Skipping non-TLS endpoint %s for host/port that appears to use TLS", endpoint.URL)
+				continue
+			}
+		}
+
 		logrus.Debugf("Trying to fetch image manifest of %s repository from %s %s", repoInfo.Name(), endpoint.URL, endpoint.Version)
 
 		//fetcher, err := newManifestFetcher(endpoint, repoInfo, config)
@@ -133,11 +149,14 @@ func GetData(c *cli.Context, name string) (*types.ImageInspect, error) {
 				if fallbackErr, ok := err.(fallbackError); ok {
 					fallback = true
 					confirmedV2 = confirmedV2 || fallbackErr.confirmedV2
+					if fallbackErr.transportOK && endpoint.URL.Scheme == "https" {
+						confirmedTLSRegistries[endpoint.URL.Host] = struct{}{}
+					}
 					err = fallbackErr.err
 				}
 			}
 			if fallback {
-				if _, ok := err.(registry.ErrNoSupport); !ok {
+				if _, ok := err.(distribution.ErrNoSupport); !ok {
 					// Because we found an error that's not ErrNoSupport, discard all subsequent ErrNoSupport errors.
 					discardNoSupportErrors = true
 					// save the current error
@@ -149,7 +168,7 @@ func GetData(c *cli.Context, name string) (*types.ImageInspect, error) {
 				}
 				continue
 			}
-			logrus.Debugf("Not continuing with error: %v", err)
+			logrus.Errorf("Not continuing with pull after error: %v", err)
 			return nil, err
 		}
 
@@ -289,4 +308,38 @@ func rawJSON(value interface{}) *json.RawMessage {
 		return nil
 	}
 	return (*json.RawMessage)(&jsonval)
+}
+
+func continueOnError(err error) bool {
+	switch v := err.(type) {
+	case errcode.Errors:
+		if len(v) == 0 {
+			return true
+		}
+		return continueOnError(v[0])
+	case distribution.ErrNoSupport:
+		return continueOnError(v.Err)
+	case errcode.Error:
+		return shouldV2Fallback(v)
+	case *client.UnexpectedHTTPResponseError:
+		return true
+	case ImageConfigPullError:
+		return false
+	case error:
+		return !strings.Contains(err.Error(), strings.ToLower(syscall.ENOSPC.Error()))
+	}
+	// let's be nice and fallback if the error is a completely
+	// unexpected one.
+	// If new errors have to be handled in some way, please
+	// add them to the switch above.
+	return true
+}
+
+// shouldV2Fallback returns true if this error is a reason to fall back to v1.
+func shouldV2Fallback(err errcode.Error) bool {
+	switch err.Code {
+	case errcode.ErrorCodeUnauthorized, v2.ErrorCodeManifestUnknown, v2.ErrorCodeNameUnknown:
+		return true
+	}
+	return false
 }

@@ -9,6 +9,8 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/registry/client/transport"
+	dockerdistribution "github.com/docker/docker/distribution"
+	"github.com/docker/docker/dockerversion"
 	"github.com/docker/docker/image"
 	"github.com/docker/docker/image/v1"
 	"github.com/docker/docker/reference"
@@ -35,7 +37,7 @@ func (mf *v1ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*t
 	)
 	if _, isCanonical := ref.(reference.Canonical); isCanonical {
 		// Allowing fallback, because HTTPS v1 is before HTTP v2
-		return nil, fallbackError{err: registry.ErrNoSupport{errors.New("Cannot pull by digest with v1 registry")}}
+		return nil, fallbackError{err: dockerdistribution.ErrNoSupport{errors.New("Cannot pull by digest with v1 registry")}}
 	}
 	tlsConfig, err := mf.service.TLSConfig(mf.repoInfo.Index.Name)
 	if err != nil {
@@ -45,11 +47,11 @@ func (mf *v1ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*t
 	tr := transport.NewTransport(
 		registry.NewTransport(tlsConfig),
 		//registry.DockerHeaders(mf.config.MetaHeaders)...,
-		registry.DockerHeaders(nil)...,
+		registry.DockerHeaders(dockerversion.DockerUserAgent(), nil)...,
 	)
 	client := registry.HTTPClient(tr)
 	//v1Endpoint, err := mf.endpoint.ToV1Endpoint(mf.config.MetaHeaders)
-	v1Endpoint, err := mf.endpoint.ToV1Endpoint(nil)
+	v1Endpoint, err := mf.endpoint.ToV1Endpoint(dockerversion.DockerUserAgent(), nil)
 	if err != nil {
 		logrus.Debugf("Could not get v1 endpoint: %v", err)
 		return nil, fallbackError{err: err}
