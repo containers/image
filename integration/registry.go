@@ -19,10 +19,15 @@ const (
 )
 
 type testRegistryV1 struct {
+	cmd *exec.Cmd
+	url string
+	dir string
 }
 
 func setupRegistryV1At(c *check.C, url string, auth bool) *testRegistryV1 {
-	return &testRegistryV1{}
+	return &testRegistryV1{
+		url: url,
+	}
 }
 
 type testRegistryV2 struct {
