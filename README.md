@@ -109,6 +109,7 @@ $ make test-integration
 ```
 TODO
 -
+- get rid of docker/docker code (?)
 - show repo tags via flag or when reference isn't tagged or digested
 - add tests (integration with deployed registries in container - Docker-like)
 - support rkt/appc image spec
