@@ -83,7 +83,7 @@ $ cd $GOPATH/src
 $ mkdir -p github.com/runcom
 $ cd runcom
 $ git clone https://github.com/runcom/skopeo
-$ make binary
+$ cd skopeo && make binary
 ```
 Man:
 -
