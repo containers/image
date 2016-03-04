@@ -2,7 +2,13 @@ FROM fedora
 
 RUN dnf -y update && dnf install -y make git golang golang-github-cpuguy83-go-md2man \
 	# registry v1 deps
-	xz-devel python-devel python-pip m2crypto swig redhat-rpm-config openssl-devel patch
+	xz-devel \
+	python-devel \
+	python-pip \
+	swig \
+	redhat-rpm-config \
+	openssl-devel \
+	patch
 
 # Install three versions of the registry. The first is an older version that
 # only supports schema1 manifests. The second is a newer version that supports
@@ -22,10 +28,14 @@ RUN set -x \
 	&& rm -rf "$GOPATH" \
 	&& export DRV1="$(mktemp -d)" \
 	&& git clone https://github.com/docker/docker-registry.git "$DRV1" \
-	&& pip install --ignore-installed "$DRV1/depends/docker-registry-core" \
-	&& pip install --ignore-installed file://"$DRV1#egg=docker-registry[bugsnag,newrelic,cors]" \
+	# no need for setuptools since we have a version conflict with fedora
+	&& sed -i.bak s/setuptools==5.8//g "$DRV1/requirements/main.txt" \
+	&& sed -i.bak s/setuptools==5.8//g "$DRV1/depends/docker-registry-core/requirements/main.txt" \
+	&& pip install "$DRV1/depends/docker-registry-core" \
+	&& pip install file://"$DRV1#egg=docker-registry[bugsnag,newrelic,cors]" \
 	&& patch $(python -c 'import boto; import os; print os.path.dirname(boto.__file__)')/connection.py \
-		< "$DRV1/contrib/boto_header_patch.diff"
+		< "$DRV1/contrib/boto_header_patch.diff" \
+	&& dnf -y update && dnf install -y m2crypto
 
 ENV GOPATH /usr/share/gocode:/go
 WORKDIR /go/src/github.com/runcom/skopeo
