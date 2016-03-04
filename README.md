@@ -92,8 +92,8 @@ To build the man page you need [`go-md2man`](https://github.com/cpuguy83/go-md2m
 $ make man
 ```
 Installing
-If you built from source:
 -
+If you built from source:
 ```sh
 $ sudo make install
 ```
