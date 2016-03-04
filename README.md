@@ -109,6 +109,7 @@ $ make test-integration
 ```
 TODO
 -
+- make skopeo docker registry v2 only
 - output raw manifest
 - download layers and support docker load tar(s)
 - get rid of docker/docker code (?)
