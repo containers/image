@@ -123,4 +123,4 @@ NOT TODO
 
 License
 -
-ASL 2.0
+GPLv2
