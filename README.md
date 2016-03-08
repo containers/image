@@ -38,6 +38,10 @@ $ skopeo docker.io/fedora | jq '.RepoTags'
 # show image's digest
 $ skopeo docker.io/fedora:rawhide | jq '.Digest'
 "sha256:905b4846938c8aef94f52f3e41a11398ae5b40f5855fb0e40ed9c157e721d7f8"
+
+# show image's label "Name"
+$ skopeo registry.access.redhat.com/rhel7 | jq '.Config.Labels.Name'
+"rhel7/rhel"
 ```
 
 Private registries with authentication
