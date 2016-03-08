@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/codegangsta/cli"
-	"github.com/runcom/skopeo/docker"
-	"github.com/runcom/skopeo/types"
+	"github.com/projectatomic/skopeo/docker"
+	"github.com/projectatomic/skopeo/types"
 )
 
 type imgKind int

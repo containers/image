@@ -38,8 +38,8 @@ RUN set -x \
 	&& dnf -y update && dnf install -y m2crypto
 
 ENV GOPATH /usr/share/gocode:/go
-WORKDIR /go/src/github.com/runcom/skopeo
+WORKDIR /go/src/github.com/projectatomic/skopeo
 
-COPY . /go/src/github.com/runcom/skopeo
+COPY . /go/src/github.com/projectatomic/skopeo
 
 #ENTRYPOINT ["hack/dind"]

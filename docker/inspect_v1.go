@@ -16,7 +16,7 @@ import (
 	"github.com/docker/docker/reference"
 	"github.com/docker/docker/registry"
 	engineTypes "github.com/docker/engine-api/types"
-	"github.com/runcom/skopeo/types"
+	"github.com/projectatomic/skopeo/types"
 	"golang.org/x/net/context"
 )
 

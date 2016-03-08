@@ -19,7 +19,7 @@ set -e
 
 set -o pipefail
 
-export SKOPEO_PKG='github.com/runcom/skopeo'
+export SKOPEO_PKG='github.com/projectatomic/skopeo'
 export SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 export MAKEDIR="$SCRIPTDIR/make"
 

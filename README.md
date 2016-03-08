@@ -1,4 +1,4 @@
-skopeo [![Build Status](https://travis-ci.org/runcom/skopeo.svg?branch=master)](https://travis-ci.org/runcom/skopeo)
+skopeo [![Build Status](https://travis-ci.org/projectatomic/skopeo.svg?branch=master)](https://travis-ci.org/projectatomic/skopeo)
 =
 
 _Please be aware `skopeo` is still work in progress_
@@ -80,9 +80,9 @@ Building
 To build `skopeo` you need at least Go 1.5 because it uses the latest `GO15VENDOREXPERIMENT` flag. Also, make sure to clone the repository in your `GOPATH` - otherwise compilation fails.
 ```sh
 $ cd $GOPATH/src
-$ mkdir -p github.com/runcom
-$ cd runcom
-$ git clone https://github.com/runcom/skopeo
+$ mkdir -p github.com/projectatomic
+$ cd projectatomic
+$ git clone https://github.com/projectatomic/skopeo
 $ cd skopeo && make binary
 ```
 Man:
