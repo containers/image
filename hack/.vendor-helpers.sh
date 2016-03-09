@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-PROJECT=github.com/runcom/skopeo
+PROJECT=github.com/projectatomic/skopeo
 
 # Downloads dependencies into vendor/ directory
 mkdir -p vendor

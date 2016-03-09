@@ -32,6 +32,8 @@ func main() {
 	app.Name = "skopeo"
 	app.Version = version
 	app.Usage = usage
+	// TODO(runcom)
+	//app.EnableBashCompletion = true
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "debug",

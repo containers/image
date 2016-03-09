@@ -5,7 +5,7 @@ cd "$(dirname "$BASH_SOURCE")/.."
 rm -rf vendor/
 source 'hack/.vendor-helpers.sh'
 
-clone git github.com/codegangsta/cli v1.2.0
+clone git github.com/codegangsta/cli master
 clone git github.com/Sirupsen/logrus v0.8.7
 clone git github.com/vbatts/tar-split v0.9.11
 clone git github.com/gorilla/mux master

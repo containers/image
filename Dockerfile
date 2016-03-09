@@ -38,6 +38,7 @@ RUN set -x \
 	&& dnf -y update && dnf install -y m2crypto
 
 ENV GOPATH /usr/share/gocode:/go
+ENV PATH $GOPATH/bin:/usr/share/gocode/bin:$PATH
 RUN go get github.com/golang/lint/golint
 WORKDIR /go/src/github.com/projectatomic/skopeo
 COPY . /go/src/github.com/projectatomic/skopeo

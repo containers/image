@@ -5,6 +5,8 @@ export GO15VENDOREXPERIMENT=1
 PREFIX ?= ${DESTDIR}/usr
 INSTALLDIR=${PREFIX}/bin
 MANINSTALLDIR=${PREFIX}/share/man
+# TODO(runcom)
+#BASHINSTALLDIR=${PREFIX}/share/bash-completion/completions
 
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null)
 DOCKER_IMAGE := skopeo-dev$(if $(GIT_BRANCH),:$(GIT_BRANCH))
@@ -33,6 +35,8 @@ clean:
 
 install: install-binary
 	install -m 644 skopeo.1 ${MANINSTALLDIR}/man1/
+	# TODO(runcom)
+	#install -m 644 completion/bash/skopeo ${BASHINSTALLDIR}/
 
 install-binary:
 	install -d -m 0755 ${INSTALLDIR}

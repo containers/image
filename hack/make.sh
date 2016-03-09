@@ -6,7 +6,7 @@ set -e
 #
 # Requirements:
 # - The current directory should be a checkout of the skopeo source code
-#   (https://github.com/runcom/skopeo). Whatever version is checked out
+#   (https://github.com/projectatomic/skopeo). Whatever version is checked out
 #   will be built.
 # - The script is intended to be run inside the docker container specified
 #   in the Dockerfile at the root of the source. In other words:
