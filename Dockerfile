@@ -37,6 +37,8 @@ RUN set -x \
 		< "$DRV1/contrib/boto_header_patch.diff" \
 	&& dnf -y update && dnf install -y m2crypto
 
+RUN go get github.com/golang/lint/golint
+
 ENV GOPATH /usr/share/gocode:/go
 WORKDIR /go/src/github.com/projectatomic/skopeo
 
