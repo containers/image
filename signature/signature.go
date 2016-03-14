@@ -167,3 +167,38 @@ func (s *privateSignature) UnmarshalJSON(data []byte) error {
 
 	return nil
 }
+
+// Sign formats the signature and returns a blob signed using mech and keyIdentity
+func (s privateSignature) sign(mech SigningMechanism, keyIdentity string) ([]byte, error) {
+	json, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+
+	return mech.Sign(json, keyIdentity)
+}
+
+// verifyAndExtractSignature verifies that signature has been signed by expectedKeyIdentity
+// using mech for expectedDockerReference, and returns it (without matching its contents to an image).
+func verifyAndExtractSignature(mech SigningMechanism, unverifiedSignature []byte,
+	expectedKeyIdentity, expectedDockerReference string) (*Signature, error) {
+	signed, keyIdentity, err := mech.Verify(unverifiedSignature)
+	if err != nil {
+		return nil, err
+	}
+	if keyIdentity != expectedKeyIdentity {
+		return nil, InvalidSignatureError{msg: fmt.Sprintf("Signature by %s does not match expected fingerprint %s", keyIdentity, expectedKeyIdentity)}
+	}
+
+	var unmatchedSignature privateSignature
+	if err := json.Unmarshal(signed, &unmatchedSignature); err != nil {
+		return nil, InvalidSignatureError{msg: err.Error()}
+	}
+
+	if unmatchedSignature.DockerReference != expectedDockerReference {
+		return nil, InvalidSignatureError{msg: fmt.Sprintf("Docker reference %s does not match %s",
+			unmatchedSignature.DockerReference, expectedDockerReference)}
+	}
+	signature := unmatchedSignature.Signature // Policy OK.
+	return &signature, nil
+}

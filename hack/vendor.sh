@@ -14,6 +14,7 @@ clone git github.com/pmezard/go-difflib master
 clone git github.com/docker/docker master
 clone git github.com/docker/distribution master
 clone git github.com/opencontainers/runc master
+clone git github.com/mtrmac/gpgme master
 
 clean
 
