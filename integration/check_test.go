@@ -102,7 +102,7 @@ func (s *SkopeoSuite) TestNeedAuthToPrivateRegistryV2WithoutDockerCfg(c *check.C
 // TODO(runcom): as soon as we can push to registries ensure you can inspect here
 // not just get image not found :)
 func (s *SkopeoSuite) TestNoNeedAuthToPrivateRegistryV2ImageNotFound(c *check.C) {
-	out, err := exec.Command(skopeoBinary, "inspect" fmt.Sprintf("docker://%s/busybox:latest", s.regV2.url)).CombinedOutput()
+	out, err := exec.Command(skopeoBinary, "inspect", fmt.Sprintf("docker://%s/busybox:latest", s.regV2.url)).CombinedOutput()
 	c.Assert(err, check.NotNil, check.Commentf(string(out)))
 	wanted := "Error: image busybox not found"
 	if !strings.Contains(string(out), wanted) {
