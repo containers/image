@@ -30,7 +30,7 @@ type ImageManifest struct {
 	ContainerConfig *containerTypes.Config // remove docker/docker code, this isn't needed
 	DockerVersion   string
 	Author          string
-	Config          *containerTypes.Config // remove docker/docker code, needs just Labels here for now
+	Config          *containerTypes.Config // remove docker/docker code, needs just Labels here for now, maybe Cmd? Hostname?
 	Architecture    string
 	Os              string
 	Layers          []string // ???
