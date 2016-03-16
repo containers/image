@@ -11,7 +11,7 @@ a repository or a tag before pulling it (using disk space) - e.g. - which tags a
 Examples:
 ```sh
 # show repository's labels of rhel7:latest
-$ skopeo inspect registry.access.redhat.com/rhel7 | jq '.Config.Labels'
+$ skopeo inspect docker://registry.access.redhat.com/rhel7 | jq '.Config.Labels'
 {
   "Architecture": "x86_64",
   "Authoritative_Registry": "registry.access.redhat.com",
@@ -24,7 +24,7 @@ $ skopeo inspect registry.access.redhat.com/rhel7 | jq '.Config.Labels'
 }
 
 # show repository's tags
-$ skopeo inspect docker.io/fedora | jq '.RepoTags'
+$ skopeo inspect docker://docker.io/fedora | jq '.RepoTags'
 [
   "20",
   "21",
@@ -36,11 +36,11 @@ $ skopeo inspect docker.io/fedora | jq '.RepoTags'
 ]
 
 # show image's digest
-$ skopeo inspect docker.io/fedora:rawhide | jq '.Digest'
+$ skopeo inspect docker://docker.io/fedora:rawhide | jq '.Digest'
 "sha256:905b4846938c8aef94f52f3e41a11398ae5b40f5855fb0e40ed9c157e721d7f8"
 
 # show image's label "Name"
-$ skopeo inspect registry.access.redhat.com/rhel7 | jq '.Config.Labels.Name'
+$ skopeo inspect docker://registry.access.redhat.com/rhel7 | jq '.Config.Labels.Name'
 "rhel7/rhel"
 ```
 
@@ -65,15 +65,15 @@ $ cat /home/runcom/.docker/config.json
 }
 
 # we can see I'm already authenticated via docker login so everything will be fine
-$ skopeo inspect myregistrydomain.com:5000/busybox
+$ skopeo inspect docker://myregistrydomain.com:5000/busybox
 {"Tag":"latest","Digest":"sha256:473bb2189d7b913ed7187a33d11e743fdc2f88931122a44d91a301b64419f092","RepoTags":["latest"],"Comment":"","Created":"2016-01-15T18:06:41.282540103Z","ContainerConfig":{"Hostname":"aded96b43f48","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":null,"Cmd":["/bin/sh","-c","#(nop) CMD [\"sh\"]"],"Image":"9e77fef7a1c9f989988c06620dabc4020c607885b959a2cbd7c2283c91da3e33","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"DockerVersion":"1.8.3","Author":"","Config":{"Hostname":"aded96b43f48","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":null,"Cmd":["sh"],"Image":"9e77fef7a1c9f989988c06620dabc4020c607885b959a2cbd7c2283c91da3e33","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"Architecture":"amd64","Os":"linux"}
 
 # let's try now to fake a non existent Docker's config file
-$ skopeo --docker-cfg="" inspect myregistrydomain.com:5000/busybox
+$ skopeo --docker-cfg="" inspect docker://myregistrydomain.com:5000/busybox
 FATA[0000] Get https://myregistrydomain.com:5000/v2/busybox/manifests/latest: no basic auth credentials
 
 # passing --username and --password - we can see that everything goes fine
-$ skopeo --docker-cfg="" --username=testuser --password=testpassword inspect myregistrydomain.com:5000/busybox
+$ skopeo --docker-cfg="" --username=testuser --password=testpassword inspect docker://myregistrydomain.com:5000/busybox
 {"Tag":"latest","Digest":"sha256:473bb2189d7b913ed7187a33d11e743fdc2f88931122a44d91a301b64419f092","RepoTags":["latest"],"Comment":"","Created":"2016-01-15T18:06:41.282540103Z","ContainerConfig":{"Hostname":"aded96b43f48","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":null,"Cmd":["/bin/sh","-c","#(nop) CMD [\"sh\"]"],"Image":"9e77fef7a1c9f989988c06620dabc4020c607885b959a2cbd7c2283c91da3e33","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"DockerVersion":"1.8.3","Author":"","Config":{"Hostname":"aded96b43f48","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":null,"Cmd":["sh"],"Image":"9e77fef7a1c9f989988c06620dabc4020c607885b959a2cbd7c2283c91da3e33","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"Architecture":"amd64","Os":"linux"}
 ```
 If your cli config is found but it doesn't contain the necessary credentials for the queried registry
