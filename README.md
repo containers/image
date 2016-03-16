@@ -113,6 +113,8 @@ $ make test-integration
 ```
 TODO
 -
+- list all images on registry?
+- registry v2 search?
 - make skopeo docker registry v2 only
 - output raw manifest
 - download layers and support docker load tar(s)
