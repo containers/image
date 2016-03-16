@@ -11,7 +11,7 @@ const (
 type Registry interface {
 	Images() []Image
 	Image(ref string) Image     // ref == image name w/o registry part
-	Lookup(term string) []Image // docker registry v1 only AFAICT
+	Lookup(term string) []Image // docker registry v1 only AFAICT, v2 can be built hacking with Images()
 }
 
 type Image interface {
