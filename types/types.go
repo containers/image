@@ -4,21 +4,21 @@ import (
 	containerTypes "github.com/docker/engine-api/types/container"
 )
 
-type Kind int
-
 const (
-	KindUnknown Kind = iota
-	KindDocker
-	KindAppc
-
 	DockerPrefix = "docker://"
 )
 
+type Registry interface {
+	Images() []Image
+	Image(ref string) Image     // ref == image name w/o registry part
+	Lookup(term string) []Image // docker registry v1 only AFAICT
+}
+
 type Image interface {
-	Kind() Kind
-	GetLayers(layers []string) error
-	GetManifest(version string) ([]byte, error)
-	GetRawManifest(version string) ([]byte, error)
+	Layers(layers []string) error
+	Manifest(version string) (ImageManifest, error)
+	RawManifest(version string) ([]byte, error)
+	DockerTar() ([]byte, error) // ???
 }
 
 type ImageManifest struct {
@@ -27,10 +27,11 @@ type ImageManifest struct {
 	RepoTags        []string
 	Comment         string
 	Created         string
-	ContainerConfig *containerTypes.Config
+	ContainerConfig *containerTypes.Config // remove docker/docker code
 	DockerVersion   string
 	Author          string
-	Config          *containerTypes.Config
+	Config          *containerTypes.Config // remove docker/docker code
 	Architecture    string
 	Os              string
+	Layers          []string // ???
 }
