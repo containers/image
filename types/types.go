@@ -9,12 +9,18 @@ const (
 )
 
 type Registry interface {
-	Images() []Image
-	Image(ref string) Image     // ref == image name w/o registry part
+	Repositories() []Repository
+	Repository(ref string) Repository
 	Lookup(term string) []Image // docker registry v1 only AFAICT, v2 can be built hacking with Images()
 }
 
+type Repository interface {
+	Images() []Image
+	Image(ref string) Image // ref == image name w/o registry part
+}
+
 type Image interface {
+	// ref to repository?
 	Layers(layers ...string) error // configure download directory? Call it DownloadLayers?
 	Manifest(version string) (ImageManifest, error)
 	RawManifest(version string) ([]byte, error)
