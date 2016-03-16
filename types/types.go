@@ -15,10 +15,10 @@ type Registry interface {
 }
 
 type Image interface {
-	Layers(layers []string) error // var args
+	Layers(layers ...string) error // configure download directory? Call it DownloadLayers?
 	Manifest(version string) (ImageManifest, error)
 	RawManifest(version string) ([]byte, error)
-	DockerTar() ([]byte, error) // ???
+	DockerTar() ([]byte, error) // ??? also, configure output directory
 }
 
 type ImageManifest struct {
@@ -27,10 +27,10 @@ type ImageManifest struct {
 	RepoTags        []string
 	Comment         string
 	Created         string
-	ContainerConfig *containerTypes.Config // remove docker/docker code
+	ContainerConfig *containerTypes.Config // remove docker/docker code, this isn't needed
 	DockerVersion   string
 	Author          string
-	Config          *containerTypes.Config // remove docker/docker code
+	Config          *containerTypes.Config // remove docker/docker code, needs just Labels here for now
 	Architecture    string
 	Os              string
 	Layers          []string // ???
