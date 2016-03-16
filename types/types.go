@@ -15,7 +15,7 @@ type Registry interface {
 }
 
 type Image interface {
-	Layers(layers []string) error
+	Layers(layers []string) error // var args
 	Manifest(version string) (ImageManifest, error)
 	RawManifest(version string) ([]byte, error)
 	DockerTar() ([]byte, error) // ???
