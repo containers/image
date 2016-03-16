@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"os"
 
 	"github.com/Sirupsen/logrus"
@@ -12,20 +10,8 @@ import (
 
 const (
 	version = "0.1.12-dev"
-	usage   = "inspect images on a registry"
+	usage   = "interact with registries"
 )
-
-var inspectCmd = func(c *cli.Context) {
-	imgInspect, err := inspect(c)
-	if err != nil {
-		logrus.Fatal(err)
-	}
-	out, err := json.Marshal(imgInspect)
-	if err != nil {
-		logrus.Fatal(err)
-	}
-	fmt.Println(string(out))
-}
 
 func main() {
 	app := cli.NewApp()
@@ -61,7 +47,9 @@ func main() {
 		}
 		return nil
 	}
-	app.Action = inspectCmd
+	app.Commands = []cli.Command{
+		inspectCmd,
+	}
 	if err := app.Run(os.Args); err != nil {
 		logrus.Fatal(err)
 	}

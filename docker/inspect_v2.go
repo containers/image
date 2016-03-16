@@ -34,9 +34,9 @@ type v2ManifestFetcher struct {
 	service    *registry.Service
 }
 
-func (mf *v2ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*types.ImageInspect, error) {
+func (mf *v2ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*types.ImageManifest, error) {
 	var (
-		imgInspect *types.ImageInspect
+		imgInspect *types.ImageManifest
 		err        error
 	)
 
@@ -60,7 +60,7 @@ func (mf *v2ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*t
 	return imgInspect, err
 }
 
-func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref reference.Named) (*types.ImageInspect, error) {
+func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref reference.Named) (*types.ImageManifest, error) {
 	var (
 		manifest    distribution.Manifest
 		tagOrDigest string // Used for logging/progress only
@@ -146,7 +146,7 @@ func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref refere
 	//ref = reference.WithDefaultTag(ref)
 	//}
 	//_ = showTags
-	return makeImageInspect(image, tagOrDigest, manifestDigest, tagList), nil
+	return makeImageManifest(image, tagOrDigest, manifestDigest, tagList), nil
 }
 
 func (mf *v2ManifestFetcher) pullSchema1(ctx context.Context, ref reference.Named, unverifiedManifest *schema1.SignedManifest) (img *image.Image, manifestDigest digest.Digest, err error) {

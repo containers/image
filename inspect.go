@@ -1,55 +1,49 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/projectatomic/skopeo/docker"
 	"github.com/projectatomic/skopeo/types"
 )
 
-type imgKind int
-
-const (
-	imgTypeDocker = "docker://"
-	imgTypeAppc   = "appc://"
-
-	kindUnknown = iota
-	kindDocker
-	kindAppc
-)
-
-func getImgType(img string) imgKind {
-	if strings.HasPrefix(img, imgTypeDocker) {
-		return kindDocker
-	}
-	if strings.HasPrefix(img, imgTypeAppc) {
-		return kindAppc
-	}
-	// TODO(runcom): v2 will support this
-	//return kindUnknown
-	return kindDocker
+var inspectCmd = cli.Command{
+	Name:      "inspect",
+	Usage:     "inspect images on a registry",
+	ArgsUsage: ``,
+	Action: func(c *cli.Context) {
+		// get the Image interface before inspecting...utils.go parseImage
+		imgInspect, err := inspect(c)
+		if err != nil {
+			logrus.Fatal(err)
+		}
+		out, err := json.Marshal(imgInspect)
+		if err != nil {
+			logrus.Fatal(err)
+		}
+		fmt.Println(string(out))
+	},
 }
 
-func inspect(c *cli.Context) (*types.ImageInspect, error) {
+func inspect(c *cli.Context) (*types.ImageManifest, error) {
 	var (
-		imgInspect *types.ImageInspect
+		imgInspect *types.ImageManifest
 		err        error
 		name       = c.Args().First()
-		kind       = getImgType(name)
 	)
 
-	switch kind {
-	case kindDocker:
-		imgInspect, err = docker.GetData(c, strings.Replace(name, imgTypeDocker, "", -1))
+	switch {
+	case strings.HasPrefix(name, types.DockerPrefix):
+		imgInspect, err = docker.GetData(c, strings.Replace(name, "docker://", "", -1))
 		if err != nil {
 			return nil, err
 		}
-	case kindAppc:
-		return nil, fmt.Errorf("not implemented yet")
 	default:
-		return nil, fmt.Errorf("%s image is invalid, please use either 'docker://' or 'appc://'", name)
+		return nil, fmt.Errorf("%s image is invalid, please use 'docker://'", name)
 	}
 	return imgInspect, nil
 }

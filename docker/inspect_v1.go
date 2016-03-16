@@ -31,9 +31,9 @@ type v1ManifestFetcher struct {
 	session    *registry.Session
 }
 
-func (mf *v1ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*types.ImageInspect, error) {
+func (mf *v1ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*types.ImageManifest, error) {
 	var (
-		imgInspect *types.ImageInspect
+		imgInspect *types.ImageManifest
 	)
 	if _, isCanonical := ref.(reference.Canonical); isCanonical {
 		// Allowing fallback, because HTTPS v1 is before HTTP v2
@@ -68,7 +68,7 @@ func (mf *v1ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*t
 	return imgInspect, nil
 }
 
-func (mf *v1ManifestFetcher) fetchWithSession(ctx context.Context, ref reference.Named) (*types.ImageInspect, error) {
+func (mf *v1ManifestFetcher) fetchWithSession(ctx context.Context, ref reference.Named) (*types.ImageManifest, error) {
 	repoData, err := mf.session.GetRepositoryData(mf.repoInfo)
 	if err != nil {
 		if strings.Contains(err.Error(), "HTTP code: 404") {
@@ -142,7 +142,7 @@ func (mf *v1ManifestFetcher) fetchWithSession(ctx context.Context, ref reference
 		return nil, fmt.Errorf("No such image %s:%s", mf.repoInfo.FullName(), tag)
 	}
 
-	return makeImageInspect(pulledImg, tag, "", tagList), nil
+	return makeImageManifest(pulledImg, tag, "", tagList), nil
 }
 
 func (mf *v1ManifestFetcher) pullImageJSON(imgID, endpoint string, token []string) (*image.Image, error) {
