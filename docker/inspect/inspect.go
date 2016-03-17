@@ -1,4 +1,4 @@
-package docker
+package inspect
 
 import (
 	"encoding/json"
@@ -47,7 +47,7 @@ func (f fallbackError) Error() string {
 }
 
 type manifestFetcher interface {
-	Fetch(ctx context.Context, ref reference.Named) (*types.ImageManifest, error)
+	Fetch(ctx context.Context, ref reference.Named) (types.ImageManifest, error)
 }
 
 func validateName(name string) error {
@@ -62,7 +62,7 @@ func validateName(name string) error {
 	return nil
 }
 
-func GetData(c *cli.Context, name string) (*types.ImageManifest, error) {
+func GetData(c *cli.Context, name string) (types.ImageManifest, error) {
 	if err := validateName(name); err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func GetData(c *cli.Context, name string) (*types.ImageManifest, error) {
 		ctx                    = context.Background()
 		lastErr                error
 		discardNoSupportErrors bool
-		imgInspect             *types.ImageManifest
+		imgInspect             types.ImageManifest
 		confirmedV2            bool
 		confirmedTLSRegistries = make(map[string]struct{})
 	)
@@ -248,12 +248,12 @@ func validateRepoName(name string) error {
 	return nil
 }
 
-func makeImageManifest(img *image.Image, tag string, dgst digest.Digest, tagList []string) *types.ImageManifest {
+func makeImageManifest(img *image.Image, tag string, dgst digest.Digest, tagList []string) types.ImageManifest {
 	var digest string
 	if err := dgst.Validate(); err == nil {
 		digest = dgst.String()
 	}
-	return &types.ImageManifest{
+	return &types.DockerImageManifest{
 		Tag:             tag,
 		Digest:          digest,
 		RepoTags:        tagList,

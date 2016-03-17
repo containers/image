@@ -1,4 +1,4 @@
-package docker
+package inspect
 
 import (
 	"encoding/json"
@@ -34,9 +34,9 @@ type v2ManifestFetcher struct {
 	service    *registry.Service
 }
 
-func (mf *v2ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*types.ImageManifest, error) {
+func (mf *v2ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (types.ImageManifest, error) {
 	var (
-		imgInspect *types.ImageManifest
+		imgInspect types.ImageManifest
 		err        error
 	)
 
@@ -60,7 +60,7 @@ func (mf *v2ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*t
 	return imgInspect, err
 }
 
-func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref reference.Named) (*types.ImageManifest, error) {
+func (mf *v2ManifestFetcher) fetchWithRepository(ctx context.Context, ref reference.Named) (types.ImageManifest, error) {
 	var (
 		manifest    distribution.Manifest
 		tagOrDigest string // Used for logging/progress only

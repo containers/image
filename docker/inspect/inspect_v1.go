@@ -1,4 +1,4 @@
-package docker
+package inspect
 
 import (
 	"encoding/json"
@@ -31,9 +31,9 @@ type v1ManifestFetcher struct {
 	session    *registry.Session
 }
 
-func (mf *v1ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*types.ImageManifest, error) {
+func (mf *v1ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (types.ImageManifest, error) {
 	var (
-		imgInspect *types.ImageManifest
+		imgInspect types.ImageManifest
 	)
 	if _, isCanonical := ref.(reference.Canonical); isCanonical {
 		// Allowing fallback, because HTTPS v1 is before HTTP v2
@@ -68,7 +68,7 @@ func (mf *v1ManifestFetcher) Fetch(ctx context.Context, ref reference.Named) (*t
 	return imgInspect, nil
 }
 
-func (mf *v1ManifestFetcher) fetchWithSession(ctx context.Context, ref reference.Named) (*types.ImageManifest, error) {
+func (mf *v1ManifestFetcher) fetchWithSession(ctx context.Context, ref reference.Named) (types.ImageManifest, error) {
 	repoData, err := mf.session.GetRepositoryData(mf.repoInfo)
 	if err != nil {
 		if strings.Contains(err.Error(), "HTTP code: 404") {

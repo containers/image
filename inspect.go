@@ -7,7 +7,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
-	"github.com/projectatomic/skopeo/docker"
+	pkgInspect "github.com/projectatomic/skopeo/docker/inspect"
 	"github.com/projectatomic/skopeo/types"
 )
 
@@ -29,16 +29,16 @@ var inspectCmd = cli.Command{
 	},
 }
 
-func inspect(c *cli.Context) (*types.ImageManifest, error) {
+func inspect(c *cli.Context) (types.ImageManifest, error) {
 	var (
-		imgInspect *types.ImageManifest
+		imgInspect types.ImageManifest
 		err        error
 		name       = c.Args().First()
 	)
 
 	switch {
 	case strings.HasPrefix(name, types.DockerPrefix):
-		imgInspect, err = docker.GetData(c, strings.Replace(name, "docker://", "", -1))
+		imgInspect, err = pkgInspect.GetData(c, strings.Replace(name, "docker://", "", -1))
 		if err != nil {
 			return nil, err
 		}

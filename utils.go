@@ -10,7 +10,7 @@ import (
 func parseImage(img string) (types.Image, error) {
 	switch {
 	case strings.HasPrefix(img, types.DockerPrefix):
-		//return parseDockerImage(strings.TrimPrefix(img, dockerPrefix))
+		return parseDockerImage(strings.TrimPrefix(img, dockerPrefix))
 		//case strings.HasPrefix(img, appcPrefix):
 		//
 	}

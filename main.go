@@ -49,6 +49,7 @@ func main() {
 	}
 	app.Commands = []cli.Command{
 		inspectCmd,
+		layersCmd,
 	}
 	if err := app.Run(os.Args); err != nil {
 		logrus.Fatal(err)

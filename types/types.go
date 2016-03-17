@@ -27,7 +27,12 @@ type Image interface {
 	DockerTar() ([]byte, error) // ??? also, configure output directory
 }
 
-type ImageManifest struct {
+// TODO(runcom)
+type ImageManifest interface {
+	Labels() map[string]string
+}
+
+type DockerImageManifest struct {
 	Tag             string
 	Digest          string
 	RepoTags        []string
@@ -40,4 +45,8 @@ type ImageManifest struct {
 	Architecture    string
 	Os              string
 	Layers          []string // ???
+}
+
+func (m *DockerImageManifest) Labels() map[string]string {
+	return m.Config.Labels
 }
