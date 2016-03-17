@@ -15,7 +15,27 @@ var inspectCmd = cli.Command{
 	Name:      "inspect",
 	Usage:     "inspect images on a registry",
 	ArgsUsage: ``,
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "raw",
+			Usage: "output raw manifest",
+		},
+	},
 	Action: func(c *cli.Context) {
+		if c.Bool("raw") {
+			img, err := parseImage(c.Args().First())
+			if err != nil {
+				logrus.Fatal(err)
+			}
+			// TODO(runcom): this is not falling back to v1
+			// TODO(runcom): hardcoded schema 2 version 1
+			b, err := img.RawManifest("2-1")
+			if err != nil {
+				logrus.Fatal(err)
+			}
+			fmt.Println(string(b))
+			return
+		}
 		// get the Image interface before inspecting...utils.go parseImage
 		imgInspect, err := inspect(c)
 		if err != nil {
