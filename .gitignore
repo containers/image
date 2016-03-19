@@ -1,3 +1,4 @@
-skopeo
-skopeo.1
-layers-*
+!cmd/skopeo/
+/skopeo
+/skopeo.1
+/layers-*
