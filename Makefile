@@ -54,5 +54,12 @@ shell: build-container
 test-integration: build-container
 	$(DOCKER_RUN_DOCKER) hack/make.sh test-integration
 
+test-unit: build-container
+	# Just call (make test unit-local) here instead of worrying about environment differences, e.g. GO15VENDOREXPERIMENT.
+	$(DOCKER_RUN_DOCKER) make test-unit-local
+
 validate: build-container
 	$(DOCKER_RUN_DOCKER) hack/make.sh validate-git-marks validate-gofmt validate-lint validate-vet
+
+test-unit-local:
+	go test $$(go list -e ./... | grep -v '^github\.com/projectatomic/skopeo/\(integration\|vendor/.*\)$$')
