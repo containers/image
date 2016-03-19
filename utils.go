@@ -1,4 +1,4 @@
-package main
+package skopeo
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"github.com/projectatomic/skopeo/types"
 )
 
-func parseImage(img string) (types.Image, error) {
+func ParseImage(img string) (types.Image, error) {
 	switch {
 	case strings.HasPrefix(img, types.DockerPrefix):
 		return parseDockerImage(strings.TrimPrefix(img, dockerPrefix))

@@ -21,10 +21,13 @@ ifeq ($(INTERACTIVE), 1)
 endif
 DOCKER_RUN_DOCKER := $(DOCKER_FLAGS) "$(DOCKER_IMAGE)"
 
+GIT_COMMIT := $(shell git rev-parse HEAD 2> /dev/null || true)
+LDFLAGS := "-X github.com/projectatomic/skopeo.GitCommit=${GIT_COMMIT} ${LDFLAGS}"
+
 all: man binary
 
 binary:
-	go build -o ${DEST}skopeo .
+	go build -ldflags ${LDFLAGS} -o ${DEST}skopeo ./cmd/skopeo
 
 build-container:
 	docker build ${DOCKER_BUILD_ARGS} -t "$(DOCKER_IMAGE)" .
