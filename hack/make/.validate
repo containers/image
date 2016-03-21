@@ -21,9 +21,7 @@ if [ -z "$VALIDATE_UPSTREAM" ]; then
 	VALIDATE_COMMIT_DIFF="$VALIDATE_UPSTREAM...$VALIDATE_HEAD"
 	
 	validate_diff() {
-		if [ "$VALIDATE_UPSTREAM" != "$VALIDATE_HEAD" ]; then
-			git diff "$VALIDATE_COMMIT_DIFF" "$@"
-		fi
+		git diff "$VALIDATE_UPSTREAM" "$@"
 	}
 	validate_log() {
 		if [ "$VALIDATE_UPSTREAM" != "$VALIDATE_HEAD" ]; then
