@@ -17,7 +17,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/homedir"
-	"github.com/projectatomic/skopeo/docker/reference"
+	"github.com/projectatomic/skopeo/reference"
 	"github.com/projectatomic/skopeo/types"
 )
 
