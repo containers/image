@@ -3,13 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/projectatomic/skopeo"
-	pkgInspect "github.com/projectatomic/skopeo/docker/inspect"
-	"github.com/projectatomic/skopeo/types"
 )
 
 var inspectCmd = cli.Command{
@@ -46,23 +43,4 @@ var inspectCmd = cli.Command{
 		}
 		fmt.Println(string(out))
 	},
-}
-
-func inspect(c *cli.Context) (types.ImageManifest, error) {
-	var (
-		imgInspect types.ImageManifest
-		err        error
-		name       = c.Args().First()
-	)
-
-	switch {
-	case strings.HasPrefix(name, types.DockerPrefix):
-		imgInspect, err = pkgInspect.GetData(c, strings.Replace(name, "docker://", "", -1))
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("%s image is invalid, please use 'docker://'", name)
-	}
-	return imgInspect, nil
 }
