@@ -22,7 +22,7 @@ type Repository interface {
 type Image interface {
 	// ref to repository?
 	Layers(layers ...string) error // configure download directory? Call it DownloadLayers?
-	Manifest(version string) (ImageManifest, error)
+	Manifest() (ImageManifest, error)
 	RawManifest(version string) ([]byte, error)
 	DockerTar() ([]byte, error) // ??? also, configure output directory
 }
@@ -48,5 +48,8 @@ type DockerImageManifest struct {
 }
 
 func (m *DockerImageManifest) Labels() map[string]string {
+	if m.Config == nil {
+		return nil
+	}
 	return m.Config.Labels
 }

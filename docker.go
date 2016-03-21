@@ -53,11 +53,36 @@ func (i *dockerImage) RawManifest(version string) ([]byte, error) {
 	return i.rawManifest, nil
 }
 
-func (i *dockerImage) Manifest(version string) (types.ImageManifest, error) {
-	// TODO(runcom): port docker/docker implementation under  docker/ to just
-	// use this!!! and do not rely on docker upstream code - will need to support
-	// v1 fall back also...
-	return nil, nil
+func (i *dockerImage) Manifest() (types.ImageManifest, error) {
+	// TODO(runcom): unused version param for now, default to docker v2-1
+	m, err := i.getSchema1Manifest()
+	if err != nil {
+		return nil, err
+	}
+	ms1, ok := m.(*manifestSchema1)
+	if !ok {
+		return nil, fmt.Errorf("error retrivieng manifest schema1")
+	}
+
+	// TODO(runcom): get all tags, last argument, and digest
+	return makeImageManifest(ms1, "", nil), nil
+}
+
+func makeImageManifest(m *manifestSchema1, dgst string, tagList []string) types.ImageManifest {
+	return &types.DockerImageManifest{
+		Tag:             m.Tag,
+		Digest:          dgst,
+		RepoTags:        tagList,
+		Comment:         "",
+		Created:         "",
+		ContainerConfig: nil,
+		DockerVersion:   "",
+		Author:          "",
+		Config:          nil,
+		Architecture:    "",
+		Os:              "",
+		Layers:          nil,
+	}
 }
 
 func (i *dockerImage) DockerTar() ([]byte, error) {
@@ -273,6 +298,13 @@ func (i *dockerImage) getSchema1Manifest() (manifest, error) {
 	if err := fixManifestLayers(mschema1); err != nil {
 		return nil, err
 	}
+	// TODO(runcom): verify manifest schema 1, 2 etc
+	//if len(m.FSLayers) != len(m.History) {
+	//return nil, fmt.Errorf("length of history not equal to number of layers for %q", ref.String())
+	//}
+	//if len(m.FSLayers) == 0 {
+	//return nil, fmt.Errorf("no FSLayers in manifest for %q", ref.String())
+	//}
 	return mschema1, nil
 }
 
