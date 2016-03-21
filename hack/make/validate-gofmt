@@ -8,8 +8,7 @@ unset IFS
 
 badFiles=()
 for f in "${files[@]}"; do
-	# we use "git show" here to validate that what's committed is formatted
-	if [ "$(git show "$VALIDATE_HEAD:$f" | gofmt -s -l)" ]; then
+	if [ "$(gofmt -s -l < $f)" ]; then
 		badFiles+=( "$f" )
 	fi
 done
