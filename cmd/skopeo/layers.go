@@ -8,9 +8,8 @@ import (
 
 // TODO(runcom): document args and usage
 var layersCmd = cli.Command{
-	Name:      "layers",
-	Usage:     "get images layers",
-	ArgsUsage: ``,
+	Name:  "layers",
+	Usage: "get images layers",
 	Action: func(context *cli.Context) {
 		img, err := skopeo.ParseImage(context.Args().First())
 		if err != nil {

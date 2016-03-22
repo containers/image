@@ -10,9 +10,8 @@ import (
 )
 
 var inspectCmd = cli.Command{
-	Name:      "inspect",
-	Usage:     "inspect images on a registry",
-	ArgsUsage: ``,
+	Name:  "inspect",
+	Usage: "inspect images on a registry",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "raw",
