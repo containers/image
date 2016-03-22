@@ -51,8 +51,23 @@ man:
 shell: build-container
 	$(DOCKER_RUN_DOCKER) bash
 
+check: validate test-unit test-integration
+
 test-integration: build-container
 	$(DOCKER_RUN_DOCKER) hack/make.sh test-integration
 
+test-unit: build-container
+	# Just call (make test unit-local) here instead of worrying about environment differences, e.g. GO15VENDOREXPERIMENT.
+	$(DOCKER_RUN_DOCKER) make test-unit-local
+
 validate: build-container
 	$(DOCKER_RUN_DOCKER) hack/make.sh validate-git-marks validate-gofmt validate-lint validate-vet
+
+# This target is only intended for development, e.g. executing it from an IDE. Use (make test) for CI or pre-release testing. 
+test-all-local: validate-local test-unit-local
+
+validate-local:
+	hack/make.sh validate-git-marks validate-gofmt validate-lint validate-vet
+
+test-unit-local:
+	go test $$(go list -e ./... | grep -v '^github\.com/projectatomic/skopeo/\(integration\|vendor/.*\)$$')
