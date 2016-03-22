@@ -36,7 +36,7 @@ clean:
 	rm -f skopeo
 	rm -f skopeo.1
 
-install: man install-binary
+install: install-binary
 	install -m 644 skopeo.1 ${MANINSTALLDIR}/man1/
 	# TODO(runcom)
 	#install -m 644 completion/bash/skopeo ${BASHINSTALLDIR}/
