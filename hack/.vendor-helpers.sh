@@ -46,10 +46,7 @@ clone() {
 }
 
 clean() {
-	local packages=(
-		"${PROJECT}/cmd/skopeo" # package main
-		"${PROJECT}/integration" # package main
-	)
+	local packages=($(go list -e ./... | grep -v "^${PROJECT}/vendor"))
 	local platforms=( linux/amd64 linux/386 )
 
 	local buildTags=(  )
@@ -65,6 +62,10 @@ clean() {
 			go list -e -tags "$buildTags" -f '{{join .Deps "\n"}}' "${packages[@]}"
 			go list -e -tags "$buildTags" -f '{{join .TestImports "\n"}}' "${packages[@]}"
 		done | grep -vE "^${PROJECT}" | sort -u
+	) )
+	# .TestImports does not include indirect dependencies, so do one more iteration.
+	imports+=( $(
+		go list -e -f '{{join .Deps "\n"}}' "${imports[@]}" | grep -vE "^${PROJECT}" | sort -u
 	) )
 	imports=( $(go list -e -f '{{if not .Standard}}{{.ImportPath}}{{end}}' "${imports[@]}") )
 	unset IFS
