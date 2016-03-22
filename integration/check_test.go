@@ -112,7 +112,7 @@ func (s *SkopeoSuite) TestNoNeedAuthToPrivateRegistryV2ImageNotFound(c *check.C)
 	if !strings.Contains(string(out), wanted) {
 		c.Fatalf("wanted %s, got %s", wanted, string(out))
 	}
-	wanted := fmt.Sprintf(errFetchManifest, "401")
+	wanted = fmt.Sprintf(errFetchManifest, "401")
 	if strings.Contains(string(out), wanted) {
 		c.Fatalf("not wanted %s, got %s", wanted, string(out))
 	}
