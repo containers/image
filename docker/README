@@ -1,5 +1,0 @@
-TODO
-
-Eventually we want to get rid of inspect pkg which uses docker upstream code
-and use, instead, docker.go which calls the api directly
-Be aware that docker pkg do not fall back to v1! this must be implemented soon

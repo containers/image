@@ -117,10 +117,7 @@ TODO
 - update README with `layers` command
 - list all images on registry?
 - registry v2 search?
-- make skopeo docker registry v2 only
-- output raw manifest
-- download layers and support docker load tar(s)
-- get rid of docker/docker code (?)
+- download layers in parallel and support docker load tar(s)
 - show repo tags via flag or when reference isn't tagged or digested
 - add tests (integration with deployed registries in container - Docker-like)
 - support rkt/appc image spec
