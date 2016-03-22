@@ -1,7 +1,8 @@
 package types
 
 import (
-	containerTypes "github.com/docker/engine-api/types/container"
+	"fmt"
+	"time"
 )
 
 const (
@@ -34,30 +35,24 @@ type Image interface {
 // ImageManifest is the interesting subset of metadata about an Image.
 // TODO(runcom)
 type ImageManifest interface {
-	Labels() map[string]string
+	String() string
 }
 
 // DockerImageManifest is a set of metadata describing Docker images and their manifest.json files.
 // Note that this is not exactly manifest.json, e.g. some fields have been added.
 type DockerImageManifest struct {
-	Tag             string
-	Digest          string
-	RepoTags        []string
-	Comment         string
-	Created         string
-	ContainerConfig *containerTypes.Config // remove docker/docker code, this isn't needed
-	DockerVersion   string
-	Author          string
-	Config          *containerTypes.Config // remove docker/docker code, needs just Labels here for now, maybe Cmd? Hostname?
-	Architecture    string
-	Os              string
-	Layers          []string // ???
+	Name          string
+	Tag           string
+	Digest        string
+	RepoTags      []string
+	Created       time.Time
+	DockerVersion string
+	Labels        map[string]string
+	Architecture  string
+	Os            string
+	Layers        []string
 }
 
-// Labels returns labels attached to this image.
-func (m *DockerImageManifest) Labels() map[string]string {
-	if m.Config == nil {
-		return nil
-	}
-	return m.Config.Labels
+func (m *DockerImageManifest) String() string {
+	return fmt.Sprintf("%s:%s", m.Name, m.Tag)
 }

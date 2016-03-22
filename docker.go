@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/homedir"
@@ -32,11 +33,23 @@ const (
 	dockerCfgObsolete = ".dockercfg"
 )
 
-var validHex = regexp.MustCompile(`^([a-f0-9]{64})$`)
+var (
+	validHex = regexp.MustCompile(`^([a-f0-9]{64})$`)
+)
+
+type errFetchManifest struct {
+	statusCode int
+	body       []byte
+}
+
+func (e errFetchManifest) Error() string {
+	return fmt.Sprintf("error fetching manifest: status code: %d, body: %s", e.statusCode, string(e.body))
+}
 
 type dockerImage struct {
 	ref             reference.Named
 	tag             string
+	digest          string
 	registry        string
 	username        string
 	password        string
@@ -63,28 +76,75 @@ func (i *dockerImage) Manifest() (types.ImageManifest, error) {
 	if !ok {
 		return nil, fmt.Errorf("error retrivieng manifest schema1")
 	}
-
-	// TODO(runcom): get all tags, last argument, and digest
-	return makeImageManifest(ms1, "", nil), nil
-}
-
-func makeImageManifest(m *manifestSchema1, dgst string, tagList []string) types.ImageManifest {
-	return &types.DockerImageManifest{
-		Tag:             m.Tag,
-		Digest:          dgst,
-		RepoTags:        tagList,
-		Comment:         "",
-		Created:         "",
-		ContainerConfig: nil,
-		DockerVersion:   "",
-		Author:          "",
-		Config:          nil,
-		Architecture:    "",
-		Os:              "",
-		Layers:          nil,
+	tags, err := i.getTags()
+	if err != nil {
+		return nil, err
 	}
+	imgManifest, err := makeImageManifest(i.ref.FullName(), ms1, i.digest, tags)
+	if err != nil {
+		return nil, err
+	}
+	return imgManifest, nil
 }
 
+func (i *dockerImage) getTags() ([]string, error) {
+	url := i.scheme + "://" + i.registry + "/v2/" + i.ref.RemoteName() + "/tags/list"
+	res, err := i.makeRequest("GET", url, i.WWWAuthenticate != "", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		// print url also
+		return nil, fmt.Errorf("Invalid status code returned when fetching tags list %d", res.StatusCode)
+	}
+	type tagsRes struct {
+		Tags []string
+	}
+	tags := &tagsRes{}
+	if err := json.NewDecoder(res.Body).Decode(tags); err != nil {
+		return nil, err
+	}
+	return tags.Tags, nil
+}
+
+type config struct {
+	Labels map[string]string
+}
+
+type v1Image struct {
+	// Config is the configuration of the container received from the client
+	Config *config `json:"config,omitempty"`
+	// DockerVersion specifies version on which image is built
+	DockerVersion string `json:"docker_version,omitempty"`
+	// Created timestamp when image was created
+	Created time.Time `json:"created"`
+	// Architecture is the hardware that the image is build and runs on
+	Architecture string `json:"architecture,omitempty"`
+	// OS is the operating system used to build and run the image
+	OS string `json:"os,omitempty"`
+}
+
+func makeImageManifest(name string, m *manifestSchema1, dgst string, tagList []string) (types.ImageManifest, error) {
+	v1 := &v1Image{}
+	if err := json.Unmarshal([]byte(m.History[0].V1Compatibility), v1); err != nil {
+		return nil, err
+	}
+	return &types.DockerImageManifest{
+		Name:          name,
+		Tag:           m.Tag,
+		Digest:        dgst,
+		RepoTags:      tagList,
+		DockerVersion: v1.DockerVersion,
+		Created:       v1.Created,
+		Labels:        v1.Config.Labels,
+		Architecture:  v1.Architecture,
+		Os:            v1.OS,
+		Layers:        m.GetLayers(),
+	}, nil
+}
+
+// TODO(runcom)
 func (i *dockerImage) DockerTar() ([]byte, error) {
 	return nil, nil
 }
@@ -274,16 +334,15 @@ func (i *dockerImage) retrieveRawManifest() error {
 		return err
 	}
 	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		// print body also
-		return fmt.Errorf("Invalid status code returned when fetching manifest %d", res.StatusCode)
-	}
 	manblob, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return err
 	}
+	if res.StatusCode != http.StatusOK {
+		return errFetchManifest{res.StatusCode, manblob}
+	}
 	i.rawManifest = manblob
+	i.digest = res.Header.Get("Docker-Content-Digest")
 	return nil
 }
 
