@@ -3,6 +3,7 @@ FROM fedora
 RUN dnf -y update && dnf install -y make git golang golang-github-cpuguy83-go-md2man \
 	# gpgme bindings deps
 	libassuan-devel gpgme-devel \
+	gnupg \
 	# registry v1 deps
 	xz-devel \
 	python-devel \

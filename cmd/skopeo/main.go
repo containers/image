@@ -54,6 +54,8 @@ func main() {
 	app.Commands = []cli.Command{
 		inspectCmd,
 		layersCmd,
+		standaloneSignCmd,
+		standaloneVerifyCmd,
 	}
 	if err := app.Run(os.Args); err != nil {
 		logrus.Fatal(err)
