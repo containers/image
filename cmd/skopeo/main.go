@@ -6,7 +6,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
-	"github.com/docker/docker/cliconfig"
 	"github.com/projectatomic/skopeo"
 )
 
@@ -37,9 +36,13 @@ func main() {
 			Usage: "registry password",
 		},
 		cli.StringFlag{
-			Name:  "docker-cfg",
-			Value: cliconfig.ConfigDir(),
-			Usage: "Docker's cli config for auth",
+			Name:  "cert-path",
+			Value: "",
+			Usage: "Certificates path to connect to the given registry (cert.pem, key.pem)",
+		},
+		cli.BoolFlag{
+			Name:  "tls-verify",
+			Usage: "Whether to verify certificates or not",
 		},
 	}
 	app.Before = func(c *cli.Context) error {

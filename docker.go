@@ -23,7 +23,6 @@ import (
 )
 
 const (
-	dockerPrefix       = "docker://"
 	dockerHostname     = "docker.io"
 	dockerRegistry     = "registry-1.docker.io"
 	dockerAuthRegistry = "https://index.docker.io/v1/"
@@ -490,6 +489,10 @@ func decodeDockerAuth(s string) (string, string, error) {
 }
 
 func getAuth(hostname string) (string, string, error) {
+	// TODO(runcom): get this from *cli.Context somehow
+	//if username != "" && password != "" {
+	//return username, password, nil
+	//}
 	if hostname == dockerHostname {
 		hostname = dockerAuthRegistry
 	}
