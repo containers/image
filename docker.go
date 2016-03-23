@@ -23,7 +23,6 @@ import (
 )
 
 const (
-	dockerPrefix       = "docker://"
 	dockerHostname     = "docker.io"
 	dockerRegistry     = "registry-1.docker.io"
 	dockerAuthRegistry = "https://index.docker.io/v1/"
@@ -31,6 +30,11 @@ const (
 	dockerCfg         = ".docker"
 	dockerCfgFileName = "config.json"
 	dockerCfgObsolete = ".dockercfg"
+
+	baseURL     = "%s://%s/v2/"
+	tagsURL     = baseURL + "%s/tags/list"
+	manifestURL = baseURL + "%s/manifests/%s"
+	blobsURL    = baseURL + "%s/blobs/%s"
 )
 
 var (
@@ -56,6 +60,7 @@ type dockerImage struct {
 	WWWAuthenticate string
 	scheme          string
 	rawManifest     []byte
+	transport       *http.Transport
 }
 
 func (i *dockerImage) RawManifest(version string) ([]byte, error) {
@@ -88,7 +93,7 @@ func (i *dockerImage) Manifest() (types.ImageManifest, error) {
 }
 
 func (i *dockerImage) getTags() ([]string, error) {
-	url := i.scheme + "://" + i.registry + "/v2/" + i.ref.RemoteName() + "/tags/list"
+	url := fmt.Sprintf(tagsURL, i.scheme, i.registry, i.ref.RemoteName())
 	res, err := i.makeRequest("GET", url, i.WWWAuthenticate != "", nil)
 	if err != nil {
 		return nil, err
@@ -198,9 +203,10 @@ func (i *dockerImage) makeRequest(method, url string, auth bool, headers map[str
 			return nil, err
 		}
 	}
-	// insecure by default for now
-	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-	client := &http.Client{Transport: tr}
+	client := &http.Client{}
+	if i.transport != nil {
+		client.Transport = i.transport
+	}
 	res, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -218,9 +224,10 @@ func (i *dockerImage) setupRequestAuth(req *http.Request) error {
 		req.SetBasicAuth(i.username, i.password)
 		return nil
 	case "Bearer":
-		// insecure by default for now
-		tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-		client := &http.Client{Transport: tr}
+		client := &http.Client{}
+		if i.transport != nil {
+			client.Transport = i.transport
+		}
 		res, err := client.Do(req)
 		if err != nil {
 			return err
@@ -281,6 +288,7 @@ func (i *dockerImage) getBearerToken(realm, service, scope string) (string, erro
 	if i.username != "" && i.password != "" {
 		authReq.SetBasicAuth(i.username, i.password)
 	}
+	// insecure for now to contact the external token service
 	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	client := &http.Client{Transport: tr}
 	res, err := client.Do(authReq)
@@ -320,13 +328,13 @@ func (i *dockerImage) retrieveRawManifest() error {
 	if i.rawManifest != nil {
 		return nil
 	}
-	pr, err := ping(i.registry)
+	pr, err := i.ping()
 	if err != nil {
 		return err
 	}
 	i.WWWAuthenticate = pr.WWWAuthenticate
 	i.scheme = pr.scheme
-	url := i.scheme + "://" + i.registry + "/v2/" + i.ref.RemoteName() + "/manifests/" + i.tag
+	url := fmt.Sprintf(manifestURL, i.scheme, i.registry, i.ref.RemoteName(), i.tag)
 	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
 	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
 	res, err := i.makeRequest("GET", url, pr.needsAuth(), nil)
@@ -383,7 +391,6 @@ func (i *dockerImage) Layers(layers ...string) error {
 	if err := ioutil.WriteFile(path.Join(tmpDir, "manifest.json"), data, 0644); err != nil {
 		return err
 	}
-	url := i.scheme + "://" + i.registry + "/v2/" + i.ref.RemoteName() + "/blobs/"
 	if len(layers) == 0 {
 		layers = m.GetLayers()
 	}
@@ -391,6 +398,7 @@ func (i *dockerImage) Layers(layers ...string) error {
 		if !strings.HasPrefix(l, "sha256:") {
 			l = "sha256:" + l
 		}
+		url := fmt.Sprintf(blobsURL, i.scheme, i.registry, i.ref.RemoteName(), l)
 		if err := i.getLayer(l, url, tmpDir); err != nil {
 			return err
 		}
@@ -399,9 +407,8 @@ func (i *dockerImage) Layers(layers ...string) error {
 }
 
 func (i *dockerImage) getLayer(l, url, tmpDir string) error {
-	lurl := url + l
-	logrus.Infof("Downloading %s", lurl)
-	res, err := i.makeRequest("GET", lurl, i.WWWAuthenticate != "", nil)
+	logrus.Infof("Downloading %s", url)
+	res, err := i.makeRequest("GET", url, i.WWWAuthenticate != "", nil)
 	if err != nil {
 		return err
 	}
@@ -424,7 +431,7 @@ func (i *dockerImage) getLayer(l, url, tmpDir string) error {
 	return nil
 }
 
-func parseDockerImage(img string) (types.Image, error) {
+func parseDockerImage(img, certPath string, tlsVerify bool) (types.Image, error) {
 	ref, err := reference.ParseNamed(img)
 	if err != nil {
 		return nil, err
@@ -450,12 +457,28 @@ func parseDockerImage(img string) (types.Image, error) {
 	if err != nil {
 		return nil, err
 	}
+	var tr *http.Transport
+	if certPath != "" {
+		tlsc := &tls.Config{}
+
+		cert, err := tls.LoadX509KeyPair(filepath.Join(certPath, "cert.pem"), filepath.Join(certPath, "key.pem"))
+		if err != nil {
+			return nil, fmt.Errorf("Error loading x509 key pair: %s", err)
+		}
+
+		tlsc.Certificates = append(tlsc.Certificates, cert)
+		tlsc.InsecureSkipVerify = !tlsVerify
+		tr = &http.Transport{
+			TLSClientConfig: tlsc,
+		}
+	}
 	return &dockerImage{
-		ref:      ref,
-		tag:      tag,
-		registry: registry,
-		username: username,
-		password: password,
+		ref:       ref,
+		tag:       tag,
+		registry:  registry,
+		username:  username,
+		password:  password,
+		transport: tr,
 	}, nil
 }
 
@@ -490,6 +513,10 @@ func decodeDockerAuth(s string) (string, string, error) {
 }
 
 func getAuth(hostname string) (string, string, error) {
+	// TODO(runcom): get this from *cli.Context somehow
+	//if username != "" && password != "" {
+	//return username, password, nil
+	//}
 	if hostname == dockerHostname {
 		hostname = dockerAuthRegistry
 	}
@@ -548,12 +575,13 @@ func (pr *pingResponse) needsAuth() bool {
 	return pr.WWWAuthenticate != ""
 }
 
-func ping(registry string) (*pingResponse, error) {
-	// insecure by default for now
-	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-	client := &http.Client{Transport: tr}
+func (i *dockerImage) ping() (*pingResponse, error) {
+	client := &http.Client{}
+	if i.transport != nil {
+		client.Transport = i.transport
+	}
 	ping := func(scheme string) (*pingResponse, error) {
-		resp, err := client.Get(scheme + "://" + registry + "/v2/")
+		resp, err := client.Get(scheme + "://" + i.registry + "/v2/")
 		if err != nil {
 			return nil, err
 		}

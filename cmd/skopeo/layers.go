@@ -10,12 +10,12 @@ import (
 var layersCmd = cli.Command{
 	Name:  "layers",
 	Usage: "get images layers",
-	Action: func(context *cli.Context) {
-		img, err := skopeo.ParseImage(context.Args().First())
+	Action: func(c *cli.Context) {
+		img, err := skopeo.ParseImage(c)
 		if err != nil {
 			logrus.Fatal(err)
 		}
-		if err := img.Layers(context.Args().Tail()...); err != nil {
+		if err := img.Layers(c.Args().Tail()...); err != nil {
 			logrus.Fatal(err)
 		}
 	},

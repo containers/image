@@ -19,7 +19,7 @@ var inspectCmd = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) {
-		img, err := skopeo.ParseImage(c.Args().First())
+		img, err := skopeo.ParseImage(c)
 		if err != nil {
 			logrus.Fatal(err)
 		}

@@ -113,7 +113,6 @@ $ make test-integration
 ```
 TODO
 -
-- support --tls-verify + --cert-path for secure connection (see docker authz plugin)
 - update README with `layers` command
 - list all images on registry?
 - registry v2 search?
