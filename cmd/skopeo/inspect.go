@@ -43,7 +43,7 @@ var inspectCmd = cli.Command{
 			return err
 		}
 		if c.Bool("raw") {
-			fmt.Println(string(rawManifest))
+			fmt.Fprintln(c.App.Writer, string(rawManifest))
 			return nil
 		}
 		imgInspect, err := img.Inspect()
@@ -77,7 +77,7 @@ var inspectCmd = cli.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Println(string(out))
+		fmt.Fprintln(c.App.Writer, string(out))
 		return nil
 	},
 }
