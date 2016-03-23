@@ -60,6 +60,7 @@ type dockerImage struct {
 	WWWAuthenticate string
 	scheme          string
 	rawManifest     []byte
+	transport       *http.Transport
 }
 
 func (i *dockerImage) RawManifest(version string) ([]byte, error) {
@@ -202,9 +203,10 @@ func (i *dockerImage) makeRequest(method, url string, auth bool, headers map[str
 			return nil, err
 		}
 	}
-	// insecure by default for now
-	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-	client := &http.Client{Transport: tr}
+	client := &http.Client{}
+	if i.transport != nil {
+		client.Transport = i.transport
+	}
 	res, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -222,9 +224,10 @@ func (i *dockerImage) setupRequestAuth(req *http.Request) error {
 		req.SetBasicAuth(i.username, i.password)
 		return nil
 	case "Bearer":
-		// insecure by default for now
-		tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-		client := &http.Client{Transport: tr}
+		client := &http.Client{}
+		if i.transport != nil {
+			client.Transport = i.transport
+		}
 		res, err := client.Do(req)
 		if err != nil {
 			return err
@@ -285,6 +288,7 @@ func (i *dockerImage) getBearerToken(realm, service, scope string) (string, erro
 	if i.username != "" && i.password != "" {
 		authReq.SetBasicAuth(i.username, i.password)
 	}
+	// insecure for now to contact the external token service
 	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	client := &http.Client{Transport: tr}
 	res, err := client.Do(authReq)
@@ -324,7 +328,7 @@ func (i *dockerImage) retrieveRawManifest() error {
 	if i.rawManifest != nil {
 		return nil
 	}
-	pr, err := ping(i.registry)
+	pr, err := i.ping()
 	if err != nil {
 		return err
 	}
@@ -427,7 +431,7 @@ func (i *dockerImage) getLayer(l, url, tmpDir string) error {
 	return nil
 }
 
-func parseDockerImage(img string) (types.Image, error) {
+func parseDockerImage(img, certPath string, tlsVerify bool) (types.Image, error) {
 	ref, err := reference.ParseNamed(img)
 	if err != nil {
 		return nil, err
@@ -453,12 +457,28 @@ func parseDockerImage(img string) (types.Image, error) {
 	if err != nil {
 		return nil, err
 	}
+	var tr *http.Transport
+	if certPath != "" {
+		tlsc := &tls.Config{}
+
+		cert, err := tls.LoadX509KeyPair(filepath.Join(certPath, "cert.pem"), filepath.Join(certPath, "key.pem"))
+		if err != nil {
+			return nil, fmt.Errorf("Error loading x509 key pair: %s", err)
+		}
+
+		tlsc.Certificates = append(tlsc.Certificates, cert)
+		tlsc.InsecureSkipVerify = !tlsVerify
+		tr = &http.Transport{
+			TLSClientConfig: tlsc,
+		}
+	}
 	return &dockerImage{
-		ref:      ref,
-		tag:      tag,
-		registry: registry,
-		username: username,
-		password: password,
+		ref:       ref,
+		tag:       tag,
+		registry:  registry,
+		username:  username,
+		password:  password,
+		transport: tr,
 	}, nil
 }
 
@@ -555,12 +575,13 @@ func (pr *pingResponse) needsAuth() bool {
 	return pr.WWWAuthenticate != ""
 }
 
-func ping(registry string) (*pingResponse, error) {
-	// insecure by default for now
-	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-	client := &http.Client{Transport: tr}
+func (i *dockerImage) ping() (*pingResponse, error) {
+	client := &http.Client{}
+	if i.transport != nil {
+		client.Transport = i.transport
+	}
 	ping := func(scheme string) (*pingResponse, error) {
-		resp, err := client.Get(scheme + "://" + registry + "/v2/")
+		resp, err := client.Get(scheme + "://" + i.registry + "/v2/")
 		if err != nil {
 			return nil, err
 		}
