@@ -30,6 +30,11 @@ const (
 	dockerCfg         = ".docker"
 	dockerCfgFileName = "config.json"
 	dockerCfgObsolete = ".dockercfg"
+
+	baseURL     = "%s://%s/v2/"
+	tagsURL     = baseURL + "%s/tags/list"
+	manifestURL = baseURL + "%s/manifests/%s"
+	blobsURL    = baseURL + "%s/blobs/%s"
 )
 
 var (
@@ -87,7 +92,7 @@ func (i *dockerImage) Manifest() (types.ImageManifest, error) {
 }
 
 func (i *dockerImage) getTags() ([]string, error) {
-	url := i.scheme + "://" + i.registry + "/v2/" + i.ref.RemoteName() + "/tags/list"
+	url := fmt.Sprintf(tagsURL, i.scheme, i.registry, i.ref.RemoteName())
 	res, err := i.makeRequest("GET", url, i.WWWAuthenticate != "", nil)
 	if err != nil {
 		return nil, err
@@ -325,7 +330,7 @@ func (i *dockerImage) retrieveRawManifest() error {
 	}
 	i.WWWAuthenticate = pr.WWWAuthenticate
 	i.scheme = pr.scheme
-	url := i.scheme + "://" + i.registry + "/v2/" + i.ref.RemoteName() + "/manifests/" + i.tag
+	url := fmt.Sprintf(manifestURL, i.scheme, i.registry, i.ref.RemoteName(), i.tag)
 	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
 	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
 	res, err := i.makeRequest("GET", url, pr.needsAuth(), nil)
@@ -382,7 +387,6 @@ func (i *dockerImage) Layers(layers ...string) error {
 	if err := ioutil.WriteFile(path.Join(tmpDir, "manifest.json"), data, 0644); err != nil {
 		return err
 	}
-	url := i.scheme + "://" + i.registry + "/v2/" + i.ref.RemoteName() + "/blobs/"
 	if len(layers) == 0 {
 		layers = m.GetLayers()
 	}
@@ -390,6 +394,7 @@ func (i *dockerImage) Layers(layers ...string) error {
 		if !strings.HasPrefix(l, "sha256:") {
 			l = "sha256:" + l
 		}
+		url := fmt.Sprintf(blobsURL, i.scheme, i.registry, i.ref.RemoteName(), l)
 		if err := i.getLayer(l, url, tmpDir); err != nil {
 			return err
 		}
@@ -398,9 +403,8 @@ func (i *dockerImage) Layers(layers ...string) error {
 }
 
 func (i *dockerImage) getLayer(l, url, tmpDir string) error {
-	lurl := url + l
-	logrus.Infof("Downloading %s", lurl)
-	res, err := i.makeRequest("GET", lurl, i.WWWAuthenticate != "", nil)
+	logrus.Infof("Downloading %s", url)
+	res, err := i.makeRequest("GET", url, i.WWWAuthenticate != "", nil)
 	if err != nil {
 		return err
 	}
