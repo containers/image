@@ -53,8 +53,9 @@ shell: build-container
 
 check: validate test-unit test-integration
 
+# The tests can run out of entropy and block in containers, so replace /dev/random.
 test-integration: build-container
-	$(DOCKER_RUN_DOCKER) hack/make.sh test-integration
+	$(DOCKER_RUN_DOCKER) bash -c 'rm -f /dev/random; ln -sf /dev/urandom /dev/random; hack/make.sh test-integration'
 
 test-unit: build-container
 	# Just call (make test unit-local) here instead of worrying about environment differences, e.g. GO15VENDOREXPERIMENT.
