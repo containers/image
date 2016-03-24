@@ -6,18 +6,26 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
-	"github.com/projectatomic/skopeo"
+	"github.com/projectatomic/skopeo/version"
+)
+
+// gitCommit will be the hash that the binary was built from
+// and will be populated by the Makefile
+var gitCommit = ""
+
+const (
+	usage = `interact with registries`
 )
 
 func main() {
 	app := cli.NewApp()
 	app.Name = "skopeo"
-	if skopeo.GitCommit != "" {
-		app.Version = fmt.Sprintf("%s commit: %s", skopeo.Version, skopeo.GitCommit)
+	if gitCommit != "" {
+		app.Version = fmt.Sprintf("%s commit: %s", version.Version, gitCommit)
 	} else {
-		app.Version = skopeo.Version
+		app.Version = version.Version
 	}
-	app.Usage = "interact with registries"
+	app.Usage = usage
 	// TODO(runcom)
 	//app.EnableBashCompletion = true
 	app.Flags = []cli.Flag{

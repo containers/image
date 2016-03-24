@@ -1,4 +1,4 @@
-package skopeo
+package main
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 )
 
 // ParseImage converts image URL-like string to an initialized handler for that image.
-func ParseImage(c *cli.Context) (types.Image, error) {
+func parseImage(c *cli.Context) (types.Image, error) {
 	var (
 		imgName   = c.Args().First()
 		certPath  = c.GlobalString("cert-path")

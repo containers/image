@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/projectatomic/skopeo"
+	"github.com/projectatomic/skopeo/version"
 )
 
 const (
 	signatureType      = "atomic container signature"
-	signatureCreatorID = "atomic " + skopeo.Version
+	signatureCreatorID = "atomic " + version.Version
 )
 
 // InvalidSignatureError is returned when parsing an invalid signature.
