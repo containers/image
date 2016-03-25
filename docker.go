@@ -1,4 +1,4 @@
-package skopeo
+package main
 
 import (
 	"crypto/tls"

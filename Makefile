@@ -22,12 +22,11 @@ endif
 DOCKER_RUN_DOCKER := $(DOCKER_FLAGS) "$(DOCKER_IMAGE)"
 
 GIT_COMMIT := $(shell git rev-parse HEAD 2> /dev/null || true)
-LDFLAGS := "-X github.com/projectatomic/skopeo.GitCommit=${GIT_COMMIT} ${LDFLAGS}"
 
 all: man binary
 
 binary:
-	go build -ldflags ${LDFLAGS} -o ${DEST}skopeo ./cmd/skopeo
+	go build -ldflags "-X main.gitCommit=${GIT_COMMIT}" -o ${DEST}skopeo .
 
 build-container:
 	docker build ${DOCKER_BUILD_ARGS} -t "$(DOCKER_IMAGE)" .

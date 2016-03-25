@@ -6,7 +6,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
-	"github.com/projectatomic/skopeo"
 )
 
 var inspectCmd = cli.Command{
@@ -19,7 +18,7 @@ var inspectCmd = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) {
-		img, err := skopeo.ParseImage(c)
+		img, err := parseImage(c)
 		if err != nil {
 			logrus.Fatal(err)
 		}
