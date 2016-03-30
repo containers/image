@@ -31,9 +31,9 @@ const (
 	dockerCfgObsolete = ".dockercfg"
 
 	baseURL     = "%s://%s/v2/"
-	tagsURL     = baseURL + "%s/tags/list"
-	manifestURL = baseURL + "%s/manifests/%s"
-	blobsURL    = baseURL + "%s/blobs/%s"
+	tagsURL     = "%s/tags/list"
+	manifestURL = "%s/manifests/%s"
+	blobsURL    = "%s/blobs/%s"
 )
 
 var (
@@ -86,7 +86,7 @@ func (i *dockerImage) Manifest() (types.ImageManifest, error) {
 
 func (i *dockerImage) getTags() ([]string, error) {
 	// FIXME? Breaking the abstraction.
-	url := fmt.Sprintf(tagsURL, i.src.scheme, i.src.registry, i.src.ref.RemoteName())
+	url := fmt.Sprintf(tagsURL, i.src.ref.RemoteName())
 	res, err := i.src.makeRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -188,19 +188,13 @@ type dockerImageSource struct {
 	registry        string
 	username        string
 	password        string
-	WWWAuthenticate string // Obtained by s.ping()
-	scheme          string // Obtained by s.ping()
+	wwwAuthenticate string // Cache of a value set by ping() if scheme is not empty
+	scheme          string // Cache of a value returned by a successful ping() if not empty
 	transport       *http.Transport
 }
 
 func (s *dockerImageSource) GetManifest() (manifest []byte, unverifiedCanonicalDigest string, err error) {
-	pr, err := s.ping()
-	if err != nil {
-		return nil, "", err
-	}
-	s.WWWAuthenticate = pr.WWWAuthenticate
-	s.scheme = pr.scheme
-	url := fmt.Sprintf(manifestURL, s.scheme, s.registry, s.ref.RemoteName(), s.tag)
+	url := fmt.Sprintf(manifestURL, s.ref.RemoteName(), s.tag)
 	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
 	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
 	res, err := s.makeRequest("GET", url, nil)
@@ -219,7 +213,7 @@ func (s *dockerImageSource) GetManifest() (manifest []byte, unverifiedCanonicalD
 }
 
 func (s *dockerImageSource) GetLayer(digest string) (io.ReadCloser, error) {
-	url := fmt.Sprintf(blobsURL, s.scheme, s.registry, s.ref.RemoteName(), digest)
+	url := fmt.Sprintf(blobsURL, s.ref.RemoteName(), digest)
 	logrus.Infof("Downloading %s", url)
 	res, err := s.makeRequest("GET", url, nil)
 	if err != nil {
@@ -237,6 +231,16 @@ func (s *dockerImageSource) GetSignatures() ([][]byte, error) {
 }
 
 func (s *dockerImageSource) makeRequest(method, url string, headers map[string]string) (*http.Response, error) {
+	if s.scheme == "" {
+		pr, err := s.ping()
+		if err != nil {
+			return nil, err
+		}
+		s.wwwAuthenticate = pr.WWWAuthenticate
+		s.scheme = pr.scheme
+	}
+
+	url = fmt.Sprintf(baseURL, s.scheme, s.registry) + url
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -245,7 +249,7 @@ func (s *dockerImageSource) makeRequest(method, url string, headers map[string]s
 	for n, h := range headers {
 		req.Header.Add(n, h)
 	}
-	if s.WWWAuthenticate != "" {
+	if s.wwwAuthenticate != "" {
 		if err := s.setupRequestAuth(req); err != nil {
 			return nil, err
 		}
@@ -262,9 +266,9 @@ func (s *dockerImageSource) makeRequest(method, url string, headers map[string]s
 }
 
 func (s *dockerImageSource) setupRequestAuth(req *http.Request) error {
-	tokens := strings.SplitN(strings.TrimSpace(s.WWWAuthenticate), " ", 2)
+	tokens := strings.SplitN(strings.TrimSpace(s.wwwAuthenticate), " ", 2)
 	if len(tokens) != 2 {
-		return fmt.Errorf("expected 2 tokens in WWW-Authenticate: %d, %s", len(tokens), s.WWWAuthenticate)
+		return fmt.Errorf("expected 2 tokens in WWW-Authenticate: %d, %s", len(tokens), s.wwwAuthenticate)
 	}
 	switch tokens[0] {
 	case "Basic":
