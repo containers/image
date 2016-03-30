@@ -87,7 +87,7 @@ func (i *dockerImage) Manifest() (types.ImageManifest, error) {
 func (i *dockerImage) getTags() ([]string, error) {
 	// FIXME? Breaking the abstraction.
 	url := fmt.Sprintf(tagsURL, i.src.scheme, i.src.registry, i.src.ref.RemoteName())
-	res, err := i.src.makeRequest("GET", url, i.src.WWWAuthenticate != "", nil)
+	res, err := i.src.makeRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +203,7 @@ func (s *dockerImageSource) GetManifest() (manifest []byte, unverifiedCanonicalD
 	url := fmt.Sprintf(manifestURL, s.scheme, s.registry, s.ref.RemoteName(), s.tag)
 	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
 	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
-	res, err := s.makeRequest("GET", url, pr.needsAuth(), nil)
+	res, err := s.makeRequest("GET", url, nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -221,7 +221,7 @@ func (s *dockerImageSource) GetManifest() (manifest []byte, unverifiedCanonicalD
 func (s *dockerImageSource) GetLayer(digest string) (io.ReadCloser, error) {
 	url := fmt.Sprintf(blobsURL, s.scheme, s.registry, s.ref.RemoteName(), digest)
 	logrus.Infof("Downloading %s", url)
-	res, err := s.makeRequest("GET", url, s.WWWAuthenticate != "", nil)
+	res, err := s.makeRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +236,7 @@ func (s *dockerImageSource) GetSignatures() ([][]byte, error) {
 	return [][]byte{}, nil
 }
 
-func (s *dockerImageSource) makeRequest(method, url string, auth bool, headers map[string]string) (*http.Response, error) {
+func (s *dockerImageSource) makeRequest(method, url string, headers map[string]string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -245,7 +245,7 @@ func (s *dockerImageSource) makeRequest(method, url string, auth bool, headers m
 	for n, h := range headers {
 		req.Header.Add(n, h)
 	}
-	if auth {
+	if s.WWWAuthenticate != "" {
 		if err := s.setupRequestAuth(req); err != nil {
 			return nil, err
 		}
@@ -598,10 +598,6 @@ type pingResponse struct {
 	APIVersion      string
 	scheme          string
 	errors          []apiErr
-}
-
-func (pr *pingResponse) needsAuth() bool {
-	return pr.WWWAuthenticate != ""
 }
 
 func (s *dockerImageSource) ping() (*pingResponse, error) {
