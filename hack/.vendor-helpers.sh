@@ -10,6 +10,12 @@ export GOPATH="$GOPATH:${PWD}/vendor"
 find="/usr/bin/find"
 
 clone() {
+	local delete_vendor=true
+	if [ "x$1" = x--keep-vendor ]; then
+		delete_vendor=false
+		shift
+	fi
+
 	local vcs="$1"
 	local pkg="$2"
 	local rev="$3"
@@ -39,8 +45,10 @@ clone() {
 	echo -n 'rm VCS, '
 	( cd "$target" && rm -rf .{git,hg} )
 
-	echo -n 'rm vendor, '
-	( cd "$target" && rm -rf vendor Godeps/_workspace )
+	if $delete_vendor; then
+		echo -n 'rm vendor, '
+		( cd "$target" && rm -rf vendor Godeps/_workspace )
+	fi
 
 	echo done
 }
