@@ -5,11 +5,18 @@ PROJECT=github.com/projectatomic/skopeo
 # Downloads dependencies into vendor/ directory
 mkdir -p vendor
 
-export GOPATH="$GOPATH:${PWD}/vendor"
+original_GOPATH=$GOPATH
+export GOPATH="${PWD}/vendor:$GOPATH"
 
 find="/usr/bin/find"
 
 clone() {
+	local delete_vendor=true
+	if [ "x$1" = x--keep-vendor ]; then
+		delete_vendor=false
+		shift
+	fi
+
 	local vcs="$1"
 	local pkg="$2"
 	local rev="$3"
@@ -39,14 +46,18 @@ clone() {
 	echo -n 'rm VCS, '
 	( cd "$target" && rm -rf .{git,hg} )
 
-	echo -n 'rm vendor, '
-	( cd "$target" && rm -rf vendor Godeps/_workspace )
+	if $delete_vendor; then
+		echo -n 'rm vendor, '
+		( cd "$target" && rm -rf vendor Godeps/_workspace )
+	fi
 
 	echo done
 }
 
 clean() {
-	local packages=($(go list -e ./... | grep -v "^${PROJECT}/vendor"))
+	# If $GOPATH starts with ./vendor, (go list) shows the short-form import paths for packages inside ./vendor.
+	# So, reset GOPATH to the external value (without ./vendor), so that the grep -v works.
+	local packages=($(GOPATH=$original_GOPATH go list -e ./... | grep -v "^${PROJECT}/vendor"))
 	local platforms=( linux/amd64 linux/386 )
 
 	local buildTags=(  )
