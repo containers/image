@@ -107,11 +107,11 @@ func (s *SigningSuite) TestSignVerifySmoke(c *check.C) {
 	defer os.Remove(sigOutput.Name())
 	out, err := exec.Command(skopeoBinary, "standalone-sign", "-o", sigOutput.Name(),
 		manifestPath, dockerReference, s.fingerprint).CombinedOutput()
-	c.Assert(err, check.IsNil)
+	c.Assert(err, check.IsNil, check.Commentf("%s", out))
 	c.Assert(string(out), check.Equals, "")
 
 	out, err = exec.Command(skopeoBinary, "standalone-verify", manifestPath,
 		dockerReference, s.fingerprint, sigOutput.Name()).CombinedOutput()
-	c.Assert(err, check.IsNil)
+	c.Assert(err, check.IsNil, check.Commentf("%s", out))
 	c.Assert(string(out), check.Equals, "Signature verified, digest "+fixtures.TestImageManifestDigest+"\n")
 }
