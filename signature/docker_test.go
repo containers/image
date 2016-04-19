@@ -2,6 +2,7 @@ package signature
 
 import (
 	"io/ioutil"
+	"path/filepath"
 	"testing"
 
 	"github.com/projectatomic/skopeo/signature/fixtures"
@@ -9,13 +10,50 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDockerManifestDigest(t *testing.T) {
-	manifest, err := ioutil.ReadFile("fixtures/image.manifest.json")
-	require.NoError(t, err)
-	digest := dockerManifestDigest(manifest)
-	assert.Equal(t, fixtures.TestImageManifestDigest, digest)
+func TestGuessManifestMIMEType(t *testing.T) {
+	cases := []struct {
+		path     string
+		mimeType manifestMIMEType
+	}{
+		{"image.manifest.json", dockerV2Schema2MIMEType},
+		{"v1s1.manifest.json", dockerV2Schema1MIMEType},
+		{"v1s1-invalid-signatures.manifest.json", dockerV2Schema1MIMEType},
+		{"v2s2nomime.manifest.json", dockerV2Schema2MIMEType}, // It is unclear whether this one is legal, but we should guess v2s2 if anything at all.
+		{"unknown-version.manifest.json", ""},
+		{"image.signature", ""}, // Not a manifest (nor JSON) at all
+	}
 
-	digest = dockerManifestDigest([]byte{})
+	for _, c := range cases {
+		manifest, err := ioutil.ReadFile(filepath.Join("fixtures", c.path))
+		require.NoError(t, err)
+		mimeType := guessManifestMIMEType(manifest)
+		assert.Equal(t, c.mimeType, mimeType)
+	}
+}
+
+func TestDockerManifestDigest(t *testing.T) {
+	cases := []struct {
+		path   string
+		digest string
+	}{
+		{"image.manifest.json", fixtures.TestImageManifestDigest},
+		{"v1s1.manifest.json", fixtures.TestV1S1ManifestDigest},
+	}
+	for _, c := range cases {
+		manifest, err := ioutil.ReadFile(filepath.Join("fixtures", c.path))
+		require.NoError(t, err)
+		digest, err := dockerManifestDigest(manifest)
+		require.NoError(t, err)
+		assert.Equal(t, c.digest, digest)
+	}
+
+	manifest, err := ioutil.ReadFile("fixtures/v1s1-invalid-signatures.manifest.json")
+	require.NoError(t, err)
+	digest, err := dockerManifestDigest(manifest)
+	assert.Error(t, err)
+
+	digest, err = dockerManifestDigest([]byte{})
+	require.NoError(t, err)
 	assert.Equal(t, "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", digest)
 }
 
@@ -33,6 +71,12 @@ func TestSignDockerManifest(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, fixtures.TestImageSignatureReference, verified.DockerReference)
 	assert.Equal(t, fixtures.TestImageManifestDigest, verified.DockerManifestDigest)
+
+	// Error computing Docker manifest
+	invalidManifest, err := ioutil.ReadFile("fixtures/v1s1-invalid-signatures.manifest.json")
+	require.NoError(t, err)
+	_, err = SignDockerManifest(invalidManifest, fixtures.TestImageSignatureReference, mech, fixtures.TestKeyFingerprint)
+	assert.Error(t, err)
 
 	// Error creating blob to sign
 	_, err = SignDockerManifest(manifest, "", mech, fixtures.TestKeyFingerprint)
@@ -58,6 +102,13 @@ func TestVerifyDockerManifestSignature(t *testing.T) {
 	assert.Equal(t, fixtures.TestImageManifestDigest, sig.DockerManifestDigest)
 
 	// For extra paranoia, test that we return nil data on error.
+
+	// Error computing Docker manifest
+	invalidManifest, err := ioutil.ReadFile("fixtures/v1s1-invalid-signatures.manifest.json")
+	require.NoError(t, err)
+	sig, err = VerifyDockerManifestSignature(signature, invalidManifest, fixtures.TestImageSignatureReference, mech, fixtures.TestKeyFingerprint)
+	assert.Error(t, err)
+	assert.Nil(t, sig)
 
 	// Error verifying signature
 	corruptSignature, err := ioutil.ReadFile("fixtures/corrupt.signature")
