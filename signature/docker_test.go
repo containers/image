@@ -73,7 +73,7 @@ func TestSignDockerManifest(t *testing.T) {
 	assert.Equal(t, fixtures.TestImageManifestDigest, verified.DockerManifestDigest)
 
 	// Error computing Docker manifest
-	invalidManifest, err := ioutil.ReadFile("fixtures/v1s1-invalid-signatures.manifest.json")
+	invalidManifest, err := ioutil.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
 	require.NoError(t, err)
 	_, err = SignDockerManifest(invalidManifest, fixtures.TestImageSignatureReference, mech, fixtures.TestKeyFingerprint)
 	assert.Error(t, err)
@@ -104,7 +104,7 @@ func TestVerifyDockerManifestSignature(t *testing.T) {
 	// For extra paranoia, test that we return nil data on error.
 
 	// Error computing Docker manifest
-	invalidManifest, err := ioutil.ReadFile("fixtures/v1s1-invalid-signatures.manifest.json")
+	invalidManifest, err := ioutil.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
 	require.NoError(t, err)
 	sig, err = VerifyDockerManifestSignature(signature, invalidManifest, fixtures.TestImageSignatureReference, mech, fixtures.TestKeyFingerprint)
 	assert.Error(t, err)
