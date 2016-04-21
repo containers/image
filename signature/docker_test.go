@@ -2,60 +2,12 @@ package signature
 
 import (
 	"io/ioutil"
-	"path/filepath"
 	"testing"
 
 	"github.com/projectatomic/skopeo/signature/fixtures"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestGuessManifestMIMEType(t *testing.T) {
-	cases := []struct {
-		path     string
-		mimeType manifestMIMEType
-	}{
-		{"image.manifest.json", dockerV2Schema2MIMEType},
-		{"v1s1.manifest.json", dockerV2Schema1MIMEType},
-		{"v1s1-invalid-signatures.manifest.json", dockerV2Schema1MIMEType},
-		{"v2s2nomime.manifest.json", dockerV2Schema2MIMEType}, // It is unclear whether this one is legal, but we should guess v2s2 if anything at all.
-		{"unknown-version.manifest.json", ""},
-		{"image.signature", ""}, // Not a manifest (nor JSON) at all
-	}
-
-	for _, c := range cases {
-		manifest, err := ioutil.ReadFile(filepath.Join("fixtures", c.path))
-		require.NoError(t, err)
-		mimeType := guessManifestMIMEType(manifest)
-		assert.Equal(t, c.mimeType, mimeType)
-	}
-}
-
-func TestDockerManifestDigest(t *testing.T) {
-	cases := []struct {
-		path   string
-		digest string
-	}{
-		{"image.manifest.json", fixtures.TestImageManifestDigest},
-		{"v1s1.manifest.json", fixtures.TestV1S1ManifestDigest},
-	}
-	for _, c := range cases {
-		manifest, err := ioutil.ReadFile(filepath.Join("fixtures", c.path))
-		require.NoError(t, err)
-		digest, err := dockerManifestDigest(manifest)
-		require.NoError(t, err)
-		assert.Equal(t, c.digest, digest)
-	}
-
-	manifest, err := ioutil.ReadFile("fixtures/v1s1-invalid-signatures.manifest.json")
-	require.NoError(t, err)
-	digest, err := dockerManifestDigest(manifest)
-	assert.Error(t, err)
-
-	digest, err = dockerManifestDigest([]byte{})
-	require.NoError(t, err)
-	assert.Equal(t, "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", digest)
-}
 
 func TestSignDockerManifest(t *testing.T) {
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
