@@ -8,6 +8,8 @@
 .SH NAME
 skopeo \(em Inspect Docker images and repositories on registries
 .SH SYNOPSIS
+\fBskopeo copy\fR source-location destination-location
+.PP
 \fBskopeo inspect\fR image-name [\fB--raw\fR]
 .PP
 \fBskopeo layers\fR image-name
@@ -45,6 +47,15 @@ Show help
 .B "--version, -v"
 print the version number
 .SH COMMANDS
+.TP
+.B copy
+Copy an image (manifest, filesystem layers, signatures) from one location to another.
+.sp
+.B source-location
+and
+.B destination-location
+can be \fBdocker://\fRdocker-reference, \fBdir:\fRlocal-path, or \fBatomic:\fRimagestream-name\fB:\fRtag .
+
 .TP
 .B inspect
 Return low-level information on images in a registry
