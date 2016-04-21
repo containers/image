@@ -505,7 +505,8 @@ func decodeDockerAuth(s string) (string, string, error) {
 	}
 	parts := strings.SplitN(string(decoded), ":", 2)
 	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid auth configuration file")
+		// if it's invalid just skip, as docker does
+		return "", "", nil
 	}
 	user := parts[0]
 	password := strings.Trim(parts[1], "\x00")
