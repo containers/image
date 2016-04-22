@@ -37,7 +37,6 @@ func standaloneSign(context *cli.Context) {
 	}
 }
 
-// FIXME: Document in the man page
 var standaloneSignCmd = cli.Command{
 	Name:   "standalone-sign",
 	Usage:  "Create a signature using local files",
@@ -80,7 +79,6 @@ func standaloneVerify(context *cli.Context) {
 	fmt.Printf("Signature verified, digest %s\n", sig.DockerManifestDigest)
 }
 
-// FIXME: Document in the man page
 var standaloneVerifyCmd = cli.Command{
 	Name:   "standalone-verify",
 	Usage:  "Verify a signature using local files",

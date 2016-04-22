@@ -89,6 +89,12 @@ $ cd projectatomic
 $ git clone https://github.com/projectatomic/skopeo
 $ cd skopeo && make binary
 ```
+
+You may need to install additional development packages: gpgme-devel and libassuan-devel
+```sh
+# dnf install gpgme-devel libassuan-devel
+```
+
 Man:
 -
 To build the man page you need [`go-md2man`](https://github.com/cpuguy83/go-md2man) available on your system, then:

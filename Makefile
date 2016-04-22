@@ -1,4 +1,4 @@
-.PHONY: all binary build clean install install-binary man shell test-integration
+.PHONY: all binary build clean install install-binary shell test-integration
 
 export GO15VENDOREXPERIMENT=1
 
@@ -23,7 +23,7 @@ DOCKER_RUN_DOCKER := $(DOCKER_FLAGS) "$(DOCKER_IMAGE)"
 
 GIT_COMMIT := $(shell git rev-parse HEAD 2> /dev/null || true)
 
-all: man binary
+all: binary
 
 binary:
 	go build -ldflags "-X main.gitCommit=${GIT_COMMIT}" -o ${DEST}skopeo .
@@ -33,10 +33,9 @@ build-container:
 
 clean:
 	rm -f skopeo
-	rm -f skopeo.1
 
 install: install-binary
-	install -m 644 skopeo.1 ${MANINSTALLDIR}/man1/
+	install -m 644 man1/skopeo.1 ${MANINSTALLDIR}/man1/
 	# TODO(runcom)
 	#install -m 644 completion/bash/skopeo ${BASHINSTALLDIR}/
 
@@ -44,8 +43,6 @@ install-binary:
 	install -d -m 0755 ${INSTALLDIR}
 	install -m 755 skopeo ${INSTALLDIR}
 
-man:
-	go-md2man -in man/skopeo.1.md -out skopeo.1
 
 shell: build-container
 	$(DOCKER_RUN_DOCKER) bash
