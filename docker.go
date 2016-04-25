@@ -87,7 +87,7 @@ func (i *dockerImage) Manifest() (types.ImageManifest, error) {
 func (i *dockerImage) getTags() ([]string, error) {
 	// FIXME? Breaking the abstraction.
 	url := fmt.Sprintf(tagsURL, i.src.ref.RemoteName())
-	res, err := i.src.makeRequest("GET", url, nil)
+	res, err := i.src.c.makeRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -183,21 +183,16 @@ func sanitize(s string) string {
 }
 
 type dockerImageSource struct {
-	ref             reference.Named
-	tag             string
-	registry        string
-	username        string
-	password        string
-	wwwAuthenticate string // Cache of a value set by ping() if scheme is not empty
-	scheme          string // Cache of a value returned by a successful ping() if not empty
-	transport       *http.Transport
+	ref reference.Named
+	tag string
+	c   *dockerClient
 }
 
 func (s *dockerImageSource) GetManifest() (manifest []byte, unverifiedCanonicalDigest string, err error) {
 	url := fmt.Sprintf(manifestURL, s.ref.RemoteName(), s.tag)
 	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
 	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
-	res, err := s.makeRequest("GET", url, nil)
+	res, err := s.c.makeRequest("GET", url, nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -215,7 +210,7 @@ func (s *dockerImageSource) GetManifest() (manifest []byte, unverifiedCanonicalD
 func (s *dockerImageSource) GetLayer(digest string) (io.ReadCloser, error) {
 	url := fmt.Sprintf(blobsURL, s.ref.RemoteName(), digest)
 	logrus.Infof("Downloading %s", url)
-	res, err := s.makeRequest("GET", url, nil)
+	res, err := s.c.makeRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -230,17 +225,27 @@ func (s *dockerImageSource) GetSignatures() ([][]byte, error) {
 	return [][]byte{}, nil
 }
 
-func (s *dockerImageSource) makeRequest(method, url string, headers map[string]string) (*http.Response, error) {
-	if s.scheme == "" {
-		pr, err := s.ping()
+// dockerClient is configuration for dealing with a single Docker registry.
+type dockerClient struct {
+	registry        string
+	username        string
+	password        string
+	wwwAuthenticate string // Cache of a value set by ping() if scheme is not empty
+	scheme          string // Cache of a value returned by a successful ping() if not empty
+	transport       *http.Transport
+}
+
+func (c *dockerClient) makeRequest(method, url string, headers map[string]string) (*http.Response, error) {
+	if c.scheme == "" {
+		pr, err := c.ping()
 		if err != nil {
 			return nil, err
 		}
-		s.wwwAuthenticate = pr.WWWAuthenticate
-		s.scheme = pr.scheme
+		c.wwwAuthenticate = pr.WWWAuthenticate
+		c.scheme = pr.scheme
 	}
 
-	url = fmt.Sprintf(baseURL, s.scheme, s.registry) + url
+	url = fmt.Sprintf(baseURL, c.scheme, c.registry) + url
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return nil, err
@@ -249,14 +254,14 @@ func (s *dockerImageSource) makeRequest(method, url string, headers map[string]s
 	for n, h := range headers {
 		req.Header.Add(n, h)
 	}
-	if s.wwwAuthenticate != "" {
-		if err := s.setupRequestAuth(req); err != nil {
+	if c.wwwAuthenticate != "" {
+		if err := c.setupRequestAuth(req); err != nil {
 			return nil, err
 		}
 	}
 	client := &http.Client{}
-	if s.transport != nil {
-		client.Transport = s.transport
+	if c.transport != nil {
+		client.Transport = c.transport
 	}
 	res, err := client.Do(req)
 	if err != nil {
@@ -265,19 +270,19 @@ func (s *dockerImageSource) makeRequest(method, url string, headers map[string]s
 	return res, nil
 }
 
-func (s *dockerImageSource) setupRequestAuth(req *http.Request) error {
-	tokens := strings.SplitN(strings.TrimSpace(s.wwwAuthenticate), " ", 2)
+func (c *dockerClient) setupRequestAuth(req *http.Request) error {
+	tokens := strings.SplitN(strings.TrimSpace(c.wwwAuthenticate), " ", 2)
 	if len(tokens) != 2 {
-		return fmt.Errorf("expected 2 tokens in WWW-Authenticate: %d, %s", len(tokens), s.wwwAuthenticate)
+		return fmt.Errorf("expected 2 tokens in WWW-Authenticate: %d, %s", len(tokens), c.wwwAuthenticate)
 	}
 	switch tokens[0] {
 	case "Basic":
-		req.SetBasicAuth(s.username, s.password)
+		req.SetBasicAuth(c.username, c.password)
 		return nil
 	case "Bearer":
 		client := &http.Client{}
-		if s.transport != nil {
-			client.Transport = s.transport
+		if c.transport != nil {
+			client.Transport = c.transport
 		}
 		res, err := client.Do(req)
 		if err != nil {
@@ -314,7 +319,7 @@ func (s *dockerImageSource) setupRequestAuth(req *http.Request) error {
 		if scope == "" {
 			return fmt.Errorf("missing scope in bearer auth challenge")
 		}
-		token, err := s.getBearerToken(realm, service, scope)
+		token, err := c.getBearerToken(realm, service, scope)
 		if err != nil {
 			return err
 		}
@@ -325,7 +330,7 @@ func (s *dockerImageSource) setupRequestAuth(req *http.Request) error {
 	// support docker bearer with authconfig's Auth string? see docker2aci
 }
 
-func (s *dockerImageSource) getBearerToken(realm, service, scope string) (string, error) {
+func (c *dockerClient) getBearerToken(realm, service, scope string) (string, error) {
 	authReq, err := http.NewRequest("GET", realm, nil)
 	if err != nil {
 		return "", err
@@ -336,8 +341,8 @@ func (s *dockerImageSource) getBearerToken(realm, service, scope string) (string
 		getParams.Add("scope", scope)
 	}
 	authReq.URL.RawQuery = getParams.Encode()
-	if s.username != "" && s.password != "" {
-		authReq.SetBasicAuth(s.username, s.password)
+	if c.username != "" && c.password != "" {
+		authReq.SetBasicAuth(c.username, c.password)
 	}
 	// insecure for now to contact the external token service
 	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
@@ -449,30 +454,15 @@ func (i *dockerImage) getLayer(dest types.ImageDestination, digest string) error
 	return dest.PutLayer(digest, stream)
 }
 
-// newDockerImageSource is the same as NewDockerImageSource, only it returns the more specific *dockerImageSource type.
-func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSource, error) {
-	ref, err := reference.ParseNamed(img)
-	if err != nil {
-		return nil, err
-	}
-	if reference.IsNameOnly(ref) {
-		ref = reference.WithDefaultTag(ref)
-	}
-	var tag string
-	switch x := ref.(type) {
-	case reference.Canonical:
-		tag = x.Digest().String()
-	case reference.NamedTagged:
-		tag = x.Tag()
-	}
+// newDockerClient returns a new dockerClient instance for refHostname (a host a specified in the Docker image reference, not canonicalized to dockerRegistry)
+func newDockerClient(refHostname, certPath string, tlsVerify bool) (*dockerClient, error) {
 	var registry string
-	hostname := ref.Hostname()
-	if hostname == dockerHostname {
+	if refHostname == dockerHostname {
 		registry = dockerRegistry
 	} else {
-		registry = hostname
+		registry = refHostname
 	}
-	username, password, err := getAuth(ref.Hostname())
+	username, password, err := getAuth(refHostname)
 	if err != nil {
 		return nil, err
 	}
@@ -492,13 +482,38 @@ func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSou
 			TLSClientConfig: tlsc,
 		}
 	}
-	return &dockerImageSource{
-		ref:       ref,
-		tag:       tag,
+	return &dockerClient{
 		registry:  registry,
 		username:  username,
 		password:  password,
 		transport: tr,
+	}, nil
+}
+
+// newDockerImageSource is the same as NewDockerImageSource, only it returns the more specific *dockerImageSource type.
+func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSource, error) {
+	ref, err := reference.ParseNamed(img)
+	if err != nil {
+		return nil, err
+	}
+	if reference.IsNameOnly(ref) {
+		ref = reference.WithDefaultTag(ref)
+	}
+	var tag string
+	switch x := ref.(type) {
+	case reference.Canonical:
+		tag = x.Digest().String()
+	case reference.NamedTagged:
+		tag = x.Tag()
+	}
+	c, err := newDockerClient(ref.Hostname(), certPath, tlsVerify)
+	if err != nil {
+		return nil, err
+	}
+	return &dockerImageSource{
+		ref: ref,
+		tag: tag,
+		c:   c,
 	}, nil
 }
 
@@ -605,13 +620,13 @@ type pingResponse struct {
 	errors          []apiErr
 }
 
-func (s *dockerImageSource) ping() (*pingResponse, error) {
+func (c *dockerClient) ping() (*pingResponse, error) {
 	client := &http.Client{}
-	if s.transport != nil {
-		client.Transport = s.transport
+	if c.transport != nil {
+		client.Transport = c.transport
 	}
 	ping := func(scheme string) (*pingResponse, error) {
-		url := fmt.Sprintf(baseURL, scheme, s.registry)
+		url := fmt.Sprintf(baseURL, scheme, c.registry)
 		resp, err := client.Get(url)
 		if err != nil {
 			return nil, err
