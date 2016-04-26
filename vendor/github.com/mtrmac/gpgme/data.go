@@ -106,7 +106,7 @@ func NewDataReader(r io.Reader) (*Data, error) {
 	d.cbs.read = C.gpgme_data_read_cb_t(C.gogpgme_readfunc)
 	cbc := callbackAdd(d)
 	d.cbc = cbc
-	return d, handleError(C.gpgme_data_new_from_cbs(&d.dh, &d.cbs, unsafe.Pointer(&cbc)))
+	return d, handleError(C.gpgme_data_new_from_cbs(&d.dh, &d.cbs, unsafe.Pointer(&d.cbc)))
 }
 
 // NewDataWriter returns a new callback based data buffer
@@ -116,7 +116,7 @@ func NewDataWriter(w io.Writer) (*Data, error) {
 	d.cbs.write = C.gpgme_data_write_cb_t(C.gogpgme_writefunc)
 	cbc := callbackAdd(d)
 	d.cbc = cbc
-	return d, handleError(C.gpgme_data_new_from_cbs(&d.dh, &d.cbs, unsafe.Pointer(&cbc)))
+	return d, handleError(C.gpgme_data_new_from_cbs(&d.dh, &d.cbs, unsafe.Pointer(&d.cbc)))
 }
 
 // NewDataReadWriter returns a new callback based data buffer
@@ -128,7 +128,7 @@ func NewDataReadWriter(rw io.ReadWriter) (*Data, error) {
 	d.cbs.write = C.gpgme_data_write_cb_t(C.gogpgme_writefunc)
 	cbc := callbackAdd(d)
 	d.cbc = cbc
-	return d, handleError(C.gpgme_data_new_from_cbs(&d.dh, &d.cbs, unsafe.Pointer(&cbc)))
+	return d, handleError(C.gpgme_data_new_from_cbs(&d.dh, &d.cbs, unsafe.Pointer(&d.cbc)))
 }
 
 // NewDataReadWriteSeeker returns a new callback based data buffer
@@ -142,7 +142,7 @@ func NewDataReadWriteSeeker(rw io.ReadWriteSeeker) (*Data, error) {
 	d.cbs.seek = C.gpgme_data_seek_cb_t(C.gogpgme_seekfunc)
 	cbc := callbackAdd(d)
 	d.cbc = cbc
-	return d, handleError(C.gpgme_data_new_from_cbs(&d.dh, &d.cbs, unsafe.Pointer(&cbc)))
+	return d, handleError(C.gpgme_data_new_from_cbs(&d.dh, &d.cbs, unsafe.Pointer(&d.cbc)))
 }
 
 // Close releases any resources associated with the data buffer
