@@ -582,7 +582,8 @@ func (i *dockerImage) ping() (*pingResponse, error) {
 		client.Transport = i.transport
 	}
 	ping := func(scheme string) (*pingResponse, error) {
-		resp, err := client.Get(scheme + "://" + i.registry + "/v2/")
+		url := fmt.Sprintf(baseURL, scheme, i.registry)
+		resp, err := client.Get(url)
 		if err != nil {
 			return nil, err
 		}
