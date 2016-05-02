@@ -241,7 +241,7 @@ func (s *dockerImageSource) makeRequest(method, url string, headers map[string]s
 	}
 
 	url = fmt.Sprintf(baseURL, s.scheme, s.registry) + url
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return nil, err
 	}
