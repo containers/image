@@ -477,15 +477,16 @@ func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSou
 		return nil, err
 	}
 	var tr *http.Transport
-	if certPath != "" {
+	if certPath != "" || !tlsVerify {
 		tlsc := &tls.Config{}
 
-		cert, err := tls.LoadX509KeyPair(filepath.Join(certPath, "cert.pem"), filepath.Join(certPath, "key.pem"))
-		if err != nil {
-			return nil, fmt.Errorf("Error loading x509 key pair: %s", err)
+		if certPath != "" {
+			cert, err := tls.LoadX509KeyPair(filepath.Join(certPath, "cert.pem"), filepath.Join(certPath, "key.pem"))
+			if err != nil {
+				return nil, fmt.Errorf("Error loading x509 key pair: %s", err)
+			}
+			tlsc.Certificates = append(tlsc.Certificates, cert)
 		}
-
-		tlsc.Certificates = append(tlsc.Certificates, cert)
 		tlsc.InsecureSkipVerify = !tlsVerify
 		tr = &http.Transport{
 			TLSClientConfig: tlsc,
