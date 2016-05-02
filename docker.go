@@ -752,6 +752,10 @@ func NewDockerImageDestination(img, certPath string, tlsVerify bool) (types.Imag
 	}, nil
 }
 
+func (d *dockerImageDestination) CanonicalDockerReference() (string, error) {
+	return fmt.Sprintf("%s:%s", d.ref.Name(), d.tag), nil
+}
+
 func (d *dockerImageDestination) PutManifest(manifest []byte) error {
 	// FIXME: This only allows upload by digest, not creating a tag.  See the
 	// corresponding comment in NewOpenshiftImageDestination.

@@ -37,6 +37,8 @@ type ImageSource interface {
 
 // ImageDestination is a service, possibly remote (= slow), to store components of a single image.
 type ImageDestination interface {
+	// CanonicalDockerReference returns the full, unambiguous, Docker reference for this image (even if the user referred to the image using some shorthand notation).
+	CanonicalDockerReference() (string, error)
 	PutManifest([]byte) error
 	PutLayer(digest string, stream io.Reader) error
 	PutSignatures(signatures [][]byte) error

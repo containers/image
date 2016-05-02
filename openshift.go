@@ -268,6 +268,10 @@ func NewOpenshiftImageDestination(imageName, certPath string, tlsVerify bool) (t
 	}, nil
 }
 
+func (d *openshiftImageDestination) CanonicalDockerReference() (string, error) {
+	return fmt.Sprintf("%s/%s/%s:%s", d.client.baseURL.Host, d.client.namespace, d.client.stream, d.client.tag), nil
+}
+
 func (d *openshiftImageDestination) PutManifest(manifest []byte) error {
 	// Note: This does absolutely no kind/version checking or conversions.
 	manifestDigest, err := dockerutils.ManifestDigest(manifest)
