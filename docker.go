@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/homedir"
+	"github.com/projectatomic/skopeo/dockerutils"
 	"github.com/projectatomic/skopeo/reference"
 	"github.com/projectatomic/skopeo/types"
 )
@@ -30,10 +32,11 @@ const (
 	dockerCfgFileName = "config.json"
 	dockerCfgObsolete = ".dockercfg"
 
-	baseURL     = "%s://%s/v2/"
-	tagsURL     = "%s/tags/list"
-	manifestURL = "%s/manifests/%s"
-	blobsURL    = "%s/blobs/%s"
+	baseURL       = "%s://%s/v2/"
+	tagsURL       = "%s/tags/list"
+	manifestURL   = "%s/manifests/%s"
+	blobsURL      = "%s/blobs/%s"
+	blobUploadURL = "%s/blobs/uploads/?digest=%s"
 )
 
 var (
@@ -87,7 +90,7 @@ func (i *dockerImage) Manifest() (types.ImageManifest, error) {
 func (i *dockerImage) getTags() ([]string, error) {
 	// FIXME? Breaking the abstraction.
 	url := fmt.Sprintf(tagsURL, i.src.ref.RemoteName())
-	res, err := i.src.c.makeRequest("GET", url, nil)
+	res, err := i.src.c.makeRequest("GET", url, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +195,7 @@ func (s *dockerImageSource) GetManifest() (manifest []byte, unverifiedCanonicalD
 	url := fmt.Sprintf(manifestURL, s.ref.RemoteName(), s.tag)
 	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
 	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
-	res, err := s.c.makeRequest("GET", url, nil)
+	res, err := s.c.makeRequest("GET", url, nil, nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -210,7 +213,7 @@ func (s *dockerImageSource) GetManifest() (manifest []byte, unverifiedCanonicalD
 func (s *dockerImageSource) GetLayer(digest string) (io.ReadCloser, error) {
 	url := fmt.Sprintf(blobsURL, s.ref.RemoteName(), digest)
 	logrus.Infof("Downloading %s", url)
-	res, err := s.c.makeRequest("GET", url, nil)
+	res, err := s.c.makeRequest("GET", url, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +238,7 @@ type dockerClient struct {
 	transport       *http.Transport
 }
 
-func (c *dockerClient) makeRequest(method, url string, headers map[string]string) (*http.Response, error) {
+func (c *dockerClient) makeRequest(method, url string, headers map[string]string, stream io.Reader) (*http.Response, error) {
 	if c.scheme == "" {
 		pr, err := c.ping()
 		if err != nil {
@@ -246,7 +249,7 @@ func (c *dockerClient) makeRequest(method, url string, headers map[string]string
 	}
 
 	url = fmt.Sprintf(baseURL, c.scheme, c.registry) + url
-	req, err := http.NewRequest(method, url, nil)
+	req, err := http.NewRequest(method, url, stream)
 	if err != nil {
 		return nil, err
 	}
@@ -263,6 +266,7 @@ func (c *dockerClient) makeRequest(method, url string, headers map[string]string
 	if c.transport != nil {
 		client.Transport = c.transport
 	}
+	logrus.Debugf("%s %s", method, url)
 	res, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -490,11 +494,11 @@ func newDockerClient(refHostname, certPath string, tlsVerify bool) (*dockerClien
 	}, nil
 }
 
-// newDockerImageSource is the same as NewDockerImageSource, only it returns the more specific *dockerImageSource type.
-func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSource, error) {
+// parseDockerImageName converts a string into a reference and tag value.
+func parseDockerImageName(img string) (reference.Named, string, error) {
 	ref, err := reference.ParseNamed(img)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if reference.IsNameOnly(ref) {
 		ref = reference.WithDefaultTag(ref)
@@ -505,6 +509,15 @@ func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSou
 		tag = x.Digest().String()
 	case reference.NamedTagged:
 		tag = x.Tag()
+	}
+	return ref, tag, nil
+}
+
+// newDockerImageSource is the same as NewDockerImageSource, only it returns the more specific *dockerImageSource type.
+func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSource, error) {
+	ref, tag, err := parseDockerImageName(img)
+	if err != nil {
+		return nil, err
 	}
 	c, err := newDockerClient(ref.Hostname(), certPath, tlsVerify)
 	if err != nil {
@@ -628,10 +641,12 @@ func (c *dockerClient) ping() (*pingResponse, error) {
 	ping := func(scheme string) (*pingResponse, error) {
 		url := fmt.Sprintf(baseURL, scheme, c.registry)
 		resp, err := client.Get(url)
+		logrus.Debugf("Ping %s err %#v", url, err)
 		if err != nil {
 			return nil, err
 		}
 		defer resp.Body.Close()
+		logrus.Debugf("Ping %s status %d", scheme+"://"+c.registry+"/v2/", resp.StatusCode)
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
 			return nil, fmt.Errorf("error pinging repository, response code %d", resp.StatusCode)
 		}
@@ -710,6 +725,98 @@ func fixManifestLayers(manifest *manifestSchema1) error {
 func validateV1ID(id string) error {
 	if ok := validHex.MatchString(id); !ok {
 		return fmt.Errorf("image ID %q is invalid", id)
+	}
+	return nil
+}
+
+type dockerImageDestination struct {
+	ref reference.Named
+	tag string
+	c   *dockerClient
+}
+
+// NewDockerImageDestination creates a new ImageDestination for the specified image and connection specification.
+func NewDockerImageDestination(img, certPath string, tlsVerify bool) (types.ImageDestination, error) {
+	ref, tag, err := parseDockerImageName(img)
+	if err != nil {
+		return nil, err
+	}
+	c, err := newDockerClient(ref.Hostname(), certPath, tlsVerify)
+	if err != nil {
+		return nil, err
+	}
+	return &dockerImageDestination{
+		ref: ref,
+		tag: tag,
+		c:   c,
+	}, nil
+}
+
+func (d *dockerImageDestination) PutManifest(manifest []byte) error {
+	// FIXME: This only allows upload by digest, not creating a tag.  See the
+	// corresponding comment in NewOpenshiftImageDestination.
+	digest, err := dockerutils.ManifestDigest(manifest)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf(manifestURL, d.ref.RemoteName(), digest)
+
+	headers := map[string]string{}
+	mimeType := dockerutils.GuessManifestMIMEType(manifest)
+	if mimeType != "" {
+		headers["Content-Type"] = mimeType
+	}
+	res, err := d.c.makeRequest("PUT", url, headers, bytes.NewReader(manifest))
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusCreated {
+		body, err := ioutil.ReadAll(res.Body)
+		if err == nil {
+			logrus.Debugf("Error body %s", string(body))
+		}
+		logrus.Debugf("Error uploading manifest, status %d, %#v", res.StatusCode, res)
+		return fmt.Errorf("Error uploading manifest to %s, status %d", url, res.StatusCode)
+	}
+	return nil
+}
+
+func (d *dockerImageDestination) PutLayer(digest string, stream io.Reader) error {
+	checkURL := fmt.Sprintf(blobsURL, d.ref.RemoteName(), digest)
+
+	logrus.Debugf("Checking %s", checkURL)
+	res, err := d.c.makeRequest("HEAD", checkURL, nil, nil)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode == http.StatusOK && res.Header.Get("Docker-Content-Digest") == digest {
+		logrus.Debugf("... already exists, not uploading")
+		return nil
+	}
+	logrus.Debugf("... failed, status %d", res.StatusCode)
+
+	// FIXME? Chunked upload, progress reporting, etc.
+	uploadURL := fmt.Sprintf(blobUploadURL, d.ref.RemoteName(), digest)
+	logrus.Debugf("Uploading %s", uploadURL)
+	// FIXME: Set Content-Length?
+	res, err = d.c.makeRequest("POST", uploadURL, map[string]string{"Content-Type": "application/octet-stream"}, stream)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusCreated {
+		logrus.Debugf("Error uploading, status %d", res.StatusCode)
+		return fmt.Errorf("Error uploading to %s, status %d", uploadURL, res.StatusCode)
+	}
+
+	return nil
+}
+
+func (d *dockerImageDestination) PutSignatures(signatures [][]byte) error {
+	if len(signatures) != 0 {
+		return fmt.Errorf("Pushing signatures to a Docker Registry is not supported")
 	}
 	return nil
 }
