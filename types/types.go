@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"io"
 	"time"
 )
 
@@ -21,6 +22,20 @@ type Registry interface {
 type Repository interface {
 	Images() []Image
 	Image(ref string) Image // ref == image name w/o registry part
+}
+
+// ImageSource is a service, possibly remote (= slow), to download components of a single image.
+type ImageSource interface {
+	GetManifest() (manifest []byte, unverifiedCanonicalDigest string, err error)
+	GetLayer(digest string) (io.ReadCloser, error)
+	GetSignatures() ([][]byte, error)
+}
+
+// ImageDestination is a service, possibly remote (= slow), to store components of a single image.
+type ImageDestination interface {
+	PutManifest([]byte) error
+	PutLayer(digest string, stream io.Reader) error
+	PutSignatures(signatures [][]byte) error
 }
 
 // Image is a Docker image in a repository.
