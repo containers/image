@@ -51,16 +51,9 @@ func (e errFetchManifest) Error() string {
 }
 
 type dockerImage struct {
-	ref             reference.Named
-	tag             string
-	digest          string
-	registry        string
-	username        string
-	password        string
-	WWWAuthenticate string
-	scheme          string
-	rawManifest     []byte
-	transport       *http.Transport
+	src         *dockerImageSource
+	digest      string
+	rawManifest []byte
 }
 
 func (i *dockerImage) RawManifest(version string) ([]byte, error) {
@@ -85,7 +78,7 @@ func (i *dockerImage) Manifest() (types.ImageManifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	imgManifest, err := makeImageManifest(i.ref.FullName(), ms1, i.digest, tags)
+	imgManifest, err := makeImageManifest(i.src.ref.FullName(), ms1, i.digest, tags)
 	if err != nil {
 		return nil, err
 	}
@@ -93,8 +86,9 @@ func (i *dockerImage) Manifest() (types.ImageManifest, error) {
 }
 
 func (i *dockerImage) getTags() ([]string, error) {
-	url := fmt.Sprintf(tagsURL, i.scheme, i.registry, i.ref.RemoteName())
-	res, err := i.makeRequest("GET", url, i.WWWAuthenticate != "", nil)
+	// FIXME? Breaking the abstraction.
+	url := fmt.Sprintf(tagsURL, i.src.scheme, i.src.registry, i.src.ref.RemoteName())
+	res, err := i.src.makeRequest("GET", url, i.src.WWWAuthenticate != "", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +183,61 @@ func sanitize(s string) string {
 	return strings.Replace(s, "/", "-", -1)
 }
 
-func (i *dockerImage) makeRequest(method, url string, auth bool, headers map[string]string) (*http.Response, error) {
+type dockerImageSource struct {
+	ref             reference.Named
+	tag             string
+	registry        string
+	username        string
+	password        string
+	WWWAuthenticate string // Obtained by s.ping()
+	scheme          string // Obtained by s.ping()
+	transport       *http.Transport
+}
+
+func (s *dockerImageSource) GetManifest() (manifest []byte, unverifiedCanonicalDigest string, err error) {
+	pr, err := s.ping()
+	if err != nil {
+		return nil, "", err
+	}
+	s.WWWAuthenticate = pr.WWWAuthenticate
+	s.scheme = pr.scheme
+	url := fmt.Sprintf(manifestURL, s.scheme, s.registry, s.ref.RemoteName(), s.tag)
+	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
+	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
+	res, err := s.makeRequest("GET", url, pr.needsAuth(), nil)
+	if err != nil {
+		return nil, "", err
+	}
+	defer res.Body.Close()
+	manblob, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, "", err
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, "", errFetchManifest{res.StatusCode, manblob}
+	}
+	return manblob, res.Header.Get("Docker-Content-Digest"), nil
+}
+
+func (s *dockerImageSource) GetLayer(digest string) (io.ReadCloser, error) {
+	url := fmt.Sprintf(blobsURL, s.scheme, s.registry, s.ref.RemoteName(), digest)
+	logrus.Infof("Downloading %s", url)
+	res, err := s.makeRequest("GET", url, s.WWWAuthenticate != "", nil)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode != http.StatusOK {
+		// print url also
+		return nil, fmt.Errorf("Invalid status code returned when fetching blob %d", res.StatusCode)
+	}
+	return res.Body, nil
+}
+
+func (s *dockerImageSource) GetSignatures() ([][]byte, error) {
+	return [][]byte{}, nil
+}
+
+func (s *dockerImageSource) makeRequest(method, url string, auth bool, headers map[string]string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -199,13 +247,13 @@ func (i *dockerImage) makeRequest(method, url string, auth bool, headers map[str
 		req.Header.Add(n, h)
 	}
 	if auth {
-		if err := i.setupRequestAuth(req); err != nil {
+		if err := s.setupRequestAuth(req); err != nil {
 			return nil, err
 		}
 	}
 	client := &http.Client{}
-	if i.transport != nil {
-		client.Transport = i.transport
+	if s.transport != nil {
+		client.Transport = s.transport
 	}
 	res, err := client.Do(req)
 	if err != nil {
@@ -214,19 +262,19 @@ func (i *dockerImage) makeRequest(method, url string, auth bool, headers map[str
 	return res, nil
 }
 
-func (i *dockerImage) setupRequestAuth(req *http.Request) error {
-	tokens := strings.SplitN(strings.TrimSpace(i.WWWAuthenticate), " ", 2)
+func (s *dockerImageSource) setupRequestAuth(req *http.Request) error {
+	tokens := strings.SplitN(strings.TrimSpace(s.WWWAuthenticate), " ", 2)
 	if len(tokens) != 2 {
-		return fmt.Errorf("expected 2 tokens in WWW-Authenticate: %d, %s", len(tokens), i.WWWAuthenticate)
+		return fmt.Errorf("expected 2 tokens in WWW-Authenticate: %d, %s", len(tokens), s.WWWAuthenticate)
 	}
 	switch tokens[0] {
 	case "Basic":
-		req.SetBasicAuth(i.username, i.password)
+		req.SetBasicAuth(s.username, s.password)
 		return nil
 	case "Bearer":
 		client := &http.Client{}
-		if i.transport != nil {
-			client.Transport = i.transport
+		if s.transport != nil {
+			client.Transport = s.transport
 		}
 		res, err := client.Do(req)
 		if err != nil {
@@ -263,7 +311,7 @@ func (i *dockerImage) setupRequestAuth(req *http.Request) error {
 		if scope == "" {
 			return fmt.Errorf("missing scope in bearer auth challenge")
 		}
-		token, err := i.getBearerToken(realm, service, scope)
+		token, err := s.getBearerToken(realm, service, scope)
 		if err != nil {
 			return err
 		}
@@ -274,7 +322,7 @@ func (i *dockerImage) setupRequestAuth(req *http.Request) error {
 	// support docker bearer with authconfig's Auth string? see docker2aci
 }
 
-func (i *dockerImage) getBearerToken(realm, service, scope string) (string, error) {
+func (s *dockerImageSource) getBearerToken(realm, service, scope string) (string, error) {
 	authReq, err := http.NewRequest("GET", realm, nil)
 	if err != nil {
 		return "", err
@@ -285,8 +333,8 @@ func (i *dockerImage) getBearerToken(realm, service, scope string) (string, erro
 		getParams.Add("scope", scope)
 	}
 	authReq.URL.RawQuery = getParams.Encode()
-	if i.username != "" && i.password != "" {
-		authReq.SetBasicAuth(i.username, i.password)
+	if s.username != "" && s.password != "" {
+		authReq.SetBasicAuth(s.username, s.password)
 	}
 	// insecure for now to contact the external token service
 	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
@@ -328,29 +376,12 @@ func (i *dockerImage) retrieveRawManifest() error {
 	if i.rawManifest != nil {
 		return nil
 	}
-	pr, err := i.ping()
+	manblob, unverifiedCanonicalDigest, err := i.src.GetManifest()
 	if err != nil {
 		return err
-	}
-	i.WWWAuthenticate = pr.WWWAuthenticate
-	i.scheme = pr.scheme
-	url := fmt.Sprintf(manifestURL, i.scheme, i.registry, i.ref.RemoteName(), i.tag)
-	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
-	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
-	res, err := i.makeRequest("GET", url, pr.needsAuth(), nil)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	manblob, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return err
-	}
-	if res.StatusCode != http.StatusOK {
-		return errFetchManifest{res.StatusCode, manblob}
 	}
 	i.rawManifest = manblob
-	i.digest = res.Header.Get("Docker-Content-Digest")
+	i.digest = unverifiedCanonicalDigest
 	return nil
 }
 
@@ -398,31 +429,25 @@ func (i *dockerImage) Layers(layers ...string) error {
 		if !strings.HasPrefix(l, "sha256:") {
 			l = "sha256:" + l
 		}
-		url := fmt.Sprintf(blobsURL, i.scheme, i.registry, i.ref.RemoteName(), l)
-		if err := i.getLayer(l, url, tmpDir); err != nil {
+		if err := i.getLayer(l, tmpDir); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (i *dockerImage) getLayer(l, url, tmpDir string) error {
-	logrus.Infof("Downloading %s", url)
-	res, err := i.makeRequest("GET", url, i.WWWAuthenticate != "", nil)
+func (i *dockerImage) getLayer(digest, tmpDir string) error {
+	stream, err := i.src.GetLayer(digest)
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		// print url also
-		return fmt.Errorf("Invalid status code returned when fetching blob %d", res.StatusCode)
-	}
-	layerPath := path.Join(tmpDir, strings.Replace(l, "sha256:", "", -1)+".tar")
+	defer stream.Close()
+	layerPath := path.Join(tmpDir, strings.Replace(digest, "sha256:", "", -1)+".tar")
 	layerFile, err := os.Create(layerPath)
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(layerFile, res.Body); err != nil {
+	if _, err := io.Copy(layerFile, stream); err != nil {
 		return err
 	}
 	if err := layerFile.Sync(); err != nil {
@@ -431,7 +456,8 @@ func (i *dockerImage) getLayer(l, url, tmpDir string) error {
 	return nil
 }
 
-func parseDockerImage(img, certPath string, tlsVerify bool) (types.Image, error) {
+// newDockerImageSource is the same as NewDockerImageSource, only it returns the more specific *dockerImageSource type.
+func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSource, error) {
 	ref, err := reference.ParseNamed(img)
 	if err != nil {
 		return nil, err
@@ -472,7 +498,7 @@ func parseDockerImage(img, certPath string, tlsVerify bool) (types.Image, error)
 			TLSClientConfig: tlsc,
 		}
 	}
-	return &dockerImage{
+	return &dockerImageSource{
 		ref:       ref,
 		tag:       tag,
 		registry:  registry,
@@ -480,6 +506,19 @@ func parseDockerImage(img, certPath string, tlsVerify bool) (types.Image, error)
 		password:  password,
 		transport: tr,
 	}, nil
+}
+
+// NewDockerImageSource creates a new ImageSource for the specified image and connection specification.
+func NewDockerImageSource(img, certPath string, tlsVerify bool) (types.ImageSource, error) {
+	return newDockerImageSource(img, certPath, tlsVerify)
+}
+
+func parseDockerImage(img, certPath string, tlsVerify bool) (types.Image, error) {
+	s, err := newDockerImageSource(img, certPath, tlsVerify)
+	if err != nil {
+		return nil, err
+	}
+	return &dockerImage{src: s}, nil
 }
 
 func getDefaultConfigDir(confPath string) string {
@@ -576,13 +615,13 @@ func (pr *pingResponse) needsAuth() bool {
 	return pr.WWWAuthenticate != ""
 }
 
-func (i *dockerImage) ping() (*pingResponse, error) {
+func (s *dockerImageSource) ping() (*pingResponse, error) {
 	client := &http.Client{}
-	if i.transport != nil {
-		client.Transport = i.transport
+	if s.transport != nil {
+		client.Transport = s.transport
 	}
 	ping := func(scheme string) (*pingResponse, error) {
-		url := fmt.Sprintf(baseURL, scheme, i.registry)
+		url := fmt.Sprintf(baseURL, scheme, s.registry)
 		resp, err := client.Get(url)
 		if err != nil {
 			return nil, err
