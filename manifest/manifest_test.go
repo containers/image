@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/docker/libtrust"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -102,4 +103,21 @@ func TestMatchesDigest(t *testing.T) {
 	res, err = MatchesDigest([]byte{}, "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
 	assert.True(t, res)
 	assert.NoError(t, err)
+}
+
+func TestAddDummyV2S1Signature(t *testing.T) {
+	manifest, err := ioutil.ReadFile("fixtures/v2s1-unsigned.manifest.json")
+	require.NoError(t, err)
+
+	signedManifest, err := AddDummyV2S1Signature(manifest)
+	require.NoError(t, err)
+
+	sig, err := libtrust.ParsePrettySignature(signedManifest, "signatures")
+	require.NoError(t, err)
+	signaturePayload, err := sig.Payload()
+	require.NoError(t, err)
+	assert.Equal(t, manifest, signaturePayload)
+
+	_, err = AddDummyV2S1Signature([]byte("}this is invalid JSON"))
+	assert.Error(t, err)
 }
