@@ -6,6 +6,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/projectatomic/skopeo/signature"
 )
 
 // FIXME: Also handle schema2, and put this elsewhere:
@@ -38,6 +39,7 @@ func copyHandler(context *cli.Context) {
 	if err != nil {
 		logrus.Fatalf("Error initializing %s: %s", context.Args()[1], err.Error())
 	}
+	signBy := context.String("sign-by")
 
 	manifest, digest, err := src.GetManifest()
 	if err != nil {
@@ -64,6 +66,24 @@ func copyHandler(context *cli.Context) {
 	if err != nil {
 		logrus.Fatalf("Error reading signatures: %s", err.Error())
 	}
+
+	if signBy != "" {
+		mech, err := signature.NewGPGSigningMechanism()
+		if err != nil {
+			logrus.Fatalf("Error initializing GPG: %s", err.Error())
+		}
+		dockerReference, err := dest.CanonicalDockerReference()
+		if err != nil {
+			logrus.Fatalf("Error determining canonical Docker reference: %s", err.Error())
+		}
+
+		newSig, err := signature.SignDockerManifest(manifest, dockerReference, mech, signBy)
+		if err != nil {
+			logrus.Fatalf("Error creating signature: %s", err.Error())
+		}
+		sigs = append(sigs, newSig)
+	}
+
 	if err := dest.PutSignatures(sigs); err != nil {
 		logrus.Fatalf("Error writing signatures: %s", err.Error())
 	}
@@ -77,4 +97,11 @@ func copyHandler(context *cli.Context) {
 var copyCmd = cli.Command{
 	Name:   "copy",
 	Action: copyHandler,
+	// FIXME: Do we need to namespace the GPG aspect?
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "sign-by",
+			Usage: "sign the image using a GPG key with the specified fingerprint",
+		},
+	},
 }

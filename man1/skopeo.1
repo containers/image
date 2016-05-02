@@ -8,7 +8,7 @@
 .SH NAME
 skopeo \(em Inspect Docker images and repositories on registries
 .SH SYNOPSIS
-\fBskopeo copy\fR source-location destination-location
+\fBskopeo copy\fR [\fB--sign-by=\fRkey-ID] source-location destination-location
 .PP
 \fBskopeo inspect\fR image-name [\fB--raw\fR]
 .PP
@@ -55,7 +55,10 @@ Copy an image (manifest, filesystem layers, signatures) from one location to ano
 and
 .B destination-location
 can be \fBdocker://\fRdocker-reference, \fBdir:\fRlocal-path, or \fBatomic:\fRimagestream-name\fB:\fRtag .
-
+.sp
+\fB\-\-sign\-by=\fRkey-id
+Add a signature by the specified key ID for image name corresponding to \fBdestination-location\fR.
+Existing signatures, if any, are preserved as well.
 .TP
 .B inspect
 Return low-level information on images in a registry
