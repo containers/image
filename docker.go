@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -415,11 +414,12 @@ func (i *dockerImage) Layers(layers ...string) error {
 	if err != nil {
 		return err
 	}
+	dest := NewDirImageDestination(tmpDir)
 	data, err := json.Marshal(m)
 	if err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(path.Join(tmpDir, "manifest.json"), data, 0644); err != nil {
+	if err := dest.PutManifest(data); err != nil {
 		return err
 	}
 	if len(layers) == 0 {
@@ -429,31 +429,20 @@ func (i *dockerImage) Layers(layers ...string) error {
 		if !strings.HasPrefix(l, "sha256:") {
 			l = "sha256:" + l
 		}
-		if err := i.getLayer(l, tmpDir); err != nil {
+		if err := i.getLayer(dest, l); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (i *dockerImage) getLayer(digest, tmpDir string) error {
+func (i *dockerImage) getLayer(dest types.ImageDestination, digest string) error {
 	stream, err := i.src.GetLayer(digest)
 	if err != nil {
 		return err
 	}
 	defer stream.Close()
-	layerPath := path.Join(tmpDir, strings.Replace(digest, "sha256:", "", -1)+".tar")
-	layerFile, err := os.Create(layerPath)
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(layerFile, stream); err != nil {
-		return err
-	}
-	if err := layerFile.Sync(); err != nil {
-		return err
-	}
-	return nil
+	return dest.PutLayer(digest, stream)
 }
 
 // newDockerImageSource is the same as NewDockerImageSource, only it returns the more specific *dockerImageSource type.
