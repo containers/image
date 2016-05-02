@@ -13,12 +13,12 @@ import (
 func TestGuessManifestMIMEType(t *testing.T) {
 	cases := []struct {
 		path     string
-		mimeType manifestMIMEType
+		mimeType string
 	}{
-		{"v2s2.manifest.json", dockerV2Schema2MIMEType},
-		{"v2s1.manifest.json", dockerV2Schema1MIMEType},
-		{"v2s1-invalid-signatures.manifest.json", dockerV2Schema1MIMEType},
-		{"v2s2nomime.manifest.json", dockerV2Schema2MIMEType}, // It is unclear whether this one is legal, but we should guess v2s2 if anything at all.
+		{"v2s2.manifest.json", DockerV2Schema2MIMEType},
+		{"v2s1.manifest.json", DockerV2Schema1MIMEType},
+		{"v2s1-invalid-signatures.manifest.json", DockerV2Schema1MIMEType},
+		{"v2s2nomime.manifest.json", DockerV2Schema2MIMEType}, // It is unclear whether this one is legal, but we should guess v2s2 if anything at all.
 		{"unknown-version.manifest.json", ""},
 		{"non-json.manifest.json", ""}, // Not a manifest (nor JSON) at all
 	}
@@ -26,7 +26,7 @@ func TestGuessManifestMIMEType(t *testing.T) {
 	for _, c := range cases {
 		manifest, err := ioutil.ReadFile(filepath.Join("fixtures", c.path))
 		require.NoError(t, err)
-		mimeType := guessManifestMIMEType(manifest)
+		mimeType := GuessManifestMIMEType(manifest)
 		assert.Equal(t, c.mimeType, mimeType)
 	}
 }
