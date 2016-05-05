@@ -1,3 +1,5 @@
+// Note: Consider the API unstable until the code supports at least three different image formats or transports.
+
 package signature
 
 import (
