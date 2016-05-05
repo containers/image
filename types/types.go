@@ -7,8 +7,12 @@ import (
 )
 
 const (
+	// AtomicPrefix is the URL-like schema prefix used for Atomic registry image references.
+	AtomicPrefix = "atomic:"
 	// DockerPrefix is the URL-like schema prefix used for Docker image references.
 	DockerPrefix = "docker://"
+	// DirectoryPrefix is the URL-like schema prefix used for local directories (for debugging)
+	DirectoryPrefix = "dir:"
 )
 
 // Registry is a service providing repositories.
@@ -33,6 +37,8 @@ type ImageSource interface {
 
 // ImageDestination is a service, possibly remote (= slow), to store components of a single image.
 type ImageDestination interface {
+	// CanonicalDockerReference returns the full, unambiguous, Docker reference for this image (even if the user referred to the image using some shorthand notation).
+	CanonicalDockerReference() (string, error)
 	PutManifest([]byte) error
 	PutLayer(digest string, stream io.Reader) error
 	PutSignatures(signatures [][]byte) error

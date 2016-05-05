@@ -60,6 +60,7 @@ func main() {
 		return nil
 	}
 	app.Commands = []cli.Command{
+		copyCmd,
 		inspectCmd,
 		layersCmd,
 		standaloneSignCmd,

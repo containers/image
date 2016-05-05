@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/homedir"
+	"github.com/projectatomic/skopeo/dockerutils"
 	"github.com/projectatomic/skopeo/reference"
 	"github.com/projectatomic/skopeo/types"
 )
@@ -30,10 +32,11 @@ const (
 	dockerCfgFileName = "config.json"
 	dockerCfgObsolete = ".dockercfg"
 
-	baseURL     = "%s://%s/v2/"
-	tagsURL     = "%s/tags/list"
-	manifestURL = "%s/manifests/%s"
-	blobsURL    = "%s/blobs/%s"
+	baseURL       = "%s://%s/v2/"
+	tagsURL       = "%s/tags/list"
+	manifestURL   = "%s/manifests/%s"
+	blobsURL      = "%s/blobs/%s"
+	blobUploadURL = "%s/blobs/uploads/?digest=%s"
 )
 
 var (
@@ -87,7 +90,7 @@ func (i *dockerImage) Manifest() (types.ImageManifest, error) {
 func (i *dockerImage) getTags() ([]string, error) {
 	// FIXME? Breaking the abstraction.
 	url := fmt.Sprintf(tagsURL, i.src.ref.RemoteName())
-	res, err := i.src.makeRequest("GET", url, nil)
+	res, err := i.src.c.makeRequest("GET", url, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -183,21 +186,16 @@ func sanitize(s string) string {
 }
 
 type dockerImageSource struct {
-	ref             reference.Named
-	tag             string
-	registry        string
-	username        string
-	password        string
-	wwwAuthenticate string // Cache of a value set by ping() if scheme is not empty
-	scheme          string // Cache of a value returned by a successful ping() if not empty
-	transport       *http.Transport
+	ref reference.Named
+	tag string
+	c   *dockerClient
 }
 
 func (s *dockerImageSource) GetManifest() (manifest []byte, unverifiedCanonicalDigest string, err error) {
 	url := fmt.Sprintf(manifestURL, s.ref.RemoteName(), s.tag)
 	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
 	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
-	res, err := s.makeRequest("GET", url, nil)
+	res, err := s.c.makeRequest("GET", url, nil, nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -215,7 +213,7 @@ func (s *dockerImageSource) GetManifest() (manifest []byte, unverifiedCanonicalD
 func (s *dockerImageSource) GetLayer(digest string) (io.ReadCloser, error) {
 	url := fmt.Sprintf(blobsURL, s.ref.RemoteName(), digest)
 	logrus.Infof("Downloading %s", url)
-	res, err := s.makeRequest("GET", url, nil)
+	res, err := s.c.makeRequest("GET", url, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -230,18 +228,28 @@ func (s *dockerImageSource) GetSignatures() ([][]byte, error) {
 	return [][]byte{}, nil
 }
 
-func (s *dockerImageSource) makeRequest(method, url string, headers map[string]string) (*http.Response, error) {
-	if s.scheme == "" {
-		pr, err := s.ping()
+// dockerClient is configuration for dealing with a single Docker registry.
+type dockerClient struct {
+	registry        string
+	username        string
+	password        string
+	wwwAuthenticate string // Cache of a value set by ping() if scheme is not empty
+	scheme          string // Cache of a value returned by a successful ping() if not empty
+	transport       *http.Transport
+}
+
+func (c *dockerClient) makeRequest(method, url string, headers map[string]string, stream io.Reader) (*http.Response, error) {
+	if c.scheme == "" {
+		pr, err := c.ping()
 		if err != nil {
 			return nil, err
 		}
-		s.wwwAuthenticate = pr.WWWAuthenticate
-		s.scheme = pr.scheme
+		c.wwwAuthenticate = pr.WWWAuthenticate
+		c.scheme = pr.scheme
 	}
 
-	url = fmt.Sprintf(baseURL, s.scheme, s.registry) + url
-	req, err := http.NewRequest(method, url, nil)
+	url = fmt.Sprintf(baseURL, c.scheme, c.registry) + url
+	req, err := http.NewRequest(method, url, stream)
 	if err != nil {
 		return nil, err
 	}
@@ -249,15 +257,16 @@ func (s *dockerImageSource) makeRequest(method, url string, headers map[string]s
 	for n, h := range headers {
 		req.Header.Add(n, h)
 	}
-	if s.wwwAuthenticate != "" {
-		if err := s.setupRequestAuth(req); err != nil {
+	if c.wwwAuthenticate != "" {
+		if err := c.setupRequestAuth(req); err != nil {
 			return nil, err
 		}
 	}
 	client := &http.Client{}
-	if s.transport != nil {
-		client.Transport = s.transport
+	if c.transport != nil {
+		client.Transport = c.transport
 	}
+	logrus.Debugf("%s %s", method, url)
 	res, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -265,19 +274,19 @@ func (s *dockerImageSource) makeRequest(method, url string, headers map[string]s
 	return res, nil
 }
 
-func (s *dockerImageSource) setupRequestAuth(req *http.Request) error {
-	tokens := strings.SplitN(strings.TrimSpace(s.wwwAuthenticate), " ", 2)
+func (c *dockerClient) setupRequestAuth(req *http.Request) error {
+	tokens := strings.SplitN(strings.TrimSpace(c.wwwAuthenticate), " ", 2)
 	if len(tokens) != 2 {
-		return fmt.Errorf("expected 2 tokens in WWW-Authenticate: %d, %s", len(tokens), s.wwwAuthenticate)
+		return fmt.Errorf("expected 2 tokens in WWW-Authenticate: %d, %s", len(tokens), c.wwwAuthenticate)
 	}
 	switch tokens[0] {
 	case "Basic":
-		req.SetBasicAuth(s.username, s.password)
+		req.SetBasicAuth(c.username, c.password)
 		return nil
 	case "Bearer":
 		client := &http.Client{}
-		if s.transport != nil {
-			client.Transport = s.transport
+		if c.transport != nil {
+			client.Transport = c.transport
 		}
 		res, err := client.Do(req)
 		if err != nil {
@@ -314,7 +323,7 @@ func (s *dockerImageSource) setupRequestAuth(req *http.Request) error {
 		if scope == "" {
 			return fmt.Errorf("missing scope in bearer auth challenge")
 		}
-		token, err := s.getBearerToken(realm, service, scope)
+		token, err := c.getBearerToken(realm, service, scope)
 		if err != nil {
 			return err
 		}
@@ -325,7 +334,7 @@ func (s *dockerImageSource) setupRequestAuth(req *http.Request) error {
 	// support docker bearer with authconfig's Auth string? see docker2aci
 }
 
-func (s *dockerImageSource) getBearerToken(realm, service, scope string) (string, error) {
+func (c *dockerClient) getBearerToken(realm, service, scope string) (string, error) {
 	authReq, err := http.NewRequest("GET", realm, nil)
 	if err != nil {
 		return "", err
@@ -336,8 +345,8 @@ func (s *dockerImageSource) getBearerToken(realm, service, scope string) (string
 		getParams.Add("scope", scope)
 	}
 	authReq.URL.RawQuery = getParams.Encode()
-	if s.username != "" && s.password != "" {
-		authReq.SetBasicAuth(s.username, s.password)
+	if c.username != "" && c.password != "" {
+		authReq.SetBasicAuth(c.username, c.password)
 	}
 	// insecure for now to contact the external token service
 	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
@@ -449,30 +458,15 @@ func (i *dockerImage) getLayer(dest types.ImageDestination, digest string) error
 	return dest.PutLayer(digest, stream)
 }
 
-// newDockerImageSource is the same as NewDockerImageSource, only it returns the more specific *dockerImageSource type.
-func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSource, error) {
-	ref, err := reference.ParseNamed(img)
-	if err != nil {
-		return nil, err
-	}
-	if reference.IsNameOnly(ref) {
-		ref = reference.WithDefaultTag(ref)
-	}
-	var tag string
-	switch x := ref.(type) {
-	case reference.Canonical:
-		tag = x.Digest().String()
-	case reference.NamedTagged:
-		tag = x.Tag()
-	}
+// newDockerClient returns a new dockerClient instance for refHostname (a host a specified in the Docker image reference, not canonicalized to dockerRegistry)
+func newDockerClient(refHostname, certPath string, tlsVerify bool) (*dockerClient, error) {
 	var registry string
-	hostname := ref.Hostname()
-	if hostname == dockerHostname {
+	if refHostname == dockerHostname {
 		registry = dockerRegistry
 	} else {
-		registry = hostname
+		registry = refHostname
 	}
-	username, password, err := getAuth(ref.Hostname())
+	username, password, err := getAuth(refHostname)
 	if err != nil {
 		return nil, err
 	}
@@ -492,13 +486,47 @@ func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSou
 			TLSClientConfig: tlsc,
 		}
 	}
-	return &dockerImageSource{
-		ref:       ref,
-		tag:       tag,
+	return &dockerClient{
 		registry:  registry,
 		username:  username,
 		password:  password,
 		transport: tr,
+	}, nil
+}
+
+// parseDockerImageName converts a string into a reference and tag value.
+func parseDockerImageName(img string) (reference.Named, string, error) {
+	ref, err := reference.ParseNamed(img)
+	if err != nil {
+		return nil, "", err
+	}
+	if reference.IsNameOnly(ref) {
+		ref = reference.WithDefaultTag(ref)
+	}
+	var tag string
+	switch x := ref.(type) {
+	case reference.Canonical:
+		tag = x.Digest().String()
+	case reference.NamedTagged:
+		tag = x.Tag()
+	}
+	return ref, tag, nil
+}
+
+// newDockerImageSource is the same as NewDockerImageSource, only it returns the more specific *dockerImageSource type.
+func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSource, error) {
+	ref, tag, err := parseDockerImageName(img)
+	if err != nil {
+		return nil, err
+	}
+	c, err := newDockerClient(ref.Hostname(), certPath, tlsVerify)
+	if err != nil {
+		return nil, err
+	}
+	return &dockerImageSource{
+		ref: ref,
+		tag: tag,
+		c:   c,
 	}, nil
 }
 
@@ -605,18 +633,20 @@ type pingResponse struct {
 	errors          []apiErr
 }
 
-func (s *dockerImageSource) ping() (*pingResponse, error) {
+func (c *dockerClient) ping() (*pingResponse, error) {
 	client := &http.Client{}
-	if s.transport != nil {
-		client.Transport = s.transport
+	if c.transport != nil {
+		client.Transport = c.transport
 	}
 	ping := func(scheme string) (*pingResponse, error) {
-		url := fmt.Sprintf(baseURL, scheme, s.registry)
+		url := fmt.Sprintf(baseURL, scheme, c.registry)
 		resp, err := client.Get(url)
+		logrus.Debugf("Ping %s err %#v", url, err)
 		if err != nil {
 			return nil, err
 		}
 		defer resp.Body.Close()
+		logrus.Debugf("Ping %s status %d", scheme+"://"+c.registry+"/v2/", resp.StatusCode)
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
 			return nil, fmt.Errorf("error pinging repository, response code %d", resp.StatusCode)
 		}
@@ -695,6 +725,102 @@ func fixManifestLayers(manifest *manifestSchema1) error {
 func validateV1ID(id string) error {
 	if ok := validHex.MatchString(id); !ok {
 		return fmt.Errorf("image ID %q is invalid", id)
+	}
+	return nil
+}
+
+type dockerImageDestination struct {
+	ref reference.Named
+	tag string
+	c   *dockerClient
+}
+
+// NewDockerImageDestination creates a new ImageDestination for the specified image and connection specification.
+func NewDockerImageDestination(img, certPath string, tlsVerify bool) (types.ImageDestination, error) {
+	ref, tag, err := parseDockerImageName(img)
+	if err != nil {
+		return nil, err
+	}
+	c, err := newDockerClient(ref.Hostname(), certPath, tlsVerify)
+	if err != nil {
+		return nil, err
+	}
+	return &dockerImageDestination{
+		ref: ref,
+		tag: tag,
+		c:   c,
+	}, nil
+}
+
+func (d *dockerImageDestination) CanonicalDockerReference() (string, error) {
+	return fmt.Sprintf("%s:%s", d.ref.Name(), d.tag), nil
+}
+
+func (d *dockerImageDestination) PutManifest(manifest []byte) error {
+	// FIXME: This only allows upload by digest, not creating a tag.  See the
+	// corresponding comment in NewOpenshiftImageDestination.
+	digest, err := dockerutils.ManifestDigest(manifest)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf(manifestURL, d.ref.RemoteName(), digest)
+
+	headers := map[string]string{}
+	mimeType := dockerutils.GuessManifestMIMEType(manifest)
+	if mimeType != "" {
+		headers["Content-Type"] = mimeType
+	}
+	res, err := d.c.makeRequest("PUT", url, headers, bytes.NewReader(manifest))
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusCreated {
+		body, err := ioutil.ReadAll(res.Body)
+		if err == nil {
+			logrus.Debugf("Error body %s", string(body))
+		}
+		logrus.Debugf("Error uploading manifest, status %d, %#v", res.StatusCode, res)
+		return fmt.Errorf("Error uploading manifest to %s, status %d", url, res.StatusCode)
+	}
+	return nil
+}
+
+func (d *dockerImageDestination) PutLayer(digest string, stream io.Reader) error {
+	checkURL := fmt.Sprintf(blobsURL, d.ref.RemoteName(), digest)
+
+	logrus.Debugf("Checking %s", checkURL)
+	res, err := d.c.makeRequest("HEAD", checkURL, nil, nil)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode == http.StatusOK && res.Header.Get("Docker-Content-Digest") == digest {
+		logrus.Debugf("... already exists, not uploading")
+		return nil
+	}
+	logrus.Debugf("... failed, status %d", res.StatusCode)
+
+	// FIXME? Chunked upload, progress reporting, etc.
+	uploadURL := fmt.Sprintf(blobUploadURL, d.ref.RemoteName(), digest)
+	logrus.Debugf("Uploading %s", uploadURL)
+	// FIXME: Set Content-Length?
+	res, err = d.c.makeRequest("POST", uploadURL, map[string]string{"Content-Type": "application/octet-stream"}, stream)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusCreated {
+		logrus.Debugf("Error uploading, status %d", res.StatusCode)
+		return fmt.Errorf("Error uploading to %s, status %d", uploadURL, res.StatusCode)
+	}
+
+	return nil
+}
+
+func (d *dockerImageDestination) PutSignatures(signatures [][]byte) error {
+	if len(signatures) != 0 {
+		return fmt.Errorf("Pushing signatures to a Docker Registry is not supported")
 	}
 	return nil
 }
