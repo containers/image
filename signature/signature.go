@@ -36,6 +36,9 @@ type privateSignature struct {
 	Signature
 }
 
+// Compile-time check that privateSignature implements json.Marshaler
+var _ json.Marshaler = (*privateSignature)(nil)
+
 // MarshalJSON implements the json.Marshaler interface.
 func (s privateSignature) MarshalJSON() ([]byte, error) {
 	return s.marshalJSONWithVariables(time.Now().UTC().Unix(), signatureCreatorID)
@@ -102,6 +105,9 @@ func stringField(m map[string]interface{}, fieldName string) (string, error) {
 	}
 	return v, nil
 }
+
+// Compile-time check that privateSignature implements json.Unmarshaler
+var _ json.Unmarshaler = (*privateSignature)(nil)
 
 // UnmarshalJSON implements the json.Unmarshaler interface
 func (s *privateSignature) UnmarshalJSON(data []byte) error {
