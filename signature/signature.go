@@ -65,52 +65,23 @@ func (s privateSignature) marshalJSONWithVariables(timestamp int64, creatorID st
 	return json.Marshal(signature)
 }
 
-// validateExactMapKeys returns an error if the keys of m are not exactly expectedKeys, which must be pairwise distinct
-func validateExactMapKeys(m map[string]interface{}, expectedKeys ...string) error {
-	if len(m) != len(expectedKeys) {
-		return InvalidSignatureError{msg: "Unexpected keys in a JSON object"}
-	}
-
-	for _, k := range expectedKeys {
-		if _, ok := m[k]; !ok {
-			return InvalidSignatureError{msg: fmt.Sprintf("Key %s missing in a JSON object", k)}
-		}
-	}
-	// Assuming expectedKeys are pairwise distinct, we know m contains len(expectedKeys) different values in expectedKeys.
-	return nil
-}
-
-// mapField returns a member fieldName of m, if it is a JSON map, or an error.
-func mapField(m map[string]interface{}, fieldName string) (map[string]interface{}, error) {
-	untyped, ok := m[fieldName]
-	if !ok {
-		return nil, InvalidSignatureError{msg: fmt.Sprintf("Field %s missing", fieldName)}
-	}
-	v, ok := untyped.(map[string]interface{})
-	if !ok {
-		return nil, InvalidSignatureError{msg: fmt.Sprintf("Field %s is not a JSON object", fieldName)}
-	}
-	return v, nil
-}
-
-// stringField returns a member fieldName of m, if it is a string, or an error.
-func stringField(m map[string]interface{}, fieldName string) (string, error) {
-	untyped, ok := m[fieldName]
-	if !ok {
-		return "", InvalidSignatureError{msg: fmt.Sprintf("Field %s missing", fieldName)}
-	}
-	v, ok := untyped.(string)
-	if !ok {
-		return "", InvalidSignatureError{msg: fmt.Sprintf("Field %s is not a JSON object", fieldName)}
-	}
-	return v, nil
-}
-
 // Compile-time check that privateSignature implements json.Unmarshaler
 var _ json.Unmarshaler = (*privateSignature)(nil)
 
 // UnmarshalJSON implements the json.Unmarshaler interface
 func (s *privateSignature) UnmarshalJSON(data []byte) error {
+	err := s.strictUnmarshalJSON(data)
+	if err != nil {
+		if _, ok := err.(jsonFormatError); ok {
+			err = InvalidSignatureError{msg: err.Error()}
+		}
+	}
+	return err
+}
+
+// strictUnmarshalJSON is UnmarshalJSON, except that it may return the internal jsonFormatError error type.
+// Splitting it into a separate function allows us to do the jsonFormatError → InvalidSignatureError in a single place, the caller.
+func (s *privateSignature) strictUnmarshalJSON(data []byte) error {
 	var untyped interface{}
 	if err := json.Unmarshal(data, &untyped); err != nil {
 		return err
