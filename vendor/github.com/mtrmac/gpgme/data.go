@@ -21,7 +21,7 @@ const (
 
 //export gogpgme_readfunc
 func gogpgme_readfunc(handle, buffer unsafe.Pointer, size C.size_t) C.ssize_t {
-	d := callbackLookup(*(*int)(handle)).(*Data)
+	d := callbackLookup(uintptr(handle)).(*Data)
 	if len(d.buf) < int(size) {
 		d.buf = make([]byte, size)
 	}
@@ -36,7 +36,7 @@ func gogpgme_readfunc(handle, buffer unsafe.Pointer, size C.size_t) C.ssize_t {
 
 //export gogpgme_writefunc
 func gogpgme_writefunc(handle, buffer unsafe.Pointer, size C.size_t) C.ssize_t {
-	d := callbackLookup(*(*int)(handle)).(*Data)
+	d := callbackLookup(uintptr(handle)).(*Data)
 	if len(d.buf) < int(size) {
 		d.buf = make([]byte, size)
 	}
@@ -51,7 +51,7 @@ func gogpgme_writefunc(handle, buffer unsafe.Pointer, size C.size_t) C.ssize_t {
 
 //export gogpgme_seekfunc
 func gogpgme_seekfunc(handle unsafe.Pointer, offset C.off_t, whence C.int) C.off_t {
-	d := callbackLookup(*(*int)(handle)).(*Data)
+	d := callbackLookup(uintptr(handle)).(*Data)
 	n, err := d.s.Seek(int64(offset), int(whence))
 	if err != nil {
 		C.gpgme_err_set_errno(C.EIO)
@@ -68,7 +68,7 @@ type Data struct {
 	r   io.Reader
 	w   io.Writer
 	s   io.Seeker
-	cbc int
+	cbc uintptr
 }
 
 func newData() *Data {
@@ -106,7 +106,7 @@ func NewDataReader(r io.Reader) (*Data, error) {
 	d.cbs.read = C.gpgme_data_read_cb_t(C.gogpgme_readfunc)
 	cbc := callbackAdd(d)
 	d.cbc = cbc
-	return d, handleError(C.gpgme_data_new_from_cbs(&d.dh, &d.cbs, unsafe.Pointer(&d.cbc)))
+	return d, handleError(C.gogpgme_data_new_from_cbs(&d.dh, &d.cbs, C.uintptr_t(cbc)))
 }
 
 // NewDataWriter returns a new callback based data buffer
@@ -116,7 +116,7 @@ func NewDataWriter(w io.Writer) (*Data, error) {
 	d.cbs.write = C.gpgme_data_write_cb_t(C.gogpgme_writefunc)
 	cbc := callbackAdd(d)
 	d.cbc = cbc
-	return d, handleError(C.gpgme_data_new_from_cbs(&d.dh, &d.cbs, unsafe.Pointer(&d.cbc)))
+	return d, handleError(C.gogpgme_data_new_from_cbs(&d.dh, &d.cbs, C.uintptr_t(cbc)))
 }
 
 // NewDataReadWriter returns a new callback based data buffer
@@ -128,7 +128,7 @@ func NewDataReadWriter(rw io.ReadWriter) (*Data, error) {
 	d.cbs.write = C.gpgme_data_write_cb_t(C.gogpgme_writefunc)
 	cbc := callbackAdd(d)
 	d.cbc = cbc
-	return d, handleError(C.gpgme_data_new_from_cbs(&d.dh, &d.cbs, unsafe.Pointer(&d.cbc)))
+	return d, handleError(C.gogpgme_data_new_from_cbs(&d.dh, &d.cbs, C.uintptr_t(cbc)))
 }
 
 // NewDataReadWriteSeeker returns a new callback based data buffer
@@ -142,7 +142,7 @@ func NewDataReadWriteSeeker(rw io.ReadWriteSeeker) (*Data, error) {
 	d.cbs.seek = C.gpgme_data_seek_cb_t(C.gogpgme_seekfunc)
 	cbc := callbackAdd(d)
 	d.cbc = cbc
-	return d, handleError(C.gpgme_data_new_from_cbs(&d.dh, &d.cbs, unsafe.Pointer(&d.cbc)))
+	return d, handleError(C.gogpgme_data_new_from_cbs(&d.dh, &d.cbs, C.uintptr_t(cbc)))
 }
 
 // Close releases any resources associated with the data buffer
