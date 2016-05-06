@@ -6,15 +6,15 @@ import (
 
 var callbacks struct {
 	sync.Mutex
-	m map[int]interface{}
-	c int
+	m map[uintptr]interface{}
+	c uintptr
 }
 
-func callbackAdd(v interface{}) int {
+func callbackAdd(v interface{}) uintptr {
 	callbacks.Lock()
 	defer callbacks.Unlock()
 	if callbacks.m == nil {
-		callbacks.m = make(map[int]interface{})
+		callbacks.m = make(map[uintptr]interface{})
 	}
 	callbacks.c++
 	ret := callbacks.c
@@ -22,7 +22,7 @@ func callbackAdd(v interface{}) int {
 	return ret
 }
 
-func callbackLookup(c int) interface{} {
+func callbackLookup(c uintptr) interface{} {
 	callbacks.Lock()
 	defer callbacks.Unlock()
 	ret := callbacks.m[c]
@@ -32,7 +32,7 @@ func callbackLookup(c int) interface{} {
 	return ret
 }
 
-func callbackDelete(c int) {
+func callbackDelete(c uintptr) {
 	callbacks.Lock()
 	defer callbacks.Unlock()
 	if callbacks.m[c] == nil {
