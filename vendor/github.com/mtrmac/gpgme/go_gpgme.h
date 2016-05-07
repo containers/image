@@ -1,6 +1,8 @@
 #ifndef GO_GPGME_H
 #define GO_GPGME_H
 
+#include <stdint.h>
+
 #include <gpgme.h>
 
 extern ssize_t gogpgme_readfunc(void *handle, void *buffer, size_t size);
