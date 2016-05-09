@@ -21,15 +21,15 @@ skopeo \(em Inspect Docker images and repositories on registries
 \fBskopeo help\fR [command]
 .SH DESCRIPTION
 \fBskopeo\fR is a command line utility which is able to inspect a repository on a Docker registry and fetch images
-layers. It fetches the repository's manifest and it is able to show you a `docker inspect`-like json output about a
-whole repository or a tag. This tool, in contrast to docker inspect, helps you gather useful information about a
-repository or a tag without requiring you to run `docker pull` - e.g. - which tags are available for the given
+layers. It fetches the repository's manifest and it is able to show you a \fBdocker inspect\fR-like json output about a
+whole repository or a tag. This tool, in contrast to \fBdocker inspect\fR, helps you gather useful information about a
+repository or a tag without requiring you to run \fBdocker pull\fR - e.g. - which tags are available for the given
 repository? which labels the image has?
 .SH OPTIONS
 .B "--debug"
 enable debug output
 .PP
-.B ""--username"
+.B "--username"
 Username to use to authenicate to the given registry
 .PP
 .B --password
