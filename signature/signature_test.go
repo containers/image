@@ -52,7 +52,7 @@ func x(m mSI, fields ...string) mSI {
 }
 
 // Return the result of modifying validJSON with fn and unmarshaling it into *sig
-func tryUnmarshalModified(t *testing.T, sig *privateSignature, validJSON []byte, modifyFn func(mSI)) error {
+func tryUnmarshalModifiedSignature(t *testing.T, sig *privateSignature, validJSON []byte, modifyFn func(mSI)) error {
 	var tmp mSI
 	err := json.Unmarshal(validJSON, &tmp)
 	require.NoError(t, err)
@@ -128,7 +128,7 @@ func TestUnmarshalJSON(t *testing.T) {
 		func(v mSI) { x(v, "critical", "identity")["docker-reference"] = 1 },
 	}
 	for _, fn := range breakFns {
-		err = tryUnmarshalModified(t, &s, validJSON, fn)
+		err = tryUnmarshalModifiedSignature(t, &s, validJSON, fn)
 		assert.Error(t, err)
 	}
 
@@ -141,7 +141,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	}
 	for _, fn := range allowedModificationFns {
 		s = privateSignature{}
-		err = tryUnmarshalModified(t, &s, validJSON, fn)
+		err = tryUnmarshalModifiedSignature(t, &s, validJSON, fn)
 		require.NoError(t, err)
 		assert.Equal(t, validSig, s)
 	}
