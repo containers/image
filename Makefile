@@ -26,7 +26,7 @@ GIT_COMMIT := $(shell git rev-parse HEAD 2> /dev/null || true)
 all: binary
 
 binary:
-	go build -ldflags "-X main.gitCommit=${GIT_COMMIT}" -o ${DEST}skopeo .
+	go build -ldflags "-X main.gitCommit=${GIT_COMMIT}" -o ${DEST}skopeo ./cmd/skopeo
 
 build-container:
 	docker build ${DOCKER_BUILD_ARGS} -t "$(DOCKER_IMAGE)" .
