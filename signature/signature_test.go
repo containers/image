@@ -147,10 +147,6 @@ func TestUnmarshalJSON(t *testing.T) {
 	}
 }
 
-type savedEnvironment struct {
-	vars []string
-}
-
 func TestSign(t *testing.T) {
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
 	require.NoError(t, err)
