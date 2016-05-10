@@ -62,6 +62,7 @@ func tryUnmarshalModifiedSignature(t *testing.T, sig *privateSignature, validJSO
 	testJSON, err := json.Marshal(tmp)
 	require.NoError(t, err)
 
+	*sig = privateSignature{}
 	return json.Unmarshal(testJSON, sig)
 }
 
@@ -140,7 +141,6 @@ func TestUnmarshalJSON(t *testing.T) {
 		func(v mSI) { delete(x(v, "optional"), "creator") },
 	}
 	for _, fn := range allowedModificationFns {
-		s = privateSignature{}
 		err = tryUnmarshalModifiedSignature(t, &s, validJSON, fn)
 		require.NoError(t, err)
 		assert.Equal(t, validSig, s)
