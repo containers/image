@@ -39,18 +39,6 @@ func TestMarshalJSON(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// A short-hand way to get a JSON object field value or panic. No error handling done, we know
-// what we are working with, a panic in a test is good enough, and fitting test cases on a single line
-// is a priority.
-func x(m mSI, fields ...string) mSI {
-	for _, field := range fields {
-		// Not .(mSI) because type assertion of an unnamed type to a named type always fails (the types
-		// are not "identical"), but the assignment is fine because they are "assignable".
-		m = m[field].(map[string]interface{})
-	}
-	return m
-}
-
 // Return the result of modifying validJSON with fn and unmarshaling it into *sig
 func tryUnmarshalModifiedSignature(t *testing.T, sig *privateSignature, validJSON []byte, modifyFn func(mSI)) error {
 	var tmp mSI
