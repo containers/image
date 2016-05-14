@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
@@ -41,11 +40,10 @@ func copyHandler(context *cli.Context) {
 	}
 	signBy := context.String("sign-by")
 
-	manifest, digest, err := src.GetManifest()
+	manifest, _, err := src.GetManifest()
 	if err != nil {
 		logrus.Fatalf("Error reading manifest: %s", err.Error())
 	}
-	fmt.Printf("Canonical manifest digest: %s\n", digest)
 
 	layers, err := manifestLayers(manifest)
 	if err != nil {
