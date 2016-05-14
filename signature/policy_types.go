@@ -41,8 +41,11 @@ const (
 	prTypeSignedBaseLayer        prTypeIdentifier = "signedBaseLayer"
 )
 
-// prInsecureAcceptAnything is a PolicyRequirement with type = prTypeInsecureAcceptAnything: every image is accepted.
+// prInsecureAcceptAnything is a PolicyRequirement with type = prTypeInsecureAcceptAnything:
+// every image is allowed to run.
 // Note that because PolicyRequirements are implicitly ANDed, this is necessary only if it is the only rule (to make the list non-empty and the policy explicit).
+// NOTE: This allows the image to run; it DOES NOT consider the signature verified (per IsSignatureAuthorAccepted).
+// FIXME? Better name?
 type prInsecureAcceptAnything struct {
 	prCommon
 }
