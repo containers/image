@@ -1,6 +1,7 @@
 package signature
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -73,4 +74,76 @@ func TestStringField(t *testing.T) {
 	s, err := stringField(mSI{"a": "x", "b": nil}, "a")
 	require.NoError(t, err)
 	assert.Equal(t, "x", s)
+}
+
+// implementsUnmarshalJSON is a minimalistic type used to detect that
+// paranoidUnmarshalJSONObject uses the json.Unmarshaler interface of resolved
+// pointers.
+type implementsUnmarshalJSON bool
+
+// Compile-time check that Policy implements json.Unmarshaler.
+var _ json.Unmarshaler = (*implementsUnmarshalJSON)(nil)
+
+func (dest *implementsUnmarshalJSON) UnmarshalJSON(data []byte) error {
+	_ = data     // We don't care, not really.
+	*dest = true // Mark handler as called
+	return nil
+}
+
+func TestParanoidUnmarshalJSONObject(t *testing.T) {
+	type testStruct struct {
+		A string
+		B int
+	}
+	ts := testStruct{}
+	var unmarshalJSONCalled implementsUnmarshalJSON
+	tsResolver := func(key string) interface{} {
+		switch key {
+		case "a":
+			return &ts.A
+		case "b":
+			return &ts.B
+		case "implementsUnmarshalJSON":
+			return &unmarshalJSONCalled
+		default:
+			return nil
+		}
+	}
+
+	// Empty object
+	ts = testStruct{}
+	err := paranoidUnmarshalJSONObject([]byte(`{}`), tsResolver)
+	require.NoError(t, err)
+	assert.Equal(t, testStruct{}, ts)
+
+	// Success
+	ts = testStruct{}
+	err = paranoidUnmarshalJSONObject([]byte(`{"a":"x", "b":2}`), tsResolver)
+	require.NoError(t, err)
+	assert.Equal(t, testStruct{A: "x", B: 2}, ts)
+
+	// json.Unamarshaler is used for decoding values
+	ts = testStruct{}
+	unmarshalJSONCalled = implementsUnmarshalJSON(false)
+	err = paranoidUnmarshalJSONObject([]byte(`{"implementsUnmarshalJSON":true}`), tsResolver)
+	require.NoError(t, err)
+	assert.Equal(t, unmarshalJSONCalled, implementsUnmarshalJSON(true))
+
+	// Various kinds of invalid input
+	for _, input := range []string{
+		``,                       // Empty input
+		`&`,                      // Entirely invalid JSON
+		`1`,                      // Not an object
+		`{&}`,                    // Invalid key JSON
+		`{1:1}`,                  // Key not a string
+		`{"b":1, "b":1}`,         // Duplicate key
+		`{"thisdoesnotexist":1}`, // Key rejected by resolver
+		`{"a":&}`,                // Invalid value JSON
+		`{"a":1}`,                // Type mismatch
+		`{"a":"value"}{}`,        // Extra data after object
+	} {
+		ts = testStruct{}
+		err := paranoidUnmarshalJSONObject([]byte(input), tsResolver)
+		assert.Error(t, err)
+	}
 }
