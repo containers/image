@@ -24,6 +24,20 @@ func manifestLayers(manifest []byte) ([]string, error) {
 	return layers, nil
 }
 
+// FIXME: this is a copy from docker_image.go and does not belong here.
+type manifestSchema1 struct {
+	Name     string
+	Tag      string
+	FSLayers []struct {
+		BlobSum string `json:"blobSum"`
+	} `json:"fsLayers"`
+	History []struct {
+		V1Compatibility string `json:"v1Compatibility"`
+	} `json:"history"`
+	// TODO(runcom) verify the downloaded manifest
+	//Signature []byte `json:"signature"`
+}
+
 func copyHandler(context *cli.Context) {
 	if len(context.Args()) != 2 {
 		logrus.Fatal("Usage: copy source destination")
