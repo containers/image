@@ -35,6 +35,13 @@ func NewDockerImage(img, certPath string, tlsVerify bool) (types.Image, error) {
 	return &dockerImage{src: s}, nil
 }
 
+// GetIntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
+// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
+// May be "" if unknown.
+func (i *dockerImage) GetIntendedDockerReference() string {
+	return i.src.GetIntendedDockerReference()
+}
+
 // GetManifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
 func (i *dockerImage) GetManifest() ([]byte, error) {
 	if err := i.retrieveRawManifest(); err != nil {
