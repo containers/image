@@ -1,4 +1,4 @@
-package main
+package docker
 
 import (
 	"encoding/json"
@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/projectatomic/skopeo/directory"
 	"github.com/projectatomic/skopeo/types"
 )
 
@@ -23,7 +24,9 @@ type dockerImage struct {
 	rawManifest []byte
 }
 
-func parseDockerImage(img, certPath string, tlsVerify bool) (types.Image, error) {
+// NewDockerImage returns a new Image interface type after setting up
+// a client to the registry hosting the given image.
+func NewDockerImage(img, certPath string, tlsVerify bool) (types.Image, error) {
 	s, err := newDockerImageSource(img, certPath, tlsVerify)
 	if err != nil {
 		return nil, err
@@ -201,7 +204,7 @@ func (i *dockerImage) Layers(layers ...string) error {
 	if err != nil {
 		return err
 	}
-	dest := NewDirImageDestination(tmpDir)
+	dest := directory.NewDirImageDestination(tmpDir)
 	data, err := json.Marshal(m)
 	if err != nil {
 		return err
