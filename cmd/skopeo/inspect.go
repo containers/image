@@ -23,8 +23,7 @@ var inspectCmd = cli.Command{
 			logrus.Fatal(err)
 		}
 		if c.Bool("raw") {
-			// TODO(runcom): hardcoded schema 2 version 1
-			b, err := img.RawManifest("2-1")
+			b, err := img.GetManifest()
 			if err != nil {
 				logrus.Fatal(err)
 			}

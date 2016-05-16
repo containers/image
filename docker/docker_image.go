@@ -19,9 +19,10 @@ var (
 )
 
 type dockerImage struct {
-	src         *dockerImageSource
-	digest      string
-	rawManifest []byte
+	src              *dockerImageSource
+	digest           string
+	rawManifest      []byte
+	cachedSignatures [][]byte // Private cache for GetSignatures; nil if not yet known.
 }
 
 // NewDockerImage returns a new Image interface type after setting up
@@ -34,12 +35,24 @@ func NewDockerImage(img, certPath string, tlsVerify bool) (types.Image, error) {
 	return &dockerImage{src: s}, nil
 }
 
-func (i *dockerImage) RawManifest(version string) ([]byte, error) {
-	// TODO(runcom): unused version param for now, default to docker v2-1
+// GetManifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
+func (i *dockerImage) GetManifest() ([]byte, error) {
 	if err := i.retrieveRawManifest(); err != nil {
 		return nil, err
 	}
 	return i.rawManifest, nil
+}
+
+// GetSignatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
+func (i *dockerImage) GetSignatures() ([][]byte, error) {
+	if i.cachedSignatures == nil {
+		sigs, err := i.src.GetSignatures()
+		if err != nil {
+			return nil, err
+		}
+		i.cachedSignatures = sigs
+	}
+	return i.cachedSignatures, nil
 }
 
 func (i *dockerImage) Manifest() (types.ImageManifest, error) {
