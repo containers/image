@@ -64,6 +64,8 @@ type Image interface {
 	Layers(layers ...string) error // configure download directory? Call it DownloadLayers?
 	Inspect() (*DockerImageManifest, error)
 	DockerTar() ([]byte, error) // ??? also, configure output directory
+	// GetRepositoryTags list all tags available in the repository. Note that this has no connection with the tag(s) used for this specific image, if any.
+	GetRepositoryTags() ([]string, error)
 }
 
 // DockerImageManifest is a set of metadata describing Docker images and their manifest.json files.
@@ -71,7 +73,6 @@ type Image interface {
 type DockerImageManifest struct {
 	Name          string
 	Tag           string
-	RepoTags      []string
 	Created       time.Time
 	DockerVersion string
 	Labels        map[string]string

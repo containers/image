@@ -75,18 +75,15 @@ func (i *dockerImage) Inspect() (*types.DockerImageManifest, error) {
 	if !ok {
 		return nil, fmt.Errorf("error retrivieng manifest schema1")
 	}
-	tags, err := i.getTags()
-	if err != nil {
-		return nil, err
-	}
-	imgManifest, err := makeImageManifest(i.src.ref.FullName(), ms1, tags)
+	imgManifest, err := makeImageManifest(i.src.ref.FullName(), ms1)
 	if err != nil {
 		return nil, err
 	}
 	return imgManifest, nil
 }
 
-func (i *dockerImage) getTags() ([]string, error) {
+// GetRepositoryTags list all tags available in the repository. Note that this has no connection with the tag(s) used for this specific image, if any.
+func (i *dockerImage) GetRepositoryTags() ([]string, error) {
 	// FIXME? Breaking the abstraction.
 	url := fmt.Sprintf(tagsURL, i.src.ref.RemoteName())
 	res, err := i.src.c.makeRequest("GET", url, nil, nil)
@@ -125,7 +122,7 @@ type v1Image struct {
 	OS string `json:"os,omitempty"`
 }
 
-func makeImageManifest(name string, m *manifestSchema1, tagList []string) (*types.DockerImageManifest, error) {
+func makeImageManifest(name string, m *manifestSchema1) (*types.DockerImageManifest, error) {
 	v1 := &v1Image{}
 	if err := json.Unmarshal([]byte(m.History[0].V1Compatibility), v1); err != nil {
 		return nil, err
@@ -133,7 +130,6 @@ func makeImageManifest(name string, m *manifestSchema1, tagList []string) (*type
 	return &types.DockerImageManifest{
 		Name:          name,
 		Tag:           m.Tag,
-		RepoTags:      tagList,
 		DockerVersion: v1.DockerVersion,
 		Created:       v1.Created,
 		Labels:        v1.Config.Labels,

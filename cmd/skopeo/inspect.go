@@ -54,11 +54,15 @@ var inspectCmd = cli.Command{
 		if err != nil {
 			logrus.Fatalf("Error computing manifest digest: %s", err.Error())
 		}
+		repoTags, err := img.GetRepositoryTags()
+		if err != nil {
+			logrus.Fatalf("Error determining repository tags: %s", err.Error())
+		}
 		outputData := inspectOutput{
 			Name:          imgInspect.Name,
 			Tag:           imgInspect.Tag,
 			Digest:        manifestDigest,
-			RepoTags:      imgInspect.RepoTags,
+			RepoTags:      repoTags,
 			Created:       imgInspect.Created,
 			DockerVersion: imgInspect.DockerVersion,
 			Labels:        imgInspect.Labels,
