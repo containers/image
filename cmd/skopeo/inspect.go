@@ -3,10 +3,25 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 )
+
+// inspectOutput is the output format of (skopeo inspect), primarily so that we can format it with a simple json.MarshalIndent.
+type inspectOutput struct {
+	Name          string
+	Tag           string
+	Digest        string
+	RepoTags      []string
+	Created       time.Time
+	DockerVersion string
+	Labels        map[string]string
+	Architecture  string
+	Os            string
+	Layers        []string
+}
 
 var inspectCmd = cli.Command{
 	Name:  "inspect",
@@ -34,7 +49,19 @@ var inspectCmd = cli.Command{
 		if err != nil {
 			logrus.Fatal(err)
 		}
-		out, err := json.MarshalIndent(imgInspect, "", "    ")
+		outputData := inspectOutput{
+			Name:          imgInspect.Name,
+			Tag:           imgInspect.Tag,
+			Digest:        imgInspect.Digest,
+			RepoTags:      imgInspect.RepoTags,
+			Created:       imgInspect.Created,
+			DockerVersion: imgInspect.DockerVersion,
+			Labels:        imgInspect.Labels,
+			Architecture:  imgInspect.Architecture,
+			Os:            imgInspect.Os,
+			Layers:        imgInspect.Layers,
+		}
+		out, err := json.MarshalIndent(outputData, "", "    ")
 		if err != nil {
 			logrus.Fatal(err)
 		}

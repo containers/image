@@ -62,14 +62,8 @@ type Image interface {
 	// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 	Signatures() ([][]byte, error)
 	Layers(layers ...string) error // configure download directory? Call it DownloadLayers?
-	Inspect() (ImageManifest, error)
+	Inspect() (*DockerImageManifest, error)
 	DockerTar() ([]byte, error) // ??? also, configure output directory
-}
-
-// ImageManifest is the interesting subset of metadata about an Image.
-// TODO(runcom)
-type ImageManifest interface {
-	String() string
 }
 
 // DockerImageManifest is a set of metadata describing Docker images and their manifest.json files.

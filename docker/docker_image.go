@@ -62,7 +62,7 @@ func (i *dockerImage) Signatures() ([][]byte, error) {
 	return i.cachedSignatures, nil
 }
 
-func (i *dockerImage) Inspect() (types.ImageManifest, error) {
+func (i *dockerImage) Inspect() (*types.DockerImageManifest, error) {
 	// TODO(runcom): unused version param for now, default to docker v2-1
 	m, err := i.getSchema1Manifest()
 	if err != nil {
@@ -122,7 +122,7 @@ type v1Image struct {
 	OS string `json:"os,omitempty"`
 }
 
-func makeImageManifest(name string, m *manifestSchema1, dgst string, tagList []string) (types.ImageManifest, error) {
+func makeImageManifest(name string, m *manifestSchema1, dgst string, tagList []string) (*types.DockerImageManifest, error) {
 	v1 := &v1Image{}
 	if err := json.Unmarshal([]byte(m.History[0].V1Compatibility), v1); err != nil {
 		return nil, err
