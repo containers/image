@@ -62,7 +62,7 @@ func (i *dockerImage) GetSignatures() ([][]byte, error) {
 	return i.cachedSignatures, nil
 }
 
-func (i *dockerImage) Manifest() (types.ImageManifest, error) {
+func (i *dockerImage) Inspect() (types.ImageManifest, error) {
 	// TODO(runcom): unused version param for now, default to docker v2-1
 	m, err := i.getSchema1Manifest()
 	if err != nil {

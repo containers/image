@@ -30,7 +30,7 @@ var inspectCmd = cli.Command{
 			fmt.Println(string(b))
 			return
 		}
-		imgInspect, err := img.Manifest()
+		imgInspect, err := img.Inspect()
 		if err != nil {
 			logrus.Fatal(err)
 		}

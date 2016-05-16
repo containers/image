@@ -60,7 +60,7 @@ type Image interface {
 	// GetSignatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 	GetSignatures() ([][]byte, error)
 	Layers(layers ...string) error // configure download directory? Call it DownloadLayers?
-	Manifest() (ImageManifest, error)
+	Inspect() (ImageManifest, error)
 	DockerTar() ([]byte, error) // ??? also, configure output directory
 }
 
