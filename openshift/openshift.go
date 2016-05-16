@@ -193,9 +193,9 @@ func (s *openshiftImageSource) IntendedDockerReference() string {
 	return s.client.canonicalDockerReference()
 }
 
-func (s *openshiftImageSource) GetManifest() (manifest []byte, unverifiedCanonicalDigest string, err error) {
+func (s *openshiftImageSource) GetManifest() ([]byte, error) {
 	if err := s.ensureImageIsResolved(); err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	return s.docker.GetManifest()
 }

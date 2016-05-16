@@ -35,7 +35,7 @@ type ImageSource interface {
 	// May be "" if unknown.
 	IntendedDockerReference() string
 	// GetManifest returns the image's manifest.  It may use a remote (= slow) service.
-	GetManifest() (manifest []byte, unverifiedCanonicalDigest string, err error)
+	GetManifest() ([]byte, error)
 	GetLayer(digest string) (io.ReadCloser, error)
 	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
 	GetSignatures() ([][]byte, error)
@@ -71,7 +71,6 @@ type Image interface {
 type DockerImageManifest struct {
 	Name          string
 	Tag           string
-	Digest        string
 	RepoTags      []string
 	Created       time.Time
 	DockerVersion string

@@ -7,6 +7,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/projectatomic/skopeo/dockerutils"
 )
 
 // inspectOutput is the output format of (skopeo inspect), primarily so that we can format it with a simple json.MarshalIndent.
@@ -37,22 +38,26 @@ var inspectCmd = cli.Command{
 		if err != nil {
 			logrus.Fatal(err)
 		}
+		rawManifest, err := img.Manifest()
+		if err != nil {
+			logrus.Fatal(err)
+		}
 		if c.Bool("raw") {
-			b, err := img.Manifest()
-			if err != nil {
-				logrus.Fatal(err)
-			}
-			fmt.Println(string(b))
+			fmt.Println(string(rawManifest))
 			return
 		}
 		imgInspect, err := img.Inspect()
 		if err != nil {
 			logrus.Fatal(err)
 		}
+		manifestDigest, err := dockerutils.ManifestDigest(rawManifest)
+		if err != nil {
+			logrus.Fatalf("Error computing manifest digest: %s", err.Error())
+		}
 		outputData := inspectOutput{
 			Name:          imgInspect.Name,
 			Tag:           imgInspect.Tag,
-			Digest:        imgInspect.Digest,
+			Digest:        manifestDigest,
 			RepoTags:      imgInspect.RepoTags,
 			Created:       imgInspect.Created,
 			DockerVersion: imgInspect.DockerVersion,

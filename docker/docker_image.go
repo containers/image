@@ -20,8 +20,7 @@ var (
 
 type dockerImage struct {
 	src              *dockerImageSource
-	digest           string
-	rawManifest      []byte
+	cachedManifest   []byte   // Private cache for Manifest(); nil if not yet known.
 	cachedSignatures [][]byte // Private cache for Signatures(); nil if not yet known.
 }
 
@@ -44,10 +43,14 @@ func (i *dockerImage) IntendedDockerReference() string {
 
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
 func (i *dockerImage) Manifest() ([]byte, error) {
-	if err := i.retrieveRawManifest(); err != nil {
-		return nil, err
+	if i.cachedManifest == nil {
+		m, err := i.src.GetManifest()
+		if err != nil {
+			return nil, err
+		}
+		i.cachedManifest = m
 	}
-	return i.rawManifest, nil
+	return i.cachedManifest, nil
 }
 
 // Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
@@ -76,7 +79,7 @@ func (i *dockerImage) Inspect() (*types.DockerImageManifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	imgManifest, err := makeImageManifest(i.src.ref.FullName(), ms1, i.digest, tags)
+	imgManifest, err := makeImageManifest(i.src.ref.FullName(), ms1, tags)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +125,7 @@ type v1Image struct {
 	OS string `json:"os,omitempty"`
 }
 
-func makeImageManifest(name string, m *manifestSchema1, dgst string, tagList []string) (*types.DockerImageManifest, error) {
+func makeImageManifest(name string, m *manifestSchema1, tagList []string) (*types.DockerImageManifest, error) {
 	v1 := &v1Image{}
 	if err := json.Unmarshal([]byte(m.History[0].V1Compatibility), v1); err != nil {
 		return nil, err
@@ -130,7 +133,6 @@ func makeImageManifest(name string, m *manifestSchema1, dgst string, tagList []s
 	return &types.DockerImageManifest{
 		Name:          name,
 		Tag:           m.Tag,
-		Digest:        dgst,
 		RepoTags:      tagList,
 		DockerVersion: v1.DockerVersion,
 		Created:       v1.Created,
@@ -181,25 +183,13 @@ func sanitize(s string) string {
 	return strings.Replace(s, "/", "-", -1)
 }
 
-func (i *dockerImage) retrieveRawManifest() error {
-	if i.rawManifest != nil {
-		return nil
-	}
-	manblob, unverifiedCanonicalDigest, err := i.src.GetManifest()
-	if err != nil {
-		return err
-	}
-	i.rawManifest = manblob
-	i.digest = unverifiedCanonicalDigest
-	return nil
-}
-
 func (i *dockerImage) getSchema1Manifest() (manifest, error) {
-	if err := i.retrieveRawManifest(); err != nil {
+	manblob, err := i.Manifest()
+	if err != nil {
 		return nil, err
 	}
 	mschema1 := &manifestSchema1{}
-	if err := json.Unmarshal(i.rawManifest, mschema1); err != nil {
+	if err := json.Unmarshal(manblob, mschema1); err != nil {
 		return nil, err
 	}
 	if err := fixManifestLayers(mschema1); err != nil {

@@ -84,13 +84,8 @@ func (s *dirImageSource) IntendedDockerReference() string {
 	return ""
 }
 
-func (s *dirImageSource) GetManifest() ([]byte, string, error) {
-	manifest, err := ioutil.ReadFile(manifestPath(s.dir))
-	if err != nil {
-		return nil, "", err
-	}
-
-	return manifest, "", nil // FIXME? unverifiedCanonicalDigest value - really primarily used by dockerImage
+func (s *dirImageSource) GetManifest() ([]byte, error) {
+	return ioutil.ReadFile(manifestPath(s.dir))
 }
 
 func (s *dirImageSource) GetLayer(digest string) (io.ReadCloser, error) {
