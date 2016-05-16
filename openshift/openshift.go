@@ -133,6 +133,13 @@ func (c *openshiftClient) doRequest(method, path string, requestBody []byte) ([]
 	return body, nil
 }
 
+// canonicalDockerReference returns a canonical reference we use for signing OpenShift images.
+// FIXME: This is, strictly speaking, a namespace conflict with images placed in a Docker registry running on the same host.
+// Do we need to do something else, perhaps disambiguate (port number?) or namespace Docker and OpenShift separately?
+func (c *openshiftClient) canonicalDockerReference() string {
+	return fmt.Sprintf("%s/%s/%s:%s", c.baseURL.Host, c.namespace, c.stream, c.tag)
+}
+
 // convertDockerImageReference takes an image API DockerImageReference value and returns a reference we can actually use;
 // currently OpenShift stores the cluster-internal service IPs here, which are unusable from the outside.
 func (c *openshiftClient) convertDockerImageReference(ref string) (string, error) {
@@ -177,6 +184,13 @@ func NewOpenshiftImageSource(imageName, certPath string, tlsVerify bool) (types.
 		certPath:  certPath,
 		tlsVerify: tlsVerify,
 	}, nil
+}
+
+// GetIntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
+// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
+// May be "" if unknown.
+func (s *openshiftImageSource) GetIntendedDockerReference() string {
+	return s.client.canonicalDockerReference()
 }
 
 func (s *openshiftImageSource) GetManifest() (manifest []byte, unverifiedCanonicalDigest string, err error) {
@@ -270,7 +284,7 @@ func NewOpenshiftImageDestination(imageName, certPath string, tlsVerify bool) (t
 }
 
 func (d *openshiftImageDestination) CanonicalDockerReference() (string, error) {
-	return fmt.Sprintf("%s/%s/%s:%s", d.client.baseURL.Host, d.client.namespace, d.client.stream, d.client.tag), nil
+	return d.client.canonicalDockerReference(), nil
 }
 
 func (d *openshiftImageDestination) PutManifest(manifest []byte) error {

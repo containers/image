@@ -48,6 +48,13 @@ func NewDockerImageSource(img, certPath string, tlsVerify bool) (types.ImageSour
 	return newDockerImageSource(img, certPath, tlsVerify)
 }
 
+// GetIntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
+// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
+// May be "" if unknown.
+func (s *dockerImageSource) GetIntendedDockerReference() string {
+	return fmt.Sprintf("%s:%s", s.ref.Name(), s.tag)
+}
+
 func (s *dockerImageSource) GetManifest() (manifest []byte, unverifiedCanonicalDigest string, err error) {
 	url := fmt.Sprintf(manifestURL, s.ref.RemoteName(), s.tag)
 	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
