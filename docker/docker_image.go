@@ -22,7 +22,7 @@ type dockerImage struct {
 	src              *dockerImageSource
 	digest           string
 	rawManifest      []byte
-	cachedSignatures [][]byte // Private cache for GetSignatures; nil if not yet known.
+	cachedSignatures [][]byte // Private cache for Signatures(); nil if not yet known.
 }
 
 // NewDockerImage returns a new Image interface type after setting up
@@ -42,16 +42,16 @@ func (i *dockerImage) GetIntendedDockerReference() string {
 	return i.src.GetIntendedDockerReference()
 }
 
-// GetManifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
-func (i *dockerImage) GetManifest() ([]byte, error) {
+// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
+func (i *dockerImage) Manifest() ([]byte, error) {
 	if err := i.retrieveRawManifest(); err != nil {
 		return nil, err
 	}
 	return i.rawManifest, nil
 }
 
-// GetSignatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
-func (i *dockerImage) GetSignatures() ([][]byte, error) {
+// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
+func (i *dockerImage) Signatures() ([][]byte, error) {
 	if i.cachedSignatures == nil {
 		sigs, err := i.src.GetSignatures()
 		if err != nil {

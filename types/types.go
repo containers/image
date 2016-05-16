@@ -34,8 +34,10 @@ type ImageSource interface {
 	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 	// May be "" if unknown.
 	GetIntendedDockerReference() string
+	// GetManifest returns the image's manifest.  It may use a remote (= slow) service.
 	GetManifest() (manifest []byte, unverifiedCanonicalDigest string, err error)
 	GetLayer(digest string) (io.ReadCloser, error)
+	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
 	GetSignatures() ([][]byte, error)
 }
 
@@ -55,10 +57,10 @@ type Image interface {
 	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 	// May be "" if unknown.
 	GetIntendedDockerReference() string
-	// GetManifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
-	GetManifest() ([]byte, error)
-	// GetSignatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
-	GetSignatures() ([][]byte, error)
+	// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
+	Manifest() ([]byte, error)
+	// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
+	Signatures() ([][]byte, error)
 	Layers(layers ...string) error // configure download directory? Call it DownloadLayers?
 	Inspect() (ImageManifest, error)
 	DockerTar() ([]byte, error) // ??? also, configure output directory

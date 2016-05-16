@@ -23,7 +23,7 @@ var inspectCmd = cli.Command{
 			logrus.Fatal(err)
 		}
 		if c.Bool("raw") {
-			b, err := img.GetManifest()
+			b, err := img.Manifest()
 			if err != nil {
 				logrus.Fatal(err)
 			}
