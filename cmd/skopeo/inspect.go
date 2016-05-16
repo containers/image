@@ -23,14 +23,14 @@ var inspectCmd = cli.Command{
 			logrus.Fatal(err)
 		}
 		if c.Bool("raw") {
-			b, err := img.GetManifest()
+			b, err := img.Manifest()
 			if err != nil {
 				logrus.Fatal(err)
 			}
 			fmt.Println(string(b))
 			return
 		}
-		imgInspect, err := img.Manifest()
+		imgInspect, err := img.Inspect()
 		if err != nil {
 			logrus.Fatal(err)
 		}

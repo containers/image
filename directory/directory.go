@@ -77,10 +77,10 @@ func NewDirImageSource(dir string) types.ImageSource {
 	return &dirImageSource{dir}
 }
 
-// GetIntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
+// IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
 // (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 // May be "" if unknown.
-func (s *dirImageSource) GetIntendedDockerReference() string {
+func (s *dirImageSource) IntendedDockerReference() string {
 	return ""
 }
 

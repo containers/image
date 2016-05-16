@@ -48,10 +48,10 @@ func NewDockerImageSource(img, certPath string, tlsVerify bool) (types.ImageSour
 	return newDockerImageSource(img, certPath, tlsVerify)
 }
 
-// GetIntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
+// IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
 // (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 // May be "" if unknown.
-func (s *dockerImageSource) GetIntendedDockerReference() string {
+func (s *dockerImageSource) IntendedDockerReference() string {
 	return fmt.Sprintf("%s:%s", s.ref.Name(), s.tag)
 }
 

@@ -22,7 +22,7 @@ type dockerImage struct {
 	src              *dockerImageSource
 	digest           string
 	rawManifest      []byte
-	cachedSignatures [][]byte // Private cache for GetSignatures; nil if not yet known.
+	cachedSignatures [][]byte // Private cache for Signatures(); nil if not yet known.
 }
 
 // NewDockerImage returns a new Image interface type after setting up
@@ -35,23 +35,23 @@ func NewDockerImage(img, certPath string, tlsVerify bool) (types.Image, error) {
 	return &dockerImage{src: s}, nil
 }
 
-// GetIntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
+// IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
 // (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 // May be "" if unknown.
-func (i *dockerImage) GetIntendedDockerReference() string {
-	return i.src.GetIntendedDockerReference()
+func (i *dockerImage) IntendedDockerReference() string {
+	return i.src.IntendedDockerReference()
 }
 
-// GetManifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
-func (i *dockerImage) GetManifest() ([]byte, error) {
+// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
+func (i *dockerImage) Manifest() ([]byte, error) {
 	if err := i.retrieveRawManifest(); err != nil {
 		return nil, err
 	}
 	return i.rawManifest, nil
 }
 
-// GetSignatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
-func (i *dockerImage) GetSignatures() ([][]byte, error) {
+// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
+func (i *dockerImage) Signatures() ([][]byte, error) {
 	if i.cachedSignatures == nil {
 		sigs, err := i.src.GetSignatures()
 		if err != nil {
@@ -62,7 +62,7 @@ func (i *dockerImage) GetSignatures() ([][]byte, error) {
 	return i.cachedSignatures, nil
 }
 
-func (i *dockerImage) Manifest() (types.ImageManifest, error) {
+func (i *dockerImage) Inspect() (types.ImageManifest, error) {
 	// TODO(runcom): unused version param for now, default to docker v2-1
 	m, err := i.getSchema1Manifest()
 	if err != nil {
