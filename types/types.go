@@ -62,15 +62,14 @@ type Image interface {
 	// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 	Signatures() ([][]byte, error)
 	Layers(layers ...string) error // configure download directory? Call it DownloadLayers?
-	Inspect() (*DockerImageManifest, error)
+	Inspect() (*ImageInspectInfo, error)
 	DockerTar() ([]byte, error) // ??? also, configure output directory
 	// GetRepositoryTags list all tags available in the repository. Note that this has no connection with the tag(s) used for this specific image, if any.
 	GetRepositoryTags() ([]string, error)
 }
 
-// DockerImageManifest is a set of metadata describing Docker images and their manifest.json files.
-// Note that this is not exactly manifest.json, e.g. some fields have been added.
-type DockerImageManifest struct {
+// ImageInspectInfo is a set of metadata describing Docker images, primarily their manifest and configuration.
+type ImageInspectInfo struct {
 	Name          string
 	Tag           string
 	Created       time.Time
@@ -81,6 +80,6 @@ type DockerImageManifest struct {
 	Layers        []string
 }
 
-func (m *DockerImageManifest) String() string {
+func (m *ImageInspectInfo) String() string {
 	return fmt.Sprintf("%s:%s", m.Name, m.Tag)
 }

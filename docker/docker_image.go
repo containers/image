@@ -65,7 +65,7 @@ func (i *dockerImage) Signatures() ([][]byte, error) {
 	return i.cachedSignatures, nil
 }
 
-func (i *dockerImage) Inspect() (*types.DockerImageManifest, error) {
+func (i *dockerImage) Inspect() (*types.ImageInspectInfo, error) {
 	// TODO(runcom): unused version param for now, default to docker v2-1
 	m, err := i.getSchema1Manifest()
 	if err != nil {
@@ -75,11 +75,20 @@ func (i *dockerImage) Inspect() (*types.DockerImageManifest, error) {
 	if !ok {
 		return nil, fmt.Errorf("error retrivieng manifest schema1")
 	}
-	imgManifest, err := makeImageManifest(i.src.ref.FullName(), ms1)
-	if err != nil {
+	v1 := &v1Image{}
+	if err := json.Unmarshal([]byte(ms1.History[0].V1Compatibility), v1); err != nil {
 		return nil, err
 	}
-	return imgManifest, nil
+	return &types.ImageInspectInfo{
+		Name:          i.src.ref.FullName(),
+		Tag:           ms1.Tag,
+		DockerVersion: v1.DockerVersion,
+		Created:       v1.Created,
+		Labels:        v1.Config.Labels,
+		Architecture:  v1.Architecture,
+		Os:            v1.OS,
+		Layers:        ms1.GetLayers(),
+	}, nil
 }
 
 // GetRepositoryTags list all tags available in the repository. Note that this has no connection with the tag(s) used for this specific image, if any.
@@ -120,23 +129,6 @@ type v1Image struct {
 	Architecture string `json:"architecture,omitempty"`
 	// OS is the operating system used to build and run the image
 	OS string `json:"os,omitempty"`
-}
-
-func makeImageManifest(name string, m *manifestSchema1) (*types.DockerImageManifest, error) {
-	v1 := &v1Image{}
-	if err := json.Unmarshal([]byte(m.History[0].V1Compatibility), v1); err != nil {
-		return nil, err
-	}
-	return &types.DockerImageManifest{
-		Name:          name,
-		Tag:           m.Tag,
-		DockerVersion: v1.DockerVersion,
-		Created:       v1.Created,
-		Labels:        v1.Config.Labels,
-		Architecture:  v1.Architecture,
-		Os:            v1.OS,
-		Layers:        m.GetLayers(),
-	}, nil
 }
 
 // TODO(runcom)
