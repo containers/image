@@ -186,10 +186,10 @@ func NewOpenshiftImageSource(imageName, certPath string, tlsVerify bool) (types.
 	}, nil
 }
 
-// GetIntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
+// IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
 // (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 // May be "" if unknown.
-func (s *openshiftImageSource) GetIntendedDockerReference() string {
+func (s *openshiftImageSource) IntendedDockerReference() string {
 	return s.client.canonicalDockerReference()
 }
 

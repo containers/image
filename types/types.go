@@ -30,10 +30,10 @@ type Repository interface {
 
 // ImageSource is a service, possibly remote (= slow), to download components of a single image.
 type ImageSource interface {
-	// GetIntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
+	// IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
 	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 	// May be "" if unknown.
-	GetIntendedDockerReference() string
+	IntendedDockerReference() string
 	// GetManifest returns the image's manifest.  It may use a remote (= slow) service.
 	GetManifest() (manifest []byte, unverifiedCanonicalDigest string, err error)
 	GetLayer(digest string) (io.ReadCloser, error)
@@ -53,10 +53,10 @@ type ImageDestination interface {
 // Image is a Docker image in a repository.
 type Image interface {
 	// ref to repository?
-	// GetIntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
+	// IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
 	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 	// May be "" if unknown.
-	GetIntendedDockerReference() string
+	IntendedDockerReference() string
 	// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
 	Manifest() ([]byte, error)
 	// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
