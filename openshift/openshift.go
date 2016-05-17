@@ -14,7 +14,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/projectatomic/skopeo/docker"
-	"github.com/projectatomic/skopeo/dockerutils"
+	"github.com/projectatomic/skopeo/docker/utils"
 	"github.com/projectatomic/skopeo/types"
 	"github.com/projectatomic/skopeo/version"
 )
@@ -289,7 +289,7 @@ func (d *openshiftImageDestination) CanonicalDockerReference() (string, error) {
 
 func (d *openshiftImageDestination) PutManifest(manifest []byte) error {
 	// Note: This does absolutely no kind/version checking or conversions.
-	manifestDigest, err := dockerutils.ManifestDigest(manifest)
+	manifestDigest, err := utils.ManifestDigest(manifest)
 	if err != nil {
 		return err
 	}

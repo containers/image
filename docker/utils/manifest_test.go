@@ -1,11 +1,10 @@
-package dockerutils
+package utils
 
 import (
 	"io/ioutil"
 	"path/filepath"
 	"testing"
 
-	"github.com/projectatomic/skopeo/dockerutils/fixtures"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,8 +35,8 @@ func TestManifestDigest(t *testing.T) {
 		path   string
 		digest string
 	}{
-		{"v2s2.manifest.json", fixtures.TestV2S2ManifestDigest},
-		{"v2s1.manifest.json", fixtures.TestV2S1ManifestDigest},
+		{"v2s2.manifest.json", TestV2S2ManifestDigest},
+		{"v2s1.manifest.json", TestV2S1ManifestDigest},
 	}
 	for _, c := range cases {
 		manifest, err := ioutil.ReadFile(filepath.Join("fixtures", c.path))

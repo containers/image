@@ -1,4 +1,4 @@
-package dockerutils
+package utils
 
 import (
 	"crypto/sha256"
