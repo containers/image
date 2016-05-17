@@ -1,4 +1,4 @@
-package fixtures
+package utils
 
 const (
 	// TestV2S2ManifestDigest is the Docker manifest digest of "v2s2.manifest.json"
