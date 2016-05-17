@@ -29,13 +29,17 @@ type Repository interface {
 }
 
 // ImageSource is a service, possibly remote (= slow), to download components of a single image.
+// This is primarily useful for copying images around; for examining their properties, Image (below)
+// is usually more useful.
 type ImageSource interface {
 	// IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
 	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 	// May be "" if unknown.
 	IntendedDockerReference() string
 	// GetManifest returns the image's manifest.  It may use a remote (= slow) service.
-	GetManifest() (manifest []byte, unverifiedCanonicalDigest string, err error)
+	// FIXME? This should also return a MIME type if known, to differentiate between schema versions.
+	GetManifest() ([]byte, error)
+	// Note: Calling GetLayer() may have ordering dependencies WRT other methods of this type. FIXME: How does this work with (docker save) on stdin?
 	GetLayer(digest string) (io.ReadCloser, error)
 	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
 	GetSignatures() ([][]byte, error)
@@ -45,12 +49,14 @@ type ImageSource interface {
 type ImageDestination interface {
 	// CanonicalDockerReference returns the full, unambiguous, Docker reference for this image (even if the user referred to the image using some shorthand notation).
 	CanonicalDockerReference() (string, error)
+	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 	PutManifest([]byte) error
+	// Note: Calling PutLayer() and other methods may have ordering dependencies WRT other methods of this type. FIXME: Figure out and document.
 	PutLayer(digest string, stream io.Reader) error
 	PutSignatures(signatures [][]byte) error
 }
 
-// Image is a Docker image in a repository.
+// Image is the primary API for inspecting properties of images.
 type Image interface {
 	// ref to repository?
 	// IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
@@ -58,27 +64,23 @@ type Image interface {
 	// May be "" if unknown.
 	IntendedDockerReference() string
 	// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
+	// FIXME? This should also return a MIME type if known, to differentiate between schema versions.
 	Manifest() ([]byte, error)
 	// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 	Signatures() ([][]byte, error)
 	Layers(layers ...string) error // configure download directory? Call it DownloadLayers?
-	Inspect() (ImageManifest, error)
+	Inspect() (*ImageInspectInfo, error)
 	DockerTar() ([]byte, error) // ??? also, configure output directory
+	// GetRepositoryTags list all tags available in the repository. Note that this has no connection with the tag(s) used for this specific image, if any.
+	// Eventually we should move this away from the generic Image interface, and move it into a Docker-specific case within the (skopeo inspect) command,
+	// see https://github.com/projectatomic/skopeo/pull/58#discussion_r63411838 .
+	GetRepositoryTags() ([]string, error)
 }
 
-// ImageManifest is the interesting subset of metadata about an Image.
-// TODO(runcom)
-type ImageManifest interface {
-	String() string
-}
-
-// DockerImageManifest is a set of metadata describing Docker images and their manifest.json files.
-// Note that this is not exactly manifest.json, e.g. some fields have been added.
-type DockerImageManifest struct {
+// ImageInspectInfo is a set of metadata describing Docker images, primarily their manifest and configuration.
+type ImageInspectInfo struct {
 	Name          string
 	Tag           string
-	Digest        string
-	RepoTags      []string
 	Created       time.Time
 	DockerVersion string
 	Labels        map[string]string
@@ -87,6 +89,6 @@ type DockerImageManifest struct {
 	Layers        []string
 }
 
-func (m *DockerImageManifest) String() string {
+func (m *ImageInspectInfo) String() string {
 	return fmt.Sprintf("%s:%s", m.Name, m.Tag)
 }

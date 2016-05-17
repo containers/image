@@ -54,7 +54,7 @@ func copyHandler(context *cli.Context) {
 	}
 	signBy := context.String("sign-by")
 
-	manifest, _, err := src.GetManifest()
+	manifest, err := src.GetManifest()
 	if err != nil {
 		logrus.Fatalf("Error reading manifest: %s", err.Error())
 	}

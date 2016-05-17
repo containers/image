@@ -20,8 +20,7 @@ var (
 
 type dockerImage struct {
 	src              *dockerImageSource
-	digest           string
-	rawManifest      []byte
+	cachedManifest   []byte   // Private cache for Manifest(); nil if not yet known.
 	cachedSignatures [][]byte // Private cache for Signatures(); nil if not yet known.
 }
 
@@ -44,10 +43,14 @@ func (i *dockerImage) IntendedDockerReference() string {
 
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
 func (i *dockerImage) Manifest() ([]byte, error) {
-	if err := i.retrieveRawManifest(); err != nil {
-		return nil, err
+	if i.cachedManifest == nil {
+		m, err := i.src.GetManifest()
+		if err != nil {
+			return nil, err
+		}
+		i.cachedManifest = m
 	}
-	return i.rawManifest, nil
+	return i.cachedManifest, nil
 }
 
 // Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
@@ -62,7 +65,7 @@ func (i *dockerImage) Signatures() ([][]byte, error) {
 	return i.cachedSignatures, nil
 }
 
-func (i *dockerImage) Inspect() (types.ImageManifest, error) {
+func (i *dockerImage) Inspect() (*types.ImageInspectInfo, error) {
 	// TODO(runcom): unused version param for now, default to docker v2-1
 	m, err := i.getSchema1Manifest()
 	if err != nil {
@@ -72,18 +75,24 @@ func (i *dockerImage) Inspect() (types.ImageManifest, error) {
 	if !ok {
 		return nil, fmt.Errorf("error retrivieng manifest schema1")
 	}
-	tags, err := i.getTags()
-	if err != nil {
+	v1 := &v1Image{}
+	if err := json.Unmarshal([]byte(ms1.History[0].V1Compatibility), v1); err != nil {
 		return nil, err
 	}
-	imgManifest, err := makeImageManifest(i.src.ref.FullName(), ms1, i.digest, tags)
-	if err != nil {
-		return nil, err
-	}
-	return imgManifest, nil
+	return &types.ImageInspectInfo{
+		Name:          i.src.ref.FullName(),
+		Tag:           ms1.Tag,
+		DockerVersion: v1.DockerVersion,
+		Created:       v1.Created,
+		Labels:        v1.Config.Labels,
+		Architecture:  v1.Architecture,
+		Os:            v1.OS,
+		Layers:        ms1.GetLayers(),
+	}, nil
 }
 
-func (i *dockerImage) getTags() ([]string, error) {
+// GetRepositoryTags list all tags available in the repository. Note that this has no connection with the tag(s) used for this specific image, if any.
+func (i *dockerImage) GetRepositoryTags() ([]string, error) {
 	// FIXME? Breaking the abstraction.
 	url := fmt.Sprintf(tagsURL, i.src.ref.RemoteName())
 	res, err := i.src.c.makeRequest("GET", url, nil, nil)
@@ -120,25 +129,6 @@ type v1Image struct {
 	Architecture string `json:"architecture,omitempty"`
 	// OS is the operating system used to build and run the image
 	OS string `json:"os,omitempty"`
-}
-
-func makeImageManifest(name string, m *manifestSchema1, dgst string, tagList []string) (types.ImageManifest, error) {
-	v1 := &v1Image{}
-	if err := json.Unmarshal([]byte(m.History[0].V1Compatibility), v1); err != nil {
-		return nil, err
-	}
-	return &types.DockerImageManifest{
-		Name:          name,
-		Tag:           m.Tag,
-		Digest:        dgst,
-		RepoTags:      tagList,
-		DockerVersion: v1.DockerVersion,
-		Created:       v1.Created,
-		Labels:        v1.Config.Labels,
-		Architecture:  v1.Architecture,
-		Os:            v1.OS,
-		Layers:        m.GetLayers(),
-	}, nil
 }
 
 // TODO(runcom)
@@ -181,25 +171,13 @@ func sanitize(s string) string {
 	return strings.Replace(s, "/", "-", -1)
 }
 
-func (i *dockerImage) retrieveRawManifest() error {
-	if i.rawManifest != nil {
-		return nil
-	}
-	manblob, unverifiedCanonicalDigest, err := i.src.GetManifest()
-	if err != nil {
-		return err
-	}
-	i.rawManifest = manblob
-	i.digest = unverifiedCanonicalDigest
-	return nil
-}
-
 func (i *dockerImage) getSchema1Manifest() (manifest, error) {
-	if err := i.retrieveRawManifest(); err != nil {
+	manblob, err := i.Manifest()
+	if err != nil {
 		return nil, err
 	}
 	mschema1 := &manifestSchema1{}
-	if err := json.Unmarshal(i.rawManifest, mschema1); err != nil {
+	if err := json.Unmarshal(manblob, mschema1); err != nil {
 		return nil, err
 	}
 	if err := fixManifestLayers(mschema1); err != nil {
