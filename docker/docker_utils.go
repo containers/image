@@ -8,9 +8,7 @@ func parseDockerImageName(img string) (reference.Named, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	if reference.IsNameOnly(ref) {
-		ref = reference.WithDefaultTag(ref)
-	}
+	ref = reference.WithDefaultTag(ref)
 	var tag string
 	switch x := ref.(type) {
 	case reference.Canonical:

@@ -59,8 +59,6 @@ func ConsumeAndLogOutput(c *check.C, id string, f io.ReadCloser, err error) {
 func (s *SigningSuite) SetUpTest(c *check.C) {
 	_, err := exec.LookPath(skopeoBinary)
 	c.Assert(err, check.IsNil)
-	_, err = exec.LookPath(skopeoBinary)
-	c.Assert(err, check.IsNil)
 
 	s.gpgHome, err = ioutil.TempDir("", "skopeo-gpg")
 	c.Assert(err, check.IsNil)
