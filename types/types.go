@@ -27,9 +27,8 @@ type ImageSource interface {
 	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 	// May be "" if unknown.
 	IntendedDockerReference() string
-	// GetManifest returns the image's manifest.  It may use a remote (= slow) service.
-	// FIXME? This should also return a MIME type if known, to differentiate between schema versions.
-	GetManifest() ([]byte, error)
+	// GetManifest returns the image's manifest along with its MIME type. The empty string is returned if the MIME type is unknown.  It may use a remote (= slow) service.
+	GetManifest() ([]byte, string, error)
 	// Note: Calling GetLayer() may have ordering dependencies WRT other methods of this type. FIXME: How does this work with (docker save) on stdin?
 	GetLayer(digest string) (io.ReadCloser, error)
 	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
