@@ -11,6 +11,15 @@ import (
 	"github.com/projectatomic/skopeo/types"
 )
 
+const (
+	// atomicPrefix is the URL-like schema prefix used for Atomic registry image references.
+	atomicPrefix = "atomic:"
+	// dockerPrefix is the URL-like schema prefix used for Docker image references.
+	dockerPrefix = "docker://"
+	// directoryPrefix is the URL-like schema prefix used for local directories (for debugging)
+	directoryPrefix = "dir:"
+)
+
 // ParseImage converts image URL-like string to an initialized handler for that image.
 func parseImage(c *cli.Context) (types.Image, error) {
 	var (
@@ -19,8 +28,8 @@ func parseImage(c *cli.Context) (types.Image, error) {
 		tlsVerify = c.GlobalBool("tls-verify")
 	)
 	switch {
-	case strings.HasPrefix(imgName, types.DockerPrefix):
-		return docker.NewDockerImage(strings.TrimPrefix(imgName, types.DockerPrefix), certPath, tlsVerify)
+	case strings.HasPrefix(imgName, dockerPrefix):
+		return docker.NewDockerImage(strings.TrimPrefix(imgName, dockerPrefix), certPath, tlsVerify)
 		//case strings.HasPrefix(img, appcPrefix):
 		//
 	}
@@ -34,12 +43,12 @@ func parseImageSource(c *cli.Context, name string) (types.ImageSource, error) {
 		tlsVerify = c.GlobalBool("tls-verify") // FIXME!! defaults to false?
 	)
 	switch {
-	case strings.HasPrefix(name, types.DockerPrefix):
-		return docker.NewDockerImageSource(strings.TrimPrefix(name, types.DockerPrefix), certPath, tlsVerify)
-	case strings.HasPrefix(name, types.AtomicPrefix):
-		return openshift.NewOpenshiftImageSource(strings.TrimPrefix(name, types.AtomicPrefix), certPath, tlsVerify)
-	case strings.HasPrefix(name, types.DirectoryPrefix):
-		return directory.NewDirImageSource(strings.TrimPrefix(name, types.DirectoryPrefix)), nil
+	case strings.HasPrefix(name, dockerPrefix):
+		return docker.NewDockerImageSource(strings.TrimPrefix(name, dockerPrefix), certPath, tlsVerify)
+	case strings.HasPrefix(name, atomicPrefix):
+		return openshift.NewOpenshiftImageSource(strings.TrimPrefix(name, atomicPrefix), certPath, tlsVerify)
+	case strings.HasPrefix(name, directoryPrefix):
+		return directory.NewDirImageSource(strings.TrimPrefix(name, directoryPrefix)), nil
 	}
 	return nil, fmt.Errorf("Unrecognized image reference %s", name)
 }
@@ -51,12 +60,12 @@ func parseImageDestination(c *cli.Context, name string) (types.ImageDestination,
 		tlsVerify = c.GlobalBool("tls-verify") // FIXME!! defaults to false?
 	)
 	switch {
-	case strings.HasPrefix(name, types.DockerPrefix):
-		return docker.NewDockerImageDestination(strings.TrimPrefix(name, types.DockerPrefix), certPath, tlsVerify)
-	case strings.HasPrefix(name, types.AtomicPrefix):
-		return openshift.NewOpenshiftImageDestination(strings.TrimPrefix(name, types.AtomicPrefix), certPath, tlsVerify)
-	case strings.HasPrefix(name, types.DirectoryPrefix):
-		return directory.NewDirImageDestination(strings.TrimPrefix(name, types.DirectoryPrefix)), nil
+	case strings.HasPrefix(name, dockerPrefix):
+		return docker.NewDockerImageDestination(strings.TrimPrefix(name, dockerPrefix), certPath, tlsVerify)
+	case strings.HasPrefix(name, atomicPrefix):
+		return openshift.NewOpenshiftImageDestination(strings.TrimPrefix(name, atomicPrefix), certPath, tlsVerify)
+	case strings.HasPrefix(name, directoryPrefix):
+		return directory.NewDirImageDestination(strings.TrimPrefix(name, directoryPrefix)), nil
 	}
 	return nil, fmt.Errorf("Unrecognized image reference %s", name)
 }
