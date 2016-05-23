@@ -44,7 +44,7 @@ func (i *dockerImage) IntendedDockerReference() string {
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
 func (i *dockerImage) Manifest() ([]byte, error) {
 	if i.cachedManifest == nil {
-		m, err := i.src.GetManifest()
+		m, _, err := i.src.GetManifest()
 		if err != nil {
 			return nil, err
 		}

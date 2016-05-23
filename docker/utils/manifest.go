@@ -10,11 +10,22 @@ import (
 
 // FIXME: Should we just use docker/distribution and docker/docker implementations directly?
 
+// ManifestMIMETypes returns a slice of supported MIME types
+func ManifestMIMETypes() []string {
+	return []string{
+		DockerV2Schema1MIMEType,
+		DockerV2Schema2MIMEType,
+		DockerV2ListMIMEType,
+	}
+}
+
 const (
 	// DockerV2Schema1MIMEType MIME type represents Docker manifest schema 1
 	DockerV2Schema1MIMEType = "application/vnd.docker.distribution.manifest.v1+json"
 	// DockerV2Schema2MIMEType MIME type represents Docker manifest schema 2
 	DockerV2Schema2MIMEType = "application/vnd.docker.distribution.manifest.v2+json"
+	// DockerV2ListMIMEType MIME type represents Docker manifest schema 2 list
+	DockerV2ListMIMEType = "application/vnd.docker.distribution.manifest.list.v2+json"
 )
 
 // GuessManifestMIMEType guesses MIME type of a manifest and returns it _if it is recognized_, or "" if unknown or unrecognized.
@@ -32,7 +43,7 @@ func GuessManifestMIMEType(manifest []byte) string {
 	}
 
 	switch meta.MediaType {
-	case DockerV2Schema2MIMEType: // A recognized type.
+	case DockerV2Schema2MIMEType, DockerV2ListMIMEType: // A recognized type.
 		return meta.MediaType
 	}
 	switch meta.SchemaVersion {

@@ -15,6 +15,7 @@ func TestGuessManifestMIMEType(t *testing.T) {
 		mimeType string
 	}{
 		{"v2s2.manifest.json", DockerV2Schema2MIMEType},
+		{"v2list.manifest.json", DockerV2ListMIMEType},
 		{"v2s1.manifest.json", DockerV2Schema1MIMEType},
 		{"v2s1-invalid-signatures.manifest.json", DockerV2Schema1MIMEType},
 		{"v2s2nomime.manifest.json", DockerV2Schema2MIMEType}, // It is unclear whether this one is legal, but we should guess v2s2 if anything at all.

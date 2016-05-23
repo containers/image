@@ -84,8 +84,13 @@ func (s *dirImageSource) IntendedDockerReference() string {
 	return ""
 }
 
-func (s *dirImageSource) GetManifest() ([]byte, error) {
-	return ioutil.ReadFile(manifestPath(s.dir))
+// it's up to the caller to determine the MIME type of the returned manifest's bytes
+func (s *dirImageSource) GetManifest() ([]byte, string, error) {
+	m, err := ioutil.ReadFile(manifestPath(s.dir))
+	if err != nil {
+		return nil, "", err
+	}
+	return m, "", err
 }
 
 func (s *dirImageSource) GetLayer(digest string) (io.ReadCloser, error) {
