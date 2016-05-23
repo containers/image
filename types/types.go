@@ -6,15 +6,6 @@ import (
 	"time"
 )
 
-const (
-	// AtomicPrefix is the URL-like schema prefix used for Atomic registry image references.
-	AtomicPrefix = "atomic:"
-	// DockerPrefix is the URL-like schema prefix used for Docker image references.
-	DockerPrefix = "docker://"
-	// DirectoryPrefix is the URL-like schema prefix used for local directories (for debugging)
-	DirectoryPrefix = "dir:"
-)
-
 // Registry is a service providing repositories.
 type Registry interface {
 	Repositories() []Repository

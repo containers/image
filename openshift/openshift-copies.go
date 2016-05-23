@@ -166,10 +166,10 @@ func (config *deferredLoadingClientConfig) ClientConfig() (*restConfig, error) {
 var (
 	// DefaultCluster is the cluster config used when no other config is specified
 	// TODO: eventually apiserver should start on 443 and be secure by default
-	DefaultCluster = clientcmdCluster{Server: "http://localhost:8080"}
+	defaultCluster = clientcmdCluster{Server: "http://localhost:8080"}
 
 	// EnvVarCluster allows overriding the DefaultCluster using an envvar for the server name
-	EnvVarCluster = clientcmdCluster{Server: os.Getenv("KUBERNETES_MASTER")}
+	envVarCluster = clientcmdCluster{Server: os.Getenv("KUBERNETES_MASTER")}
 )
 
 // directClientConfig is a modified copy of k8s.io/kubernetes/pkg/client/unversioned/clientcmd.DirectClientConfig.
@@ -440,8 +440,8 @@ func (config *directClientConfig) getCluster() clientcmdCluster {
 	clusterInfoName := config.getClusterName()
 
 	var mergedClusterInfo clientcmdCluster
-	mergo.Merge(&mergedClusterInfo, DefaultCluster)
-	mergo.Merge(&mergedClusterInfo, EnvVarCluster)
+	mergo.Merge(&mergedClusterInfo, defaultCluster)
+	mergo.Merge(&mergedClusterInfo, envVarCluster)
 	if configClusterInfo, exists := clusterInfos[clusterInfoName]; exists {
 		mergo.Merge(&mergedClusterInfo, configClusterInfo)
 	}
