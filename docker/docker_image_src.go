@@ -55,11 +55,13 @@ func (s *dockerImageSource) IntendedDockerReference() string {
 	return fmt.Sprintf("%s:%s", s.ref.Name(), s.tag)
 }
 
-func (s *dockerImageSource) GetManifest() ([]byte, string, error) {
+func (s *dockerImageSource) GetManifest(mimetypes []string) ([]byte, string, error) {
 	url := fmt.Sprintf(manifestURL, s.ref.RemoteName(), s.tag)
 	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
 	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
-	res, err := s.c.makeRequest("GET", url, nil, nil)
+	headers := make(map[string][]string)
+	headers["Accept"] = mimetypes
+	res, err := s.c.makeRequest("GET", url, headers, nil)
 	if err != nil {
 		return nil, "", err
 	}

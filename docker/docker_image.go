@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/projectatomic/skopeo/directory"
+	"github.com/projectatomic/skopeo/docker/utils"
 	"github.com/projectatomic/skopeo/types"
 )
 
@@ -44,7 +45,7 @@ func (i *dockerImage) IntendedDockerReference() string {
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
 func (i *dockerImage) Manifest() ([]byte, error) {
 	if i.cachedManifest == nil {
-		m, _, err := i.src.GetManifest()
+		m, _, err := i.src.GetManifest([]string{utils.DockerV2Schema1MIMEType})
 		if err != nil {
 			return nil, err
 		}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/projectatomic/skopeo/docker/utils"
 	"github.com/projectatomic/skopeo/signature"
 )
 
@@ -54,7 +55,7 @@ func copyHandler(context *cli.Context) {
 	}
 	signBy := context.String("sign-by")
 
-	manifest, _, err := src.GetManifest()
+	manifest, _, err := src.GetManifest([]string{utils.DockerV2Schema1MIMEType})
 	if err != nil {
 		logrus.Fatalf("Error reading manifest: %s", err.Error())
 	}
