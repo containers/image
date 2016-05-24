@@ -85,7 +85,7 @@ func (s *dirImageSource) IntendedDockerReference() string {
 }
 
 // it's up to the caller to determine the MIME type of the returned manifest's bytes
-func (s *dirImageSource) GetManifest() ([]byte, string, error) {
+func (s *dirImageSource) GetManifest(_ []string) ([]byte, string, error) {
 	m, err := ioutil.ReadFile(manifestPath(s.dir))
 	if err != nil {
 		return nil, "", err
