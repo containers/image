@@ -1,7 +1,9 @@
 package signature
 
 import (
+	"bytes"
 	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,6 +25,45 @@ func TestNewGPGSigningMechanismInDirectory(t *testing.T) {
 	_, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
 	assert.NoError(t, err)
 	// The various GPG failure cases are not obviously easy to reach.
+}
+
+func TestGPGSigningMechanismImportKeysFromBytes(t *testing.T) {
+	testDir, err := ioutil.TempDir("", "gpg-import-keys")
+	require.NoError(t, err)
+	defer os.RemoveAll(testDir)
+
+	mech, err := newGPGSigningMechanismInDirectory(testDir)
+	require.NoError(t, err)
+
+	// Try validating a signature when the key is unknown.
+	signature, err := ioutil.ReadFile("./fixtures/invalid-blob.signature")
+	require.NoError(t, err)
+	content, signingFingerprint, err := mech.Verify(signature)
+	require.Error(t, err)
+
+	// Successful import
+	keyBlob, err := ioutil.ReadFile("./fixtures/public-key.gpg")
+	require.NoError(t, err)
+	keyIdentities, err := mech.ImportKeysFromBytes(keyBlob)
+	require.NoError(t, err)
+	assert.Equal(t, []string{TestKeyFingerprint}, keyIdentities)
+
+	// After import, the signature should validate.
+	content, signingFingerprint, err = mech.Verify(signature)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("This is not JSON\n"), content)
+	assert.Equal(t, TestKeyFingerprint, signingFingerprint)
+
+	// Two keys: just concatenate the valid input twice.
+	keyIdentities, err = mech.ImportKeysFromBytes(bytes.Join([][]byte{keyBlob, keyBlob}, nil))
+	require.NoError(t, err)
+	assert.Equal(t, []string{TestKeyFingerprint, TestKeyFingerprint}, keyIdentities)
+
+	// Invalid input: This is accepted anyway by GPG, just returns no keys.
+	keyIdentities, err = mech.ImportKeysFromBytes([]byte("This is invalid"))
+	require.NoError(t, err)
+	assert.Equal(t, []string{}, keyIdentities)
+	// The various GPG/GPGME failures cases are not obviously easy to reach.
 }
 
 func TestGPGSigningMechanismSign(t *testing.T) {

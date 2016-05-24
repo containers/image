@@ -13,6 +13,10 @@ import (
 // FIXME: Eventually expand on keyIdentity (namespace them between mechanisms to
 // eliminate ambiguities, support CA signatures and perhaps other key properties)
 type SigningMechanism interface {
+	// ImportKeysFromBytes imports public keys from the supplied blob and returns their identities.
+	// The blob is assumed to have an appropriate format (the caller is expected to know which one).
+	// NOTE: This may modify long-term state (e.g. key storage in a directory underlying the mechanism).
+	ImportKeysFromBytes(blob []byte) ([]string, error)
 	// Sign creates a (non-detached) signature of input using keyidentity
 	Sign(input []byte, keyIdentity string) ([]byte, error)
 	// Verify parses unverifiedSignature and returns the content and the signer's identity
@@ -47,6 +51,25 @@ func newGPGSigningMechanismInDirectory(optionalDir string) (SigningMechanism, er
 	ctx.SetArmor(false)
 	ctx.SetTextMode(false)
 	return gpgSigningMechanism{ctx: ctx}, nil
+}
+
+// ImportKeysFromBytes implements SigningMechanism.ImportKeysFromBytes
+func (m gpgSigningMechanism) ImportKeysFromBytes(blob []byte) ([]string, error) {
+	inputData, err := gpgme.NewDataBytes(blob)
+	if err != nil {
+		return nil, err
+	}
+	res, err := m.ctx.Import(inputData)
+	if err != nil {
+		return nil, err
+	}
+	keyIdentities := []string{}
+	for _, i := range res.Imports {
+		if i.Result == nil {
+			keyIdentities = append(keyIdentities, i.Fingerprint)
+		}
+	}
+	return keyIdentities, nil
 }
 
 // Sign implements SigningMechanism.Sign
