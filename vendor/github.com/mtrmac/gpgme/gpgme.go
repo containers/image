@@ -472,6 +472,72 @@ func (c *Context) Sign(signers []*Key, plain, sig *Data, mode SigMode) error {
 	return handleError(C.gpgme_op_sign(c.ctx, plain.dh, sig.dh, C.gpgme_sig_mode_t(mode)))
 }
 
+// ImportStatusFlags describes the type of ImportStatus.Status. The C API in gpgme.h simply uses "unsigned".
+type ImportStatusFlags uint
+
+const (
+	ImportNew    ImportStatusFlags = C.GPGME_IMPORT_NEW
+	ImportUID    ImportStatusFlags = C.GPGME_IMPORT_UID
+	ImportSIG    ImportStatusFlags = C.GPGME_IMPORT_SIG
+	ImportSubKey ImportStatusFlags = C.GPGME_IMPORT_SUBKEY
+	ImportSecret ImportStatusFlags = C.GPGME_IMPORT_SECRET
+)
+
+type ImportStatus struct {
+	Fingerprint string
+	Result      error
+	Status      ImportStatusFlags
+}
+
+type ImportResult struct {
+	Considered      int
+	NoUserID        int
+	Imported        int
+	ImportedRSA     int
+	Unchanged       int
+	NewUserIDs      int
+	NewSubKeys      int
+	NewSignatures   int
+	NewRevocations  int
+	SecretRead      int
+	SecretImported  int
+	SecretUnchanged int
+	NotImported     int
+	Imports         []ImportStatus
+}
+
+func (c *Context) Import(keyData *Data) (*ImportResult, error) {
+	err := handleError(C.gpgme_op_import(c.ctx, keyData.dh))
+	if err != nil {
+		return nil, err
+	}
+	res := C.gpgme_op_import_result(c.ctx)
+	imports := []ImportStatus{}
+	for s := res.imports; s != nil; s = s.next {
+		imports = append(imports, ImportStatus{
+			Fingerprint: C.GoString(s.fpr),
+			Result:      handleError(s.result),
+			Status:      ImportStatusFlags(s.status),
+		})
+	}
+	return &ImportResult{
+		Considered:      int(res.considered),
+		NoUserID:        int(res.no_user_id),
+		Imported:        int(res.imported),
+		ImportedRSA:     int(res.imported_rsa),
+		Unchanged:       int(res.unchanged),
+		NewUserIDs:      int(res.new_user_ids),
+		NewSubKeys:      int(res.new_sub_keys),
+		NewSignatures:   int(res.new_signatures),
+		NewRevocations:  int(res.new_revocations),
+		SecretRead:      int(res.secret_read),
+		SecretImported:  int(res.secret_imported),
+		SecretUnchanged: int(res.secret_unchanged),
+		NotImported:     int(res.not_imported),
+		Imports:         imports,
+	}, nil
+}
+
 type Key struct {
 	k C.gpgme_key_t
 }
