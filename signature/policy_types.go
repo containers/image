@@ -101,7 +101,6 @@ type prSignedBaseLayer struct {
 
 // PolicyReferenceMatch specifies a set of image identities accepted in PolicyRequirement.
 // The type is public, but its implementation is private.
-type PolicyReferenceMatch interface{} // Will be expanded and moved elsewhere later.
 
 // prmCommon is the common type field in a JSON encoding of PolicyReferenceMatch.
 type prmCommon struct {
