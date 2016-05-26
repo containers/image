@@ -363,7 +363,7 @@ func (kt *sbKeyType) UnmarshalJSON(data []byte) error {
 // newPRSignedBaseLayer is NewPRSignedBaseLayer, except it returns the private type.
 func newPRSignedBaseLayer(baseLayerIdentity PolicyReferenceMatch) (*prSignedBaseLayer, error) {
 	if baseLayerIdentity == nil {
-		return nil, InvalidPolicyFormatError("baseLayerIdenitty not specified")
+		return nil, InvalidPolicyFormatError("baseLayerIdentity not specified")
 	}
 	return &prSignedBaseLayer{
 		prCommon:          prCommon{Type: prTypeSignedBaseLayer},
