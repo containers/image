@@ -7,12 +7,13 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/projectatomic/skopeo/docker"
 	"github.com/projectatomic/skopeo/docker/utils"
 )
 
 // inspectOutput is the output format of (skopeo inspect), primarily so that we can format it with a simple json.MarshalIndent.
 type inspectOutput struct {
-	Name          string
+	Name          string `json:",omitempty"`
 	Tag           string
 	Digest        string
 	RepoTags      []string
@@ -51,10 +52,10 @@ var inspectCmd = cli.Command{
 			logrus.Fatal(err)
 		}
 		outputData := inspectOutput{
-			// Name is set below.
-			Tag: imgInspect.Tag,
+			Name: "", // Possibly overridden for a docker.Image.
+			Tag:  imgInspect.Tag,
 			// Digest is set below.
-			// RepoTags are set below.
+			RepoTags:      []string{}, // Possibly overriden for a docker.Image.
 			Created:       imgInspect.Created,
 			DockerVersion: imgInspect.DockerVersion,
 			Labels:        imgInspect.Labels,
@@ -66,13 +67,15 @@ var inspectCmd = cli.Command{
 		if err != nil {
 			logrus.Fatalf("Error computing manifest digest: %s", err.Error())
 		}
-		outputData.Name, err = img.SourceRefFullName()
-		if err != nil {
-			logrus.Fatalf("Error getting expanded repository name: %s", err.Error())
-		}
-		outputData.RepoTags, err = img.GetRepositoryTags()
-		if err != nil {
-			logrus.Fatalf("Error determining repository tags: %s", err.Error())
+		if dockerImg, ok := img.(*docker.Image); ok {
+			outputData.Name, err = dockerImg.SourceRefFullName()
+			if err != nil {
+				logrus.Fatalf("Error getting expanded repository name: %s", err.Error())
+			}
+			outputData.RepoTags, err = dockerImg.GetRepositoryTags()
+			if err != nil {
+				logrus.Fatalf("Error determining repository tags: %s", err.Error())
+			}
 		}
 		out, err := json.MarshalIndent(outputData, "", "    ")
 		if err != nil {

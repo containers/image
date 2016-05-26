@@ -26,6 +26,14 @@ type genericImage struct {
 	cachedSignatures [][]byte // Private cache for Signatures(); nil if not yet known.
 }
 
+// GenericImageFromSource returns a types.Image implementation for source.
+// NOTE: This is currently an internal testing helper, do not rely on this as
+// a stable API. There might be an ImageFromSource eventually, but it would not be
+// in the skopeo/docker package.
+func GenericImageFromSource(src types.ImageSource) types.Image {
+	return &genericImage{src: src}
+}
+
 // IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
 // (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 // May be "" if unknown.
