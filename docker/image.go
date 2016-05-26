@@ -18,9 +18,10 @@ var (
 	validHex = regexp.MustCompile(`^([a-f0-9]{64})$`)
 )
 
-// genericImage is a general set of utilities for working with container images.
+// genericImage is a general set of utilities for working with container images,
+// whatever is their underlying location (i.e. dockerImageSource-independent).
 type genericImage struct {
-	src              *dockerImageSource
+	src              types.ImageSource
 	cachedManifest   []byte   // Private cache for Manifest(); nil if not yet known.
 	cachedSignatures [][]byte // Private cache for Signatures(); nil if not yet known.
 }

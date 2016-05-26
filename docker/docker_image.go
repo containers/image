@@ -24,17 +24,32 @@ func NewDockerImage(img, certPath string, tlsVerify bool) (types.Image, error) {
 	return &Image{genericImage{src: s}}, nil
 }
 
+// By construction a, docker.Image.genericImage.src must be a dockerImageSource.
+// dockerSource returns it.
+func (i *Image) dockerSource() (*dockerImageSource, error) {
+	if src, ok := i.genericImage.src.(*dockerImageSource); ok {
+		return src, nil
+	}
+	return nil, fmt.Errorf("Unexpected internal inconsistency, docker.Image not based on dockerImageSource")
+}
+
 // SourceRefFullName returns a fully expanded name for the repository this image is in.
 func (i *Image) SourceRefFullName() (string, error) {
-	// FIXME? Breaking the abstraction.
-	return i.genericImage.src.ref.FullName(), nil
+	src, err := i.dockerSource()
+	if err != nil {
+		return "", err
+	}
+	return src.ref.FullName(), nil
 }
 
 // GetRepositoryTags list all tags available in the repository. Note that this has no connection with the tag(s) used for this specific image, if any.
 func (i *Image) GetRepositoryTags() ([]string, error) {
-	// FIXME? Breaking the abstraction.
-	url := fmt.Sprintf(tagsURL, i.genericImage.src.ref.RemoteName())
-	res, err := i.genericImage.src.c.makeRequest("GET", url, nil, nil)
+	src, err := i.dockerSource()
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf(tagsURL, src.ref.RemoteName())
+	res, err := src.c.makeRequest("GET", url, nil, nil)
 	if err != nil {
 		return nil, err
 	}
