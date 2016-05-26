@@ -1,7 +1,6 @@
 package types
 
 import (
-	"fmt"
 	"io"
 	"time"
 )
@@ -60,6 +59,8 @@ type Image interface {
 	// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 	Signatures() ([][]byte, error)
 	Layers(layers ...string) error // configure download directory? Call it DownloadLayers?
+	// SourceRefFullName returns a fully expanded name for the repository this image is in.
+	SourceRefFullName() (string, error)
 	Inspect() (*ImageInspectInfo, error)
 	DockerTar() ([]byte, error) // ??? also, configure output directory
 	// GetRepositoryTags list all tags available in the repository. Note that this has no connection with the tag(s) used for this specific image, if any.
@@ -70,7 +71,6 @@ type Image interface {
 
 // ImageInspectInfo is a set of metadata describing Docker images, primarily their manifest and configuration.
 type ImageInspectInfo struct {
-	Name          string
 	Tag           string
 	Created       time.Time
 	DockerVersion string
@@ -78,8 +78,4 @@ type ImageInspectInfo struct {
 	Architecture  string
 	Os            string
 	Layers        []string
-}
-
-func (m *ImageInspectInfo) String() string {
-	return fmt.Sprintf("%s:%s", m.Name, m.Tag)
 }

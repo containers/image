@@ -70,7 +70,6 @@ func (i *dockerImage) Inspect() (*types.ImageInspectInfo, error) {
 		return nil, err
 	}
 	return &types.ImageInspectInfo{
-		Name:          i.src.ref.FullName(),
 		Tag:           ms1.Tag,
 		DockerVersion: v1.DockerVersion,
 		Created:       v1.Created,

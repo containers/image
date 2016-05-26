@@ -51,8 +51,8 @@ var inspectCmd = cli.Command{
 			logrus.Fatal(err)
 		}
 		outputData := inspectOutput{
-			Name: imgInspect.Name,
-			Tag:  imgInspect.Tag,
+			// Name is set below.
+			Tag: imgInspect.Tag,
 			// Digest is set below.
 			// RepoTags are set below.
 			Created:       imgInspect.Created,
@@ -65,6 +65,10 @@ var inspectCmd = cli.Command{
 		outputData.Digest, err = utils.ManifestDigest(rawManifest)
 		if err != nil {
 			logrus.Fatalf("Error computing manifest digest: %s", err.Error())
+		}
+		outputData.Name, err = img.SourceRefFullName()
+		if err != nil {
+			logrus.Fatalf("Error getting expanded repository name: %s", err.Error())
 		}
 		outputData.RepoTags, err = img.GetRepositoryTags()
 		if err != nil {
