@@ -18,7 +18,8 @@ var (
 	validHex = regexp.MustCompile(`^([a-f0-9]{64})$`)
 )
 
-type dockerImage struct {
+// genericImage is a general set of utilities for working with container images.
+type genericImage struct {
 	src              *dockerImageSource
 	cachedManifest   []byte   // Private cache for Manifest(); nil if not yet known.
 	cachedSignatures [][]byte // Private cache for Signatures(); nil if not yet known.
@@ -27,12 +28,12 @@ type dockerImage struct {
 // IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
 // (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 // May be "" if unknown.
-func (i *dockerImage) IntendedDockerReference() string {
+func (i *genericImage) IntendedDockerReference() string {
 	return i.src.IntendedDockerReference()
 }
 
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
-func (i *dockerImage) Manifest() ([]byte, error) {
+func (i *genericImage) Manifest() ([]byte, error) {
 	if i.cachedManifest == nil {
 		m, _, err := i.src.GetManifest([]string{utils.DockerV2Schema1MIMEType})
 		if err != nil {
@@ -44,7 +45,7 @@ func (i *dockerImage) Manifest() ([]byte, error) {
 }
 
 // Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
-func (i *dockerImage) Signatures() ([][]byte, error) {
+func (i *genericImage) Signatures() ([][]byte, error) {
 	if i.cachedSignatures == nil {
 		sigs, err := i.src.GetSignatures()
 		if err != nil {
@@ -55,7 +56,7 @@ func (i *dockerImage) Signatures() ([][]byte, error) {
 	return i.cachedSignatures, nil
 }
 
-func (i *dockerImage) Inspect() (*types.ImageInspectInfo, error) {
+func (i *genericImage) Inspect() (*types.ImageInspectInfo, error) {
 	// TODO(runcom): unused version param for now, default to docker v2-1
 	m, err := i.getSchema1Manifest()
 	if err != nil {
@@ -98,7 +99,7 @@ type v1Image struct {
 }
 
 // TODO(runcom)
-func (i *dockerImage) DockerTar() ([]byte, error) {
+func (i *genericImage) DockerTar() ([]byte, error) {
 	return nil, nil
 }
 
@@ -137,7 +138,7 @@ func sanitize(s string) string {
 	return strings.Replace(s, "/", "-", -1)
 }
 
-func (i *dockerImage) getSchema1Manifest() (manifest, error) {
+func (i *genericImage) getSchema1Manifest() (manifest, error) {
 	manblob, err := i.Manifest()
 	if err != nil {
 		return nil, err
@@ -159,7 +160,7 @@ func (i *dockerImage) getSchema1Manifest() (manifest, error) {
 	return mschema1, nil
 }
 
-func (i *dockerImage) Layers(layers ...string) error {
+func (i *genericImage) Layers(layers ...string) error {
 	m, err := i.getSchema1Manifest()
 	if err != nil {
 		return err
@@ -190,7 +191,7 @@ func (i *dockerImage) Layers(layers ...string) error {
 	return nil
 }
 
-func (i *dockerImage) getLayer(dest types.ImageDestination, digest string) error {
+func (i *genericImage) getLayer(dest types.ImageDestination, digest string) error {
 	stream, err := i.src.GetLayer(digest)
 	if err != nil {
 		return err

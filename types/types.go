@@ -61,6 +61,7 @@ type Image interface {
 	Layers(layers ...string) error // configure download directory? Call it DownloadLayers?
 	// SourceRefFullName returns a fully expanded name for the repository this image is in.
 	SourceRefFullName() (string, error)
+	// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
 	Inspect() (*ImageInspectInfo, error)
 	DockerTar() ([]byte, error) // ??? also, configure output directory
 	// GetRepositoryTags list all tags available in the repository. Note that this has no connection with the tag(s) used for this specific image, if any.
