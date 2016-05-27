@@ -50,25 +50,25 @@ var inspectCmd = cli.Command{
 		if err != nil {
 			logrus.Fatal(err)
 		}
-		manifestDigest, err := utils.ManifestDigest(rawManifest)
-		if err != nil {
-			logrus.Fatalf("Error computing manifest digest: %s", err.Error())
-		}
-		repoTags, err := img.GetRepositoryTags()
-		if err != nil {
-			logrus.Fatalf("Error determining repository tags: %s", err.Error())
-		}
 		outputData := inspectOutput{
-			Name:          imgInspect.Name,
-			Tag:           imgInspect.Tag,
-			Digest:        manifestDigest,
-			RepoTags:      repoTags,
+			Name: imgInspect.Name,
+			Tag:  imgInspect.Tag,
+			// Digest is set below.
+			// RepoTags are set below.
 			Created:       imgInspect.Created,
 			DockerVersion: imgInspect.DockerVersion,
 			Labels:        imgInspect.Labels,
 			Architecture:  imgInspect.Architecture,
 			Os:            imgInspect.Os,
 			Layers:        imgInspect.Layers,
+		}
+		outputData.Digest, err = utils.ManifestDigest(rawManifest)
+		if err != nil {
+			logrus.Fatalf("Error computing manifest digest: %s", err.Error())
+		}
+		outputData.RepoTags, err = img.GetRepositoryTags()
+		if err != nil {
+			logrus.Fatalf("Error determining repository tags: %s", err.Error())
 		}
 		out, err := json.MarshalIndent(outputData, "", "    ")
 		if err != nil {
