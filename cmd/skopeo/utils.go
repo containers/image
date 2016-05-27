@@ -32,6 +32,9 @@ func parseImage(c *cli.Context) (types.Image, error) {
 		return docker.NewDockerImage(strings.TrimPrefix(imgName, dockerPrefix), certPath, tlsVerify)
 		//case strings.HasPrefix(img, appcPrefix):
 		//
+	case strings.HasPrefix(imgName, directoryPrefix):
+		src := directory.NewDirImageSource(strings.TrimPrefix(imgName, directoryPrefix))
+		return docker.GenericImageFromSource(src), nil
 	}
 	return nil, fmt.Errorf("no valid prefix provided")
 }
