@@ -7,12 +7,13 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/projectatomic/skopeo/docker"
 	"github.com/projectatomic/skopeo/docker/utils"
 )
 
 // inspectOutput is the output format of (skopeo inspect), primarily so that we can format it with a simple json.MarshalIndent.
 type inspectOutput struct {
-	Name          string
+	Name          string `json:",omitempty"`
 	Tag           string
 	Digest        string
 	RepoTags      []string
@@ -50,25 +51,31 @@ var inspectCmd = cli.Command{
 		if err != nil {
 			logrus.Fatal(err)
 		}
-		manifestDigest, err := utils.ManifestDigest(rawManifest)
-		if err != nil {
-			logrus.Fatalf("Error computing manifest digest: %s", err.Error())
-		}
-		repoTags, err := img.GetRepositoryTags()
-		if err != nil {
-			logrus.Fatalf("Error determining repository tags: %s", err.Error())
-		}
 		outputData := inspectOutput{
-			Name:          imgInspect.Name,
-			Tag:           imgInspect.Tag,
-			Digest:        manifestDigest,
-			RepoTags:      repoTags,
+			Name: "", // Possibly overridden for a docker.Image.
+			Tag:  imgInspect.Tag,
+			// Digest is set below.
+			RepoTags:      []string{}, // Possibly overriden for a docker.Image.
 			Created:       imgInspect.Created,
 			DockerVersion: imgInspect.DockerVersion,
 			Labels:        imgInspect.Labels,
 			Architecture:  imgInspect.Architecture,
 			Os:            imgInspect.Os,
 			Layers:        imgInspect.Layers,
+		}
+		outputData.Digest, err = utils.ManifestDigest(rawManifest)
+		if err != nil {
+			logrus.Fatalf("Error computing manifest digest: %s", err.Error())
+		}
+		if dockerImg, ok := img.(*docker.Image); ok {
+			outputData.Name, err = dockerImg.SourceRefFullName()
+			if err != nil {
+				logrus.Fatalf("Error getting expanded repository name: %s", err.Error())
+			}
+			outputData.RepoTags, err = dockerImg.GetRepositoryTags()
+			if err != nil {
+				logrus.Fatalf("Error determining repository tags: %s", err.Error())
+			}
 		}
 		out, err := json.MarshalIndent(outputData, "", "    ")
 		if err != nil {
