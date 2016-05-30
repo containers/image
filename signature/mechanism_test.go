@@ -138,5 +138,12 @@ func TestGPGSigningMechanismVerify(t *testing.T) {
 	require.NoError(t, err)
 	content, signingFingerprint, err = mech.Verify(signature)
 	assertSigningError(t, content, signingFingerprint, err)
+
+	// Valid signature with an unknown key
+	signature, err = ioutil.ReadFile("./fixtures/unknown-key.signature")
+	require.NoError(t, err)
+	content, signingFingerprint, err = mech.Verify(signature)
+	assertSigningError(t, content, signingFingerprint, err)
+
 	// The various GPG/GPGME failures cases are not obviously easy to reach.
 }
