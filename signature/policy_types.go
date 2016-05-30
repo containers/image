@@ -26,7 +26,6 @@ type PolicyRequirements []PolicyRequirement
 
 // PolicyRequirement is a rule which must be satisfied by at least one of the signatures of an image.
 // The type is public, but its definition is private.
-type PolicyRequirement interface{} // Will be expanded and moved elsewhere later.
 
 // prCommon is the common type field in a JSON encoding of PolicyRequirement.
 type prCommon struct {
