@@ -11,7 +11,9 @@ type Policy struct {
 	// Default applies to any image which does not have a matching policy in Specific.
 	Default PolicyRequirements `json:"default"`
 	// Specific applies to images matching scope, the map key.
-	// Scope is registry/server, namespace in a registry, single repository.
+	// Scope is hostname[/zero/or/more/namespaces[/repository[:tag|@digest]]]; note that in order to be
+	// unambiguous, this must use a fully expanded format, e.g. "docker.io/library/busybox" or
+	// "docker.io/library", not "busybox" or "library".
 	// FIXME: Scope syntax - should it be namespaced docker:something ? Or, in the worst case, a composite object (we couldn't use a JSON map)
 	// Most specific scope wins, duplication is prohibited (hard failure).
 	// Defaults to an empty map if not specified.
