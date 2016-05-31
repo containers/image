@@ -1,6 +1,7 @@
 #ifndef GO_GPGME_H
 #define GO_GPGME_H
 
+#define _FILE_OFFSET_BITS 64
 #include <stdint.h>
 
 #include <gpgme.h>
