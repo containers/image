@@ -2,6 +2,7 @@
 package gpgme
 
 // #cgo LDFLAGS: -lgpgme -lassuan -lgpg-error
+// #cgo CPPFLAGS: -D_FILE_OFFSET_BITS=64
 // #include <stdlib.h>
 // #include <gpgme.h>
 // #include "go_gpgme.h"
