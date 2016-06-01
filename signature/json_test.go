@@ -144,6 +144,6 @@ func TestParanoidUnmarshalJSONObject(t *testing.T) {
 	} {
 		ts = testStruct{}
 		err := paranoidUnmarshalJSONObject([]byte(input), tsResolver)
-		assert.Error(t, err)
+		assert.Error(t, err, input)
 	}
 }
