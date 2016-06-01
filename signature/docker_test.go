@@ -72,6 +72,11 @@ func TestVerifyDockerManifestSignature(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, sig)
 
+	// Docker reference mismatch
+	sig, err = VerifyDockerManifestSignature(signature, manifest, "example.com/doesnt/match", mech, TestKeyFingerprint)
+	assert.Error(t, err)
+	assert.Nil(t, sig)
+
 	// Docker manifest digest mismatch
 	sig, err = VerifyDockerManifestSignature(signature, []byte("unexpected manifest"), TestImageSignatureReference, mech, TestKeyFingerprint)
 	assert.Error(t, err)
