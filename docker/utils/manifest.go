@@ -64,3 +64,16 @@ func ManifestDigest(manifest []byte) (string, error) {
 	hash := sha256.Sum256(manifest)
 	return "sha256:" + hex.EncodeToString(hash[:]), nil
 }
+
+// ManifestMatchesDigest returns true iff the manifest matches expectedDigest.
+// Error may be set if this returns false.
+// Note that this is not doing ConstantTimeCompare; by the time we get here, the cryptographic signature must already have been verified,
+// or we are not using a cryptographic channel and the attacker can modify the digest along with the manifest blob.
+func ManifestMatchesDigest(manifest []byte, expectedDigest string) (bool, error) {
+	// This should eventually support various digest types.
+	actualDigest, err := ManifestDigest(manifest)
+	if err != nil {
+		return false, err
+	}
+	return expectedDigest == actualDigest, nil
+}
