@@ -160,7 +160,7 @@ func TestPolicyUnmarshalJSON(t *testing.T) {
 			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("abc"), NewPRMMatchExact()),
 		},
 		Specific: map[string]PolicyRequirements{
-			"library/busybox": []PolicyRequirement{
+			"docker.io/library/busybox": []PolicyRequirement{
 				xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("def"), NewPRMMatchExact()),
 			},
 			"registry.access.redhat.com": []PolicyRequirement{
@@ -191,11 +191,8 @@ func TestPolicyUnmarshalJSON(t *testing.T) {
 		func(v mSI) { v["specific"] = []string{} },
 		// "default" is an invalid PolicyRequirements
 		func(v mSI) { v["default"] = PolicyRequirements{} },
-		// Invalid scope name in "specific". Uppercase is invalid in Docker reference components.
-		// Get valid PolicyRequirements by copying them from  "library/buxybox".
-		func(v mSI) { x(v, "specific")["INVALIDUPPERCASE"] = x(v, "specific")["library/busybox"] },
 		// A field in "specific" is an invalid PolicyRequirements
-		func(v mSI) { x(v, "specific")["library/busybox"] = PolicyRequirements{} },
+		func(v mSI) { x(v, "specific")["docker.io/library/busybox"] = PolicyRequirements{} },
 	}
 	for _, fn := range breakFns {
 		err = tryUnmarshalModifiedPolicy(t, &p, validJSON, fn)

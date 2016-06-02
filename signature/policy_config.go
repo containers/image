@@ -88,10 +88,9 @@ func (m *policySpecificMap) UnmarshalJSON(data []byte) error {
 	// So, use a temporary map of pointers-to-slices and convert.
 	tmpMap := map[string]*PolicyRequirements{}
 	if err := paranoidUnmarshalJSONObject(data, func(key string) interface{} {
-		// Check that the scope format is at least plausible.
-		if _, err := reference.ParseNamed(key); err != nil {
-			return nil // FIXME? This returns an "Unknown key" error instead of saying that the format is invalid.
-		}
+		// FIXME? We might want to validate the scope format.
+		// Note that reference.ParseNamed is unsuitable; it would understand "example.com" as
+		// "docker.io/library/example.com"
 		// paranoidUnmarshalJSONObject detects key duplication for us, check just to be safe.
 		if _, ok := tmpMap[key]; ok {
 			return nil

@@ -11,7 +11,9 @@ type Policy struct {
 	// Default applies to any image which does not have a matching policy in Specific.
 	Default PolicyRequirements `json:"default"`
 	// Specific applies to images matching scope, the map key.
-	// Scope is registry/server, namespace in a registry, single repository.
+	// Scope is hostname[/zero/or/more/namespaces[/repository[:tag|@digest]]]; note that in order to be
+	// unambiguous, this must use a fully expanded format, e.g. "docker.io/library/busybox" or
+	// "docker.io/library", not "busybox" or "library".
 	// FIXME: Scope syntax - should it be namespaced docker:something ? Or, in the worst case, a composite object (we couldn't use a JSON map)
 	// Most specific scope wins, duplication is prohibited (hard failure).
 	// Defaults to an empty map if not specified.
@@ -24,7 +26,6 @@ type PolicyRequirements []PolicyRequirement
 
 // PolicyRequirement is a rule which must be satisfied by at least one of the signatures of an image.
 // The type is public, but its definition is private.
-type PolicyRequirement interface{} // Will be expanded and moved elsewhere later.
 
 // prCommon is the common type field in a JSON encoding of PolicyRequirement.
 type prCommon struct {
@@ -99,7 +100,6 @@ type prSignedBaseLayer struct {
 
 // PolicyReferenceMatch specifies a set of image identities accepted in PolicyRequirement.
 // The type is public, but its implementation is private.
-type PolicyReferenceMatch interface{} // Will be expanded and moved elsewhere later.
 
 // prmCommon is the common type field in a JSON encoding of PolicyReferenceMatch.
 type prmCommon struct {

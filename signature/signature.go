@@ -155,26 +155,37 @@ func (s privateSignature) sign(mech SigningMechanism, keyIdentity string) ([]byt
 	return mech.Sign(json, keyIdentity)
 }
 
-// verifyAndExtractSignature verifies that signature has been signed by expectedKeyIdentity
-// using mech for expectedDockerReference, and returns it (without matching its contents to an image).
-func verifyAndExtractSignature(mech SigningMechanism, unverifiedSignature []byte,
-	expectedKeyIdentity, expectedDockerReference string) (*Signature, error) {
+// signatureAcceptanceRules specifies how to decide whether an untrusted signature is acceptable.
+// We centralize the actual parsing and data extraction in verifyAndExtractSignature; this supplies
+// the policy.  We use an object instead of supplying func parameters to verifyAndExtractSignature
+// because all of the functions have the same type, so there is a risk of exchanging the functions;
+// named members of this struct are more explicit.
+type signatureAcceptanceRules struct {
+	validateKeyIdentity                func(string) error
+	validateSignedDockerReference      func(string) error
+	validateSignedDockerManifestDigest func(string) error
+}
+
+// verifyAndExtractSignature verifies that unverifiedSignature has been signed, and that its principial components
+// match expected values, both as specified by rules, and returns it
+func verifyAndExtractSignature(mech SigningMechanism, unverifiedSignature []byte, rules signatureAcceptanceRules) (*Signature, error) {
 	signed, keyIdentity, err := mech.Verify(unverifiedSignature)
 	if err != nil {
 		return nil, err
 	}
-	if keyIdentity != expectedKeyIdentity {
-		return nil, InvalidSignatureError{msg: fmt.Sprintf("Signature by %s does not match expected fingerprint %s", keyIdentity, expectedKeyIdentity)}
+	if err := rules.validateKeyIdentity(keyIdentity); err != nil {
+		return nil, err
 	}
 
 	var unmatchedSignature privateSignature
 	if err := json.Unmarshal(signed, &unmatchedSignature); err != nil {
 		return nil, InvalidSignatureError{msg: err.Error()}
 	}
-
-	if unmatchedSignature.DockerReference != expectedDockerReference {
-		return nil, InvalidSignatureError{msg: fmt.Sprintf("Docker reference %s does not match %s",
-			unmatchedSignature.DockerReference, expectedDockerReference)}
+	if err := rules.validateSignedDockerManifestDigest(unmatchedSignature.DockerManifestDigest); err != nil {
+		return nil, err
+	}
+	if err := rules.validateSignedDockerReference(unmatchedSignature.DockerReference); err != nil {
+		return nil, err
 	}
 	signature := unmatchedSignature.Signature // Policy OK.
 	return &signature, nil

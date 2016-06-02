@@ -28,16 +28,33 @@ func SignDockerManifest(manifest []byte, dockerReference string, mech SigningMec
 // using mech.
 func VerifyDockerManifestSignature(unverifiedSignature, unverifiedManifest []byte,
 	expectedDockerReference string, mech SigningMechanism, expectedKeyIdentity string) (*Signature, error) {
-	expectedManifestDigest, err := utils.ManifestDigest(unverifiedManifest)
+	sig, err := verifyAndExtractSignature(mech, unverifiedSignature, signatureAcceptanceRules{
+		validateKeyIdentity: func(keyIdentity string) error {
+			if keyIdentity != expectedKeyIdentity {
+				return InvalidSignatureError{msg: fmt.Sprintf("Signature by %s does not match expected fingerprint %s", keyIdentity, expectedKeyIdentity)}
+			}
+			return nil
+		},
+		validateSignedDockerReference: func(signedDockerReference string) error {
+			if signedDockerReference != expectedDockerReference {
+				return InvalidSignatureError{msg: fmt.Sprintf("Docker reference %s does not match %s",
+					signedDockerReference, expectedDockerReference)}
+			}
+			return nil
+		},
+		validateSignedDockerManifestDigest: func(signedDockerManifestDigest string) error {
+			matches, err := utils.ManifestMatchesDigest(unverifiedManifest, signedDockerManifestDigest)
+			if err != nil {
+				return err
+			}
+			if !matches {
+				return InvalidSignatureError{msg: fmt.Sprintf("Signature for docker digest %s does not match", signedDockerManifestDigest, signedDockerManifestDigest)}
+			}
+			return nil
+		},
+	})
 	if err != nil {
 		return nil, err
-	}
-	sig, err := verifyAndExtractSignature(mech, unverifiedSignature, expectedKeyIdentity, expectedDockerReference)
-	if err != nil {
-		return nil, err
-	}
-	if sig.DockerManifestDigest != expectedManifestDigest {
-		return nil, InvalidSignatureError{msg: fmt.Sprintf("Docker manifest digest %s does not match %s", sig.DockerManifestDigest, expectedManifestDigest)}
 	}
 	return sig, nil
 }
