@@ -157,8 +157,7 @@ func fullyExpandedDockerReference(ref reference.Named) (string, error) {
 func (pc *PolicyContext) requirementsForImage(image types.Image) (PolicyRequirements, error) {
 	ref := image.IntendedDockerReference()
 	if ref == nil {
-		// FIXME: Tell the user which image this is.
-		return nil, fmt.Errorf("Can not determine policy for an image with no known Docker reference identity")
+		return pc.Policy.Default, nil
 	}
 	ref = reference.WithDefaultTag(ref) // This should not be needed, but if we did receive a name-only reference, this is a reasonable thing to do.
 

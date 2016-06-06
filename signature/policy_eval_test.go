@@ -212,9 +212,11 @@ func TestPolicyContextRequirementsForImage(t *testing.T) {
 		assert.True(t, len(reqs) == len(expected), comment)
 	}
 
-	// Image without a Docker reference identity
-	_, err = pc.requirementsForImage(refImageMock{nil})
-	assert.Error(t, err)
+	// Image without a Docker reference identity, e.g. local directories
+	reqs, err := pc.requirementsForImage(refImageMock{nil})
+	assert.NoError(t, err)
+	assert.True(t, &(reqs[0]) == &policy.Default[0])
+	assert.True(t, len(reqs) == len(policy.Default))
 }
 
 func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
@@ -344,14 +346,14 @@ func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
 	// implementations meddling with the state, or threads. This is for catching trivial programmer
 	// mistakes only, anyway.
 
-	// Image without a Docker reference identity
+	// Image without a Docker reference identity, e.g. local directories (rejected per default policy)
 	img = image.FromSource(&dirImageSourceMock{
 		ImageSource:             directory.NewImageSource("fixtures/dir-img-valid"),
 		intendedDockerReference: nil,
 	}, nil)
 	sigs, err = pc.GetSignaturesWithAcceptedAuthor(img)
-	assert.Error(t, err)
-	assert.Nil(t, sigs)
+	require.NoError(t, err)
+	assert.Empty(t, sigs)
 
 	// Error reading signatures.
 	invalidSigDir := createInvalidSigDir(t)
