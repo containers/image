@@ -29,7 +29,7 @@ const (
 	tagsURL       = "%s/tags/list"
 	manifestURL   = "%s/manifests/%s"
 	blobsURL      = "%s/blobs/%s"
-	blobUploadURL = "%s/blobs/uploads/?digest=%s"
+	blobUploadURL = "%s/blobs/uploads/"
 )
 
 // dockerClient is configuration for dealing with a single Docker registry.
@@ -78,6 +78,8 @@ func newDockerClient(refHostname, certPath string, tlsVerify bool) (*dockerClien
 	}, nil
 }
 
+// makeRequest creates and executes a http.Request with the specified parameters, adding authentication and TLS options for the Docker client.
+// url is NOT an absolute URL, but a path relative to the /v2/ top-level API path.  The host name and schema is taken from the client or autodetected.
 func (c *dockerClient) makeRequest(method, url string, headers map[string][]string, stream io.Reader) (*http.Response, error) {
 	if c.scheme == "" {
 		pr, err := c.ping()
@@ -89,6 +91,12 @@ func (c *dockerClient) makeRequest(method, url string, headers map[string][]stri
 	}
 
 	url = fmt.Sprintf(baseURL, c.scheme, c.registry) + url
+	return c.makeRequestToResolvedURL(method, url, headers, stream)
+}
+
+// makeRequestToResolvedURL creates and executes a http.Request with the specified parameters, adding authentication and TLS options for the Docker client.
+// makeRequest should generally be preferred.
+func (c *dockerClient) makeRequestToResolvedURL(method, url string, headers map[string][]string, stream io.Reader) (*http.Response, error) {
 	req, err := http.NewRequest(method, url, stream)
 	if err != nil {
 		return nil, err
