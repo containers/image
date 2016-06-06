@@ -111,3 +111,7 @@ func (s *dirImageSource) GetSignatures() ([][]byte, error) {
 	}
 	return signatures, nil
 }
+
+func (s *dirImageSource) Delete() error {
+	return fmt.Errorf("directory#dirImageSource.Delete() not implmented")
+}

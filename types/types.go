@@ -33,6 +33,8 @@ type ImageSource interface {
 	GetLayer(digest string) (io.ReadCloser, error)
 	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
 	GetSignatures() ([][]byte, error)
+	// Delete image from registry, if operation is supported
+	Delete() error
 }
 
 // ImageDestination is a service, possibly remote (= slow), to store components of a single image.
