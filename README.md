@@ -1,7 +1,7 @@
 skopeo [![Build Status](https://travis-ci.org/projectatomic/skopeo.svg?branch=master)](https://travis-ci.org/projectatomic/skopeo)
 =
 
-_Please be aware `skopeo` is still work in progress_
+_Please be aware `skopeo` is still work in progress and it currently supports only registry API V2_
 
 `skopeo` is a command line utility which is able to _inspect_ a repository on a Docker registry and fetch images layers.  
 By _inspect_ I mean it fetches the repository's manifest and it is able to show you a `docker inspect`-like
@@ -10,38 +10,35 @@ a repository or a tag before pulling it (using disk space) - e.g. - which tags a
 
 Examples:
 ```sh
-# show repository's labels of rhel7:latest
-$ skopeo inspect docker://registry.access.redhat.com/rhel7 | jq '.Config.Labels'
+# show properties of fedora:latest
+$ skopeo inspect docker://docker.io/fedora
 {
-  "Architecture": "x86_64",
-  "Authoritative_Registry": "registry.access.redhat.com",
-  "BZComponent": "rhel-server-docker",
-  "Build_Host": "rcm-img04.build.eng.bos.redhat.com",
-  "Name": "rhel7/rhel",
-  "Release": "38",
-  "Vendor": "Red Hat, Inc.",
-  "Version": "7.2"
+    "Name": "docker.io/library/fedora",
+    "Tag": "latest",
+    "Digest": "sha256:cfd8f071bf8da7a466748f522406f7ae5908d002af1b1a1c0dcf893e183e5b32",
+    "RepoTags": [
+        "20",
+        "21",
+        "22",
+        "23",
+        "heisenbug",
+        "latest",
+        "rawhide"
+    ],
+    "Created": "2016-03-04T18:40:02.92155334Z",
+    "DockerVersion": "1.9.1",
+    "Labels": {},
+    "Architecture": "amd64",
+    "Os": "linux",
+    "Layers": [
+        "sha256:236608c7b546e2f4e7223526c74fc71470ba06d46ec82aeb402e704bfdee02a2",
+        "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
+    ]
 }
 
-# show repository's tags
-$ skopeo inspect docker://docker.io/fedora | jq '.RepoTags'
-[
-  "20",
-  "21",
-  "22",
-  "23",
-  "heisenbug",
-  "latest",
-  "rawhide"
-]
-
-# show image's digest
+# show unverifed image's digest
 $ skopeo inspect docker://docker.io/fedora:rawhide | jq '.Digest'
 "sha256:905b4846938c8aef94f52f3e41a11398ae5b40f5855fb0e40ed9c157e721d7f8"
-
-# show image's label "Name"
-$ skopeo inspect docker://registry.access.redhat.com/rhel7 | jq '.Config.Labels.Name'
-"rhel7/rhel"
 ```
 
 Private registries with authentication
