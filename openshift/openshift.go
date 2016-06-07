@@ -2,6 +2,7 @@ package openshift
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -126,6 +127,22 @@ func (c *openshiftClient) doRequest(method, path string, requestBody []byte) ([]
 	return body, nil
 }
 
+// getImage loads the specified image object.
+func (c *openshiftClient) getImage(imageStreamImageName string) (*image, error) {
+	// FIXME: validate components per validation.IsValidPathSegmentName?
+	path := fmt.Sprintf("/oapi/v1/namespaces/%s/imagestreamimages/%s@%s", c.ref.namespace, c.ref.stream, imageStreamImageName)
+	body, err := c.doRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	// Note: This does absolutely no kind/version checking or conversions.
+	var isi imageStreamImage
+	if err := json.Unmarshal(body, &isi); err != nil {
+		return nil, err
+	}
+	return &isi.Image, nil
+}
+
 // convertDockerImageReference takes an image API DockerImageReference value and returns a reference we can actually use;
 // currently OpenShift stores the cluster-internal service IPs here, which are unusable from the outside.
 func (c *openshiftClient) convertDockerImageReference(ref string) (string, error) {
@@ -193,7 +210,21 @@ func (s *openshiftImageSource) GetBlob(digest string) (io.ReadCloser, int64, err
 }
 
 func (s *openshiftImageSource) GetSignatures() ([][]byte, error) {
-	return nil, nil
+	if err := s.ensureImageIsResolved(); err != nil {
+		return nil, err
+	}
+
+	image, err := s.client.getImage(s.imageStreamImageName)
+	if err != nil {
+		return nil, err
+	}
+	var sigs [][]byte
+	for _, sig := range image.Signatures {
+		if sig.Type == imageSignatureTypeAtomic {
+			sigs = append(sigs, sig.Content)
+		}
+	}
+	return sigs, nil
 }
 
 // ensureImageIsResolved sets up s.docker and s.imageStreamImageName
@@ -248,6 +279,8 @@ func (s *openshiftImageSource) ensureImageIsResolved() error {
 type openshiftImageDestination struct {
 	client *openshiftClient
 	docker types.ImageDestination // The Docker Registry endpoint
+	// State
+	imageStreamImageName string // "" if not yet known
 }
 
 // newImageDestination creates a new ImageDestination for the specified reference and connection specification.
@@ -299,6 +332,7 @@ func (d *openshiftImageDestination) PutManifest(m []byte) error {
 	if err != nil {
 		return err
 	}
+	d.imageStreamImageName = manifestDigest
 	// FIXME: We can't do what respositorymiddleware.go does because we don't know the internal address. Does any of this matter?
 	dockerImageReference := fmt.Sprintf("%s/%s/%s@%s", d.client.dockerRegistryHostPart(), d.client.ref.namespace, d.client.ref.stream, manifestDigest)
 	ism := imageStreamMapping{
@@ -339,9 +373,64 @@ func (d *openshiftImageDestination) PutBlob(digest string, stream io.Reader) err
 }
 
 func (d *openshiftImageDestination) PutSignatures(signatures [][]byte) error {
-	if len(signatures) != 0 {
-		return fmt.Errorf("Pushing signatures to an Atomic Registry is not supported")
+	// FIXME: This assumption that signatures are stored after the manifest rather breaks the model.
+	if d.imageStreamImageName == "" {
+		return fmt.Errorf("Unknown manifest digest, can't add signatures")
 	}
+	// Because image signatures are a shared resource in Atomic Registry, the default upload
+	// always adds signatures.  Eventually we should also allow removing signatures.
+
+	if len(signatures) == 0 {
+		return nil // No need to even read the old state.
+	}
+
+	image, err := d.client.getImage(d.imageStreamImageName)
+	if err != nil {
+		return err
+	}
+	existingSigNames := map[string]struct{}{}
+	for _, sig := range image.Signatures {
+		existingSigNames[sig.objectMeta.Name] = struct{}{}
+	}
+
+sigExists:
+	for _, newSig := range signatures {
+		for _, existingSig := range image.Signatures {
+			if existingSig.Type == imageSignatureTypeAtomic && bytes.Equal(existingSig.Content, newSig) {
+				continue sigExists
+			}
+		}
+
+		// The API expect us to invent a new unique name. This is racy, but hopefully good enough.
+		var signatureName string
+		for {
+			randBytes := make([]byte, 16)
+			n, err := rand.Read(randBytes)
+			if err != nil || n != 16 {
+				return fmt.Errorf("Error generating random signature ID: %v, len %d", err, n)
+			}
+			signatureName = fmt.Sprintf("%s@%032x", d.imageStreamImageName, randBytes)
+			if _, ok := existingSigNames[signatureName]; !ok {
+				break
+			}
+		}
+		// Note: This does absolutely no kind/version checking or conversions.
+		sig := imageSignature{
+			typeMeta: typeMeta{
+				Kind:       "ImageSignature",
+				APIVersion: "v1",
+			},
+			objectMeta: objectMeta{Name: signatureName},
+			Type:       imageSignatureTypeAtomic,
+			Content:    newSig,
+		}
+		body, err := json.Marshal(sig)
+		_, err = d.client.doRequest("POST", "/oapi/v1/imagesignatures", body)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -371,6 +460,22 @@ type image struct {
 	DockerImageMetadataVersion string `json:"dockerImageMetadataVersion,omitempty"`
 	DockerImageManifest        string `json:"dockerImageManifest,omitempty"`
 	//	DockerImageLayers          []ImageLayer         `json:"dockerImageLayers"`
+	Signatures []imageSignature `json:"signatures,omitempty"`
+}
+
+const imageSignatureTypeAtomic string = "atomic"
+
+type imageSignature struct {
+	typeMeta   `json:",inline"`
+	objectMeta `json:"metadata,omitempty"`
+	Type       string `json:"type"`
+	Content    []byte `json:"content"`
+	// Conditions []SignatureCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	// ImageIdentity string `json:"imageIdentity,omitempty"`
+	// SignedClaims map[string]string `json:"signedClaims,omitempty"`
+	// Created *unversioned.Time `json:"created,omitempty"`
+	// IssuedBy SignatureIssuer `json:"issuedBy,omitempty"`
+	// IssuedTo SignatureSubject `json:"issuedTo,omitempty"`
 }
 type imageStreamMapping struct {
 	typeMeta   `json:",inline"`
