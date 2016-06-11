@@ -212,11 +212,18 @@ func (i *genericImage) getLayer(dest types.ImageDestination, digest string) erro
 	return dest.PutLayer(digest, stream)
 }
 
+// fixManifestLayers, after validating the supplied manifest
+// (to use correctly-formatted IDs, and to not have non-consecutive ID collisions in manifest.History),
+// modifies manifest to only have one entry for each layer ID in manifest.History (deleting the older duplicates,
+// both from manifest.History and manifest.FSLayers).
+// Note that even after this succeeds, manifest.FSLayers may contain duplicate entries
+// (for Dockerfile operations which change the configuration but not the filesystem).
 func fixManifestLayers(manifest *manifestSchema1) error {
 	type imageV1 struct {
 		ID     string
 		Parent string
 	}
+	// Per the specification, we can assume that len(manifest.FSLayers) == len(manifest.History)
 	imgs := make([]*imageV1, len(manifest.FSLayers))
 	for i := range manifest.FSLayers {
 		img := &imageV1{}
