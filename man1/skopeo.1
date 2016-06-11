@@ -10,6 +10,8 @@ skopeo \(em Inspect Docker images and repositories on registries
 .SH SYNOPSIS
 \fBskopeo copy\fR [\fB--sign-by=\fRkey-ID] source-location destination-location
 .PP
+\fBskopeo delete\fR source-location
+.PP
 \fBskopeo inspect\fR image-name [\fB--raw\fR]
 .PP
 \fBskopeo layers\fR image-name
@@ -54,11 +56,21 @@ Copy an image (manifest, filesystem layers, signatures) from one location to ano
 .B source-location
 and
 .B destination-location
-can be \fBdocker://\fRdocker-reference, \fBdir:\fRlocal-path, or \fBatomic:\fRimagestream-name\fB:\fRtag .
+can be \fB\%docker://\fRdocker-reference, \fBdir:\fRlocal-path, or \fBatomic:\fRimagestream-name\fB:\fRtag .
 .sp
 \fB\-\-sign\-by=\fRkey-id
 Add a signature by the specified key ID for image name corresponding to \fBdestination-location\fR.
 Existing signatures, if any, are preserved as well.
+.TP
+.B delete
+Mark an image for deletion.  You must then run docker registry garabage collection to recover the disk space. E.g.,
+.sp
+\fBdocker exec -it registry bin/registry \\
+.br
+garbage-collect /etc/docker/registry/config.yml\fR
+.sp 2
+Additionally, the registry must allow deletions by setting \fB\%REGISTRY_STORAGE_DELETE_ENABLED=true\fR
+for the registry daemon.
 .TP
 .B inspect
 Return low-level information on images in a registry

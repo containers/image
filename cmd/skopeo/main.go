@@ -63,6 +63,7 @@ func main() {
 		copyCmd,
 		inspectCmd,
 		layersCmd,
+		deleteCmd,
 		standaloneSignCmd,
 		standaloneVerifyCmd,
 	}
