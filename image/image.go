@@ -1,4 +1,7 @@
-package docker
+// Package image consolidates knowledge about various container image formats
+// (as opposed to image storage mechanisms, which are handled by types.ImageSource)
+// and exposes all of them using an unified interface.
+package image
 
 import (
 	"encoding/json"
@@ -20,17 +23,17 @@ var (
 
 // genericImage is a general set of utilities for working with container images,
 // whatever is their underlying location (i.e. dockerImageSource-independent).
+// Note the existence of skopeo/docker.Image: some instances of a `types.Image`
+// may not be a `genericImage` directly. However, most users of `types.Image`
+// do not care, and those who care about `skopeo/docker.Image` know they do.
 type genericImage struct {
 	src              types.ImageSource
 	cachedManifest   []byte   // Private cache for Manifest(); nil if not yet known.
 	cachedSignatures [][]byte // Private cache for Signatures(); nil if not yet known.
 }
 
-// GenericImageFromSource returns a types.Image implementation for source.
-// NOTE: This is currently an internal testing helper, do not rely on this as
-// a stable API. There might be an ImageFromSource eventually, but it would not be
-// in the skopeo/docker package.
-func GenericImageFromSource(src types.ImageSource) types.Image {
+// FromSource returns a types.Image implementation for source.
+func FromSource(src types.ImageSource) types.Image {
 	return &genericImage{src: src}
 }
 

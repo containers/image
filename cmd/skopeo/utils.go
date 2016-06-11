@@ -7,6 +7,7 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/projectatomic/skopeo/directory"
 	"github.com/projectatomic/skopeo/docker"
+	"github.com/projectatomic/skopeo/image"
 	"github.com/projectatomic/skopeo/openshift"
 	"github.com/projectatomic/skopeo/types"
 )
@@ -34,7 +35,7 @@ func parseImage(c *cli.Context) (types.Image, error) {
 		//
 	case strings.HasPrefix(imgName, directoryPrefix):
 		src := directory.NewDirImageSource(strings.TrimPrefix(imgName, directoryPrefix))
-		return docker.GenericImageFromSource(src), nil
+		return image.FromSource(src), nil
 	}
 	return nil, fmt.Errorf("no valid prefix provided")
 }
