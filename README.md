@@ -112,7 +112,7 @@ Tests
 -
 _You need Docker installed on your system in order to run the test suite_
 ```sh
-$ make test-integration
+$ make check
 ```
 TODO
 -
