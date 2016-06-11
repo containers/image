@@ -3,7 +3,11 @@ skopeo [![Build Status](https://travis-ci.org/projectatomic/skopeo.svg?branch=ma
 
 _Please be aware `skopeo` is still work in progress and it currently supports only registry API V2_
 
-`skopeo` is a command line utility which is able to _inspect_ a repository on a Docker registry and fetch images layers.  
+`skopeo` is a command line utility for various operations on container images and image repositories.
+
+Inspecting a repository
+-
+`skopeo` is able to _inspect_ a repository on a Docker registry and fetch images layers.
 By _inspect_ I mean it fetches the repository's manifest and it is able to show you a `docker inspect`-like
 json output about a whole repository or a tag. This tool, in contrast to `docker inspect`, helps you gather useful information about
 a repository or a tag before pulling it (using disk space) - e.g. - which tags are available for the given repository? which labels the image has?
@@ -39,6 +43,24 @@ $ skopeo inspect docker://docker.io/fedora
 # show unverifed image's digest
 $ skopeo inspect docker://docker.io/fedora:rawhide | jq '.Digest'
 "sha256:905b4846938c8aef94f52f3e41a11398ae5b40f5855fb0e40ed9c157e721d7f8"
+```
+
+Copying images
+-
+`skopeo` can copy container images between various storage mechansism,
+e.g. Docker registries (including the Docker Hub), the Atomic Registry,
+and local directories:
+
+```sh
+$ skopeo copy docker://busybox:1-glibc atomic:myns/unsigned:streaming
+$ skopeo copy docker://busybox:latest dir:existingemptydirectory
+```
+
+Deleting images
+-
+For example,
+```sh
+$ skopeo delete docker://localhost:5000/imagename:latest
 ```
 
 Private registries with authentication
@@ -112,7 +134,7 @@ Tests
 -
 _You need Docker installed on your system in order to run the test suite_
 ```sh
-$ make test-integration
+$ make check
 ```
 TODO
 -
