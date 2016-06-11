@@ -57,7 +57,6 @@ type Image interface {
 	// May be "" if unknown.
 	IntendedDockerReference() string
 	// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
-	// FIXME? This should also return a MIME type if known, to differentiate between schema versions.
 	Manifest() ([]byte, error)
 	// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 	Signatures() ([][]byte, error)
