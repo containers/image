@@ -45,6 +45,7 @@ func (i *genericImage) IntendedDockerReference() string {
 }
 
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
+// NOTE: It is essential for signature verification that Manifest returns the manifest from which LayerDigests is computed.
 func (i *genericImage) Manifest() ([]byte, error) {
 	if i.cachedManifest == nil {
 		m, _, err := i.src.GetManifest([]string{manifest.DockerV2Schema1MIMEType})
@@ -121,13 +122,15 @@ type genericManifest interface {
 	GetLayers() []string
 }
 
+type fsLayersSchema1 struct {
+	BlobSum string `json:"blobSum"`
+}
+
 type manifestSchema1 struct {
 	Name     string
 	Tag      string
-	FSLayers []struct {
-		BlobSum string `json:"blobSum"`
-	} `json:"fsLayers"`
-	History []struct {
+	FSLayers []fsLayersSchema1 `json:"fsLayers"`
+	History  []struct {
 		V1Compatibility string `json:"v1Compatibility"`
 	} `json:"history"`
 	// TODO(runcom) verify the downloaded manifest
@@ -150,6 +153,10 @@ func sanitize(s string) string {
 	return strings.Replace(s, "/", "-", -1)
 }
 
+// getSchema1Manifest parses the manifest into a data structure, cleans it up, and returns it.
+// NOTE: The manifest may have been modified in the process; DO NOT reserialize and store the return value
+// if you want to preserve the original manifest; use the blob returned by Manifest() directly.
+// NOTE: It is essential for signature verification that the object is computed from the same manifest which is returned by Manifest().
 func (i *genericImage) getSchema1Manifest() (genericManifest, error) {
 	manblob, err := i.Manifest()
 	if err != nil {
@@ -170,6 +177,32 @@ func (i *genericImage) getSchema1Manifest() (genericManifest, error) {
 	//return nil, fmt.Errorf("no FSLayers in manifest for %q", ref.String())
 	//}
 	return mschema1, nil
+}
+
+// uniqueLayerDigests returns a list of layer digests referenced from a manifest.
+// The list will not contain duplicates; it is not intended to correspond to the "history" or "parent chain" of a Docker image.
+func uniqueLayerDigests(m genericManifest) []string {
+	var res []string
+	seen := make(map[string]struct{})
+	for _, digest := range m.GetLayers() {
+		if _, ok := seen[digest]; ok {
+			continue
+		}
+		seen[digest] = struct{}{}
+		res = append(res, digest)
+	}
+	return res
+}
+
+// LayerDigests returns a list of layer digests referenced by this image.
+// The list will not contain duplicates; it is not intended to correspond to the "history" or "parent chain" of a Docker image.
+// NOTE: It is essential for signature verification that LayerDigests is computed from the same manifest which is returned by Manifest().
+func (i *genericImage) LayerDigests() ([]string, error) {
+	m, err := i.getSchema1Manifest()
+	if err != nil {
+		return nil, err
+	}
+	return uniqueLayerDigests(m), nil
 }
 
 func (i *genericImage) LayersCommand(layers ...string) error {
