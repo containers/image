@@ -223,7 +223,7 @@ func (i *genericImage) LayersCommand(layers ...string) error {
 		return err
 	}
 	if len(layers) == 0 {
-		layers = m.GetLayers()
+		layers = uniqueLayerDigests(m)
 	}
 	for _, l := range layers {
 		if !strings.HasPrefix(l, "sha256:") {
