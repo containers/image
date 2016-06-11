@@ -60,7 +60,10 @@ type Image interface {
 	Manifest() ([]byte, error)
 	// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 	Signatures() ([][]byte, error)
-	Layers(layers ...string) error // configure download directory? Call it DownloadLayers?
+	// LayersCommand implements (skopeo layers).  Do not use for any other purpose.
+	// Longer-term we would like to move the command-specific code up to the command handler,
+	// but the command has functionality specific to util.DockerV2Schema1MIMEType manifests.
+	LayersCommand(layers ...string) error // configure download directory?
 	// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
 	Inspect() (*ImageInspectInfo, error)
 	DockerTar() ([]byte, error) // ??? also, configure output directory

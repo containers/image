@@ -13,7 +13,7 @@ var layersCmd = cli.Command{
 		if err != nil {
 			return err
 		}
-		if err := img.Layers(c.Args().Tail()...); err != nil {
+		if err := img.LayersCommand(c.Args().Tail()...); err != nil {
 			return err
 		}
 		return nil

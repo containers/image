@@ -172,7 +172,7 @@ func (i *genericImage) getSchema1Manifest() (genericManifest, error) {
 	return mschema1, nil
 }
 
-func (i *genericImage) Layers(layers ...string) error {
+func (i *genericImage) LayersCommand(layers ...string) error {
 	m, err := i.getSchema1Manifest()
 	if err != nil {
 		return err
