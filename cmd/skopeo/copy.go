@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/projectatomic/skopeo/docker/utils"
+	"github.com/projectatomic/skopeo/manifest"
 	"github.com/projectatomic/skopeo/signature"
 	"github.com/urfave/cli"
 )
@@ -56,12 +56,12 @@ func copyHandler(context *cli.Context) error {
 	}
 	signBy := context.String("sign-by")
 
-	manifest, _, err := src.GetManifest([]string{utils.DockerV2Schema1MIMEType})
+	m, _, err := src.GetManifest([]string{manifest.DockerV2Schema1MIMEType})
 	if err != nil {
 		return fmt.Errorf("Error reading manifest: %v", err)
 	}
 
-	layers, err := manifestLayers(manifest)
+	layers, err := manifestLayers(m)
 	if err != nil {
 		return fmt.Errorf("Error parsing manifest: %v", err)
 	}
@@ -92,7 +92,7 @@ func copyHandler(context *cli.Context) error {
 			return fmt.Errorf("Error determining canonical Docker reference: %v", err)
 		}
 
-		newSig, err := signature.SignDockerManifest(manifest, dockerReference, mech, signBy)
+		newSig, err := signature.SignDockerManifest(m, dockerReference, mech, signBy)
 		if err != nil {
 			return fmt.Errorf("Error creating signature: %v", err)
 		}
@@ -104,7 +104,7 @@ func copyHandler(context *cli.Context) error {
 	}
 
 	// FIXME: We need to call PutManifest after PutBlob and PutSignatures. This seems ugly; move to a "set properties" + "commit" model?
-	if err := dest.PutManifest(manifest); err != nil {
+	if err := dest.PutManifest(m); err != nil {
 		return fmt.Errorf("Error writing manifest: %v", err)
 	}
 	return nil

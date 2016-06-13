@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/projectatomic/skopeo/docker/utils"
+	"github.com/projectatomic/skopeo/manifest"
 	"github.com/projectatomic/skopeo/reference"
 	"github.com/projectatomic/skopeo/types"
 )
@@ -40,21 +40,21 @@ func (d *dockerImageDestination) CanonicalDockerReference() (string, error) {
 	return fmt.Sprintf("%s:%s", d.ref.Name(), d.tag), nil
 }
 
-func (d *dockerImageDestination) PutManifest(manifest []byte) error {
+func (d *dockerImageDestination) PutManifest(m []byte) error {
 	// FIXME: This only allows upload by digest, not creating a tag.  See the
 	// corresponding comment in NewOpenshiftImageDestination.
-	digest, err := utils.ManifestDigest(manifest)
+	digest, err := manifest.Digest(m)
 	if err != nil {
 		return err
 	}
 	url := fmt.Sprintf(manifestURL, d.ref.RemoteName(), digest)
 
 	headers := map[string][]string{}
-	mimeType := utils.GuessManifestMIMEType(manifest)
+	mimeType := manifest.GuessMIMEType(m)
 	if mimeType != "" {
 		headers["Content-Type"] = []string{mimeType}
 	}
-	res, err := d.c.makeRequest("PUT", url, headers, bytes.NewReader(manifest))
+	res, err := d.c.makeRequest("PUT", url, headers, bytes.NewReader(m))
 	if err != nil {
 		return err
 	}

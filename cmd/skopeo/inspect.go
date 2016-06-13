@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/projectatomic/skopeo/docker"
-	"github.com/projectatomic/skopeo/docker/utils"
+	"github.com/projectatomic/skopeo/manifest"
 	"github.com/urfave/cli"
 )
 
@@ -62,7 +62,7 @@ var inspectCmd = cli.Command{
 			Os:            imgInspect.Os,
 			Layers:        imgInspect.Layers,
 		}
-		outputData.Digest, err = utils.ManifestDigest(rawManifest)
+		outputData.Digest, err = manifest.Digest(rawManifest)
 		if err != nil {
 			return fmt.Errorf("Error computing manifest digest: %v", err)
 		}

@@ -5,13 +5,13 @@ package signature
 import (
 	"fmt"
 
-	"github.com/projectatomic/skopeo/docker/utils"
+	"github.com/projectatomic/skopeo/manifest"
 )
 
 // SignDockerManifest returns a signature for manifest as the specified dockerReference,
 // using mech and keyIdentity.
-func SignDockerManifest(manifest []byte, dockerReference string, mech SigningMechanism, keyIdentity string) ([]byte, error) {
-	manifestDigest, err := utils.ManifestDigest(manifest)
+func SignDockerManifest(m []byte, dockerReference string, mech SigningMechanism, keyIdentity string) ([]byte, error) {
+	manifestDigest, err := manifest.Digest(m)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func VerifyDockerManifestSignature(unverifiedSignature, unverifiedManifest []byt
 			return nil
 		},
 		validateSignedDockerManifestDigest: func(signedDockerManifestDigest string) error {
-			matches, err := utils.ManifestMatchesDigest(unverifiedManifest, signedDockerManifestDigest)
+			matches, err := manifest.MatchesDigest(unverifiedManifest, signedDockerManifestDigest)
 			if err != nil {
 				return err
 			}

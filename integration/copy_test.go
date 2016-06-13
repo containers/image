@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/go-check/check"
-	"github.com/projectatomic/skopeo/docker/utils"
+	"github.com/projectatomic/skopeo/manifest"
 )
 
 func init() {
@@ -86,9 +86,9 @@ func (s *CopySuite) TestCopyStreaming(c *check.C) {
 	digests := []string{}
 	for _, dir := range []string{dir1, dir2} {
 		manifestPath := filepath.Join(dir, "manifest.json")
-		manifest, err := ioutil.ReadFile(manifestPath)
+		m, err := ioutil.ReadFile(manifestPath)
 		c.Assert(err, check.IsNil)
-		digest, err := utils.ManifestDigest(manifest)
+		digest, err := manifest.Digest(m)
 		c.Assert(err, check.IsNil)
 		digests = append(digests, digest)
 		err = os.Remove(manifestPath)

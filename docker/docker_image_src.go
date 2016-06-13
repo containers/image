@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/projectatomic/skopeo/docker/utils"
+	"github.com/projectatomic/skopeo/manifest"
 	"github.com/projectatomic/skopeo/reference"
 	"github.com/projectatomic/skopeo/types"
 )
@@ -107,7 +107,7 @@ func (s *dockerImageSource) Delete() error {
 	// When retrieving the digest from a registry >= 2.3 use the following header:
 	//   "Accept": "application/vnd.docker.distribution.manifest.v2+json"
 	headers := make(map[string][]string)
-	headers["Accept"] = []string{utils.DockerV2Schema2MIMEType}
+	headers["Accept"] = []string{manifest.DockerV2Schema2MIMEType}
 
 	getURL := fmt.Sprintf(manifestURL, s.ref.RemoteName(), s.tag)
 	get, err := s.c.makeRequest("GET", getURL, headers, nil)

@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/projectatomic/skopeo/docker/utils"
+	"github.com/projectatomic/skopeo/manifest"
 	"github.com/projectatomic/skopeo/types"
 )
 
@@ -76,11 +76,11 @@ func (pr *prSignedBy) isSignatureAuthorAccepted(image types.Image, sig []byte) (
 			return nil
 		},
 		validateSignedDockerManifestDigest: func(digest string) error {
-			manifest, err := image.Manifest()
+			m, err := image.Manifest()
 			if err != nil {
 				return err
 			}
-			digestMatches, err := utils.ManifestMatchesDigest(manifest, digest)
+			digestMatches, err := manifest.MatchesDigest(m, digest)
 			if err != nil {
 				return err
 			}
