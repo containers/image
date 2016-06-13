@@ -68,10 +68,7 @@ var inspectCmd = cli.Command{
 			logrus.Fatalf("Error computing manifest digest: %s", err.Error())
 		}
 		if dockerImg, ok := img.(*docker.Image); ok {
-			outputData.Name, err = dockerImg.SourceRefFullName()
-			if err != nil {
-				logrus.Fatalf("Error getting expanded repository name: %s", err.Error())
-			}
+			outputData.Name = dockerImg.SourceRefFullName()
 			outputData.RepoTags, err = dockerImg.GetRepositoryTags()
 			if err != nil {
 				logrus.Fatalf("Error determining repository tags: %s", err.Error())
