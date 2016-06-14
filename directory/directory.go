@@ -44,7 +44,7 @@ func (d *dirImageDestination) PutManifest(manifest []byte) error {
 	return ioutil.WriteFile(manifestPath(d.dir), manifest, 0644)
 }
 
-func (d *dirImageDestination) PutLayer(digest string, stream io.Reader) error {
+func (d *dirImageDestination) PutBlob(digest string, stream io.Reader) error {
 	layerFile, err := os.Create(layerPath(d.dir, digest))
 	if err != nil {
 		return err
@@ -93,7 +93,7 @@ func (s *dirImageSource) GetManifest(_ []string) ([]byte, string, error) {
 	return m, "", err
 }
 
-func (s *dirImageSource) GetLayer(digest string) (io.ReadCloser, error) {
+func (s *dirImageSource) GetBlob(digest string) (io.ReadCloser, error) {
 	return os.Open(layerPath(s.dir, digest))
 }
 

@@ -70,7 +70,7 @@ func (d *dockerImageDestination) PutManifest(manifest []byte) error {
 	return nil
 }
 
-func (d *dockerImageDestination) PutLayer(digest string, stream io.Reader) error {
+func (d *dockerImageDestination) PutBlob(digest string, stream io.Reader) error {
 	checkURL := fmt.Sprintf(blobsURL, d.ref.RemoteName(), digest)
 
 	logrus.Debugf("Checking %s", checkURL)
