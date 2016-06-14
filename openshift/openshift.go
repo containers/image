@@ -200,11 +200,11 @@ func (s *openshiftImageSource) GetManifest(mimetypes []string) ([]byte, string, 
 	return s.docker.GetManifest(mimetypes)
 }
 
-func (s *openshiftImageSource) GetLayer(digest string) (io.ReadCloser, error) {
+func (s *openshiftImageSource) GetBlob(digest string) (io.ReadCloser, error) {
 	if err := s.ensureImageIsResolved(); err != nil {
 		return nil, err
 	}
-	return s.docker.GetLayer(digest)
+	return s.docker.GetBlob(digest)
 }
 
 func (s *openshiftImageSource) GetSignatures() ([][]byte, error) {
@@ -328,8 +328,8 @@ func (d *openshiftImageDestination) PutManifest(manifest []byte) error {
 	return d.docker.PutManifest(manifest)
 }
 
-func (d *openshiftImageDestination) PutLayer(digest string, stream io.Reader) error {
-	return d.docker.PutLayer(digest, stream)
+func (d *openshiftImageDestination) PutBlob(digest string, stream io.Reader) error {
+	return d.docker.PutBlob(digest, stream)
 }
 
 func (d *openshiftImageDestination) PutSignatures(signatures [][]byte) error {

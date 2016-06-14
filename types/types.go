@@ -29,8 +29,8 @@ type ImageSource interface {
 	// GetManifest returns the image's manifest along with its MIME type. The empty string is returned if the MIME type is unknown. The slice parameter indicates the supported mime types the manifest should be when getting it.
 	// It may use a remote (= slow) service.
 	GetManifest([]string) ([]byte, string, error)
-	// Note: Calling GetLayer() may have ordering dependencies WRT other methods of this type. FIXME: How does this work with (docker save) on stdin?
-	GetLayer(digest string) (io.ReadCloser, error)
+	// Note: Calling GetBlob() may have ordering dependencies WRT other methods of this type. FIXME: How does this work with (docker save) on stdin?
+	GetBlob(digest string) (io.ReadCloser, error)
 	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
 	GetSignatures() ([][]byte, error)
 	// Delete image from registry, if operation is supported
@@ -43,8 +43,8 @@ type ImageDestination interface {
 	CanonicalDockerReference() (string, error)
 	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 	PutManifest([]byte) error
-	// Note: Calling PutLayer() and other methods may have ordering dependencies WRT other methods of this type. FIXME: Figure out and document.
-	PutLayer(digest string, stream io.Reader) error
+	// Note: Calling PutBlob() and other methods may have ordering dependencies WRT other methods of this type. FIXME: Figure out and document.
+	PutBlob(digest string, stream io.Reader) error
 	PutSignatures(signatures [][]byte) error
 }
 

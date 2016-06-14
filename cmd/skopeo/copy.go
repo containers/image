@@ -65,12 +65,12 @@ func copyHandler(context *cli.Context) {
 		logrus.Fatalf("Error parsing manifest: %s", err.Error())
 	}
 	for _, layer := range layers {
-		stream, err := src.GetLayer(layer)
+		stream, err := src.GetBlob(layer)
 		if err != nil {
 			logrus.Fatalf("Error reading layer %s: %s", layer, err.Error())
 		}
 		defer stream.Close()
-		if err := dest.PutLayer(layer, stream); err != nil {
+		if err := dest.PutBlob(layer, stream); err != nil {
 			logrus.Fatalf("Error writing layer: %s", err.Error())
 		}
 	}
@@ -101,7 +101,7 @@ func copyHandler(context *cli.Context) {
 		logrus.Fatalf("Error writing signatures: %s", err.Error())
 	}
 
-	// FIXME: We need to call PutManifest after PutLayer and PutSignatures. This seems ugly; move to a "set properties" + "commit" model?
+	// FIXME: We need to call PutManifest after PutBlob and PutSignatures. This seems ugly; move to a "set properties" + "commit" model?
 	if err := dest.PutManifest(manifest); err != nil {
 		logrus.Fatalf("Error writing manifest: %s", err.Error())
 	}

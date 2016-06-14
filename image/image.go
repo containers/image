@@ -204,12 +204,12 @@ func (i *genericImage) Layers(layers ...string) error {
 }
 
 func (i *genericImage) getLayer(dest types.ImageDestination, digest string) error {
-	stream, err := i.src.GetLayer(digest)
+	stream, err := i.src.GetBlob(digest)
 	if err != nil {
 		return err
 	}
 	defer stream.Close()
-	return dest.PutLayer(digest, stream)
+	return dest.PutBlob(digest, stream)
 }
 
 // fixManifestLayers, after validating the supplied manifest

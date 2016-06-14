@@ -78,7 +78,7 @@ func (s *dockerImageSource) GetManifest(mimetypes []string) ([]byte, string, err
 	return manblob, res.Header.Get("Content-Type"), nil
 }
 
-func (s *dockerImageSource) GetLayer(digest string) (io.ReadCloser, error) {
+func (s *dockerImageSource) GetBlob(digest string) (io.ReadCloser, error) {
 	url := fmt.Sprintf(blobsURL, s.ref.RemoteName(), digest)
 	logrus.Infof("Downloading %s", url)
 	res, err := s.c.makeRequest("GET", url, nil, nil)
