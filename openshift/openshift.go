@@ -200,9 +200,9 @@ func (s *openshiftImageSource) GetManifest(mimetypes []string) ([]byte, string, 
 	return s.docker.GetManifest(mimetypes)
 }
 
-func (s *openshiftImageSource) GetBlob(digest string) (io.ReadCloser, error) {
+func (s *openshiftImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
 	if err := s.ensureImageIsResolved(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	return s.docker.GetBlob(digest)
 }

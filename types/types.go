@@ -30,7 +30,8 @@ type ImageSource interface {
 	// It may use a remote (= slow) service.
 	GetManifest([]string) ([]byte, string, error)
 	// Note: Calling GetBlob() may have ordering dependencies WRT other methods of this type. FIXME: How does this work with (docker save) on stdin?
-	GetBlob(digest string) (io.ReadCloser, error)
+	// the second return value is the size of the blob. If not known 0 is returned
+	GetBlob(digest string) (io.ReadCloser, int64, error)
 	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
 	GetSignatures() ([][]byte, error)
 	// Delete image from registry, if operation is supported

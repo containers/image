@@ -93,8 +93,16 @@ func (s *dirImageSource) GetManifest(_ []string) ([]byte, string, error) {
 	return m, "", err
 }
 
-func (s *dirImageSource) GetBlob(digest string) (io.ReadCloser, error) {
-	return os.Open(layerPath(s.dir, digest))
+func (s *dirImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
+	r, err := os.Open(layerPath(s.dir, digest))
+	if err != nil {
+		return nil, 0, nil
+	}
+	fi, err := os.Stat(layerPath(s.dir, digest))
+	if err != nil {
+		return nil, 0, nil
+	}
+	return r, fi.Size(), nil
 }
 
 func (s *dirImageSource) GetSignatures() ([][]byte, error) {
