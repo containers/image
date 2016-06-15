@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/projectatomic/skopeo/docker/utils"
@@ -78,18 +79,22 @@ func (s *dockerImageSource) GetManifest(mimetypes []string) ([]byte, string, err
 	return manblob, res.Header.Get("Content-Type"), nil
 }
 
-func (s *dockerImageSource) GetBlob(digest string) (io.ReadCloser, error) {
+func (s *dockerImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
 	url := fmt.Sprintf(blobsURL, s.ref.RemoteName(), digest)
 	logrus.Infof("Downloading %s", url)
 	res, err := s.c.makeRequest("GET", url, nil, nil)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if res.StatusCode != http.StatusOK {
 		// print url also
-		return nil, fmt.Errorf("Invalid status code returned when fetching blob %d", res.StatusCode)
+		return nil, 0, fmt.Errorf("Invalid status code returned when fetching blob %d", res.StatusCode)
 	}
-	return res.Body, nil
+	size, err := strconv.ParseInt(res.Header.Get("Content-Length"), 10, 64)
+	if err != nil {
+		size = 0
+	}
+	return res.Body, size, nil
 }
 
 func (s *dockerImageSource) GetSignatures() ([][]byte, error) {

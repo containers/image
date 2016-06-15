@@ -65,7 +65,8 @@ func copyHandler(context *cli.Context) {
 		logrus.Fatalf("Error parsing manifest: %s", err.Error())
 	}
 	for _, layer := range layers {
-		stream, err := src.GetBlob(layer)
+		// TODO(mitr): do not ignore the size param returned here
+		stream, _, err := src.GetBlob(layer)
 		if err != nil {
 			logrus.Fatalf("Error reading layer %s: %s", layer, err.Error())
 		}

@@ -204,7 +204,7 @@ func (i *genericImage) Layers(layers ...string) error {
 }
 
 func (i *genericImage) getLayer(dest types.ImageDestination, digest string) error {
-	stream, err := i.src.GetBlob(digest)
+	stream, _, err := i.src.GetBlob(digest)
 	if err != nil {
 		return err
 	}
