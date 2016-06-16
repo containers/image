@@ -5,11 +5,11 @@ import (
 	"io/ioutil"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/codegangsta/cli"
 	"github.com/projectatomic/skopeo/signature"
+	"github.com/urfave/cli"
 )
 
-func standaloneSign(context *cli.Context) {
+func standaloneSign(context *cli.Context) error {
 	outputFile := context.String("output")
 	if len(context.Args()) != 3 || outputFile == "" {
 		logrus.Fatal("Usage: skopeo standalone-sign manifest docker-reference key-fingerprint -o signature")
@@ -35,6 +35,7 @@ func standaloneSign(context *cli.Context) {
 	if err := ioutil.WriteFile(outputFile, signature, 0644); err != nil {
 		logrus.Fatalf("Error writing signature to %s: %s", outputFile, err.Error())
 	}
+	return nil
 }
 
 var standaloneSignCmd = cli.Command{
@@ -49,7 +50,7 @@ var standaloneSignCmd = cli.Command{
 	},
 }
 
-func standaloneVerify(context *cli.Context) {
+func standaloneVerify(context *cli.Context) error {
 	if len(context.Args()) != 4 {
 		logrus.Fatal("Usage: skopeo standalone-verify manifest docker-reference key-fingerprint signature")
 	}
@@ -77,6 +78,7 @@ func standaloneVerify(context *cli.Context) {
 	}
 
 	fmt.Printf("Signature verified, digest %s\n", sig.DockerManifestDigest)
+	return nil
 }
 
 var standaloneVerifyCmd = cli.Command{

@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/codegangsta/cli"
 	"github.com/projectatomic/skopeo/docker"
 	"github.com/projectatomic/skopeo/docker/utils"
+	"github.com/urfave/cli"
 )
 
 // inspectOutput is the output format of (skopeo inspect), primarily so that we can format it with a simple json.MarshalIndent.
@@ -34,7 +34,7 @@ var inspectCmd = cli.Command{
 			Usage: "output raw manifest",
 		},
 	},
-	Action: func(c *cli.Context) {
+	Action: func(c *cli.Context) error {
 		img, err := parseImage(c)
 		if err != nil {
 			logrus.Fatal(err)
@@ -45,7 +45,7 @@ var inspectCmd = cli.Command{
 		}
 		if c.Bool("raw") {
 			fmt.Println(string(rawManifest))
-			return
+			return nil
 		}
 		imgInspect, err := img.Inspect()
 		if err != nil {
@@ -79,5 +79,6 @@ var inspectCmd = cli.Command{
 			logrus.Fatal(err)
 		}
 		fmt.Println(string(out))
+		return nil
 	},
 }

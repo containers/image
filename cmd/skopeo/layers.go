@@ -2,14 +2,14 @@ package main
 
 import (
 	"github.com/Sirupsen/logrus"
-	"github.com/codegangsta/cli"
+	"github.com/urfave/cli"
 )
 
 // TODO(runcom): document args and usage
 var layersCmd = cli.Command{
 	Name:  "layers",
 	Usage: "get images layers",
-	Action: func(c *cli.Context) {
+	Action: func(c *cli.Context) error {
 		img, err := parseImage(c)
 		if err != nil {
 			logrus.Fatal(err)
@@ -17,5 +17,6 @@ var layersCmd = cli.Command{
 		if err := img.Layers(c.Args().Tail()...); err != nil {
 			logrus.Fatal(err)
 		}
+		return nil
 	},
 }

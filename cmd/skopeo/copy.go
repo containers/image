@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/codegangsta/cli"
 	"github.com/projectatomic/skopeo/docker/utils"
 	"github.com/projectatomic/skopeo/signature"
+	"github.com/urfave/cli"
 )
 
 // FIXME: Also handle schema2, and put this elsewhere:
@@ -39,7 +39,7 @@ type manifestSchema1 struct {
 	//Signature []byte `json:"signature"`
 }
 
-func copyHandler(context *cli.Context) {
+func copyHandler(context *cli.Context) error {
 	if len(context.Args()) != 2 {
 		logrus.Fatal("Usage: copy source destination")
 	}
@@ -106,6 +106,7 @@ func copyHandler(context *cli.Context) {
 	if err := dest.PutManifest(manifest); err != nil {
 		logrus.Fatalf("Error writing manifest: %s", err.Error())
 	}
+	return nil
 }
 
 var copyCmd = cli.Command{
