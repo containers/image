@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -12,10 +11,10 @@ var layersCmd = cli.Command{
 	Action: func(c *cli.Context) error {
 		img, err := parseImage(c)
 		if err != nil {
-			logrus.Fatal(err)
+			return err
 		}
 		if err := img.Layers(c.Args().Tail()...); err != nil {
-			logrus.Fatal(err)
+			return err
 		}
 		return nil
 	},

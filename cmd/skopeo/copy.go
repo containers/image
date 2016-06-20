@@ -2,8 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/projectatomic/skopeo/docker/utils"
 	"github.com/projectatomic/skopeo/signature"
 	"github.com/urfave/cli"
@@ -41,70 +42,70 @@ type manifestSchema1 struct {
 
 func copyHandler(context *cli.Context) error {
 	if len(context.Args()) != 2 {
-		logrus.Fatal("Usage: copy source destination")
+		return errors.New("Usage: copy source destination")
 	}
 
 	src, err := parseImageSource(context, context.Args()[0])
 	if err != nil {
-		logrus.Fatalf("Error initializing %s: %s", context.Args()[0], err.Error())
+		return fmt.Errorf("Error initializing %s: %v", context.Args()[0], err)
 	}
 
 	dest, err := parseImageDestination(context, context.Args()[1])
 	if err != nil {
-		logrus.Fatalf("Error initializing %s: %s", context.Args()[1], err.Error())
+		return fmt.Errorf("Error initializing %s: %v", context.Args()[1], err)
 	}
 	signBy := context.String("sign-by")
 
 	manifest, _, err := src.GetManifest([]string{utils.DockerV2Schema1MIMEType})
 	if err != nil {
-		logrus.Fatalf("Error reading manifest: %s", err.Error())
+		return fmt.Errorf("Error reading manifest: %v", err)
 	}
 
 	layers, err := manifestLayers(manifest)
 	if err != nil {
-		logrus.Fatalf("Error parsing manifest: %s", err.Error())
+		return fmt.Errorf("Error parsing manifest: %v", err)
 	}
 	for _, layer := range layers {
 		// TODO(mitr): do not ignore the size param returned here
 		stream, _, err := src.GetBlob(layer)
 		if err != nil {
-			logrus.Fatalf("Error reading layer %s: %s", layer, err.Error())
+			return fmt.Errorf("Error reading layer %s: %v", layer, err)
 		}
 		defer stream.Close()
 		if err := dest.PutBlob(layer, stream); err != nil {
-			logrus.Fatalf("Error writing layer: %s", err.Error())
+			return fmt.Errorf("Error writing layer: %v", err)
 		}
 	}
 
 	sigs, err := src.GetSignatures()
 	if err != nil {
-		logrus.Fatalf("Error reading signatures: %s", err.Error())
+		return fmt.Errorf("Error reading signatures: %v", err)
 	}
 
 	if signBy != "" {
 		mech, err := signature.NewGPGSigningMechanism()
 		if err != nil {
-			logrus.Fatalf("Error initializing GPG: %s", err.Error())
+			return fmt.Errorf("Error initializing GPG: %v", err)
 		}
 		dockerReference, err := dest.CanonicalDockerReference()
 		if err != nil {
-			logrus.Fatalf("Error determining canonical Docker reference: %s", err.Error())
+			return fmt.Errorf("Error determining canonical Docker reference: %v", err)
 		}
 
 		newSig, err := signature.SignDockerManifest(manifest, dockerReference, mech, signBy)
 		if err != nil {
-			logrus.Fatalf("Error creating signature: %s", err.Error())
+			return fmt.Errorf("Error creating signature: %v", err)
 		}
 		sigs = append(sigs, newSig)
 	}
 
 	if err := dest.PutSignatures(sigs); err != nil {
-		logrus.Fatalf("Error writing signatures: %s", err.Error())
+		return fmt.Errorf("Error writing signatures: %v", err)
 	}
 
 	// FIXME: We need to call PutManifest after PutBlob and PutSignatures. This seems ugly; move to a "set properties" + "commit" model?
 	if err := dest.PutManifest(manifest); err != nil {
-		logrus.Fatalf("Error writing manifest: %s", err.Error())
+		return fmt.Errorf("Error writing manifest: %v", err)
 	}
 	return nil
 }
