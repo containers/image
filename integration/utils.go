@@ -2,8 +2,10 @@ package main
 
 import (
 	"io"
+	"net"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/go-check/check"
 )
@@ -36,6 +38,15 @@ func consumeAndLogOutputs(c *check.C, id string, cmd *exec.Cmd) {
 	consumeAndLogOutputStream(c, id+" stdout", stdout, err)
 	stderr, err := cmd.StderrPipe()
 	consumeAndLogOutputStream(c, id+" stderr", stderr, err)
+}
+
+// combinedOutputOfCommand runs a command as if exec.Command().CombinedOutput(), verifies that the exit status is 0, and returns the output,
+// or terminates c on failure.
+func combinedOutputOfCommand(c *check.C, name string, args ...string) string {
+	c.Logf("Running %s %s", name, strings.Join(args, " "))
+	out, err := exec.Command(name, args...).CombinedOutput()
+	c.Assert(err, check.IsNil, check.Commentf("%s", out))
+	return string(out)
 }
 
 // assertSkopeoSucceeds runs a skopeo command as if exec.Command().CombinedOutput, verifies that the exit status is 0,
@@ -76,4 +87,60 @@ func runCommandWithInput(c *check.C, input string, name string, args ...string) 
 	c.Assert(err, check.IsNil)
 	err = cmd.Wait()
 	c.Assert(err, check.IsNil)
+}
+
+// isPortOpen returns true iff the specified port on localhost is open.
+func isPortOpen(port int) bool {
+	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: port})
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
+}
+
+// newPortChecker sets up a portOpen channel which will receive true after the specified port is open.
+// The checking can be aborted by sending a value to the terminate channel, which the caller should
+// always do using
+// defer func() {terminate <- true}()
+func newPortChecker(c *check.C, port int) (portOpen <-chan bool, terminate chan<- bool) {
+	portOpenBidi := make(chan bool)
+	// Buffered, so that sending a terminate request after the goroutine has exited does not block.
+	terminateBidi := make(chan bool, 1)
+
+	go func() {
+		defer func() {
+			c.Logf("Port checker for port %d exiting", port)
+		}()
+		for {
+			c.Logf("Checking for port %d...", port)
+			if isPortOpen(port) {
+				c.Logf("Port %d open", port)
+				portOpenBidi <- true
+				return
+			}
+			c.Logf("Sleeping for port %d", port)
+			sleepChan := time.After(100 * time.Millisecond)
+			select {
+			case <-sleepChan: // Try again
+				c.Logf("Sleeping for port %d done, will retry", port)
+			case <-terminateBidi:
+				c.Logf("Check for port %d terminated", port)
+				return
+			}
+		}
+	}()
+	return portOpenBidi, terminateBidi
+}
+
+// modifyEnviron modifies os.Environ()-like list of name=value assignments to set name to value.
+func modifyEnviron(env []string, name, value string) []string {
+	prefix := name + "="
+	res := []string{}
+	for _, e := range env {
+		if !strings.HasPrefix(e, prefix) {
+			res = append(res, e)
+		}
+	}
+	return append(res, prefix+value)
 }
