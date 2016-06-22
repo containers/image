@@ -70,7 +70,6 @@ func standaloneVerify(context *cli.Context) error {
 
 	mech, err := signature.NewGPGSigningMechanism()
 	if err != nil {
-
 		return fmt.Errorf("Error initializing GPG: %v", err)
 	}
 	sig, err := signature.VerifyDockerManifestSignature(unverifiedSignature, unverifiedManifest, expectedDockerReference, mech, expectedFingerprint)
@@ -78,7 +77,7 @@ func standaloneVerify(context *cli.Context) error {
 		return fmt.Errorf("Error verifying signature: %v", err)
 	}
 
-	fmt.Printf("Signature verified, digest %s\n", sig.DockerManifestDigest)
+	fmt.Fprintf(context.App.Writer, "Signature verified, digest %s\n", sig.DockerManifestDigest)
 	return nil
 }
 
