@@ -113,13 +113,6 @@ You may need to install additional development packages: gpgme-devel and libassu
 ```sh
 # dnf install gpgme-devel libassuan-devel
 ```
-
-Man:
--
-To build the man page you need [`go-md2man`](https://github.com/cpuguy83/go-md2man) available on your system, then:
-```
-$ make man
-```
 Installing
 -
 If you built from source:
@@ -130,18 +123,11 @@ $ sudo make install
 ```sh
 sudo dnf install skopeo
 ```
-Tests
--
-_You need Docker installed on your system in order to run the test suite_
-```sh
-$ make check
-```
 TODO
 -
-- update README with `layers` command
 - list all images on registry?
 - registry v2 search?
-- download layers in parallel and support docker load tar(s)
+- support output to docker load tar(s)
 - show repo tags via flag or when reference isn't tagged or digested
 - add tests (integration with deployed registries in container - Docker-like)
 - support rkt/appc image spec
