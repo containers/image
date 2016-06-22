@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Sirupsen/logrus"
-	"github.com/codegangsta/cli"
 	"github.com/projectatomic/skopeo/docker"
 	"github.com/projectatomic/skopeo/docker/utils"
+	"github.com/urfave/cli"
 )
 
 // inspectOutput is the output format of (skopeo inspect), primarily so that we can format it with a simple json.MarshalIndent.
@@ -34,22 +33,22 @@ var inspectCmd = cli.Command{
 			Usage: "output raw manifest",
 		},
 	},
-	Action: func(c *cli.Context) {
+	Action: func(c *cli.Context) error {
 		img, err := parseImage(c)
 		if err != nil {
-			logrus.Fatal(err)
+			return err
 		}
 		rawManifest, err := img.Manifest()
 		if err != nil {
-			logrus.Fatal(err)
+			return err
 		}
 		if c.Bool("raw") {
 			fmt.Println(string(rawManifest))
-			return
+			return nil
 		}
 		imgInspect, err := img.Inspect()
 		if err != nil {
-			logrus.Fatal(err)
+			return err
 		}
 		outputData := inspectOutput{
 			Name: "", // Possibly overridden for a docker.Image.
@@ -65,19 +64,20 @@ var inspectCmd = cli.Command{
 		}
 		outputData.Digest, err = utils.ManifestDigest(rawManifest)
 		if err != nil {
-			logrus.Fatalf("Error computing manifest digest: %s", err.Error())
+			return fmt.Errorf("Error computing manifest digest: %v", err)
 		}
 		if dockerImg, ok := img.(*docker.Image); ok {
 			outputData.Name = dockerImg.SourceRefFullName()
 			outputData.RepoTags, err = dockerImg.GetRepositoryTags()
 			if err != nil {
-				logrus.Fatalf("Error determining repository tags: %s", err.Error())
+				return fmt.Errorf("Error determining repository tags: %v", err)
 			}
 		}
 		out, err := json.MarshalIndent(outputData, "", "    ")
 		if err != nil {
-			logrus.Fatal(err)
+			return err
 		}
 		fmt.Println(string(out))
+		return nil
 	},
 }

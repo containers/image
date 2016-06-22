@@ -1,15 +1,16 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/codegangsta/cli"
 	"github.com/projectatomic/skopeo/directory"
 	"github.com/projectatomic/skopeo/docker"
 	"github.com/projectatomic/skopeo/image"
 	"github.com/projectatomic/skopeo/openshift"
 	"github.com/projectatomic/skopeo/types"
+	"github.com/urfave/cli"
 )
 
 const (
@@ -37,7 +38,7 @@ func parseImage(c *cli.Context) (types.Image, error) {
 		src := directory.NewDirImageSource(strings.TrimPrefix(imgName, directoryPrefix))
 		return image.FromSource(src), nil
 	}
-	return nil, fmt.Errorf("no valid prefix provided")
+	return nil, errors.New("no valid prefix provided")
 }
 
 // parseImageSource converts image URL-like string to an ImageSource.

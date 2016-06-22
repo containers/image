@@ -1,23 +1,25 @@
 package main
 
 import (
-	"github.com/Sirupsen/logrus"
-	"github.com/codegangsta/cli"
+	"errors"
+
+	"github.com/urfave/cli"
 )
 
-func deleteHandler(context *cli.Context) {
+func deleteHandler(context *cli.Context) error {
 	if len(context.Args()) != 1 {
-		logrus.Fatal("Usage: delete imageReference")
+		return errors.New("Usage: delete imageReference")
 	}
 
 	image, err := parseImageSource(context, context.Args()[0])
 	if err != nil {
-		logrus.Fatal(err.Error())
+		return err
 	}
 
 	if err := image.Delete(); err != nil {
-		logrus.Fatal(err)
+		return err
 	}
+	return nil
 }
 
 var deleteCmd = cli.Command{
