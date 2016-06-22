@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os/exec"
-	"strings"
 	"testing"
 
 	"github.com/go-check/check"
@@ -15,8 +14,6 @@ const (
 	privateRegistryURL2 = "127.0.0.1:5002"
 	privateRegistryURL3 = "127.0.0.1:5003"
 	privateRegistryURL4 = "127.0.0.1:5004"
-
-	skopeoBinary = "skopeo"
 )
 
 func Test(t *testing.T) {
@@ -73,38 +70,26 @@ func (s *SkopeoSuite) TearDownTest(c *check.C) {
 //func skopeoCmd()
 
 func (s *SkopeoSuite) TestVersion(c *check.C) {
-	out, err := exec.Command(skopeoBinary, "--version").CombinedOutput()
-	c.Assert(err, check.IsNil, check.Commentf(string(out)))
-	wanted := skopeoBinary + " version "
-	if !strings.Contains(string(out), wanted) {
-		c.Fatalf("wanted %s, got %s", wanted, string(out))
-	}
+	wanted := fmt.Sprintf(".*%s version .*", skopeoBinary)
+	assertSkopeoSucceeds(c, wanted, "--version")
 }
 
-var (
-	errFetchManifest = "error fetching manifest: status code: %s"
+const (
+	errFetchManifestRegexp = ".*error fetching manifest: status code: %s.*"
 )
 
 func (s *SkopeoSuite) TestCanAuthToPrivateRegistryV2WithoutDockerCfg(c *check.C) {
 	// TODO(runcom)
 	c.Skip("we need to restore --username --password flags!")
-	out, err := exec.Command(skopeoBinary, "--docker-cfg=''", "--username="+s.regV2WithAuth.username, "--password="+s.regV2WithAuth.password, "inspect", fmt.Sprintf("docker://%s/busybox:latest", s.regV2WithAuth.url)).CombinedOutput()
-	c.Assert(err, check.NotNil, check.Commentf(string(out)))
-	wanted := fmt.Sprintf(errFetchManifest, "401")
-	if !strings.Contains(string(out), wanted) {
-		c.Fatalf("wanted %s, got %s", wanted, string(out))
-	}
+	wanted := fmt.Sprintf(errFetchManifestRegexp, "401")
+	assertSkopeoFails(c, wanted, "--docker-cfg=''", "--username="+s.regV2WithAuth.username, "--password="+s.regV2WithAuth.password, "inspect", fmt.Sprintf("docker://%s/busybox:latest", s.regV2WithAuth.url))
 }
 
 func (s *SkopeoSuite) TestNeedAuthToPrivateRegistryV2WithoutDockerCfg(c *check.C) {
 	// TODO(runcom): mock the empty docker-cfg by removing it in the test itself (?)
 	c.Skip("mock empty docker config")
-	out, err := exec.Command(skopeoBinary, "--docker-cfg=''", "inspect", fmt.Sprintf("docker://%s/busybox:latest", s.regV2WithAuth.url)).CombinedOutput()
-	c.Assert(err, check.NotNil, check.Commentf(string(out)))
-	wanted := fmt.Sprintf(errFetchManifest, "401")
-	if !strings.Contains(string(out), wanted) {
-		c.Fatalf("wanted %s, got %s", wanted, string(out))
-	}
+	wanted := fmt.Sprintf(errFetchManifestRegexp, "401")
+	assertSkopeoFails(c, wanted, "--docker-cfg=''", "inspect", fmt.Sprintf("docker://%s/busybox:latest", s.regV2WithAuth.url))
 }
 
 // TODO(runcom): as soon as we can push to registries ensure you can inspect here
@@ -112,12 +97,8 @@ func (s *SkopeoSuite) TestNeedAuthToPrivateRegistryV2WithoutDockerCfg(c *check.C
 func (s *SkopeoSuite) TestNoNeedAuthToPrivateRegistryV2ImageNotFound(c *check.C) {
 	out, err := exec.Command(skopeoBinary, "inspect", fmt.Sprintf("docker://%s/busybox:latest", s.regV2.url)).CombinedOutput()
 	c.Assert(err, check.NotNil, check.Commentf(string(out)))
-	wanted := fmt.Sprintf(errFetchManifest, "404")
-	if !strings.Contains(string(out), wanted) {
-		c.Fatalf("wanted %s, got %s", wanted, string(out))
-	}
-	wanted = fmt.Sprintf(errFetchManifest, "401")
-	if strings.Contains(string(out), wanted) {
-		c.Fatalf("not wanted %s, got %s", wanted, string(out))
-	}
+	wanted := fmt.Sprintf(errFetchManifestRegexp, "404")
+	c.Assert(string(out), check.Matches, "(?s)"+wanted) // (?s) : '.' will also match newlines
+	wanted = fmt.Sprintf(errFetchManifestRegexp, "401")
+	c.Assert(string(out), check.Not(check.Matches), "(?s)"+wanted) // (?s) : '.' will also match newlines
 }
