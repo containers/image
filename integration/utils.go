@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	"strings"
 
 	"github.com/go-check/check"
 )
@@ -14,11 +15,11 @@ func consumeAndLogOutput(c *check.C, id string, f io.ReadCloser, err error) {
 			f.Close()
 			c.Logf("Output %s: Closed", id)
 		}()
-		buf := make([]byte, 0, 1024)
+		buf := make([]byte, 1024)
 		for {
 			c.Logf("Output %s: waiting", id)
 			n, err := f.Read(buf)
-			c.Logf("Output %s: got %d,%#v: %#v", id, n, err, buf[:n])
+			c.Logf("Output %s: got %d,%#v: %s", id, n, err, strings.TrimSuffix(string(buf[:n]), "\n"))
 			if n <= 0 {
 				break
 			}
