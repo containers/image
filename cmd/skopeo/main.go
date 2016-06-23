@@ -17,7 +17,8 @@ const (
 	usage = `interact with registries`
 )
 
-func main() {
+// createApp returns a cli.App to be run or tested.
+func createApp() *cli.App {
 	app := cli.NewApp()
 	app.Name = "skopeo"
 	if gitCommit != "" {
@@ -67,6 +68,11 @@ func main() {
 		standaloneSignCmd,
 		standaloneVerifyCmd,
 	}
+	return app
+}
+
+func main() {
+	app := createApp()
 	if err := app.Run(os.Args); err != nil {
 		logrus.Fatal(err)
 	}
