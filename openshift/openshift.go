@@ -14,7 +14,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/projectatomic/skopeo/docker"
-	"github.com/projectatomic/skopeo/docker/utils"
+	"github.com/projectatomic/skopeo/manifest"
 	"github.com/projectatomic/skopeo/types"
 	"github.com/projectatomic/skopeo/version"
 )
@@ -287,9 +287,9 @@ func (d *openshiftImageDestination) CanonicalDockerReference() (string, error) {
 	return d.client.canonicalDockerReference(), nil
 }
 
-func (d *openshiftImageDestination) PutManifest(manifest []byte) error {
+func (d *openshiftImageDestination) PutManifest(m []byte) error {
 	// Note: This does absolutely no kind/version checking or conversions.
-	manifestDigest, err := utils.ManifestDigest(manifest)
+	manifestDigest, err := manifest.Digest(m)
 	if err != nil {
 		return err
 	}
@@ -309,7 +309,7 @@ func (d *openshiftImageDestination) PutManifest(manifest []byte) error {
 				Name: manifestDigest,
 			},
 			DockerImageReference: dockerImageReference,
-			DockerImageManifest:  string(manifest),
+			DockerImageManifest:  string(m),
 		},
 		Tag: d.client.tag,
 	}
@@ -325,7 +325,7 @@ func (d *openshiftImageDestination) PutManifest(manifest []byte) error {
 		return err
 	}
 
-	return d.docker.PutManifest(manifest)
+	return d.docker.PutManifest(m)
 }
 
 func (d *openshiftImageDestination) PutBlob(digest string, stream io.Reader) error {

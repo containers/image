@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/projectatomic/skopeo/directory"
-	"github.com/projectatomic/skopeo/docker/utils"
+	"github.com/projectatomic/skopeo/manifest"
 	"github.com/projectatomic/skopeo/types"
 )
 
@@ -47,7 +47,7 @@ func (i *genericImage) IntendedDockerReference() string {
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
 func (i *genericImage) Manifest() ([]byte, error) {
 	if i.cachedManifest == nil {
-		m, _, err := i.src.GetManifest([]string{utils.DockerV2Schema1MIMEType})
+		m, _, err := i.src.GetManifest([]string{manifest.DockerV2Schema1MIMEType})
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +116,7 @@ func (i *genericImage) DockerTar() ([]byte, error) {
 }
 
 // will support v1 one day...
-type manifest interface {
+type genericManifest interface {
 	String() string
 	GetLayers() []string
 }
@@ -150,7 +150,7 @@ func sanitize(s string) string {
 	return strings.Replace(s, "/", "-", -1)
 }
 
-func (i *genericImage) getSchema1Manifest() (manifest, error) {
+func (i *genericImage) getSchema1Manifest() (genericManifest, error) {
 	manblob, err := i.Manifest()
 	if err != nil {
 		return nil, err
