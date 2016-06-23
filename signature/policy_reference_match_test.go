@@ -55,7 +55,10 @@ func (ref refImageMock) ManifestMatchesDigest(expectedDigest string) (bool, erro
 func (ref refImageMock) Signatures() ([][]byte, error) {
 	panic("unexpected call to a mock function")
 }
-func (ref refImageMock) Layers(layers ...string) error {
+func (ref refImageMock) LayerDigests() ([]string, error) {
+	panic("unexpected call to a mock function")
+}
+func (ref refImageMock) LayersCommand(layers ...string) error {
 	panic("unexpected call to a mock function")
 }
 func (ref refImageMock) Inspect() (*types.ImageInspectInfo, error) {
@@ -168,7 +171,10 @@ func (ref forbiddenImageMock) ManifestMatchesDigest(expectedDigest string) (bool
 func (ref forbiddenImageMock) Signatures() ([][]byte, error) {
 	panic("unexpected call to a mock function")
 }
-func (ref forbiddenImageMock) Layers(layers ...string) error {
+func (ref forbiddenImageMock) LayerDigests() ([]string, error) {
+	panic("unexpected call to a mock function")
+}
+func (ref forbiddenImageMock) LayersCommand(layers ...string) error {
 	panic("unexpected call to a mock function")
 }
 func (ref forbiddenImageMock) Inspect() (*types.ImageInspectInfo, error) {

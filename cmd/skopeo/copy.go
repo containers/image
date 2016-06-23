@@ -1,54 +1,24 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 
-	"github.com/projectatomic/skopeo/manifest"
+	"github.com/projectatomic/skopeo/image"
 	"github.com/projectatomic/skopeo/signature"
 	"github.com/urfave/cli"
 )
-
-// FIXME: Also handle schema2, and put this elsewhere:
-// docker.go contains similar code, more sophisticated
-// (at the very least the deduplication should be reused from there).
-func manifestLayers(manifest []byte) ([]string, error) {
-	man := manifestSchema1{}
-	if err := json.Unmarshal(manifest, &man); err != nil {
-		return nil, err
-	}
-
-	layers := []string{}
-	for _, layer := range man.FSLayers {
-		layers = append(layers, layer.BlobSum)
-	}
-	return layers, nil
-}
-
-// FIXME: this is a copy from docker_image.go and does not belong here.
-type manifestSchema1 struct {
-	Name     string
-	Tag      string
-	FSLayers []struct {
-		BlobSum string `json:"blobSum"`
-	} `json:"fsLayers"`
-	History []struct {
-		V1Compatibility string `json:"v1Compatibility"`
-	} `json:"history"`
-	// TODO(runcom) verify the downloaded manifest
-	//Signature []byte `json:"signature"`
-}
 
 func copyHandler(context *cli.Context) error {
 	if len(context.Args()) != 2 {
 		return errors.New("Usage: copy source destination")
 	}
 
-	src, err := parseImageSource(context, context.Args()[0])
+	rawSource, err := parseImageSource(context, context.Args()[0])
 	if err != nil {
 		return fmt.Errorf("Error initializing %s: %v", context.Args()[0], err)
 	}
+	src := image.FromSource(rawSource)
 
 	dest, err := parseImageDestination(context, context.Args()[1])
 	if err != nil {
@@ -56,18 +26,18 @@ func copyHandler(context *cli.Context) error {
 	}
 	signBy := context.String("sign-by")
 
-	m, _, err := src.GetManifest([]string{manifest.DockerV2Schema1MIMEType})
+	manifest, err := src.Manifest()
 	if err != nil {
 		return fmt.Errorf("Error reading manifest: %v", err)
 	}
 
-	layers, err := manifestLayers(m)
+	layers, err := src.LayerDigests()
 	if err != nil {
 		return fmt.Errorf("Error parsing manifest: %v", err)
 	}
 	for _, layer := range layers {
 		// TODO(mitr): do not ignore the size param returned here
-		stream, _, err := src.GetBlob(layer)
+		stream, _, err := rawSource.GetBlob(layer)
 		if err != nil {
 			return fmt.Errorf("Error reading layer %s: %v", layer, err)
 		}
@@ -77,7 +47,7 @@ func copyHandler(context *cli.Context) error {
 		}
 	}
 
-	sigs, err := src.GetSignatures()
+	sigs, err := src.Signatures()
 	if err != nil {
 		return fmt.Errorf("Error reading signatures: %v", err)
 	}
@@ -92,7 +62,7 @@ func copyHandler(context *cli.Context) error {
 			return fmt.Errorf("Error determining canonical Docker reference: %v", err)
 		}
 
-		newSig, err := signature.SignDockerManifest(m, dockerReference, mech, signBy)
+		newSig, err := signature.SignDockerManifest(manifest, dockerReference, mech, signBy)
 		if err != nil {
 			return fmt.Errorf("Error creating signature: %v", err)
 		}
@@ -104,7 +74,7 @@ func copyHandler(context *cli.Context) error {
 	}
 
 	// FIXME: We need to call PutManifest after PutBlob and PutSignatures. This seems ugly; move to a "set properties" + "commit" model?
-	if err := dest.PutManifest(m); err != nil {
+	if err := dest.PutManifest(manifest); err != nil {
 		return fmt.Errorf("Error writing manifest: %v", err)
 	}
 	return nil

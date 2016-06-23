@@ -57,11 +57,18 @@ type Image interface {
 	// May be "" if unknown.
 	IntendedDockerReference() string
 	// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
-	// FIXME? This should also return a MIME type if known, to differentiate between schema versions.
+	// NOTE: It is essential for signature verification that Manifest returns the manifest from which LayerDigests is computed.
 	Manifest() ([]byte, error)
 	// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 	Signatures() ([][]byte, error)
-	Layers(layers ...string) error // configure download directory? Call it DownloadLayers?
+	// LayerDigests returns a list of layer digests referenced by this image.
+	// The list will not contain duplicates; it is not intended to correspond to the "history" or "parent chain" of a Docker image.
+	// NOTE: It is essential for signature verification that LayerDigests is computed from the same manifest which is returned by Manifest().
+	LayerDigests() ([]string, error)
+	// LayersCommand implements (skopeo layers).  Do not use for any other purpose.
+	// Longer-term we would like to move the command-specific code up to the command handler,
+	// but the command has functionality specific to util.DockerV2Schema1MIMEType manifests.
+	LayersCommand(layers ...string) error // configure download directory?
 	// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
 	Inspect() (*ImageInspectInfo, error)
 	DockerTar() ([]byte, error) // ??? also, configure output directory
