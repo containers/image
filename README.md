@@ -102,11 +102,8 @@ Building
 -
 To build `skopeo` you need at least Go 1.5 because it uses the latest `GO15VENDOREXPERIMENT` flag. Also, make sure to clone the repository in your `GOPATH` - otherwise compilation fails.
 ```sh
-$ cd $GOPATH/src
-$ mkdir -p github.com/projectatomic
-$ cd projectatomic
-$ git clone https://github.com/projectatomic/skopeo
-$ cd skopeo && make binary
+$ git clone https://github.com/projectatomic/skopeo $GOPATH/src/github.com/projectatomic/skopeo
+$ cd $GOPATH/src/github.com/projectatomic/skopeo && make binary
 ```
 
 You may need to install additional development packages: gpgme-devel and libassuan-devel
