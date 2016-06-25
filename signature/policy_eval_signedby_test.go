@@ -6,9 +6,9 @@ import (
 	"path"
 	"testing"
 
-	"github.com/projectatomic/skopeo/directory"
-	"github.com/projectatomic/skopeo/image"
-	"github.com/projectatomic/skopeo/types"
+	"github.com/containers/image/directory"
+	"github.com/containers/image/image"
+	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -2,7 +2,7 @@
 
 package signature
 
-import "github.com/projectatomic/skopeo/types"
+import "github.com/containers/image/types"
 
 func (pr *prInsecureAcceptAnything) isSignatureAuthorAccepted(image types.Image, sig []byte) (signatureAcceptanceResult, *Signature, error) {
 	// prInsecureAcceptAnything semantics: Every image is allowed to run,

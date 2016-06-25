@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/projectatomic/skopeo/reference"
+	"github.com/containers/image/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

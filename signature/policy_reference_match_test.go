@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/projectatomic/skopeo/types"
+	"github.com/containers/image/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

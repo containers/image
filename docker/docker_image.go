@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/projectatomic/skopeo/image"
-	"github.com/projectatomic/skopeo/types"
+	"github.com/containers/image/image"
+	"github.com/containers/image/types"
 )
 
 // Image is a Docker-specific implementation of types.Image with a few extra methods

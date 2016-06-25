@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/projectatomic/skopeo/reference"
+	"github.com/containers/image/reference"
 )
 
 // InvalidPolicyFormatError is returned when parsing an invalid policy configuration.

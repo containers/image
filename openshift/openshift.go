@@ -13,10 +13,10 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/projectatomic/skopeo/docker"
-	"github.com/projectatomic/skopeo/manifest"
-	"github.com/projectatomic/skopeo/types"
-	"github.com/projectatomic/skopeo/version"
+	"github.com/containers/image/docker"
+	"github.com/containers/image/manifest"
+	"github.com/containers/image/types"
+	"github.com/containers/image/version"
 )
 
 // openshiftClient is configuration for dealing with a single image stream, for reading or writing.

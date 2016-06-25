@@ -5,7 +5,7 @@ package signature
 import (
 	"fmt"
 
-	"github.com/projectatomic/skopeo/manifest"
+	"github.com/containers/image/manifest"
 )
 
 // SignDockerManifest returns a signature for manifest as the specified dockerReference,
@@ -48,7 +48,7 @@ func VerifyDockerManifestSignature(unverifiedSignature, unverifiedManifest []byt
 				return err
 			}
 			if !matches {
-				return InvalidSignatureError{msg: fmt.Sprintf("Signature for docker digest %s does not match", signedDockerManifestDigest, signedDockerManifestDigest)}
+				return InvalidSignatureError{msg: fmt.Sprintf("Signature for docker digest %s does not match", signedDockerManifestDigest)}
 			}
 			return nil
 		},

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/projectatomic/skopeo/types"
+	"github.com/containers/image/types"
 )
 
 // manifestPath returns a path for the manifest within a directory using our conventions.

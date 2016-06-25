@@ -5,7 +5,7 @@
 //    import (
 //    	"fmt"
 //
-//    	"github.com/projectatomic/skopeo/docker"
+//    	"github.com/containers/image/docker"
 //    )
 //
 //    func main() {

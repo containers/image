@@ -4,7 +4,7 @@ package signature
 
 import (
 	"github.com/Sirupsen/logrus"
-	"github.com/projectatomic/skopeo/types"
+	"github.com/containers/image/types"
 )
 
 func (pr *prSignedBaseLayer) isSignatureAuthorAccepted(image types.Image, sig []byte) (signatureAcceptanceResult, *Signature, error) {

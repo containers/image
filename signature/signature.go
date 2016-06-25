@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/projectatomic/skopeo/version"
+	"github.com/containers/image/version"
 )
 
 const (

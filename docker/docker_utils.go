@@ -1,6 +1,6 @@
 package docker
 
-import "github.com/projectatomic/skopeo/reference"
+import "github.com/containers/image/reference"
 
 // parseDockerImageName converts a string into a reference and tag value.
 func parseDockerImageName(img string) (reference.Named, string, error) {

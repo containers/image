@@ -11,8 +11,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	distreference "github.com/docker/distribution/reference"
-	"github.com/projectatomic/skopeo/reference"
-	"github.com/projectatomic/skopeo/types"
+	"github.com/containers/image/reference"
+	"github.com/containers/image/types"
 )
 
 // PolicyRequirementError is an explanatory text for rejecting a signature or an image.

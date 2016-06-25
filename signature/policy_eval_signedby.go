@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/projectatomic/skopeo/manifest"
-	"github.com/projectatomic/skopeo/types"
+	"github.com/containers/image/manifest"
+	"github.com/containers/image/types"
 )
 
 func (pr *prSignedBy) isSignatureAuthorAccepted(image types.Image, sig []byte) (signatureAcceptanceResult, *Signature, error) {

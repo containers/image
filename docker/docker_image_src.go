@@ -8,9 +8,9 @@ import (
 	"strconv"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/projectatomic/skopeo/manifest"
-	"github.com/projectatomic/skopeo/reference"
-	"github.com/projectatomic/skopeo/types"
+	"github.com/containers/image/manifest"
+	"github.com/containers/image/reference"
+	"github.com/containers/image/types"
 )
 
 type errFetchManifest struct {

@@ -3,8 +3,8 @@
 package signature
 
 import (
-	"github.com/projectatomic/skopeo/reference"
-	"github.com/projectatomic/skopeo/types"
+	"github.com/containers/image/reference"
+	"github.com/containers/image/types"
 )
 
 // parseDockerReferences converts two reference strings into parsed entities, failing on any error
