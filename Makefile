@@ -8,14 +8,14 @@ deps:
 	go get github.com/vbatts/git-validation
 
 test:
-	go test -tags experimental -race -cover ./...
+	@go test -tags experimental -race -cover ./...
 
 validate: lint
-	go vet ./...
-	test -z "$(gofmt -s -l . | tee /dev/stderr)"
+	@go vet ./...
+	@test -z "$(gofmt -s -l . | tee /dev/stderr)"
 
 lint:
-	out="$$(golint ./...)"; \
+	@out="$$(golint ./...)"; \
 	if [ -n "$$(golint ./...)" ]; then \
 		echo "$$out"; \
 		exit 1; \
@@ -29,7 +29,7 @@ EPOCH_TEST_COMMIT ?= e68e0e1110e64f906f9b482e548f17d73e02e6b1
 .gitvalidation:
 	@which git-validation > /dev/null 2>/dev/null || (echo "ERROR: git-validation not found. Consider 'make deps' target" && false)
 ifeq ($(TRAVIS),true)
-	git-validation -q -run DCO,short-subject,dangling-whitespace
+	@git-validation -q -run DCO,short-subject,dangling-whitespace
 else
-	git-validation -v -run DCO,short-subject,dangling-whitespace -range $(EPOCH_TEST_COMMIT)..HEAD
+	@git-validation -v -run DCO,short-subject,dangling-whitespace -range $(EPOCH_TEST_COMMIT)..HEAD
 endif
