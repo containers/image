@@ -31,5 +31,5 @@ EPOCH_TEST_COMMIT ?= e68e0e1110e64f906f9b482e548f17d73e02e6b1
 ifeq ($(TRAVIS),true)
 	@git-validation -q -run DCO,short-subject,dangling-whitespace
 else
-	@git-validation -v -run DCO,short-subject,dangling-whitespace -range $(EPOCH_TEST_COMMIT)..HEAD
+	@git-validation -q -run DCO,short-subject,dangling-whitespace -range $(EPOCH_TEST_COMMIT)..HEAD
 endif
