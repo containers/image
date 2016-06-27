@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	distreference "github.com/docker/distribution/reference"
-	"github.com/containers/image/reference"
+	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
+	distreference "github.com/docker/distribution/reference"
 )
 
 // PolicyRequirementError is an explanatory text for rejecting a signature or an image.
