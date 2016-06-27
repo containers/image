@@ -1,4 +1,4 @@
-// Package skopeo provides libraries and commands to interact with containers images.
+// Package image provides libraries and commands to interact with containers images.
 //
 //    package main
 //
@@ -21,4 +21,4 @@
 //    }
 //
 // TODO(runcom)
-package skopeo
+package image
