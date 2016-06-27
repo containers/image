@@ -6,7 +6,7 @@
   go:
     - 1.6.2
   install: make deps
-  script: make validate && make test
+  script: make .gitvalidation && make validate && make test
   dist: trusty
   os:
     - linux
