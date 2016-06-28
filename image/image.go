@@ -75,23 +75,11 @@ func (i *genericImage) Inspect() (*types.ImageInspectInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	ms1, ok := m.(*manifestSchema1)
-	if !ok {
-		return nil, fmt.Errorf("error retrivieng manifest schema1")
-	}
-	v1 := &v1Image{}
-	if err := json.Unmarshal([]byte(ms1.History[0].V1Compatibility), v1); err != nil {
+	info, err := m.ImageInspectInfo()
+	if err != nil {
 		return nil, err
 	}
-	return &types.ImageInspectInfo{
-		Tag:           ms1.Tag,
-		DockerVersion: v1.DockerVersion,
-		Created:       v1.Created,
-		Labels:        v1.Config.Labels,
-		Architecture:  v1.Architecture,
-		Os:            v1.OS,
-		Layers:        ms1.GetLayers(),
-	}, nil
+	return info, nil
 }
 
 type config struct {
@@ -114,6 +102,7 @@ type v1Image struct {
 // will support v1 one day...
 type genericManifest interface {
 	GetLayers() []string
+	ImageInspectInfo() (*types.ImageInspectInfo, error)
 }
 
 type fsLayersSchema1 struct {
@@ -137,6 +126,22 @@ func (m *manifestSchema1) GetLayers() []string {
 		layers[i] = layer.BlobSum
 	}
 	return layers
+}
+
+func (m *manifestSchema1) ImageInspectInfo() (*types.ImageInspectInfo, error) {
+	v1 := &v1Image{}
+	if err := json.Unmarshal([]byte(m.History[0].V1Compatibility), v1); err != nil {
+		return nil, err
+	}
+	return &types.ImageInspectInfo{
+		Tag:           m.Tag,
+		DockerVersion: v1.DockerVersion,
+		Created:       v1.Created,
+		Labels:        v1.Config.Labels,
+		Architecture:  v1.Architecture,
+		Os:            v1.OS,
+		Layers:        m.GetLayers(),
+	}, nil
 }
 
 func (m *manifestSchema1) String() string {
