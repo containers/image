@@ -20,18 +20,17 @@ const (
 	DockerV2Schema2MIMEType = "application/vnd.docker.distribution.manifest.v2+json"
 	// DockerV2ListMIMEType MIME type represents Docker manifest schema 2 list
 	DockerV2ListMIMEType = "application/vnd.docker.distribution.manifest.list.v2+json"
-	// OCIV1DescriptorMIMEType TODO
+
+	// OCIV1DescriptorMIMEType specifies the mediaType for a content descriptor.
 	OCIV1DescriptorMIMEType = "application/vnd.oci.descriptor.v1+json"
-	// OCIV1ImageManifestMIMEType TODO
+	// OCIV1ImageManifestMIMEType specifies the mediaType for an image manifest.
 	OCIV1ImageManifestMIMEType = "application/vnd.oci.image.manifest.v1+json"
-	// OCIV1ImageManifestListMIMEType TODO
+	// OCIV1ImageManifestListMIMEType specifies the mediaType for an image manifest list.
 	OCIV1ImageManifestListMIMEType = "application/vnd.oci.image.manifest.list.v1+json"
-	// OCIV1ImageSerializationRootfsTarGzipMIMEType TODO)
-	OCIV1ImageSerializationRootfsTarGzipMIMEType = "application/vnd.oci.image.serialization.rootfs.tar.gzip"
-	// OCIV1ImageSerializationConfigMIMEType TODO
+	// OCIV1ImageSerialization is the mediaType used for layers referenced by the manifest.
+	OCIV1ImageSerialization = "application/vnd.oci.image.serialization.rootfs.tar.gzip"
+	// OCIV1ImageSerializationConfigMIMEType specifies the mediaType for the image configuration.
 	OCIV1ImageSerializationConfigMIMEType = "application/vnd.oci.image.serialization.config.v1+json"
-	// OCIV1ImageSerializationCombinedMIMEType TODO
-	OCIV1ImageSerializationCombinedMIMEType = "application/vnd.oci.image.serialization.combined.v1+json"
 )
 
 // GuessMIMEType guesses MIME type of a manifest and returns it _if it is recognized_, or "" if unknown or unrecognized.
@@ -50,7 +49,7 @@ func GuessMIMEType(manifest []byte) string {
 	}
 
 	switch meta.MediaType {
-	case DockerV2Schema2MIMEType, DockerV2ListMIMEType, OCIV1DescriptorMIMEType, OCIV1ImageManifestMIMEType, OCIV1ImageManifestListMIMEType, OCIV1ImageSerializationRootfsTarGzipMIMEType, OCIV1ImageSerializationConfigMIMEType, OCIV1ImageSerializationCombinedMIMEType: // A recognized type.
+	case DockerV2Schema2MIMEType, DockerV2ListMIMEType, OCIV1DescriptorMIMEType, OCIV1ImageManifestMIMEType, OCIV1ImageManifestListMIMEType: // A recognized type.
 		return meta.MediaType
 	}
 	// this is the only way the function can return DockerV2Schema1MIMEType, and recognizing that is essential for stripping the JWS signatures = computing the correct manifest digest.

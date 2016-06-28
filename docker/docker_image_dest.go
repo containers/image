@@ -38,7 +38,8 @@ func NewDockerImageDestination(img, certPath string, tlsVerify bool) (types.Imag
 
 func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 	return []string{
-		// TODO(runcom): we'll add OCI and v2s2 as part of another PR here
+		// TODO(runcom): we'll add OCI as part of another PR here
+		manifest.DockerV2Schema2MIMEType,
 		manifest.DockerV2Schema1SignedMIMEType,
 		manifest.DockerV2Schema1MIMEType,
 	}
