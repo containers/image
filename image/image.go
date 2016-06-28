@@ -152,6 +152,55 @@ func sanitize(s string) string {
 	return strings.Replace(s, "/", "-", -1)
 }
 
+type manifestSchema2 struct {
+	src    types.ImageSource
+	Config descriptor   `json:"config"`
+	Layers []descriptor `json:"layers"`
+}
+
+type descriptor struct {
+	MediaType string `json:"mediaType"`
+	Size      int64  `json:"size"`
+	Digest    string `json:"digest"`
+}
+
+func (m *manifestSchema2) String() string {
+	return ""
+}
+
+func (m *manifestSchema2) GetLayers() []string {
+	blobs := []string{}
+	for _, layer := range m.Layers {
+		blobs = append(blobs, layer.Digest)
+	}
+	blobs = append(blobs, m.Config.Digest)
+	return blobs
+}
+
+func (m *manifestSchema2) ImageInspectInfo() (*types.ImageInspectInfo, error) {
+	rawConfig, _, err := m.src.GetBlob(m.Config.Digest)
+	if err != nil {
+		return nil, err
+	}
+	defer rawConfig.Close()
+	config, err := ioutil.ReadAll(rawConfig)
+	if err != nil {
+		return nil, err
+	}
+	v1 := &v1Image{}
+	if err := json.Unmarshal(config, v1); err != nil {
+		return nil, err
+	}
+	return &types.ImageInspectInfo{
+		DockerVersion: v1.DockerVersion,
+		Created:       v1.Created,
+		Labels:        v1.Config.Labels,
+		Architecture:  v1.Architecture,
+		Os:            v1.OS,
+		Layers:        m.GetLayers(),
+	}, nil
+}
+
 // getParsedManifest parses the manifest into a data structure, cleans it up, and returns it.
 // NOTE: The manifest may have been modified in the process; DO NOT reserialize and store the return value
 // if you want to preserve the original manifest; use the blob returned by Manifest() directly.
@@ -178,6 +227,12 @@ func (i *genericImage) getParsedManifest() (genericManifest, error) {
 		//return nil, fmt.Errorf("no FSLayers in manifest for %q", ref.String())
 		//}
 		return mschema1, nil
+	case manifest.DockerV2Schema2MIMEType:
+		v2s2 := manifestSchema2{src: i.src}
+		if err := json.Unmarshal(manblob, &v2s2); err != nil {
+			return nil, err
+		}
+		return &v2s2, nil
 	default:
 		return nil, fmt.Errorf("unsupported manifest media type %s", mt)
 	}
