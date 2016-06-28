@@ -7,12 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/containers/image/directory"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 )
@@ -198,37 +196,6 @@ func (i *genericImage) LayerDigests() ([]string, error) {
 		return nil, err
 	}
 	return uniqueLayerDigests(m), nil
-}
-
-func (i *genericImage) LayersCommand(layers ...string) error {
-	m, err := i.getSchema1Manifest()
-	if err != nil {
-		return err
-	}
-	tmpDir, err := ioutil.TempDir(".", "layers-"+m.String()+"-")
-	if err != nil {
-		return err
-	}
-	dest := directory.NewDirImageDestination(tmpDir)
-	data, err := json.Marshal(m)
-	if err != nil {
-		return err
-	}
-	if err := dest.PutManifest(data); err != nil {
-		return err
-	}
-	if len(layers) == 0 {
-		layers = uniqueLayerDigests(m)
-	}
-	for _, l := range layers {
-		if !strings.HasPrefix(l, "sha256:") {
-			l = "sha256:" + l
-		}
-		if err := i.getLayer(dest, l); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (i *genericImage) getLayer(dest types.ImageDestination, digest string) error {
