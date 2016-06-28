@@ -21,7 +21,7 @@ func TestUniqueLayerDigests(t *testing.T) {
 		}
 
 		m := manifestSchema1{FSLayers: in}
-		res := uniqueLayerDigests(&m)
+		res := uniqueBlobDigests(&m)
 		// Test that the length is the same and each expected element is present.
 		// This requires each element of test.expected to be unique, as noted above.
 		assert.Len(t, res, len(test.expected))
