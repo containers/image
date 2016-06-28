@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime"
 	"net/http"
 	"strconv"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/containers/image/manifest"
 	"github.com/containers/image/docker/reference"
+	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 )
 
@@ -57,6 +58,19 @@ func (s *dockerImageSource) IntendedDockerReference() string {
 	return fmt.Sprintf("%s:%s", s.ref.Name(), s.tag)
 }
 
+// simplifyContentType drops parameters from a HTTP media type (see https://tools.ietf.org/html/rfc7231#section-3.1.1.1)
+// Alternatively, an empty string is returned unchanged, and invalid values are "simplified" to an empty string.
+func simplifyContentType(contentType string) string {
+	if contentType == "" {
+		return contentType
+	}
+	mimeType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return ""
+	}
+	return mimeType
+}
+
 func (s *dockerImageSource) GetManifest(mimetypes []string) ([]byte, string, error) {
 	url := fmt.Sprintf(manifestURL, s.ref.RemoteName(), s.tag)
 	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
@@ -76,7 +90,7 @@ func (s *dockerImageSource) GetManifest(mimetypes []string) ([]byte, string, err
 		return nil, "", errFetchManifest{res.StatusCode, manblob}
 	}
 	// We might validate manblob against the Docker-Content-Digest header here to protect against transport errors.
-	return manblob, res.Header.Get("Content-Type"), nil
+	return manblob, simplifyContentType(res.Header.Get("Content-Type")), nil
 }
 
 func (s *dockerImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
