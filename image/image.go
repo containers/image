@@ -7,12 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"regexp"
-	"strings"
 	"time"
 
-	"github.com/containers/image/directory"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 )
@@ -111,14 +108,8 @@ type v1Image struct {
 	OS string `json:"os,omitempty"`
 }
 
-// TODO(runcom)
-func (i *genericImage) DockerTar() ([]byte, error) {
-	return nil, nil
-}
-
 // will support v1 one day...
 type genericManifest interface {
-	String() string
 	GetLayers() []string
 }
 
@@ -143,14 +134,6 @@ func (m *manifestSchema1) GetLayers() []string {
 		layers[i] = layer.BlobSum
 	}
 	return layers
-}
-
-func (m *manifestSchema1) String() string {
-	return fmt.Sprintf("%s-%s", sanitize(m.Name), sanitize(m.Tag))
-}
-
-func sanitize(s string) string {
-	return strings.Replace(s, "/", "-", -1)
 }
 
 // getSchema1Manifest parses the manifest into a data structure, cleans it up, and returns it.
@@ -203,37 +186,6 @@ func (i *genericImage) LayerDigests() ([]string, error) {
 		return nil, err
 	}
 	return uniqueLayerDigests(m), nil
-}
-
-func (i *genericImage) LayersCommand(layers ...string) error {
-	m, err := i.getSchema1Manifest()
-	if err != nil {
-		return err
-	}
-	tmpDir, err := ioutil.TempDir(".", "layers-"+m.String()+"-")
-	if err != nil {
-		return err
-	}
-	dest := directory.NewDirImageDestination(tmpDir)
-	data, err := json.Marshal(m)
-	if err != nil {
-		return err
-	}
-	if err := dest.PutManifest(data); err != nil {
-		return err
-	}
-	if len(layers) == 0 {
-		layers = uniqueLayerDigests(m)
-	}
-	for _, l := range layers {
-		if !strings.HasPrefix(l, "sha256:") {
-			l = "sha256:" + l
-		}
-		if err := i.getLayer(dest, l); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (i *genericImage) getLayer(dest types.ImageDestination, digest string) error {
