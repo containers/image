@@ -14,11 +14,12 @@ import (
 const (
 	// DockerV2Schema1MIMEType MIME type represents Docker manifest schema 1
 	DockerV2Schema1MIMEType = "application/vnd.docker.distribution.manifest.v1+json"
+	// DockerV2Schema1MIMEType MIME type represents Docker manifest schema 1 with a JWS signature
+	DockerV2Schema1SignedMIMEType = "application/vnd.docker.distribution.manifest.v1+prettyjws"
 	// DockerV2Schema2MIMEType MIME type represents Docker manifest schema 2
 	DockerV2Schema2MIMEType = "application/vnd.docker.distribution.manifest.v2+json"
 	// DockerV2ListMIMEType MIME type represents Docker manifest schema 2 list
 	DockerV2ListMIMEType = "application/vnd.docker.distribution.manifest.list.v2+json"
-
 	// OCIV1DescriptorMIMEType TODO
 	OCIV1DescriptorMIMEType = "application/vnd.oci.descriptor.v1+json"
 	// OCIV1ImageManifestMIMEType TODO
@@ -40,8 +41,9 @@ func GuessMIMEType(manifest []byte) string {
 	// A subset of manifest fields; the rest is silently ignored by json.Unmarshal.
 	// Also docker/distribution/manifest.Versioned.
 	meta := struct {
-		MediaType     string `json:"mediaType"`
-		SchemaVersion int    `json:"schemaVersion"`
+		MediaType     string      `json:"mediaType"`
+		SchemaVersion int         `json:"schemaVersion"`
+		Signatures    interface{} `json:"signatures"`
 	}{}
 	if err := json.Unmarshal(manifest, &meta); err != nil {
 		return ""
@@ -54,6 +56,9 @@ func GuessMIMEType(manifest []byte) string {
 	// this is the only way the function can return DockerV2Schema1MIMEType, and recognizing that is essential for stripping the JWS signatures = computing the correct manifest digest.
 	switch meta.SchemaVersion {
 	case 1:
+		if meta.Signatures != nil {
+			return DockerV2Schema1SignedMIMEType
+		}
 		return DockerV2Schema1MIMEType
 	case 2: // Really should not happen, meta.MediaType should have been set. But given the data, this is our best guess.
 		return DockerV2Schema2MIMEType
@@ -63,7 +68,7 @@ func GuessMIMEType(manifest []byte) string {
 
 // Digest returns the a digest of a docker manifest, with any necessary implied transformations like stripping v1s1 signatures.
 func Digest(manifest []byte) (string, error) {
-	if GuessMIMEType(manifest) == DockerV2Schema1MIMEType {
+	if GuessMIMEType(manifest) == DockerV2Schema1SignedMIMEType {
 		sig, err := libtrust.ParsePrettySignature(manifest, "signatures")
 		if err != nil {
 			return "", err

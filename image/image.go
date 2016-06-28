@@ -52,7 +52,7 @@ func (i *genericImage) IntendedDockerReference() string {
 // NOTE: It is essential for signature verification that Manifest returns the manifest from which BlobDigests is computed.
 func (i *genericImage) Manifest() ([]byte, string, error) {
 	if i.cachedManifest == nil {
-		m, mt, err := i.src.GetManifest([]string{manifest.DockerV2Schema1MIMEType})
+		m, mt, err := i.src.GetManifest([]string{manifest.DockerV2Schema1SignedMIMEType, manifest.DockerV2Schema1MIMEType})
 		if err != nil {
 			return nil, "", err
 		}
@@ -233,7 +233,10 @@ func (i *genericImage) getParsedManifest() (genericManifest, error) {
 		return nil, err
 	}
 	switch mt {
-	case manifest.DockerV2Schema1MIMEType:
+	// "application/json" is a valid v2s1 value per https://github.com/docker/distribution/blob/master/docs/spec/manifest-v2-1.md .
+	// This works for now, when nothing else seems to return "application/json"; if that were not true, the mapping/detection might
+	// need to happen within the ImageSource.
+	case manifest.DockerV2Schema1MIMEType, manifest.DockerV2Schema1SignedMIMEType, "application/json":
 		mschema1 := &manifestSchema1{}
 		if err := json.Unmarshal(manblob, mschema1); err != nil {
 			return nil, err
