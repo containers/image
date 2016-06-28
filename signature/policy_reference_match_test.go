@@ -64,9 +64,6 @@ func (ref refImageMock) LayersCommand(layers ...string) error {
 func (ref refImageMock) Inspect() (*types.ImageInspectInfo, error) {
 	panic("unexpected call to a mock function")
 }
-func (ref refImageMock) DockerTar() ([]byte, error) {
-	panic("unexpected call to a mock function")
-}
 func (ref refImageMock) GetRepositoryTags() ([]string, error) {
 	panic("unexpected call to a mock function")
 }
@@ -178,9 +175,6 @@ func (ref forbiddenImageMock) LayersCommand(layers ...string) error {
 	panic("unexpected call to a mock function")
 }
 func (ref forbiddenImageMock) Inspect() (*types.ImageInspectInfo, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref forbiddenImageMock) DockerTar() ([]byte, error) {
 	panic("unexpected call to a mock function")
 }
 func (ref forbiddenImageMock) GetRepositoryTags() ([]string, error) {

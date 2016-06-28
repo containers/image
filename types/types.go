@@ -5,19 +5,6 @@ import (
 	"time"
 )
 
-// Registry is a service providing repositories.
-type Registry interface {
-	Repositories() []Repository
-	Repository(ref string) Repository
-	Lookup(term string) []Image // docker registry v1 only AFAICT, v2 can be built hacking with Images()
-}
-
-// Repository is a set of images.
-type Repository interface {
-	Images() []Image
-	Image(ref string) Image // ref == image name w/o registry part
-}
-
 // ImageSource is a service, possibly remote (= slow), to download components of a single image.
 // This is primarily useful for copying images around; for examining their properties, Image (below)
 // is usually more useful.
@@ -71,7 +58,6 @@ type Image interface {
 	LayersCommand(layers ...string) error // configure download directory?
 	// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
 	Inspect() (*ImageInspectInfo, error)
-	DockerTar() ([]byte, error) // ??? also, configure output directory
 }
 
 // ImageInspectInfo is a set of metadata describing Docker images, primarily their manifest and configuration.

@@ -111,11 +111,6 @@ type v1Image struct {
 	OS string `json:"os,omitempty"`
 }
 
-// TODO(runcom)
-func (i *genericImage) DockerTar() ([]byte, error) {
-	return nil, nil
-}
-
 // will support v1 one day...
 type genericManifest interface {
 	String() string
