@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/containers/image/manifest"
@@ -25,10 +25,15 @@ var (
 // may not be a `genericImage` directly. However, most users of `types.Image`
 // do not care, and those who care about `skopeo/docker.Image` know they do.
 type genericImage struct {
-	src                    types.ImageSource
-	cachedManifest         []byte   // Private cache for Manifest(); nil if not yet known.
-	cachedManifestMIMEType string   // Private cache for the manifest media type w/o having to guess it
-	cachedSignatures       [][]byte // Private cache for Signatures(); nil if not yet known.
+	src types.ImageSource
+	// private cache for Manifest(); nil if not yet known.
+	cachedManifest []byte
+	// private cache for the manifest media type w/o having to guess it
+	// this may be the empty string in case the MIME Type wasn't guessed correctly
+	// this field is valid only if cachedManifest is not nil
+	cachedManifestMIMEType string
+	// private cache for Signatures(); nil if not yet known.
+	cachedSignatures [][]byte
 }
 
 // FromSource returns a types.Image implementation for source.
@@ -44,15 +49,18 @@ func (i *genericImage) IntendedDockerReference() string {
 }
 
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
-// NOTE: It is essential for signature verification that Manifest returns the manifest from which LayerDigests is computed.
+// NOTE: It is essential for signature verification that Manifest returns the manifest from which BlobDigests is computed.
 func (i *genericImage) Manifest() ([]byte, string, error) {
 	if i.cachedManifest == nil {
-		m, _, err := i.src.GetManifest([]string{manifest.DockerV2Schema1MIMEType})
+		m, mt, err := i.src.GetManifest([]string{manifest.DockerV2Schema1MIMEType})
 		if err != nil {
 			return nil, "", err
 		}
 		i.cachedManifest = m
-		i.cachedManifestMIMEType = manifest.GuessMIMEType(i.cachedManifest)
+		if mt == "" {
+			mt = manifest.GuessMIMEType(i.cachedManifest)
+		}
+		i.cachedManifestMIMEType = mt
 	}
 	return i.cachedManifest, i.cachedManifestMIMEType, nil
 }
@@ -75,11 +83,7 @@ func (i *genericImage) Inspect() (*types.ImageInspectInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	info, err := m.ImageInspectInfo()
-	if err != nil {
-		return nil, err
-	}
-	return info, nil
+	return m.ImageInspectInfo()
 }
 
 type config struct {
@@ -101,13 +105,18 @@ type v1Image struct {
 
 // will support v1 one day...
 type genericManifest interface {
-	GetLayers() []string
+	Config() ([]byte, error)
+	LayerDigests() []string
+	BlobDigests() []string
 	ImageInspectInfo() (*types.ImageInspectInfo, error)
 }
 
 type fsLayersSchema1 struct {
 	BlobSum string `json:"blobSum"`
 }
+
+// compile-time check that manifestSchema1 implements genericManifest
+var _ genericManifest = (*manifestSchema1)(nil)
 
 type manifestSchema1 struct {
 	Name     string
@@ -120,7 +129,7 @@ type manifestSchema1 struct {
 	//Signature []byte `json:"signature"`
 }
 
-func (m *manifestSchema1) GetLayers() []string {
+func (m *manifestSchema1) LayerDigests() []string {
 	layers := make([]string, len(m.FSLayers))
 	for i, layer := range m.FSLayers {
 		layers[i] = layer.BlobSum
@@ -128,9 +137,21 @@ func (m *manifestSchema1) GetLayers() []string {
 	return layers
 }
 
+func (m *manifestSchema1) BlobDigests() []string {
+	return m.LayerDigests()
+}
+
+func (m *manifestSchema1) Config() ([]byte, error) {
+	return []byte(m.History[0].V1Compatibility), nil
+}
+
 func (m *manifestSchema1) ImageInspectInfo() (*types.ImageInspectInfo, error) {
 	v1 := &v1Image{}
-	if err := json.Unmarshal([]byte(m.History[0].V1Compatibility), v1); err != nil {
+	config, err := m.Config()
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(config, v1); err != nil {
 		return nil, err
 	}
 	return &types.ImageInspectInfo{
@@ -140,22 +161,17 @@ func (m *manifestSchema1) ImageInspectInfo() (*types.ImageInspectInfo, error) {
 		Labels:        v1.Config.Labels,
 		Architecture:  v1.Architecture,
 		Os:            v1.OS,
-		Layers:        m.GetLayers(),
+		Layers:        m.LayerDigests(),
 	}, nil
 }
 
-func (m *manifestSchema1) String() string {
-	return fmt.Sprintf("%s-%s", sanitize(m.Name), sanitize(m.Tag))
-}
-
-func sanitize(s string) string {
-	return strings.Replace(s, "/", "-", -1)
-}
+// compile-time check that manifestSchema2 implements genericManifest
+var _ genericManifest = (*manifestSchema2)(nil)
 
 type manifestSchema2 struct {
-	src    types.ImageSource
-	Config descriptor   `json:"config"`
-	Layers []descriptor `json:"layers"`
+	src               types.ImageSource
+	ConfigDescriptor  descriptor   `json:"config"`
+	LayersDescriptors []descriptor `json:"layers"`
 }
 
 type descriptor struct {
@@ -164,26 +180,32 @@ type descriptor struct {
 	Digest    string `json:"digest"`
 }
 
-func (m *manifestSchema2) String() string {
-	return ""
-}
-
-func (m *manifestSchema2) GetLayers() []string {
+func (m *manifestSchema2) LayerDigests() []string {
 	blobs := []string{}
-	for _, layer := range m.Layers {
+	for _, layer := range m.LayersDescriptors {
 		blobs = append(blobs, layer.Digest)
 	}
-	blobs = append(blobs, m.Config.Digest)
 	return blobs
 }
 
-func (m *manifestSchema2) ImageInspectInfo() (*types.ImageInspectInfo, error) {
-	rawConfig, _, err := m.src.GetBlob(m.Config.Digest)
+func (m *manifestSchema2) BlobDigests() []string {
+	blobs := m.LayerDigests()
+	blobs = append(blobs, m.ConfigDescriptor.Digest)
+	return blobs
+}
+
+func (m *manifestSchema2) Config() ([]byte, error) {
+	rawConfig, _, err := m.src.GetBlob(m.ConfigDescriptor.Digest)
 	if err != nil {
 		return nil, err
 	}
-	defer rawConfig.Close()
 	config, err := ioutil.ReadAll(rawConfig)
+	rawConfig.Close()
+	return config, err
+}
+
+func (m *manifestSchema2) ImageInspectInfo() (*types.ImageInspectInfo, error) {
+	config, err := m.Config()
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +219,7 @@ func (m *manifestSchema2) ImageInspectInfo() (*types.ImageInspectInfo, error) {
 		Labels:        v1.Config.Labels,
 		Architecture:  v1.Architecture,
 		Os:            v1.OS,
-		Layers:        m.GetLayers(),
+		Layers:        m.LayerDigests(),
 	}, nil
 }
 
@@ -233,17 +255,19 @@ func (i *genericImage) getParsedManifest() (genericManifest, error) {
 			return nil, err
 		}
 		return &v2s2, nil
+	case "":
+		return nil, errors.New("could not guess manifest media type")
 	default:
 		return nil, fmt.Errorf("unsupported manifest media type %s", mt)
 	}
 }
 
-// uniqueLayerDigests returns a list of layer digests referenced from a manifest.
+// uniqueBlobDigests returns a list of blob digests referenced from a manifest.
 // The list will not contain duplicates; it is not intended to correspond to the "history" or "parent chain" of a Docker image.
-func uniqueLayerDigests(m genericManifest) []string {
+func uniqueBlobDigests(m genericManifest) []string {
 	var res []string
 	seen := make(map[string]struct{})
-	for _, digest := range m.GetLayers() {
+	for _, digest := range m.BlobDigests() {
 		if _, ok := seen[digest]; ok {
 			continue
 		}
@@ -253,15 +277,15 @@ func uniqueLayerDigests(m genericManifest) []string {
 	return res
 }
 
-// LayerDigests returns a list of layer digests referenced by this image.
+// BlobDigests returns a list of blob digests referenced by this image.
 // The list will not contain duplicates; it is not intended to correspond to the "history" or "parent chain" of a Docker image.
-// NOTE: It is essential for signature verification that LayerDigests is computed from the same manifest which is returned by Manifest().
-func (i *genericImage) LayerDigests() ([]string, error) {
+// NOTE: It is essential for signature verification that BlobDigests is computed from the same manifest which is returned by Manifest().
+func (i *genericImage) BlobDigests() ([]string, error) {
 	m, err := i.getParsedManifest()
 	if err != nil {
 		return nil, err
 	}
-	return uniqueLayerDigests(m), nil
+	return uniqueBlobDigests(m), nil
 }
 
 func (i *genericImage) getLayer(dest types.ImageDestination, digest string) error {
