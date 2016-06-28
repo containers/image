@@ -29,7 +29,7 @@ func TestGuessMIMEType(t *testing.T) {
 		manifest, err := ioutil.ReadFile(filepath.Join("fixtures", c.path))
 		require.NoError(t, err)
 		mimeType := GuessMIMEType(manifest)
-		assert.Equal(t, c.mimeType, mimeType)
+		assert.Equal(t, c.mimeType, mimeType, c.path)
 	}
 }
 
