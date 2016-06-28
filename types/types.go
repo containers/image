@@ -45,7 +45,7 @@ type Image interface {
 	IntendedDockerReference() string
 	// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
 	// NOTE: It is essential for signature verification that Manifest returns the manifest from which LayerDigests is computed.
-	Manifest() ([]byte, error)
+	Manifest() ([]byte, string, error)
 	// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 	Signatures() ([][]byte, error)
 	// LayerDigests returns a list of layer digests referenced by this image.

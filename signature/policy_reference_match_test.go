@@ -46,7 +46,7 @@ type refImageMock string
 func (ref refImageMock) IntendedDockerReference() string {
 	return string(ref)
 }
-func (ref refImageMock) Manifest() ([]byte, error) {
+func (ref refImageMock) Manifest() ([]byte, string, error) {
 	panic("unexpected call to a mock function")
 }
 func (ref refImageMock) ManifestMatchesDigest(expectedDigest string) (bool, error) {
@@ -156,7 +156,7 @@ type forbiddenImageMock string
 func (ref forbiddenImageMock) IntendedDockerReference() string {
 	panic("unexpected call to a mock function")
 }
-func (ref forbiddenImageMock) Manifest() ([]byte, error) {
+func (ref forbiddenImageMock) Manifest() ([]byte, string, error) {
 	panic("unexpected call to a mock function")
 }
 func (ref forbiddenImageMock) ManifestMatchesDigest(expectedDigest string) (bool, error) {
