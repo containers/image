@@ -71,8 +71,11 @@ func simplifyContentType(contentType string) string {
 	return mimeType
 }
 
-func (s *dockerImageSource) GetManifest(mimetypes []string) ([]byte, string, error) {
-	url := fmt.Sprintf(manifestURL, s.ref.RemoteName(), s.tag)
+func (s *dockerImageSource) GetManifest(mimetypes []string, reference string) ([]byte, string, error) {
+	if reference == "" {
+		reference = s.tag
+	}
+	url := fmt.Sprintf(manifestURL, s.ref.RemoteName(), reference)
 	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
 	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
 	headers := make(map[string][]string)
