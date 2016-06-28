@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/containers/image/manifest"
@@ -111,7 +110,6 @@ type v1Image struct {
 
 // will support v1 one day...
 type genericManifest interface {
-	String() string
 	GetLayers() []string
 }
 
@@ -136,14 +134,6 @@ func (m *manifestSchema1) GetLayers() []string {
 		layers[i] = layer.BlobSum
 	}
 	return layers
-}
-
-func (m *manifestSchema1) String() string {
-	return fmt.Sprintf("%s-%s", sanitize(m.Name), sanitize(m.Tag))
-}
-
-func sanitize(s string) string {
-	return strings.Replace(s, "/", "-", -1)
 }
 
 // getSchema1Manifest parses the manifest into a data structure, cleans it up, and returns it.
