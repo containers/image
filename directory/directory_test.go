@@ -27,7 +27,7 @@ func TestGetPutManifest(t *testing.T) {
 	assert.NoError(t, err)
 
 	src := NewDirImageSource(tmpDir)
-	m, mt, err := src.GetManifest(nil)
+	m, mt, err := src.GetManifest(nil, "")
 	assert.NoError(t, err)
 	assert.Equal(t, man, m)
 	assert.Equal(t, "", mt)

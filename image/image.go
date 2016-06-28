@@ -52,7 +52,10 @@ func (i *genericImage) IntendedDockerReference() string {
 // NOTE: It is essential for signature verification that Manifest returns the manifest from which BlobDigests is computed.
 func (i *genericImage) Manifest() ([]byte, string, error) {
 	if i.cachedManifest == nil {
-		m, mt, err := i.src.GetManifest([]string{manifest.DockerV2Schema1SignedMIMEType, manifest.DockerV2Schema1MIMEType})
+		m, mt, err := i.src.GetManifest([]string{
+			manifest.DockerV2Schema1SignedMIMEType,
+			manifest.DockerV2Schema1MIMEType,
+		}, "")
 		if err != nil {
 			return nil, "", err
 		}

@@ -14,8 +14,9 @@ type ImageSource interface {
 	// May be "" if unknown.
 	IntendedDockerReference() string
 	// GetManifest returns the image's manifest along with its MIME type. The empty string is returned if the MIME type is unknown. The slice parameter indicates the supported mime types the manifest should be when getting it.
+	// The string parameter indicates the reference to be looking for when getting a manifest.
 	// It may use a remote (= slow) service.
-	GetManifest([]string) ([]byte, string, error)
+	GetManifest([]string, string) ([]byte, string, error)
 	// Note: Calling GetBlob() may have ordering dependencies WRT other methods of this type. FIXME: How does this work with (docker save) on stdin?
 	// the second return value is the size of the blob. If not known 0 is returned
 	GetBlob(digest string) (io.ReadCloser, int64, error)

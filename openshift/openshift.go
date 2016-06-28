@@ -193,11 +193,11 @@ func (s *openshiftImageSource) IntendedDockerReference() string {
 	return s.client.canonicalDockerReference()
 }
 
-func (s *openshiftImageSource) GetManifest(mimetypes []string) ([]byte, string, error) {
+func (s *openshiftImageSource) GetManifest(mimetypes []string, reference string) ([]byte, string, error) {
 	if err := s.ensureImageIsResolved(); err != nil {
 		return nil, "", err
 	}
-	return s.docker.GetManifest(mimetypes)
+	return s.docker.GetManifest(mimetypes, reference)
 }
 
 func (s *openshiftImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
