@@ -22,6 +22,10 @@ func (d *dirImageDestination) CanonicalDockerReference() (string, error) {
 	return "", fmt.Errorf("Can not determine canonical Docker reference for a local directory")
 }
 
+func (d *dirImageDestination) SupportedManifestMIMETypes() []string {
+	return nil
+}
+
 func (d *dirImageDestination) PutManifest(manifest []byte) error {
 	return ioutil.WriteFile(manifestPath(d.dir), manifest, 0644)
 }

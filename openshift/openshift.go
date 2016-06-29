@@ -283,6 +283,13 @@ func NewOpenshiftImageDestination(imageName, certPath string, tlsVerify bool) (t
 	}, nil
 }
 
+func (d *openshiftImageDestination) SupportedManifestMIMETypes() []string {
+	return []string{
+		manifest.DockerV2Schema1SignedMIMEType,
+		manifest.DockerV2Schema1MIMEType,
+	}
+}
+
 func (d *openshiftImageDestination) CanonicalDockerReference() (string, error) {
 	return d.client.canonicalDockerReference(), nil
 }

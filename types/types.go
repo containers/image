@@ -34,6 +34,9 @@ type ImageDestination interface {
 	// Note: Calling PutBlob() and other methods may have ordering dependencies WRT other methods of this type. FIXME: Figure out and document.
 	PutBlob(digest string, stream io.Reader) error
 	PutSignatures(signatures [][]byte) error
+	// SupportedManifestMIMETypes tells which manifest mime types the destination supports
+	// If an empty slice or nil it's returned, then any mime type can be tried to upload
+	SupportedManifestMIMETypes() []string
 }
 
 // Image is the primary API for inspecting properties of images.
