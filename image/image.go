@@ -41,6 +41,8 @@ type genericImage struct {
 func FromSource(src types.ImageSource, requestedManifestMIMETypes []string) types.Image {
 	if len(requestedManifestMIMETypes) == 0 {
 		requestedManifestMIMETypes = []string{
+			manifest.OCIV1ImageManifestMIMEType,
+			manifest.DockerV2Schema2MIMEType,
 			manifest.DockerV2Schema1SignedMIMEType,
 			manifest.DockerV2Schema1MIMEType,
 		}
