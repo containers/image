@@ -23,7 +23,7 @@ func NewDockerImage(img, certPath string, tlsVerify bool) (types.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Image{Image: image.FromSource(s), src: s}, nil
+	return &Image{Image: image.FromSource(s, nil), src: s}, nil
 }
 
 // SourceRefFullName returns a fully expanded name for the repository this image is in.

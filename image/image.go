@@ -33,12 +33,19 @@ type genericImage struct {
 	// this field is valid only if cachedManifest is not nil
 	cachedManifestMIMEType string
 	// private cache for Signatures(); nil if not yet known.
-	cachedSignatures [][]byte
+	cachedSignatures           [][]byte
+	requestedManifestMIMETypes []string
 }
 
 // FromSource returns a types.Image implementation for source.
-func FromSource(src types.ImageSource) types.Image {
-	return &genericImage{src: src}
+func FromSource(src types.ImageSource, requestedManifestMIMETypes []string) types.Image {
+	if len(requestedManifestMIMETypes) == 0 {
+		requestedManifestMIMETypes = []string{
+			manifest.DockerV2Schema1SignedMIMEType,
+			manifest.DockerV2Schema1MIMEType,
+		}
+	}
+	return &genericImage{src: src, requestedManifestMIMETypes: requestedManifestMIMETypes}
 }
 
 // IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
@@ -52,7 +59,7 @@ func (i *genericImage) IntendedDockerReference() string {
 // NOTE: It is essential for signature verification that Manifest returns the manifest from which BlobDigests is computed.
 func (i *genericImage) Manifest() ([]byte, string, error) {
 	if i.cachedManifest == nil {
-		m, mt, err := i.src.GetManifest([]string{manifest.DockerV2Schema1SignedMIMEType, manifest.DockerV2Schema1MIMEType})
+		m, mt, err := i.src.GetManifest(i.requestedManifestMIMETypes)
 		if err != nil {
 			return nil, "", err
 		}

@@ -8,8 +8,8 @@ import (
 	"net/http"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/containers/image/manifest"
 	"github.com/containers/image/docker/reference"
+	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 )
 
@@ -34,6 +34,14 @@ func NewDockerImageDestination(img, certPath string, tlsVerify bool) (types.Imag
 		tag: tag,
 		c:   c,
 	}, nil
+}
+
+func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
+	return []string{
+		// TODO(runcom): we'll add OCI and v2s2 as part of another PR here
+		manifest.DockerV2Schema1SignedMIMEType,
+		manifest.DockerV2Schema1MIMEType,
+	}
 }
 
 func (d *dockerImageDestination) CanonicalDockerReference() (string, error) {
