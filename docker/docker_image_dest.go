@@ -19,8 +19,8 @@ type dockerImageDestination struct {
 	c   Client
 }
 
-// NewDockerImageDestination creates a new ImageDestination for the specified image and connection specification.
-func NewDockerImageDestination(img string, dc Client) (types.ImageDestination, error) {
+// NewImageDestination creates a new ImageDestination for the specified image and connection specification.
+func NewImageDestination(img string, dc Client) (types.ImageDestination, error) {
 	ref, tag, err := parseDockerImageName(img)
 	if err != nil {
 		return nil, err

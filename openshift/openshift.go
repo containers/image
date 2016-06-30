@@ -251,7 +251,7 @@ func (s *openshiftImageSource) ensureImageIsResolved() error {
 	if err != nil {
 		return err
 	}
-	d, err := docker.NewDockerImageSource(dockerRef, dc)
+	d, err := docker.NewImageSource(dockerRef, dc)
 	if err != nil {
 		return err
 	}
@@ -280,7 +280,7 @@ func NewOpenshiftImageDestination(imageName, certPath string, tlsVerify bool) (t
 	if err != nil {
 		return nil, err
 	}
-	docker, err := docker.NewDockerImageDestination(dockerRef, dc)
+	docker, err := docker.NewImageDestination(dockerRef, dc)
 	if err != nil {
 		return nil, err
 	}

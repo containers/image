@@ -29,7 +29,7 @@ type dockerImageSource struct {
 	c   Client
 }
 
-// newDockerImageSource is the same as NewDockerImageSource, only it returns the more specific *dockerImageSource type.
+// newDockerImageSource is the same as NewImageSource, only it returns the more specific *dockerImageSource type.
 func newDockerImageSource(img string, dc Client) (*dockerImageSource, error) {
 	ref, tag, err := parseDockerImageName(img)
 	if err != nil {
@@ -42,8 +42,8 @@ func newDockerImageSource(img string, dc Client) (*dockerImageSource, error) {
 	}, nil
 }
 
-// NewDockerImageSource creates a new ImageSource for the specified image and connection specification.
-func NewDockerImageSource(img string, dc Client) (types.ImageSource, error) {
+// NewImageSource creates a new ImageSource for the specified image and connection specification.
+func NewImageSource(img string, dc Client) (types.ImageSource, error) {
 	return newDockerImageSource(img, dc)
 }
 

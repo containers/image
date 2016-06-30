@@ -36,18 +36,18 @@ func TestIntendedDockerReference(t *testing.T) {
 	client := &testClient{}
 
 	img := "localhost:5000/runcom/busybox"
-	src, err := NewDockerImageSource(img, client)
+	src, err := NewImageSource(img, client)
 	assert.NoError(t, err)
 	expected := fmt.Sprintf("%s:latest", img)
 	assert.Equal(t, expected, src.IntendedDockerReference())
 
 	imgWithTag := "localhost:5000/runcom/busybox:amd64"
-	src, err = NewDockerImageSource(imgWithTag, client)
+	src, err = NewImageSource(imgWithTag, client)
 	assert.NoError(t, err)
 	assert.Equal(t, imgWithTag, src.IntendedDockerReference())
 
 	dockerImg := "runcom/busybox:amd64"
-	src, err = NewDockerImageSource(dockerImg, client)
+	src, err = NewImageSource(dockerImg, client)
 	assert.NoError(t, err)
 	assert.Equal(t, dockerImg, src.IntendedDockerReference())
 }
