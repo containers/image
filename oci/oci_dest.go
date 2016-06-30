@@ -72,6 +72,10 @@ func createManifest(m []byte) ([]byte, string, error) {
 			return nil, "", err
 		}
 		om.MediaType = manifest.OCIV1ImageManifestMIMEType
+		for i := range om.Layers {
+			om.Layers[i].MediaType = manifest.OCIV1ImageSerializationMIMEType
+		}
+		om.Config.MediaType = manifest.OCIV1ImageSerializationConfigMIMEType
 		b, err := json.Marshal(om)
 		if err != nil {
 			return nil, "", err
