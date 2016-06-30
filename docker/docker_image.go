@@ -18,8 +18,8 @@ type Image struct {
 
 // NewDockerImage returns a new Image interface type after setting up
 // a client to the registry hosting the given image.
-func NewDockerImage(img, certPath string, tlsVerify bool) (types.Image, error) {
-	s, err := newDockerImageSource(img, certPath, tlsVerify)
+func NewDockerImage(img string, dc Client) (types.Image, error) {
+	s, err := newDockerImageSource(img, dc)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func (i *Image) SourceRefFullName() string {
 // GetRepositoryTags list all tags available in the repository. Note that this has no connection with the tag(s) used for this specific image, if any.
 func (i *Image) GetRepositoryTags() ([]string, error) {
 	url := fmt.Sprintf(tagsURL, i.src.ref.RemoteName())
-	res, err := i.src.c.makeRequest("GET", url, nil, nil)
+	res, err := i.src.c.MakeRequest("GET", url, nil, nil, false)
 	if err != nil {
 		return nil, err
 	}

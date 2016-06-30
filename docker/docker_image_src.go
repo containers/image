@@ -26,29 +26,25 @@ func (e errFetchManifest) Error() string {
 type dockerImageSource struct {
 	ref reference.Named
 	tag string
-	c   *dockerClient
+	c   Client
 }
 
 // newDockerImageSource is the same as NewDockerImageSource, only it returns the more specific *dockerImageSource type.
-func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSource, error) {
+func newDockerImageSource(img string, dc Client) (*dockerImageSource, error) {
 	ref, tag, err := parseDockerImageName(img)
-	if err != nil {
-		return nil, err
-	}
-	c, err := newDockerClient(ref.Hostname(), certPath, tlsVerify)
 	if err != nil {
 		return nil, err
 	}
 	return &dockerImageSource{
 		ref: ref,
 		tag: tag,
-		c:   c,
+		c:   dc,
 	}, nil
 }
 
 // NewDockerImageSource creates a new ImageSource for the specified image and connection specification.
-func NewDockerImageSource(img, certPath string, tlsVerify bool) (types.ImageSource, error) {
-	return newDockerImageSource(img, certPath, tlsVerify)
+func NewDockerImageSource(img string, dc Client) (types.ImageSource, error) {
+	return newDockerImageSource(img, dc)
 }
 
 // IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
@@ -77,7 +73,7 @@ func (s *dockerImageSource) GetManifest(mimetypes []string) ([]byte, string, err
 	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
 	headers := make(map[string][]string)
 	headers["Accept"] = mimetypes
-	res, err := s.c.makeRequest("GET", url, headers, nil)
+	res, err := s.c.MakeRequest("GET", url, headers, nil, false)
 	if err != nil {
 		return nil, "", err
 	}
@@ -96,7 +92,7 @@ func (s *dockerImageSource) GetManifest(mimetypes []string) ([]byte, string, err
 func (s *dockerImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
 	url := fmt.Sprintf(blobsURL, s.ref.RemoteName(), digest)
 	logrus.Debugf("Downloading %s", url)
-	res, err := s.c.makeRequest("GET", url, nil, nil)
+	res, err := s.c.MakeRequest("GET", url, nil, nil, false)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -124,7 +120,7 @@ func (s *dockerImageSource) Delete() error {
 	headers["Accept"] = []string{manifest.DockerV2Schema2MIMEType}
 
 	getURL := fmt.Sprintf(manifestURL, s.ref.RemoteName(), s.tag)
-	get, err := s.c.makeRequest("GET", getURL, headers, nil)
+	get, err := s.c.MakeRequest("GET", getURL, headers, nil, false)
 	if err != nil {
 		return err
 	}
@@ -146,7 +142,7 @@ func (s *dockerImageSource) Delete() error {
 
 	// When retrieving the digest from a registry >= 2.3 use the following header:
 	//   "Accept": "application/vnd.docker.distribution.manifest.v2+json"
-	delete, err := s.c.makeRequest("DELETE", deleteURL, headers, nil)
+	delete, err := s.c.MakeRequest("DELETE", deleteURL, headers, nil, false)
 	if err != nil {
 		return err
 	}
