@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/containers/image/docker/reference"
+	"github.com/docker/docker/reference"
 	"github.com/containers/image/types"
 	distreference "github.com/docker/distribution/reference"
 )

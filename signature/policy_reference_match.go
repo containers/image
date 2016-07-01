@@ -3,7 +3,7 @@
 package signature
 
 import (
-	"github.com/containers/image/docker/reference"
+	"github.com/docker/docker/reference"
 	"github.com/containers/image/types"
 )
 
