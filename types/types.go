@@ -17,6 +17,8 @@ import (
 // OTOH all images using the same transport should (apart from versions of the image format), be interoperable.
 // For example, several different ImageTransport implementations may be based on local filesystem paths,
 // but using completely different formats for the contents of that path (a single tar file, a directory containing tarballs, a fully expanded container filesystem, ...)
+//
+// See also transports.KnownTransports.
 type ImageTransport interface {
 	// Name returns the name of the transport, which must be unique among other transports.
 	Name() string
@@ -38,7 +40,8 @@ type ImageReference interface {
 	// reference.Transport().ParseReference(reference.StringWithinTransport()) returns an equivalent reference.
 	// NOTE: The returned string is not promised to be equal to the original input to ParseReference;
 	// e.g. default attribute values omitted by the user may be filled in in the return value, or vice versa.
-	// WARNING: Do not use the return value in the UI to describe an image, it does not contain the Transport().Name() prefix.
+	// WARNING: Do not use the return value in the UI to describe an image, it does not contain the Transport().Name() prefix;
+	// instead, see transports.ImageName().
 	StringWithinTransport() string
 
 	// DockerReference returns a Docker reference associated with this reference
