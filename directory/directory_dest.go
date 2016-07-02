@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/containers/image/types"
-	"github.com/docker/docker/reference"
 )
 
 type dirImageDestination struct {
@@ -18,8 +17,10 @@ func newImageDestination(ref dirReference) types.ImageDestination {
 	return &dirImageDestination{ref}
 }
 
-func (d *dirImageDestination) CanonicalDockerReference() reference.Named {
-	return nil
+// Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
+// e.g. it should use the public hostname instead of the result of resolving CNAMEs or following redirects.
+func (d *dirImageDestination) Reference() types.ImageReference {
+	return d.ref
 }
 
 func (d *dirImageDestination) SupportedManifestMIMETypes() []string {

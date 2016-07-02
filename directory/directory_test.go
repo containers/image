@@ -10,12 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCanonicalDockerReference(t *testing.T) {
-	destRef := NewReference("/etc")
-	dest, err := destRef.NewImageDestination("", true)
+func TestDestinationReference(t *testing.T) {
+	ref, tmpDir := refToTempDir(t)
+	defer os.RemoveAll(tmpDir)
+
+	dest, err := ref.NewImageDestination("", true)
 	require.NoError(t, err)
-	ref := dest.CanonicalDockerReference()
-	assert.Nil(t, ref)
+	ref2 := dest.Reference()
+	assert.Equal(t, tmpDir, ref2.StringWithinTransport())
 }
 
 func TestGetPutManifest(t *testing.T) {

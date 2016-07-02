@@ -77,9 +77,9 @@ type ImageSource interface {
 
 // ImageDestination is a service, possibly remote (= slow), to store components of a single image.
 type ImageDestination interface {
-	// CanonicalDockerReference returns the Docker reference for this image (fully expanded, i.e. !reference.IsNameOnly, but
-	// reflecting user intent, not e.g. after redirect or alias processing), or nil if unknown.
-	CanonicalDockerReference() reference.Named
+	// Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
+	// e.g. it should use the public hostname instead of the result of resolving CNAMEs or following redirects.
+	Reference() ImageReference
 	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 	PutManifest([]byte) error
 	// Note: Calling PutBlob() and other methods may have ordering dependencies WRT other methods of this type. FIXME: Figure out and document.

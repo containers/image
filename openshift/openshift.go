@@ -277,15 +277,17 @@ func newImageDestination(ref openshiftReference, certPath string, tlsVerify bool
 	}, nil
 }
 
+// Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
+// e.g. it should use the public hostname instead of the result of resolving CNAMEs or following redirects.
+func (d *openshiftImageDestination) Reference() types.ImageReference {
+	return d.client.ref
+}
+
 func (d *openshiftImageDestination) SupportedManifestMIMETypes() []string {
 	return []string{
 		manifest.DockerV2Schema1SignedMIMEType,
 		manifest.DockerV2Schema1MIMEType,
 	}
-}
-
-func (d *openshiftImageDestination) CanonicalDockerReference() reference.Named {
-	return d.client.ref.dockerReference
 }
 
 func (d *openshiftImageDestination) PutManifest(m []byte) error {

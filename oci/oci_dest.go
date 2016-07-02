@@ -11,7 +11,6 @@ import (
 
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
-	"github.com/docker/docker/reference"
 )
 
 type ociManifest struct {
@@ -37,8 +36,10 @@ func newImageDestination(ref ociReference) types.ImageDestination {
 	return &ociImageDestination{ref: ref}
 }
 
-func (d *ociImageDestination) CanonicalDockerReference() reference.Named {
-	return nil
+// Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
+// e.g. it should use the public hostname instead of the result of resolving CNAMEs or following redirects.
+func (d *ociImageDestination) Reference() types.ImageReference {
+	return d.ref
 }
 
 func createManifest(m []byte) ([]byte, string, error) {

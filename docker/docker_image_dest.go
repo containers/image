@@ -10,7 +10,6 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
-	"github.com/docker/docker/reference"
 )
 
 type dockerImageDestination struct {
@@ -30,6 +29,12 @@ func newImageDestination(ref dockerReference, certPath string, tlsVerify bool) (
 	}, nil
 }
 
+// Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
+// e.g. it should use the public hostname instead of the result of resolving CNAMEs or following redirects.
+func (d *dockerImageDestination) Reference() types.ImageReference {
+	return d.ref
+}
+
 func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 	return []string{
 		// TODO(runcom): we'll add OCI as part of another PR here
@@ -37,10 +42,6 @@ func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 		manifest.DockerV2Schema1SignedMIMEType,
 		manifest.DockerV2Schema1MIMEType,
 	}
-}
-
-func (d *dockerImageDestination) CanonicalDockerReference() reference.Named {
-	return d.ref.ref
 }
 
 func (d *dockerImageDestination) PutManifest(m []byte) error {
