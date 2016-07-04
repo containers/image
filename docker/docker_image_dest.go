@@ -51,7 +51,7 @@ func (d *dockerImageDestination) CanonicalDockerReference() (string, error) {
 
 func (d *dockerImageDestination) PutManifest(m []byte) error {
 	// FIXME: This only allows upload by digest, not creating a tag.  See the
-	// corresponding comment in NewOpenshiftImageDestination.
+	// corresponding comment in openshift.NewImageDestination.
 	digest, err := manifest.Digest(m)
 	if err != nil {
 		return err

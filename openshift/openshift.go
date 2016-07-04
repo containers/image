@@ -172,8 +172,8 @@ type openshiftImageSource struct {
 	imageStreamImageName string            // Resolved image identifier, or "" if not known yet
 }
 
-// NewOpenshiftImageSource creates a new ImageSource for the specified image and connection specification.
-func NewOpenshiftImageSource(imageName, certPath string, tlsVerify bool) (types.ImageSource, error) {
+// NewImageSource creates a new ImageSource for the specified image and connection specification.
+func NewImageSource(imageName, certPath string, tlsVerify bool) (types.ImageSource, error) {
 	client, err := newOpenshiftClient(imageName)
 	if err != nil {
 		return nil, err
@@ -261,8 +261,8 @@ type openshiftImageDestination struct {
 	docker types.ImageDestination // The Docker Registry endpoint
 }
 
-// NewOpenshiftImageDestination creates a new ImageDestination for the specified image and connection specification.
-func NewOpenshiftImageDestination(imageName, certPath string, tlsVerify bool) (types.ImageDestination, error) {
+// NewImageDestination creates a new ImageDestination for the specified image and connection specification.
+func NewImageDestination(imageName, certPath string, tlsVerify bool) (types.ImageDestination, error) {
 	client, err := newOpenshiftClient(imageName)
 	if err != nil {
 		return nil, err
