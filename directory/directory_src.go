@@ -13,8 +13,8 @@ type dirImageSource struct {
 	dir string
 }
 
-// NewDirImageSource returns an ImageSource reading from an existing directory.
-func NewDirImageSource(dir string) types.ImageSource {
+// NewImageSource returns an ImageSource reading from an existing directory.
+func NewImageSource(dir string) types.ImageSource {
 	return &dirImageSource{dir}
 }
 

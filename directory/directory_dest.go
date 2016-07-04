@@ -13,8 +13,8 @@ type dirImageDestination struct {
 	dir string
 }
 
-// NewDirImageDestination returns an ImageDestination for writing to an existing directory.
-func NewDirImageDestination(dir string) types.ImageDestination {
+// NewImageDestination returns an ImageDestination for writing to an existing directory.
+func NewImageDestination(dir string) types.ImageDestination {
 	return &dirImageDestination{dir}
 }
 
