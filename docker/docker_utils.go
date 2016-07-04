@@ -2,8 +2,8 @@ package docker
 
 import "github.com/docker/docker/reference"
 
-// parseDockerImageName converts a string into a reference and tag value.
-func parseDockerImageName(img string) (reference.Named, string, error) {
+// parseImageName converts a string into a reference and tag value.
+func parseImageName(img string) (reference.Named, string, error) {
 	ref, err := reference.ParseNamed(img)
 	if err != nil {
 		return nil, "", err

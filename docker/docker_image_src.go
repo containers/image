@@ -9,9 +9,9 @@ import (
 	"strconv"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/docker/docker/reference"
 )
 
 type errFetchManifest struct {
@@ -29,9 +29,9 @@ type dockerImageSource struct {
 	c   *dockerClient
 }
 
-// newDockerImageSource is the same as NewDockerImageSource, only it returns the more specific *dockerImageSource type.
+// newDockerImageSource is the same as NewImageSource, only it returns the more specific *dockerImageSource type.
 func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSource, error) {
-	ref, tag, err := parseDockerImageName(img)
+	ref, tag, err := parseImageName(img)
 	if err != nil {
 		return nil, err
 	}
@@ -46,8 +46,8 @@ func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSou
 	}, nil
 }
 
-// NewDockerImageSource creates a new ImageSource for the specified image and connection specification.
-func NewDockerImageSource(img, certPath string, tlsVerify bool) (types.ImageSource, error) {
+// NewImageSource creates a new ImageSource for the specified image and connection specification.
+func NewImageSource(img, certPath string, tlsVerify bool) (types.ImageSource, error) {
 	return newDockerImageSource(img, certPath, tlsVerify)
 }
 

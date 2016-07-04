@@ -16,7 +16,7 @@ import (
 // dirImageMock returns a types.Image for a directory, claiming a specified intendedDockerReference.
 func dirImageMock(dir, intendedDockerReference string) types.Image {
 	return image.FromSource(&dirImageSourceMock{
-		ImageSource:             directory.NewDirImageSource(dir),
+		ImageSource:             directory.NewImageSource(dir),
 		intendedDockerReference: intendedDockerReference,
 	}, nil)
 }

@@ -11,7 +11,7 @@ import (
 )
 
 func TestCanonicalDockerReference(t *testing.T) {
-	dest := NewDirImageDestination("/path/to/somewhere")
+	dest := NewImageDestination("/path/to/somewhere")
 	_, err := dest.CanonicalDockerReference()
 	assert.Error(t, err)
 }
@@ -22,11 +22,11 @@ func TestGetPutManifest(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	man := []byte("test-manifest")
-	dest := NewDirImageDestination(tmpDir)
+	dest := NewImageDestination(tmpDir)
 	err = dest.PutManifest(man)
 	assert.NoError(t, err)
 
-	src := NewDirImageSource(tmpDir)
+	src := NewImageSource(tmpDir)
 	m, mt, err := src.GetManifest(nil)
 	assert.NoError(t, err)
 	assert.Equal(t, man, m)
@@ -40,11 +40,11 @@ func TestGetPutBlob(t *testing.T) {
 
 	digest := "digest-test"
 	blob := []byte("test-blob")
-	dest := NewDirImageDestination(tmpDir)
+	dest := NewImageDestination(tmpDir)
 	err = dest.PutBlob(digest, bytes.NewReader(blob))
 	assert.NoError(t, err)
 
-	src := NewDirImageSource(tmpDir)
+	src := NewImageSource(tmpDir)
 	rc, size, err := src.GetBlob(digest)
 	assert.NoError(t, err)
 	defer rc.Close()
@@ -59,7 +59,7 @@ func TestGetPutSignatures(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	dest := NewDirImageDestination(tmpDir)
+	dest := NewImageDestination(tmpDir)
 	signatures := [][]byte{
 		[]byte("sig1"),
 		[]byte("sig2"),
@@ -67,7 +67,7 @@ func TestGetPutSignatures(t *testing.T) {
 	err = dest.PutSignatures(signatures)
 	assert.NoError(t, err)
 
-	src := NewDirImageSource(tmpDir)
+	src := NewImageSource(tmpDir)
 	sigs, err := src.GetSignatures()
 	assert.NoError(t, err)
 	assert.Equal(t, signatures, sigs)
@@ -78,13 +78,13 @@ func TestDelete(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	src := NewDirImageSource(tmpDir)
+	src := NewImageSource(tmpDir)
 	err = src.Delete()
 	assert.Error(t, err)
 }
 
 func TestIntendedDockerReference(t *testing.T) {
-	src := NewDirImageSource("/path/to/somewhere")
+	src := NewImageSource("/path/to/somewhere")
 	dr := src.IntendedDockerReference()
 	assert.Equal(t, "", dr)
 

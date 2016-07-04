@@ -35,8 +35,8 @@ type ociImageDestination struct {
 
 var refRegexp = regexp.MustCompile(`^([A-Za-z0-9._-]+)+$`)
 
-// NewOCIImageDestination returns an ImageDestination for writing to an existing directory.
-func NewOCIImageDestination(dest string) (types.ImageDestination, error) {
+// NewImageDestination returns an ImageDestination for writing to an existing directory.
+func NewImageDestination(dest string) (types.ImageDestination, error) {
 	dir := dest
 	sep := strings.LastIndex(dest, ":")
 	tag := "latest"
