@@ -1,5 +1,11 @@
 .PHONY: all deps test validate lint
 
+# Which github repostiory and branch to use for testing with skopeo
+SKOPEO_REPO = projectatomic/skopeo
+SKOPEO_BRANCH = master
+# Set SUDO=sudo to run container integration tests using sudo.
+SUDO =
+
 all: deps .gitvalidation test validate
 
 deps:
@@ -9,6 +15,23 @@ deps:
 
 test:
 	@go test -cover ./...
+
+# This is not run as part of (make all), but Travis CI does run this.
+# Demonstarting a working version of skopeo (possibly with modified SKOPEO_REPO/SKOPEO_BRANCH, e.g.
+#    make test-skopeo SKOPEO_REPO=runcom/skopeo-1 SKOPEO_BRANCH=oci-3 SUDO=sudo
+# ) is a requirement before merging; note that Travis will only test
+# the master branch of the upstream repo.
+test-skopeo:
+	@echo === Testing skopeo build
+	@export GOPATH=$$(mktemp -d) && \
+		skopeo_path=$${GOPATH}/src/github.com/projectatomic/skopeo && \
+		vendor_path=$${skopeo_path}/vendor/github.com/containers/image && \
+		git clone -b $(SKOPEO_BRANCH) https://github.com/$(SKOPEO_REPO) $${skopeo_path} && \
+		rm -rf $${vendor_path} && cp -r . $${vendor_path} && \
+		cd $${skopeo_path} && \
+		make binary-local test-all-local && \
+		$(SUDO) make check && \
+		rm -rf $${skopeo_path}
 
 validate: lint
 	@go vet ./...
