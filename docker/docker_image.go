@@ -16,9 +16,9 @@ type Image struct {
 	src *dockerImageSource
 }
 
-// NewDockerImage returns a new Image interface type after setting up
+// NewImage returns a new Image interface type after setting up
 // a client to the registry hosting the given image.
-func NewDockerImage(img, certPath string, tlsVerify bool) (types.Image, error) {
+func NewImage(img, certPath string, tlsVerify bool) (types.Image, error) {
 	s, err := newDockerImageSource(img, certPath, tlsVerify)
 	if err != nil {
 		return nil, err

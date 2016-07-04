@@ -9,7 +9,7 @@
 //    )
 //
 //    func main() {
-//    	img, err := docker.NewDockerImage("fedora", "", false)
+//    	img, err := docker.NewImage("fedora", "", false)
 //    	if err != nil {
 //    		panic(err)
 //    	}

@@ -8,9 +8,9 @@ import (
 	"net/http"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/docker/docker/reference"
 )
 
 type dockerImageDestination struct {
@@ -19,9 +19,9 @@ type dockerImageDestination struct {
 	c   *dockerClient
 }
 
-// NewDockerImageDestination creates a new ImageDestination for the specified image and connection specification.
-func NewDockerImageDestination(img, certPath string, tlsVerify bool) (types.ImageDestination, error) {
-	ref, tag, err := parseDockerImageName(img)
+// NewImageDestination creates a new ImageDestination for the specified image and connection specification.
+func NewImageDestination(img, certPath string, tlsVerify bool) (types.ImageDestination, error) {
+	ref, tag, err := parseImageName(img)
 	if err != nil {
 		return nil, err
 	}
