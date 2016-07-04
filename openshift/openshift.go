@@ -247,7 +247,11 @@ func (s *openshiftImageSource) ensureImageIsResolved() error {
 		return err
 	}
 	logrus.Debugf("Resolved reference %#v", dockerRef)
-	d, err := docker.NewDockerImageSource(dockerRef, s.certPath, s.tlsVerify)
+	dc, err := docker.NewClient(dockerRef, s.certPath, s.tlsVerify)
+	if err != nil {
+		return err
+	}
+	d, err := docker.NewImageSource(dockerRef, dc)
 	if err != nil {
 		return err
 	}
@@ -272,7 +276,11 @@ func NewOpenshiftImageDestination(imageName, certPath string, tlsVerify bool) (t
 	// i.e. a single signed image cannot be available under multiple tags.  But with types.ImageDestination, we don't know
 	// the manifest digest at this point.
 	dockerRef := fmt.Sprintf("%s/%s/%s:%s", client.dockerRegistryHostPart(), client.namespace, client.stream, client.tag)
-	docker, err := docker.NewDockerImageDestination(dockerRef, certPath, tlsVerify)
+	dc, err := docker.NewClient(dockerRef, certPath, tlsVerify)
+	if err != nil {
+		return nil, err
+	}
+	docker, err := docker.NewImageDestination(dockerRef, dc)
 	if err != nil {
 		return nil, err
 	}

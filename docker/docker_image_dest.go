@@ -16,23 +16,19 @@ import (
 type dockerImageDestination struct {
 	ref reference.Named
 	tag string
-	c   *dockerClient
+	c   Client
 }
 
-// NewDockerImageDestination creates a new ImageDestination for the specified image and connection specification.
-func NewDockerImageDestination(img, certPath string, tlsVerify bool) (types.ImageDestination, error) {
+// NewImageDestination creates a new ImageDestination for the specified image and connection specification.
+func NewImageDestination(img string, dc Client) (types.ImageDestination, error) {
 	ref, tag, err := parseDockerImageName(img)
-	if err != nil {
-		return nil, err
-	}
-	c, err := newDockerClient(ref.Hostname(), certPath, tlsVerify)
 	if err != nil {
 		return nil, err
 	}
 	return &dockerImageDestination{
 		ref: ref,
 		tag: tag,
-		c:   c,
+		c:   dc,
 	}, nil
 }
 
@@ -63,7 +59,7 @@ func (d *dockerImageDestination) PutManifest(m []byte) error {
 	if mimeType != "" {
 		headers["Content-Type"] = []string{mimeType}
 	}
-	res, err := d.c.makeRequest("PUT", url, headers, bytes.NewReader(m))
+	res, err := d.c.MakeRequest("PUT", url, headers, bytes.NewReader(m), false)
 	if err != nil {
 		return err
 	}
@@ -83,7 +79,7 @@ func (d *dockerImageDestination) PutBlob(digest string, stream io.Reader) error 
 	checkURL := fmt.Sprintf(blobsURL, d.ref.RemoteName(), digest)
 
 	logrus.Debugf("Checking %s", checkURL)
-	res, err := d.c.makeRequest("HEAD", checkURL, nil, nil)
+	res, err := d.c.MakeRequest("HEAD", checkURL, nil, nil, false)
 	if err != nil {
 		return err
 	}
@@ -97,7 +93,7 @@ func (d *dockerImageDestination) PutBlob(digest string, stream io.Reader) error 
 	// FIXME? Chunked upload, progress reporting, etc.
 	uploadURL := fmt.Sprintf(blobUploadURL, d.ref.RemoteName())
 	logrus.Debugf("Uploading %s", uploadURL)
-	res, err = d.c.makeRequest("POST", uploadURL, nil, nil)
+	res, err = d.c.MakeRequest("POST", uploadURL, nil, nil, false)
 	if err != nil {
 		return err
 	}
@@ -116,7 +112,7 @@ func (d *dockerImageDestination) PutBlob(digest string, stream io.Reader) error 
 	locationQuery := uploadLocation.Query()
 	locationQuery.Set("digest", digest)
 	uploadLocation.RawQuery = locationQuery.Encode()
-	res, err = d.c.makeRequestToResolvedURL("PUT", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, stream)
+	res, err = d.c.MakeRequest("PUT", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, stream, true)
 	if err != nil {
 		return err
 	}

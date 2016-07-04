@@ -32,6 +32,11 @@ const (
 	blobUploadURL = "%s/blobs/uploads/"
 )
 
+// Client is a generic client interface
+type Client interface {
+	MakeRequest(string, string, map[string][]string, io.Reader, bool) (*http.Response, error)
+}
+
 // dockerClient is configuration for dealing with a single Docker registry.
 type dockerClient struct {
 	registry        string
@@ -42,8 +47,13 @@ type dockerClient struct {
 	transport       *http.Transport
 }
 
-// newDockerClient returns a new dockerClient instance for refHostname (a host a specified in the Docker image reference, not canonicalized to dockerRegistry)
-func newDockerClient(refHostname, certPath string, tlsVerify bool) (*dockerClient, error) {
+// NewClient returns a new Client instance for refHostname (a host a specified in the Docker image reference, not canonicalized to dockerRegistry)
+func NewClient(img, certPath string, tlsVerify bool) (Client, error) {
+	ref, _, err := parseDockerImageName(img)
+	if err != nil {
+		return nil, err
+	}
+	refHostname := ref.Hostname()
 	var registry string
 	if refHostname == dockerHostname {
 		registry = dockerRegistry
@@ -78,19 +88,21 @@ func newDockerClient(refHostname, certPath string, tlsVerify bool) (*dockerClien
 	}, nil
 }
 
-// makeRequest creates and executes a http.Request with the specified parameters, adding authentication and TLS options for the Docker client.
-// url is NOT an absolute URL, but a path relative to the /v2/ top-level API path.  The host name and schema is taken from the client or autodetected.
-func (c *dockerClient) makeRequest(method, url string, headers map[string][]string, stream io.Reader) (*http.Response, error) {
-	if c.scheme == "" {
-		pr, err := c.ping()
-		if err != nil {
-			return nil, err
+// MakeRequest creates and executes a http.Request with the specified parameters, adding authentication and TLS options for the Docker client.
+// if resolved is fals, eurl is NOT an absolute URL, but a path relative to the /v2/ top-level API path.  The host name and schema is taken from the client or autodetected.
+func (c *dockerClient) MakeRequest(method, url string, headers map[string][]string, stream io.Reader, resolved bool) (*http.Response, error) {
+	if !resolved {
+		if c.scheme == "" {
+			pr, err := c.ping()
+			if err != nil {
+				return nil, err
+			}
+			c.wwwAuthenticate = pr.WWWAuthenticate
+			c.scheme = pr.scheme
 		}
-		c.wwwAuthenticate = pr.WWWAuthenticate
-		c.scheme = pr.scheme
-	}
 
-	url = fmt.Sprintf(baseURL, c.scheme, c.registry) + url
+		url = fmt.Sprintf(baseURL, c.scheme, c.registry) + url
+	}
 	return c.makeRequestToResolvedURL(method, url, headers, stream)
 }
 
