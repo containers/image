@@ -76,9 +76,6 @@ func createManifest(m []byte) ([]byte, string, error) {
 }
 
 func (d *ociImageDestination) PutManifest(m []byte) error {
-	if err := d.ensureParentDirectoryExists("refs"); err != nil {
-		return err
-	}
 	// TODO(mitr, runcom): this breaks signatures entirely since at this point we're creating a new manifest
 	// and signatures don't apply anymore. Will fix.
 	ociMan, mt, err := createManifest(m)
@@ -106,14 +103,19 @@ func (d *ociImageDestination) PutManifest(m []byte) error {
 	if err := ioutil.WriteFile(d.ref.ociLayoutPath(), []byte(`{"imageLayoutVersion": "1.0.0"}`), 0644); err != nil {
 		return err
 	}
-	return ioutil.WriteFile(d.ref.descriptorPath(d.ref.tag), data, 0644)
+	descriptorPath := d.ref.descriptorPath(d.ref.tag)
+	if err := ensureParentDirectoryExists(descriptorPath); err != nil {
+		return err
+	}
+	return ioutil.WriteFile(descriptorPath, data, 0644)
 }
 
 func (d *ociImageDestination) PutBlob(digest string, stream io.Reader) error {
-	if err := d.ensureParentDirectoryExists("blobs"); err != nil {
+	blobPath := d.ref.blobPath(digest)
+	if err := ensureParentDirectoryExists(blobPath); err != nil {
 		return err
 	}
-	blob, err := os.Create(d.ref.blobPath(digest))
+	blob, err := os.Create(blobPath)
 	if err != nil {
 		return err
 	}
@@ -127,10 +129,11 @@ func (d *ociImageDestination) PutBlob(digest string, stream io.Reader) error {
 	return nil
 }
 
-func (d *ociImageDestination) ensureParentDirectoryExists(parent string) error {
-	path := filepath.Join(d.ref.dir, parent)
-	if _, err := os.Stat(path); err != nil && os.IsNotExist(err) {
-		if err := os.MkdirAll(path, 0755); err != nil {
+// ensureParentDirectoryExists ensures the parent of the supplied path exists.
+func ensureParentDirectoryExists(path string) error {
+	parent := filepath.Dir(path)
+	if _, err := os.Stat(parent); err != nil && os.IsNotExist(err) {
+		if err := os.MkdirAll(parent, 0755); err != nil {
 			return err
 		}
 	}
