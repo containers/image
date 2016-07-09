@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
@@ -100,21 +99,21 @@ func (d *ociImageDestination) PutManifest(m []byte) error {
 		return err
 	}
 
-	if err := ioutil.WriteFile(blobPath(d.ref.dir, digest), ociMan, 0644); err != nil {
+	if err := ioutil.WriteFile(d.ref.blobPath(digest), ociMan, 0644); err != nil {
 		return err
 	}
 	// TODO(runcom): ugly here?
-	if err := ioutil.WriteFile(ociLayoutPath(d.ref.dir), []byte(`{"imageLayoutVersion": "1.0.0"}`), 0644); err != nil {
+	if err := ioutil.WriteFile(d.ref.ociLayoutPath(), []byte(`{"imageLayoutVersion": "1.0.0"}`), 0644); err != nil {
 		return err
 	}
-	return ioutil.WriteFile(descriptorPath(d.ref.dir, d.ref.tag), data, 0644)
+	return ioutil.WriteFile(d.ref.descriptorPath(d.ref.tag), data, 0644)
 }
 
 func (d *ociImageDestination) PutBlob(digest string, stream io.Reader) error {
 	if err := d.ensureParentDirectoryExists("blobs"); err != nil {
 		return err
 	}
-	blob, err := os.Create(blobPath(d.ref.dir, digest))
+	blob, err := os.Create(d.ref.blobPath(digest))
 	if err != nil {
 		return err
 	}
@@ -150,19 +149,4 @@ func (d *ociImageDestination) PutSignatures(signatures [][]byte) error {
 		return fmt.Errorf("Pushing signatures for OCI images is not supported")
 	}
 	return nil
-}
-
-// ociLayoutPathPath returns a path for the oci-layout within a directory using OCI conventions.
-func ociLayoutPath(dir string) string {
-	return filepath.Join(dir, "oci-layout")
-}
-
-// blobPath returns a path for a blob within a directory using OCI image-layout conventions.
-func blobPath(dir string, digest string) string {
-	return filepath.Join(dir, "blobs", strings.Replace(digest, ":", "-", -1))
-}
-
-// descriptorPath returns a path for the manifest within a directory using OCI conventions.
-func descriptorPath(dir string, digest string) string {
-	return filepath.Join(dir, "refs", digest)
 }

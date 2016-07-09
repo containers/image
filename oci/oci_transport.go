@@ -3,6 +3,7 @@ package oci
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -172,4 +173,19 @@ func (ref ociReference) NewImageSource(certPath string, tlsVerify bool) (types.I
 // NewImageDestination returns a types.ImageDestination for this reference.
 func (ref ociReference) NewImageDestination(certPath string, tlsVerify bool) (types.ImageDestination, error) {
 	return newImageDestination(ref), nil
+}
+
+// ociLayoutPathPath returns a path for the oci-layout within a directory using OCI conventions.
+func (ref ociReference) ociLayoutPath() string {
+	return filepath.Join(ref.dir, "oci-layout")
+}
+
+// blobPath returns a path for a blob within a directory using OCI image-layout conventions.
+func (ref ociReference) blobPath(digest string) string {
+	return filepath.Join(ref.dir, "blobs", strings.Replace(digest, ":", "-", -1))
+}
+
+// descriptorPath returns a path for the manifest within a directory using OCI conventions.
+func (ref ociReference) descriptorPath(digest string) string {
+	return filepath.Join(ref.dir, "refs", digest)
 }

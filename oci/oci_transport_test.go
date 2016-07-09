@@ -215,3 +215,29 @@ func TestReferenceNewImageDestination(t *testing.T) {
 	_, err := ref.NewImageDestination("/this/doesn't/exist", true)
 	assert.NoError(t, err)
 }
+
+func TestReferenceOCILayoutPath(t *testing.T) {
+	ref, tmpDir := refToTempOCI(t)
+	defer os.RemoveAll(tmpDir)
+	ociRef, ok := ref.(ociReference)
+	require.True(t, ok)
+	assert.Equal(t, tmpDir+"/oci-layout", ociRef.ociLayoutPath())
+}
+
+func TestReferenceBlobPath(t *testing.T) {
+	const hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+	ref, tmpDir := refToTempOCI(t)
+	defer os.RemoveAll(tmpDir)
+	ociRef, ok := ref.(ociReference)
+	require.True(t, ok)
+	assert.Equal(t, tmpDir+"/blobs/sha256-"+hex, ociRef.blobPath("sha256:"+hex))
+}
+
+func TestReferenceDescriptorPath(t *testing.T) {
+	ref, tmpDir := refToTempOCI(t)
+	defer os.RemoveAll(tmpDir)
+	ociRef, ok := ref.(ociReference)
+	require.True(t, ok)
+	assert.Equal(t, tmpDir+"/refs/notlatest", ociRef.descriptorPath("notlatest"))
+}
