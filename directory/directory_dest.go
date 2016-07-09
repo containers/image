@@ -28,11 +28,11 @@ func (d *dirImageDestination) SupportedManifestMIMETypes() []string {
 }
 
 func (d *dirImageDestination) PutManifest(manifest []byte) error {
-	return ioutil.WriteFile(manifestPath(d.ref.path), manifest, 0644)
+	return ioutil.WriteFile(d.ref.manifestPath(), manifest, 0644)
 }
 
 func (d *dirImageDestination) PutBlob(digest string, stream io.Reader) error {
-	layerFile, err := os.Create(layerPath(d.ref.path, digest))
+	layerFile, err := os.Create(d.ref.layerPath(digest))
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func (d *dirImageDestination) PutBlob(digest string, stream io.Reader) error {
 
 func (d *dirImageDestination) PutSignatures(signatures [][]byte) error {
 	for i, sig := range signatures {
-		if err := ioutil.WriteFile(signaturePath(d.ref.path, i), sig, 0644); err != nil {
+		if err := ioutil.WriteFile(d.ref.signaturePath(i), sig, 0644); err != nil {
 			return err
 		}
 	}
