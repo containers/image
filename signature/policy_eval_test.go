@@ -82,7 +82,7 @@ func TestFullyExpandedDockerReference(t *testing.T) {
 			sha256Digest: sha256Digest,
 			"":           "",
 			// A github.com/distribution/reference value can have a tag and a digest at the same time!
-			// github.com/skopeo/reference handles that by dropping the tag. That is not obviously the
+			// github.com/docker/reference handles that by dropping the tag. That is not obviously the
 			// right thing to do, but it is at least reasonable, so test that we keep behaving reasonably.
 			// This test case should not be construed to make this an API promise.
 			":tag" + sha256Digest: sha256Digest,

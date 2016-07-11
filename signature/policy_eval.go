@@ -135,11 +135,11 @@ func fullyExpandedDockerReference(ref reference.Named) (string, error) {
 	tagged, isTagged := ref.(distreference.Tagged)
 	digested, isDigested := ref.(distreference.Digested)
 	// A github.com/distribution/reference value can have a tag and a digest at the same time!
-	// skopeo/reference does not handle that, so fail.
+	// github.com/docker/reference does not handle that, so fail.
 	// FIXME? Should we support that?
 	switch {
 	case isTagged && isDigested:
-		// Coverage: This should currently not happen, the way skopeo/reference sets up types,
+		// Coverage: This should currently not happen, the way docker/reference sets up types,
 		// isTagged and isDigested is mutually exclusive.
 		return "", fmt.Errorf("Names with both a tag and digest are not currently supported")
 	case isTagged:
