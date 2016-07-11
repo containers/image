@@ -25,13 +25,12 @@ func (e errFetchManifest) Error() string {
 
 type dockerImageSource struct {
 	ref reference.Named
-	tag string
 	c   *dockerClient
 }
 
 // newDockerImageSource is the same as NewImageSource, only it returns the more specific *dockerImageSource type.
 func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSource, error) {
-	ref, tag, err := parseImageName(img)
+	ref, err := parseImageName(img)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +40,6 @@ func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSou
 	}
 	return &dockerImageSource{
 		ref: ref,
-		tag: tag,
 		c:   c,
 	}, nil
 }
@@ -55,7 +53,7 @@ func NewImageSource(img, certPath string, tlsVerify bool) (types.ImageSource, er
 // (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 // May be "" if unknown.
 func (s *dockerImageSource) IntendedDockerReference() string {
-	return fmt.Sprintf("%s:%s", s.ref.Name(), s.tag)
+	return s.ref.String()
 }
 
 // simplifyContentType drops parameters from a HTTP media type (see https://tools.ietf.org/html/rfc7231#section-3.1.1.1)
@@ -72,7 +70,11 @@ func simplifyContentType(contentType string) string {
 }
 
 func (s *dockerImageSource) GetManifest(mimetypes []string) ([]byte, string, error) {
-	url := fmt.Sprintf(manifestURL, s.ref.RemoteName(), s.tag)
+	reference, err := tagOrDigest(s.ref)
+	if err != nil {
+		return nil, "", err
+	}
+	url := fmt.Sprintf(manifestURL, s.ref.RemoteName(), reference)
 	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
 	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
 	headers := make(map[string][]string)
@@ -123,7 +125,11 @@ func (s *dockerImageSource) Delete() error {
 	headers := make(map[string][]string)
 	headers["Accept"] = []string{manifest.DockerV2Schema2MIMEType}
 
-	getURL := fmt.Sprintf(manifestURL, s.ref.RemoteName(), s.tag)
+	reference, err := tagOrDigest(s.ref)
+	if err != nil {
+		return err
+	}
+	getURL := fmt.Sprintf(manifestURL, s.ref.RemoteName(), reference)
 	get, err := s.c.makeRequest("GET", getURL, headers, nil)
 	if err != nil {
 		return err
