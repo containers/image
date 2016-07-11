@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/containers/image/types"
+	"github.com/docker/docker/reference"
 )
 
 type dirImageSource struct {
@@ -18,11 +19,12 @@ func NewImageSource(dir string) types.ImageSource {
 	return &dirImageSource{dir}
 }
 
-// IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
-// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
-// May be "" if unknown.
-func (s *dirImageSource) IntendedDockerReference() string {
-	return ""
+// IntendedDockerReference returns the Docker reference for this image, _as specified by the user_
+// (not as the image itself, or its underlying storage, claims).  Should be fully expanded, i.e. !reference.IsNameOnly.
+// This can be used e.g. to determine which public keys are trusted for this image.
+// May be nil if unknown.
+func (s *dirImageSource) IntendedDockerReference() reference.Named {
+	return nil
 }
 
 // it's up to the caller to determine the MIME type of the returned manifest's bytes

@@ -7,11 +7,12 @@ import (
 	"github.com/containers/image/types"
 )
 
-// parseDockerReferences converts two reference strings into parsed entities, failing on any error
-func parseDockerReferences(s1, s2 string) (reference.Named, reference.Named, error) {
-	r1, err := reference.ParseNamed(s1)
-	if err != nil {
-		return nil, nil, err
+// parseImageAndDockerReference converts an image and a reference string into two parsed entities, failing on any error and handling unidentified images.
+func parseImageAndDockerReference(image types.Image, s2 string) (reference.Named, reference.Named, error) {
+	r1 := image.IntendedDockerReference()
+	if r1 == nil {
+		// FIXME: Tell the user which image this is.
+		return nil, nil, PolicyRequirementError("Docker reference match attempted on an image with no known Docker reference identity")
 	}
 	r2, err := reference.ParseNamed(s2)
 	if err != nil {
@@ -21,7 +22,7 @@ func parseDockerReferences(s1, s2 string) (reference.Named, reference.Named, err
 }
 
 func (prm *prmMatchExact) matchesDockerReference(image types.Image, signatureDockerReference string) bool {
-	intended, signature, err := parseDockerReferences(image.IntendedDockerReference(), signatureDockerReference)
+	intended, signature, err := parseImageAndDockerReference(image, signatureDockerReference)
 	if err != nil {
 		return false
 	}
@@ -33,11 +34,24 @@ func (prm *prmMatchExact) matchesDockerReference(image types.Image, signatureDoc
 }
 
 func (prm *prmMatchRepository) matchesDockerReference(image types.Image, signatureDockerReference string) bool {
-	intended, signature, err := parseDockerReferences(image.IntendedDockerReference(), signatureDockerReference)
+	intended, signature, err := parseImageAndDockerReference(image, signatureDockerReference)
 	if err != nil {
 		return false
 	}
 	return signature.Name() == intended.Name()
+}
+
+// parseDockerReferences converts two reference strings into parsed entities, failing on any error
+func parseDockerReferences(s1, s2 string) (reference.Named, reference.Named, error) {
+	r1, err := reference.ParseNamed(s1)
+	if err != nil {
+		return nil, nil, err
+	}
+	r2, err := reference.ParseNamed(s2)
+	if err != nil {
+		return nil, nil, err
+	}
+	return r1, r2, nil
 }
 
 func (prm *prmExactReference) matchesDockerReference(image types.Image, signatureDockerReference string) bool {

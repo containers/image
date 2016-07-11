@@ -43,8 +43,8 @@ func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 	}
 }
 
-func (d *dockerImageDestination) CanonicalDockerReference() (string, error) {
-	return d.ref.String(), nil
+func (d *dockerImageDestination) CanonicalDockerReference() reference.Named {
+	return d.ref
 }
 
 func (d *dockerImageDestination) PutManifest(m []byte) error {

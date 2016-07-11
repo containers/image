@@ -17,6 +17,7 @@ import (
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	"github.com/containers/image/version"
+	"github.com/docker/docker/reference"
 )
 
 // openshiftClient is configuration for dealing with a single image stream, for reading or writing.
@@ -28,9 +29,10 @@ type openshiftClient struct {
 	username    string // "" if not used
 	password    string // if username != ""
 	// Values specific to this image
-	namespace string
-	stream    string
-	tag       string
+	namespace                string
+	stream                   string
+	tag                      string
+	canonicalDockerReference reference.Named // Computed from the above in advance, so that later references can not fail.
 }
 
 // FIXME: Is imageName like this a good way to refer to OpenShift images?
@@ -58,7 +60,7 @@ func newOpenshiftClient(imageName string) (*openshiftClient, error) {
 		return nil, fmt.Errorf("Invalid image reference %s, %#v", imageName, m)
 	}
 
-	return &openshiftClient{
+	c := &openshiftClient{
 		baseURL:     baseURL,
 		httpClient:  httpClient,
 		bearerToken: restConfig.BearerToken,
@@ -68,7 +70,21 @@ func newOpenshiftClient(imageName string) (*openshiftClient, error) {
 		namespace: m[1],
 		stream:    m[2],
 		tag:       m[3],
-	}, nil
+	}
+
+	// Precompute also c.canonicalDockerReference so that later references can not fail.
+	// FIXME: This is, strictly speaking, a namespace conflict with images placed in a Docker registry running on the same host.
+	// Do we need to do something else, perhaps disambiguate (port number?) or namespace Docker and OpenShift separately?
+	dockerRef, err := reference.WithName(fmt.Sprintf("%s/%s/%s", c.baseURL.Host, c.namespace, c.stream))
+	if err != nil {
+		return nil, err
+	}
+	c.canonicalDockerReference, err = reference.WithTag(dockerRef, c.tag)
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }
 
 // doRequest performs a correctly authenticated request to a specified path, and returns response body or an error object.
@@ -133,13 +149,6 @@ func (c *openshiftClient) doRequest(method, path string, requestBody []byte) ([]
 	return body, nil
 }
 
-// canonicalDockerReference returns a canonical reference we use for signing OpenShift images.
-// FIXME: This is, strictly speaking, a namespace conflict with images placed in a Docker registry running on the same host.
-// Do we need to do something else, perhaps disambiguate (port number?) or namespace Docker and OpenShift separately?
-func (c *openshiftClient) canonicalDockerReference() string {
-	return fmt.Sprintf("%s/%s/%s:%s", c.baseURL.Host, c.namespace, c.stream, c.tag)
-}
-
 // convertDockerImageReference takes an image API DockerImageReference value and returns a reference we can actually use;
 // currently OpenShift stores the cluster-internal service IPs here, which are unusable from the outside.
 func (c *openshiftClient) convertDockerImageReference(ref string) (string, error) {
@@ -186,11 +195,12 @@ func NewImageSource(imageName, certPath string, tlsVerify bool) (types.ImageSour
 	}, nil
 }
 
-// IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
-// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
-// May be "" if unknown.
-func (s *openshiftImageSource) IntendedDockerReference() string {
-	return s.client.canonicalDockerReference()
+// IntendedDockerReference returns the Docker reference for this image, _as specified by the user_
+// (not as the image itself, or its underlying storage, claims).  Should be fully expanded, i.e. !reference.IsNameOnly.
+// This can be used e.g. to determine which public keys are trusted for this image.
+// May be nil if unknown.
+func (s *openshiftImageSource) IntendedDockerReference() reference.Named {
+	return s.client.canonicalDockerReference
 }
 
 func (s *openshiftImageSource) GetManifest(mimetypes []string) ([]byte, string, error) {
@@ -290,8 +300,8 @@ func (d *openshiftImageDestination) SupportedManifestMIMETypes() []string {
 	}
 }
 
-func (d *openshiftImageDestination) CanonicalDockerReference() (string, error) {
-	return d.client.canonicalDockerReference(), nil
+func (d *openshiftImageDestination) CanonicalDockerReference() reference.Named {
+	return d.client.canonicalDockerReference
 }
 
 func (d *openshiftImageDestination) PutManifest(m []byte) error {

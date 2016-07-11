@@ -12,6 +12,7 @@ import (
 
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/docker/docker/reference"
 )
 
 type ociManifest struct {
@@ -53,8 +54,8 @@ func NewImageDestination(dest string) (types.ImageDestination, error) {
 	}, nil
 }
 
-func (d *ociImageDestination) CanonicalDockerReference() (string, error) {
-	return "", fmt.Errorf("Can not determine canonical Docker reference for an OCI image")
+func (d *ociImageDestination) CanonicalDockerReference() reference.Named {
+	return nil
 }
 
 func createManifest(m []byte) ([]byte, string, error) {

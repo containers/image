@@ -49,11 +49,12 @@ func NewImageSource(img, certPath string, tlsVerify bool) (types.ImageSource, er
 	return newDockerImageSource(img, certPath, tlsVerify)
 }
 
-// IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
-// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
-// May be "" if unknown.
-func (s *dockerImageSource) IntendedDockerReference() string {
-	return s.ref.String()
+// IntendedDockerReference returns the Docker reference for this image, _as specified by the user_
+// (not as the image itself, or its underlying storage, claims).  Should be fully expanded, i.e. !reference.IsNameOnly.
+// This can be used e.g. to determine which public keys are trusted for this image.
+// May be nil if unknown.
+func (s *dockerImageSource) IntendedDockerReference() reference.Named {
+	return s.ref
 }
 
 // simplifyContentType drops parameters from a HTTP media type (see https://tools.ietf.org/html/rfc7231#section-3.1.1.1)

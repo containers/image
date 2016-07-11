@@ -3,16 +3,19 @@ package types
 import (
 	"io"
 	"time"
+
+	"github.com/docker/docker/reference"
 )
 
 // ImageSource is a service, possibly remote (= slow), to download components of a single image.
 // This is primarily useful for copying images around; for examining their properties, Image (below)
 // is usually more useful.
 type ImageSource interface {
-	// IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
-	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
-	// May be "" if unknown.
-	IntendedDockerReference() string
+	// IntendedDockerReference returns the Docker reference for this image, _as specified by the user_
+	// (not as the image itself, or its underlying storage, claims).  Should be fully expanded, i.e. !reference.IsNameOnly.
+	// This can be used e.g. to determine which public keys are trusted for this image.
+	// May be nil if unknown.
+	IntendedDockerReference() reference.Named
 	// GetManifest returns the image's manifest along with its MIME type. The empty string is returned if the MIME type is unknown. The slice parameter indicates the supported mime types the manifest should be when getting it.
 	// It may use a remote (= slow) service.
 	GetManifest([]string) ([]byte, string, error)
@@ -27,8 +30,9 @@ type ImageSource interface {
 
 // ImageDestination is a service, possibly remote (= slow), to store components of a single image.
 type ImageDestination interface {
-	// CanonicalDockerReference returns the full, unambiguous, Docker reference for this image (even if the user referred to the image using some shorthand notation).
-	CanonicalDockerReference() (string, error)
+	// CanonicalDockerReference returns the Docker reference for this image (fully expanded, i.e. !reference.IsNameOnly, but
+	// reflecting user intent, not e.g. after redirect or alias processing), or nil if unknown.
+	CanonicalDockerReference() reference.Named
 	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 	PutManifest([]byte) error
 	// Note: Calling PutBlob() and other methods may have ordering dependencies WRT other methods of this type. FIXME: Figure out and document.
@@ -42,10 +46,11 @@ type ImageDestination interface {
 // Image is the primary API for inspecting properties of images.
 type Image interface {
 	// ref to repository?
-	// IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
-	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
-	// May be "" if unknown.
-	IntendedDockerReference() string
+	// IntendedDockerReference returns the Docker reference for this image, _as specified by the user_
+	// (not as the image itself, or its underlying storage, claims).  Should be fully expanded, i.e. !reference.IsNameOnly.
+	// This can be used e.g. to determine which public keys are trusted for this image.
+	// May be nil if unknown.
+	IntendedDockerReference() reference.Named
 	// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
 	// NOTE: It is essential for signature verification that Manifest returns the manifest from which BlobDigests is computed.
 	Manifest() ([]byte, string, error)
