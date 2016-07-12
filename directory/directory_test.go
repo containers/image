@@ -12,8 +12,8 @@ import (
 
 func TestCanonicalDockerReference(t *testing.T) {
 	dest := NewImageDestination("/path/to/somewhere")
-	_, err := dest.CanonicalDockerReference()
-	assert.Error(t, err)
+	ref := dest.CanonicalDockerReference()
+	assert.Nil(t, ref)
 }
 
 func TestGetPutManifest(t *testing.T) {
@@ -85,7 +85,6 @@ func TestDelete(t *testing.T) {
 
 func TestIntendedDockerReference(t *testing.T) {
 	src := NewImageSource("/path/to/somewhere")
-	dr := src.IntendedDockerReference()
-	assert.Equal(t, "", dr)
-
+	ref := src.IntendedDockerReference()
+	assert.Nil(t, ref)
 }

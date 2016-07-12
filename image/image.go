@@ -13,6 +13,7 @@ import (
 
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/docker/docker/reference"
 )
 
 var (
@@ -50,10 +51,11 @@ func FromSource(src types.ImageSource, requestedManifestMIMETypes []string) type
 	return &genericImage{src: src, requestedManifestMIMETypes: requestedManifestMIMETypes}
 }
 
-// IntendedDockerReference returns the full, unambiguous, Docker reference for this image, _as specified by the user_
-// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
-// May be "" if unknown.
-func (i *genericImage) IntendedDockerReference() string {
+// IntendedDockerReference returns the Docker reference for this image, _as specified by the user_
+// (not as the image itself, or its underlying storage, claims).  Should be fully expanded, i.e. !reference.IsNameOnly.
+// This can be used e.g. to determine which public keys are trusted for this image.
+// May be nil if unknown.
+func (i *genericImage) IntendedDockerReference() reference.Named {
 	return i.src.IntendedDockerReference()
 }
 

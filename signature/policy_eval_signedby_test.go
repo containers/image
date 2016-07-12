@@ -9,32 +9,35 @@ import (
 	"github.com/containers/image/directory"
 	"github.com/containers/image/image"
 	"github.com/containers/image/types"
+	"github.com/docker/docker/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // dirImageMock returns a types.Image for a directory, claiming a specified intendedDockerReference.
-func dirImageMock(dir, intendedDockerReference string) types.Image {
+func dirImageMock(t *testing.T, dir, intendedDockerReference string) types.Image {
+	ref, err := reference.ParseNamed(intendedDockerReference)
+	require.NoError(t, err)
 	return image.FromSource(&dirImageSourceMock{
 		ImageSource:             directory.NewImageSource(dir),
-		intendedDockerReference: intendedDockerReference,
+		intendedDockerReference: ref,
 	}, nil)
 }
 
 // dirImageSourceMock inherits dirImageSource, but overrides its IntendedDockerReference method.
 type dirImageSourceMock struct {
 	types.ImageSource
-	intendedDockerReference string
+	intendedDockerReference reference.Named
 }
 
-func (d *dirImageSourceMock) IntendedDockerReference() string {
+func (d *dirImageSourceMock) IntendedDockerReference() reference.Named {
 	return d.intendedDockerReference
 }
 
 func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	ktGPG := SBKeyTypeGPGKeys
 	prm := NewPRMMatchExact()
-	testImage := dirImageMock("fixtures/dir-img-valid", "testing/manifest:latest")
+	testImage := dirImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
 	testImageSig, err := ioutil.ReadFile("fixtures/dir-img-valid/signature-1")
 	require.NoError(t, err)
 
@@ -138,7 +141,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	assertSARRejectedPolicyRequirement(t, sar, parsedSig, err)
 
 	// Error reading image manifest
-	image := dirImageMock("fixtures/dir-img-no-manifest", "testing/manifest:latest")
+	image := dirImageMock(t, "fixtures/dir-img-no-manifest", "testing/manifest:latest")
 	sig, err = ioutil.ReadFile("fixtures/dir-img-no-manifest/signature-1")
 	require.NoError(t, err)
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
@@ -147,7 +150,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	assertSARRejected(t, sar, parsedSig, err)
 
 	// Error computing manifest digest
-	image = dirImageMock("fixtures/dir-img-manifest-digest-error", "testing/manifest:latest")
+	image = dirImageMock(t, "fixtures/dir-img-manifest-digest-error", "testing/manifest:latest")
 	sig, err = ioutil.ReadFile("fixtures/dir-img-manifest-digest-error/signature-1")
 	require.NoError(t, err)
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
@@ -156,7 +159,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	assertSARRejected(t, sar, parsedSig, err)
 
 	// A valid signature with a non-matching manifest
-	image = dirImageMock("fixtures/dir-img-modified-manifest", "testing/manifest:latest")
+	image = dirImageMock(t, "fixtures/dir-img-modified-manifest", "testing/manifest:latest")
 	sig, err = ioutil.ReadFile("fixtures/dir-img-modified-manifest/signature-1")
 	require.NoError(t, err)
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
@@ -187,7 +190,7 @@ func TestPRSignedByIsRunningImageAllowed(t *testing.T) {
 	prm := NewPRMMatchExact()
 
 	// A simple success case: single valid signature.
-	image := dirImageMock("fixtures/dir-img-valid", "testing/manifest:latest")
+	image := dirImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
 	pr, err := NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
 	allowed, err := pr.isRunningImageAllowed(image)
@@ -196,42 +199,42 @@ func TestPRSignedByIsRunningImageAllowed(t *testing.T) {
 	// Error reading signatures
 	invalidSigDir := createInvalidSigDir(t)
 	defer os.RemoveAll(invalidSigDir)
-	image = dirImageMock(invalidSigDir, "testing/manifest:latest")
+	image = dirImageMock(t, invalidSigDir, "testing/manifest:latest")
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
 	allowed, err = pr.isRunningImageAllowed(image)
 	assertRunningRejected(t, allowed, err)
 
 	// No signatures
-	image = dirImageMock("fixtures/dir-img-unsigned", "testing/manifest:latest")
+	image = dirImageMock(t, "fixtures/dir-img-unsigned", "testing/manifest:latest")
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
 	allowed, err = pr.isRunningImageAllowed(image)
 	assertRunningRejectedPolicyRequirement(t, allowed, err)
 
 	// 1 invalid signature: use dir-img-valid, but a non-matching Docker reference
-	image = dirImageMock("fixtures/dir-img-valid", "testing/manifest:notlatest")
+	image = dirImageMock(t, "fixtures/dir-img-valid", "testing/manifest:notlatest")
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
 	allowed, err = pr.isRunningImageAllowed(image)
 	assertRunningRejectedPolicyRequirement(t, allowed, err)
 
 	// 2 valid signatures
-	image = dirImageMock("fixtures/dir-img-valid-2", "testing/manifest:latest")
+	image = dirImageMock(t, "fixtures/dir-img-valid-2", "testing/manifest:latest")
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
 	allowed, err = pr.isRunningImageAllowed(image)
 	assertRunningAllowed(t, allowed, err)
 
 	// One invalid, one valid signature (in this order)
-	image = dirImageMock("fixtures/dir-img-mixed", "testing/manifest:latest")
+	image = dirImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:latest")
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
 	allowed, err = pr.isRunningImageAllowed(image)
 	assertRunningAllowed(t, allowed, err)
 
 	// 2 invalid signatures: use dir-img-valid-2, but a non-matching Docker reference
-	image = dirImageMock("fixtures/dir-img-valid-2", "testing/manifest:notlatest")
+	image = dirImageMock(t, "fixtures/dir-img-valid-2", "testing/manifest:notlatest")
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
 	allowed, err = pr.isRunningImageAllowed(image)

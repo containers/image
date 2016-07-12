@@ -10,9 +10,8 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/docker/reference"
 	"github.com/containers/image/types"
-	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/docker/reference"
 )
 
 // PolicyRequirementError is an explanatory text for rejecting a signature or an image.
@@ -71,7 +70,8 @@ type PolicyRequirement interface {
 // The type is public, but its implementation is private.
 type PolicyReferenceMatch interface {
 	// matchesDockerReference decides whether a specific image identity is accepted for an image
-	// (or, usually, for the image's IntendedDockerReference()),
+	// (or, usually, for the image's IntendedDockerReference()).  Note that
+	// image.IntendedDockerReference() may be nil.
 	matchesDockerReference(image types.Image, signatureDockerReference string) bool
 }
 
@@ -132,14 +132,15 @@ func (pc *PolicyContext) Destroy() error {
 // FIXME? This feels like it should be provided by skopeo/reference.
 func fullyExpandedDockerReference(ref reference.Named) (string, error) {
 	res := ref.FullName()
-	tagged, isTagged := ref.(distreference.Tagged)
-	digested, isDigested := ref.(distreference.Digested)
+	tagged, isTagged := ref.(reference.NamedTagged)
+	digested, isDigested := ref.(reference.Canonical)
 	// A github.com/distribution/reference value can have a tag and a digest at the same time!
-	// skopeo/reference does not handle that, so fail.
-	// FIXME? Should we support that?
+	// github.com/docker/reference does not handle that, so fail.
+	// (Even if it were supported, the semantics of policy namespaces are unclear - should we drop
+	// the tag or the digest first?)
 	switch {
 	case isTagged && isDigested:
-		// Coverage: This should currently not happen, the way skopeo/reference sets up types,
+		// Coverage: This should currently not happen, the way docker/reference sets up types,
 		// isTagged and isDigested is mutually exclusive.
 		return "", fmt.Errorf("Names with both a tag and digest are not currently supported")
 	case isTagged:
@@ -154,15 +155,12 @@ func fullyExpandedDockerReference(ref reference.Named) (string, error) {
 
 // requirementsForImage selects the appropriate requirements for image.
 func (pc *PolicyContext) requirementsForImage(image types.Image) (PolicyRequirements, error) {
-	imageIdentity := image.IntendedDockerReference()
-	// We don't technically need to parse it first in order to match the full name:tag,
-	// but do so anyway to ensure that the intended identity really does follow that
-	// format, or at least that it is not demonstrably wrong.
-	ref, err := reference.ParseNamed(imageIdentity)
-	if err != nil {
-		return nil, err
+	ref := image.IntendedDockerReference()
+	if ref == nil {
+		// FIXME: Tell the user which image this is.
+		return nil, fmt.Errorf("Can not determine policy for an image with no known Docker reference identity")
 	}
-	ref = reference.WithDefaultTag(ref)
+	ref = reference.WithDefaultTag(ref) // This should not be needed, but if we did receive a name-only reference, this is a reasonable thing to do.
 
 	// Look for a full match.
 	fullyExpanded, err := fullyExpandedDockerReference(ref)

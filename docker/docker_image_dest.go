@@ -15,13 +15,12 @@ import (
 
 type dockerImageDestination struct {
 	ref reference.Named
-	tag string
 	c   *dockerClient
 }
 
 // NewImageDestination creates a new ImageDestination for the specified image and connection specification.
 func NewImageDestination(img, certPath string, tlsVerify bool) (types.ImageDestination, error) {
-	ref, tag, err := parseImageName(img)
+	ref, err := parseImageName(img)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +30,6 @@ func NewImageDestination(img, certPath string, tlsVerify bool) (types.ImageDesti
 	}
 	return &dockerImageDestination{
 		ref: ref,
-		tag: tag,
 		c:   c,
 	}, nil
 }
@@ -45,8 +43,8 @@ func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 	}
 }
 
-func (d *dockerImageDestination) CanonicalDockerReference() (string, error) {
-	return fmt.Sprintf("%s:%s", d.ref.Name(), d.tag), nil
+func (d *dockerImageDestination) CanonicalDockerReference() reference.Named {
+	return d.ref
 }
 
 func (d *dockerImageDestination) PutManifest(m []byte) error {

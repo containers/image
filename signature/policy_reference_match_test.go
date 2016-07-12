@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/containers/image/types"
+	"github.com/docker/docker/reference"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,19 +16,25 @@ const (
 	untaggedRHELRef = "registry.access.redhat.com/rhel7/rhel"
 )
 
-func TestParseDockerReferences(t *testing.T) {
+func TestParseImageAndDockerReference(t *testing.T) {
 	const (
 		ok1  = "busybox"
 		ok2  = fullRHELRef
 		bad1 = "UPPERCASE_IS_INVALID_IN_DOCKER_REFERENCES"
 		bad2 = ""
 	)
-
 	// Success
-	r1, r2, err := parseDockerReferences(ok1, ok2)
+	ref, err := reference.ParseNamed(ok1)
+	require.NoError(t, err)
+	r1, r2, err := parseImageAndDockerReference(refImageMock{ref}, ok2)
 	require.NoError(t, err)
 	assert.Equal(t, ok1, r1.String())
 	assert.Equal(t, ok2, r2.String())
+
+	// Unidentified images are rejected.
+	_, _, err = parseImageAndDockerReference(refImageMock{nil}, ok2)
+	require.Error(t, err)
+	assert.IsType(t, PolicyRequirementError(""), err)
 
 	// Failures
 	for _, refs := range [][]string{
@@ -35,16 +42,19 @@ func TestParseDockerReferences(t *testing.T) {
 		{ok1, bad2},
 		{bad1, bad2},
 	} {
-		_, _, err := parseDockerReferences(refs[0], refs[1])
-		assert.Error(t, err)
+		ref, err := reference.ParseNamed(refs[0])
+		if err == nil {
+			_, _, err := parseImageAndDockerReference(refImageMock{ref}, refs[1])
+			assert.Error(t, err)
+		}
 	}
 }
 
 // refImageMock is a mock of types.Image which returns itself in IntendedDockerReference.
-type refImageMock string
+type refImageMock struct{ reference.Named }
 
-func (ref refImageMock) IntendedDockerReference() string {
-	return string(ref)
+func (ref refImageMock) IntendedDockerReference() reference.Named {
+	return ref.Named
 }
 func (ref refImageMock) Manifest() ([]byte, string, error) {
 	panic("unexpected call to a mock function")
@@ -137,23 +147,66 @@ var prmRepositoryMatchTestTable = []prmTableTest{
 func TestPRMMatchExactMatchesDockerReference(t *testing.T) {
 	prm := NewPRMMatchExact()
 	for _, test := range prmExactMatchTestTable {
-		res := prm.matchesDockerReference(refImageMock(test.imageRef), test.sigRef)
+		// This assumes that all ways to obtain a reference.Named perform equivalent validation,
+		// and therefore values refused by reference.ParseNamed can not happen in practice.
+		imageRef, err := reference.ParseNamed(test.imageRef)
+		if err != nil {
+			continue
+		}
+		res := prm.matchesDockerReference(refImageMock{imageRef}, test.sigRef)
 		assert.Equal(t, test.result, res, fmt.Sprintf("%s vs. %s", test.imageRef, test.sigRef))
 	}
+	// Even if they are signed with an empty string as a reference, unidentified images are rejected.
+	res := prm.matchesDockerReference(refImageMock{nil}, "")
+	assert.False(t, res, `unidentified vs. ""`)
 }
 
 func TestPRMMatchRepositoryMatchesDockerReference(t *testing.T) {
 	prm := NewPRMMatchRepository()
 	for _, test := range prmRepositoryMatchTestTable {
-		res := prm.matchesDockerReference(refImageMock(test.imageRef), test.sigRef)
+		// This assumes that all ways to obtain a reference.Named perform equivalent validation,
+		// and therefore values refused by reference.ParseNamed can not happen in practice.
+		imageRef, err := reference.ParseNamed(test.imageRef)
+		if err != nil {
+			continue
+		}
+		res := prm.matchesDockerReference(refImageMock{imageRef}, test.sigRef)
 		assert.Equal(t, test.result, res, fmt.Sprintf("%s vs. %s", test.imageRef, test.sigRef))
+	}
+	// Even if they are signed with an empty string as a reference, unidentified images are rejected.
+	res := prm.matchesDockerReference(refImageMock{nil}, "")
+	assert.False(t, res, `unidentified vs. ""`)
+}
+
+func TestParseDockerReferences(t *testing.T) {
+	const (
+		ok1  = "busybox"
+		ok2  = fullRHELRef
+		bad1 = "UPPERCASE_IS_INVALID_IN_DOCKER_REFERENCES"
+		bad2 = ""
+	)
+
+	// Success
+	r1, r2, err := parseDockerReferences(ok1, ok2)
+	require.NoError(t, err)
+	assert.Equal(t, ok1, r1.String())
+	assert.Equal(t, ok2, r2.String())
+
+	// Failures
+	for _, refs := range [][]string{
+		{bad1, ok2},
+		{ok1, bad2},
+		{bad1, bad2},
+	} {
+		_, _, err := parseDockerReferences(refs[0], refs[1])
+		assert.Error(t, err)
 	}
 }
 
 // forbiddenImageMock is a mock of types.Image which ensures IntendedDockerReference is not called
 type forbiddenImageMock string
 
-func (ref forbiddenImageMock) IntendedDockerReference() string {
+func (ref forbiddenImageMock) IntendedDockerReference() reference.Named {
 	panic("unexpected call to a mock function")
 }
 func (ref forbiddenImageMock) Manifest() ([]byte, string, error) {
