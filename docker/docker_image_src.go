@@ -59,7 +59,7 @@ func simplifyContentType(contentType string) string {
 }
 
 func (s *dockerImageSource) GetManifest(mimetypes []string) ([]byte, string, error) {
-	reference, err := tagOrDigest(s.ref.ref)
+	reference, err := s.ref.tagOrDigest()
 	if err != nil {
 		return nil, "", err
 	}
@@ -114,7 +114,7 @@ func (s *dockerImageSource) Delete() error {
 	headers := make(map[string][]string)
 	headers["Accept"] = []string{manifest.DockerV2Schema2MIMEType}
 
-	reference, err := tagOrDigest(s.ref.ref)
+	reference, err := s.ref.tagOrDigest()
 	if err != nil {
 		return err
 	}
