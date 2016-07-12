@@ -5,6 +5,13 @@
         }
     ],
     "transports": {
+        "dir": {
+            "": [
+                {
+                    "type": "insecureAcceptAnything"
+                }
+            ]
+        },
         "docker": {
             "example.com/playground": [
                 {

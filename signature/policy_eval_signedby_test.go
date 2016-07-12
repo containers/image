@@ -23,7 +23,8 @@ func dirImageMock(t *testing.T, dir, dockerReference string) types.Image {
 
 // dirImageMockWithRef returns a types.Image for a directory, claiming a specified ref.
 func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) types.Image {
-	srcRef := directory.NewReference(dir)
+	srcRef, err := directory.NewReference(dir)
+	require.NoError(t, err)
 	src, err := srcRef.NewImageSource("", true)
 	require.NoError(t, err)
 	return image.FromSource(&dirImageSourceMock{

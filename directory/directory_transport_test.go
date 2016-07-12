@@ -3,6 +3,7 @@ package directory
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/containers/image/types"
@@ -19,9 +20,7 @@ func TestTransportParseReference(t *testing.T) {
 }
 
 func TestNewReference(t *testing.T) {
-	testNewReference(t, func(ref string) (types.ImageReference, error) {
-		return NewReference(ref), nil
-	})
+	testNewReference(t, NewReference)
 }
 
 // testNewReference is a test shared for Transport.ParseReference and NewReference.
@@ -43,6 +42,9 @@ func testNewReference(t *testing.T, fn func(string) (types.ImageReference, error
 		require.True(t, ok)
 		assert.Equal(t, path, dirRef.path, path)
 	}
+
+	_, err = fn(tmpDir + "/thisparentdoesnotexist/something")
+	assert.Error(t, err)
 }
 
 // refToTempDir creates a temporary directory and returns a reference to it.
@@ -51,7 +53,8 @@ func testNewReference(t *testing.T, fn func(string) (types.ImageReference, error
 func refToTempDir(t *testing.T) (ref types.ImageReference, tmpDir string) {
 	tmpDir, err := ioutil.TempDir("", "dir-transport-test")
 	require.NoError(t, err)
-	ref = NewReference(tmpDir)
+	ref, err = NewReference(tmpDir)
+	require.NoError(t, err)
 	return ref, tmpDir
 }
 
@@ -76,13 +79,49 @@ func TestReferenceDockerReference(t *testing.T) {
 func TestReferencePolicyConfigurationIdentity(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)
-	assert.Equal(t, "", ref.PolicyConfigurationIdentity())
+
+	assert.Equal(t, tmpDir, ref.PolicyConfigurationIdentity())
+	// A non-canonical path.  Test just one, the various other cases are
+	// tested in explicitfilepath.ResolvePathToFullyExplicit.
+	ref, err := NewReference(tmpDir + "/.")
+	require.NoError(t, err)
+	assert.Equal(t, tmpDir, ref.PolicyConfigurationIdentity())
+
+	// "/" as a corner case.
+	ref, err = NewReference("/")
+	require.NoError(t, err)
+	assert.Equal(t, "/", ref.PolicyConfigurationIdentity())
 }
 
 func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)
-	assert.Nil(t, ref.PolicyConfigurationNamespaces())
+	// We don't really know enough to make a full equality test here.
+	ns := ref.PolicyConfigurationNamespaces()
+	require.NotNil(t, ns)
+	assert.NotEmpty(t, ns)
+	assert.Equal(t, filepath.Dir(tmpDir), ns[0])
+
+	// Test with a known path which should exist. Test just one non-canonical
+	// path, the various other cases are tested in explicitfilepath.ResolvePathToFullyExplicit.
+	//
+	// It would be nice to test a deeper hierarchy, but it is not obvious what
+	// deeper path is always available in the various distros, AND is not likely
+	// to contains a symbolic link.
+	for _, path := range []string{"/etc/skel", "/etc/skel/./."} {
+		_, err := os.Lstat(path)
+		require.NoError(t, err)
+		ref, err := NewReference(path)
+		require.NoError(t, err)
+		ns := ref.PolicyConfigurationNamespaces()
+		require.NotNil(t, ns)
+		assert.Equal(t, []string{"/etc"}, ns)
+	}
+
+	// "/" as a corner case.
+	ref, err := NewReference("/")
+	require.NoError(t, err)
+	assert.Equal(t, []string{}, ref.PolicyConfigurationNamespaces())
 }
 
 func TestReferenceNewImage(t *testing.T) {

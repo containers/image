@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/containers/image/transports"
 	"github.com/docker/docker/reference"
 )
 
@@ -88,8 +89,8 @@ func (m *policyTransportsMap) UnmarshalJSON(data []byte) error {
 	// So, use a temporary map of pointers-to-slices and convert.
 	tmpMap := map[string]*PolicyTransportScopes{}
 	if err := paranoidUnmarshalJSONObject(data, func(key string) interface{} {
-		if key != "docker" {
-			return nil // Only accept this one for now
+		if _, ok := transports.KnownTransports[key]; !ok {
+			return nil
 		}
 		// paranoidUnmarshalJSONObject detects key duplication for us, check just to be safe.
 		if _, ok := tmpMap[key]; ok {

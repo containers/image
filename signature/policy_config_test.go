@@ -14,6 +14,9 @@ import (
 var policyFixtureContents = &Policy{
 	Default: PolicyRequirements{NewPRReject()},
 	Transports: map[string]PolicyTransportScopes{
+		"dir": {
+			"": PolicyRequirements{NewPRInsecureAcceptAnything()},
+		},
 		"docker": {
 			"example.com/playground": {
 				NewPRInsecureAcceptAnything(),
@@ -168,6 +171,11 @@ func TestPolicyUnmarshalJSON(t *testing.T) {
 				},
 				"registry.access.redhat.com": []PolicyRequirement{
 					xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RH"), NewPRMMatchRepository()),
+				},
+			},
+			"atomic": {
+				"registry.access.redhat.com/rhel7": []PolicyRequirement{
+					xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RHatomic"), NewPRMMatchRepository()),
 				},
 			},
 		},

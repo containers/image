@@ -1,6 +1,9 @@
 package directory
 
 import (
+	"strings"
+
+	"github.com/containers/image/directory/explicitfilepath"
 	"github.com/containers/image/image"
 	"github.com/containers/image/types"
 	"github.com/docker/docker/reference"
@@ -17,13 +20,19 @@ func (t dirTransport) Name() string {
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an ImageReference.
 func (t dirTransport) ParseReference(reference string) (types.ImageReference, error) {
-	return NewReference(reference), nil
+	return NewReference(reference)
 }
 
 // dirReference is an ImageReference for directory paths.
 type dirReference struct {
 	// Note that the interpretation of paths below depends on the underlying filesystem state, which may change under us at any time!
-	path string // As specified by the user. May be relative, contain symlinks, etc.
+	// Either of the paths may point to a different, or no, inode over time.  resolvedPath may contain symbolic links, and so on.
+
+	// Generally we follow the intent of the user, and use the "path" member for filesystem operations (e.g. the user can use a relative path to avoid
+	// being exposed to symlinks and renames in the parent directories to the working directory).
+	// (But in general, we make no attempt to be completely safe against concurrent hostile filesystem modifications.)
+	path         string // As specified by the user. May be relative, contain symlinks, etc.
+	resolvedPath string // Absolute path with no symlinks, at least at the time of its creation. Primarily used for policy namespaces.
 }
 
 // There is no directory.ParseReference because it is rather pointless.
@@ -32,8 +41,15 @@ type dirReference struct {
 // can use directory.NewReference.
 
 // NewReference returns a directory reference for a specified path.
-func NewReference(path string) types.ImageReference {
-	return dirReference{path: path}
+//
+// We do not expose an API supplying the resolvedPath; we could, but recomputing it
+// is generally cheap enough that we prefer being confident about the properties of resolvedPath.
+func NewReference(path string) (types.ImageReference, error) {
+	resolved, err := explicitfilepath.ResolvePathToFullyExplicit(path)
+	if err != nil {
+		return nil, err
+	}
+	return dirReference{path: path, resolvedPath: resolved}, nil
 }
 
 func (ref dirReference) Transport() types.ImageTransport {
@@ -64,7 +80,7 @@ func (ref dirReference) DockerReference() reference.Named {
 // not required/guaranteed that it will be a valid input to Transport().ParseReference().
 // Returns "" if configuration identities for these references are not supported.
 func (ref dirReference) PolicyConfigurationIdentity() string {
-	return ""
+	return ref.resolvedPath
 }
 
 // PolicyConfigurationNamespaces returns a list of other policy configuration namespaces to search
@@ -73,7 +89,19 @@ func (ref dirReference) PolicyConfigurationIdentity() string {
 // It is STRONGLY recommended for the first element, if any, to be a prefix of PolicyConfigurationIdentity(),
 // and each following element to be a prefix of the element preceding it.
 func (ref dirReference) PolicyConfigurationNamespaces() []string {
-	return nil
+	res := []string{}
+	path := ref.resolvedPath
+	for {
+		lastSlash := strings.LastIndex(path, "/")
+		if lastSlash == -1 || lastSlash == 0 {
+			break
+		}
+		path = path[:lastSlash]
+		res = append(res, path)
+	}
+	// Note that we do not include "/"; it is redundant with the default "" global default.
+	// FIXME: Reject "/" when parsing configurations.
+	return res
 }
 
 // NewImage returns a types.Image for this reference.

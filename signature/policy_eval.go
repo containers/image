@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
 )
 
@@ -125,38 +124,41 @@ func (pc *PolicyContext) Destroy() error {
 	return pc.changeState(pcDestroying, pcDestroyed)
 }
 
+// policyIdentityLogName returns a string description of the image identity for policy purposes.
+// ONLY use this for log messages, not for any decisions!
+func policyIdentityLogName(ref types.ImageReference) string {
+	return ref.Transport().Name() + ":" + ref.PolicyConfigurationIdentity()
+}
+
 // requirementsForImageRef selects the appropriate requirements for ref.
-func (pc *PolicyContext) requirementsForImageRef(ref types.ImageReference) (PolicyRequirements, error) {
-	identity := ref.PolicyConfigurationIdentity()
-	if identity == "" {
-		return nil, fmt.Errorf("Can not determine policy for image %s with undefined policy configuration identity", transports.ImageName(ref))
-	}
+func (pc *PolicyContext) requirementsForImageRef(ref types.ImageReference) PolicyRequirements {
 	// Do we have a PolicyTransportScopes for this transport?
-	// FIXME: Hard-codes "docker" for compatibility.
-	if transportScopes, ok := pc.Policy.Transports["docker"]; ok {
+	transportName := ref.Transport().Name()
+	if transportScopes, ok := pc.Policy.Transports[transportName]; ok {
 		// Look for a full match.
+		identity := ref.PolicyConfigurationIdentity()
 		if req, ok := transportScopes[identity]; ok {
-			logrus.Debugf(` Using transport "docker" policy section %s`, identity)
-			return req, nil
+			logrus.Debugf(` Using transport "%s" policy section %s`, transportName, identity)
+			return req
 		}
 
 		// Look for a match of the possible parent namespaces.
 		for _, name := range ref.PolicyConfigurationNamespaces() {
 			if req, ok := transportScopes[name]; ok {
-				logrus.Debugf(` Using transport "docker" specific policy section %s`, name)
-				return req, nil
+				logrus.Debugf(` Using transport "%s" specific policy section %s`, transportName, name)
+				return req
 			}
 		}
 
 		// Look for a default match for the transport.
 		if req, ok := transportScopes[""]; ok {
-			logrus.Debugf(` Using transport "docker" policy section ""`)
-			return req, nil
+			logrus.Debugf(` Using transport "%s" policy section ""`, transportName)
+			return req
 		}
 	}
 
 	logrus.Debugf(" Using default policy section")
-	return pc.Policy.Default, nil
+	return pc.Policy.Default
 }
 
 // GetSignaturesWithAcceptedAuthor returns those signatures from an image
@@ -183,12 +185,8 @@ func (pc *PolicyContext) GetSignaturesWithAcceptedAuthor(image types.Image) (sig
 		}
 	}()
 
-	logrus.Debugf("GetSignaturesWithAcceptedAuthor for image %s:%s", image.Reference().DockerReference())
-
-	reqs, err := pc.requirementsForImageRef(image.Reference())
-	if err != nil {
-		return nil, err
-	}
+	logrus.Debugf("GetSignaturesWithAcceptedAuthor for image %s", policyIdentityLogName(image.Reference()))
+	reqs := pc.requirementsForImageRef(image.Reference())
 
 	// FIXME: rename Signatures to UnverifiedSignatures
 	unverifiedSignatures, err := image.Signatures()
@@ -267,12 +265,8 @@ func (pc *PolicyContext) IsRunningImageAllowed(image types.Image) (res bool, fin
 		}
 	}()
 
-	logrus.Debugf("IsRunningImageAllowed for image %s", image.Reference().DockerReference())
-
-	reqs, err := pc.requirementsForImageRef(image.Reference())
-	if err != nil {
-		return false, err
-	}
+	logrus.Debugf("IsRunningImageAllowed for image %s", policyIdentityLogName(image.Reference()))
+	reqs := pc.requirementsForImageRef(image.Reference())
 
 	if len(reqs) == 0 {
 		return false, PolicyRequirementError("List of verification policy requirements must not be empty")

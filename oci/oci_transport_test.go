@@ -3,6 +3,7 @@ package oci
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/containers/image/types"
@@ -49,12 +50,8 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 		}
 	}
 
-	ref, err := fn(tmpDir + "/with:colons:and:tag")
-	require.NoError(t, err)
-	ociRef, ok := ref.(ociReference)
-	require.True(t, ok)
-	assert.Equal(t, tmpDir+"/with:colons:and", ociRef.dir)
-	assert.Equal(t, "tag", ociRef.tag)
+	_, err = fn(tmpDir + "/with:multiple:colons:and:tag")
+	assert.Error(t, err)
 
 	_, err = fn(tmpDir + ":invalid'tag!value@")
 	assert.Error(t, err)
@@ -67,11 +64,18 @@ func TestNewReference(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	ref := NewReference(tmpDir, tagValue)
+	ref, err := NewReference(tmpDir, tagValue)
+	require.NoError(t, err)
 	ociRef, ok := ref.(ociReference)
 	require.True(t, ok)
 	assert.Equal(t, tmpDir, ociRef.dir)
 	assert.Equal(t, tagValue, ociRef.tag)
+
+	_, err = NewReference(tmpDir+"/thisparentdoesnotexist/something", tagValue)
+	assert.Error(t, err)
+
+	_, err = NewReference(tmpDir+"/has:colon", tagValue)
+	assert.Error(t, err)
 }
 
 // refToTempOCI creates a temporary directory and returns an reference to it.
@@ -80,7 +84,8 @@ func TestNewReference(t *testing.T) {
 func refToTempOCI(t *testing.T) (ref types.ImageReference, tmpDir string) {
 	tmpDir, err := ioutil.TempDir("", "oci-transport-test")
 	require.NoError(t, err)
-	ref = NewReference(tmpDir, "tagValue")
+	ref, err = NewReference(tmpDir, "tagValue")
+	require.NoError(t, err)
 	return ref, tmpDir
 }
 
@@ -98,7 +103,6 @@ func TestReferenceStringWithinTransport(t *testing.T) {
 	for _, c := range []struct{ input, result string }{
 		{"/dir1:notlatest", "/dir1:notlatest"}, // Explicit tag
 		{"/dir2", "/dir2:latest"},              // Default tag
-		{"/dir3:with:colons:and:tag", "/dir3:with:colons:and:tag"},
 	} {
 		ref, err := ParseReference(tmpDir + c.input)
 		require.NoError(t, err, c.input)
@@ -121,13 +125,50 @@ func TestReferenceDockerReference(t *testing.T) {
 func TestReferencePolicyConfigurationIdentity(t *testing.T) {
 	ref, tmpDir := refToTempOCI(t)
 	defer os.RemoveAll(tmpDir)
-	assert.Equal(t, "", ref.PolicyConfigurationIdentity())
+
+	assert.Equal(t, tmpDir+":tagValue", ref.PolicyConfigurationIdentity())
+	// A non-canonical path.  Test just one, the various other cases are
+	// tested in explicitfilepath.ResolvePathToFullyExplicit.
+	ref, err := NewReference(tmpDir+"/.", "tag2")
+	require.NoError(t, err)
+	assert.Equal(t, tmpDir+":tag2", ref.PolicyConfigurationIdentity())
+
+	// "/" as a corner case.
+	ref, err = NewReference("/", "tag3")
+	require.NoError(t, err)
+	assert.Equal(t, "/:tag3", ref.PolicyConfigurationIdentity())
 }
 
 func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 	ref, tmpDir := refToTempOCI(t)
 	defer os.RemoveAll(tmpDir)
-	assert.Nil(t, ref.PolicyConfigurationNamespaces())
+	// We don't really know enough to make a full equality test here.
+	ns := ref.PolicyConfigurationNamespaces()
+	require.NotNil(t, ns)
+	assert.True(t, len(ns) >= 2)
+	assert.Equal(t, tmpDir, ns[0])
+	assert.Equal(t, filepath.Dir(tmpDir), ns[1])
+
+	// Test with a known path which should exist. Test just one non-canonical
+	// path, the various other cases are tested in explicitfilepath.ResolvePathToFullyExplicit.
+	//
+	// It would be nice to test a deeper hierarchy, but it is not obvious what
+	// deeper path is always available in the various distros, AND is not likely
+	// to contains a symbolic link.
+	for _, path := range []string{"/etc/skel", "/etc/skel/./."} {
+		_, err := os.Lstat(path)
+		require.NoError(t, err)
+		ref, err := NewReference(path, "sometag")
+		require.NoError(t, err)
+		ns := ref.PolicyConfigurationNamespaces()
+		require.NotNil(t, ns)
+		assert.Equal(t, []string{"/etc/skel", "/etc"}, ns)
+	}
+
+	// "/" as a corner case.
+	ref, err := NewReference("/", "tag3")
+	require.NoError(t, err)
+	assert.Equal(t, []string{}, ref.PolicyConfigurationNamespaces())
 }
 
 func TestReferenceNewImage(t *testing.T) {

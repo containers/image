@@ -62,11 +62,13 @@ func TestPolicyContextNewDestroy(t *testing.T) {
 
 // pcImageReferenceMock is a mock of types.ImageReference which returns itself in DockerReference
 // and handles PolicyConfigurationIdentity and PolicyConfigurationReference consistently.
-type pcImageReferenceMock struct{ ref reference.Named }
+type pcImageReferenceMock struct {
+	transportName string
+	ref           reference.Named
+}
 
 func (ref pcImageReferenceMock) Transport() types.ImageTransport {
-	// We use this in error messages, so sadly we must return something.
-	return nameImageTransportMock("== Transport mock")
+	return nameImageTransportMock(ref.transportName)
 }
 func (ref pcImageReferenceMock) StringWithinTransport() string {
 	// We use this in error messages, so sadly we must return something.
@@ -76,9 +78,6 @@ func (ref pcImageReferenceMock) DockerReference() reference.Named {
 	return ref.ref
 }
 func (ref pcImageReferenceMock) PolicyConfigurationIdentity() string {
-	if ref.ref == nil {
-		return ""
-	}
 	res, err := policyconfiguration.DockerReferenceIdentity(ref.ref)
 	if res == "" || err != nil {
 		panic(fmt.Sprintf("Internal inconsistency: policyconfiguration.DockerReferenceIdentity returned %#v, %v", res, err))
@@ -107,64 +106,73 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 
 	policy := &Policy{
 		Default:    PolicyRequirements{NewPRReject()},
-		Transports: map[string]PolicyTransportScopes{"docker": {}},
+		Transports: map[string]PolicyTransportScopes{},
 	}
 	// Just put _something_ into the PolicyTransportScopes map for the keys we care about, and make it pairwise
 	// distinct so that we can compare the values and show them when debugging the tests.
-	for _, scope := range []string{
-		"",
-		"unmatched",
-		"deep.com",
-		"deep.com/n1",
-		"deep.com/n1/n2",
-		"deep.com/n1/n2/n3",
-		"deep.com/n1/n2/n3/repo",
-		"deep.com/n1/n2/n3/repo:tag2",
+	for _, t := range []struct{ transport, scope string }{
+		{"docker", ""},
+		{"docker", "unmatched"},
+		{"docker", "deep.com"},
+		{"docker", "deep.com/n1"},
+		{"docker", "deep.com/n1/n2"},
+		{"docker", "deep.com/n1/n2/n3"},
+		{"docker", "deep.com/n1/n2/n3/repo"},
+		{"docker", "deep.com/n1/n2/n3/repo:tag2"},
+		{"atomic", "unmatched"},
 	} {
-		policy.Transports["docker"][scope] = PolicyRequirements{xNewPRSignedByKeyData(ktGPG, []byte(scope), prm)}
+		if _, ok := policy.Transports[t.transport]; !ok {
+			policy.Transports[t.transport] = PolicyTransportScopes{}
+		}
+		policy.Transports[t.transport][t.scope] = PolicyRequirements{xNewPRSignedByKeyData(ktGPG, []byte(t.transport+t.scope), prm)}
 	}
 
 	pc, err := NewPolicyContext(policy)
 	require.NoError(t, err)
 
-	for input, matched := range map[string]string{
+	for _, c := range []struct{ inputTransport, input, matchedTransport, matched string }{
 		// Full match
-		"deep.com/n1/n2/n3/repo:tag2": "deep.com/n1/n2/n3/repo:tag2",
+		{"docker", "deep.com/n1/n2/n3/repo:tag2", "docker", "deep.com/n1/n2/n3/repo:tag2"},
 		// Namespace matches
-		"deep.com/n1/n2/n3/repo:nottag2": "deep.com/n1/n2/n3/repo",
-		"deep.com/n1/n2/n3/notrepo:tag2": "deep.com/n1/n2/n3",
-		"deep.com/n1/n2/notn3/repo:tag2": "deep.com/n1/n2",
-		"deep.com/n1/notn2/n3/repo:tag2": "deep.com/n1",
+		{"docker", "deep.com/n1/n2/n3/repo:nottag2", "docker", "deep.com/n1/n2/n3/repo"},
+		{"docker", "deep.com/n1/n2/n3/notrepo:tag2", "docker", "deep.com/n1/n2/n3"},
+		{"docker", "deep.com/n1/n2/notn3/repo:tag2", "docker", "deep.com/n1/n2"},
+		{"docker", "deep.com/n1/notn2/n3/repo:tag2", "docker", "deep.com/n1"},
 		// Host name match
-		"deep.com/notn1/n2/n3/repo:tag2": "deep.com",
+		{"docker", "deep.com/notn1/n2/n3/repo:tag2", "docker", "deep.com"},
 		// Default
-		"this.doesnt/match:anything": "",
+		{"docker", "this.doesnt/match:anything", "docker", ""},
+		// No match within a matched transport which doesn't have a "" scope
+		{"atomic", "this.doesnt/match:anything", "", ""},
+		// No configuration available for this transport at all
+		{"dir", "what/ever", "", ""}, // "what/ever" is not a valid scope for the real "dir" transport, but we only need it to be a valid reference.Named.
 	} {
-		expected, ok := policy.Transports["docker"][matched]
-		require.True(t, ok, fmt.Sprintf("case %s: expected reqs not found", input))
+		var expected PolicyRequirements
+		if c.matchedTransport != "" {
+			e, ok := policy.Transports[c.matchedTransport][c.matched]
+			require.True(t, ok, fmt.Sprintf("case %s:%s: expected reqs not found", c.inputTransport, c.input))
+			expected = e
+		} else {
+			expected = policy.Default
+		}
 
-		ref, err := reference.ParseNamed(input)
+		ref, err := reference.ParseNamed(c.input)
 		require.NoError(t, err)
-		reqs, err := pc.requirementsForImageRef(pcImageReferenceMock{ref})
-		require.NoError(t, err)
-		comment := fmt.Sprintf("case %s: %#v", input, reqs[0])
+		reqs := pc.requirementsForImageRef(pcImageReferenceMock{c.inputTransport, ref})
+		comment := fmt.Sprintf("case %s:%s: %#v", c.inputTransport, c.input, reqs[0])
 		// Do not use assert.Equal, which would do a deep contents comparison; we want to compare
 		// the pointers. Also, == does not work on slices; so test that the slices start at the
 		// same element and have the same length.
 		assert.True(t, &(reqs[0]) == &(expected[0]), comment)
 		assert.True(t, len(reqs) == len(expected), comment)
 	}
-
-	// Image without a Docker reference identity
-	_, err = pc.requirementsForImageRef(pcImageReferenceMock{nil})
-	assert.Error(t, err)
 }
 
 // pcImageMock returns a types.Image for a directory, claiming a specified dockerReference and implementing PolicyConfigurationIdentity/PolicyConfigurationNamespaces.
 func pcImageMock(t *testing.T, dir, dockerReference string) types.Image {
 	ref, err := reference.ParseNamed(dockerReference)
 	require.NoError(t, err)
-	return dirImageMockWithRef(t, dir, pcImageReferenceMock{ref})
+	return dirImageMockWithRef(t, dir, pcImageReferenceMock{"docker", ref})
 }
 
 func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
@@ -296,12 +304,6 @@ func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
 	// implementations meddling with the state, or threads. This is for catching trivial programmer
 	// mistakes only, anyway.
 
-	// Image without a Docker reference identity
-	img = dirImageMockWithRef(t, "fixtures/dir-img-valid", pcImageReferenceMock{nil})
-	sigs, err = pc.GetSignaturesWithAcceptedAuthor(img)
-	assert.Error(t, err)
-	assert.Nil(t, sigs)
-
 	// Error reading signatures.
 	invalidSigDir := createInvalidSigDir(t)
 	defer os.RemoveAll(invalidSigDir)
@@ -402,11 +404,6 @@ func TestPolicyContextIsRunningImageAllowed(t *testing.T) {
 	// Not testing the pcInUse->pcReady transition, that would require custom PolicyRequirement
 	// implementations meddling with the state, or threads. This is for catching trivial programmer
 	// mistakes only, anyway.
-
-	// Image without a Docker reference identity
-	img = dirImageMockWithRef(t, "fixtures/dir-img-valid", pcImageReferenceMock{nil})
-	res, err = pc.IsRunningImageAllowed(img)
-	assertRunningRejected(t, res, err)
 }
 
 // Helpers for validating PolicyRequirement.isSignatureAuthorAccepted results:
