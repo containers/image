@@ -58,11 +58,9 @@ type ImageReference interface {
 // This is primarily useful for copying images around; for examining their properties, Image (below)
 // is usually more useful.
 type ImageSource interface {
-	// IntendedDockerReference returns the Docker reference for this image, _as specified by the user_
-	// (not as the image itself, or its underlying storage, claims).  Should be fully expanded, i.e. !reference.IsNameOnly.
-	// This can be used e.g. to determine which public keys are trusted for this image.
-	// May be nil if unknown.
-	IntendedDockerReference() reference.Named
+	// Reference returns the reference used to set up this source, _as specified by the user_
+	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
+	Reference() ImageReference
 	// GetManifest returns the image's manifest along with its MIME type. The empty string is returned if the MIME type is unknown. The slice parameter indicates the supported mime types the manifest should be when getting it.
 	// It may use a remote (= slow) service.
 	GetManifest([]string) ([]byte, string, error)
@@ -92,12 +90,10 @@ type ImageDestination interface {
 
 // Image is the primary API for inspecting properties of images.
 type Image interface {
+	// Reference returns the reference used to set up this source, _as specified by the user_
+	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
+	Reference() ImageReference
 	// ref to repository?
-	// IntendedDockerReference returns the Docker reference for this image, _as specified by the user_
-	// (not as the image itself, or its underlying storage, claims).  Should be fully expanded, i.e. !reference.IsNameOnly.
-	// This can be used e.g. to determine which public keys are trusted for this image.
-	// May be nil if unknown.
-	IntendedDockerReference() reference.Named
 	// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
 	// NOTE: It is essential for signature verification that Manifest returns the manifest from which BlobDigests is computed.
 	Manifest() ([]byte, string, error)

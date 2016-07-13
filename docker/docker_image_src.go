@@ -10,7 +10,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/manifest"
-	"github.com/docker/docker/reference"
+	"github.com/containers/image/types"
 )
 
 type errFetchManifest struct {
@@ -39,12 +39,10 @@ func newImageSource(ref dockerReference, certPath string, tlsVerify bool) (*dock
 	}, nil
 }
 
-// IntendedDockerReference returns the Docker reference for this image, _as specified by the user_
-// (not as the image itself, or its underlying storage, claims).  Should be fully expanded, i.e. !reference.IsNameOnly.
-// This can be used e.g. to determine which public keys are trusted for this image.
-// May be nil if unknown.
-func (s *dockerImageSource) IntendedDockerReference() reference.Named {
-	return s.ref.ref
+// Reference returns the reference used to set up this source, _as specified by the user_
+// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
+func (s *dockerImageSource) Reference() types.ImageReference {
+	return s.ref
 }
 
 // simplifyContentType drops parameters from a HTTP media type (see https://tools.ietf.org/html/rfc7231#section-3.1.1.1)

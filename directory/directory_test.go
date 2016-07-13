@@ -90,10 +90,12 @@ func TestDelete(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestIntendedDockerReference(t *testing.T) {
-	destRef := NewReference("/etc")
-	src, err := destRef.NewImageSource("", true)
+func TestSourceReference(t *testing.T) {
+	ref, tmpDir := refToTempDir(t)
+	defer os.RemoveAll(tmpDir)
+
+	src, err := ref.NewImageSource("", true)
 	require.NoError(t, err)
-	ref := src.IntendedDockerReference()
-	assert.Nil(t, ref)
+	ref2 := src.Reference()
+	assert.Equal(t, tmpDir, ref2.StringWithinTransport())
 }

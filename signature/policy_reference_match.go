@@ -9,7 +9,7 @@ import (
 
 // parseImageAndDockerReference converts an image and a reference string into two parsed entities, failing on any error and handling unidentified images.
 func parseImageAndDockerReference(image types.Image, s2 string) (reference.Named, reference.Named, error) {
-	r1 := image.IntendedDockerReference()
+	r1 := image.Reference().DockerReference()
 	if r1 == nil {
 		// FIXME: Tell the user which image this is.
 		return nil, nil, PolicyRequirementError("Docker reference match attempted on an image with no known Docker reference identity")
@@ -26,7 +26,7 @@ func (prm *prmMatchExact) matchesDockerReference(image types.Image, signatureDoc
 	if err != nil {
 		return false
 	}
-	// Do not add default tags: image.IntendedDockerReference() has it added already per its construction, and signatureDockerReference should be exact; so, verify that now.
+	// Do not add default tags: image.Reference().DockerReference() should contain it already, and signatureDockerReference should be exact; so, verify that now.
 	if reference.IsNameOnly(intended) || reference.IsNameOnly(signature) {
 		return false
 	}

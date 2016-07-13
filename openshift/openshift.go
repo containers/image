@@ -15,7 +15,6 @@ import (
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	"github.com/containers/image/version"
-	"github.com/docker/docker/reference"
 )
 
 // openshiftClient is configuration for dealing with a single image stream, for reading or writing.
@@ -171,12 +170,10 @@ func newImageSource(ref openshiftReference, certPath string, tlsVerify bool) (ty
 	}, nil
 }
 
-// IntendedDockerReference returns the Docker reference for this image, _as specified by the user_
-// (not as the image itself, or its underlying storage, claims).  Should be fully expanded, i.e. !reference.IsNameOnly.
-// This can be used e.g. to determine which public keys are trusted for this image.
-// May be nil if unknown.
-func (s *openshiftImageSource) IntendedDockerReference() reference.Named {
-	return s.client.ref.dockerReference
+// Reference returns the reference used to set up this source, _as specified by the user_
+// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
+func (s *openshiftImageSource) Reference() types.ImageReference {
+	return s.client.ref
 }
 
 func (s *openshiftImageSource) GetManifest(mimetypes []string) ([]byte, string, error) {
