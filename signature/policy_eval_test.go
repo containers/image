@@ -103,18 +103,12 @@ func TestFullyExpandedDockerReference(t *testing.T) {
 type pcImageReferenceMock struct{ ref reference.Named }
 
 func (ref pcImageReferenceMock) Transport() types.ImageTransport {
-	// We use this in error messages, so sadly we must return something. But right now we do so only when DockerReference is nil, so restrict to that.
-	if ref.ref == nil {
-		return nameImageTransportMock("== Transport mock")
-	}
-	panic("unexpected call to a mock function")
+	// We use this in error messages, so sadly we must return something.
+	return nameImageTransportMock("== Transport mock")
 }
 func (ref pcImageReferenceMock) StringWithinTransport() string {
-	// We use this in error messages, so sadly we must return something. But right now we do so only when DockerReference is nil, so restrict to that.
-	if ref.ref == nil {
-		return "== StringWithinTransport for an image with no Docker support"
-	}
-	panic("unexpected call to a mock function")
+	// We use this in error messages, so sadly we must return something.
+	return "== StringWithinTransport mock"
 }
 func (ref pcImageReferenceMock) DockerReference() reference.Named {
 	return ref.ref

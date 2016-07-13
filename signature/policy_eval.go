@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
 	"github.com/docker/docker/reference"
 )
@@ -157,8 +158,7 @@ func fullyExpandedDockerReference(ref reference.Named) (string, error) {
 func (pc *PolicyContext) requirementsForImage(image types.Image) (PolicyRequirements, error) {
 	ref := image.Reference().DockerReference()
 	if ref == nil {
-		// FIXME: Tell the user which image this is.
-		return nil, fmt.Errorf("Can not determine policy for an image with no known Docker reference identity")
+		return nil, fmt.Errorf("Can not determine policy for image %s with no known Docker reference identity", transports.ImageName(image.Reference()))
 	}
 	ref = reference.WithDefaultTag(ref) // This should not be needed, but if we did receive a name-only reference, this is a reasonable thing to do.
 

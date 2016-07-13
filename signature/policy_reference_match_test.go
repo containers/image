@@ -244,7 +244,7 @@ func TestParseDockerReferences(t *testing.T) {
 }
 
 // forbiddenImageMock is a mock of types.Image which ensures Reference is not called
-type forbiddenImageMock string
+type forbiddenImageMock struct{}
 
 func (ref forbiddenImageMock) Reference() types.ImageReference {
 	panic("unexpected call to a mock function")
@@ -273,7 +273,7 @@ func TestPRMExactReferenceMatchesDockerReference(t *testing.T) {
 		// Do not use NewPRMExactReference, we want to also test the case with an invalid DockerReference,
 		// even though NewPRMExactReference should never let it happen.
 		prm := prmExactReference{DockerReference: test.imageRef}
-		res := prm.matchesDockerReference(forbiddenImageMock(""), test.sigRef)
+		res := prm.matchesDockerReference(forbiddenImageMock{}, test.sigRef)
 		assert.Equal(t, test.result, res, fmt.Sprintf("%s vs. %s", test.imageRef, test.sigRef))
 	}
 }
@@ -283,7 +283,7 @@ func TestPRMExactRepositoryMatchesDockerReference(t *testing.T) {
 		// Do not use NewPRMExactRepository, we want to also test the case with an invalid DockerReference,
 		// even though NewPRMExactRepository should never let it happen.
 		prm := prmExactRepository{DockerRepository: test.imageRef}
-		res := prm.matchesDockerReference(forbiddenImageMock(""), test.sigRef)
+		res := prm.matchesDockerReference(forbiddenImageMock{}, test.sigRef)
 		assert.Equal(t, test.result, res, fmt.Sprintf("%s vs. %s", test.imageRef, test.sigRef))
 	}
 }
