@@ -38,7 +38,7 @@ func (s *dirImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
 	if err != nil {
 		return nil, 0, nil
 	}
-	fi, err := os.Stat(s.ref.layerPath(digest))
+	fi, err := r.Stat()
 	if err != nil {
 		return nil, 0, nil
 	}
