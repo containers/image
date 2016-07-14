@@ -9,11 +9,15 @@
 //    )
 //
 //    func main() {
-//    	img, err := docker.NewImage("fedora", "", false)
+//    	ref, err := docker.ParseReference("fedora")
 //    	if err != nil {
 //    		panic(err)
 //    	}
-//    	b, err := img.Manifest()
+//    	img, err := ref.NewImage("", true)
+//    	if err != nil {
+//    		panic(err)
+//    	}
+//    	b, _, err := img.Manifest()
 //    	if err != nil {
 //    		panic(err)
 //    	}

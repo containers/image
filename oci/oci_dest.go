@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/containers/image/manifest"
@@ -30,28 +29,12 @@ type descriptor struct {
 }
 
 type ociImageDestination struct {
-	dir string
-	tag string
+	ref ociReference
 }
 
-var refRegexp = regexp.MustCompile(`^([A-Za-z0-9._-]+)+$`)
-
-// NewImageDestination returns an ImageDestination for writing to an existing directory.
-func NewImageDestination(dest string) (types.ImageDestination, error) {
-	dir := dest
-	sep := strings.LastIndex(dest, ":")
-	tag := "latest"
-	if sep != -1 {
-		dir = dest[:sep]
-		tag = dest[sep+1:]
-		if !refRegexp.MatchString(tag) {
-			return nil, fmt.Errorf("Invalid reference %s", tag)
-		}
-	}
-	return &ociImageDestination{
-		dir: dir,
-		tag: tag,
-	}, nil
+// newImageDestination returns an ImageDestination for writing to an existing directory.
+func newImageDestination(ref ociReference) types.ImageDestination {
+	return &ociImageDestination{ref: ref}
 }
 
 func (d *ociImageDestination) CanonicalDockerReference() reference.Named {
@@ -116,21 +99,21 @@ func (d *ociImageDestination) PutManifest(m []byte) error {
 		return err
 	}
 
-	if err := ioutil.WriteFile(blobPath(d.dir, digest), ociMan, 0644); err != nil {
+	if err := ioutil.WriteFile(blobPath(d.ref.dir, digest), ociMan, 0644); err != nil {
 		return err
 	}
 	// TODO(runcom): ugly here?
-	if err := ioutil.WriteFile(ociLayoutPath(d.dir), []byte(`{"imageLayoutVersion": "1.0.0"}`), 0644); err != nil {
+	if err := ioutil.WriteFile(ociLayoutPath(d.ref.dir), []byte(`{"imageLayoutVersion": "1.0.0"}`), 0644); err != nil {
 		return err
 	}
-	return ioutil.WriteFile(descriptorPath(d.dir, d.tag), data, 0644)
+	return ioutil.WriteFile(descriptorPath(d.ref.dir, d.ref.tag), data, 0644)
 }
 
 func (d *ociImageDestination) PutBlob(digest string, stream io.Reader) error {
 	if err := d.ensureParentDirectoryExists("blobs"); err != nil {
 		return err
 	}
-	blob, err := os.Create(blobPath(d.dir, digest))
+	blob, err := os.Create(blobPath(d.ref.dir, digest))
 	if err != nil {
 		return err
 	}
@@ -145,7 +128,7 @@ func (d *ociImageDestination) PutBlob(digest string, stream io.Reader) error {
 }
 
 func (d *ociImageDestination) ensureParentDirectoryExists(parent string) error {
-	path := filepath.Join(d.dir, parent)
+	path := filepath.Join(d.ref.dir, parent)
 	if _, err := os.Stat(path); err != nil && os.IsNotExist(err) {
 		if err := os.MkdirAll(path, 0755); err != nil {
 			return err

@@ -5,8 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/containers/image/directory"
-	"github.com/containers/image/image"
 	"github.com/docker/docker/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -345,10 +343,7 @@ func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
 	// mistakes only, anyway.
 
 	// Image without a Docker reference identity
-	img = image.FromSource(&dirImageSourceMock{
-		ImageSource:             directory.NewImageSource("fixtures/dir-img-valid"),
-		intendedDockerReference: nil,
-	}, nil)
+	img = dirImageMockWithRef(t, "fixtures/dir-img-valid", nil)
 	sigs, err = pc.GetSignaturesWithAcceptedAuthor(img)
 	assert.Error(t, err)
 	assert.Nil(t, sigs)
@@ -453,10 +448,7 @@ func TestPolicyContextIsRunningImageAllowed(t *testing.T) {
 	// mistakes only, anyway.
 
 	// Image without a Docker reference identity
-	img = image.FromSource(&dirImageSourceMock{
-		ImageSource:             directory.NewImageSource("fixtures/dir-img-valid"),
-		intendedDockerReference: nil,
-	}, nil)
+	img = dirImageMockWithRef(t, "fixtures/dir-img-valid", nil)
 	res, err = pc.IsRunningImageAllowed(img)
 	assertRunningRejected(t, res, err)
 }

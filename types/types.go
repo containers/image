@@ -7,6 +7,48 @@ import (
 	"github.com/docker/docker/reference"
 )
 
+// ImageTransport is a top-level namespace for ways to to store/load an image.
+// It should generally correspond to ImageSource/ImageDestination implementations.
+//
+// Note that ImageTransport is based on "ways the users refer to image storage", not necessarily on the underlying physical transport.
+// For example, all Docker References would be used within a single "docker" transport, regardless of whether the images are pulled over HTTP or HTTPS
+// (or, even, IPv4 or IPv6).
+//
+// OTOH all images using the same transport should (apart from versions of the image format), be interoperable.
+// For example, several different ImageTransport implementations may be based on local filesystem paths,
+// but using completely different formats for the contents of that path (a single tar file, a directory containing tarballs, a fully expanded container filesystem, ...)
+type ImageTransport interface {
+	// Name returns the name of the transport, which must be unique among other transports.
+	Name() string
+	// ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an ImageReference.
+	ParseReference(reference string) (ImageReference, error)
+}
+
+// ImageReference is an abstracted way to refer to an image location, namespaced within an ImageTransport.
+//
+// The object should preferably be immutable after creation, with any parsing/state-dependent resolving happening
+// within an ImageTransport.ParseReference() or equivalent API creating the reference object.
+// That's also why the various identification/formatting methods of this type do not support returning errors.
+//
+// WARNING: While this design freezes the content of the reference within this process, it can not freeze the outside
+// world: paths may be replaced by symlinks elsewhere, HTTP APIs may start returning different results, and so on.
+type ImageReference interface {
+	Transport() ImageTransport
+	// StringWithinTransport returns a string representation of the reference, which MUST be such that
+	// reference.Transport().ParseReference(reference.StringWithinTransport()) returns an equivalent reference.
+	// NOTE: The returned string is not promised to be equal to the original input to ParseReference;
+	// e.g. default attribute values omitted by the user may be filled in in the return value, or vice versa.
+	// WARNING: Do not use the return value in the UI to describe an image, it does not contain the Transport().Name() prefix.
+	StringWithinTransport() string
+
+	// NewImage returns a types.Image for this reference.
+	NewImage(certPath string, tlsVerify bool) (Image, error)
+	// NewImageSource returns a types.ImageSource for this reference.
+	NewImageSource(certPath string, tlsVerify bool) (ImageSource, error)
+	// NewImageDestination returns a types.ImageDestination for this reference.
+	NewImageDestination(certPath string, tlsVerify bool) (ImageDestination, error)
+}
+
 // ImageSource is a service, possibly remote (= slow), to download components of a single image.
 // This is primarily useful for copying images around; for examining their properties, Image (below)
 // is usually more useful.
