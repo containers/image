@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/containers/image/docker/policyconfiguration"
 	"github.com/containers/image/types"
 	"github.com/docker/docker/reference"
 )
@@ -77,6 +78,30 @@ func (ref dockerReference) StringWithinTransport() string {
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
 func (ref dockerReference) DockerReference() reference.Named {
 	return ref.ref
+}
+
+// PolicyConfigurationIdentity returns a string representation of the reference, suitable for policy lookup.
+// This MUST reflect user intent, not e.g. after processing of third-party redirects or aliases;
+// The value SHOULD be fully explicit about its semantics, with no hidden defaults, AND canonical
+// (i.e. various references with exactly the same semantics should return the same configuration identity)
+// It is fine for the return value to be equal to StringWithinTransport(), and it is desirable but
+// not required/guaranteed that it will be a valid input to Transport().ParseReference().
+// Returns "" if configuration identities for these references are not supported.
+func (ref dockerReference) PolicyConfigurationIdentity() string {
+	res, err := policyconfiguration.DockerReferenceIdentity(ref.ref)
+	if res == "" || err != nil { // Coverage: Should never happen, NewReference above should refuse values which could cause a failure.
+		panic(fmt.Sprintf("Internal inconsistency: policyconfiguration.DockerReferenceIdentity returned %#v, %v", res, err))
+	}
+	return res
+}
+
+// PolicyConfigurationNamespaces returns a list of other policy configuration namespaces to search
+// for if explicit configuration for PolicyConfigurationIdentity() is not set.  The list will be processed
+// in order, terminating on first match, and an implicit "" is always checked at the end.
+// It is STRONGLY recommended for the first element, if any, to be a prefix of PolicyConfigurationIdentity(),
+// and each following element to be a prefix of the element preceding it.
+func (ref dockerReference) PolicyConfigurationNamespaces() []string {
+	return policyconfiguration.DockerReferenceNamespaces(ref.ref)
 }
 
 // NewImage returns a types.Image for this reference.

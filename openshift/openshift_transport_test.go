@@ -71,6 +71,24 @@ func TestReferenceStringWithinTransport(t *testing.T) {
 	// but that is untested because it depends on per-user configuration.
 }
 
+func TestReferencePolicyConfigurationIdentity(t *testing.T) {
+	// Just a smoke test, the substance is tested in policyconfiguration.TestDockerReference.
+	ref, err := NewReference(testBaseURL, "ns", "stream", "notlatest")
+	require.NoError(t, err)
+	assert.Equal(t, "registry.example.com:8443/ns/stream:notlatest", ref.PolicyConfigurationIdentity())
+}
+
+func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
+	// Just a smoke test, the substance is tested in policyconfiguration.TestDockerReference.
+	ref, err := NewReference(testBaseURL, "ns", "stream", "notlatest")
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"registry.example.com:8443/ns/stream",
+		"registry.example.com:8443/ns",
+		"registry.example.com:8443",
+	}, ref.PolicyConfigurationNamespaces())
+}
+
 func TestReferenceNewImage(t *testing.T) {
 	ref, err := NewReference(testBaseURL, "ns", "stream", "notlatest")
 	require.NoError(t, err)

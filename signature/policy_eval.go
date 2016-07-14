@@ -7,12 +7,10 @@ package signature
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
-	"github.com/docker/docker/reference"
 )
 
 // PolicyRequirementError is an explanatory text for rejecting a signature or an image.
@@ -127,71 +125,24 @@ func (pc *PolicyContext) Destroy() error {
 	return pc.changeState(pcDestroying, pcDestroyed)
 }
 
-// fullyExpandedDockerReference converts a reference.Named into a fully expanded format;
-// i.e. soft of an opposite to ref.String(), which is a fully canonicalized/minimized format.
-// This is guaranteed to be the same as reference.FullName(), with a tag or digest appended, if available.
-// FIXME? This feels like it should be provided by skopeo/reference.
-func fullyExpandedDockerReference(ref reference.Named) (string, error) {
-	res := ref.FullName()
-	tagged, isTagged := ref.(reference.NamedTagged)
-	digested, isDigested := ref.(reference.Canonical)
-	// A github.com/distribution/reference value can have a tag and a digest at the same time!
-	// github.com/docker/reference does not handle that, so fail.
-	// (Even if it were supported, the semantics of policy namespaces are unclear - should we drop
-	// the tag or the digest first?)
-	switch {
-	case isTagged && isDigested:
-		// Coverage: This should currently not happen, the way docker/reference sets up types,
-		// isTagged and isDigested is mutually exclusive.
-		return "", fmt.Errorf("Names with both a tag and digest are not currently supported")
-	case isTagged:
-		res = res + ":" + tagged.Tag()
-	case isDigested:
-		res = res + "@" + digested.Digest().String()
-	default:
-		// res is already OK.
+// requirementsForImageRef selects the appropriate requirements for ref.
+func (pc *PolicyContext) requirementsForImageRef(ref types.ImageReference) (PolicyRequirements, error) {
+	identity := ref.PolicyConfigurationIdentity()
+	if identity == "" {
+		return nil, fmt.Errorf("Can not determine policy for image %s with undefined policy configuration identity", transports.ImageName(ref))
 	}
-	return res, nil
-}
-
-// requirementsForImage selects the appropriate requirements for image.
-func (pc *PolicyContext) requirementsForImage(image types.Image) (PolicyRequirements, error) {
-	ref := image.Reference().DockerReference()
-	if ref == nil {
-		return nil, fmt.Errorf("Can not determine policy for image %s with no known Docker reference identity", transports.ImageName(image.Reference()))
-	}
-	ref = reference.WithDefaultTag(ref) // This should not be needed, but if we did receive a name-only reference, this is a reasonable thing to do.
-
 	// Look for a full match.
-	fullyExpanded, err := fullyExpandedDockerReference(ref)
-	if err != nil { // Coverage: This cannot currently happen.
-		return nil, err
-	}
-	if req, ok := pc.Policy.Specific[fullyExpanded]; ok {
-		logrus.Debugf(" Using specific policy section %s", fullyExpanded)
+	if req, ok := pc.Policy.Specific[identity]; ok {
+		logrus.Debugf(" Using specific policy section %s", identity)
 		return req, nil
 	}
 
-	// Look for a match of the repository, and then of the possible parent
-	// namespaces. Note that this only happens on the expanded host names
-	// and repository names, i.e. "busybox" is looked up as "docker.io/library/busybox",
-	// then in its parent "docker.io/library"; in none of "busybox",
-	// un-namespaced "library" nor in "" implicitly representing "library/".
-	//
-	// ref.FullName() == ref.Hostname() + "/" + ref.RemoteName(), so the last
-	// iteration matches the host name (for any namespace).
-	name := ref.FullName()
-	for {
+	// Look for a match of the possible parent namespaces.
+	for _, name := range ref.PolicyConfigurationNamespaces() {
 		if req, ok := pc.Policy.Specific[name]; ok {
 			logrus.Debugf(" Using specific policy section %s", name)
 			return req, nil
 		}
-
-		lastSlash := strings.LastIndex(name, "/")
-		if lastSlash == -1 {
-			break
-		}
-		name = name[:lastSlash]
 	}
 
 	logrus.Debugf(" Using default policy section")
@@ -222,9 +173,9 @@ func (pc *PolicyContext) GetSignaturesWithAcceptedAuthor(image types.Image) (sig
 		}
 	}()
 
-	logrus.Debugf("GetSignaturesWithAcceptedAuthor for image %s", image.Reference().DockerReference())
+	logrus.Debugf("GetSignaturesWithAcceptedAuthor for image %s:%s", image.Reference().DockerReference())
 
-	reqs, err := pc.requirementsForImage(image)
+	reqs, err := pc.requirementsForImageRef(image.Reference())
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +259,7 @@ func (pc *PolicyContext) IsRunningImageAllowed(image types.Image) (res bool, fin
 
 	logrus.Debugf("IsRunningImageAllowed for image %s", image.Reference().DockerReference())
 
-	reqs, err := pc.requirementsForImage(image)
+	reqs, err := pc.requirementsForImageRef(image.Reference())
 	if err != nil {
 		return false, err
 	}

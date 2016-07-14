@@ -118,6 +118,18 @@ func TestReferenceDockerReference(t *testing.T) {
 	assert.Nil(t, ref.DockerReference())
 }
 
+func TestReferencePolicyConfigurationIdentity(t *testing.T) {
+	ref, tmpDir := refToTempOCI(t)
+	defer os.RemoveAll(tmpDir)
+	assert.Equal(t, "", ref.PolicyConfigurationIdentity())
+}
+
+func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
+	ref, tmpDir := refToTempOCI(t)
+	defer os.RemoveAll(tmpDir)
+	assert.Nil(t, ref.PolicyConfigurationNamespaces())
+}
+
 func TestReferenceNewImage(t *testing.T) {
 	ref, tmpDir := refToTempOCI(t)
 	defer os.RemoveAll(tmpDir)

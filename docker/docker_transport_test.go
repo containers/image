@@ -126,6 +126,24 @@ func TestReferenceDockerReference(t *testing.T) {
 	}
 }
 
+func TestReferencePolicyConfigurationIdentity(t *testing.T) {
+	// Just a smoke test, the substance is tested in policyconfiguration.TestDockerReference.
+	ref, err := ParseReference("//busybox")
+	require.NoError(t, err)
+	assert.Equal(t, "docker.io/library/busybox:latest", ref.PolicyConfigurationIdentity())
+}
+
+func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
+	// Just a smoke test, the substance is tested in policyconfiguration.TestDockerReference.
+	ref, err := ParseReference("//busybox")
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"docker.io/library/busybox",
+		"docker.io/library",
+		"docker.io",
+	}, ref.PolicyConfigurationNamespaces())
+}
+
 func TestReferenceNewImage(t *testing.T) {
 	ref, err := ParseReference("//busybox")
 	require.NoError(t, err)
