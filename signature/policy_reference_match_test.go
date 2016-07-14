@@ -79,8 +79,11 @@ func (ref refImageMock) GetRepositoryTags() ([]string, error) {
 type refImageReferenceMock struct{ reference.Named }
 
 func (ref refImageReferenceMock) Transport() types.ImageTransport {
-	// We use this in error messages, so sadly we must return something.
-	return nameImageTransportMock("== Transport mock")
+	// We use this in error messages, so sadly we must return something. But right now we do so only when DockerReference is nil, so restrict to that.
+	if ref.Named == nil {
+		return nameImageTransportMock("== Transport mock")
+	}
+	panic("unexpected call to a mock function")
 }
 func (ref refImageReferenceMock) StringWithinTransport() string {
 	// We use this in error messages, so sadly we must return something. But right now we do so only when DockerReference is nil, so restrict to that.

@@ -18,17 +18,17 @@ import (
 func dirImageMock(t *testing.T, dir, dockerReference string) types.Image {
 	ref, err := reference.ParseNamed(dockerReference)
 	require.NoError(t, err)
-	return dirImageMockWithRef(t, dir, ref)
+	return dirImageMockWithRef(t, dir, refImageReferenceMock{ref})
 }
 
-// dirImageMockWithRef returns a types.Image for a directory, claiming a specified dockerReference.
-func dirImageMockWithRef(t *testing.T, dir string, dockerReference reference.Named) types.Image {
+// dirImageMockWithRef returns a types.Image for a directory, claiming a specified ref.
+func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) types.Image {
 	srcRef := directory.NewReference(dir)
 	src, err := srcRef.NewImageSource("", true)
 	require.NoError(t, err)
 	return image.FromSource(&dirImageSourceMock{
 		ImageSource: src,
-		ref:         refImageReferenceMock{dockerReference},
+		ref:         ref,
 	}, nil)
 }
 
