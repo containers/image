@@ -41,6 +41,11 @@ type ImageReference interface {
 	// WARNING: Do not use the return value in the UI to describe an image, it does not contain the Transport().Name() prefix.
 	StringWithinTransport() string
 
+	// DockerReference returns a Docker reference associated with this reference
+	// (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
+	// not e.g. after redirect or alias processing), or nil if unknown/not applicable.
+	DockerReference() reference.Named
+
 	// NewImage returns a types.Image for this reference.
 	NewImage(certPath string, tlsVerify bool) (Image, error)
 	// NewImageSource returns a types.ImageSource for this reference.

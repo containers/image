@@ -67,6 +67,12 @@ func TestReferenceStringWithinTransport(t *testing.T) {
 	assert.Equal(t, tmpDir, ref.StringWithinTransport())
 }
 
+func TestReferenceDockerReference(t *testing.T) {
+	ref, tmpDir := refToTempDir(t)
+	defer os.RemoveAll(tmpDir)
+	assert.Nil(t, ref.DockerReference())
+}
+
 func TestReferenceNewImage(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)

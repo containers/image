@@ -49,6 +49,14 @@ func TestNewReference(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestReferenceDockerReference(t *testing.T) {
+	ref, err := NewReference(testBaseURL, "ns", "stream", "notlatest")
+	require.NoError(t, err)
+	dockerRef := ref.DockerReference()
+	require.NotNil(t, dockerRef)
+	assert.Equal(t, "registry.example.com:8443/ns/stream:notlatest", dockerRef.String())
+}
+
 func TestReferenceTransport(t *testing.T) {
 	ref, err := NewReference(testBaseURL, "ns", "stream", "notlatest")
 	require.NoError(t, err)

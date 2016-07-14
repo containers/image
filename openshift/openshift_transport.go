@@ -104,6 +104,13 @@ func (ref openshiftReference) StringWithinTransport() string {
 	return fmt.Sprintf("%s/%s:%s", ref.namespace, ref.stream, ref.tag)
 }
 
+// DockerReference returns a Docker reference associated with this reference
+// (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
+// not e.g. after redirect or alias processing), or nil if unknown/not applicable.
+func (ref openshiftReference) DockerReference() reference.Named {
+	return ref.dockerReference
+}
+
 // NewImage returns a types.Image for this reference.
 func (ref openshiftReference) NewImage(certPath string, tlsVerify bool) (types.Image, error) {
 	return nil, errors.New("Full Image support not implemented for atomic: image names")

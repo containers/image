@@ -116,6 +116,16 @@ func TestReferenceStringWithinTransport(t *testing.T) {
 	}
 }
 
+func TestReferenceDockerReference(t *testing.T) {
+	for _, c := range validReferenceTestCases {
+		ref, err := ParseReference("//" + c.input)
+		require.NoError(t, err, c.input)
+		dockerRef := ref.DockerReference()
+		require.NotNil(t, dockerRef, c.input)
+		assert.Equal(t, c.dockerRef, dockerRef.String(), c.input)
+	}
+}
+
 func TestReferenceNewImage(t *testing.T) {
 	ref, err := ParseReference("//busybox")
 	require.NoError(t, err)

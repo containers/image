@@ -72,6 +72,13 @@ func (ref dockerReference) StringWithinTransport() string {
 	return "//" + ref.ref.String()
 }
 
+// DockerReference returns a Docker reference associated with this reference
+// (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
+// not e.g. after redirect or alias processing), or nil if unknown/not applicable.
+func (ref dockerReference) DockerReference() reference.Named {
+	return ref.ref
+}
+
 // NewImage returns a types.Image for this reference.
 func (ref dockerReference) NewImage(certPath string, tlsVerify bool) (types.Image, error) {
 	return newImage(ref, certPath, tlsVerify)

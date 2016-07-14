@@ -112,6 +112,12 @@ func TestReferenceStringWithinTransport(t *testing.T) {
 	}
 }
 
+func TestReferenceDockerReference(t *testing.T) {
+	ref, tmpDir := refToTempOCI(t)
+	defer os.RemoveAll(tmpDir)
+	assert.Nil(t, ref.DockerReference())
+}
+
 func TestReferenceNewImage(t *testing.T) {
 	ref, tmpDir := refToTempOCI(t)
 	defer os.RemoveAll(tmpDir)

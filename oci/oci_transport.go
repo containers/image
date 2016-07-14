@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/containers/image/types"
+	"github.com/docker/docker/reference"
 )
 
 // Transport is an ImageTransport for Docker references.
@@ -65,6 +66,13 @@ func (ref ociReference) Transport() types.ImageTransport {
 // WARNING: Do not use the return value in the UI to describe an image, it does not contain the Transport().Name() prefix.
 func (ref ociReference) StringWithinTransport() string {
 	return fmt.Sprintf("%s:%s", ref.dir, ref.tag)
+}
+
+// DockerReference returns a Docker reference associated with this reference
+// (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
+// not e.g. after redirect or alias processing), or nil if unknown/not applicable.
+func (ref ociReference) DockerReference() reference.Named {
+	return nil
 }
 
 // NewImage returns a types.Image for this reference.
