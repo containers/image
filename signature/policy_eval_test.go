@@ -106,12 +106,13 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 	prm := NewPRMMatchExact()
 
 	policy := &Policy{
-		Default:  PolicyRequirements{NewPRReject()},
-		Specific: map[string]PolicyRequirements{},
+		Default:    PolicyRequirements{NewPRReject()},
+		Transports: map[string]PolicyTransportScopes{"docker": {}},
 	}
-	// Just put _something_ into the Specific map for the keys we care about, and make it pairwise
+	// Just put _something_ into the PolicyTransportScopes map for the keys we care about, and make it pairwise
 	// distinct so that we can compare the values and show them when debugging the tests.
 	for _, scope := range []string{
+		"",
 		"unmatched",
 		"deep.com",
 		"deep.com/n1",
@@ -120,7 +121,7 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 		"deep.com/n1/n2/n3/repo",
 		"deep.com/n1/n2/n3/repo:tag2",
 	} {
-		policy.Specific[scope] = PolicyRequirements{xNewPRSignedByKeyData(ktGPG, []byte(scope), prm)}
+		policy.Transports["docker"][scope] = PolicyRequirements{xNewPRSignedByKeyData(ktGPG, []byte(scope), prm)}
 	}
 
 	pc, err := NewPolicyContext(policy)
@@ -139,14 +140,8 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 		// Default
 		"this.doesnt/match:anything": "",
 	} {
-		var expected PolicyRequirements
-		if matched != "" {
-			e, ok := policy.Specific[matched]
-			require.True(t, ok, fmt.Sprintf("case %s: expected reqs not found", input))
-			expected = e
-		} else {
-			expected = policy.Default
-		}
+		expected, ok := policy.Transports["docker"][matched]
+		require.True(t, ok, fmt.Sprintf("case %s: expected reqs not found", input))
 
 		ref, err := reference.ParseNamed(input)
 		require.NoError(t, err)
@@ -180,33 +175,35 @@ func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
 
 	pc, err := NewPolicyContext(&Policy{
 		Default: PolicyRequirements{NewPRReject()},
-		Specific: map[string]PolicyRequirements{
-			"docker.io/testing/manifest:latest": {
-				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchExact()),
+		Transports: map[string]PolicyTransportScopes{
+			"docker": {
+				"docker.io/testing/manifest:latest": {
+					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchExact()),
+				},
+				"docker.io/testing/manifest:twoAccepts": {
+					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
+					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
+				},
+				"docker.io/testing/manifest:acceptReject": {
+					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
+					NewPRReject(),
+				},
+				"docker.io/testing/manifest:acceptUnknown": {
+					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
+					xNewPRSignedBaseLayer(NewPRMMatchRepository()),
+				},
+				"docker.io/testing/manifest:rejectUnknown": {
+					NewPRReject(),
+					xNewPRSignedBaseLayer(NewPRMMatchRepository()),
+				},
+				"docker.io/testing/manifest:unknown": {
+					xNewPRSignedBaseLayer(NewPRMMatchRepository()),
+				},
+				"docker.io/testing/manifest:unknown2": {
+					NewPRInsecureAcceptAnything(),
+				},
+				"docker.io/testing/manifest:invalidEmptyRequirements": {},
 			},
-			"docker.io/testing/manifest:twoAccepts": {
-				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
-				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
-			},
-			"docker.io/testing/manifest:acceptReject": {
-				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
-				NewPRReject(),
-			},
-			"docker.io/testing/manifest:acceptUnknown": {
-				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
-				xNewPRSignedBaseLayer(NewPRMMatchRepository()),
-			},
-			"docker.io/testing/manifest:rejectUnknown": {
-				NewPRReject(),
-				xNewPRSignedBaseLayer(NewPRMMatchRepository()),
-			},
-			"docker.io/testing/manifest:unknown": {
-				xNewPRSignedBaseLayer(NewPRMMatchRepository()),
-			},
-			"docker.io/testing/manifest:unknown2": {
-				NewPRInsecureAcceptAnything(),
-			},
-			"docker.io/testing/manifest:invalidEmptyRequirements": {},
 		},
 	})
 	require.NoError(t, err)
@@ -317,25 +314,27 @@ func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
 func TestPolicyContextIsRunningImageAllowed(t *testing.T) {
 	pc, err := NewPolicyContext(&Policy{
 		Default: PolicyRequirements{NewPRReject()},
-		Specific: map[string]PolicyRequirements{
-			"docker.io/testing/manifest:latest": {
-				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchExact()),
+		Transports: map[string]PolicyTransportScopes{
+			"docker": {
+				"docker.io/testing/manifest:latest": {
+					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchExact()),
+				},
+				"docker.io/testing/manifest:twoAllows": {
+					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
+					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
+				},
+				"docker.io/testing/manifest:allowDeny": {
+					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
+					NewPRReject(),
+				},
+				"docker.io/testing/manifest:reject": {
+					NewPRReject(),
+				},
+				"docker.io/testing/manifest:acceptAnything": {
+					NewPRInsecureAcceptAnything(),
+				},
+				"docker.io/testing/manifest:invalidEmptyRequirements": {},
 			},
-			"docker.io/testing/manifest:twoAllows": {
-				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
-				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
-			},
-			"docker.io/testing/manifest:allowDeny": {
-				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
-				NewPRReject(),
-			},
-			"docker.io/testing/manifest:reject": {
-				NewPRReject(),
-			},
-			"docker.io/testing/manifest:acceptAnything": {
-				NewPRInsecureAcceptAnything(),
-			},
-			"docker.io/testing/manifest:invalidEmptyRequirements": {},
 		},
 	})
 	require.NoError(t, err)

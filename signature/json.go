@@ -59,7 +59,7 @@ func stringField(m map[string]interface{}, fieldName string) (string, error) {
 // (including duplicated keys, unrecognized keys, and non-matching types). Uses fieldResolver to
 // determine the destination for a field value, which should return a pointer to the destination if valid, or nil if the key is rejected.
 //
-// The fieldResolver approach is useful for decoding the Policy.Specific map; using it for structs is a bit lazy,
+// The fieldResolver approach is useful for decoding the Policy.Transports map; using it for structs is a bit lazy,
 // we could use reflection to automate this. Later?
 func paranoidUnmarshalJSONObject(data []byte, fieldResolver func(string) interface{}) error {
 	seenKeys := map[string]struct{}{}

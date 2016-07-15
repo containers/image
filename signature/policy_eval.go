@@ -131,16 +131,26 @@ func (pc *PolicyContext) requirementsForImageRef(ref types.ImageReference) (Poli
 	if identity == "" {
 		return nil, fmt.Errorf("Can not determine policy for image %s with undefined policy configuration identity", transports.ImageName(ref))
 	}
-	// Look for a full match.
-	if req, ok := pc.Policy.Specific[identity]; ok {
-		logrus.Debugf(" Using specific policy section %s", identity)
-		return req, nil
-	}
+	// Do we have a PolicyTransportScopes for this transport?
+	// FIXME: Hard-codes "docker" for compatibility.
+	if transportScopes, ok := pc.Policy.Transports["docker"]; ok {
+		// Look for a full match.
+		if req, ok := transportScopes[identity]; ok {
+			logrus.Debugf(` Using transport "docker" policy section %s`, identity)
+			return req, nil
+		}
 
-	// Look for a match of the possible parent namespaces.
-	for _, name := range ref.PolicyConfigurationNamespaces() {
-		if req, ok := pc.Policy.Specific[name]; ok {
-			logrus.Debugf(" Using specific policy section %s", name)
+		// Look for a match of the possible parent namespaces.
+		for _, name := range ref.PolicyConfigurationNamespaces() {
+			if req, ok := transportScopes[name]; ok {
+				logrus.Debugf(` Using transport "docker" specific policy section %s`, name)
+				return req, nil
+			}
+		}
+
+		// Look for a default match for the transport.
+		if req, ok := transportScopes[""]; ok {
+			logrus.Debugf(` Using transport "docker" policy section ""`)
 			return req, nil
 		}
 	}

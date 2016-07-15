@@ -55,13 +55,13 @@ var _ json.Unmarshaler = (*Policy)(nil)
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (p *Policy) UnmarshalJSON(data []byte) error {
 	*p = Policy{}
-	specific := policySpecificMap{}
+	transports := policyTransportsMap{}
 	if err := paranoidUnmarshalJSONObject(data, func(key string) interface{} {
 		switch key {
 		case "default":
 			return &p.Default
-		case "specific":
-			return &specific
+		case "transports":
+			return &transports
 		default:
 			return nil
 		}
@@ -72,25 +72,51 @@ func (p *Policy) UnmarshalJSON(data []byte) error {
 	if p.Default == nil {
 		return InvalidPolicyFormatError("Default policy is missing")
 	}
-	p.Specific = map[string]PolicyRequirements(specific)
+	p.Transports = map[string]PolicyTransportScopes(transports)
 	return nil
 }
 
-// policySpecificMap is a specialization of this map type for the strict JSON parsing semantics appropriate for the Policy.Specific member.
-type policySpecificMap map[string]PolicyRequirements
+// policyTransportsMap is a specialization of this map type for the strict JSON parsing semantics appropriate for the Policy.Transports member.
+type policyTransportsMap map[string]PolicyTransportScopes
 
-// Compile-time check that policySpecificMap implements json.Unmarshaler.
-var _ json.Unmarshaler = (*policySpecificMap)(nil)
+// Compile-time check that policyTransportsMap implements json.Unmarshaler.
+var _ json.Unmarshaler = (*policyTransportsMap)(nil)
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
-func (m *policySpecificMap) UnmarshalJSON(data []byte) error {
+func (m *policyTransportsMap) UnmarshalJSON(data []byte) error {
+	// We can't unmarshal directly into map values because it is not possible to take an address of a map value.
+	// So, use a temporary map of pointers-to-slices and convert.
+	tmpMap := map[string]*PolicyTransportScopes{}
+	if err := paranoidUnmarshalJSONObject(data, func(key string) interface{} {
+		if key != "docker" {
+			return nil // Only accept this one for now
+		}
+		// paranoidUnmarshalJSONObject detects key duplication for us, check just to be safe.
+		if _, ok := tmpMap[key]; ok {
+			return nil
+		}
+		ptr := &PolicyTransportScopes{} // This allocates a new instance on each call.
+		tmpMap[key] = ptr
+		return ptr
+	}); err != nil {
+		return err
+	}
+	for key, ptr := range tmpMap {
+		(*m)[key] = *ptr
+	}
+	return nil
+}
+
+// Compile-time check that PolicyTransportScopes implements json.Unmarshaler.
+var _ json.Unmarshaler = (*PolicyTransportScopes)(nil)
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (m *PolicyTransportScopes) UnmarshalJSON(data []byte) error {
 	// We can't unmarshal directly into map values because it is not possible to take an address of a map value.
 	// So, use a temporary map of pointers-to-slices and convert.
 	tmpMap := map[string]*PolicyRequirements{}
 	if err := paranoidUnmarshalJSONObject(data, func(key string) interface{} {
 		// FIXME? We might want to validate the scope format.
-		// Note that reference.ParseNamed is unsuitable; it would understand "example.com" as
-		// "docker.io/library/example.com"
 		// paranoidUnmarshalJSONObject detects key duplication for us, check just to be safe.
 		if _, ok := tmpMap[key]; ok {
 			return nil
