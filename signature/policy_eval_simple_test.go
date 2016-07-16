@@ -65,7 +65,6 @@ func TestPRRejectIsSignatureAuthorAccepted(t *testing.T) {
 }
 
 func TestPRRejectIsRunningImageAllowed(t *testing.T) {
-	// This will obviously need to change after this is implemented.
 	pr := NewPRReject()
 	res, err := pr.isRunningImageAllowed(nameOnlyImageMock{})
 	assertRunningRejectedPolicyRequirement(t, res, err)
