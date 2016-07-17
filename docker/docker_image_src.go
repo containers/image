@@ -29,12 +29,12 @@ type dockerImageSource struct {
 }
 
 // newDockerImageSource is the same as NewImageSource, only it returns the more specific *dockerImageSource type.
-func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSource, error) {
+func newDockerImageSource(img, certPath string, tlsVerify bool, username, password string) (*dockerImageSource, error) {
 	ref, err := parseImageName(img)
 	if err != nil {
 		return nil, err
 	}
-	c, err := newDockerClient(ref.Hostname(), certPath, tlsVerify)
+	c, err := newDockerClient(ref.Hostname(), certPath, tlsVerify, username, password)
 	if err != nil {
 		return nil, err
 	}
@@ -45,8 +45,8 @@ func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSou
 }
 
 // NewImageSource creates a new ImageSource for the specified image and connection specification.
-func NewImageSource(img, certPath string, tlsVerify bool) (types.ImageSource, error) {
-	return newDockerImageSource(img, certPath, tlsVerify)
+func NewImageSource(img, certPath string, tlsVerify bool, username, password string) (types.ImageSource, error) {
+	return newDockerImageSource(img, certPath, tlsVerify, username, password)
 }
 
 // IntendedDockerReference returns the Docker reference for this image, _as specified by the user_

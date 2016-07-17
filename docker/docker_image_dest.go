@@ -19,12 +19,12 @@ type dockerImageDestination struct {
 }
 
 // NewImageDestination creates a new ImageDestination for the specified image and connection specification.
-func NewImageDestination(img, certPath string, tlsVerify bool) (types.ImageDestination, error) {
+func NewImageDestination(img, certPath string, tlsVerify bool, username, password string) (types.ImageDestination, error) {
 	ref, err := parseImageName(img)
 	if err != nil {
 		return nil, err
 	}
-	c, err := newDockerClient(ref.Hostname(), certPath, tlsVerify)
+	c, err := newDockerClient(ref.Hostname(), certPath, tlsVerify, username, password)
 	if err != nil {
 		return nil, err
 	}
