@@ -176,13 +176,15 @@ type openshiftImageSource struct {
 	// Values specific to this image
 	certPath  string // Only for parseDockerImageSource
 	tlsVerify bool   // Only for parseDockerImageSource
+	username  string // Only for parseDockerImageSource
+	password  string // Only for parseDockerImageSource
 	// State
 	docker               types.ImageSource // The Docker Registry endpoint, or nil if not resolved yet
 	imageStreamImageName string            // Resolved image identifier, or "" if not known yet
 }
 
 // NewImageSource creates a new ImageSource for the specified image and connection specification.
-func NewImageSource(imageName, certPath string, tlsVerify bool) (types.ImageSource, error) {
+func NewImageSource(imageName, certPath string, tlsVerify bool, username, password string) (types.ImageSource, error) {
 	client, err := newOpenshiftClient(imageName)
 	if err != nil {
 		return nil, err
@@ -192,6 +194,8 @@ func NewImageSource(imageName, certPath string, tlsVerify bool) (types.ImageSour
 		client:    client,
 		certPath:  certPath,
 		tlsVerify: tlsVerify,
+		username:  username,
+		password:  password,
 	}, nil
 }
 
@@ -257,7 +261,7 @@ func (s *openshiftImageSource) ensureImageIsResolved() error {
 		return err
 	}
 	logrus.Debugf("Resolved reference %#v", dockerRef)
-	d, err := docker.NewImageSource(dockerRef, s.certPath, s.tlsVerify)
+	d, err := docker.NewImageSource(dockerRef, s.certPath, s.tlsVerify, s.username, s.password)
 	if err != nil {
 		return err
 	}
@@ -272,7 +276,7 @@ type openshiftImageDestination struct {
 }
 
 // NewImageDestination creates a new ImageDestination for the specified image and connection specification.
-func NewImageDestination(imageName, certPath string, tlsVerify bool) (types.ImageDestination, error) {
+func NewImageDestination(imageName, certPath string, tlsVerify bool, username, password string) (types.ImageDestination, error) {
 	client, err := newOpenshiftClient(imageName)
 	if err != nil {
 		return nil, err
@@ -282,7 +286,7 @@ func NewImageDestination(imageName, certPath string, tlsVerify bool) (types.Imag
 	// i.e. a single signed image cannot be available under multiple tags.  But with types.ImageDestination, we don't know
 	// the manifest digest at this point.
 	dockerRef := fmt.Sprintf("%s/%s/%s:%s", client.dockerRegistryHostPart(), client.namespace, client.stream, client.tag)
-	docker, err := docker.NewImageDestination(dockerRef, certPath, tlsVerify)
+	docker, err := docker.NewImageDestination(dockerRef, certPath, tlsVerify, username, password)
 	if err != nil {
 		return nil, err
 	}

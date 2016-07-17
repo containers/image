@@ -18,8 +18,8 @@ type Image struct {
 
 // NewImage returns a new Image interface type after setting up
 // a client to the registry hosting the given image.
-func NewImage(img, certPath string, tlsVerify bool) (types.Image, error) {
-	s, err := newDockerImageSource(img, certPath, tlsVerify)
+func NewImage(img, certPath string, tlsVerify bool, username, password string) (types.Image, error) {
+	s, err := newDockerImageSource(img, certPath, tlsVerify, username, password)
 	if err != nil {
 		return nil, err
 	}
