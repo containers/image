@@ -95,6 +95,20 @@ func TestNewPolicyFromBytes(t *testing.T) {
 
 // FIXME? There is quite a bit of duplication below. Factor some of it out?
 
+// testInvalidJSONInput verifies that obviously invalid input is rejected for dest.
+func testInvalidJSONInput(t *testing.T, dest json.Unmarshaler) {
+	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
+	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
+	err := json.Unmarshal([]byte("&"), dest)
+	assert.Error(t, err)
+	err = dest.UnmarshalJSON([]byte("&"))
+	assert.Error(t, err)
+
+	// Not an object/array/string
+	err = json.Unmarshal([]byte("1"), dest)
+	assert.Error(t, err)
+}
+
 // addExtraJSONMember adds adds an additional member "$name": $extra,
 // possibly with a duplicate name, to encoded.
 // Errors, if any, are reported through t.
@@ -151,16 +165,7 @@ func xNewPRSignedByKeyData(keyType sbKeyType, keyData []byte, signedIdentity Pol
 func TestPolicyUnmarshalJSON(t *testing.T) {
 	var p Policy
 
-	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
-	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
-	err := json.Unmarshal([]byte("&"), &p)
-	assert.Error(t, err)
-	err = p.UnmarshalJSON([]byte("&"))
-	assert.Error(t, err)
-
-	// Not an object
-	err = json.Unmarshal([]byte("1"), &p)
-	assert.Error(t, err)
+	testInvalidJSONInput(t, &p)
 
 	// Start with a valid JSON.
 	validPolicy := Policy{
@@ -283,16 +288,11 @@ func tryUnmarshalModifiedPTS(t *testing.T, pts *PolicyTransportScopes, transport
 func TestPolicyTransportScopesWithTransportUnmarshalJSON(t *testing.T) {
 	var pts PolicyTransportScopes
 
-	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
-	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
-	err := json.Unmarshal([]byte("&"), &pts)
-	assert.Error(t, err)
-	err = pts.UnmarshalJSON([]byte("&"))
-	assert.Error(t, err)
-
-	// Not an object
-	err = json.Unmarshal([]byte("1"), &pts)
-	assert.Error(t, err)
+	dest := policyTransportScopesWithTransport{
+		transport: docker.Transport,
+		dest:      &pts,
+	}
+	testInvalidJSONInput(t, &dest)
 
 	// Start with a valid JSON.
 	validPTS := PolicyTransportScopes{
@@ -311,7 +311,7 @@ func TestPolicyTransportScopesWithTransportUnmarshalJSON(t *testing.T) {
 
 	// Success
 	pts = PolicyTransportScopes{}
-	dest := policyTransportScopesWithTransport{
+	dest = policyTransportScopesWithTransport{
 		transport: docker.Transport,
 		dest:      &pts,
 	}
@@ -378,16 +378,7 @@ func TestPolicyTransportScopesWithTransportUnmarshalJSON(t *testing.T) {
 func TestPolicyRequirementsUnmarshalJSON(t *testing.T) {
 	var reqs PolicyRequirements
 
-	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
-	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
-	err := json.Unmarshal([]byte("&"), &reqs)
-	assert.Error(t, err)
-	err = reqs.UnmarshalJSON([]byte("&"))
-	assert.Error(t, err)
-
-	// Not an array
-	err = json.Unmarshal([]byte("1"), &reqs)
-	assert.Error(t, err)
+	testInvalidJSONInput(t, &reqs)
 
 	// Start with a valid JSON.
 	validReqs := PolicyRequirements{
@@ -466,16 +457,7 @@ func TestNewPRInsecureAcceptAnything(t *testing.T) {
 func TestPRInsecureAcceptAnythingUnmarshalJSON(t *testing.T) {
 	var pr prInsecureAcceptAnything
 
-	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
-	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
-	err := json.Unmarshal([]byte("&"), &pr)
-	assert.Error(t, err)
-	err = pr.UnmarshalJSON([]byte("&"))
-	assert.Error(t, err)
-
-	// Not an object
-	err = json.Unmarshal([]byte("1"), &pr)
-	assert.Error(t, err)
+	testInvalidJSONInput(t, &pr)
 
 	// Start with a valid JSON.
 	validPR := NewPRInsecureAcceptAnything()
@@ -537,16 +519,7 @@ func TestNewPRReject(t *testing.T) {
 func TestPRRejectUnmarshalJSON(t *testing.T) {
 	var pr prReject
 
-	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
-	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
-	err := json.Unmarshal([]byte("&"), &pr)
-	assert.Error(t, err)
-	err = pr.UnmarshalJSON([]byte("&"))
-	assert.Error(t, err)
-
-	// Not an object
-	err = json.Unmarshal([]byte("1"), &pr)
-	assert.Error(t, err)
+	testInvalidJSONInput(t, &pr)
 
 	// Start with a valid JSON.
 	validPR := NewPRReject()
@@ -676,16 +649,7 @@ func tryUnmarshalModifiedSignedBy(t *testing.T, pr *prSignedBy, validJSON []byte
 func TestPRSignedByUnmarshalJSON(t *testing.T) {
 	var pr prSignedBy
 
-	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
-	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
-	err := json.Unmarshal([]byte("&"), &pr)
-	assert.Error(t, err)
-	err = pr.UnmarshalJSON([]byte("&"))
-	assert.Error(t, err)
-
-	// Not an object
-	err = json.Unmarshal([]byte("1"), &pr)
-	assert.Error(t, err)
+	testInvalidJSONInput(t, &pr)
 
 	// Start with a valid JSON.
 	validPR, err := NewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("abc"), NewPRMMatchExact())
@@ -801,16 +765,7 @@ func TestSBKeyTypeIsValid(t *testing.T) {
 func TestSBKeyTypeUnmarshalJSON(t *testing.T) {
 	var kt sbKeyType
 
-	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
-	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
-	err := json.Unmarshal([]byte("&"), &kt)
-	assert.Error(t, err)
-	err = kt.UnmarshalJSON([]byte("&"))
-	assert.Error(t, err)
-
-	// Not a string
-	err = json.Unmarshal([]byte("1"), &kt)
-	assert.Error(t, err)
+	testInvalidJSONInput(t, &kt)
 
 	// Valid values.
 	for _, v := range []sbKeyType{
@@ -820,13 +775,13 @@ func TestSBKeyTypeUnmarshalJSON(t *testing.T) {
 		SBKeyTypeSignedByX509CAs,
 	} {
 		kt = sbKeyType("")
-		err = json.Unmarshal([]byte(`"`+string(v)+`"`), &kt)
+		err := json.Unmarshal([]byte(`"`+string(v)+`"`), &kt)
 		assert.NoError(t, err)
 	}
 
 	// Invalid values
 	kt = sbKeyType("")
-	err = json.Unmarshal([]byte(`""`), &kt)
+	err := json.Unmarshal([]byte(`""`), &kt)
 	assert.Error(t, err)
 
 	kt = sbKeyType("")
@@ -864,16 +819,7 @@ func TestNewPRSignedBaseLayer(t *testing.T) {
 func TestPRSignedBaseLayerUnmarshalJSON(t *testing.T) {
 	var pr prSignedBaseLayer
 
-	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
-	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
-	err := json.Unmarshal([]byte("&"), &pr)
-	assert.Error(t, err)
-	err = pr.UnmarshalJSON([]byte("&"))
-	assert.Error(t, err)
-
-	// Not an object
-	err = json.Unmarshal([]byte("1"), &pr)
-	assert.Error(t, err)
+	testInvalidJSONInput(t, &pr)
 
 	// Start with a valid JSON.
 	baseIdentity, err := NewPRMExactReference("registry.access.redhat.com/rhel7/rhel:7.2.3")
@@ -980,16 +926,7 @@ func TestNewPRMMatchExact(t *testing.T) {
 func TestPRMMatchExactUnmarshalJSON(t *testing.T) {
 	var prm prmMatchExact
 
-	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
-	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
-	err := json.Unmarshal([]byte("&"), &prm)
-	assert.Error(t, err)
-	err = prm.UnmarshalJSON([]byte("&"))
-	assert.Error(t, err)
-
-	// Not an object
-	err = json.Unmarshal([]byte("1"), &prm)
-	assert.Error(t, err)
+	testInvalidJSONInput(t, &prm)
 
 	// Start with a valid JSON.
 	validPR := NewPRMMatchExact()
@@ -1051,16 +988,7 @@ func TestNewPRMMatchRepository(t *testing.T) {
 func TestPRMMatchRepositoryUnmarshalJSON(t *testing.T) {
 	var prm prmMatchRepository
 
-	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
-	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
-	err := json.Unmarshal([]byte("&"), &prm)
-	assert.Error(t, err)
-	err = prm.UnmarshalJSON([]byte("&"))
-	assert.Error(t, err)
-
-	// Not an object
-	err = json.Unmarshal([]byte("1"), &prm)
-	assert.Error(t, err)
+	testInvalidJSONInput(t, &prm)
 
 	// Start with a valid JSON.
 	validPR := NewPRMMatchRepository()
@@ -1148,16 +1076,7 @@ func TestNewPRMExactReference(t *testing.T) {
 func TestPRMExactReferenceUnmarshalJSON(t *testing.T) {
 	var prm prmExactReference
 
-	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
-	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
-	err := json.Unmarshal([]byte("&"), &prm)
-	assert.Error(t, err)
-	err = prm.UnmarshalJSON([]byte("&"))
-	assert.Error(t, err)
-
-	// Not an object
-	err = json.Unmarshal([]byte("1"), &prm)
-	assert.Error(t, err)
+	testInvalidJSONInput(t, &prm)
 
 	// Start with a valid JSON.
 	validPRM, err := NewPRMExactReference("library/buxybox:latest")
@@ -1252,16 +1171,7 @@ func TestNewPRMExactRepository(t *testing.T) {
 func TestPRMExactRepositoryUnmarshalJSON(t *testing.T) {
 	var prm prmExactRepository
 
-	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
-	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
-	err := json.Unmarshal([]byte("&"), &prm)
-	assert.Error(t, err)
-	err = prm.UnmarshalJSON([]byte("&"))
-	assert.Error(t, err)
-
-	// Not an object
-	err = json.Unmarshal([]byte("1"), &prm)
-	assert.Error(t, err)
+	testInvalidJSONInput(t, &prm)
 
 	// Start with a valid JSON.
 	validPRM, err := NewPRMExactRepository("library/buxybox:latest")
