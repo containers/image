@@ -100,6 +100,9 @@ func TestNewReference(t *testing.T) {
 
 	_, err = NewReference(tmpDir+"/has:colon", tagValue)
 	assert.Error(t, err)
+
+	_, err = NewReference(tmpDir, "invalid'tag!value@")
+	assert.Error(t, err)
 }
 
 // refToTempOCI creates a temporary directory and returns an reference to it.

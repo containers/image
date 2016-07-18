@@ -84,9 +84,6 @@ func ParseReference(reference string) (types.ImageReference, error) {
 	} else {
 		dir = reference[:sep]
 		tag = reference[sep+1:]
-		if !refRegexp.MatchString(tag) {
-			return nil, fmt.Errorf("Invalid tag %s", tag)
-		}
 	}
 	return NewReference(dir, tag)
 }
@@ -104,6 +101,9 @@ func NewReference(dir, tag string) (types.ImageReference, error) {
 	// from being ambiguous with values of PolicyConfigurationIdentity.
 	if strings.Contains(resolved, ":") {
 		return nil, fmt.Errorf("Invalid OCI reference %s:%s: path %s contains a colon", dir, tag, resolved)
+	}
+	if !refRegexp.MatchString(tag) {
+		return nil, fmt.Errorf("Invalid tag %s", tag)
 	}
 	return ociReference{dir: dir, resolvedDir: resolved, tag: tag}, nil
 }
