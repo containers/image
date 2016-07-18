@@ -7,6 +7,7 @@ import (
 	"regexp"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containers/image/docker/policyconfiguration"
 	"github.com/containers/image/types"
 	"github.com/docker/docker/reference"
 )
@@ -25,6 +26,22 @@ func (t openshiftTransport) ParseReference(reference string) (types.ImageReferen
 	return ParseReference(reference)
 }
 
+// Note that imageNameRegexp is namespace/stream:tag, this
+// is HOSTNAME/namespace/stream:tag or parent prefixes.
+// Keep this in sync with imageNameRegexp!
+var scopeRegexp = regexp.MustCompile("^[^/]*(/[^:/]*(/[^:/]*(:[^:/]*)?)?)?$")
+
+// ValidatePolicyConfigurationScope checks that scope is a valid name for a signature.PolicyTransportScopes keys
+// (i.e. a valid PolicyConfigurationIdentity() or PolicyConfigurationNamespaces() return value).
+// It is acceptable to allow an invalid value which will never be matched, it can "only" cause user confusion.
+// scope passed to this function will not be "", that value is always allowed.
+func (t openshiftTransport) ValidatePolicyConfigurationScope(scope string) error {
+	if scopeRegexp.FindStringIndex(scope) == nil {
+		return fmt.Errorf("Invalid scope name %s", scope)
+	}
+	return nil
+}
+
 // openshiftReference is an ImageReference for OpenShift images.
 type openshiftReference struct {
 	baseURL         *url.URL
@@ -35,6 +52,7 @@ type openshiftReference struct {
 }
 
 // FIXME: Is imageName like this a good way to refer to OpenShift images?
+// Keep this in sync with scopeRegexp!
 var imageNameRegexp = regexp.MustCompile("^([^:/]*)/([^:/]*):([^:/]*)$")
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an OpenShift ImageReference.
@@ -109,6 +127,30 @@ func (ref openshiftReference) StringWithinTransport() string {
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
 func (ref openshiftReference) DockerReference() reference.Named {
 	return ref.dockerReference
+}
+
+// PolicyConfigurationIdentity returns a string representation of the reference, suitable for policy lookup.
+// This MUST reflect user intent, not e.g. after processing of third-party redirects or aliases;
+// The value SHOULD be fully explicit about its semantics, with no hidden defaults, AND canonical
+// (i.e. various references with exactly the same semantics should return the same configuration identity)
+// It is fine for the return value to be equal to StringWithinTransport(), and it is desirable but
+// not required/guaranteed that it will be a valid input to Transport().ParseReference().
+// Returns "" if configuration identities for these references are not supported.
+func (ref openshiftReference) PolicyConfigurationIdentity() string {
+	res, err := policyconfiguration.DockerReferenceIdentity(ref.dockerReference)
+	if res == "" || err != nil { // Coverage: Should never happen, NewReference constructs a valid tagged reference.
+		panic(fmt.Sprintf("Internal inconsistency: policyconfiguration.DockerReferenceIdentity returned %#v, %v", res, err))
+	}
+	return res
+}
+
+// PolicyConfigurationNamespaces returns a list of other policy configuration namespaces to search
+// for if explicit configuration for PolicyConfigurationIdentity() is not set.  The list will be processed
+// in order, terminating on first match, and an implicit "" is always checked at the end.
+// It is STRONGLY recommended for the first element, if any, to be a prefix of PolicyConfigurationIdentity(),
+// and each following element to be a prefix of the element preceding it.
+func (ref openshiftReference) PolicyConfigurationNamespaces() []string {
+	return policyconfiguration.DockerReferenceNamespaces(ref.dockerReference)
 }
 
 // NewImage returns a types.Image for this reference.

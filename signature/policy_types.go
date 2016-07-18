@@ -8,17 +8,21 @@ package signature
 
 // Policy defines requirements for considering a signature valid.
 type Policy struct {
-	// Default applies to any image which does not have a matching policy in Specific.
-	Default PolicyRequirements `json:"default"`
-	// Specific applies to images matching scope, the map key.
-	// Scope is hostname[/zero/or/more/namespaces[/repository[:tag|@digest]]]; note that in order to be
-	// unambiguous, this must use a fully expanded format, e.g. "docker.io/library/busybox" or
-	// "docker.io/library", not "busybox" or "library".
-	// FIXME: Scope syntax - should it be namespaced docker:something ? Or, in the worst case, a composite object (we couldn't use a JSON map)
-	// Most specific scope wins, duplication is prohibited (hard failure).
-	// Defaults to an empty map if not specified.
-	Specific map[string]PolicyRequirements `json:"specific"`
+	// Default applies to any image which does not have a matching policy in Transports.
+	// Note that this can happen even if a matching PolicyTransportScopes exists in Transports
+	// if the image matches none of the scopes.
+	Default    PolicyRequirements               `json:"default"`
+	Transports map[string]PolicyTransportScopes `json:"transports"`
 }
+
+// PolicyTransportScopes defines policies for images for a specific transport,
+// for various scopes, the map keys.
+// Scopes are defined by the transport (types.ImageReference.PolicyConfigurationIdentity etc.);
+// there is one scope precisely matching to a single image, and namespace scopes as prefixes
+// of the single-image scope. (e.g. hostname[/zero[/or[/more[/namespaces[/individualimage]]]]])
+// The empty scope, if exists, is considered a parent namespace of all other scopes.
+// Most specific scope wins, duplication is prohibited (hard failure).
+type PolicyTransportScopes map[string]PolicyRequirements
 
 // PolicyRequirements is a set of requirements applying to a set of images; each of them must be satisfied (though perhaps each by a different signature).
 // Must not be empty, frequently will only contain a single element.

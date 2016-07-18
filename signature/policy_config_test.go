@@ -6,6 +6,9 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/containers/image/directory"
+	"github.com/containers/image/docker"
+	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,44 +16,49 @@ import (
 // policyFixtureContents is a data structure equal to the contents of "fixtures/policy.json"
 var policyFixtureContents = &Policy{
 	Default: PolicyRequirements{NewPRReject()},
-	Specific: map[string]PolicyRequirements{
-		"example.com/playground": {
-			NewPRInsecureAcceptAnything(),
+	Transports: map[string]PolicyTransportScopes{
+		"dir": {
+			"": PolicyRequirements{NewPRInsecureAcceptAnything()},
 		},
-		"example.com/production": {
-			xNewPRSignedByKeyPath(SBKeyTypeGPGKeys,
-				"/keys/employee-gpg-keyring",
-				NewPRMMatchExact()),
-		},
-		"example.com/hardened": {
-			xNewPRSignedByKeyPath(SBKeyTypeGPGKeys,
-				"/keys/employee-gpg-keyring",
-				NewPRMMatchRepository()),
-			xNewPRSignedByKeyPath(SBKeyTypeSignedByGPGKeys,
-				"/keys/public-key-signing-gpg-keyring",
-				NewPRMMatchExact()),
-			xNewPRSignedBaseLayer(xNewPRMExactRepository("registry.access.redhat.com/rhel7/rhel")),
-		},
-		"example.com/hardened-x509": {
-			xNewPRSignedByKeyPath(SBKeyTypeX509Certificates,
-				"/keys/employee-cert-file",
-				NewPRMMatchRepository()),
-			xNewPRSignedByKeyPath(SBKeyTypeSignedByX509CAs,
-				"/keys/public-key-signing-ca-file",
-				NewPRMMatchExact()),
-		},
-		"registry.access.redhat.com": {
-			xNewPRSignedByKeyPath(SBKeyTypeSignedByGPGKeys,
-				"/keys/RH-key-signing-key-gpg-keyring",
-				NewPRMMatchExact()),
-		},
-		"bogus/key-data-example": {
-			xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys,
-				[]byte("nonsense"),
-				NewPRMMatchExact()),
-		},
-		"bogus/signed-identity-example": {
-			xNewPRSignedBaseLayer(xNewPRMExactReference("registry.access.redhat.com/rhel7/rhel:latest")),
+		"docker": {
+			"example.com/playground": {
+				NewPRInsecureAcceptAnything(),
+			},
+			"example.com/production": {
+				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys,
+					"/keys/employee-gpg-keyring",
+					NewPRMMatchExact()),
+			},
+			"example.com/hardened": {
+				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys,
+					"/keys/employee-gpg-keyring",
+					NewPRMMatchRepository()),
+				xNewPRSignedByKeyPath(SBKeyTypeSignedByGPGKeys,
+					"/keys/public-key-signing-gpg-keyring",
+					NewPRMMatchExact()),
+				xNewPRSignedBaseLayer(xNewPRMExactRepository("registry.access.redhat.com/rhel7/rhel")),
+			},
+			"example.com/hardened-x509": {
+				xNewPRSignedByKeyPath(SBKeyTypeX509Certificates,
+					"/keys/employee-cert-file",
+					NewPRMMatchRepository()),
+				xNewPRSignedByKeyPath(SBKeyTypeSignedByX509CAs,
+					"/keys/public-key-signing-ca-file",
+					NewPRMMatchExact()),
+			},
+			"registry.access.redhat.com": {
+				xNewPRSignedByKeyPath(SBKeyTypeSignedByGPGKeys,
+					"/keys/RH-key-signing-key-gpg-keyring",
+					NewPRMMatchExact()),
+			},
+			"bogus/key-data-example": {
+				xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys,
+					[]byte("nonsense"),
+					NewPRMMatchExact()),
+			},
+			"bogus/signed-identity-example": {
+				xNewPRSignedBaseLayer(xNewPRMExactReference("registry.access.redhat.com/rhel7/rhel:latest")),
+			},
 		},
 	},
 }
@@ -159,12 +167,19 @@ func TestPolicyUnmarshalJSON(t *testing.T) {
 		Default: []PolicyRequirement{
 			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("abc"), NewPRMMatchExact()),
 		},
-		Specific: map[string]PolicyRequirements{
-			"docker.io/library/busybox": []PolicyRequirement{
-				xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("def"), NewPRMMatchExact()),
+		Transports: map[string]PolicyTransportScopes{
+			"docker": {
+				"docker.io/library/busybox": []PolicyRequirement{
+					xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("def"), NewPRMMatchExact()),
+				},
+				"registry.access.redhat.com": []PolicyRequirement{
+					xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RH"), NewPRMMatchRepository()),
+				},
 			},
-			"registry.access.redhat.com": []PolicyRequirement{
-				xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RH"), NewPRMMatchRepository()),
+			"atomic": {
+				"registry.access.redhat.com/rhel7": []PolicyRequirement{
+					xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RHatomic"), NewPRMMatchRepository()),
+				},
 			},
 		},
 	}
@@ -186,13 +201,14 @@ func TestPolicyUnmarshalJSON(t *testing.T) {
 		// "default" not an array
 		func(v mSI) { v["default"] = 1 },
 		func(v mSI) { v["default"] = mSI{} },
-		// "specific" not an object
-		func(v mSI) { v["specific"] = 1 },
-		func(v mSI) { v["specific"] = []string{} },
+		// "transports" not an object
+		func(v mSI) { v["transports"] = 1 },
+		func(v mSI) { v["transports"] = []string{} },
 		// "default" is an invalid PolicyRequirements
 		func(v mSI) { v["default"] = PolicyRequirements{} },
-		// A field in "specific" is an invalid PolicyRequirements
-		func(v mSI) { x(v, "specific")["docker.io/library/busybox"] = PolicyRequirements{} },
+		// A key in "transports" is an invalid transport name
+		func(v mSI) { x(v, "transports")["this is unknown"] = x(v, "transports")["docker"] },
+		func(v mSI) { x(v, "transports")[""] = x(v, "transports")["docker"] },
 	}
 	for _, fn := range breakFns {
 		err = tryUnmarshalModifiedPolicy(t, &p, validJSON, fn)
@@ -200,7 +216,7 @@ func TestPolicyUnmarshalJSON(t *testing.T) {
 	}
 
 	// Duplicated fields
-	for _, field := range []string{"default", "specific"} {
+	for _, field := range []string{"default", "transports"} {
 		var tmp mSI
 		err := json.Unmarshal(validJSON, &tmp)
 		require.NoError(t, err)
@@ -216,11 +232,145 @@ func TestPolicyUnmarshalJSON(t *testing.T) {
 	allowedModificationFns := []func(mSI){
 		// Delete the map of specific policies
 		func(v mSI) { delete(v, "specific") },
-		// Use an empty map of specific policies
-		func(v mSI) { v["specific"] = map[string]PolicyRequirements{} },
+		// Use an empty map of transport-specific scopes
+		func(v mSI) { v["transports"] = map[string]PolicyTransportScopes{} },
 	}
 	for _, fn := range allowedModificationFns {
 		err = tryUnmarshalModifiedPolicy(t, &p, validJSON, fn)
+		require.NoError(t, err)
+	}
+}
+
+func TestPolicyTransportScopesUnmarshalJSON(t *testing.T) {
+	var pts PolicyTransportScopes
+
+	// Start with a valid JSON.
+	validPTS := PolicyTransportScopes{
+		"": []PolicyRequirement{
+			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("global"), NewPRMMatchExact()),
+		},
+	}
+	validJSON, err := json.Marshal(validPTS)
+	require.NoError(t, err)
+
+	// Nothing can be unmarshaled directly into PolicyTransportScopes
+	pts = PolicyTransportScopes{}
+	err = json.Unmarshal(validJSON, &pts)
+	assert.Error(t, err)
+}
+
+// Return the result of modifying validJSON with fn and unmarshaling it into *pts
+// using transport.
+func tryUnmarshalModifiedPTS(t *testing.T, pts *PolicyTransportScopes, transport types.ImageTransport,
+	validJSON []byte, modifyFn func(mSI)) error {
+	var tmp mSI
+	err := json.Unmarshal(validJSON, &tmp)
+	require.NoError(t, err)
+
+	modifyFn(tmp)
+
+	testJSON, err := json.Marshal(tmp)
+	require.NoError(t, err)
+
+	*pts = PolicyTransportScopes{}
+	dest := policyTransportScopesWithTransport{
+		transport: transport,
+		dest:      pts,
+	}
+	return json.Unmarshal(testJSON, &dest)
+}
+
+func TestPolicyTransportScopesWithTransportUnmarshalJSON(t *testing.T) {
+	var pts PolicyTransportScopes
+
+	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
+	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
+	err := json.Unmarshal([]byte("&"), &pts)
+	assert.Error(t, err)
+	err = pts.UnmarshalJSON([]byte("&"))
+	assert.Error(t, err)
+
+	// Not an object
+	err = json.Unmarshal([]byte("1"), &pts)
+	assert.Error(t, err)
+
+	// Start with a valid JSON.
+	validPTS := PolicyTransportScopes{
+		"docker.io/library/busybox": []PolicyRequirement{
+			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("def"), NewPRMMatchExact()),
+		},
+		"registry.access.redhat.com": []PolicyRequirement{
+			xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RH"), NewPRMMatchRepository()),
+		},
+		"": []PolicyRequirement{
+			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("global"), NewPRMMatchExact()),
+		},
+	}
+	validJSON, err := json.Marshal(validPTS)
+	require.NoError(t, err)
+
+	// Success
+	pts = PolicyTransportScopes{}
+	dest := policyTransportScopesWithTransport{
+		transport: docker.Transport,
+		dest:      &pts,
+	}
+	err = json.Unmarshal(validJSON, &dest)
+	require.NoError(t, err)
+	assert.Equal(t, validPTS, pts)
+
+	// Various ways to corrupt the JSON
+	breakFns := []func(mSI){
+		// A scope is not an array
+		func(v mSI) { v["docker.io/library/busybox"] = 1 },
+		func(v mSI) { v["docker.io/library/busybox"] = mSI{} },
+		func(v mSI) { v[""] = 1 },
+		func(v mSI) { v[""] = mSI{} },
+		// A scope is an invalid PolicyRequirements
+		func(v mSI) { v["docker.io/library/busybox"] = PolicyRequirements{} },
+		func(v mSI) { v[""] = PolicyRequirements{} },
+	}
+	for _, fn := range breakFns {
+		err = tryUnmarshalModifiedPTS(t, &pts, docker.Transport, validJSON, fn)
+		assert.Error(t, err)
+	}
+
+	// Duplicated fields
+	for _, field := range []string{"docker.io/library/busybox", ""} {
+		var tmp mSI
+		err := json.Unmarshal(validJSON, &tmp)
+		require.NoError(t, err)
+
+		testJSON := addExtraJSONMember(t, validJSON, field, tmp[field])
+
+		pts = PolicyTransportScopes{}
+		dest := policyTransportScopesWithTransport{
+			transport: docker.Transport,
+			dest:      &pts,
+		}
+		err = json.Unmarshal(testJSON, &dest)
+		assert.Error(t, err)
+	}
+
+	// Scope rejected by transport the Docker scopes we use as valid are rejected by directory.Transport
+	// as relative paths.
+	err = tryUnmarshalModifiedPTS(t, &pts, directory.Transport, validJSON,
+		func(v mSI) {})
+	assert.Error(t, err)
+
+	// Various allowed modifications to the policy
+	allowedModificationFns := []func(mSI){
+		// The "" scope is missing
+		func(v mSI) { delete(v, "") },
+		// The policy is completely empty
+		func(v mSI) {
+			for key := range v {
+				delete(v, key)
+			}
+		},
+	}
+	for _, fn := range allowedModificationFns {
+		err = tryUnmarshalModifiedPTS(t, &pts, docker.Transport, validJSON, fn)
 		require.NoError(t, err)
 	}
 }

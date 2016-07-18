@@ -95,6 +95,12 @@ func (ref refImageReferenceMock) StringWithinTransport() string {
 func (ref refImageReferenceMock) DockerReference() reference.Named {
 	return ref.Named
 }
+func (ref refImageReferenceMock) PolicyConfigurationIdentity() string {
+	panic("unexpected call to a mock function")
+}
+func (ref refImageReferenceMock) PolicyConfigurationNamespaces() []string {
+	panic("unexpected call to a mock function")
+}
 func (ref refImageReferenceMock) NewImage(certPath string, tlsVerify bool) (types.Image, error) {
 	panic("unexpected call to a mock function")
 }
@@ -112,6 +118,9 @@ func (name nameImageTransportMock) Name() string {
 	return string(name)
 }
 func (name nameImageTransportMock) ParseReference(reference string) (types.ImageReference, error) {
+	panic("unexpected call to a mock function")
+}
+func (name nameImageTransportMock) ValidatePolicyConfigurationScope(scope string) error {
 	panic("unexpected call to a mock function")
 }
 

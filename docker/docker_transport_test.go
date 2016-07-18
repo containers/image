@@ -22,6 +22,19 @@ func TestTransportParseReference(t *testing.T) {
 	testParseReference(t, Transport.ParseReference)
 }
 
+func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
+	for _, scope := range []string{
+		"docker.io/library/busybox" + sha256digest,
+		"docker.io/library/busybox:notlatest",
+		"docker.io/library/busybox",
+		"docker.io/library",
+		"docker.io",
+	} {
+		err := Transport.ValidatePolicyConfigurationScope(scope)
+		assert.NoError(t, err, scope)
+	}
+}
+
 func TestParseReference(t *testing.T) {
 	testParseReference(t, ParseReference)
 }
@@ -124,6 +137,24 @@ func TestReferenceDockerReference(t *testing.T) {
 		require.NotNil(t, dockerRef, c.input)
 		assert.Equal(t, c.dockerRef, dockerRef.String(), c.input)
 	}
+}
+
+func TestReferencePolicyConfigurationIdentity(t *testing.T) {
+	// Just a smoke test, the substance is tested in policyconfiguration.TestDockerReference.
+	ref, err := ParseReference("//busybox")
+	require.NoError(t, err)
+	assert.Equal(t, "docker.io/library/busybox:latest", ref.PolicyConfigurationIdentity())
+}
+
+func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
+	// Just a smoke test, the substance is tested in policyconfiguration.TestDockerReference.
+	ref, err := ParseReference("//busybox")
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"docker.io/library/busybox",
+		"docker.io/library",
+		"docker.io",
+	}, ref.PolicyConfigurationNamespaces())
 }
 
 func TestReferenceNewImage(t *testing.T) {

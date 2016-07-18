@@ -28,6 +28,12 @@ func (ref nameOnlyImageReferenceMock) StringWithinTransport() string {
 func (ref nameOnlyImageReferenceMock) DockerReference() reference.Named {
 	panic("unexpected call to a mock function")
 }
+func (ref nameOnlyImageReferenceMock) PolicyConfigurationIdentity() string {
+	panic("unexpected call to a mock function")
+}
+func (ref nameOnlyImageReferenceMock) PolicyConfigurationNamespaces() []string {
+	panic("unexpected call to a mock function")
+}
 func (ref nameOnlyImageReferenceMock) NewImage(certPath string, tlsVerify bool) (types.Image, error) {
 	panic("unexpected call to a mock function")
 }
