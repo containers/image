@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/docker"
@@ -52,6 +53,7 @@ func newOpenshiftClient(ref openshiftReference) (*openshiftClient, error) {
 	if *baseURL != *ref.baseURL {
 		return nil, fmt.Errorf("Unexpected baseURL mismatch: default %#v, reference %#v", *baseURL, *ref.baseURL)
 	}
+	httpClient.Timeout = 1 * time.Minute
 
 	return &openshiftClient{
 		ref:         ref,

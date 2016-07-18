@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/homedir"
@@ -39,7 +40,7 @@ type dockerClient struct {
 	password        string
 	wwwAuthenticate string // Cache of a value set by ping() if scheme is not empty
 	scheme          string // Cache of a value returned by a successful ping() if not empty
-	transport       *http.Transport
+	client          *http.Client
 }
 
 // newDockerClient returns a new dockerClient instance for refHostname (a host a specified in the Docker image reference, not canonicalized to dockerRegistry)
@@ -70,11 +71,17 @@ func newDockerClient(refHostname, certPath string, tlsVerify bool) (*dockerClien
 			TLSClientConfig: tlsc,
 		}
 	}
+	client := &http.Client{
+		Timeout: 1 * time.Minute,
+	}
+	if tr != nil {
+		client.Transport = tr
+	}
 	return &dockerClient{
-		registry:  registry,
-		username:  username,
-		password:  password,
-		transport: tr,
+		registry: registry,
+		username: username,
+		password: password,
+		client:   client,
 	}, nil
 }
 
@@ -112,12 +119,8 @@ func (c *dockerClient) makeRequestToResolvedURL(method, url string, headers map[
 			return nil, err
 		}
 	}
-	client := &http.Client{}
-	if c.transport != nil {
-		client.Transport = c.transport
-	}
 	logrus.Debugf("%s %s", method, url)
-	res, err := client.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -134,11 +137,7 @@ func (c *dockerClient) setupRequestAuth(req *http.Request) error {
 		req.SetBasicAuth(c.username, c.password)
 		return nil
 	case "Bearer":
-		client := &http.Client{}
-		if c.transport != nil {
-			client.Transport = c.transport
-		}
-		res, err := client.Do(req)
+		res, err := c.client.Do(req)
 		if err != nil {
 			return err
 		}
@@ -294,13 +293,9 @@ type pingResponse struct {
 }
 
 func (c *dockerClient) ping() (*pingResponse, error) {
-	client := &http.Client{}
-	if c.transport != nil {
-		client.Transport = c.transport
-	}
 	ping := func(scheme string) (*pingResponse, error) {
 		url := fmt.Sprintf(baseURL, scheme, c.registry)
-		resp, err := client.Get(url)
+		resp, err := c.client.Get(url)
 		logrus.Debugf("Ping %s err %#v", url, err)
 		if err != nil {
 			return nil, err
