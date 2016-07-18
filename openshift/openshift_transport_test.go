@@ -17,6 +17,27 @@ func TestTransportName(t *testing.T) {
 	assert.Equal(t, "atomic", Transport.Name())
 }
 
+func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
+	for _, scope := range []string{
+		"registry.example.com/ns/stream" + sha256digest,
+		"registry.example.com/ns/stream:notlatest",
+		"registry.example.com/ns/stream",
+		"registry.example.com/ns",
+		"registry.example.com",
+	} {
+		err := Transport.ValidatePolicyConfigurationScope(scope)
+		assert.NoError(t, err, scope)
+	}
+
+	for _, scope := range []string{
+		"registry.example.com/too/deep/hierarchy",
+		"registry.example.com/ns/stream:tag1:tag2",
+	} {
+		err := Transport.ValidatePolicyConfigurationScope(scope)
+		assert.Error(t, err, scope)
+	}
+}
+
 // Transport.ParseReference, ParseReference untested because they depend
 // on per-user configuration.
 var testBaseURL *url.URL

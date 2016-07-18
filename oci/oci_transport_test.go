@@ -19,6 +19,30 @@ func TestTransportParseReference(t *testing.T) {
 	testParseReference(t, Transport.ParseReference)
 }
 
+func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
+	for _, scope := range []string{
+		"/etc",
+		"/etc:notlatest",
+		"/this/does/not/exist",
+		"/this/does/not/exist:notlatest",
+		"/:strangecornercase",
+	} {
+		err := Transport.ValidatePolicyConfigurationScope(scope)
+		assert.NoError(t, err, scope)
+	}
+
+	for _, scope := range []string{
+		"relative/path",
+		"/",
+		"/etc:invalid'tag!value@",
+		"/path:with/colons",
+		"/path:with/colons/and:tag",
+	} {
+		err := Transport.ValidatePolicyConfigurationScope(scope)
+		assert.Error(t, err, scope)
+	}
+}
+
 func TestParseReference(t *testing.T) {
 	testParseReference(t, ParseReference)
 }

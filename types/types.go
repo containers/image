@@ -24,6 +24,11 @@ type ImageTransport interface {
 	Name() string
 	// ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an ImageReference.
 	ParseReference(reference string) (ImageReference, error)
+	// ValidatePolicyConfigurationScope checks that scope is a valid name for a signature.PolicyTransportScopes keys
+	// (i.e. a valid PolicyConfigurationIdentity() or PolicyConfigurationNamespaces() return value).
+	// It is acceptable to allow an invalid value which will never be matched, it can "only" cause user confusion.
+	// scope passed to this function will not be "", that value is always allowed.
+	ValidatePolicyConfigurationScope(scope string) error
 }
 
 // ImageReference is an abstracted way to refer to an image location, namespaced within an ImageTransport.

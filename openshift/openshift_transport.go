@@ -26,6 +26,22 @@ func (t openshiftTransport) ParseReference(reference string) (types.ImageReferen
 	return ParseReference(reference)
 }
 
+// Note that imageNameRegexp is namespace/stream:tag, this
+// is HOSTNAME/namespace/stream:tag or parent prefixes.
+// Keep this in sync with imageNameRegexp!
+var scopeRegexp = regexp.MustCompile("^[^/]*(/[^:/]*(/[^:/]*(:[^:/]*)?)?)?$")
+
+// ValidatePolicyConfigurationScope checks that scope is a valid name for a signature.PolicyTransportScopes keys
+// (i.e. a valid PolicyConfigurationIdentity() or PolicyConfigurationNamespaces() return value).
+// It is acceptable to allow an invalid value which will never be matched, it can "only" cause user confusion.
+// scope passed to this function will not be "", that value is always allowed.
+func (t openshiftTransport) ValidatePolicyConfigurationScope(scope string) error {
+	if scopeRegexp.FindStringIndex(scope) == nil {
+		return fmt.Errorf("Invalid scope name %s", scope)
+	}
+	return nil
+}
+
 // openshiftReference is an ImageReference for OpenShift images.
 type openshiftReference struct {
 	baseURL         *url.URL
@@ -36,6 +52,7 @@ type openshiftReference struct {
 }
 
 // FIXME: Is imageName like this a good way to refer to OpenShift images?
+// Keep this in sync with scopeRegexp!
 var imageNameRegexp = regexp.MustCompile("^([^:/]*)/([^:/]*):([^:/]*)$")
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an OpenShift ImageReference.

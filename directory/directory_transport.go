@@ -1,6 +1,8 @@
 package directory
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/containers/image/directory/explicitfilepath"
@@ -21,6 +23,22 @@ func (t dirTransport) Name() string {
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an ImageReference.
 func (t dirTransport) ParseReference(reference string) (types.ImageReference, error) {
 	return NewReference(reference)
+}
+
+// ValidatePolicyConfigurationScope checks that scope is a valid name for a signature.PolicyTransportScopes keys
+// (i.e. a valid PolicyConfigurationIdentity() or PolicyConfigurationNamespaces() return value).
+// It is acceptable to allow an invalid value which will never be matched, it can "only" cause user confusion.
+// scope passed to this function will not be "", that value is always allowed.
+func (t dirTransport) ValidatePolicyConfigurationScope(scope string) error {
+	if !strings.HasPrefix(scope, "/") {
+		return fmt.Errorf("Invalid scope %s: must be an absolute path", scope)
+	}
+	// Refuse also "/", otherwise "/" and "" would have the same semantics,
+	// and "" could be unexpectedly shadowed by the "/" entry.
+	if scope == "/" {
+		return errors.New(`Invalid scope "/": Use the generic default scope ""`)
+	}
+	return nil
 }
 
 // dirReference is an ImageReference for directory paths.
@@ -99,8 +117,8 @@ func (ref dirReference) PolicyConfigurationNamespaces() []string {
 		path = path[:lastSlash]
 		res = append(res, path)
 	}
-	// Note that we do not include "/"; it is redundant with the default "" global default.
-	// FIXME: Reject "/" when parsing configurations.
+	// Note that we do not include "/"; it is redundant with the default "" global default,
+	// and rejected by dirTransport.ValidatePolicyConfigurationScope above.
 	return res
 }
 

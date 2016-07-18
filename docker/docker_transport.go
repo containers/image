@@ -23,6 +23,17 @@ func (t dockerTransport) ParseReference(reference string) (types.ImageReference,
 	return ParseReference(reference)
 }
 
+// ValidatePolicyConfigurationScope checks that scope is a valid name for a signature.PolicyTransportScopes keys
+// (i.e. a valid PolicyConfigurationIdentity() or PolicyConfigurationNamespaces() return value).
+// It is acceptable to allow an invalid value which will never be matched, it can "only" cause user confusion.
+// scope passed to this function will not be "", that value is always allowed.
+func (t dockerTransport) ValidatePolicyConfigurationScope(scope string) error {
+	// FIXME? We could be verifying the various character set and length restrictions
+	// from docker/distribution/reference.regexp.go, but other than that there
+	// are few semantically invalid strings.
+	return nil
+}
+
 // dockerReference is an ImageReference for Docker images.
 type dockerReference struct {
 	ref reference.Named // By construction we know that !reference.IsNameOnly(ref)

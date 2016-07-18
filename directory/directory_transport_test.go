@@ -19,6 +19,24 @@ func TestTransportParseReference(t *testing.T) {
 	testNewReference(t, Transport.ParseReference)
 }
 
+func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
+	for _, scope := range []string{
+		"/etc",
+		"/this/does/not/exist",
+	} {
+		err := Transport.ValidatePolicyConfigurationScope(scope)
+		assert.NoError(t, err, scope)
+	}
+
+	for _, scope := range []string{
+		"relative/path",
+		"/",
+	} {
+		err := Transport.ValidatePolicyConfigurationScope(scope)
+		assert.Error(t, err, scope)
+	}
+}
+
 func TestNewReference(t *testing.T) {
 	testNewReference(t, NewReference)
 }

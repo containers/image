@@ -6,6 +6,9 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/containers/image/directory"
+	"github.com/containers/image/docker"
+	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -238,8 +241,28 @@ func TestPolicyUnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestPolicyTransportScopesUnmarshalJSON(t *testing.T) {
+	var pts PolicyTransportScopes
+
+	// Start with a valid JSON.
+	validPTS := PolicyTransportScopes{
+		"": []PolicyRequirement{
+			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("global"), NewPRMMatchExact()),
+		},
+	}
+	validJSON, err := json.Marshal(validPTS)
+	require.NoError(t, err)
+
+	// Nothing can be unmarshaled directly into PolicyTransportScopes
+	pts = PolicyTransportScopes{}
+	err = json.Unmarshal(validJSON, &pts)
+	assert.Error(t, err)
+}
+
 // Return the result of modifying validJSON with fn and unmarshaling it into *pts
-func tryUnmarshalModifiedPTS(t *testing.T, pts *PolicyTransportScopes, validJSON []byte, modifyFn func(mSI)) error {
+// using transport.
+func tryUnmarshalModifiedPTS(t *testing.T, pts *PolicyTransportScopes, transport types.ImageTransport,
+	validJSON []byte, modifyFn func(mSI)) error {
 	var tmp mSI
 	err := json.Unmarshal(validJSON, &tmp)
 	require.NoError(t, err)
@@ -250,10 +273,14 @@ func tryUnmarshalModifiedPTS(t *testing.T, pts *PolicyTransportScopes, validJSON
 	require.NoError(t, err)
 
 	*pts = PolicyTransportScopes{}
-	return json.Unmarshal(testJSON, pts)
+	dest := policyTransportScopesWithTransport{
+		transport: transport,
+		dest:      pts,
+	}
+	return json.Unmarshal(testJSON, &dest)
 }
 
-func TestPolicyTransportScopesUnmarshalJSON(t *testing.T) {
+func TestPolicyTransportScopesWithTransportUnmarshalJSON(t *testing.T) {
 	var pts PolicyTransportScopes
 
 	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
@@ -284,7 +311,11 @@ func TestPolicyTransportScopesUnmarshalJSON(t *testing.T) {
 
 	// Success
 	pts = PolicyTransportScopes{}
-	err = json.Unmarshal(validJSON, &pts)
+	dest := policyTransportScopesWithTransport{
+		transport: docker.Transport,
+		dest:      &pts,
+	}
+	err = json.Unmarshal(validJSON, &dest)
 	require.NoError(t, err)
 	assert.Equal(t, validPTS, pts)
 
@@ -300,7 +331,7 @@ func TestPolicyTransportScopesUnmarshalJSON(t *testing.T) {
 		func(v mSI) { v[""] = PolicyRequirements{} },
 	}
 	for _, fn := range breakFns {
-		err = tryUnmarshalModifiedPTS(t, &pts, validJSON, fn)
+		err = tryUnmarshalModifiedPTS(t, &pts, docker.Transport, validJSON, fn)
 		assert.Error(t, err)
 	}
 
@@ -313,9 +344,19 @@ func TestPolicyTransportScopesUnmarshalJSON(t *testing.T) {
 		testJSON := addExtraJSONMember(t, validJSON, field, tmp[field])
 
 		pts = PolicyTransportScopes{}
-		err = json.Unmarshal(testJSON, &pts)
+		dest := policyTransportScopesWithTransport{
+			transport: docker.Transport,
+			dest:      &pts,
+		}
+		err = json.Unmarshal(testJSON, &dest)
 		assert.Error(t, err)
 	}
+
+	// Scope rejected by transport the Docker scopes we use as valid are rejected by directory.Transport
+	// as relative paths.
+	err = tryUnmarshalModifiedPTS(t, &pts, directory.Transport, validJSON,
+		func(v mSI) {})
+	assert.Error(t, err)
 
 	// Various allowed modifications to the policy
 	allowedModificationFns := []func(mSI){
@@ -329,7 +370,7 @@ func TestPolicyTransportScopesUnmarshalJSON(t *testing.T) {
 		},
 	}
 	for _, fn := range allowedModificationFns {
-		err = tryUnmarshalModifiedPTS(t, &pts, validJSON, fn)
+		err = tryUnmarshalModifiedPTS(t, &pts, docker.Transport, validJSON, fn)
 		require.NoError(t, err)
 	}
 }

@@ -15,10 +15,12 @@ package signature
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 
 	"github.com/containers/image/transports"
+	"github.com/containers/image/types"
 	"github.com/docker/docker/reference"
 )
 
@@ -89,16 +91,20 @@ func (m *policyTransportsMap) UnmarshalJSON(data []byte) error {
 	// So, use a temporary map of pointers-to-slices and convert.
 	tmpMap := map[string]*PolicyTransportScopes{}
 	if err := paranoidUnmarshalJSONObject(data, func(key string) interface{} {
-		if _, ok := transports.KnownTransports[key]; !ok {
+		transport, ok := transports.KnownTransports[key]
+		if !ok {
 			return nil
 		}
 		// paranoidUnmarshalJSONObject detects key duplication for us, check just to be safe.
 		if _, ok := tmpMap[key]; ok {
 			return nil
 		}
-		ptr := &PolicyTransportScopes{} // This allocates a new instance on each call.
-		tmpMap[key] = ptr
-		return ptr
+		ptsWithTransport := policyTransportScopesWithTransport{
+			transport: transport,
+			dest:      &PolicyTransportScopes{}, // This allocates a new instance on each call.
+		}
+		tmpMap[key] = ptsWithTransport.dest
+		return &ptsWithTransport
 	}); err != nil {
 		return err
 	}
@@ -108,19 +114,39 @@ func (m *policyTransportsMap) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Compile-time check that PolicyTransportScopes implements json.Unmarshaler.
+// Compile-time check that PolicyTransportScopes "implements"" json.Unmarshaler.
+// we want to only use policyTransportScopesWithTransport
 var _ json.Unmarshaler = (*PolicyTransportScopes)(nil)
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (m *PolicyTransportScopes) UnmarshalJSON(data []byte) error {
+	return errors.New("Do not try to unmarshal PolicyTransportScopes directly")
+}
+
+// policyTransportScopesWithTransport is a way to unmarshal a PolicyTransportScopes
+// while validating using a specific ImageTransport.
+type policyTransportScopesWithTransport struct {
+	transport types.ImageTransport
+	dest      *PolicyTransportScopes
+}
+
+// Compile-time check that policyTransportScopesWithTransport implements json.Unmarshaler.
+var _ json.Unmarshaler = (*policyTransportScopesWithTransport)(nil)
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (m *policyTransportScopesWithTransport) UnmarshalJSON(data []byte) error {
 	// We can't unmarshal directly into map values because it is not possible to take an address of a map value.
 	// So, use a temporary map of pointers-to-slices and convert.
 	tmpMap := map[string]*PolicyRequirements{}
 	if err := paranoidUnmarshalJSONObject(data, func(key string) interface{} {
-		// FIXME? We might want to validate the scope format.
 		// paranoidUnmarshalJSONObject detects key duplication for us, check just to be safe.
 		if _, ok := tmpMap[key]; ok {
 			return nil
+		}
+		if key != "" {
+			if err := m.transport.ValidatePolicyConfigurationScope(key); err != nil {
+				return nil
+			}
 		}
 		ptr := &PolicyRequirements{} // This allocates a new instance on each call.
 		tmpMap[key] = ptr
@@ -129,7 +155,7 @@ func (m *PolicyTransportScopes) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	for key, ptr := range tmpMap {
-		(*m)[key] = *ptr
+		(*m.dest)[key] = *ptr
 	}
 	return nil
 }

@@ -25,6 +25,41 @@ func (t ociTransport) ParseReference(reference string) (types.ImageReference, er
 	return ParseReference(reference)
 }
 
+var refRegexp = regexp.MustCompile(`^([A-Za-z0-9._-]+)+$`)
+
+// ValidatePolicyConfigurationScope checks that scope is a valid name for a signature.PolicyTransportScopes keys
+// (i.e. a valid PolicyConfigurationIdentity() or PolicyConfigurationNamespaces() return value).
+// It is acceptable to allow an invalid value which will never be matched, it can "only" cause user confusion.
+// scope passed to this function will not be "", that value is always allowed.
+func (t ociTransport) ValidatePolicyConfigurationScope(scope string) error {
+	var dir string
+	sep := strings.LastIndex(scope, ":")
+	if sep == -1 {
+		dir = scope
+	} else {
+		dir = scope[:sep]
+		tag := scope[sep+1:]
+		if !refRegexp.MatchString(tag) {
+			return fmt.Errorf("Invalid tag %s", tag)
+		}
+	}
+
+	if strings.Contains(dir, ":") {
+		return fmt.Errorf("Invalid OCI reference %s: path contains a colon", scope)
+	}
+
+	if !strings.HasPrefix(dir, "/") {
+		return fmt.Errorf("Invalid scope %s: must be an absolute path", scope)
+	}
+	// Refuse also "/", otherwise "/" and "" would have the same semantics,
+	// and "" could be unexpectedly shadowed by the "/" entry.
+	// (Note: we do allow "/:sometag", a bit ridiculous but why refuse it?)
+	if scope == "/" {
+		return errors.New(`Invalid scope "/": Use the generic default scope ""`)
+	}
+	return nil
+}
+
 // ociReference is an ImageReference for OCI directory paths.
 type ociReference struct {
 	// Note that the interpretation of paths below depends on the underlying filesystem state, which may change under us at any time!
@@ -37,8 +72,6 @@ type ociReference struct {
 	resolvedDir string // Absolute path with no symlinks, at least at the time of its creation. Primarily used for policy namespaces.
 	tag         string
 }
-
-var refRegexp = regexp.MustCompile(`^([A-Za-z0-9._-]+)+$`)
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an OCI ImageReference.
 func ParseReference(reference string) (types.ImageReference, error) {
@@ -115,8 +148,8 @@ func (ref ociReference) PolicyConfigurationNamespaces() []string {
 	path := ref.resolvedDir
 	for {
 		lastSlash := strings.LastIndex(path, "/")
-		// Note that we do not include "/"; it is redundant with the default "" global default.
-		// FIXME: Reject "/" when parsing configurations.
+		// Note that we do not include "/"; it is redundant with the default "" global default,
+		// and rejected by ociTransport.ValidatePolicyConfigurationScope above.
 		if lastSlash == -1 || path == "/" {
 			break
 		}

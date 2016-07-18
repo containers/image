@@ -120,6 +120,9 @@ func (name nameImageTransportMock) Name() string {
 func (name nameImageTransportMock) ParseReference(reference string) (types.ImageReference, error) {
 	panic("unexpected call to a mock function")
 }
+func (name nameImageTransportMock) ValidatePolicyConfigurationScope(scope string) error {
+	panic("unexpected call to a mock function")
+}
 
 type prmTableTest struct {
 	imageRef, sigRef string
