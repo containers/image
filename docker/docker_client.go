@@ -32,6 +32,11 @@ const (
 	blobUploadURL = "%s/blobs/uploads/"
 )
 
+type client interface {
+	makeRequest(method, url string, headers map[string][]string, stream io.Reader) (*http.Response, error)
+	makeRequestToResolvedURL(method, url string, headers map[string][]string, stream io.Reader) (*http.Response, error)
+}
+
 // dockerClient is configuration for dealing with a single Docker registry.
 type dockerClient struct {
 	registry        string

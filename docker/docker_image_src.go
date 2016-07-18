@@ -25,7 +25,7 @@ func (e errFetchManifest) Error() string {
 
 type dockerImageSource struct {
 	ref reference.Named
-	c   *dockerClient
+	c   client
 }
 
 // newDockerImageSource is the same as NewImageSource, only it returns the more specific *dockerImageSource type.

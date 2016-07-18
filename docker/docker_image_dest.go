@@ -15,7 +15,7 @@ import (
 
 type dockerImageDestination struct {
 	ref reference.Named
-	c   *dockerClient
+	c   client
 }
 
 // NewImageDestination creates a new ImageDestination for the specified image and connection specification.
