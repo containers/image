@@ -7,29 +7,26 @@ import (
 	"os"
 
 	"github.com/containers/image/types"
-	"github.com/docker/docker/reference"
 )
 
 type dirImageSource struct {
-	dir string
+	ref dirReference
 }
 
-// NewImageSource returns an ImageSource reading from an existing directory.
-func NewImageSource(dir string) types.ImageSource {
-	return &dirImageSource{dir}
+// newImageSource returns an ImageSource reading from an existing directory.
+func newImageSource(ref dirReference) types.ImageSource {
+	return &dirImageSource{ref}
 }
 
-// IntendedDockerReference returns the Docker reference for this image, _as specified by the user_
-// (not as the image itself, or its underlying storage, claims).  Should be fully expanded, i.e. !reference.IsNameOnly.
-// This can be used e.g. to determine which public keys are trusted for this image.
-// May be nil if unknown.
-func (s *dirImageSource) IntendedDockerReference() reference.Named {
-	return nil
+// Reference returns the reference used to set up this source, _as specified by the user_
+// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
+func (s *dirImageSource) Reference() types.ImageReference {
+	return s.ref
 }
 
 // it's up to the caller to determine the MIME type of the returned manifest's bytes
 func (s *dirImageSource) GetManifest(_ []string) ([]byte, string, error) {
-	m, err := ioutil.ReadFile(manifestPath(s.dir))
+	m, err := ioutil.ReadFile(manifestPath(s.ref.path))
 	if err != nil {
 		return nil, "", err
 	}
@@ -37,11 +34,11 @@ func (s *dirImageSource) GetManifest(_ []string) ([]byte, string, error) {
 }
 
 func (s *dirImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
-	r, err := os.Open(layerPath(s.dir, digest))
+	r, err := os.Open(layerPath(s.ref.path, digest))
 	if err != nil {
 		return nil, 0, nil
 	}
-	fi, err := os.Stat(layerPath(s.dir, digest))
+	fi, err := os.Stat(layerPath(s.ref.path, digest))
 	if err != nil {
 		return nil, 0, nil
 	}
@@ -51,7 +48,7 @@ func (s *dirImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
 func (s *dirImageSource) GetSignatures() ([][]byte, error) {
 	signatures := [][]byte{}
 	for i := 0; ; i++ {
-		signature, err := ioutil.ReadFile(signaturePath(s.dir, i))
+		signature, err := ioutil.ReadFile(signaturePath(s.ref.path, i))
 		if err != nil {
 			if os.IsNotExist(err) {
 				break

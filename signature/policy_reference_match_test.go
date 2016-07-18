@@ -50,11 +50,11 @@ func TestParseImageAndDockerReference(t *testing.T) {
 	}
 }
 
-// refImageMock is a mock of types.Image which returns itself in IntendedDockerReference.
+// refImageMock is a mock of types.Image which returns itself in Reference().DockerReference.
 type refImageMock struct{ reference.Named }
 
-func (ref refImageMock) IntendedDockerReference() reference.Named {
-	return ref.Named
+func (ref refImageMock) Reference() types.ImageReference {
+	return refImageReferenceMock{ref.Named}
 }
 func (ref refImageMock) Manifest() ([]byte, string, error) {
 	panic("unexpected call to a mock function")
@@ -72,6 +72,46 @@ func (ref refImageMock) Inspect() (*types.ImageInspectInfo, error) {
 	panic("unexpected call to a mock function")
 }
 func (ref refImageMock) GetRepositoryTags() ([]string, error) {
+	panic("unexpected call to a mock function")
+}
+
+// refImageReferenceMock is a mock of types.ImageReference which returns itself in DockerReference.
+type refImageReferenceMock struct{ reference.Named }
+
+func (ref refImageReferenceMock) Transport() types.ImageTransport {
+	// We use this in error messages, so sadly we must return something. But right now we do so only when DockerReference is nil, so restrict to that.
+	if ref.Named == nil {
+		return nameImageTransportMock("== Transport mock")
+	}
+	panic("unexpected call to a mock function")
+}
+func (ref refImageReferenceMock) StringWithinTransport() string {
+	// We use this in error messages, so sadly we must return something. But right now we do so only when DockerReference is nil, so restrict to that.
+	if ref.Named == nil {
+		return "== StringWithinTransport for an image with no Docker support"
+	}
+	panic("unexpected call to a mock function")
+}
+func (ref refImageReferenceMock) DockerReference() reference.Named {
+	return ref.Named
+}
+func (ref refImageReferenceMock) NewImage(certPath string, tlsVerify bool) (types.Image, error) {
+	panic("unexpected call to a mock function")
+}
+func (ref refImageReferenceMock) NewImageSource(certPath string, tlsVerify bool) (types.ImageSource, error) {
+	panic("unexpected call to a mock function")
+}
+func (ref refImageReferenceMock) NewImageDestination(certPath string, tlsVerify bool) (types.ImageDestination, error) {
+	panic("unexpected call to a mock function")
+}
+
+// nameImageTransportMock is a mock of types.ImageTransport which returns itself in Name.
+type nameImageTransportMock string
+
+func (name nameImageTransportMock) Name() string {
+	return string(name)
+}
+func (name nameImageTransportMock) ParseReference(reference string) (types.ImageReference, error) {
 	panic("unexpected call to a mock function")
 }
 
@@ -203,10 +243,10 @@ func TestParseDockerReferences(t *testing.T) {
 	}
 }
 
-// forbiddenImageMock is a mock of types.Image which ensures IntendedDockerReference is not called
-type forbiddenImageMock string
+// forbiddenImageMock is a mock of types.Image which ensures Reference is not called
+type forbiddenImageMock struct{}
 
-func (ref forbiddenImageMock) IntendedDockerReference() reference.Named {
+func (ref forbiddenImageMock) Reference() types.ImageReference {
 	panic("unexpected call to a mock function")
 }
 func (ref forbiddenImageMock) Manifest() ([]byte, string, error) {
@@ -233,7 +273,7 @@ func TestPRMExactReferenceMatchesDockerReference(t *testing.T) {
 		// Do not use NewPRMExactReference, we want to also test the case with an invalid DockerReference,
 		// even though NewPRMExactReference should never let it happen.
 		prm := prmExactReference{DockerReference: test.imageRef}
-		res := prm.matchesDockerReference(forbiddenImageMock(""), test.sigRef)
+		res := prm.matchesDockerReference(forbiddenImageMock{}, test.sigRef)
 		assert.Equal(t, test.result, res, fmt.Sprintf("%s vs. %s", test.imageRef, test.sigRef))
 	}
 }
@@ -243,7 +283,7 @@ func TestPRMExactRepositoryMatchesDockerReference(t *testing.T) {
 		// Do not use NewPRMExactRepository, we want to also test the case with an invalid DockerReference,
 		// even though NewPRMExactRepository should never let it happen.
 		prm := prmExactRepository{DockerRepository: test.imageRef}
-		res := prm.matchesDockerReference(forbiddenImageMock(""), test.sigRef)
+		res := prm.matchesDockerReference(forbiddenImageMock{}, test.sigRef)
 		assert.Equal(t, test.result, res, fmt.Sprintf("%s vs. %s", test.imageRef, test.sigRef))
 	}
 }

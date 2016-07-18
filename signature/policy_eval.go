@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
 	"github.com/docker/docker/reference"
 )
@@ -70,8 +71,8 @@ type PolicyRequirement interface {
 // The type is public, but its implementation is private.
 type PolicyReferenceMatch interface {
 	// matchesDockerReference decides whether a specific image identity is accepted for an image
-	// (or, usually, for the image's IntendedDockerReference()).  Note that
-	// image.IntendedDockerReference() may be nil.
+	// (or, usually, for the image's Reference().DockerReference()).  Note that
+	// image.Reference().DockerReference() may be nil.
 	matchesDockerReference(image types.Image, signatureDockerReference string) bool
 }
 
@@ -155,10 +156,9 @@ func fullyExpandedDockerReference(ref reference.Named) (string, error) {
 
 // requirementsForImage selects the appropriate requirements for image.
 func (pc *PolicyContext) requirementsForImage(image types.Image) (PolicyRequirements, error) {
-	ref := image.IntendedDockerReference()
+	ref := image.Reference().DockerReference()
 	if ref == nil {
-		// FIXME: Tell the user which image this is.
-		return nil, fmt.Errorf("Can not determine policy for an image with no known Docker reference identity")
+		return nil, fmt.Errorf("Can not determine policy for image %s with no known Docker reference identity", transports.ImageName(image.Reference()))
 	}
 	ref = reference.WithDefaultTag(ref) // This should not be needed, but if we did receive a name-only reference, this is a reasonable thing to do.
 
@@ -222,7 +222,7 @@ func (pc *PolicyContext) GetSignaturesWithAcceptedAuthor(image types.Image) (sig
 		}
 	}()
 
-	logrus.Debugf("GetSignaturesWithAcceptedAuthor for image %s", image.IntendedDockerReference())
+	logrus.Debugf("GetSignaturesWithAcceptedAuthor for image %s", image.Reference().DockerReference())
 
 	reqs, err := pc.requirementsForImage(image)
 	if err != nil {
@@ -306,7 +306,7 @@ func (pc *PolicyContext) IsRunningImageAllowed(image types.Image) (res bool, fin
 		}
 	}()
 
-	logrus.Debugf("IsRunningImageAllowed for image %s", image.IntendedDockerReference())
+	logrus.Debugf("IsRunningImageAllowed for image %s", image.Reference().DockerReference())
 
 	reqs, err := pc.requirementsForImage(image)
 	if err != nil {

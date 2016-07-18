@@ -11,7 +11,6 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
-	"github.com/docker/docker/reference"
 )
 
 type errFetchManifest struct {
@@ -24,17 +23,13 @@ func (e errFetchManifest) Error() string {
 }
 
 type dockerImageSource struct {
-	ref reference.Named
+	ref dockerReference
 	c   *dockerClient
 }
 
-// newDockerImageSource is the same as NewImageSource, only it returns the more specific *dockerImageSource type.
-func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSource, error) {
-	ref, err := parseImageName(img)
-	if err != nil {
-		return nil, err
-	}
-	c, err := newDockerClient(ref.Hostname(), certPath, tlsVerify)
+// newImageSource creates a new ImageSource for the specified image reference and connection specification.
+func newImageSource(ref dockerReference, certPath string, tlsVerify bool) (*dockerImageSource, error) {
+	c, err := newDockerClient(ref.ref.Hostname(), certPath, tlsVerify)
 	if err != nil {
 		return nil, err
 	}
@@ -44,16 +39,9 @@ func newDockerImageSource(img, certPath string, tlsVerify bool) (*dockerImageSou
 	}, nil
 }
 
-// NewImageSource creates a new ImageSource for the specified image and connection specification.
-func NewImageSource(img, certPath string, tlsVerify bool) (types.ImageSource, error) {
-	return newDockerImageSource(img, certPath, tlsVerify)
-}
-
-// IntendedDockerReference returns the Docker reference for this image, _as specified by the user_
-// (not as the image itself, or its underlying storage, claims).  Should be fully expanded, i.e. !reference.IsNameOnly.
-// This can be used e.g. to determine which public keys are trusted for this image.
-// May be nil if unknown.
-func (s *dockerImageSource) IntendedDockerReference() reference.Named {
+// Reference returns the reference used to set up this source, _as specified by the user_
+// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
+func (s *dockerImageSource) Reference() types.ImageReference {
 	return s.ref
 }
 
@@ -71,11 +59,11 @@ func simplifyContentType(contentType string) string {
 }
 
 func (s *dockerImageSource) GetManifest(mimetypes []string) ([]byte, string, error) {
-	reference, err := tagOrDigest(s.ref)
+	reference, err := tagOrDigest(s.ref.ref)
 	if err != nil {
 		return nil, "", err
 	}
-	url := fmt.Sprintf(manifestURL, s.ref.RemoteName(), reference)
+	url := fmt.Sprintf(manifestURL, s.ref.ref.RemoteName(), reference)
 	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
 	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
 	headers := make(map[string][]string)
@@ -97,7 +85,7 @@ func (s *dockerImageSource) GetManifest(mimetypes []string) ([]byte, string, err
 }
 
 func (s *dockerImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
-	url := fmt.Sprintf(blobsURL, s.ref.RemoteName(), digest)
+	url := fmt.Sprintf(blobsURL, s.ref.ref.RemoteName(), digest)
 	logrus.Debugf("Downloading %s", url)
 	res, err := s.c.makeRequest("GET", url, nil, nil)
 	if err != nil {
@@ -126,11 +114,11 @@ func (s *dockerImageSource) Delete() error {
 	headers := make(map[string][]string)
 	headers["Accept"] = []string{manifest.DockerV2Schema2MIMEType}
 
-	reference, err := tagOrDigest(s.ref)
+	reference, err := tagOrDigest(s.ref.ref)
 	if err != nil {
 		return err
 	}
-	getURL := fmt.Sprintf(manifestURL, s.ref.RemoteName(), reference)
+	getURL := fmt.Sprintf(manifestURL, s.ref.ref.RemoteName(), reference)
 	get, err := s.c.makeRequest("GET", getURL, headers, nil)
 	if err != nil {
 		return err
@@ -143,13 +131,13 @@ func (s *dockerImageSource) Delete() error {
 	switch get.StatusCode {
 	case http.StatusOK:
 	case http.StatusNotFound:
-		return fmt.Errorf("Unable to delete %v. Image may not exist or is not stored with a v2 Schema in a v2 registry.", s.ref)
+		return fmt.Errorf("Unable to delete %v. Image may not exist or is not stored with a v2 Schema in a v2 registry.", s.ref.ref)
 	default:
-		return fmt.Errorf("Failed to delete %v: %v (%v)", s.ref, body, get.Status)
+		return fmt.Errorf("Failed to delete %v: %v (%v)", s.ref.ref, body, get.Status)
 	}
 
 	digest := get.Header.Get("Docker-Content-Digest")
-	deleteURL := fmt.Sprintf(manifestURL, s.ref.RemoteName(), digest)
+	deleteURL := fmt.Sprintf(manifestURL, s.ref.ref.RemoteName(), digest)
 
 	// When retrieving the digest from a registry >= 2.3 use the following header:
 	//   "Accept": "application/vnd.docker.distribution.manifest.v2+json"

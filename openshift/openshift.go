@@ -8,8 +8,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
-	"regexp"
 	"strings"
 
 	"github.com/Sirupsen/logrus"
@@ -17,29 +15,26 @@ import (
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	"github.com/containers/image/version"
-	"github.com/docker/docker/reference"
 )
 
 // openshiftClient is configuration for dealing with a single image stream, for reading or writing.
 type openshiftClient struct {
+	ref openshiftReference
 	// Values from Kubernetes configuration
-	baseURL     *url.URL
 	httpClient  *http.Client
 	bearerToken string // "" if not used
 	username    string // "" if not used
 	password    string // if username != ""
-	// Values specific to this image
-	namespace                string
-	stream                   string
-	tag                      string
-	canonicalDockerReference reference.Named // Computed from the above in advance, so that later references can not fail.
 }
 
-// FIXME: Is imageName like this a good way to refer to OpenShift images?
-var imageNameRegexp = regexp.MustCompile("^([^:/]*)/([^:/]*):([^:/]*)$")
+// newOpenshiftClient creates a new openshiftClient for the specified reference.
+func newOpenshiftClient(ref openshiftReference) (*openshiftClient, error) {
+	// We have already done this parsing in ParseReference, but thrown away
+	// httpClient. So, parse again.
+	// (We could also rework/split restClientFor to "get base URL" to be done
+	// in ParseReference, and "get httpClient" to be done here.  But until/unless
+	// we support non-default clusters, this is good enough.)
 
-// newOpenshiftClient creates a new openshiftClient for the specified image.
-func newOpenshiftClient(imageName string) (*openshiftClient, error) {
 	// Overall, this is modelled on openshift/origin/pkg/cmd/util/clientcmd.New().ClientConfig() and openshift/origin/pkg/client.
 	cmdConfig := defaultClientConfig()
 	logrus.Debugf("cmdConfig: %#v", cmdConfig)
@@ -54,42 +49,22 @@ func newOpenshiftClient(imageName string) (*openshiftClient, error) {
 		return nil, err
 	}
 	logrus.Debugf("URL: %#v", *baseURL)
-
-	m := imageNameRegexp.FindStringSubmatch(imageName)
-	if m == nil || len(m) != 4 {
-		return nil, fmt.Errorf("Invalid image reference %s, %#v", imageName, m)
+	if *baseURL != *ref.baseURL {
+		return nil, fmt.Errorf("Unexpected baseURL mismatch: default %#v, reference %#v", *baseURL, *ref.baseURL)
 	}
 
-	c := &openshiftClient{
-		baseURL:     baseURL,
+	return &openshiftClient{
+		ref:         ref,
 		httpClient:  httpClient,
 		bearerToken: restConfig.BearerToken,
 		username:    restConfig.Username,
 		password:    restConfig.Password,
-
-		namespace: m[1],
-		stream:    m[2],
-		tag:       m[3],
-	}
-
-	// Precompute also c.canonicalDockerReference so that later references can not fail.
-	// FIXME: This is, strictly speaking, a namespace conflict with images placed in a Docker registry running on the same host.
-	// Do we need to do something else, perhaps disambiguate (port number?) or namespace Docker and OpenShift separately?
-	dockerRef, err := reference.WithName(fmt.Sprintf("%s/%s/%s", c.baseURL.Host, c.namespace, c.stream))
-	if err != nil {
-		return nil, err
-	}
-	c.canonicalDockerReference, err = reference.WithTag(dockerRef, c.tag)
-	if err != nil {
-		return nil, err
-	}
-
-	return c, nil
+	}, nil
 }
 
 // doRequest performs a correctly authenticated request to a specified path, and returns response body or an error object.
 func (c *openshiftClient) doRequest(method, path string, requestBody []byte) ([]byte, error) {
-	url := *c.baseURL
+	url := *c.ref.baseURL
 	url.Path = path
 	var requestBodyReader io.Reader
 	if requestBody != nil {
@@ -168,7 +143,7 @@ func (c *openshiftClient) convertDockerImageReference(ref string) (string, error
 // about how the OpenShift Atomic Registry is configured, per examples/atomic-registry/run.sh:
 // -p OPENSHIFT_OAUTH_PROVIDER_URL=https://${INSTALL_HOST}:8443,COCKPIT_KUBE_URL=https://${INSTALL_HOST},REGISTRY_HOST=${INSTALL_HOST}:5000
 func (c *openshiftClient) dockerRegistryHostPart() string {
-	return strings.SplitN(c.baseURL.Host, ":", 2)[0] + ":5000"
+	return strings.SplitN(c.ref.baseURL.Host, ":", 2)[0] + ":5000"
 }
 
 type openshiftImageSource struct {
@@ -181,9 +156,9 @@ type openshiftImageSource struct {
 	imageStreamImageName string            // Resolved image identifier, or "" if not known yet
 }
 
-// NewImageSource creates a new ImageSource for the specified image and connection specification.
-func NewImageSource(imageName, certPath string, tlsVerify bool) (types.ImageSource, error) {
-	client, err := newOpenshiftClient(imageName)
+// newImageSource creates a new ImageSource for the specified reference and connection specification.
+func newImageSource(ref openshiftReference, certPath string, tlsVerify bool) (types.ImageSource, error) {
+	client, err := newOpenshiftClient(ref)
 	if err != nil {
 		return nil, err
 	}
@@ -195,12 +170,10 @@ func NewImageSource(imageName, certPath string, tlsVerify bool) (types.ImageSour
 	}, nil
 }
 
-// IntendedDockerReference returns the Docker reference for this image, _as specified by the user_
-// (not as the image itself, or its underlying storage, claims).  Should be fully expanded, i.e. !reference.IsNameOnly.
-// This can be used e.g. to determine which public keys are trusted for this image.
-// May be nil if unknown.
-func (s *openshiftImageSource) IntendedDockerReference() reference.Named {
-	return s.client.canonicalDockerReference
+// Reference returns the reference used to set up this source, _as specified by the user_
+// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
+func (s *openshiftImageSource) Reference() types.ImageReference {
+	return s.client.ref
 }
 
 func (s *openshiftImageSource) GetManifest(mimetypes []string) ([]byte, string, error) {
@@ -228,7 +201,7 @@ func (s *openshiftImageSource) ensureImageIsResolved() error {
 	}
 
 	// FIXME: validate components per validation.IsValidPathSegmentName?
-	path := fmt.Sprintf("/oapi/v1/namespaces/%s/imagestreams/%s", s.client.namespace, s.client.stream)
+	path := fmt.Sprintf("/oapi/v1/namespaces/%s/imagestreams/%s", s.client.ref.namespace, s.client.ref.stream)
 	body, err := s.client.doRequest("GET", path, nil)
 	if err != nil {
 		return err
@@ -240,7 +213,7 @@ func (s *openshiftImageSource) ensureImageIsResolved() error {
 	}
 	var te *tagEvent
 	for _, tag := range is.Status.Tags {
-		if tag.Tag != s.client.tag {
+		if tag.Tag != s.client.ref.tag {
 			continue
 		}
 		if len(tag.Items) > 0 {
@@ -252,12 +225,16 @@ func (s *openshiftImageSource) ensureImageIsResolved() error {
 		return fmt.Errorf("No matching tag found")
 	}
 	logrus.Debugf("tag event %#v", te)
-	dockerRef, err := s.client.convertDockerImageReference(te.DockerImageReference)
+	dockerRefString, err := s.client.convertDockerImageReference(te.DockerImageReference)
 	if err != nil {
 		return err
 	}
-	logrus.Debugf("Resolved reference %#v", dockerRef)
-	d, err := docker.NewImageSource(dockerRef, s.certPath, s.tlsVerify)
+	logrus.Debugf("Resolved reference %#v", dockerRefString)
+	dockerRef, err := docker.ParseReference("//" + dockerRefString)
+	if err != nil {
+		return err
+	}
+	d, err := dockerRef.NewImageSource(s.certPath, s.tlsVerify)
 	if err != nil {
 		return err
 	}
@@ -271,9 +248,9 @@ type openshiftImageDestination struct {
 	docker types.ImageDestination // The Docker Registry endpoint
 }
 
-// NewImageDestination creates a new ImageDestination for the specified image and connection specification.
-func NewImageDestination(imageName, certPath string, tlsVerify bool) (types.ImageDestination, error) {
-	client, err := newOpenshiftClient(imageName)
+// newImageDestination creates a new ImageDestination for the specified reference and connection specification.
+func newImageDestination(ref openshiftReference, certPath string, tlsVerify bool) (types.ImageDestination, error) {
+	client, err := newOpenshiftClient(ref)
 	if err != nil {
 		return nil, err
 	}
@@ -281,8 +258,12 @@ func NewImageDestination(imageName, certPath string, tlsVerify bool) (types.Imag
 	// FIXME: Should this always use a digest, not a tag? Uploading to Docker by tag requires the tag _inside_ the manifest to match,
 	// i.e. a single signed image cannot be available under multiple tags.  But with types.ImageDestination, we don't know
 	// the manifest digest at this point.
-	dockerRef := fmt.Sprintf("%s/%s/%s:%s", client.dockerRegistryHostPart(), client.namespace, client.stream, client.tag)
-	docker, err := docker.NewImageDestination(dockerRef, certPath, tlsVerify)
+	dockerRefString := fmt.Sprintf("//%s/%s/%s:%s", client.dockerRegistryHostPart(), client.ref.namespace, client.ref.stream, client.ref.tag)
+	dockerRef, err := docker.ParseReference(dockerRefString)
+	if err != nil {
+		return nil, err
+	}
+	docker, err := dockerRef.NewImageDestination(certPath, tlsVerify)
 	if err != nil {
 		return nil, err
 	}
@@ -293,15 +274,17 @@ func NewImageDestination(imageName, certPath string, tlsVerify bool) (types.Imag
 	}, nil
 }
 
+// Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
+// e.g. it should use the public hostname instead of the result of resolving CNAMEs or following redirects.
+func (d *openshiftImageDestination) Reference() types.ImageReference {
+	return d.client.ref
+}
+
 func (d *openshiftImageDestination) SupportedManifestMIMETypes() []string {
 	return []string{
 		manifest.DockerV2Schema1SignedMIMEType,
 		manifest.DockerV2Schema1MIMEType,
 	}
-}
-
-func (d *openshiftImageDestination) CanonicalDockerReference() reference.Named {
-	return d.client.canonicalDockerReference
 }
 
 func (d *openshiftImageDestination) PutManifest(m []byte) error {
@@ -311,15 +294,15 @@ func (d *openshiftImageDestination) PutManifest(m []byte) error {
 		return err
 	}
 	// FIXME: We can't do what respositorymiddleware.go does because we don't know the internal address. Does any of this matter?
-	dockerImageReference := fmt.Sprintf("%s/%s/%s@%s", d.client.dockerRegistryHostPart(), d.client.namespace, d.client.stream, manifestDigest)
+	dockerImageReference := fmt.Sprintf("%s/%s/%s@%s", d.client.dockerRegistryHostPart(), d.client.ref.namespace, d.client.ref.stream, manifestDigest)
 	ism := imageStreamMapping{
 		typeMeta: typeMeta{
 			Kind:       "ImageStreamMapping",
 			APIVersion: "v1",
 		},
 		objectMeta: objectMeta{
-			Namespace: d.client.namespace,
-			Name:      d.client.stream,
+			Namespace: d.client.ref.namespace,
+			Name:      d.client.ref.stream,
 		},
 		Image: image{
 			objectMeta: objectMeta{
@@ -328,7 +311,7 @@ func (d *openshiftImageDestination) PutManifest(m []byte) error {
 			DockerImageReference: dockerImageReference,
 			DockerImageManifest:  string(m),
 		},
-		Tag: d.client.tag,
+		Tag: d.client.ref.tag,
 	}
 	body, err := json.Marshal(ism)
 	if err != nil {
@@ -336,7 +319,7 @@ func (d *openshiftImageDestination) PutManifest(m []byte) error {
 	}
 
 	// FIXME: validate components per validation.IsValidPathSegmentName?
-	path := fmt.Sprintf("/oapi/v1/namespaces/%s/imagestreammappings", d.client.namespace)
+	path := fmt.Sprintf("/oapi/v1/namespaces/%s/imagestreammappings", d.client.ref.namespace)
 	body, err = d.client.doRequest("POST", path, body)
 	if err != nil {
 		return err

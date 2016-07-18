@@ -6,20 +6,21 @@ import (
 	"os"
 
 	"github.com/containers/image/types"
-	"github.com/docker/docker/reference"
 )
 
 type dirImageDestination struct {
-	dir string
+	ref dirReference
 }
 
-// NewImageDestination returns an ImageDestination for writing to an existing directory.
-func NewImageDestination(dir string) types.ImageDestination {
-	return &dirImageDestination{dir}
+// newImageDestination returns an ImageDestination for writing to an existing directory.
+func newImageDestination(ref dirReference) types.ImageDestination {
+	return &dirImageDestination{ref}
 }
 
-func (d *dirImageDestination) CanonicalDockerReference() reference.Named {
-	return nil
+// Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
+// e.g. it should use the public hostname instead of the result of resolving CNAMEs or following redirects.
+func (d *dirImageDestination) Reference() types.ImageReference {
+	return d.ref
 }
 
 func (d *dirImageDestination) SupportedManifestMIMETypes() []string {
@@ -27,11 +28,11 @@ func (d *dirImageDestination) SupportedManifestMIMETypes() []string {
 }
 
 func (d *dirImageDestination) PutManifest(manifest []byte) error {
-	return ioutil.WriteFile(manifestPath(d.dir), manifest, 0644)
+	return ioutil.WriteFile(manifestPath(d.ref.path), manifest, 0644)
 }
 
 func (d *dirImageDestination) PutBlob(digest string, stream io.Reader) error {
-	layerFile, err := os.Create(layerPath(d.dir, digest))
+	layerFile, err := os.Create(layerPath(d.ref.path, digest))
 	if err != nil {
 		return err
 	}
@@ -47,7 +48,7 @@ func (d *dirImageDestination) PutBlob(digest string, stream io.Reader) error {
 
 func (d *dirImageDestination) PutSignatures(signatures [][]byte) error {
 	for i, sig := range signatures {
-		if err := ioutil.WriteFile(signaturePath(d.dir, i), sig, 0644); err != nil {
+		if err := ioutil.WriteFile(signaturePath(d.ref.path, i), sig, 0644); err != nil {
 			return err
 		}
 	}

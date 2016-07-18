@@ -13,7 +13,6 @@ import (
 
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
-	"github.com/docker/docker/reference"
 )
 
 var (
@@ -51,12 +50,10 @@ func FromSource(src types.ImageSource, requestedManifestMIMETypes []string) type
 	return &genericImage{src: src, requestedManifestMIMETypes: requestedManifestMIMETypes}
 }
 
-// IntendedDockerReference returns the Docker reference for this image, _as specified by the user_
-// (not as the image itself, or its underlying storage, claims).  Should be fully expanded, i.e. !reference.IsNameOnly.
-// This can be used e.g. to determine which public keys are trusted for this image.
-// May be nil if unknown.
-func (i *genericImage) IntendedDockerReference() reference.Named {
-	return i.src.IntendedDockerReference()
+// Reference returns the reference used to set up this source, _as specified by the user_
+// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
+func (i *genericImage) Reference() types.ImageReference {
+	return i.src.Reference()
 }
 
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.

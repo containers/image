@@ -10,21 +10,16 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
-	"github.com/docker/docker/reference"
 )
 
 type dockerImageDestination struct {
-	ref reference.Named
+	ref dockerReference
 	c   *dockerClient
 }
 
-// NewImageDestination creates a new ImageDestination for the specified image and connection specification.
-func NewImageDestination(img, certPath string, tlsVerify bool) (types.ImageDestination, error) {
-	ref, err := parseImageName(img)
-	if err != nil {
-		return nil, err
-	}
-	c, err := newDockerClient(ref.Hostname(), certPath, tlsVerify)
+// newImageDestination creates a new ImageDestination for the specified image reference and connection specification.
+func newImageDestination(ref dockerReference, certPath string, tlsVerify bool) (types.ImageDestination, error) {
+	c, err := newDockerClient(ref.ref.Hostname(), certPath, tlsVerify)
 	if err != nil {
 		return nil, err
 	}
@@ -32,6 +27,12 @@ func NewImageDestination(img, certPath string, tlsVerify bool) (types.ImageDesti
 		ref: ref,
 		c:   c,
 	}, nil
+}
+
+// Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
+// e.g. it should use the public hostname instead of the result of resolving CNAMEs or following redirects.
+func (d *dockerImageDestination) Reference() types.ImageReference {
+	return d.ref
 }
 
 func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
@@ -43,10 +44,6 @@ func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 	}
 }
 
-func (d *dockerImageDestination) CanonicalDockerReference() reference.Named {
-	return d.ref
-}
-
 func (d *dockerImageDestination) PutManifest(m []byte) error {
 	// FIXME: This only allows upload by digest, not creating a tag.  See the
 	// corresponding comment in openshift.NewImageDestination.
@@ -54,7 +51,7 @@ func (d *dockerImageDestination) PutManifest(m []byte) error {
 	if err != nil {
 		return err
 	}
-	url := fmt.Sprintf(manifestURL, d.ref.RemoteName(), digest)
+	url := fmt.Sprintf(manifestURL, d.ref.ref.RemoteName(), digest)
 
 	headers := map[string][]string{}
 	mimeType := manifest.GuessMIMEType(m)
@@ -78,7 +75,7 @@ func (d *dockerImageDestination) PutManifest(m []byte) error {
 }
 
 func (d *dockerImageDestination) PutBlob(digest string, stream io.Reader) error {
-	checkURL := fmt.Sprintf(blobsURL, d.ref.RemoteName(), digest)
+	checkURL := fmt.Sprintf(blobsURL, d.ref.ref.RemoteName(), digest)
 
 	logrus.Debugf("Checking %s", checkURL)
 	res, err := d.c.makeRequest("HEAD", checkURL, nil, nil)
@@ -93,7 +90,7 @@ func (d *dockerImageDestination) PutBlob(digest string, stream io.Reader) error 
 	logrus.Debugf("... failed, status %d", res.StatusCode)
 
 	// FIXME? Chunked upload, progress reporting, etc.
-	uploadURL := fmt.Sprintf(blobUploadURL, d.ref.RemoteName())
+	uploadURL := fmt.Sprintf(blobUploadURL, d.ref.ref.RemoteName())
 	logrus.Debugf("Uploading %s", uploadURL)
 	res, err = d.c.makeRequest("POST", uploadURL, nil, nil)
 	if err != nil {

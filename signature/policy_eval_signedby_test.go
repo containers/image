@@ -14,24 +14,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// dirImageMock returns a types.Image for a directory, claiming a specified intendedDockerReference.
-func dirImageMock(t *testing.T, dir, intendedDockerReference string) types.Image {
-	ref, err := reference.ParseNamed(intendedDockerReference)
+// dirImageMock returns a types.Image for a directory, claiming a specified dockerReference.
+func dirImageMock(t *testing.T, dir, dockerReference string) types.Image {
+	ref, err := reference.ParseNamed(dockerReference)
+	require.NoError(t, err)
+	return dirImageMockWithRef(t, dir, refImageReferenceMock{ref})
+}
+
+// dirImageMockWithRef returns a types.Image for a directory, claiming a specified ref.
+func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) types.Image {
+	srcRef := directory.NewReference(dir)
+	src, err := srcRef.NewImageSource("", true)
 	require.NoError(t, err)
 	return image.FromSource(&dirImageSourceMock{
-		ImageSource:             directory.NewImageSource(dir),
-		intendedDockerReference: ref,
+		ImageSource: src,
+		ref:         ref,
 	}, nil)
 }
 
-// dirImageSourceMock inherits dirImageSource, but overrides its IntendedDockerReference method.
+// dirImageSourceMock inherits dirImageSource, but overrides its Reference method.
 type dirImageSourceMock struct {
 	types.ImageSource
-	intendedDockerReference reference.Named
+	ref types.ImageReference
 }
 
-func (d *dirImageSourceMock) IntendedDockerReference() reference.Named {
-	return d.intendedDockerReference
+func (d *dirImageSourceMock) Reference() types.ImageReference {
+	return d.ref
 }
 
 func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
