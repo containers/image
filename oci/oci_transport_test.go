@@ -100,6 +100,9 @@ func TestNewReference(t *testing.T) {
 
 	_, err = NewReference(tmpDir+"/has:colon", tagValue)
 	assert.Error(t, err)
+
+	_, err = NewReference(tmpDir, "invalid'tag!value@")
+	assert.Error(t, err)
 }
 
 // refToTempOCI creates a temporary directory and returns an reference to it.
@@ -214,4 +217,30 @@ func TestReferenceNewImageDestination(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	_, err := ref.NewImageDestination("/this/doesn't/exist", true)
 	assert.NoError(t, err)
+}
+
+func TestReferenceOCILayoutPath(t *testing.T) {
+	ref, tmpDir := refToTempOCI(t)
+	defer os.RemoveAll(tmpDir)
+	ociRef, ok := ref.(ociReference)
+	require.True(t, ok)
+	assert.Equal(t, tmpDir+"/oci-layout", ociRef.ociLayoutPath())
+}
+
+func TestReferenceBlobPath(t *testing.T) {
+	const hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+	ref, tmpDir := refToTempOCI(t)
+	defer os.RemoveAll(tmpDir)
+	ociRef, ok := ref.(ociReference)
+	require.True(t, ok)
+	assert.Equal(t, tmpDir+"/blobs/sha256-"+hex, ociRef.blobPath("sha256:"+hex))
+}
+
+func TestReferenceDescriptorPath(t *testing.T) {
+	ref, tmpDir := refToTempOCI(t)
+	defer os.RemoveAll(tmpDir)
+	ociRef, ok := ref.(ociReference)
+	require.True(t, ok)
+	assert.Equal(t, tmpDir+"/refs/notlatest", ociRef.descriptorPath("notlatest"))
 }

@@ -35,7 +35,7 @@ test-skopeo:
 
 validate: lint
 	@go vet ./...
-	@test -z "$(gofmt -s -l . | tee /dev/stderr)"
+	@test -z "$$(gofmt -s -l . | tee /dev/stderr)"
 
 lint:
 	@out="$$(golint ./...)"; \

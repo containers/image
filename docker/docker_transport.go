@@ -129,3 +129,15 @@ func (ref dockerReference) NewImageSource(certPath string, tlsVerify bool) (type
 func (ref dockerReference) NewImageDestination(certPath string, tlsVerify bool) (types.ImageDestination, error) {
 	return newImageDestination(ref, certPath, tlsVerify)
 }
+
+// tagOrDigest returns a tag or digest from the reference.
+func (ref dockerReference) tagOrDigest() (string, error) {
+	if ref, ok := ref.ref.(reference.Canonical); ok {
+		return ref.Digest().String(), nil
+	}
+	if ref, ok := ref.ref.(reference.NamedTagged); ok {
+		return ref.Tag(), nil
+	}
+	// This should not happen, NewReference above refuses reference.IsNameOnly values.
+	return "", fmt.Errorf("Internal inconsistency: Reference %s unexpectedly has neither a digest nor a tag", ref.ref.String())
+}

@@ -26,7 +26,7 @@ func (s *dirImageSource) Reference() types.ImageReference {
 
 // it's up to the caller to determine the MIME type of the returned manifest's bytes
 func (s *dirImageSource) GetManifest(_ []string) ([]byte, string, error) {
-	m, err := ioutil.ReadFile(manifestPath(s.ref.path))
+	m, err := ioutil.ReadFile(s.ref.manifestPath())
 	if err != nil {
 		return nil, "", err
 	}
@@ -34,11 +34,11 @@ func (s *dirImageSource) GetManifest(_ []string) ([]byte, string, error) {
 }
 
 func (s *dirImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
-	r, err := os.Open(layerPath(s.ref.path, digest))
+	r, err := os.Open(s.ref.layerPath(digest))
 	if err != nil {
 		return nil, 0, nil
 	}
-	fi, err := os.Stat(layerPath(s.ref.path, digest))
+	fi, err := r.Stat()
 	if err != nil {
 		return nil, 0, nil
 	}
@@ -48,7 +48,7 @@ func (s *dirImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
 func (s *dirImageSource) GetSignatures() ([][]byte, error) {
 	signatures := [][]byte{}
 	for i := 0; ; i++ {
-		signature, err := ioutil.ReadFile(signaturePath(s.ref.path, i))
+		signature, err := ioutil.ReadFile(s.ref.signaturePath(i))
 		if err != nil {
 			if os.IsNotExist(err) {
 				break

@@ -3,6 +3,7 @@ package directory
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/containers/image/directory/explicitfilepath"
@@ -136,4 +137,20 @@ func (ref dirReference) NewImageSource(certPath string, tlsVerify bool) (types.I
 // NewImageDestination returns a types.ImageDestination for this reference.
 func (ref dirReference) NewImageDestination(certPath string, tlsVerify bool) (types.ImageDestination, error) {
 	return newImageDestination(ref), nil
+}
+
+// manifestPath returns a path for the manifest within a directory using our conventions.
+func (ref dirReference) manifestPath() string {
+	return filepath.Join(ref.path, "manifest.json")
+}
+
+// layerPath returns a path for a layer tarball within a directory using our conventions.
+func (ref dirReference) layerPath(digest string) string {
+	// FIXME: Should we keep the digest identification?
+	return filepath.Join(ref.path, strings.TrimPrefix(digest, "sha256:")+".tar")
+}
+
+// signaturePath returns a path for a signature within a directory using our conventions.
+func (ref dirReference) signaturePath(index int) string {
+	return filepath.Join(ref.path, fmt.Sprintf("signature-%d", index+1))
 }

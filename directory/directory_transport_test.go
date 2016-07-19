@@ -162,3 +162,30 @@ func TestReferenceNewImageDestination(t *testing.T) {
 	_, err := ref.NewImageDestination("/this/doesn't/exist", true)
 	assert.NoError(t, err)
 }
+
+func TestReferenceManifestPath(t *testing.T) {
+	ref, tmpDir := refToTempDir(t)
+	defer os.RemoveAll(tmpDir)
+	dirRef, ok := ref.(dirReference)
+	require.True(t, ok)
+	assert.Equal(t, tmpDir+"/manifest.json", dirRef.manifestPath())
+}
+
+func TestReferenceLayerPath(t *testing.T) {
+	const hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+	ref, tmpDir := refToTempDir(t)
+	defer os.RemoveAll(tmpDir)
+	dirRef, ok := ref.(dirReference)
+	require.True(t, ok)
+	assert.Equal(t, tmpDir+"/"+hex+".tar", dirRef.layerPath("sha256:"+hex))
+}
+
+func TestReferenceSignaturePath(t *testing.T) {
+	ref, tmpDir := refToTempDir(t)
+	defer os.RemoveAll(tmpDir)
+	dirRef, ok := ref.(dirReference)
+	require.True(t, ok)
+	assert.Equal(t, tmpDir+"/signature-1", dirRef.signaturePath(0))
+	assert.Equal(t, tmpDir+"/signature-10", dirRef.signaturePath(9))
+}

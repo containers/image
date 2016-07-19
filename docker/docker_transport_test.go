@@ -177,3 +177,25 @@ func TestReferenceNewImageDestination(t *testing.T) {
 	_, err = ref.NewImageDestination("", true)
 	assert.NoError(t, err)
 }
+
+func TestReferenceTagOrDigest(t *testing.T) {
+	for input, expected := range map[string]string{
+		"//busybox:notlatest":      "notlatest",
+		"//busybox" + sha256digest: "sha256:" + sha256digestHex,
+	} {
+		ref, err := ParseReference(input)
+		require.NoError(t, err, input)
+		dockerRef, ok := ref.(dockerReference)
+		require.True(t, ok, input)
+		tod, err := dockerRef.tagOrDigest()
+		require.NoError(t, err, input)
+		assert.Equal(t, expected, tod, input)
+	}
+
+	// Invalid input
+	ref, err := reference.ParseNamed("busybox")
+	require.NoError(t, err)
+	dockerRef := dockerReference{ref: ref}
+	_, err = dockerRef.tagOrDigest()
+	assert.Error(t, err)
+}
