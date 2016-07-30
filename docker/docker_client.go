@@ -137,41 +137,38 @@ func (c *dockerClient) setupRequestAuth(req *http.Request) error {
 		req.SetBasicAuth(c.username, c.password)
 		return nil
 	case "Bearer":
-		res, err := c.client.Do(req)
+		// FIXME? This gets a new token for every API request;
+		// we may be easily able to reuse a previous token, e.g.
+		// for OpenShift the token only identifies the user and does not vary
+		// across operations.  Should we just try the request first, and
+		// only get a new token on failure?
+		// OTOH what to do with the single-use body stream in that case?
+
+		// Try performing the request, expecting it to fail.
+		testReq := *req
+		// Do not use the body stream, or we couldn't reuse it for the "real" call later.
+		testReq.Body = nil
+		testReq.ContentLength = 0
+		res, err := c.client.Do(&testReq)
 		if err != nil {
 			return err
 		}
-		hdr := res.Header.Get("WWW-Authenticate")
-		if hdr == "" || res.StatusCode != http.StatusUnauthorized {
+		chs := parseAuthHeader(res.Header)
+		if res.StatusCode != http.StatusUnauthorized || chs == nil || len(chs) == 0 {
 			// no need for bearer? wtf?
 			return nil
 		}
-		tokens = strings.Split(hdr, " ")
-		tokens = strings.Split(tokens[1], ",")
-		var realm, service, scope string
-		for _, token := range tokens {
-			if strings.HasPrefix(token, "realm") {
-				realm = strings.Trim(token[len("realm="):], "\"")
-			}
-			if strings.HasPrefix(token, "service") {
-				service = strings.Trim(token[len("service="):], "\"")
-			}
-			if strings.HasPrefix(token, "scope") {
-				scope = strings.Trim(token[len("scope="):], "\"")
-			}
+		// Arbitrarily use the first challenge, there is no reason to expect more than one.
+		challenge := chs[0]
+		if challenge.Scheme != "bearer" { // Another artifact of trying to handle WWW-Authenticate before it actually happens.
+			return fmt.Errorf("Unimplemented: WWW-Authenticate Bearer replaced by %#v", challenge.Scheme)
 		}
-
-		if realm == "" {
+		realm, ok := challenge.Parameters["realm"]
+		if !ok {
 			return fmt.Errorf("missing realm in bearer auth challenge")
 		}
-		if service == "" {
-			return fmt.Errorf("missing service in bearer auth challenge")
-		}
-		// The scope can be empty if we're not getting a token for a specific repo
-		//if scope == "" && repo != "" {
-		if scope == "" {
-			return fmt.Errorf("missing scope in bearer auth challenge")
-		}
+		service, _ := challenge.Parameters["service"] // Will be "" if not present
+		scope, _ := challenge.Parameters["scope"]     // Will be "" if not present
 		token, err := c.getBearerToken(realm, service, scope)
 		if err != nil {
 			return err
@@ -189,7 +186,9 @@ func (c *dockerClient) getBearerToken(realm, service, scope string) (string, err
 		return "", err
 	}
 	getParams := authReq.URL.Query()
-	getParams.Add("service", service)
+	if service != "" {
+		getParams.Add("service", service)
+	}
 	if scope != "" {
 		getParams.Add("scope", scope)
 	}
