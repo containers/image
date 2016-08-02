@@ -58,6 +58,10 @@ func (t ociTransport) ValidatePolicyConfigurationScope(scope string) error {
 	if scope == "/" {
 		return errors.New(`Invalid scope "/": Use the generic default scope ""`)
 	}
+	cleaned := filepath.Clean(dir)
+	if cleaned != dir {
+		return fmt.Errorf(`Invalid scope %s: Uses non-canonical path format, perhaps try with path %s`, scope, cleaned)
+	}
 	return nil
 }
 

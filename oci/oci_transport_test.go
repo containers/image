@@ -34,6 +34,10 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 	for _, scope := range []string{
 		"relative/path",
 		"/",
+		"/double//slashes",
+		"/has/./dot",
+		"/has/dot/../dot",
+		"/trailing/slash/",
 		"/etc:invalid'tag!value@",
 		"/path:with/colons",
 		"/path:with/colons/and:tag",

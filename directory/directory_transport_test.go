@@ -30,6 +30,10 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 
 	for _, scope := range []string{
 		"relative/path",
+		"/double//slashes",
+		"/has/./dot",
+		"/has/dot/../dot",
+		"/trailing/slash/",
 		"/",
 	} {
 		err := Transport.ValidatePolicyConfigurationScope(scope)
