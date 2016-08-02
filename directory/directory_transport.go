@@ -32,12 +32,16 @@ func (t dirTransport) ParseReference(reference string) (types.ImageReference, er
 // scope passed to this function will not be "", that value is always allowed.
 func (t dirTransport) ValidatePolicyConfigurationScope(scope string) error {
 	if !strings.HasPrefix(scope, "/") {
-		return fmt.Errorf("Invalid scope %s: must be an absolute path", scope)
+		return fmt.Errorf("Invalid scope %s: Must be an absolute path", scope)
 	}
 	// Refuse also "/", otherwise "/" and "" would have the same semantics,
 	// and "" could be unexpectedly shadowed by the "/" entry.
 	if scope == "/" {
 		return errors.New(`Invalid scope "/": Use the generic default scope ""`)
+	}
+	cleaned := filepath.Clean(scope)
+	if cleaned != scope {
+		return fmt.Errorf(`Invalid scope %s: Uses non-canonical format, perhaps try %s`, scope, cleaned)
 	}
 	return nil
 }
