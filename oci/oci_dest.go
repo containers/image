@@ -110,22 +110,41 @@ func (d *ociImageDestination) PutManifest(m []byte) error {
 	return ioutil.WriteFile(descriptorPath, data, 0644)
 }
 
+// PutBlob writes contents of stream as a blob identified by digest.
+// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
+// to any other readers for download using the supplied digest.
+// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
+// Note: Calling PutBlob() and other methods may have ordering dependencies WRT other methods of this type. FIXME: Figure out and document.
 func (d *ociImageDestination) PutBlob(digest string, stream io.Reader) error {
 	blobPath := d.ref.blobPath(digest)
 	if err := ensureParentDirectoryExists(blobPath); err != nil {
 		return err
 	}
-	blob, err := os.Create(blobPath)
+	blobFile, err := ioutil.TempFile(filepath.Dir(blobPath), filepath.Base(blobPath))
 	if err != nil {
 		return err
 	}
-	defer blob.Close()
-	if _, err := io.Copy(blob, stream); err != nil {
+	succeeded := false
+	defer func() {
+		blobFile.Close()
+		if !succeeded {
+			os.Remove(blobFile.Name())
+		}
+	}()
+
+	if _, err := io.Copy(blobFile, stream); err != nil {
 		return err
 	}
-	if err := blob.Sync(); err != nil {
+	if err := blobFile.Sync(); err != nil {
 		return err
 	}
+	if err := blobFile.Chmod(0644); err != nil {
+		return err
+	}
+	if err := os.Rename(blobFile.Name(), blobPath); err != nil {
+		return nil
+	}
+	succeeded = true
 	return nil
 }
 
