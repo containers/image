@@ -104,6 +104,10 @@ type ImageDestination interface {
 	Reference() ImageReference
 	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 	PutManifest([]byte) error
+	// PutBlob writes contents of stream as a blob identified by digest.
+	// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
+	// to any other readers for download using the supplied digest.
+	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 	// Note: Calling PutBlob() and other methods may have ordering dependencies WRT other methods of this type. FIXME: Figure out and document.
 	PutBlob(digest string, stream io.Reader) error
 	PutSignatures(signatures [][]byte) error
