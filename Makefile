@@ -5,16 +5,17 @@ SKOPEO_REPO = projectatomic/skopeo
 SKOPEO_BRANCH = master
 # Set SUDO=sudo to run container integration tests using sudo.
 SUDO =
+BUILDFLAGS = -tags "btrfs_noversion libdm_no_deferred_remove"
 
 all: deps .gitvalidation test validate
 
 deps:
-	go get -t ./...
-	go get -u github.com/golang/lint/golint
-	go get github.com/vbatts/git-validation
+	go get -t $(BUILDFLAGS) ./...
+	go get -u $(BUILDFLAGS) github.com/golang/lint/golint
+	go get $(BUILDFLAGS) github.com/vbatts/git-validation
 
 test:
-	@go test -cover ./...
+	@go test $(BUILDFLAGS) -cover ./...
 
 # This is not run as part of (make all), but Travis CI does run this.
 # Demonstarting a working version of skopeo (possibly with modified SKOPEO_REPO/SKOPEO_BRANCH, e.g.

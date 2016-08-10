@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/containers/image/types"
-	"github.com/docker/docker/pkg/homedir"
+	"github.com/containers/storage/pkg/homedir"
 )
 
 func TestGetAuth(t *testing.T) {
