@@ -160,7 +160,7 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 func TestReferenceNewImage(t *testing.T) {
 	ref, err := ParseReference("//busybox")
 	require.NoError(t, err)
-	img, err := ref.NewImage(nil)
+	img, err := ref.NewImage(&types.SystemContext{RegistriesDirPath: "/this/doesnt/exist"})
 	assert.NoError(t, err)
 	defer img.Close()
 }
@@ -168,7 +168,7 @@ func TestReferenceNewImage(t *testing.T) {
 func TestReferenceNewImageSource(t *testing.T) {
 	ref, err := ParseReference("//busybox")
 	require.NoError(t, err)
-	src, err := ref.NewImageSource(nil, nil)
+	src, err := ref.NewImageSource(&types.SystemContext{RegistriesDirPath: "/this/doesnt/exist"}, nil)
 	assert.NoError(t, err)
 	defer src.Close()
 }
@@ -176,7 +176,7 @@ func TestReferenceNewImageSource(t *testing.T) {
 func TestReferenceNewImageDestination(t *testing.T) {
 	ref, err := ParseReference("//busybox")
 	require.NoError(t, err)
-	dest, err := ref.NewImageDestination(nil)
+	dest, err := ref.NewImageDestination(&types.SystemContext{RegistriesDirPath: "/this/doesnt/exist"})
 	assert.NoError(t, err)
 	defer dest.Close()
 }
