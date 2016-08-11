@@ -113,7 +113,7 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 func TestReferenceNewImage(t *testing.T) {
 	ref, err := NewReference(testBaseURL, "ns", "stream", "notlatest")
 	require.NoError(t, err)
-	_, err = ref.NewImage("", true)
+	_, err = ref.NewImage(nil)
 	assert.Error(t, err)
 }
 

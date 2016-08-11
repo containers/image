@@ -27,9 +27,9 @@ type dockerImageSource struct {
 	c   *dockerClient
 }
 
-// newImageSource creates a new ImageSource for the specified image reference and connection specification.
-func newImageSource(ref dockerReference, certPath string, tlsVerify bool) (*dockerImageSource, error) {
-	c, err := newDockerClient(ref.ref.Hostname(), certPath, tlsVerify)
+// newImageSource creates a new ImageSource for the specified image reference.
+func newImageSource(ctx *types.SystemContext, ref dockerReference) (*dockerImageSource, error) {
+	c, err := newDockerClient(ctx, ref.ref.Hostname())
 	if err != nil {
 		return nil, err
 	}

@@ -154,16 +154,16 @@ func (ref openshiftReference) PolicyConfigurationNamespaces() []string {
 }
 
 // NewImage returns a types.Image for this reference.
-func (ref openshiftReference) NewImage(certPath string, tlsVerify bool) (types.Image, error) {
+func (ref openshiftReference) NewImage(ctx *types.SystemContext) (types.Image, error) {
 	return nil, errors.New("Full Image support not implemented for atomic: image names")
 }
 
 // NewImageSource returns a types.ImageSource for this reference.
-func (ref openshiftReference) NewImageSource(certPath string, tlsVerify bool) (types.ImageSource, error) {
-	return newImageSource(ref, certPath, tlsVerify)
+func (ref openshiftReference) NewImageSource(ctx *types.SystemContext) (types.ImageSource, error) {
+	return newImageSource(ctx, ref)
 }
 
 // NewImageDestination returns a types.ImageDestination for this reference.
-func (ref openshiftReference) NewImageDestination(certPath string, tlsVerify bool) (types.ImageDestination, error) {
-	return newImageDestination(ref, certPath, tlsVerify)
+func (ref openshiftReference) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {
+	return newImageDestination(ctx, ref)
 }

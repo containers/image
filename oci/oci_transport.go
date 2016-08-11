@@ -165,17 +165,17 @@ func (ref ociReference) PolicyConfigurationNamespaces() []string {
 }
 
 // NewImage returns a types.Image for this reference.
-func (ref ociReference) NewImage(certPath string, tlsVerify bool) (types.Image, error) {
+func (ref ociReference) NewImage(ctx *types.SystemContext) (types.Image, error) {
 	return nil, errors.New("Full Image support not implemented for oci: image names")
 }
 
 // NewImageSource returns a types.ImageSource for this reference.
-func (ref ociReference) NewImageSource(certPath string, tlsVerify bool) (types.ImageSource, error) {
+func (ref ociReference) NewImageSource(ctx *types.SystemContext) (types.ImageSource, error) {
 	return nil, errors.New("Reading images not implemented for oci: image names")
 }
 
 // NewImageDestination returns a types.ImageDestination for this reference.
-func (ref ociReference) NewImageDestination(certPath string, tlsVerify bool) (types.ImageDestination, error) {
+func (ref ociReference) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {
 	return newImageDestination(ref), nil
 }
 

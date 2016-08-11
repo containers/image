@@ -128,18 +128,18 @@ func (ref dirReference) PolicyConfigurationNamespaces() []string {
 }
 
 // NewImage returns a types.Image for this reference.
-func (ref dirReference) NewImage(certPath string, tlsVerify bool) (types.Image, error) {
+func (ref dirReference) NewImage(ctx *types.SystemContext) (types.Image, error) {
 	src := newImageSource(ref)
 	return image.FromSource(src, nil), nil
 }
 
 // NewImageSource returns a types.ImageSource for this reference.
-func (ref dirReference) NewImageSource(certPath string, tlsVerify bool) (types.ImageSource, error) {
+func (ref dirReference) NewImageSource(ctx *types.SystemContext) (types.ImageSource, error) {
 	return newImageSource(ref), nil
 }
 
 // NewImageDestination returns a types.ImageDestination for this reference.
-func (ref dirReference) NewImageDestination(certPath string, tlsVerify bool) (types.ImageDestination, error) {
+func (ref dirReference) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {
 	return newImageDestination(ref), nil
 }
 

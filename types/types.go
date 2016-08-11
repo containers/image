@@ -71,11 +71,11 @@ type ImageReference interface {
 	PolicyConfigurationNamespaces() []string
 
 	// NewImage returns a types.Image for this reference.
-	NewImage(certPath string, tlsVerify bool) (Image, error)
+	NewImage(ctx *SystemContext) (Image, error)
 	// NewImageSource returns a types.ImageSource for this reference.
-	NewImageSource(certPath string, tlsVerify bool) (ImageSource, error)
+	NewImageSource(ctx *SystemContext) (ImageSource, error)
 	// NewImageDestination returns a types.ImageDestination for this reference.
-	NewImageDestination(certPath string, tlsVerify bool) (ImageDestination, error)
+	NewImageDestination(ctx *SystemContext) (ImageDestination, error)
 }
 
 // ImageSource is a service, possibly remote (= slow), to download components of a single image.
@@ -159,6 +159,12 @@ type SystemContext struct {
 	// Not used for any paths specified by users in config files (even if the location of the config file _was_ affected by it).
 	// NOTE: This does NOT affect paths starting by $HOME.
 	RootForImplicitAbsolutePaths string
+
+	// === Global configuration overrides ===
 	// If not "", overrides the system's default path for signature.Policy configuration.
 	SignaturePolicyPath string
+
+	// === docker.Transport overrides ===
+	DockerCertPath              string // If not "", a directory containing "cert.pem" and "key.pem" used when talking to a Docker Registry
+	DockerInsecureSkipTLSVerify bool
 }

@@ -116,18 +116,18 @@ func (ref dockerReference) PolicyConfigurationNamespaces() []string {
 }
 
 // NewImage returns a types.Image for this reference.
-func (ref dockerReference) NewImage(certPath string, tlsVerify bool) (types.Image, error) {
-	return newImage(ref, certPath, tlsVerify)
+func (ref dockerReference) NewImage(ctx *types.SystemContext) (types.Image, error) {
+	return newImage(ctx, ref)
 }
 
 // NewImageSource returns a types.ImageSource for this reference.
-func (ref dockerReference) NewImageSource(certPath string, tlsVerify bool) (types.ImageSource, error) {
-	return newImageSource(ref, certPath, tlsVerify)
+func (ref dockerReference) NewImageSource(ctx *types.SystemContext) (types.ImageSource, error) {
+	return newImageSource(ctx, ref)
 }
 
 // NewImageDestination returns a types.ImageDestination for this reference.
-func (ref dockerReference) NewImageDestination(certPath string, tlsVerify bool) (types.ImageDestination, error) {
-	return newImageDestination(ref, certPath, tlsVerify)
+func (ref dockerReference) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {
+	return newImageDestination(ctx, ref)
 }
 
 // tagOrDigest returns a tag or digest from the reference.
