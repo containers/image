@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
@@ -54,8 +55,13 @@ func DefaultPolicy(ctx *types.SystemContext) (*Policy, error) {
 
 // defaultPolicyPath returns a path to the default policy of the system.
 func defaultPolicyPath(ctx *types.SystemContext) string {
-	if ctx != nil && ctx.SignaturePolicyPath != "" {
-		return ctx.SignaturePolicyPath
+	if ctx != nil {
+		if ctx.SignaturePolicyPath != "" {
+			return ctx.SignaturePolicyPath
+		}
+		if ctx.RootForImplicitAbsolutePaths != "" {
+			return filepath.Join(ctx.RootForImplicitAbsolutePaths, systemDefaultPolicyPath)
+		}
 	}
 	return systemDefaultPolicyPath
 }
