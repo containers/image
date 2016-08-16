@@ -171,14 +171,17 @@ func (c *openshiftClient) dockerRegistryHostPart() string {
 type openshiftImageSource struct {
 	client *openshiftClient
 	// Values specific to this image
-	ctx *types.SystemContext
+	ctx                        *types.SystemContext
+	requestedManifestMIMETypes []string
 	// State
 	docker               types.ImageSource // The Docker Registry endpoint, or nil if not resolved yet
 	imageStreamImageName string            // Resolved image identifier, or "" if not known yet
 }
 
-// newImageSource creates a new ImageSource for the specified reference.
-func newImageSource(ctx *types.SystemContext, ref openshiftReference) (types.ImageSource, error) {
+// newImageSource creates a new ImageSource for the specified reference,
+// asking the backend to use a manifest from requestedManifestMIMETypes if possible
+// nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+func newImageSource(ctx *types.SystemContext, ref openshiftReference, requestedManifestMIMETypes []string) (types.ImageSource, error) {
 	client, err := newOpenshiftClient(ref)
 	if err != nil {
 		return nil, err
@@ -187,6 +190,7 @@ func newImageSource(ctx *types.SystemContext, ref openshiftReference) (types.Ima
 	return &openshiftImageSource{
 		client: client,
 		ctx:    ctx,
+		requestedManifestMIMETypes: requestedManifestMIMETypes,
 	}, nil
 }
 
@@ -196,11 +200,11 @@ func (s *openshiftImageSource) Reference() types.ImageReference {
 	return s.client.ref
 }
 
-func (s *openshiftImageSource) GetManifest(mimetypes []string) ([]byte, string, error) {
+func (s *openshiftImageSource) GetManifest() ([]byte, string, error) {
 	if err := s.ensureImageIsResolved(); err != nil {
 		return nil, "", err
 	}
-	return s.docker.GetManifest(mimetypes)
+	return s.docker.GetManifest()
 }
 
 func (s *openshiftImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
@@ -268,7 +272,7 @@ func (s *openshiftImageSource) ensureImageIsResolved() error {
 	if err != nil {
 		return err
 	}
-	d, err := dockerRef.NewImageSource(s.ctx)
+	d, err := dockerRef.NewImageSource(s.ctx, s.requestedManifestMIMETypes)
 	if err != nil {
 		return err
 	}

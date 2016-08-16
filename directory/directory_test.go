@@ -31,9 +31,9 @@ func TestGetPutManifest(t *testing.T) {
 	err = dest.PutManifest(man)
 	assert.NoError(t, err)
 
-	src, err := ref.NewImageSource(nil)
+	src, err := ref.NewImageSource(nil, nil)
 	require.NoError(t, err)
-	m, mt, err := src.GetManifest(nil)
+	m, mt, err := src.GetManifest()
 	assert.NoError(t, err)
 	assert.Equal(t, man, m)
 	assert.Equal(t, "", mt)
@@ -50,7 +50,7 @@ func TestGetPutBlob(t *testing.T) {
 	err = dest.PutBlob(digest, bytes.NewReader(blob))
 	assert.NoError(t, err)
 
-	src, err := ref.NewImageSource(nil)
+	src, err := ref.NewImageSource(nil, nil)
 	require.NoError(t, err)
 	rc, size, err := src.GetBlob(digest)
 	assert.NoError(t, err)
@@ -120,7 +120,7 @@ func TestGetPutSignatures(t *testing.T) {
 	err = dest.PutSignatures(signatures)
 	assert.NoError(t, err)
 
-	src, err := ref.NewImageSource(nil)
+	src, err := ref.NewImageSource(nil, nil)
 	require.NoError(t, err)
 	sigs, err := src.GetSignatures()
 	assert.NoError(t, err)
@@ -131,7 +131,7 @@ func TestDelete(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)
 
-	src, err := ref.NewImageSource(nil)
+	src, err := ref.NewImageSource(nil, nil)
 	require.NoError(t, err)
 	err = src.Delete()
 	assert.Error(t, err)
@@ -141,7 +141,7 @@ func TestSourceReference(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)
 
-	src, err := ref.NewImageSource(nil)
+	src, err := ref.NewImageSource(nil, nil)
 	require.NoError(t, err)
 	ref2 := src.Reference()
 	assert.Equal(t, tmpDir, ref2.StringWithinTransport())

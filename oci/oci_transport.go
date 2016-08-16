@@ -169,8 +169,10 @@ func (ref ociReference) NewImage(ctx *types.SystemContext) (types.Image, error) 
 	return nil, errors.New("Full Image support not implemented for oci: image names")
 }
 
-// NewImageSource returns a types.ImageSource for this reference.
-func (ref ociReference) NewImageSource(ctx *types.SystemContext) (types.ImageSource, error) {
+// NewImageSource returns a types.ImageSource for this reference,
+// asking the backend to use a manifest from requestedManifestMIMETypes if possible
+// nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+func (ref ociReference) NewImageSource(ctx *types.SystemContext, requestedManifestMIMETypes []string) (types.ImageSource, error) {
 	return nil, errors.New("Reading images not implemented for oci: image names")
 }
 

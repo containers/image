@@ -25,7 +25,7 @@ func (s *dirImageSource) Reference() types.ImageReference {
 }
 
 // it's up to the caller to determine the MIME type of the returned manifest's bytes
-func (s *dirImageSource) GetManifest(_ []string) ([]byte, string, error) {
+func (s *dirImageSource) GetManifest() ([]byte, string, error) {
 	m, err := ioutil.ReadFile(s.ref.manifestPath())
 	if err != nil {
 		return nil, "", err

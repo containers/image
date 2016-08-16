@@ -93,7 +93,7 @@ func (ref pcImageReferenceMock) PolicyConfigurationNamespaces() []string {
 func (ref pcImageReferenceMock) NewImage(ctx *types.SystemContext) (types.Image, error) {
 	panic("unexpected call to a mock function")
 }
-func (ref pcImageReferenceMock) NewImageSource(ctx *types.SystemContext) (types.ImageSource, error) {
+func (ref pcImageReferenceMock) NewImageSource(ctx *types.SystemContext, requestedManifestMIMETypes []string) (types.ImageSource, error) {
 	panic("unexpected call to a mock function")
 }
 func (ref pcImageReferenceMock) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {

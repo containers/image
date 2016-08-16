@@ -167,7 +167,7 @@ func TestReferenceNewImage(t *testing.T) {
 func TestReferenceNewImageSource(t *testing.T) {
 	ref, err := ParseReference("//busybox")
 	require.NoError(t, err)
-	_, err = ref.NewImageSource(nil)
+	_, err = ref.NewImageSource(nil, nil)
 	assert.NoError(t, err)
 }
 

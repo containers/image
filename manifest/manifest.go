@@ -33,6 +33,15 @@ const (
 	OCIV1ImageSerializationConfigMIMEType = "application/vnd.oci.image.serialization.config.v1+json"
 )
 
+// DefaultRequestedManifestMIMETypes is a list of MIME types a types.ImageSource
+// should request from the backend unless directed otherwise.
+var DefaultRequestedManifestMIMETypes = []string{
+	OCIV1ImageManifestMIMEType,
+	DockerV2Schema2MIMEType,
+	DockerV2Schema1SignedMIMEType,
+	DockerV2Schema1MIMEType,
+}
+
 // GuessMIMEType guesses MIME type of a manifest and returns it _if it is recognized_, or "" if unknown or unrecognized.
 // FIXME? We should, in general, prefer out-of-band MIME type instead of blindly parsing the manifest,
 // but we may not have such metadata available (e.g. when the manifest is a local file).

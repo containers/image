@@ -25,12 +25,12 @@ func dirImageMock(t *testing.T, dir, dockerReference string) types.Image {
 func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) types.Image {
 	srcRef, err := directory.NewReference(dir)
 	require.NoError(t, err)
-	src, err := srcRef.NewImageSource(nil)
+	src, err := srcRef.NewImageSource(nil, nil)
 	require.NoError(t, err)
 	return image.FromSource(&dirImageSourceMock{
 		ImageSource: src,
 		ref:         ref,
-	}, nil)
+	})
 }
 
 // dirImageSourceMock inherits dirImageSource, but overrides its Reference method.

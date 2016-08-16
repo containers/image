@@ -23,19 +23,26 @@ func (e errFetchManifest) Error() string {
 }
 
 type dockerImageSource struct {
-	ref dockerReference
-	c   *dockerClient
+	ref                        dockerReference
+	requestedManifestMIMETypes []string
+	c                          *dockerClient
 }
 
-// newImageSource creates a new ImageSource for the specified image reference.
-func newImageSource(ctx *types.SystemContext, ref dockerReference) (*dockerImageSource, error) {
+// newImageSource creates a new ImageSource for the specified image reference,
+// asking the backend to use a manifest from requestedManifestMIMETypes if possible
+// nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+func newImageSource(ctx *types.SystemContext, ref dockerReference, requestedManifestMIMETypes []string) (*dockerImageSource, error) {
 	c, err := newDockerClient(ctx, ref.ref.Hostname())
 	if err != nil {
 		return nil, err
 	}
+	if requestedManifestMIMETypes == nil {
+		requestedManifestMIMETypes = manifest.DefaultRequestedManifestMIMETypes
+	}
 	return &dockerImageSource{
 		ref: ref,
-		c:   c,
+		requestedManifestMIMETypes: requestedManifestMIMETypes,
+		c: c,
 	}, nil
 }
 
@@ -58,7 +65,7 @@ func simplifyContentType(contentType string) string {
 	return mimeType
 }
 
-func (s *dockerImageSource) GetManifest(mimetypes []string) ([]byte, string, error) {
+func (s *dockerImageSource) GetManifest() ([]byte, string, error) {
 	reference, err := s.ref.tagOrDigest()
 	if err != nil {
 		return nil, "", err
@@ -67,7 +74,7 @@ func (s *dockerImageSource) GetManifest(mimetypes []string) ([]byte, string, err
 	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
 	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
 	headers := make(map[string][]string)
-	headers["Accept"] = mimetypes
+	headers["Accept"] = s.requestedManifestMIMETypes
 	res, err := s.c.makeRequest("GET", url, headers, nil)
 	if err != nil {
 		return nil, "", err

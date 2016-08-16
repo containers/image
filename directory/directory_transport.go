@@ -130,11 +130,13 @@ func (ref dirReference) PolicyConfigurationNamespaces() []string {
 // NewImage returns a types.Image for this reference.
 func (ref dirReference) NewImage(ctx *types.SystemContext) (types.Image, error) {
 	src := newImageSource(ref)
-	return image.FromSource(src, nil), nil
+	return image.FromSource(src), nil
 }
 
-// NewImageSource returns a types.ImageSource for this reference.
-func (ref dirReference) NewImageSource(ctx *types.SystemContext) (types.ImageSource, error) {
+// NewImageSource returns a types.ImageSource for this reference,
+// asking the backend to use a manifest from requestedManifestMIMETypes if possible
+// nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+func (ref dirReference) NewImageSource(ctx *types.SystemContext, requestedManifestMIMETypes []string) (types.ImageSource, error) {
 	return newImageSource(ref), nil
 }
 
