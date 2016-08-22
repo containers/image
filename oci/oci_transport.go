@@ -12,7 +12,7 @@ import (
 	"github.com/docker/docker/reference"
 )
 
-// Transport is an ImageTransport for Docker references.
+// Transport is an ImageTransport for OCI directories.
 var Transport = ociTransport{}
 
 type ociTransport struct{}
