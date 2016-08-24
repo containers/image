@@ -167,6 +167,13 @@ func TestReferenceNewImageDestination(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestReferenceDeleteImage(t *testing.T) {
+	ref, tmpDir := refToTempDir(t)
+	defer os.RemoveAll(tmpDir)
+	err := ref.DeleteImage(nil)
+	assert.Error(t, err)
+}
+
 func TestReferenceManifestPath(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)

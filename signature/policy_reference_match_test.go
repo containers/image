@@ -110,6 +110,9 @@ func (ref refImageReferenceMock) NewImageSource(ctx *types.SystemContext, reques
 func (ref refImageReferenceMock) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {
 	panic("unexpected call to a mock function")
 }
+func (ref refImageReferenceMock) DeleteImage(ctx *types.SystemContext) error {
+	panic("unexpected call to a mock function")
+}
 
 // nameImageTransportMock is a mock of types.ImageTransport which returns itself in Name.
 type nameImageTransportMock string

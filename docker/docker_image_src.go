@@ -113,42 +113,46 @@ func (s *dockerImageSource) GetSignatures() ([][]byte, error) {
 	return [][]byte{}, nil
 }
 
-func (s *dockerImageSource) Delete() error {
-	var body []byte
+// deleteImage deletes the named image from the registry, if supported.
+func deleteImage(ctx *types.SystemContext, ref dockerReference) error {
+	c, err := newDockerClient(ctx, ref.ref.Hostname())
+	if err != nil {
+		return err
+	}
 
 	// When retrieving the digest from a registry >= 2.3 use the following header:
 	//   "Accept": "application/vnd.docker.distribution.manifest.v2+json"
 	headers := make(map[string][]string)
 	headers["Accept"] = []string{manifest.DockerV2Schema2MIMEType}
 
-	reference, err := s.ref.tagOrDigest()
+	reference, err := ref.tagOrDigest()
 	if err != nil {
 		return err
 	}
-	getURL := fmt.Sprintf(manifestURL, s.ref.ref.RemoteName(), reference)
-	get, err := s.c.makeRequest("GET", getURL, headers, nil)
+	getURL := fmt.Sprintf(manifestURL, ref.ref.RemoteName(), reference)
+	get, err := c.makeRequest("GET", getURL, headers, nil)
 	if err != nil {
 		return err
 	}
 	defer get.Body.Close()
-	body, err = ioutil.ReadAll(get.Body)
+	body, err := ioutil.ReadAll(get.Body)
 	if err != nil {
 		return err
 	}
 	switch get.StatusCode {
 	case http.StatusOK:
 	case http.StatusNotFound:
-		return fmt.Errorf("Unable to delete %v. Image may not exist or is not stored with a v2 Schema in a v2 registry.", s.ref.ref)
+		return fmt.Errorf("Unable to delete %v. Image may not exist or is not stored with a v2 Schema in a v2 registry.", ref.ref)
 	default:
-		return fmt.Errorf("Failed to delete %v: %s (%v)", s.ref.ref, string(body), get.Status)
+		return fmt.Errorf("Failed to delete %v: %s (%v)", ref.ref, string(body), get.Status)
 	}
 
 	digest := get.Header.Get("Docker-Content-Digest")
-	deleteURL := fmt.Sprintf(manifestURL, s.ref.ref.RemoteName(), digest)
+	deleteURL := fmt.Sprintf(manifestURL, ref.ref.RemoteName(), digest)
 
 	// When retrieving the digest from a registry >= 2.3 use the following header:
 	//   "Accept": "application/vnd.docker.distribution.manifest.v2+json"
-	delete, err := s.c.makeRequest("DELETE", deleteURL, headers, nil)
+	delete, err := c.makeRequest("DELETE", deleteURL, headers, nil)
 	if err != nil {
 		return err
 	}

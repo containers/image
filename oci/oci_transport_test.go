@@ -223,6 +223,13 @@ func TestReferenceNewImageDestination(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestReferenceDeleteImage(t *testing.T) {
+	ref, tmpDir := refToTempOCI(t)
+	defer os.RemoveAll(tmpDir)
+	err := ref.DeleteImage(nil)
+	assert.Error(t, err)
+}
+
 func TestReferenceOCILayoutPath(t *testing.T) {
 	ref, tmpDir := refToTempOCI(t)
 	defer os.RemoveAll(tmpDir)

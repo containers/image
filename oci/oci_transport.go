@@ -181,6 +181,11 @@ func (ref ociReference) NewImageDestination(ctx *types.SystemContext) (types.Ima
 	return newImageDestination(ref), nil
 }
 
+// DeleteImage deletes the named image from the registry, if supported.
+func (ref ociReference) DeleteImage(ctx *types.SystemContext) error {
+	return fmt.Errorf("Deleting images not implemented for oci: images")
+}
+
 // ociLayoutPathPath returns a path for the oci-layout within a directory using OCI conventions.
 func (ref ociReference) ociLayoutPath() string {
 	return filepath.Join(ref.dir, "oci-layout")

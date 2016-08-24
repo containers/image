@@ -517,7 +517,3 @@ type status struct {
 	// Details *StatusDetails `json:"details,omitempty"`
 	Code int32 `json:"code,omitempty"`
 }
-
-func (s *openshiftImageSource) Delete() error {
-	return fmt.Errorf("openshift#openshiftImageSource.Delete() not implmented")
-}

@@ -119,3 +119,10 @@ func TestReferenceNewImage(t *testing.T) {
 
 // openshiftReference.NewImageSource, openshiftReference.NewImageDestination untested because they depend
 // on per-user configuration when initializing httpClient.
+
+func TestReferenceDeleteImage(t *testing.T) {
+	ref, err := NewReference(testBaseURL, "ns", "stream", "notlatest")
+	require.NoError(t, err)
+	err = ref.DeleteImage(nil)
+	assert.Error(t, err)
+}

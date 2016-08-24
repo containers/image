@@ -169,3 +169,8 @@ func (ref openshiftReference) NewImageSource(ctx *types.SystemContext, requested
 func (ref openshiftReference) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {
 	return newImageDestination(ctx, ref)
 }
+
+// DeleteImage deletes the named image from the registry, if supported.
+func (ref openshiftReference) DeleteImage(ctx *types.SystemContext) error {
+	return fmt.Errorf("Deleting images not implemented for atomic: images")
+}

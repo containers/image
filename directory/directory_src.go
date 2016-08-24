@@ -1,7 +1,6 @@
 package directory
 
 import (
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -58,8 +57,4 @@ func (s *dirImageSource) GetSignatures() ([][]byte, error) {
 		signatures = append(signatures, signature)
 	}
 	return signatures, nil
-}
-
-func (s *dirImageSource) Delete() error {
-	return fmt.Errorf("directory#dirImageSource.Delete() not implmented")
 }

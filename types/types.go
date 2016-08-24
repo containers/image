@@ -78,6 +78,9 @@ type ImageReference interface {
 	NewImageSource(ctx *SystemContext, requestedManifestMIMETypes []string) (ImageSource, error)
 	// NewImageDestination returns a types.ImageDestination for this reference.
 	NewImageDestination(ctx *SystemContext) (ImageDestination, error)
+
+	// DeleteImage deletes the named image from the registry, if supported.
+	DeleteImage(ctx *SystemContext) error
 }
 
 // ImageSource is a service, possibly remote (= slow), to download components of a single image.
@@ -95,8 +98,6 @@ type ImageSource interface {
 	GetBlob(digest string) (io.ReadCloser, int64, error)
 	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
 	GetSignatures() ([][]byte, error)
-	// Delete image from registry, if operation is supported
-	Delete() error
 }
 
 // ImageDestination is a service, possibly remote (= slow), to store components of a single image.

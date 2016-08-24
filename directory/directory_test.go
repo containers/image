@@ -127,16 +127,6 @@ func TestGetPutSignatures(t *testing.T) {
 	assert.Equal(t, signatures, sigs)
 }
 
-func TestDelete(t *testing.T) {
-	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
-
-	src, err := ref.NewImageSource(nil, nil)
-	require.NoError(t, err)
-	err = src.Delete()
-	assert.Error(t, err)
-}
-
 func TestSourceReference(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)

@@ -145,6 +145,11 @@ func (ref dirReference) NewImageDestination(ctx *types.SystemContext) (types.Ima
 	return newImageDestination(ref), nil
 }
 
+// DeleteImage deletes the named image from the registry, if supported.
+func (ref dirReference) DeleteImage(ctx *types.SystemContext) error {
+	return fmt.Errorf("Deleting images not implemented for dir: images")
+}
+
 // manifestPath returns a path for the manifest within a directory using our conventions.
 func (ref dirReference) manifestPath() string {
 	return filepath.Join(ref.path, "manifest.json")

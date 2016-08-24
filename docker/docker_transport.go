@@ -132,6 +132,11 @@ func (ref dockerReference) NewImageDestination(ctx *types.SystemContext) (types.
 	return newImageDestination(ctx, ref)
 }
 
+// DeleteImage deletes the named image from the registry, if supported.
+func (ref dockerReference) DeleteImage(ctx *types.SystemContext) error {
+	return deleteImage(ctx, ref)
+}
+
 // tagOrDigest returns a tag or digest from the reference.
 func (ref dockerReference) tagOrDigest() (string, error) {
 	if ref, ok := ref.ref.(reference.Canonical); ok {

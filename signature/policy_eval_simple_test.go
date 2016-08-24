@@ -43,6 +43,9 @@ func (ref nameOnlyImageReferenceMock) NewImageSource(ctx *types.SystemContext, r
 func (ref nameOnlyImageReferenceMock) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {
 	panic("unexpected call to a mock function")
 }
+func (ref nameOnlyImageReferenceMock) DeleteImage(ctx *types.SystemContext) error {
+	panic("unexpected call to a mock function")
+}
 
 func TestPRInsecureAcceptAnythingIsSignatureAuthorAccepted(t *testing.T) {
 	pr := NewPRInsecureAcceptAnything()

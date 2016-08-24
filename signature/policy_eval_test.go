@@ -99,6 +99,9 @@ func (ref pcImageReferenceMock) NewImageSource(ctx *types.SystemContext, request
 func (ref pcImageReferenceMock) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {
 	panic("unexpected call to a mock function")
 }
+func (ref pcImageReferenceMock) DeleteImage(ctx *types.SystemContext) error {
+	panic("unexpected call to a mock function")
+}
 
 func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 	ktGPG := SBKeyTypeGPGKeys
