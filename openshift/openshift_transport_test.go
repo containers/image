@@ -117,5 +117,5 @@ func TestReferenceNewImage(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// openshfitReference.NewImageSource, openshfitReference.NewImageDestination untested because they depend
+// openshiftReference.NewImageSource, openshiftReference.NewImageDestination untested because they depend
 // on per-user configuration when initializing httpClient.
