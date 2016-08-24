@@ -6,6 +6,7 @@ import (
 
 	"github.com/containers/image/directory"
 	"github.com/containers/image/docker"
+	"github.com/containers/image/docker/daemon"
 	ociLayout "github.com/containers/image/oci/layout"
 	"github.com/containers/image/openshift"
 	"github.com/containers/image/types"
@@ -21,6 +22,7 @@ func init() {
 	for _, t := range []types.ImageTransport{
 		directory.Transport,
 		docker.Transport,
+		daemon.Transport,
 		ociLayout.Transport,
 		openshift.Transport,
 	} {
