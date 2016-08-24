@@ -32,6 +32,7 @@ func TestImageNameHandling(t *testing.T) {
 		{"dir", "/etc", "/etc"},
 		{"docker", "//busybox", "//busybox:latest"},
 		{"docker", "//busybox:notlatest", "//busybox:notlatest"}, // This also tests handling of multiple ":" characters
+		{"docker-daemon", "FIXME FIXME", "FIXME FIXME"},
 		{"oci", "/etc:sometag", "/etc:sometag"},
 		// "atomic" not tested here because it depends on per-user configuration for the default cluster.
 	} {
