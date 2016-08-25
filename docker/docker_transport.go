@@ -9,7 +9,7 @@ import (
 	"github.com/docker/docker/reference"
 )
 
-// Transport is an ImageTransport for Docker references.
+// Transport is an ImageTransport for Docker registry-hosted images.
 var Transport = dockerTransport{}
 
 type dockerTransport struct{}

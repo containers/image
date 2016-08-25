@@ -12,7 +12,7 @@ import (
 	"github.com/docker/docker/reference"
 )
 
-// Transport is an ImageTransport for directory paths.
+// Transport is an ImageTransport for OpenShift registry-hosted images.
 var Transport = openshiftTransport{}
 
 type openshiftTransport struct{}
