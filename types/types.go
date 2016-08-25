@@ -147,3 +147,12 @@ type ImageInspectInfo struct {
 	Os            string
 	Layers        []string
 }
+
+// SystemContext allows parametrizing access to implicitly-accessed resources,
+// like configuration files in /etc and users' login state in their home directory.
+// Various components can share the same field only if their semantics is exactly
+// the same; if in doubt, add a new field.
+// It is always OK to pass nil instead of a SystemContext.
+type SystemContext struct {
+	SignaturePolicyPath string // If not "", overrides the system's default path for signature.Policy configuration.
+}

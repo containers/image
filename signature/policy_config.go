@@ -24,6 +24,15 @@ import (
 	"github.com/docker/docker/reference"
 )
 
+// systemDefaultPolicyPath is the policy path used for DefaultPolicy().
+// You can override this at build time with
+// -ldflags '-X github.com/containers/image/signature.systemDefaultPolicyPath=$your_path'
+var systemDefaultPolicyPath = builtinDefaultPolicyPath
+
+// builtinDefaultPolicyPath is the policy pat used for DefaultPolicy().
+// DO NOT change this, instead see systemDefaultPolicyPath above.
+const builtinDefaultPolicyPath = "/etc/containers/policy.json"
+
 // InvalidPolicyFormatError is returned when parsing an invalid policy configuration.
 type InvalidPolicyFormatError string
 
@@ -32,6 +41,24 @@ func (err InvalidPolicyFormatError) Error() string {
 }
 
 // FIXME: NewDefaultPolicy, from default file (or environment if trusted?)
+
+// DefaultPolicy returns the default policy of the system.
+// Most applications should be using this method to get the policy configured
+// by the system administrator.
+// ctx should usually be nil, can be set to override the default.
+// NOTE: When this function returns an error, report it to the user and abort.
+// DO NOT hard-code fallback policies in your application.
+func DefaultPolicy(ctx *types.SystemContext) (*Policy, error) {
+	return NewPolicyFromFile(defaultPolicyPath(ctx))
+}
+
+// defaultPolicyPath returns a path to the default policy of the system.
+func defaultPolicyPath(ctx *types.SystemContext) string {
+	if ctx != nil && ctx.SignaturePolicyPath != "" {
+		return ctx.SignaturePolicyPath
+	}
+	return systemDefaultPolicyPath
+}
 
 // NewPolicyFromFile returns a policy configured in the specified file.
 func NewPolicyFromFile(fileName string) (*Policy, error) {

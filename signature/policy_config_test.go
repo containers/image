@@ -63,6 +63,40 @@ var policyFixtureContents = &Policy{
 	},
 }
 
+func TestDefaultPolicy(t *testing.T) {
+	// We can't test the actual systemDefaultPolicyPath, so override.
+	// TestDefaultPolicyPath below tests that we handle the overrides and defaults
+	// correctly.
+
+	// Success
+	policy, err := DefaultPolicy(&types.SystemContext{SignaturePolicyPath: "./fixtures/policy.json"})
+	require.NoError(t, err)
+	assert.Equal(t, policyFixtureContents, policy)
+
+	for _, path := range []string{
+		"/this/doesnt/exist", // Error reading file
+		"/dev/null",          // A failure case; most are tested in the individual method unit tests.
+	} {
+		policy, err := DefaultPolicy(&types.SystemContext{SignaturePolicyPath: path})
+		assert.Error(t, err)
+		assert.Nil(t, policy)
+	}
+}
+
+func TestDefaultPolicyPath(t *testing.T) {
+	// The common case
+	path := defaultPolicyPath(nil)
+	assert.Equal(t, systemDefaultPolicyPath, path)
+	// There is a context, but it does not override the path.
+	path = defaultPolicyPath(&types.SystemContext{})
+	assert.Equal(t, systemDefaultPolicyPath, path)
+
+	// Path overridden
+	const nondefaultPath = "/this/is/not/the/default/path.json"
+	path = defaultPolicyPath(&types.SystemContext{SignaturePolicyPath: nondefaultPath})
+	assert.Equal(t, nondefaultPath, path)
+}
+
 func TestNewPolicyFromFile(t *testing.T) {
 	// Success
 	policy, err := NewPolicyFromFile("./fixtures/policy.json")
