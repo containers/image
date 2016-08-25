@@ -1,0 +1,15 @@
+{
+    "critical": {
+        "identity": {
+            "docker-reference": "busybox"
+        },
+        "image": {
+            "docker-manifest-digest": "sha256:a59906e33509d14c036c8678d687bd4eec81ed7c4b8ce907b888c607f6a1e0e6"
+        },
+        "type": "atomic container signature"
+    },
+    "optional": {
+        "creator": "atomic 0.1.0-dev",
+        "timestamp": 1471035347
+    }
+}
