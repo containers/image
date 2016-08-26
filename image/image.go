@@ -37,6 +37,12 @@ type genericImage struct {
 }
 
 // FromSource returns a types.Image implementation for source.
+// The caller must call .Close() on the returned Image.
+//
+// FromSource “takes ownership” of the input ImageSource and will call src.Close()
+// when the image is closed.  (This does not prevent callers from using both the
+// Image and ImageSource objects simultaneously, but it means that they only need to
+// the Image.)
 func FromSource(src types.ImageSource) types.Image {
 	return &genericImage{src: src}
 }
@@ -45,6 +51,11 @@ func FromSource(src types.ImageSource) types.Image {
 // (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 func (i *genericImage) Reference() types.ImageReference {
 	return i.src.Reference()
+}
+
+// Close removes resources associated with an initialized Image, if any.
+func (i *genericImage) Close() {
+	i.src.Close()
 }
 
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.

@@ -13,6 +13,7 @@ type dirImageSource struct {
 }
 
 // newImageSource returns an ImageSource reading from an existing directory.
+// The caller must call .Close() on the returned ImageSource.
 func newImageSource(ref dirReference) types.ImageSource {
 	return &dirImageSource{ref}
 }
@@ -21,6 +22,10 @@ func newImageSource(ref dirReference) types.ImageSource {
 // (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 func (s *dirImageSource) Reference() types.ImageReference {
 	return s.ref
+}
+
+// Close removes resources associated with an initialized ImageSource, if any.
+func (s *dirImageSource) Close() {
 }
 
 // it's up to the caller to determine the MIME type of the returned manifest's bytes

@@ -33,6 +33,7 @@ func TestGetPutManifest(t *testing.T) {
 
 	src, err := ref.NewImageSource(nil, nil)
 	require.NoError(t, err)
+	defer src.Close()
 	m, mt, err := src.GetManifest()
 	assert.NoError(t, err)
 	assert.Equal(t, man, m)
@@ -52,6 +53,7 @@ func TestGetPutBlob(t *testing.T) {
 
 	src, err := ref.NewImageSource(nil, nil)
 	require.NoError(t, err)
+	defer src.Close()
 	rc, size, err := src.GetBlob(digest)
 	assert.NoError(t, err)
 	defer rc.Close()
@@ -122,6 +124,7 @@ func TestGetPutSignatures(t *testing.T) {
 
 	src, err := ref.NewImageSource(nil, nil)
 	require.NoError(t, err)
+	defer src.Close()
 	sigs, err := src.GetSignatures()
 	assert.NoError(t, err)
 	assert.Equal(t, signatures, sigs)
@@ -133,6 +136,7 @@ func TestSourceReference(t *testing.T) {
 
 	src, err := ref.NewImageSource(nil, nil)
 	require.NoError(t, err)
+	defer src.Close()
 	ref2 := src.Reference()
 	assert.Equal(t, tmpDir, ref2.StringWithinTransport())
 }

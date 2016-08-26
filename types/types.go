@@ -71,10 +71,12 @@ type ImageReference interface {
 	PolicyConfigurationNamespaces() []string
 
 	// NewImage returns a types.Image for this reference.
+	// The caller must call .Close() on the returned Image.
 	NewImage(ctx *SystemContext) (Image, error)
 	// NewImageSource returns a types.ImageSource for this reference,
-	// asking the backend to use a manifest from requestedManifestMIMETypes if possible
+	// asking the backend to use a manifest from requestedManifestMIMETypes if possible.
 	// nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+	// The caller must call .Close() on the returned ImageSource.
 	NewImageSource(ctx *SystemContext, requestedManifestMIMETypes []string) (ImageSource, error)
 	// NewImageDestination returns a types.ImageDestination for this reference.
 	NewImageDestination(ctx *SystemContext) (ImageDestination, error)
@@ -86,10 +88,13 @@ type ImageReference interface {
 // ImageSource is a service, possibly remote (= slow), to download components of a single image.
 // This is primarily useful for copying images around; for examining their properties, Image (below)
 // is usually more useful.
+// Each ImageSource should eventually be closed by calling Close().
 type ImageSource interface {
 	// Reference returns the reference used to set up this source, _as specified by the user_
 	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 	Reference() ImageReference
+	// Close removes resources associated with an initialized ImageSource, if any.
+	Close()
 	// GetManifest returns the image's manifest along with its MIME type. The empty string is returned if the MIME type is unknown.
 	// It may use a remote (= slow) service.
 	GetManifest() ([]byte, string, error)
@@ -120,10 +125,13 @@ type ImageDestination interface {
 }
 
 // Image is the primary API for inspecting properties of images.
+// Each Image should eventually be closed by calling Close().
 type Image interface {
 	// Reference returns the reference used to set up this source, _as specified by the user_
 	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 	Reference() ImageReference
+	// Close removes resources associated with an initialized Image, if any.
+	Close()
 	// ref to repository?
 	// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
 	// NOTE: It is essential for signature verification that Manifest returns the manifest from which BlobDigests is computed.

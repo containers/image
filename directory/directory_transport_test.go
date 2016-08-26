@@ -149,15 +149,17 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 func TestReferenceNewImage(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)
-	_, err := ref.NewImage(nil)
+	img, err := ref.NewImage(nil)
 	assert.NoError(t, err)
+	defer img.Close()
 }
 
 func TestReferenceNewImageSource(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)
-	_, err := ref.NewImageSource(nil, nil)
+	src, err := ref.NewImageSource(nil, nil)
 	assert.NoError(t, err)
+	defer src.Close()
 }
 
 func TestReferenceNewImageDestination(t *testing.T) {

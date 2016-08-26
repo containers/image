@@ -91,6 +91,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		return fmt.Errorf("Error initializing source %s: %v", transports.ImageName(srcRef), err)
 	}
 	src := image.FromSource(rawSource)
+	defer src.Close()
 
 	// Please keep this policy check BEFORE reading any other information about the image.
 	if allowed, err := policyContext.IsRunningImageAllowed(src); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.

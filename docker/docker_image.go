@@ -18,6 +18,7 @@ type Image struct {
 
 // newImage returns a new Image interface type after setting up
 // a client to the registry hosting the given image.
+// The caller must call .Close() on the returned Image.
 func newImage(ctx *types.SystemContext, ref dockerReference) (types.Image, error) {
 	s, err := newImageSource(ctx, ref, nil)
 	if err != nil {

@@ -116,13 +116,15 @@ func (ref dockerReference) PolicyConfigurationNamespaces() []string {
 }
 
 // NewImage returns a types.Image for this reference.
+// The caller must call .Close() on the returned Image.
 func (ref dockerReference) NewImage(ctx *types.SystemContext) (types.Image, error) {
 	return newImage(ctx, ref)
 }
 
 // NewImageSource returns a types.ImageSource for this reference,
-// asking the backend to use a manifest from requestedManifestMIMETypes if possible
+// asking the backend to use a manifest from requestedManifestMIMETypes if possible.
 // nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+// The caller must call .Close() on the returned ImageSource.
 func (ref dockerReference) NewImageSource(ctx *types.SystemContext, requestedManifestMIMETypes []string) (types.ImageSource, error) {
 	return newImageSource(ctx, ref, requestedManifestMIMETypes)
 }

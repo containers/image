@@ -179,8 +179,9 @@ type openshiftImageSource struct {
 }
 
 // newImageSource creates a new ImageSource for the specified reference,
-// asking the backend to use a manifest from requestedManifestMIMETypes if possible
+// asking the backend to use a manifest from requestedManifestMIMETypes if possible.
 // nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+// The caller must call .Close() on the returned ImageSource.
 func newImageSource(ctx *types.SystemContext, ref openshiftReference, requestedManifestMIMETypes []string) (types.ImageSource, error) {
 	client, err := newOpenshiftClient(ref)
 	if err != nil {
@@ -198,6 +199,14 @@ func newImageSource(ctx *types.SystemContext, ref openshiftReference, requestedM
 // (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 func (s *openshiftImageSource) Reference() types.ImageReference {
 	return s.client.ref
+}
+
+// Close removes resources associated with an initialized ImageSource, if any.
+func (s *openshiftImageSource) Close() {
+	if s.docker != nil {
+		s.docker.Close()
+		s.docker = nil
+	}
 }
 
 func (s *openshiftImageSource) GetManifest() ([]byte, string, error) {
