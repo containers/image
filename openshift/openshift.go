@@ -216,6 +216,7 @@ func (s *openshiftImageSource) GetManifest() ([]byte, string, error) {
 	return s.docker.GetManifest()
 }
 
+// GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 func (s *openshiftImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
 	if err := s.ensureImageIsResolved(); err != nil {
 		return nil, 0, err

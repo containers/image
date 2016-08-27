@@ -37,6 +37,7 @@ func (s *dirImageSource) GetManifest() ([]byte, string, error) {
 	return m, "", err
 }
 
+// GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 func (s *dirImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
 	r, err := os.Open(s.ref.layerPath(digest))
 	if err != nil {

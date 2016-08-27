@@ -96,6 +96,7 @@ func (s *dockerImageSource) GetManifest() ([]byte, string, error) {
 	return manblob, simplifyContentType(res.Header.Get("Content-Type")), nil
 }
 
+// GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 func (s *dockerImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
 	url := fmt.Sprintf(blobsURL, s.ref.ref.RemoteName(), digest)
 	logrus.Debugf("Downloading %s", url)
@@ -109,7 +110,7 @@ func (s *dockerImageSource) GetBlob(digest string) (io.ReadCloser, int64, error)
 	}
 	size, err := strconv.ParseInt(res.Header.Get("Content-Length"), 10, 64)
 	if err != nil {
-		size = 0
+		size = -1
 	}
 	return res.Body, size, nil
 }

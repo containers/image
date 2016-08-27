@@ -98,8 +98,7 @@ type ImageSource interface {
 	// GetManifest returns the image's manifest along with its MIME type. The empty string is returned if the MIME type is unknown.
 	// It may use a remote (= slow) service.
 	GetManifest() ([]byte, string, error)
-	// Note: Calling GetBlob() may have ordering dependencies WRT other methods of this type. FIXME: How does this work with (docker save) on stdin?
-	// the second return value is the size of the blob. If not known 0 is returned
+	// GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 	GetBlob(digest string) (io.ReadCloser, int64, error)
 	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
 	GetSignatures() ([][]byte, error)
