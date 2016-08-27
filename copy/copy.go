@@ -120,8 +120,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		return fmt.Errorf("Error parsing manifest: %v", err)
 	}
 	for _, digest := range blobDigests {
-		// TODO(mitr): do not ignore the size param returned here
-		stream, _, err := rawSource.GetBlob(digest)
+		stream, blobSize, err := rawSource.GetBlob(digest)
 		if err != nil {
 			return fmt.Errorf("Error reading blob %s: %v", digest, err)
 		}
@@ -136,7 +135,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		if err != nil {
 			return fmt.Errorf("Error preparing to verify blob %s: %v", digest, err)
 		}
-		if err := dest.PutBlob(digest, digestingReader); err != nil {
+		if err := dest.PutBlob(digest, blobSize, digestingReader); err != nil {
 			return fmt.Errorf("Error writing blob: %v", err)
 		}
 		if digestingReader.validationFailed { // Coverage: This should never happen.

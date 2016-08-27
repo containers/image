@@ -75,11 +75,11 @@ func (d *dockerImageDestination) PutManifest(m []byte) error {
 }
 
 // PutBlob writes contents of stream as a blob identified by digest.
+// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-// Note: Calling PutBlob() and other methods may have ordering dependencies WRT other methods of this type. FIXME: Figure out and document.
-func (d *dockerImageDestination) PutBlob(digest string, stream io.Reader) error {
+func (d *dockerImageDestination) PutBlob(digest string, expectedSize int64, stream io.Reader) error {
 	checkURL := fmt.Sprintf(blobsURL, d.ref.ref.RemoteName(), digest)
 
 	logrus.Debugf("Checking %s", checkURL)
@@ -116,7 +116,7 @@ func (d *dockerImageDestination) PutBlob(digest string, stream io.Reader) error 
 	locationQuery := uploadLocation.Query()
 	locationQuery.Set("digest", digest)
 	uploadLocation.RawQuery = locationQuery.Encode()
-	res, err = d.c.makeRequestToResolvedURL("PUT", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, stream)
+	res, err = d.c.makeRequestToResolvedURL("PUT", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, stream, expectedSize)
 	if err != nil {
 		return err
 	}

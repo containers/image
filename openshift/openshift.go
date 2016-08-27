@@ -384,12 +384,12 @@ func (d *openshiftImageDestination) PutManifest(m []byte) error {
 }
 
 // PutBlob writes contents of stream as a blob identified by digest.
+// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-// Note: Calling PutBlob() and other methods may have ordering dependencies WRT other methods of this type. FIXME: Figure out and document.
-func (d *openshiftImageDestination) PutBlob(digest string, stream io.Reader) error {
-	return d.docker.PutBlob(digest, stream)
+func (d *openshiftImageDestination) PutBlob(digest string, expectedSize int64, stream io.Reader) error {
+	return d.docker.PutBlob(digest, expectedSize, stream)
 }
 
 func (d *openshiftImageDestination) PutSignatures(signatures [][]byte) error {

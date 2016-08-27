@@ -1,6 +1,7 @@
 package directory
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -33,11 +34,11 @@ func (d *dirImageDestination) PutManifest(manifest []byte) error {
 }
 
 // PutBlob writes contents of stream as a blob identified by digest.
+// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-// Note: Calling PutBlob() and other methods may have ordering dependencies WRT other methods of this type. FIXME: Figure out and document.
-func (d *dirImageDestination) PutBlob(digest string, stream io.Reader) error {
+func (d *dirImageDestination) PutBlob(digest string, expectedSize int64, stream io.Reader) error {
 	blobPath := d.ref.layerPath(digest)
 	blobFile, err := ioutil.TempFile(filepath.Dir(blobPath), filepath.Base(blobPath))
 	if err != nil {
@@ -51,8 +52,12 @@ func (d *dirImageDestination) PutBlob(digest string, stream io.Reader) error {
 		}
 	}()
 
-	if _, err := io.Copy(blobFile, stream); err != nil {
+	size, err := io.Copy(blobFile, stream)
+	if err != nil {
 		return err
+	}
+	if expectedSize != -1 && size != expectedSize {
+		return fmt.Errorf("Size mismatch when copying %s, expected %d, got %d", digest, expectedSize, size)
 	}
 	if err := blobFile.Sync(); err != nil {
 		return err
