@@ -299,15 +299,6 @@ func (i *genericImage) BlobDigests() ([]string, error) {
 	return uniqueBlobDigests(m), nil
 }
 
-func (i *genericImage) getLayer(dest types.ImageDestination, digest string) error {
-	stream, _, err := i.src.GetBlob(digest)
-	if err != nil {
-		return err
-	}
-	defer stream.Close()
-	return dest.PutBlob(digest, stream)
-}
-
 // fixManifestLayers, after validating the supplied manifest
 // (to use correctly-formatted IDs, and to not have non-consecutive ID collisions in manifest.History),
 // modifies manifest to only have one entry for each layer ID in manifest.History (deleting the older duplicates,
