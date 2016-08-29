@@ -54,6 +54,9 @@ func newOpenshiftClient(ref openshiftReference) (*openshiftClient, error) {
 	if *baseURL != *ref.baseURL {
 		return nil, fmt.Errorf("Unexpected baseURL mismatch: default %#v, reference %#v", *baseURL, *ref.baseURL)
 	}
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
 	httpClient.Timeout = 1 * time.Minute
 
 	return &openshiftClient{
