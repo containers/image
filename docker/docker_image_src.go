@@ -133,7 +133,7 @@ func (s *dockerImageSource) Delete() error {
 	case http.StatusNotFound:
 		return fmt.Errorf("Unable to delete %v. Image may not exist or is not stored with a v2 Schema in a v2 registry.", s.ref.ref)
 	default:
-		return fmt.Errorf("Failed to delete %v: %v (%v)", s.ref.ref, body, get.Status)
+		return fmt.Errorf("Failed to delete %v: %s (%v)", s.ref.ref, string(body), get.Status)
 	}
 
 	digest := get.Header.Get("Docker-Content-Digest")
@@ -152,7 +152,7 @@ func (s *dockerImageSource) Delete() error {
 		return err
 	}
 	if delete.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("Failed to delete %v: %v (%v)", deleteURL, body, delete.Status)
+		return fmt.Errorf("Failed to delete %v: %s (%v)", deleteURL, string(body), delete.Status)
 	}
 
 	return nil
