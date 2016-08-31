@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
+	"path/filepath"
 	"testing"
 
 	"github.com/containers/image/directory"
@@ -84,17 +85,40 @@ func TestDefaultPolicy(t *testing.T) {
 }
 
 func TestDefaultPolicyPath(t *testing.T) {
-	// The common case
-	path := defaultPolicyPath(nil)
-	assert.Equal(t, systemDefaultPolicyPath, path)
-	// There is a context, but it does not override the path.
-	path = defaultPolicyPath(&types.SystemContext{})
-	assert.Equal(t, systemDefaultPolicyPath, path)
 
-	// Path overridden
 	const nondefaultPath = "/this/is/not/the/default/path.json"
-	path = defaultPolicyPath(&types.SystemContext{SignaturePolicyPath: nondefaultPath})
-	assert.Equal(t, nondefaultPath, path)
+	const variableReference = "$HOME"
+	const rootPrefix = "/root/prefix"
+
+	for _, c := range []struct {
+		ctx      *types.SystemContext
+		expected string
+	}{
+		// The common case
+		{nil, systemDefaultPolicyPath},
+		// There is a context, but it does not override the path.
+		{&types.SystemContext{}, systemDefaultPolicyPath},
+		// Path overridden
+		{&types.SystemContext{SignaturePolicyPath: nondefaultPath}, nondefaultPath},
+		// Root overridden
+		{
+			&types.SystemContext{RootForImplicitAbsolutePaths: rootPrefix},
+			filepath.Join(rootPrefix, systemDefaultPolicyPath),
+		},
+		// Root and path overrides present simultaneously,
+		{
+			&types.SystemContext{
+				RootForImplicitAbsolutePaths: rootPrefix,
+				SignaturePolicyPath:          nondefaultPath,
+			},
+			nondefaultPath,
+		},
+		// No environment expansion happens in the overridden paths
+		{&types.SystemContext{SignaturePolicyPath: variableReference}, variableReference},
+	} {
+		path := defaultPolicyPath(c.ctx)
+		assert.Equal(t, c.expected, path)
+	}
 }
 
 func TestNewPolicyFromFile(t *testing.T) {

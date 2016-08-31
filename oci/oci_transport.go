@@ -165,18 +165,25 @@ func (ref ociReference) PolicyConfigurationNamespaces() []string {
 }
 
 // NewImage returns a types.Image for this reference.
-func (ref ociReference) NewImage(certPath string, tlsVerify bool) (types.Image, error) {
+func (ref ociReference) NewImage(ctx *types.SystemContext) (types.Image, error) {
 	return nil, errors.New("Full Image support not implemented for oci: image names")
 }
 
-// NewImageSource returns a types.ImageSource for this reference.
-func (ref ociReference) NewImageSource(certPath string, tlsVerify bool) (types.ImageSource, error) {
+// NewImageSource returns a types.ImageSource for this reference,
+// asking the backend to use a manifest from requestedManifestMIMETypes if possible
+// nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+func (ref ociReference) NewImageSource(ctx *types.SystemContext, requestedManifestMIMETypes []string) (types.ImageSource, error) {
 	return nil, errors.New("Reading images not implemented for oci: image names")
 }
 
 // NewImageDestination returns a types.ImageDestination for this reference.
-func (ref ociReference) NewImageDestination(certPath string, tlsVerify bool) (types.ImageDestination, error) {
+func (ref ociReference) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {
 	return newImageDestination(ref), nil
+}
+
+// DeleteImage deletes the named image from the registry, if supported.
+func (ref ociReference) DeleteImage(ctx *types.SystemContext) error {
+	return fmt.Errorf("Deleting images not implemented for oci: images")
 }
 
 // ociLayoutPathPath returns a path for the oci-layout within a directory using OCI conventions.

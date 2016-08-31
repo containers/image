@@ -116,18 +116,25 @@ func (ref dockerReference) PolicyConfigurationNamespaces() []string {
 }
 
 // NewImage returns a types.Image for this reference.
-func (ref dockerReference) NewImage(certPath string, tlsVerify bool) (types.Image, error) {
-	return newImage(ref, certPath, tlsVerify)
+func (ref dockerReference) NewImage(ctx *types.SystemContext) (types.Image, error) {
+	return newImage(ctx, ref)
 }
 
-// NewImageSource returns a types.ImageSource for this reference.
-func (ref dockerReference) NewImageSource(certPath string, tlsVerify bool) (types.ImageSource, error) {
-	return newImageSource(ref, certPath, tlsVerify)
+// NewImageSource returns a types.ImageSource for this reference,
+// asking the backend to use a manifest from requestedManifestMIMETypes if possible
+// nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+func (ref dockerReference) NewImageSource(ctx *types.SystemContext, requestedManifestMIMETypes []string) (types.ImageSource, error) {
+	return newImageSource(ctx, ref, requestedManifestMIMETypes)
 }
 
 // NewImageDestination returns a types.ImageDestination for this reference.
-func (ref dockerReference) NewImageDestination(certPath string, tlsVerify bool) (types.ImageDestination, error) {
-	return newImageDestination(ref, certPath, tlsVerify)
+func (ref dockerReference) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {
+	return newImageDestination(ctx, ref)
+}
+
+// DeleteImage deletes the named image from the registry, if supported.
+func (ref dockerReference) DeleteImage(ctx *types.SystemContext) error {
+	return deleteImage(ctx, ref)
 }
 
 // tagOrDigest returns a tag or digest from the reference.

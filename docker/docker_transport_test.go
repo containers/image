@@ -160,21 +160,21 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 func TestReferenceNewImage(t *testing.T) {
 	ref, err := ParseReference("//busybox")
 	require.NoError(t, err)
-	_, err = ref.NewImage("", true)
+	_, err = ref.NewImage(nil)
 	assert.NoError(t, err)
 }
 
 func TestReferenceNewImageSource(t *testing.T) {
 	ref, err := ParseReference("//busybox")
 	require.NoError(t, err)
-	_, err = ref.NewImageSource("", true)
+	_, err = ref.NewImageSource(nil, nil)
 	assert.NoError(t, err)
 }
 
 func TestReferenceNewImageDestination(t *testing.T) {
 	ref, err := ParseReference("//busybox")
 	require.NoError(t, err)
-	_, err = ref.NewImageDestination("", true)
+	_, err = ref.NewImageDestination(nil)
 	assert.NoError(t, err)
 }
 

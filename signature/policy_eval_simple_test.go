@@ -34,13 +34,16 @@ func (ref nameOnlyImageReferenceMock) PolicyConfigurationIdentity() string {
 func (ref nameOnlyImageReferenceMock) PolicyConfigurationNamespaces() []string {
 	panic("unexpected call to a mock function")
 }
-func (ref nameOnlyImageReferenceMock) NewImage(certPath string, tlsVerify bool) (types.Image, error) {
+func (ref nameOnlyImageReferenceMock) NewImage(ctx *types.SystemContext) (types.Image, error) {
 	panic("unexpected call to a mock function")
 }
-func (ref nameOnlyImageReferenceMock) NewImageSource(certPath string, tlsVerify bool) (types.ImageSource, error) {
+func (ref nameOnlyImageReferenceMock) NewImageSource(ctx *types.SystemContext, requestedManifestMIMETypes []string) (types.ImageSource, error) {
 	panic("unexpected call to a mock function")
 }
-func (ref nameOnlyImageReferenceMock) NewImageDestination(certPath string, tlsVerify bool) (types.ImageDestination, error) {
+func (ref nameOnlyImageReferenceMock) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {
+	panic("unexpected call to a mock function")
+}
+func (ref nameOnlyImageReferenceMock) DeleteImage(ctx *types.SystemContext) error {
 	panic("unexpected call to a mock function")
 }
 

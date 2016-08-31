@@ -205,22 +205,29 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 func TestReferenceNewImage(t *testing.T) {
 	ref, tmpDir := refToTempOCI(t)
 	defer os.RemoveAll(tmpDir)
-	_, err := ref.NewImage("/this/doesn't/exist", true)
+	_, err := ref.NewImage(nil)
 	assert.Error(t, err)
 }
 
 func TestReferenceNewImageSource(t *testing.T) {
 	ref, tmpDir := refToTempOCI(t)
 	defer os.RemoveAll(tmpDir)
-	_, err := ref.NewImageSource("/this/doesn't/exist", true)
+	_, err := ref.NewImageSource(nil, nil)
 	assert.Error(t, err)
 }
 
 func TestReferenceNewImageDestination(t *testing.T) {
 	ref, tmpDir := refToTempOCI(t)
 	defer os.RemoveAll(tmpDir)
-	_, err := ref.NewImageDestination("/this/doesn't/exist", true)
+	_, err := ref.NewImageDestination(nil)
 	assert.NoError(t, err)
+}
+
+func TestReferenceDeleteImage(t *testing.T) {
+	ref, tmpDir := refToTempOCI(t)
+	defer os.RemoveAll(tmpDir)
+	err := ref.DeleteImage(nil)
+	assert.Error(t, err)
 }
 
 func TestReferenceOCILayoutPath(t *testing.T) {

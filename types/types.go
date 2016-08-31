@@ -71,11 +71,16 @@ type ImageReference interface {
 	PolicyConfigurationNamespaces() []string
 
 	// NewImage returns a types.Image for this reference.
-	NewImage(certPath string, tlsVerify bool) (Image, error)
-	// NewImageSource returns a types.ImageSource for this reference.
-	NewImageSource(certPath string, tlsVerify bool) (ImageSource, error)
+	NewImage(ctx *SystemContext) (Image, error)
+	// NewImageSource returns a types.ImageSource for this reference,
+	// asking the backend to use a manifest from requestedManifestMIMETypes if possible
+	// nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+	NewImageSource(ctx *SystemContext, requestedManifestMIMETypes []string) (ImageSource, error)
 	// NewImageDestination returns a types.ImageDestination for this reference.
-	NewImageDestination(certPath string, tlsVerify bool) (ImageDestination, error)
+	NewImageDestination(ctx *SystemContext) (ImageDestination, error)
+
+	// DeleteImage deletes the named image from the registry, if supported.
+	DeleteImage(ctx *SystemContext) error
 }
 
 // ImageSource is a service, possibly remote (= slow), to download components of a single image.
@@ -85,16 +90,14 @@ type ImageSource interface {
 	// Reference returns the reference used to set up this source, _as specified by the user_
 	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 	Reference() ImageReference
-	// GetManifest returns the image's manifest along with its MIME type. The empty string is returned if the MIME type is unknown. The slice parameter indicates the supported mime types the manifest should be when getting it.
+	// GetManifest returns the image's manifest along with its MIME type. The empty string is returned if the MIME type is unknown.
 	// It may use a remote (= slow) service.
-	GetManifest([]string) ([]byte, string, error)
+	GetManifest() ([]byte, string, error)
 	// Note: Calling GetBlob() may have ordering dependencies WRT other methods of this type. FIXME: How does this work with (docker save) on stdin?
 	// the second return value is the size of the blob. If not known 0 is returned
 	GetBlob(digest string) (io.ReadCloser, int64, error)
 	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
 	GetSignatures() ([][]byte, error)
-	// Delete image from registry, if operation is supported
-	Delete() error
 }
 
 // ImageDestination is a service, possibly remote (= slow), to store components of a single image.
@@ -154,5 +157,17 @@ type ImageInspectInfo struct {
 // the same; if in doubt, add a new field.
 // It is always OK to pass nil instead of a SystemContext.
 type SystemContext struct {
-	SignaturePolicyPath string // If not "", overrides the system's default path for signature.Policy configuration.
+	// If not "", prefixed to any absolute paths used by default by the library (e.g. in /etc/).
+	// Not used for any of the more specific path overrides available in this struct.
+	// Not used for any paths specified by users in config files (even if the location of the config file _was_ affected by it).
+	// NOTE: This does NOT affect paths starting by $HOME.
+	RootForImplicitAbsolutePaths string
+
+	// === Global configuration overrides ===
+	// If not "", overrides the system's default path for signature.Policy configuration.
+	SignaturePolicyPath string
+
+	// === docker.Transport overrides ===
+	DockerCertPath              string // If not "", a directory containing "cert.pem" and "key.pem" used when talking to a Docker Registry
+	DockerInsecureSkipTLSVerify bool
 }

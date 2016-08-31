@@ -171,24 +171,26 @@ func (c *openshiftClient) dockerRegistryHostPart() string {
 type openshiftImageSource struct {
 	client *openshiftClient
 	// Values specific to this image
-	certPath  string // Only for parseDockerImageSource
-	tlsVerify bool   // Only for parseDockerImageSource
+	ctx                        *types.SystemContext
+	requestedManifestMIMETypes []string
 	// State
 	docker               types.ImageSource // The Docker Registry endpoint, or nil if not resolved yet
 	imageStreamImageName string            // Resolved image identifier, or "" if not known yet
 }
 
-// newImageSource creates a new ImageSource for the specified reference and connection specification.
-func newImageSource(ref openshiftReference, certPath string, tlsVerify bool) (types.ImageSource, error) {
+// newImageSource creates a new ImageSource for the specified reference,
+// asking the backend to use a manifest from requestedManifestMIMETypes if possible
+// nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+func newImageSource(ctx *types.SystemContext, ref openshiftReference, requestedManifestMIMETypes []string) (types.ImageSource, error) {
 	client, err := newOpenshiftClient(ref)
 	if err != nil {
 		return nil, err
 	}
 
 	return &openshiftImageSource{
-		client:    client,
-		certPath:  certPath,
-		tlsVerify: tlsVerify,
+		client: client,
+		ctx:    ctx,
+		requestedManifestMIMETypes: requestedManifestMIMETypes,
 	}, nil
 }
 
@@ -198,11 +200,11 @@ func (s *openshiftImageSource) Reference() types.ImageReference {
 	return s.client.ref
 }
 
-func (s *openshiftImageSource) GetManifest(mimetypes []string) ([]byte, string, error) {
+func (s *openshiftImageSource) GetManifest() ([]byte, string, error) {
 	if err := s.ensureImageIsResolved(); err != nil {
 		return nil, "", err
 	}
-	return s.docker.GetManifest(mimetypes)
+	return s.docker.GetManifest()
 }
 
 func (s *openshiftImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
@@ -270,7 +272,7 @@ func (s *openshiftImageSource) ensureImageIsResolved() error {
 	if err != nil {
 		return err
 	}
-	d, err := dockerRef.NewImageSource(s.certPath, s.tlsVerify)
+	d, err := dockerRef.NewImageSource(s.ctx, s.requestedManifestMIMETypes)
 	if err != nil {
 		return err
 	}
@@ -286,8 +288,8 @@ type openshiftImageDestination struct {
 	imageStreamImageName string // "" if not yet known
 }
 
-// newImageDestination creates a new ImageDestination for the specified reference and connection specification.
-func newImageDestination(ref openshiftReference, certPath string, tlsVerify bool) (types.ImageDestination, error) {
+// newImageDestination creates a new ImageDestination for the specified reference.
+func newImageDestination(ctx *types.SystemContext, ref openshiftReference) (types.ImageDestination, error) {
 	client, err := newOpenshiftClient(ref)
 	if err != nil {
 		return nil, err
@@ -301,7 +303,7 @@ func newImageDestination(ref openshiftReference, certPath string, tlsVerify bool
 	if err != nil {
 		return nil, err
 	}
-	docker, err := dockerRef.NewImageDestination(certPath, tlsVerify)
+	docker, err := dockerRef.NewImageDestination(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -514,8 +516,4 @@ type status struct {
 	// Reason StatusReason `json:"reason,omitempty"`
 	// Details *StatusDetails `json:"details,omitempty"`
 	Code int32 `json:"code,omitempty"`
-}
-
-func (s *openshiftImageSource) Delete() error {
-	return fmt.Errorf("openshift#openshiftImageSource.Delete() not implmented")
 }

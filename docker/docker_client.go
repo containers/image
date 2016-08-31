@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containers/image/types"
 	"github.com/docker/docker/pkg/homedir"
 )
 
@@ -44,7 +45,7 @@ type dockerClient struct {
 }
 
 // newDockerClient returns a new dockerClient instance for refHostname (a host a specified in the Docker image reference, not canonicalized to dockerRegistry)
-func newDockerClient(refHostname, certPath string, tlsVerify bool) (*dockerClient, error) {
+func newDockerClient(ctx *types.SystemContext, refHostname string) (*dockerClient, error) {
 	var registry string
 	if refHostname == dockerHostname {
 		registry = dockerRegistry
@@ -56,17 +57,17 @@ func newDockerClient(refHostname, certPath string, tlsVerify bool) (*dockerClien
 		return nil, err
 	}
 	var tr *http.Transport
-	if certPath != "" || !tlsVerify {
+	if ctx != nil && (ctx.DockerCertPath != "" || ctx.DockerInsecureSkipTLSVerify) {
 		tlsc := &tls.Config{}
 
-		if certPath != "" {
-			cert, err := tls.LoadX509KeyPair(filepath.Join(certPath, "cert.pem"), filepath.Join(certPath, "key.pem"))
+		if ctx.DockerCertPath != "" {
+			cert, err := tls.LoadX509KeyPair(filepath.Join(ctx.DockerCertPath, "cert.pem"), filepath.Join(ctx.DockerCertPath, "key.pem"))
 			if err != nil {
 				return nil, fmt.Errorf("Error loading x509 key pair: %s", err)
 			}
 			tlsc.Certificates = append(tlsc.Certificates, cert)
 		}
-		tlsc.InsecureSkipVerify = !tlsVerify
+		tlsc.InsecureSkipVerify = ctx.DockerInsecureSkipTLSVerify
 		tr = &http.Transport{
 			TLSClientConfig: tlsc,
 		}
