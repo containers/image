@@ -24,12 +24,12 @@ type digestingReader struct {
 	source           io.Reader
 	digest           hash.Hash
 	expectedDigest   []byte
-	failureIndicator *bool
+	validationFailed bool
 }
 
-// newDigestingReader returns an io.Reader with contents of source, which will eventually return a non-EOF error
-// and set *failureIndicator to true if the source stream does not match expectedDigestString.
-func newDigestingReader(source io.Reader, expectedDigestString string, failureIndicator *bool) (io.Reader, error) {
+// newDigestingReader returns an io.Reader implementation with contents of source, which will eventually return a non-EOF error
+// and set validationFailed to true if the source stream does not match expectedDigestString.
+func newDigestingReader(source io.Reader, expectedDigestString string) (*digestingReader, error) {
 	fields := strings.SplitN(expectedDigestString, ":", 2)
 	if len(fields) != 2 {
 		return nil, fmt.Errorf("Invalid digest specification %s", expectedDigestString)
@@ -50,7 +50,7 @@ func newDigestingReader(source io.Reader, expectedDigestString string, failureIn
 		source:           source,
 		digest:           digest,
 		expectedDigest:   expectedDigest,
-		failureIndicator: failureIndicator,
+		validationFailed: false,
 	}, nil
 }
 
@@ -67,7 +67,7 @@ func (d *digestingReader) Read(p []byte) (int, error) {
 	if err == io.EOF {
 		actualDigest := d.digest.Sum(nil)
 		if subtle.ConstantTimeCompare(actualDigest, d.expectedDigest) != 1 {
-			*d.failureIndicator = true
+			d.validationFailed = true
 			return 0, fmt.Errorf("Digest did not match, expected %s, got %s", hex.EncodeToString(d.expectedDigest), hex.EncodeToString(actualDigest))
 		}
 	}
@@ -123,15 +123,14 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		// Note that we don't use a stronger "validationSucceeded" indicator, because
 		// dest.PutBlob may detect that the layer already exists, in which case we don't
 		// read stream to the end, and validation does not happen.
-		validationFailed := false // This is a new instance on each loop iteration.
-		digestingReader, err := newDigestingReader(stream, digest, &validationFailed)
+		digestingReader, err := newDigestingReader(stream, digest)
 		if err != nil {
 			return fmt.Errorf("Error preparing to verify blob %s: %v", digest, err)
 		}
 		if err := dest.PutBlob(digest, digestingReader); err != nil {
 			return fmt.Errorf("Error writing blob: %v", err)
 		}
-		if validationFailed { // Coverage: This should never happen.
+		if digestingReader.validationFailed { // Coverage: This should never happen.
 			return fmt.Errorf("Internal error uploading blob %s, digest verification failed but was ignored", digest)
 		}
 	}
