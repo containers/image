@@ -96,7 +96,11 @@ func (d *ociImageDestination) PutManifest(m []byte) error {
 		return err
 	}
 
-	if err := ioutil.WriteFile(d.ref.blobPath(digest), ociMan, 0644); err != nil {
+	blobPath, err := d.ref.blobPath(digest)
+	if err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(blobPath, ociMan, 0644); err != nil {
 		return err
 	}
 	// TODO(runcom): ugly here?
@@ -116,7 +120,10 @@ func (d *ociImageDestination) PutManifest(m []byte) error {
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 // Note: Calling PutBlob() and other methods may have ordering dependencies WRT other methods of this type. FIXME: Figure out and document.
 func (d *ociImageDestination) PutBlob(digest string, stream io.Reader) error {
-	blobPath := d.ref.blobPath(digest)
+	blobPath, err := d.ref.blobPath(digest)
+	if err != nil {
+		return err
+	}
 	if err := ensureParentDirectoryExists(blobPath); err != nil {
 		return err
 	}
