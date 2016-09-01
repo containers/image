@@ -19,13 +19,14 @@ func (fn readerFromFunc) Read(p []byte) (int, error) {
 // TestPutBlobDigestFailure simulates behavior on digest verification failure.
 func TestPutBlobDigestFailure(t *testing.T) {
 	const digestErrorString = "Simulated digest error"
-	const blobDigest = "test-digest"
+	const blobDigest = "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f"
 
 	ref, tmpDir := refToTempOCI(t)
 	defer os.RemoveAll(tmpDir)
 	dirRef, ok := ref.(ociReference)
 	require.True(t, ok)
-	blobPath := dirRef.blobPath(blobDigest)
+	blobPath, err := dirRef.blobPath(blobDigest)
+	assert.NoError(t, err)
 
 	firstRead := true
 	reader := readerFromFunc(func(p []byte) (int, error) {

@@ -192,8 +192,12 @@ func (ref ociReference) ociLayoutPath() string {
 }
 
 // blobPath returns a path for a blob within a directory using OCI image-layout conventions.
-func (ref ociReference) blobPath(digest string) string {
-	return filepath.Join(ref.dir, "blobs", strings.Replace(digest, ":", "-", -1))
+func (ref ociReference) blobPath(digest string) (string, error) {
+	pts := strings.SplitN(digest, ":", 2)
+	if len(pts) != 2 {
+		return "", fmt.Errorf("unexpected digest reference %s", digest)
+	}
+	return filepath.Join(ref.dir, "blobs", pts[0], pts[1]), nil
 }
 
 // descriptorPath returns a path for the manifest within a directory using OCI conventions.
