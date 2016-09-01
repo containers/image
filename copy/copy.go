@@ -76,7 +76,8 @@ func (d *digestingReader) Read(p []byte) (int, error) {
 
 // Options allows supplying non-default configuration modifying the behavior of CopyImage.
 type Options struct {
-	SignBy string // If non-empty, asks for a signature to be added during the copy, and specifies a key ID, as accepted by signature.NewGPGSigningMechanism().SignDockerManifest(),
+	RemoveSignatures bool   // Remove any pre-existing signatures. SignBy will still add a new signature.
+	SignBy           string // If non-empty, asks for a signature to be added during the copy, and specifies a key ID, as accepted by signature.NewGPGSigningMechanism().SignDockerManifest(),
 }
 
 // Image copies image from srcRef to destRef, using policyContext to validate source image admissibility.
@@ -101,9 +102,16 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		return fmt.Errorf("Error reading manifest: %v", err)
 	}
 
-	sigs, err := src.Signatures()
-	if err != nil {
-		return fmt.Errorf("Error reading signatures: %v", err)
+	var sigs [][]byte
+	if options != nil && options.RemoveSignatures {
+		sigs = [][]byte{}
+	} else {
+		s, err := src.Signatures()
+		if err != nil {
+			return fmt.Errorf("Error reading signatures: %v", err)
+		}
+		sigs = s
+		// FIXME: Fail early if we can detect that RemoveSignatures should be used.
 	}
 
 	blobDigests, err := src.BlobDigests()
