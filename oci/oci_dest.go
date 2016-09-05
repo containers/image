@@ -1,6 +1,8 @@
 package oci
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,22 +35,19 @@ func (d *ociImageDestination) Reference() types.ImageReference {
 func (d *ociImageDestination) Close() {
 }
 
-// PutBlob writes contents of stream as a blob identified by digest.
+// PutBlob writes contents of stream and returns its computed digest and size.
+// A digest can be optionally provided if known, the specific image destination can decide to play with it or not.
 // The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (d *ociImageDestination) PutBlob(digest string, expectedSize int64, stream io.Reader) error {
-	blobPath, err := d.ref.blobPath(digest)
-	if err != nil {
-		return err
+func (d *ociImageDestination) PutBlob(stream io.Reader, _ string, expectedSize int64) (string, int64, error) {
+	if err := ensureDirectoryExists(d.ref.dir); err != nil {
+		return "", -1, err
 	}
-	if err := ensureParentDirectoryExists(blobPath); err != nil {
-		return err
-	}
-	blobFile, err := ioutil.TempFile(filepath.Dir(blobPath), filepath.Base(blobPath))
+	blobFile, err := ioutil.TempFile(d.ref.dir, "oci-put-blob")
 	if err != nil {
-		return err
+		return "", -1, err
 	}
 	succeeded := false
 	defer func() {
@@ -58,24 +57,36 @@ func (d *ociImageDestination) PutBlob(digest string, expectedSize int64, stream 
 		}
 	}()
 
-	size, err := io.Copy(blobFile, stream)
+	h := sha256.New()
+	tee := io.TeeReader(stream, h)
+
+	size, err := io.Copy(blobFile, tee)
 	if err != nil {
-		return err
+		return "", -1, err
 	}
+	computedDigest := "sha256:" + hex.EncodeToString(h.Sum(nil))
 	if expectedSize != -1 && size != expectedSize {
-		return fmt.Errorf("Size mismatch when copying %s, expected %d, got %d", digest, expectedSize, size)
+		return "", -1, fmt.Errorf("Size mismatch when copying %s, expected %d, got %d", computedDigest, expectedSize, size)
 	}
 	if err := blobFile.Sync(); err != nil {
-		return err
+		return "", -1, err
 	}
 	if err := blobFile.Chmod(0644); err != nil {
-		return err
+		return "", -1, err
+	}
+
+	blobPath, err := d.ref.blobPath(computedDigest)
+	if err != nil {
+		return "", -1, err
+	}
+	if err := ensureParentDirectoryExists(blobPath); err != nil {
+		return "", -1, err
 	}
 	if err := os.Rename(blobFile.Name(), blobPath); err != nil {
-		return nil
+		return "", -1, err
 	}
 	succeeded = true
-	return nil
+	return computedDigest, size, nil
 }
 
 func createManifest(m []byte) ([]byte, string, error) {
@@ -151,15 +162,18 @@ func (d *ociImageDestination) PutManifest(m []byte) error {
 	return ioutil.WriteFile(descriptorPath, data, 0644)
 }
 
-// ensureParentDirectoryExists ensures the parent of the supplied path exists.
-func ensureParentDirectoryExists(path string) error {
-	parent := filepath.Dir(path)
-	if _, err := os.Stat(parent); err != nil && os.IsNotExist(err) {
-		if err := os.MkdirAll(parent, 0755); err != nil {
+func ensureDirectoryExists(path string) error {
+	if _, err := os.Stat(path); err != nil && os.IsNotExist(err) {
+		if err := os.MkdirAll(path, 0755); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// ensureParentDirectoryExists ensures the parent of the supplied path exists.
+func ensureParentDirectoryExists(path string) error {
+	return ensureDirectoryExists(filepath.Dir(path))
 }
 
 func (d *ociImageDestination) SupportedManifestMIMETypes() []string {

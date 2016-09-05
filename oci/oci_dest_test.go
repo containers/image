@@ -48,7 +48,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	dest, err := ref.NewImageDestination(nil)
 	require.NoError(t, err)
 	defer dest.Close()
-	err = dest.PutBlob(blobDigest, -1, reader)
+	_, _, err = dest.PutBlob(reader, blobDigest, -1)
 	assert.Error(t, err)
 	assert.Contains(t, digestErrorString, err.Error())
 	err = dest.Commit()

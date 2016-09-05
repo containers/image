@@ -2,10 +2,13 @@ package docker
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/manifest"
@@ -48,60 +51,84 @@ func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 	}
 }
 
-// PutBlob writes contents of stream as a blob identified by digest.
+// PutBlob writes contents of stream and returns its computed digest and size.
+// A digest can be optionally provided if known, the specific image destination can decide to play with it or not.
 // The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (d *dockerImageDestination) PutBlob(digest string, expectedSize int64, stream io.Reader) error {
-	checkURL := fmt.Sprintf(blobsURL, d.ref.ref.RemoteName(), digest)
+func (d *dockerImageDestination) PutBlob(stream io.Reader, digest string, expectedSize int64) (string, int64, error) {
+	if digest != "" {
+		checkURL := fmt.Sprintf(blobsURL, d.ref.ref.RemoteName(), digest)
 
-	logrus.Debugf("Checking %s", checkURL)
-	res, err := d.c.makeRequest("HEAD", checkURL, nil, nil)
-	if err != nil {
-		return err
+		logrus.Debugf("Checking %s", checkURL)
+		res, err := d.c.makeRequest("HEAD", checkURL, nil, nil)
+		if err != nil {
+			return "", -1, err
+		}
+		defer res.Body.Close()
+		if res.StatusCode == http.StatusOK && res.Header.Get("Docker-Content-Digest") == digest {
+			logrus.Debugf("... already exists, not uploading")
+			blobLength, err := strconv.ParseInt(res.Header.Get("Content-Length"), 10, 64)
+			if err != nil {
+				return "", -1, err
+			}
+			return digest, blobLength, nil
+		}
+		logrus.Debugf("... failed, status %d", res.StatusCode)
 	}
-	defer res.Body.Close()
-	if res.StatusCode == http.StatusOK && res.Header.Get("Docker-Content-Digest") == digest {
-		logrus.Debugf("... already exists, not uploading")
-		return nil
-	}
-	logrus.Debugf("... failed, status %d", res.StatusCode)
 
 	// FIXME? Chunked upload, progress reporting, etc.
 	uploadURL := fmt.Sprintf(blobUploadURL, d.ref.ref.RemoteName())
 	logrus.Debugf("Uploading %s", uploadURL)
-	res, err = d.c.makeRequest("POST", uploadURL, nil, nil)
+	res, err := d.c.makeRequest("POST", uploadURL, nil, nil)
 	if err != nil {
-		return err
+		return "", -1, err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusAccepted {
 		logrus.Debugf("Error initiating layer upload, response %#v", *res)
-		return fmt.Errorf("Error initiating layer upload to %s, status %d", uploadURL, res.StatusCode)
+		return "", -1, fmt.Errorf("Error initiating layer upload to %s, status %d", uploadURL, res.StatusCode)
 	}
 	uploadLocation, err := res.Location()
 	if err != nil {
-		return fmt.Errorf("Error determining upload URL: %s", err.Error())
+		return "", -1, fmt.Errorf("Error determining upload URL: %s", err.Error())
+	}
+
+	h := sha256.New()
+	tee := io.TeeReader(stream, h)
+	res, err = d.c.makeRequestToResolvedURL("PATCH", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, tee, expectedSize)
+	if err != nil {
+		logrus.Debugf("Error uploading layer chunked, response %#v", *res)
+		return "", -1, err
+	}
+	defer res.Body.Close()
+	hash := h.Sum(nil)
+	computedDigest := "sha256:" + hex.EncodeToString(hash[:])
+
+	uploadLocation, err = res.Location()
+	if err != nil {
+		return "", -1, fmt.Errorf("Error determining upload URL: %s", err.Error())
 	}
 
 	// FIXME: DELETE uploadLocation on failure
 
 	locationQuery := uploadLocation.Query()
-	locationQuery.Set("digest", digest)
+	// TODO: check digest == computedDigest https://github.com/containers/image/pull/70#discussion_r77646717
+	locationQuery.Set("digest", computedDigest)
 	uploadLocation.RawQuery = locationQuery.Encode()
-	res, err = d.c.makeRequestToResolvedURL("PUT", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, stream, expectedSize)
+	res, err = d.c.makeRequestToResolvedURL("PUT", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, nil, -1)
 	if err != nil {
-		return err
+		return "", -1, err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusCreated {
 		logrus.Debugf("Error uploading layer, response %#v", *res)
-		return fmt.Errorf("Error uploading layer to %s, status %d", uploadLocation, res.StatusCode)
+		return "", -1, fmt.Errorf("Error uploading layer to %s, status %d", uploadLocation, res.StatusCode)
 	}
 
 	logrus.Debugf("Upload of layer %s complete", digest)
-	return nil
+	return computedDigest, res.Request.ContentLength, nil
 }
 
 func (d *dockerImageDestination) PutManifest(m []byte) error {

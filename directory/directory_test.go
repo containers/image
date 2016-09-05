@@ -2,6 +2,8 @@ package directory
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -53,15 +55,18 @@ func TestGetPutBlob(t *testing.T) {
 	dest, err := ref.NewImageDestination(nil)
 	require.NoError(t, err)
 	defer dest.Close()
-	err = dest.PutBlob(digest, int64(len(blob)), bytes.NewReader(blob))
+	d, size, err := dest.PutBlob(bytes.NewReader(blob), digest, int64(9))
 	assert.NoError(t, err)
 	err = dest.Commit()
 	assert.NoError(t, err)
+	assert.Equal(t, int64(9), size)
+	hash := sha256.Sum256(blob)
+	assert.Equal(t, "sha256:"+hex.EncodeToString(hash[:]), d)
 
 	src, err := ref.NewImageSource(nil, nil)
 	require.NoError(t, err)
 	defer src.Close()
-	rc, size, err := src.GetBlob(digest)
+	rc, size, err := src.GetBlob(d)
 	assert.NoError(t, err)
 	defer rc.Close()
 	b, err := ioutil.ReadAll(rc)
@@ -108,7 +113,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	dest, err := ref.NewImageDestination(nil)
 	require.NoError(t, err)
 	defer dest.Close()
-	err = dest.PutBlob(blobDigest, -1, reader)
+	_, _, err = dest.PutBlob(reader, blobDigest, -1)
 	assert.Error(t, err)
 	assert.Contains(t, digestErrorString, err.Error())
 	err = dest.Commit()

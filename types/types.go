@@ -119,12 +119,13 @@ type ImageDestination interface {
 	Reference() ImageReference
 	// Close removes resources associated with an initialized ImageDestination, if any.
 	Close()
-	// PutBlob writes contents of stream as a blob identified by digest.
+	// PutBlob writes contents of stream and returns its computed digest and size.
+	// A digest can be optionally provided if known, the specific image destination can decide to play with it or not.
 	// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
 	// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 	// to any other readers for download using the supplied digest.
 	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-	PutBlob(digest string, expectedSize int64, stream io.Reader) error
+	PutBlob(stream io.Reader, digest string, expectedSize int64) (string, int64, error)
 	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 	PutManifest([]byte) error
 	PutSignatures(signatures [][]byte) error
