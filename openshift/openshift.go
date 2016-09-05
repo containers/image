@@ -337,6 +337,15 @@ func (d *openshiftImageDestination) SupportedManifestMIMETypes() []string {
 	}
 }
 
+// PutBlob writes contents of stream as a blob identified by digest.
+// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
+// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
+// to any other readers for download using the supplied digest.
+// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
+func (d *openshiftImageDestination) PutBlob(digest string, expectedSize int64, stream io.Reader) error {
+	return d.docker.PutBlob(digest, expectedSize, stream)
+}
+
 func (d *openshiftImageDestination) PutManifest(m []byte) error {
 	// FIXME? Can this eventually just call d.docker.PutManifest()?
 	// Right now we need this as a skeleton to attach signatures to, and
@@ -383,19 +392,9 @@ func (d *openshiftImageDestination) PutManifest(m []byte) error {
 	return nil
 }
 
-// PutBlob writes contents of stream as a blob identified by digest.
-// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
-// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
-// to any other readers for download using the supplied digest.
-// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (d *openshiftImageDestination) PutBlob(digest string, expectedSize int64, stream io.Reader) error {
-	return d.docker.PutBlob(digest, expectedSize, stream)
-}
-
 func (d *openshiftImageDestination) PutSignatures(signatures [][]byte) error {
-	// FIXME: This assumption that signatures are stored after the manifest rather breaks the model.
 	if d.imageStreamImageName == "" {
-		return fmt.Errorf("Unknown manifest digest, can't add signatures")
+		return fmt.Errorf("Internal error: Unknown manifest digest, can't add signatures")
 	}
 	// Because image signatures are a shared resource in Atomic Registry, the default upload
 	// always adds signatures.  Eventually we should also allow removing signatures.

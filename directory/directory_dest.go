@@ -29,10 +29,6 @@ func (d *dirImageDestination) SupportedManifestMIMETypes() []string {
 	return nil
 }
 
-func (d *dirImageDestination) PutManifest(manifest []byte) error {
-	return ioutil.WriteFile(d.ref.manifestPath(), manifest, 0644)
-}
-
 // PutBlob writes contents of stream as a blob identified by digest.
 // The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
@@ -70,6 +66,10 @@ func (d *dirImageDestination) PutBlob(digest string, expectedSize int64, stream 
 	}
 	succeeded = true
 	return nil
+}
+
+func (d *dirImageDestination) PutManifest(manifest []byte) error {
+	return ioutil.WriteFile(d.ref.manifestPath(), manifest, 0644)
 }
 
 func (d *dirImageDestination) PutSignatures(signatures [][]byte) error {

@@ -44,36 +44,6 @@ func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 	}
 }
 
-func (d *dockerImageDestination) PutManifest(m []byte) error {
-	// FIXME: This only allows upload by digest, not creating a tag.  See the
-	// corresponding comment in openshift.NewImageDestination.
-	digest, err := manifest.Digest(m)
-	if err != nil {
-		return err
-	}
-	url := fmt.Sprintf(manifestURL, d.ref.ref.RemoteName(), digest)
-
-	headers := map[string][]string{}
-	mimeType := manifest.GuessMIMEType(m)
-	if mimeType != "" {
-		headers["Content-Type"] = []string{mimeType}
-	}
-	res, err := d.c.makeRequest("PUT", url, headers, bytes.NewReader(m))
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusCreated {
-		body, err := ioutil.ReadAll(res.Body)
-		if err == nil {
-			logrus.Debugf("Error body %s", string(body))
-		}
-		logrus.Debugf("Error uploading manifest, status %d, %#v", res.StatusCode, res)
-		return fmt.Errorf("Error uploading manifest to %s, status %d", url, res.StatusCode)
-	}
-	return nil
-}
-
 // PutBlob writes contents of stream as a blob identified by digest.
 // The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
@@ -127,6 +97,36 @@ func (d *dockerImageDestination) PutBlob(digest string, expectedSize int64, stre
 	}
 
 	logrus.Debugf("Upload of layer %s complete", digest)
+	return nil
+}
+
+func (d *dockerImageDestination) PutManifest(m []byte) error {
+	// FIXME: This only allows upload by digest, not creating a tag.  See the
+	// corresponding comment in openshift.NewImageDestination.
+	digest, err := manifest.Digest(m)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf(manifestURL, d.ref.ref.RemoteName(), digest)
+
+	headers := map[string][]string{}
+	mimeType := manifest.GuessMIMEType(m)
+	if mimeType != "" {
+		headers["Content-Type"] = []string{mimeType}
+	}
+	res, err := d.c.makeRequest("PUT", url, headers, bytes.NewReader(m))
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusCreated {
+		body, err := ioutil.ReadAll(res.Body)
+		if err == nil {
+			logrus.Debugf("Error body %s", string(body))
+		}
+		logrus.Debugf("Error uploading manifest, status %d, %#v", res.StatusCode, res)
+		return fmt.Errorf("Error uploading manifest to %s, status %d", url, res.StatusCode)
+	}
 	return nil
 }
 

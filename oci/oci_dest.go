@@ -41,6 +41,51 @@ func (d *ociImageDestination) Reference() types.ImageReference {
 	return d.ref
 }
 
+// PutBlob writes contents of stream as a blob identified by digest.
+// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
+// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
+// to any other readers for download using the supplied digest.
+// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
+func (d *ociImageDestination) PutBlob(digest string, expectedSize int64, stream io.Reader) error {
+	blobPath, err := d.ref.blobPath(digest)
+	if err != nil {
+		return err
+	}
+	if err := ensureParentDirectoryExists(blobPath); err != nil {
+		return err
+	}
+	blobFile, err := ioutil.TempFile(filepath.Dir(blobPath), filepath.Base(blobPath))
+	if err != nil {
+		return err
+	}
+	succeeded := false
+	defer func() {
+		blobFile.Close()
+		if !succeeded {
+			os.Remove(blobFile.Name())
+		}
+	}()
+
+	size, err := io.Copy(blobFile, stream)
+	if err != nil {
+		return err
+	}
+	if expectedSize != -1 && size != expectedSize {
+		return fmt.Errorf("Size mismatch when copying %s, expected %d, got %d", digest, expectedSize, size)
+	}
+	if err := blobFile.Sync(); err != nil {
+		return err
+	}
+	if err := blobFile.Chmod(0644); err != nil {
+		return err
+	}
+	if err := os.Rename(blobFile.Name(), blobPath); err != nil {
+		return nil
+	}
+	succeeded = true
+	return nil
+}
+
 func createManifest(m []byte) ([]byte, string, error) {
 	om := ociManifest{}
 	mt := manifest.GuessMIMEType(m)
@@ -112,51 +157,6 @@ func (d *ociImageDestination) PutManifest(m []byte) error {
 		return err
 	}
 	return ioutil.WriteFile(descriptorPath, data, 0644)
-}
-
-// PutBlob writes contents of stream as a blob identified by digest.
-// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
-// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
-// to any other readers for download using the supplied digest.
-// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (d *ociImageDestination) PutBlob(digest string, expectedSize int64, stream io.Reader) error {
-	blobPath, err := d.ref.blobPath(digest)
-	if err != nil {
-		return err
-	}
-	if err := ensureParentDirectoryExists(blobPath); err != nil {
-		return err
-	}
-	blobFile, err := ioutil.TempFile(filepath.Dir(blobPath), filepath.Base(blobPath))
-	if err != nil {
-		return err
-	}
-	succeeded := false
-	defer func() {
-		blobFile.Close()
-		if !succeeded {
-			os.Remove(blobFile.Name())
-		}
-	}()
-
-	size, err := io.Copy(blobFile, stream)
-	if err != nil {
-		return err
-	}
-	if expectedSize != -1 && size != expectedSize {
-		return fmt.Errorf("Size mismatch when copying %s, expected %d, got %d", digest, expectedSize, size)
-	}
-	if err := blobFile.Sync(); err != nil {
-		return err
-	}
-	if err := blobFile.Chmod(0644); err != nil {
-		return err
-	}
-	if err := os.Rename(blobFile.Name(), blobPath); err != nil {
-		return nil
-	}
-	succeeded = true
-	return nil
 }
 
 // ensureParentDirectoryExists ensures the parent of the supplied path exists.

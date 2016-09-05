@@ -160,7 +160,6 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		sigs = append(sigs, newSig)
 	}
 
-	// FIXME: We need to call PutManifest after PutBlob and before PutSignatures. This seems ugly; move to a "set properties" + "commit" model?
 	if err := dest.PutManifest(manifest); err != nil {
 		return fmt.Errorf("Error writing manifest: %v", err)
 	}

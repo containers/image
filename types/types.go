@@ -105,19 +105,21 @@ type ImageSource interface {
 }
 
 // ImageDestination is a service, possibly remote (= slow), to store components of a single image.
-// The callers MUST call PutBlob on the various blobs before PutManifest and PutSignatures.
+// There is a specific required order for some of the calls:
+// PutBlob on the various blobs, if any, MUST be called before PutManifest (manifest references blobs, which may be created or compressed only at push time)
+// PutSignatures, if called, MUST be called after PutManifest (signatures reference manifest contents)
 type ImageDestination interface {
 	// Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
 	// e.g. it should use the public hostname instead of the result of resolving CNAMEs or following redirects.
 	Reference() ImageReference
-	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
-	PutManifest([]byte) error
 	// PutBlob writes contents of stream as a blob identified by digest.
 	// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
 	// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 	// to any other readers for download using the supplied digest.
 	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 	PutBlob(digest string, expectedSize int64, stream io.Reader) error
+	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
+	PutManifest([]byte) error
 	PutSignatures(signatures [][]byte) error
 	// SupportedManifestMIMETypes tells which manifest mime types the destination supports
 	// If an empty slice or nil it's returned, then any mime type can be tried to upload
