@@ -51,6 +51,8 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	err = dest.PutBlob(blobDigest, -1, reader)
 	assert.Error(t, err)
 	assert.Contains(t, digestErrorString, err.Error())
+	err = dest.Commit()
+	assert.NoError(t, err)
 
 	_, err = os.Lstat(blobPath)
 	require.Error(t, err)

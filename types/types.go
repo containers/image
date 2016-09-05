@@ -110,6 +110,7 @@ type ImageSource interface {
 // There is a specific required order for some of the calls:
 // PutBlob on the various blobs, if any, MUST be called before PutManifest (manifest references blobs, which may be created or compressed only at push time)
 // PutSignatures, if called, MUST be called after PutManifest (signatures reference manifest contents)
+// Finally, Commit MUST be called if the caller wants the image, as formed by the components saved above, to persist.
 //
 // Each ImageDestination should eventually be closed by calling Close().
 type ImageDestination interface {
@@ -127,6 +128,11 @@ type ImageDestination interface {
 	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 	PutManifest([]byte) error
 	PutSignatures(signatures [][]byte) error
+	// Commit marks the process of storing the image as successful and asks for the image to be persisted.
+	// WARNING: This does not have any transactional semantics:
+	// - Uploaded data MAY be visible to others before Commit() is called
+	// - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
+	Commit() error
 	// SupportedManifestMIMETypes tells which manifest mime types the destination supports
 	// If an empty slice or nil it's returned, then any mime type can be tried to upload
 	SupportedManifestMIMETypes() []string

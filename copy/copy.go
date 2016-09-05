@@ -169,5 +169,10 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	if err := dest.PutSignatures(sigs); err != nil {
 		return fmt.Errorf("Error writing signatures: %v", err)
 	}
+
+	if err := dest.Commit(); err != nil {
+		return fmt.Errorf("Error committing the finished image: %v", err)
+	}
+
 	return nil
 }

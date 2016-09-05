@@ -32,6 +32,8 @@ func TestGetPutManifest(t *testing.T) {
 	defer dest.Close()
 	err = dest.PutManifest(man)
 	assert.NoError(t, err)
+	err = dest.Commit()
+	assert.NoError(t, err)
 
 	src, err := ref.NewImageSource(nil, nil)
 	require.NoError(t, err)
@@ -52,6 +54,8 @@ func TestGetPutBlob(t *testing.T) {
 	require.NoError(t, err)
 	defer dest.Close()
 	err = dest.PutBlob(digest, int64(len(blob)), bytes.NewReader(blob))
+	assert.NoError(t, err)
+	err = dest.Commit()
 	assert.NoError(t, err)
 
 	src, err := ref.NewImageSource(nil, nil)
@@ -107,6 +111,8 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	err = dest.PutBlob(blobDigest, -1, reader)
 	assert.Error(t, err)
 	assert.Contains(t, digestErrorString, err.Error())
+	err = dest.Commit()
+	assert.NoError(t, err)
 
 	_, err = os.Lstat(blobPath)
 	require.Error(t, err)
@@ -125,6 +131,8 @@ func TestGetPutSignatures(t *testing.T) {
 		[]byte("sig2"),
 	}
 	err = dest.PutSignatures(signatures)
+	assert.NoError(t, err)
+	err = dest.Commit()
 	assert.NoError(t, err)
 
 	src, err := ref.NewImageSource(nil, nil)

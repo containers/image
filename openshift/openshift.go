@@ -458,6 +458,14 @@ sigExists:
 	return nil
 }
 
+// Commit marks the process of storing the image as successful and asks for the image to be persisted.
+// WARNING: This does not have any transactional semantics:
+// - Uploaded data MAY be visible to others before Commit() is called
+// - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
+func (d *openshiftImageDestination) Commit() error {
+	return d.docker.Commit()
+}
+
 // These structs are subsets of github.com/openshift/origin/pkg/image/api/v1 and its dependencies.
 type imageStream struct {
 	Status imageStreamStatus `json:"status,omitempty"`

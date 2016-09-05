@@ -84,3 +84,11 @@ func (d *dirImageDestination) PutSignatures(signatures [][]byte) error {
 	}
 	return nil
 }
+
+// Commit marks the process of storing the image as successful and asks for the image to be persisted.
+// WARNING: This does not have any transactional semantics:
+// - Uploaded data MAY be visible to others before Commit() is called
+// - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
+func (d *dirImageDestination) Commit() error {
+	return nil
+}
