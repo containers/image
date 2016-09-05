@@ -35,6 +35,10 @@ func (d *dockerImageDestination) Reference() types.ImageReference {
 	return d.ref
 }
 
+// Close removes resources associated with an initialized ImageDestination, if any.
+func (d *dockerImageDestination) Close() {
+}
+
 func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 	return []string{
 		// TODO(runcom): we'll add OCI as part of another PR here

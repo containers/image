@@ -17,6 +17,7 @@ func TestDestinationReference(t *testing.T) {
 
 	dest, err := ref.NewImageDestination(nil)
 	require.NoError(t, err)
+	defer dest.Close()
 	ref2 := dest.Reference()
 	assert.Equal(t, tmpDir, ref2.StringWithinTransport())
 }
@@ -28,6 +29,7 @@ func TestGetPutManifest(t *testing.T) {
 	man := []byte("test-manifest")
 	dest, err := ref.NewImageDestination(nil)
 	require.NoError(t, err)
+	defer dest.Close()
 	err = dest.PutManifest(man)
 	assert.NoError(t, err)
 
@@ -48,6 +50,7 @@ func TestGetPutBlob(t *testing.T) {
 	blob := []byte("test-blob")
 	dest, err := ref.NewImageDestination(nil)
 	require.NoError(t, err)
+	defer dest.Close()
 	err = dest.PutBlob(digest, int64(len(blob)), bytes.NewReader(blob))
 	assert.NoError(t, err)
 
@@ -100,6 +103,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 
 	dest, err := ref.NewImageDestination(nil)
 	require.NoError(t, err)
+	defer dest.Close()
 	err = dest.PutBlob(blobDigest, -1, reader)
 	assert.Error(t, err)
 	assert.Contains(t, digestErrorString, err.Error())
@@ -115,6 +119,7 @@ func TestGetPutSignatures(t *testing.T) {
 
 	dest, err := ref.NewImageDestination(nil)
 	require.NoError(t, err)
+	defer dest.Close()
 	signatures := [][]byte{
 		[]byte("sig1"),
 		[]byte("sig2"),

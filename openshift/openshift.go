@@ -330,6 +330,11 @@ func (d *openshiftImageDestination) Reference() types.ImageReference {
 	return d.client.ref
 }
 
+// Close removes resources associated with an initialized ImageDestination, if any.
+func (d *openshiftImageDestination) Close() {
+	d.docker.Close()
+}
+
 func (d *openshiftImageDestination) SupportedManifestMIMETypes() []string {
 	return []string{
 		manifest.DockerV2Schema1SignedMIMEType,

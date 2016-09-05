@@ -86,6 +86,8 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	if err != nil {
 		return fmt.Errorf("Error initializing destination %s: %v", transports.ImageName(destRef), err)
 	}
+	defer dest.Close()
+
 	rawSource, err := srcRef.NewImageSource(ctx, dest.SupportedManifestMIMETypes())
 	if err != nil {
 		return fmt.Errorf("Error initializing source %s: %v", transports.ImageName(srcRef), err)

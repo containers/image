@@ -79,6 +79,7 @@ type ImageReference interface {
 	// The caller must call .Close() on the returned ImageSource.
 	NewImageSource(ctx *SystemContext, requestedManifestMIMETypes []string) (ImageSource, error)
 	// NewImageDestination returns a types.ImageDestination for this reference.
+	// The caller must call .Close() on the returned ImageDestination.
 	NewImageDestination(ctx *SystemContext) (ImageDestination, error)
 
 	// DeleteImage deletes the named image from the registry, if supported.
@@ -105,13 +106,18 @@ type ImageSource interface {
 }
 
 // ImageDestination is a service, possibly remote (= slow), to store components of a single image.
+//
 // There is a specific required order for some of the calls:
 // PutBlob on the various blobs, if any, MUST be called before PutManifest (manifest references blobs, which may be created or compressed only at push time)
 // PutSignatures, if called, MUST be called after PutManifest (signatures reference manifest contents)
+//
+// Each ImageDestination should eventually be closed by calling Close().
 type ImageDestination interface {
 	// Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
 	// e.g. it should use the public hostname instead of the result of resolving CNAMEs or following redirects.
 	Reference() ImageReference
+	// Close removes resources associated with an initialized ImageDestination, if any.
+	Close()
 	// PutBlob writes contents of stream as a blob identified by digest.
 	// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
 	// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available

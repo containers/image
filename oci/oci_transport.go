@@ -179,6 +179,7 @@ func (ref ociReference) NewImageSource(ctx *types.SystemContext, requestedManife
 }
 
 // NewImageDestination returns a types.ImageDestination for this reference.
+// The caller must call .Close() on the returned ImageDestination.
 func (ref ociReference) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {
 	return newImageDestination(ref), nil
 }

@@ -176,8 +176,9 @@ func TestReferenceNewImageSource(t *testing.T) {
 func TestReferenceNewImageDestination(t *testing.T) {
 	ref, err := ParseReference("//busybox")
 	require.NoError(t, err)
-	_, err = ref.NewImageDestination(nil)
+	dest, err := ref.NewImageDestination(nil)
 	assert.NoError(t, err)
+	defer dest.Close()
 }
 
 func TestReferenceTagOrDigest(t *testing.T) {

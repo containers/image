@@ -25,6 +25,10 @@ func (d *dirImageDestination) Reference() types.ImageReference {
 	return d.ref
 }
 
+// Close removes resources associated with an initialized ImageDestination, if any.
+func (d *dirImageDestination) Close() {
+}
+
 func (d *dirImageDestination) SupportedManifestMIMETypes() []string {
 	return nil
 }
