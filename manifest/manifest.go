@@ -28,9 +28,9 @@ const (
 	// OCIV1ImageManifestListMIMEType specifies the mediaType for an image manifest list.
 	OCIV1ImageManifestListMIMEType = "application/vnd.oci.image.manifest.list.v1+json"
 	// OCIV1ImageSerializationMIMEType is the mediaType used for layers referenced by the manifest.
-	OCIV1ImageSerializationMIMEType = "application/vnd.oci.image.serialization.rootfs.tar.gzip"
+	OCIV1ImageSerializationMIMEType = "application/vnd.oci.image.layer.tar+gzip"
 	// OCIV1ImageSerializationConfigMIMEType specifies the mediaType for the image configuration.
-	OCIV1ImageSerializationConfigMIMEType = "application/vnd.oci.image.serialization.config.v1+json"
+	OCIV1ImageSerializationConfigMIMEType = "application/vnd.oci.image.config.v1+json"
 )
 
 // DefaultRequestedManifestMIMETypes is a list of MIME types a types.ImageSource
