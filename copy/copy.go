@@ -137,7 +137,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		if err != nil {
 			return fmt.Errorf("Error preparing to verify blob %s: %v", digest, err)
 		}
-		if err := dest.PutBlob(digest, blobSize, digestingReader); err != nil {
+		if _, _, err := dest.PutBlob(digestingReader, digest, blobSize); err != nil {
 			return fmt.Errorf("Error writing blob: %v", err)
 		}
 		if digestingReader.validationFailed { // Coverage: This should never happen.
