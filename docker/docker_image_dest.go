@@ -73,7 +73,7 @@ func (d *dockerImageDestination) PutBlob(stream io.Reader, digest string, expect
 			return "", -1, err
 		}
 		defer res.Body.Close()
-		if res.StatusCode == http.StatusOK && res.Header.Get("Docker-Content-Digest") == digest {
+		if res.StatusCode == http.StatusOK {
 			logrus.Debugf("... already exists, not uploading")
 			blobLength, err := strconv.ParseInt(res.Header.Get("Content-Length"), 10, 64)
 			if err != nil {
