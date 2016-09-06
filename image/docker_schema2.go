@@ -27,17 +27,15 @@ func manifestSchema2FromManifest(src types.ImageSource, manifest []byte) (generi
 	return &v2s2, nil
 }
 
+func (m *manifestSchema2) ConfigDigest() string {
+	return m.ConfigDescriptor.Digest
+}
+
 func (m *manifestSchema2) LayerDigests() []string {
 	blobs := []string{}
 	for _, layer := range m.LayersDescriptors {
 		blobs = append(blobs, layer.Digest)
 	}
-	return blobs
-}
-
-func (m *manifestSchema2) BlobDigests() []string {
-	blobs := m.LayerDigests()
-	blobs = append(blobs, m.ConfigDescriptor.Digest)
 	return blobs
 }
 

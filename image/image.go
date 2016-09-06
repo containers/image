@@ -52,7 +52,7 @@ func (i *genericImage) Close() {
 }
 
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
-// NOTE: It is essential for signature verification that Manifest returns the manifest from which BlobDigests is computed.
+// NOTE: It is essential for signature verification that Manifest returns the manifest from which ConfigDigest and LayerDigests is computed.
 func (i *genericImage) Manifest() ([]byte, string, error) {
 	if i.cachedManifest == nil {
 		m, mt, err := i.src.GetManifest()
@@ -105,8 +105,8 @@ type v1Image struct {
 // will support v1 one day...
 type genericManifest interface {
 	Config() ([]byte, error)
+	ConfigDigest() string
 	LayerDigests() []string
-	BlobDigests() []string
 	ImageInspectInfo() (*types.ImageInspectInfo, error)
 }
 
@@ -143,28 +143,23 @@ func (i *genericImage) Inspect() (*types.ImageInspectInfo, error) {
 	return m.ImageInspectInfo()
 }
 
-// uniqueBlobDigests returns a list of blob digests referenced from a manifest.
-// The list will not contain duplicates; it is not intended to correspond to the "history" or "parent chain" of a Docker image.
-func uniqueBlobDigests(m genericManifest) []string {
-	var res []string
-	seen := make(map[string]struct{})
-	for _, digest := range m.BlobDigests() {
-		if _, ok := seen[digest]; ok {
-			continue
-		}
-		seen[digest] = struct{}{}
-		res = append(res, digest)
+// ConfigDigest returns a blobLayerDigests digest for the separate config object, or "" if there isn't a separate object.
+// NOTE: It is essential for signature verification that ConfigDigest is computed from the same manifest which is returned by Manifest().
+func (i *genericImage) ConfigDigest() (string, error) {
+	m, err := i.getParsedManifest()
+	if err != nil {
+		return "", err
 	}
-	return res
+	return m.ConfigDigest(), nil
 }
 
-// BlobDigests returns a list of blob digests referenced by this image.
-// The list will not contain duplicates; it is not intended to correspond to the "history" or "parent chain" of a Docker image.
-// NOTE: It is essential for signature verification that BlobDigests is computed from the same manifest which is returned by Manifest().
-func (i *genericImage) BlobDigests() ([]string, error) {
+// LayerDigests returns a list of blob digests of layers referenced by this image, in order (the root layer first, and then successive layered layers).
+// NOTE: It is essential for signature verification that LayerDigests is computed from the same manifest which is returned by Manifest().
+// WARNING: The list may contain duplicates, and they are semantically relevant.
+func (i *genericImage) LayerDigests() ([]string, error) {
 	m, err := i.getParsedManifest()
 	if err != nil {
 		return nil, err
 	}
-	return uniqueBlobDigests(m), nil
+	return m.LayerDigests(), nil
 }

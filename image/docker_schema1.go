@@ -46,16 +46,16 @@ func manifestSchema1FromManifest(manifest []byte) (genericManifest, error) {
 	return mschema1, nil
 }
 
+func (m *manifestSchema1) ConfigDigest() string {
+	return ""
+}
+
 func (m *manifestSchema1) LayerDigests() []string {
 	layers := make([]string, len(m.FSLayers))
 	for i, layer := range m.FSLayers {
-		layers[i] = layer.BlobSum
+		layers[(len(m.FSLayers)-1)-i] = layer.BlobSum
 	}
 	return layers
-}
-
-func (m *manifestSchema1) BlobDigests() []string {
-	return m.LayerDigests()
 }
 
 func (m *manifestSchema1) Config() ([]byte, error) {

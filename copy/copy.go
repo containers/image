@@ -121,13 +121,26 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		}
 	}
 
-	blobDigests, err := src.BlobDigests()
+	configDigest, err := src.ConfigDigest()
 	if err != nil {
 		return fmt.Errorf("Error parsing manifest: %v", err)
 	}
-	for _, digest := range blobDigests {
-		if err := copyBlob(dest, rawSource, digest); err != nil {
+	if configDigest != "" {
+		if err := copyBlob(dest, rawSource, configDigest); err != nil {
 			return err
+		}
+	}
+	layerDigests, err := src.LayerDigests()
+	if err != nil {
+		return fmt.Errorf("Error parsing manifest: %v", err)
+	}
+	copiedLayers := map[string]struct{}{}
+	for _, digest := range layerDigests {
+		if _, ok := copiedLayers[digest]; !ok {
+			if err := copyBlob(dest, rawSource, digest); err != nil {
+				return err
+			}
+			copiedLayers[digest] = struct{}{}
 		}
 	}
 

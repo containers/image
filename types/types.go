@@ -161,14 +161,17 @@ type Image interface {
 	Close()
 	// ref to repository?
 	// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
-	// NOTE: It is essential for signature verification that Manifest returns the manifest from which BlobDigests is computed.
+	// NOTE: It is essential for signature verification that Manifest returns the manifest from which ConfigDigest and LayerDigests is computed.
 	Manifest() ([]byte, string, error)
 	// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 	Signatures() ([][]byte, error)
-	// BlobDigests returns a list of blob digests referenced by this image.
-	// The list will not contain duplicates; it is not intended to correspond to the "history" or "parent chain" of a Docker image.
-	// NOTE: It is essential for signature verification that BlobDigests is computed from the same manifest which is returned by Manifest().
-	BlobDigests() ([]string, error)
+	// ConfigDigest returns a blobLayerDigests digest for the separate config object, or "" if there isn't a separate object.
+	// NOTE: It is essential for signature verification that ConfigDigest is computed from the same manifest which is returned by Manifest().
+	ConfigDigest() (string, error)
+	// LayerDigests returns a list of blob digests of layers referenced by this image, in order (the root layer first, and then successive layered layers).
+	// NOTE: It is essential for signature verification that LayerDigests is computed from the same manifest which is returned by Manifest().
+	// WARNING: The list may contain duplicates, and they are semantically relevant.
+	LayerDigests() ([]string, error)
 	// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
 	Inspect() (*ImageInspectInfo, error)
 }
