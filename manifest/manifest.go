@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/docker/libtrust"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // FIXME: Should we just use docker/distribution and docker/docker implementations directly?
@@ -20,23 +21,12 @@ const (
 	DockerV2Schema2MIMEType = "application/vnd.docker.distribution.manifest.v2+json"
 	// DockerV2ListMIMEType MIME type represents Docker manifest schema 2 list
 	DockerV2ListMIMEType = "application/vnd.docker.distribution.manifest.list.v2+json"
-
-	// OCIV1DescriptorMIMEType specifies the mediaType for a content descriptor.
-	OCIV1DescriptorMIMEType = "application/vnd.oci.descriptor.v1+json"
-	// OCIV1ImageManifestMIMEType specifies the mediaType for an image manifest.
-	OCIV1ImageManifestMIMEType = "application/vnd.oci.image.manifest.v1+json"
-	// OCIV1ImageManifestListMIMEType specifies the mediaType for an image manifest list.
-	OCIV1ImageManifestListMIMEType = "application/vnd.oci.image.manifest.list.v1+json"
-	// OCIV1ImageSerializationMIMEType is the mediaType used for layers referenced by the manifest.
-	OCIV1ImageSerializationMIMEType = "application/vnd.oci.image.layer.tar+gzip"
-	// OCIV1ImageSerializationConfigMIMEType specifies the mediaType for the image configuration.
-	OCIV1ImageSerializationConfigMIMEType = "application/vnd.oci.image.config.v1+json"
 )
 
 // DefaultRequestedManifestMIMETypes is a list of MIME types a types.ImageSource
 // should request from the backend unless directed otherwise.
 var DefaultRequestedManifestMIMETypes = []string{
-	OCIV1ImageManifestMIMEType,
+	imgspecv1.MediaTypeImageManifest,
 	DockerV2Schema2MIMEType,
 	DockerV2Schema1SignedMIMEType,
 	DockerV2Schema1MIMEType,
@@ -58,7 +48,7 @@ func GuessMIMEType(manifest []byte) string {
 	}
 
 	switch meta.MediaType {
-	case DockerV2Schema2MIMEType, DockerV2ListMIMEType, OCIV1DescriptorMIMEType, OCIV1ImageManifestMIMEType, OCIV1ImageManifestListMIMEType: // A recognized type.
+	case DockerV2Schema2MIMEType, DockerV2ListMIMEType, imgspecv1.MediaTypeImageManifest, imgspecv1.MediaTypeImageManifestList: // A recognized type.
 		return meta.MediaType
 	}
 	// this is the only way the function can return DockerV2Schema1MIMEType, and recognizing that is essential for stripping the JWS signatures = computing the correct manifest digest.

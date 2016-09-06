@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,8 +17,8 @@ func TestGuessMIMEType(t *testing.T) {
 		path     string
 		mimeType string
 	}{
-		{"ociv1.manifest.json", OCIV1ImageManifestMIMEType},
-		{"ociv1list.manifest.json", OCIV1ImageManifestListMIMEType},
+		{"ociv1.manifest.json", imgspecv1.MediaTypeImageManifest},
+		{"ociv1list.manifest.json", imgspecv1.MediaTypeImageManifestList},
 		{"v2s2.manifest.json", DockerV2Schema2MIMEType},
 		{"v2list.manifest.json", DockerV2ListMIMEType},
 		{"v2s1.manifest.json", DockerV2Schema1SignedMIMEType},
