@@ -114,7 +114,11 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 			return fmt.Errorf("Error reading signatures: %v", err)
 		}
 		sigs = s
-		// FIXME: Fail early if we can detect that RemoveSignatures should be used.
+	}
+	if len(sigs) != 0 {
+		if err := dest.SupportsSignatures(); err != nil {
+			return fmt.Errorf("Can not copy signatures: %v", err)
+		}
 	}
 
 	blobDigests, err := src.BlobDigests()

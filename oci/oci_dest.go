@@ -35,6 +35,19 @@ func (d *ociImageDestination) Reference() types.ImageReference {
 func (d *ociImageDestination) Close() {
 }
 
+func (d *ociImageDestination) SupportedManifestMIMETypes() []string {
+	return []string{
+		imgspecv1.MediaTypeImageManifest,
+		manifest.DockerV2Schema2MIMEType,
+	}
+}
+
+// SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
+// Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
+func (d *ociImageDestination) SupportsSignatures() error {
+	return fmt.Errorf("Pushing signatures for OCI images is not supported")
+}
+
 // PutBlob writes contents of stream and returns its computed digest and size.
 // A digest can be optionally provided if known, the specific image destination can decide to play with it or not.
 // The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
@@ -174,13 +187,6 @@ func ensureDirectoryExists(path string) error {
 // ensureParentDirectoryExists ensures the parent of the supplied path exists.
 func ensureParentDirectoryExists(path string) error {
 	return ensureDirectoryExists(filepath.Dir(path))
-}
-
-func (d *ociImageDestination) SupportedManifestMIMETypes() []string {
-	return []string{
-		imgspecv1.MediaTypeImageManifest,
-		manifest.DockerV2Schema2MIMEType,
-	}
 }
 
 func (d *ociImageDestination) PutSignatures(signatures [][]byte) error {

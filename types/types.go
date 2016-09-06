@@ -119,6 +119,14 @@ type ImageDestination interface {
 	Reference() ImageReference
 	// Close removes resources associated with an initialized ImageDestination, if any.
 	Close()
+
+	// SupportedManifestMIMETypes tells which manifest mime types the destination supports
+	// If an empty slice or nil it's returned, then any mime type can be tried to upload
+	SupportedManifestMIMETypes() []string
+	// SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
+	// Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
+	SupportsSignatures() error
+
 	// PutBlob writes contents of stream and returns its computed digest and size.
 	// A digest can be optionally provided if known, the specific image destination can decide to play with it or not.
 	// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
@@ -134,9 +142,6 @@ type ImageDestination interface {
 	// - Uploaded data MAY be visible to others before Commit() is called
 	// - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 	Commit() error
-	// SupportedManifestMIMETypes tells which manifest mime types the destination supports
-	// If an empty slice or nil it's returned, then any mime type can be tried to upload
-	SupportedManifestMIMETypes() []string
 }
 
 // Image is the primary API for inspecting properties of images.

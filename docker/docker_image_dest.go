@@ -51,6 +51,12 @@ func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 	}
 }
 
+// SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
+// Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
+func (d *dockerImageDestination) SupportsSignatures() error {
+	return fmt.Errorf("Pushing signatures to a Docker Registry is not supported")
+}
+
 // PutBlob writes contents of stream and returns its computed digest and size.
 // A digest can be optionally provided if known, the specific image destination can decide to play with it or not.
 // The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.

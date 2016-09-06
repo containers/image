@@ -135,6 +135,8 @@ func TestGetPutSignatures(t *testing.T) {
 		[]byte("sig1"),
 		[]byte("sig2"),
 	}
+	err = dest.SupportsSignatures()
+	assert.NoError(t, err)
 	err = dest.PutSignatures(signatures)
 	assert.NoError(t, err)
 	err = dest.Commit()
