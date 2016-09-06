@@ -86,11 +86,14 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	if err != nil {
 		return fmt.Errorf("Error initializing destination %s: %v", transports.ImageName(destRef), err)
 	}
+	defer dest.Close()
+
 	rawSource, err := srcRef.NewImageSource(ctx, dest.SupportedManifestMIMETypes())
 	if err != nil {
 		return fmt.Errorf("Error initializing source %s: %v", transports.ImageName(srcRef), err)
 	}
 	src := image.FromSource(rawSource)
+	defer src.Close()
 
 	// Please keep this policy check BEFORE reading any other information about the image.
 	if allowed, err := policyContext.IsRunningImageAllowed(src); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
@@ -119,8 +122,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		return fmt.Errorf("Error parsing manifest: %v", err)
 	}
 	for _, digest := range blobDigests {
-		// TODO(mitr): do not ignore the size param returned here
-		stream, _, err := rawSource.GetBlob(digest)
+		stream, blobSize, err := rawSource.GetBlob(digest)
 		if err != nil {
 			return fmt.Errorf("Error reading blob %s: %v", digest, err)
 		}
@@ -135,7 +137,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		if err != nil {
 			return fmt.Errorf("Error preparing to verify blob %s: %v", digest, err)
 		}
-		if err := dest.PutBlob(digest, digestingReader); err != nil {
+		if err := dest.PutBlob(digest, blobSize, digestingReader); err != nil {
 			return fmt.Errorf("Error writing blob: %v", err)
 		}
 		if digestingReader.validationFailed { // Coverage: This should never happen.
@@ -160,7 +162,6 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		sigs = append(sigs, newSig)
 	}
 
-	// FIXME: We need to call PutManifest after PutBlob and before PutSignatures. This seems ugly; move to a "set properties" + "commit" model?
 	if err := dest.PutManifest(manifest); err != nil {
 		return fmt.Errorf("Error writing manifest: %v", err)
 	}
@@ -168,5 +169,10 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	if err := dest.PutSignatures(sigs); err != nil {
 		return fmt.Errorf("Error writing signatures: %v", err)
 	}
+
+	if err := dest.Commit(); err != nil {
+		return fmt.Errorf("Error committing the finished image: %v", err)
+	}
+
 	return nil
 }

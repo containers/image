@@ -179,8 +179,9 @@ type openshiftImageSource struct {
 }
 
 // newImageSource creates a new ImageSource for the specified reference,
-// asking the backend to use a manifest from requestedManifestMIMETypes if possible
+// asking the backend to use a manifest from requestedManifestMIMETypes if possible.
 // nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+// The caller must call .Close() on the returned ImageSource.
 func newImageSource(ctx *types.SystemContext, ref openshiftReference, requestedManifestMIMETypes []string) (types.ImageSource, error) {
 	client, err := newOpenshiftClient(ref)
 	if err != nil {
@@ -200,6 +201,14 @@ func (s *openshiftImageSource) Reference() types.ImageReference {
 	return s.client.ref
 }
 
+// Close removes resources associated with an initialized ImageSource, if any.
+func (s *openshiftImageSource) Close() {
+	if s.docker != nil {
+		s.docker.Close()
+		s.docker = nil
+	}
+}
+
 func (s *openshiftImageSource) GetManifest() ([]byte, string, error) {
 	if err := s.ensureImageIsResolved(); err != nil {
 		return nil, "", err
@@ -207,6 +216,7 @@ func (s *openshiftImageSource) GetManifest() ([]byte, string, error) {
 	return s.docker.GetManifest()
 }
 
+// GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 func (s *openshiftImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
 	if err := s.ensureImageIsResolved(); err != nil {
 		return nil, 0, err
@@ -320,11 +330,25 @@ func (d *openshiftImageDestination) Reference() types.ImageReference {
 	return d.client.ref
 }
 
+// Close removes resources associated with an initialized ImageDestination, if any.
+func (d *openshiftImageDestination) Close() {
+	d.docker.Close()
+}
+
 func (d *openshiftImageDestination) SupportedManifestMIMETypes() []string {
 	return []string{
 		manifest.DockerV2Schema1SignedMIMEType,
 		manifest.DockerV2Schema1MIMEType,
 	}
+}
+
+// PutBlob writes contents of stream as a blob identified by digest.
+// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
+// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
+// to any other readers for download using the supplied digest.
+// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
+func (d *openshiftImageDestination) PutBlob(digest string, expectedSize int64, stream io.Reader) error {
+	return d.docker.PutBlob(digest, expectedSize, stream)
 }
 
 func (d *openshiftImageDestination) PutManifest(m []byte) error {
@@ -373,19 +397,9 @@ func (d *openshiftImageDestination) PutManifest(m []byte) error {
 	return nil
 }
 
-// PutBlob writes contents of stream as a blob identified by digest.
-// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
-// to any other readers for download using the supplied digest.
-// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-// Note: Calling PutBlob() and other methods may have ordering dependencies WRT other methods of this type. FIXME: Figure out and document.
-func (d *openshiftImageDestination) PutBlob(digest string, stream io.Reader) error {
-	return d.docker.PutBlob(digest, stream)
-}
-
 func (d *openshiftImageDestination) PutSignatures(signatures [][]byte) error {
-	// FIXME: This assumption that signatures are stored after the manifest rather breaks the model.
 	if d.imageStreamImageName == "" {
-		return fmt.Errorf("Unknown manifest digest, can't add signatures")
+		return fmt.Errorf("Internal error: Unknown manifest digest, can't add signatures")
 	}
 	// Because image signatures are a shared resource in Atomic Registry, the default upload
 	// always adds signatures.  Eventually we should also allow removing signatures.
@@ -442,6 +456,14 @@ sigExists:
 	}
 
 	return nil
+}
+
+// Commit marks the process of storing the image as successful and asks for the image to be persisted.
+// WARNING: This does not have any transactional semantics:
+// - Uploaded data MAY be visible to others before Commit() is called
+// - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
+func (d *openshiftImageDestination) Commit() error {
+	return d.docker.Commit()
 }
 
 // These structs are subsets of github.com/openshift/origin/pkg/image/api/v1 and its dependencies.

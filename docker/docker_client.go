@@ -99,15 +99,19 @@ func (c *dockerClient) makeRequest(method, url string, headers map[string][]stri
 	}
 
 	url = fmt.Sprintf(baseURL, c.scheme, c.registry) + url
-	return c.makeRequestToResolvedURL(method, url, headers, stream)
+	return c.makeRequestToResolvedURL(method, url, headers, stream, -1)
 }
 
 // makeRequestToResolvedURL creates and executes a http.Request with the specified parameters, adding authentication and TLS options for the Docker client.
+// streamLen, if not -1, specifies the length of the data expected on stream.
 // makeRequest should generally be preferred.
-func (c *dockerClient) makeRequestToResolvedURL(method, url string, headers map[string][]string, stream io.Reader) (*http.Response, error) {
+func (c *dockerClient) makeRequestToResolvedURL(method, url string, headers map[string][]string, stream io.Reader, streamLen int64) (*http.Response, error) {
 	req, err := http.NewRequest(method, url, stream)
 	if err != nil {
 		return nil, err
+	}
+	if streamLen != -1 { // Do not blindly overwrite if streamLen == -1, http.NewRequest above can figure out the length of bytes.Reader and similar objects without us having to compute it.
+		req.ContentLength = streamLen
 	}
 	req.Header.Set("Docker-Distribution-API-Version", "registry/2.0")
 	for n, h := range headers {

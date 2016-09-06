@@ -71,12 +71,15 @@ type ImageReference interface {
 	PolicyConfigurationNamespaces() []string
 
 	// NewImage returns a types.Image for this reference.
+	// The caller must call .Close() on the returned Image.
 	NewImage(ctx *SystemContext) (Image, error)
 	// NewImageSource returns a types.ImageSource for this reference,
-	// asking the backend to use a manifest from requestedManifestMIMETypes if possible
+	// asking the backend to use a manifest from requestedManifestMIMETypes if possible.
 	// nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+	// The caller must call .Close() on the returned ImageSource.
 	NewImageSource(ctx *SystemContext, requestedManifestMIMETypes []string) (ImageSource, error)
 	// NewImageDestination returns a types.ImageDestination for this reference.
+	// The caller must call .Close() on the returned ImageDestination.
 	NewImageDestination(ctx *SystemContext) (ImageDestination, error)
 
 	// DeleteImage deletes the named image from the registry, if supported.
@@ -86,44 +89,63 @@ type ImageReference interface {
 // ImageSource is a service, possibly remote (= slow), to download components of a single image.
 // This is primarily useful for copying images around; for examining their properties, Image (below)
 // is usually more useful.
+// Each ImageSource should eventually be closed by calling Close().
 type ImageSource interface {
 	// Reference returns the reference used to set up this source, _as specified by the user_
 	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 	Reference() ImageReference
+	// Close removes resources associated with an initialized ImageSource, if any.
+	Close()
 	// GetManifest returns the image's manifest along with its MIME type. The empty string is returned if the MIME type is unknown.
 	// It may use a remote (= slow) service.
 	GetManifest() ([]byte, string, error)
-	// Note: Calling GetBlob() may have ordering dependencies WRT other methods of this type. FIXME: How does this work with (docker save) on stdin?
-	// the second return value is the size of the blob. If not known 0 is returned
+	// GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 	GetBlob(digest string) (io.ReadCloser, int64, error)
 	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
 	GetSignatures() ([][]byte, error)
 }
 
 // ImageDestination is a service, possibly remote (= slow), to store components of a single image.
+//
+// There is a specific required order for some of the calls:
+// PutBlob on the various blobs, if any, MUST be called before PutManifest (manifest references blobs, which may be created or compressed only at push time)
+// PutSignatures, if called, MUST be called after PutManifest (signatures reference manifest contents)
+// Finally, Commit MUST be called if the caller wants the image, as formed by the components saved above, to persist.
+//
+// Each ImageDestination should eventually be closed by calling Close().
 type ImageDestination interface {
 	// Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
 	// e.g. it should use the public hostname instead of the result of resolving CNAMEs or following redirects.
 	Reference() ImageReference
-	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
-	PutManifest([]byte) error
+	// Close removes resources associated with an initialized ImageDestination, if any.
+	Close()
 	// PutBlob writes contents of stream as a blob identified by digest.
+	// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
 	// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 	// to any other readers for download using the supplied digest.
 	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-	// Note: Calling PutBlob() and other methods may have ordering dependencies WRT other methods of this type. FIXME: Figure out and document.
-	PutBlob(digest string, stream io.Reader) error
+	PutBlob(digest string, expectedSize int64, stream io.Reader) error
+	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
+	PutManifest([]byte) error
 	PutSignatures(signatures [][]byte) error
+	// Commit marks the process of storing the image as successful and asks for the image to be persisted.
+	// WARNING: This does not have any transactional semantics:
+	// - Uploaded data MAY be visible to others before Commit() is called
+	// - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
+	Commit() error
 	// SupportedManifestMIMETypes tells which manifest mime types the destination supports
 	// If an empty slice or nil it's returned, then any mime type can be tried to upload
 	SupportedManifestMIMETypes() []string
 }
 
 // Image is the primary API for inspecting properties of images.
+// Each Image should eventually be closed by calling Close().
 type Image interface {
 	// Reference returns the reference used to set up this source, _as specified by the user_
 	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 	Reference() ImageReference
+	// Close removes resources associated with an initialized Image, if any.
+	Close()
 	// ref to repository?
 	// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
 	// NOTE: It is essential for signature verification that Manifest returns the manifest from which BlobDigests is computed.

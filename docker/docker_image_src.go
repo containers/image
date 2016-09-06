@@ -29,8 +29,9 @@ type dockerImageSource struct {
 }
 
 // newImageSource creates a new ImageSource for the specified image reference,
-// asking the backend to use a manifest from requestedManifestMIMETypes if possible
+// asking the backend to use a manifest from requestedManifestMIMETypes if possible.
 // nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+// The caller must call .Close() on the returned ImageSource.
 func newImageSource(ctx *types.SystemContext, ref dockerReference, requestedManifestMIMETypes []string) (*dockerImageSource, error) {
 	c, err := newDockerClient(ctx, ref.ref.Hostname())
 	if err != nil {
@@ -50,6 +51,10 @@ func newImageSource(ctx *types.SystemContext, ref dockerReference, requestedMani
 // (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 func (s *dockerImageSource) Reference() types.ImageReference {
 	return s.ref
+}
+
+// Close removes resources associated with an initialized ImageSource, if any.
+func (s *dockerImageSource) Close() {
 }
 
 // simplifyContentType drops parameters from a HTTP media type (see https://tools.ietf.org/html/rfc7231#section-3.1.1.1)
@@ -91,6 +96,7 @@ func (s *dockerImageSource) GetManifest() ([]byte, string, error) {
 	return manblob, simplifyContentType(res.Header.Get("Content-Type")), nil
 }
 
+// GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 func (s *dockerImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
 	url := fmt.Sprintf(blobsURL, s.ref.ref.RemoteName(), digest)
 	logrus.Debugf("Downloading %s", url)
@@ -104,7 +110,7 @@ func (s *dockerImageSource) GetBlob(digest string) (io.ReadCloser, int64, error)
 	}
 	size, err := strconv.ParseInt(res.Header.Get("Content-Length"), 10, 64)
 	if err != nil {
-		size = 0
+		size = -1
 	}
 	return res.Body, size, nil
 }

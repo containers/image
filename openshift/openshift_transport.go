@@ -154,18 +154,21 @@ func (ref openshiftReference) PolicyConfigurationNamespaces() []string {
 }
 
 // NewImage returns a types.Image for this reference.
+// The caller must call .Close() on the returned Image.
 func (ref openshiftReference) NewImage(ctx *types.SystemContext) (types.Image, error) {
 	return nil, errors.New("Full Image support not implemented for atomic: image names")
 }
 
 // NewImageSource returns a types.ImageSource for this reference,
-// asking the backend to use a manifest from requestedManifestMIMETypes if possible
+// asking the backend to use a manifest from requestedManifestMIMETypes if possible.
 // nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+// The caller must call .Close() on the returned ImageSource.
 func (ref openshiftReference) NewImageSource(ctx *types.SystemContext, requestedManifestMIMETypes []string) (types.ImageSource, error) {
 	return newImageSource(ctx, ref, requestedManifestMIMETypes)
 }
 
 // NewImageDestination returns a types.ImageDestination for this reference.
+// The caller must call .Close() on the returned ImageDestination.
 func (ref openshiftReference) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {
 	return newImageDestination(ctx, ref)
 }

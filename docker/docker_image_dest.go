@@ -35,6 +35,10 @@ func (d *dockerImageDestination) Reference() types.ImageReference {
 	return d.ref
 }
 
+// Close removes resources associated with an initialized ImageDestination, if any.
+func (d *dockerImageDestination) Close() {
+}
+
 func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 	return []string{
 		// TODO(runcom): we'll add OCI as part of another PR here
@@ -44,42 +48,12 @@ func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 	}
 }
 
-func (d *dockerImageDestination) PutManifest(m []byte) error {
-	// FIXME: This only allows upload by digest, not creating a tag.  See the
-	// corresponding comment in openshift.NewImageDestination.
-	digest, err := manifest.Digest(m)
-	if err != nil {
-		return err
-	}
-	url := fmt.Sprintf(manifestURL, d.ref.ref.RemoteName(), digest)
-
-	headers := map[string][]string{}
-	mimeType := manifest.GuessMIMEType(m)
-	if mimeType != "" {
-		headers["Content-Type"] = []string{mimeType}
-	}
-	res, err := d.c.makeRequest("PUT", url, headers, bytes.NewReader(m))
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusCreated {
-		body, err := ioutil.ReadAll(res.Body)
-		if err == nil {
-			logrus.Debugf("Error body %s", string(body))
-		}
-		logrus.Debugf("Error uploading manifest, status %d, %#v", res.StatusCode, res)
-		return fmt.Errorf("Error uploading manifest to %s, status %d", url, res.StatusCode)
-	}
-	return nil
-}
-
 // PutBlob writes contents of stream as a blob identified by digest.
+// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-// Note: Calling PutBlob() and other methods may have ordering dependencies WRT other methods of this type. FIXME: Figure out and document.
-func (d *dockerImageDestination) PutBlob(digest string, stream io.Reader) error {
+func (d *dockerImageDestination) PutBlob(digest string, expectedSize int64, stream io.Reader) error {
 	checkURL := fmt.Sprintf(blobsURL, d.ref.ref.RemoteName(), digest)
 
 	logrus.Debugf("Checking %s", checkURL)
@@ -116,7 +90,7 @@ func (d *dockerImageDestination) PutBlob(digest string, stream io.Reader) error 
 	locationQuery := uploadLocation.Query()
 	locationQuery.Set("digest", digest)
 	uploadLocation.RawQuery = locationQuery.Encode()
-	res, err = d.c.makeRequestToResolvedURL("PUT", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, stream)
+	res, err = d.c.makeRequestToResolvedURL("PUT", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, stream, expectedSize)
 	if err != nil {
 		return err
 	}
@@ -130,9 +104,47 @@ func (d *dockerImageDestination) PutBlob(digest string, stream io.Reader) error 
 	return nil
 }
 
+func (d *dockerImageDestination) PutManifest(m []byte) error {
+	// FIXME: This only allows upload by digest, not creating a tag.  See the
+	// corresponding comment in openshift.NewImageDestination.
+	digest, err := manifest.Digest(m)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf(manifestURL, d.ref.ref.RemoteName(), digest)
+
+	headers := map[string][]string{}
+	mimeType := manifest.GuessMIMEType(m)
+	if mimeType != "" {
+		headers["Content-Type"] = []string{mimeType}
+	}
+	res, err := d.c.makeRequest("PUT", url, headers, bytes.NewReader(m))
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusCreated {
+		body, err := ioutil.ReadAll(res.Body)
+		if err == nil {
+			logrus.Debugf("Error body %s", string(body))
+		}
+		logrus.Debugf("Error uploading manifest, status %d, %#v", res.StatusCode, res)
+		return fmt.Errorf("Error uploading manifest to %s, status %d", url, res.StatusCode)
+	}
+	return nil
+}
+
 func (d *dockerImageDestination) PutSignatures(signatures [][]byte) error {
 	if len(signatures) != 0 {
 		return fmt.Errorf("Pushing signatures to a Docker Registry is not supported")
 	}
+	return nil
+}
+
+// Commit marks the process of storing the image as successful and asks for the image to be persisted.
+// WARNING: This does not have any transactional semantics:
+// - Uploaded data MAY be visible to others before Commit() is called
+// - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
+func (d *dockerImageDestination) Commit() error {
 	return nil
 }
