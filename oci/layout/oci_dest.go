@@ -1,4 +1,4 @@
-package oci
+package layout
 
 import (
 	"crypto/sha256"
