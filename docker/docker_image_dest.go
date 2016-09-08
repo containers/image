@@ -45,9 +45,9 @@ func (d *dockerImageDestination) Close() {
 func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 	return []string{
 		// TODO(runcom): we'll add OCI as part of another PR here
-		manifest.DockerV2Schema2MIMEType,
-		manifest.DockerV2Schema1SignedMIMEType,
-		manifest.DockerV2Schema1MIMEType,
+		manifest.DockerV2Schema2MediaType,
+		manifest.DockerV2Schema1SignedMediaType,
+		manifest.DockerV2Schema1MediaType,
 	}
 }
 

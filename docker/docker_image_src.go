@@ -129,7 +129,7 @@ func deleteImage(ctx *types.SystemContext, ref dockerReference) error {
 	// When retrieving the digest from a registry >= 2.3 use the following header:
 	//   "Accept": "application/vnd.docker.distribution.manifest.v2+json"
 	headers := make(map[string][]string)
-	headers["Accept"] = []string{manifest.DockerV2Schema2MIMEType}
+	headers["Accept"] = []string{manifest.DockerV2Schema2MediaType}
 
 	reference, err := ref.tagOrDigest()
 	if err != nil {

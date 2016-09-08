@@ -246,7 +246,7 @@ func (i *genericImage) getParsedManifest() (genericManifest, error) {
 	// "application/json" is a valid v2s1 value per https://github.com/docker/distribution/blob/master/docs/spec/manifest-v2-1.md .
 	// This works for now, when nothing else seems to return "application/json"; if that were not true, the mapping/detection might
 	// need to happen within the ImageSource.
-	case manifest.DockerV2Schema1MIMEType, manifest.DockerV2Schema1SignedMIMEType, "application/json":
+	case manifest.DockerV2Schema1MediaType, manifest.DockerV2Schema1SignedMediaType, "application/json":
 		mschema1 := &manifestSchema1{}
 		if err := json.Unmarshal(manblob, mschema1); err != nil {
 			return nil, err
@@ -262,7 +262,7 @@ func (i *genericImage) getParsedManifest() (genericManifest, error) {
 		//return nil, fmt.Errorf("no FSLayers in manifest for %q", ref.String())
 		//}
 		return mschema1, nil
-	case manifest.DockerV2Schema2MIMEType:
+	case manifest.DockerV2Schema2MediaType:
 		v2s2 := manifestSchema2{src: i.src}
 		if err := json.Unmarshal(manblob, &v2s2); err != nil {
 			return nil, err
