@@ -38,7 +38,7 @@ func (d *ociImageDestination) Close() {
 func (d *ociImageDestination) SupportedManifestMIMETypes() []string {
 	return []string{
 		imgspecv1.MediaTypeImageManifest,
-		manifest.DockerV2Schema2MIMEType,
+		manifest.DockerV2Schema2MediaType,
 	}
 }
 
@@ -106,27 +106,27 @@ func createManifest(m []byte) ([]byte, string, error) {
 	om := imgspecv1.Manifest{}
 	mt := manifest.GuessMIMEType(m)
 	switch mt {
-	case manifest.DockerV2Schema1MIMEType:
+	case manifest.DockerV2Schema1MediaType:
 		// There a simple reason about not yet implementing this.
 		// OCI image-spec assure about backward compatibility with docker v2s2 but not v2s1
 		// generating a v2s2 is a migration docker does when upgrading to 1.10.3
 		// and I don't think we should bother about this now (I don't want to have migration code here in skopeo)
 		return nil, "", fmt.Errorf("can't create OCI manifest from Docker V2 schema 1 manifest")
-	case manifest.DockerV2Schema2MIMEType:
+	case manifest.DockerV2Schema2MediaType:
 		if err := json.Unmarshal(m, &om); err != nil {
 			return nil, "", err
 		}
 		om.MediaType = imgspecv1.MediaTypeImageManifest
 		for i := range om.Layers {
-			om.Layers[i].MediaType = imgspecv1.MediaTypeImageSerialization
+			om.Layers[i].MediaType = imgspecv1.MediaTypeImageLayer
 		}
-		om.Config.MediaType = imgspecv1.MediaTypeImageSerializationConfig
+		om.Config.MediaType = imgspecv1.MediaTypeImageConfig
 		b, err := json.Marshal(om)
 		if err != nil {
 			return nil, "", err
 		}
 		return b, om.MediaType, nil
-	case manifest.DockerV2ListMIMEType:
+	case manifest.DockerV2ListMediaType:
 		return nil, "", fmt.Errorf("can't create OCI manifest from Docker V2 schema 2 manifest list")
 	case imgspecv1.MediaTypeImageManifestList:
 		return nil, "", fmt.Errorf("can't create OCI manifest from OCI manifest list")

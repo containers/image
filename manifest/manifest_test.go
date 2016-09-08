@@ -19,12 +19,12 @@ func TestGuessMIMEType(t *testing.T) {
 	}{
 		{"ociv1.manifest.json", imgspecv1.MediaTypeImageManifest},
 		{"ociv1list.manifest.json", imgspecv1.MediaTypeImageManifestList},
-		{"v2s2.manifest.json", DockerV2Schema2MIMEType},
-		{"v2list.manifest.json", DockerV2ListMIMEType},
-		{"v2s1.manifest.json", DockerV2Schema1SignedMIMEType},
-		{"v2s1-unsigned.manifest.json", DockerV2Schema1MIMEType},
-		{"v2s1-invalid-signatures.manifest.json", DockerV2Schema1SignedMIMEType},
-		{"v2s2nomime.manifest.json", DockerV2Schema2MIMEType}, // It is unclear whether this one is legal, but we should guess v2s2 if anything at all.
+		{"v2s2.manifest.json", DockerV2Schema2MediaType},
+		{"v2list.manifest.json", DockerV2ListMediaType},
+		{"v2s1.manifest.json", DockerV2Schema1SignedMediaType},
+		{"v2s1-unsigned.manifest.json", DockerV2Schema1MediaType},
+		{"v2s1-invalid-signatures.manifest.json", DockerV2Schema1SignedMediaType},
+		{"v2s2nomime.manifest.json", DockerV2Schema2MediaType}, // It is unclear whether this one is legal, but we should guess v2s2 if anything at all.
 		{"unknown-version.manifest.json", ""},
 		{"non-json.manifest.json", ""}, // Not a manifest (nor JSON) at all
 	}
