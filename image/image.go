@@ -67,7 +67,12 @@ func (i *genericImage) Manifest() ([]byte, string, error) {
 			return nil, "", err
 		}
 		i.cachedManifest = m
-		if mt == "" {
+		if mt == "" || mt == "text/plain" {
+			// Crane registries can return "text/plain".
+			// This makes no real sense, but it happens
+			// because requests for manifests are
+			// redirected to a content distribution
+			// network which is configured that way.
 			mt = manifest.GuessMIMEType(i.cachedManifest)
 		}
 		i.cachedManifestMIMEType = mt
