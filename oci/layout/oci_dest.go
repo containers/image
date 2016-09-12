@@ -133,7 +133,7 @@ func createManifest(m []byte) ([]byte, string, error) {
 	case imgspecv1.MediaTypeImageManifest:
 		return m, mt, nil
 	}
-	return nil, "", fmt.Errorf("Unrecognized manifest media type")
+	return nil, "", fmt.Errorf("Unrecognized manifest media type: %q", mt)
 }
 
 func (d *ociImageDestination) PutManifest(m []byte) error {
