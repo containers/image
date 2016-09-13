@@ -1,9 +1,9 @@
 package openshift
 
 import (
-	"net/url"
 	"testing"
 
+	"github.com/docker/docker/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,40 +38,44 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 	}
 }
 
-// Transport.ParseReference, ParseReference untested because they depend
-// on per-user configuration.
-var testBaseURL *url.URL
+func TestNewReference(t *testing.T) {
+	// too many ns
+	r, err := reference.ParseNamed("registry.example.com/ns1/ns2/ns3/stream:tag")
+	require.NoError(t, err)
+	tagged, ok := r.(reference.NamedTagged)
+	require.True(t, ok)
+	_, err = NewReference(tagged)
+	assert.Error(t, err)
 
-func init() {
-	u, err := url.Parse("https://registry.example.com:8443")
-	if err != nil {
-		panic("Error initializing testBaseURL")
-	}
-	testBaseURL = u
+	r, err = reference.ParseNamed("registry.example.com/ns/stream:tag")
+	require.NoError(t, err)
+	tagged, ok = r.(reference.NamedTagged)
+	require.True(t, ok)
+	_, err = NewReference(tagged)
+	assert.NoError(t, err)
 }
 
-func TestNewReference(t *testing.T) {
+func TestParseReference(t *testing.T) {
 	// Success
-	ref, err := NewReference(testBaseURL, "ns", "stream", "notlatest")
+	ref, err := ParseReference("registry.example.com:8443/ns/stream:notlatest")
 	require.NoError(t, err)
 	osRef, ok := ref.(openshiftReference)
 	require.True(t, ok)
-	assert.Equal(t, testBaseURL.String(), osRef.baseURL.String())
 	assert.Equal(t, "ns", osRef.namespace)
 	assert.Equal(t, "stream", osRef.stream)
-	assert.Equal(t, "notlatest", osRef.tag)
-	assert.Equal(t, "registry.example.com:8443/ns/stream:notlatest", osRef.dockerReference.String())
+	assert.Equal(t, "notlatest", osRef.dockerReference.Tag())
+	assert.Equal(t, "registry.example.com:8443", osRef.dockerReference.Hostname())
 
 	// Components creating an invalid Docker Reference name
-	_, err = NewReference(testBaseURL, "ns", "UPPERCASEISINVALID", "notlatest")
+	_, err = ParseReference("registry.example.com/ns/UPPERCASEISINVALID:notlatest")
 	assert.Error(t, err)
 
-	_, err = NewReference(testBaseURL, "ns", "stream", "invalid!tag@value=")
+	_, err = ParseReference("registry.example.com/ns/stream:invalid!tag@value=")
 	assert.Error(t, err)
 }
 
 func TestReferenceDockerReference(t *testing.T) {
-	ref, err := NewReference(testBaseURL, "ns", "stream", "notlatest")
+	ref, err := ParseReference("registry.example.com:8443/ns/stream:notlatest")
 	require.NoError(t, err)
 	dockerRef := ref.DockerReference()
 	require.NotNil(t, dockerRef)
@@ -79,29 +83,29 @@ func TestReferenceDockerReference(t *testing.T) {
 }
 
 func TestReferenceTransport(t *testing.T) {
-	ref, err := NewReference(testBaseURL, "ns", "stream", "notlatest")
+	ref, err := ParseReference("registry.example.com:8443/ns/stream:notlatest")
 	require.NoError(t, err)
 	assert.Equal(t, Transport, ref.Transport())
 }
 
 func TestReferenceStringWithinTransport(t *testing.T) {
-	ref, err := NewReference(testBaseURL, "ns", "stream", "notlatest")
+	ref, err := ParseReference("registry.example.com:8443/ns/stream:notlatest")
 	require.NoError(t, err)
-	assert.Equal(t, "ns/stream:notlatest", ref.StringWithinTransport())
+	assert.Equal(t, "registry.example.com:8443/ns/stream:notlatest", ref.StringWithinTransport())
 	// We should do one more round to verify that the output can be parsed, to an equal value,
 	// but that is untested because it depends on per-user configuration.
 }
 
 func TestReferencePolicyConfigurationIdentity(t *testing.T) {
 	// Just a smoke test, the substance is tested in policyconfiguration.TestDockerReference.
-	ref, err := NewReference(testBaseURL, "ns", "stream", "notlatest")
+	ref, err := ParseReference("registry.example.com:8443/ns/stream:notlatest")
 	require.NoError(t, err)
 	assert.Equal(t, "registry.example.com:8443/ns/stream:notlatest", ref.PolicyConfigurationIdentity())
 }
 
 func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 	// Just a smoke test, the substance is tested in policyconfiguration.TestDockerReference.
-	ref, err := NewReference(testBaseURL, "ns", "stream", "notlatest")
+	ref, err := ParseReference("registry.example.com:8443/ns/stream:notlatest")
 	require.NoError(t, err)
 	assert.Equal(t, []string{
 		"registry.example.com:8443/ns/stream",
@@ -111,7 +115,7 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 }
 
 func TestReferenceNewImage(t *testing.T) {
-	ref, err := NewReference(testBaseURL, "ns", "stream", "notlatest")
+	ref, err := ParseReference("registry.example.com:8443/ns/stream:notlatest")
 	require.NoError(t, err)
 	_, err = ref.NewImage(nil)
 	assert.Error(t, err)
@@ -121,7 +125,7 @@ func TestReferenceNewImage(t *testing.T) {
 // on per-user configuration when initializing httpClient.
 
 func TestReferenceDeleteImage(t *testing.T) {
-	ref, err := NewReference(testBaseURL, "ns", "stream", "notlatest")
+	ref, err := ParseReference("registry.example.com:8443/ns/stream:notlatest")
 	require.NoError(t, err)
 	err = ref.DeleteImage(nil)
 	assert.Error(t, err)
