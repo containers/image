@@ -201,5 +201,5 @@ type SystemContext struct {
 
 	// === docker.Transport overrides ===
 	DockerCertPath              string // If not "", a directory containing "cert.pem" and "key.pem" used when talking to a Docker Registry
-	DockerInsecureSkipTLSVerify bool
+	DockerInsecureSkipTLSVerify bool   // Allow contacting docker registries over HTTP, or HTTPS with failed TLS verification. Note that this does not affect other TLS connections.
 }
