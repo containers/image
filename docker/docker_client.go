@@ -36,6 +36,7 @@ const (
 
 // dockerClient is configuration for dealing with a single Docker registry.
 type dockerClient struct {
+	ctx             *types.SystemContext
 	registry        string
 	username        string
 	password        string
@@ -85,6 +86,7 @@ func newDockerClient(ctx *types.SystemContext, ref dockerReference, write bool) 
 	}
 
 	return &dockerClient{
+		ctx:           ctx,
 		registry:      registry,
 		username:      username,
 		password:      password,
@@ -332,14 +334,9 @@ func (c *dockerClient) ping() (*pingResponse, error) {
 		}
 		return pr, nil
 	}
-	scheme := "https"
-	pr, err := ping(scheme)
-	if err != nil {
-		scheme = "http"
-		pr, err = ping(scheme)
-		if err == nil {
-			return pr, nil
-		}
+	pr, err := ping("https")
+	if err != nil && c.ctx.DockerInsecureSkipTLSVerify {
+		pr, err = ping("http")
 	}
 	return pr, err
 }
