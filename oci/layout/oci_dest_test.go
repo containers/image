@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -48,7 +49,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	dest, err := ref.NewImageDestination(nil)
 	require.NoError(t, err)
 	defer dest.Close()
-	_, _, err = dest.PutBlob(reader, blobDigest, -1)
+	_, err = dest.PutBlob(reader, types.BlobInfo{Digest: blobDigest, Size: -1})
 	assert.Error(t, err)
 	assert.Contains(t, digestErrorString, err.Error())
 	err = dest.Commit()

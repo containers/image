@@ -179,7 +179,7 @@ func copyBlob(dest types.ImageDestination, src types.ImageSource, digest string)
 	if err != nil {
 		return fmt.Errorf("Error preparing to verify blob %s: %v", digest, err)
 	}
-	if _, _, err := dest.PutBlob(digestingReader, digest, blobSize); err != nil {
+	if _, err := dest.PutBlob(digestingReader, types.BlobInfo{Digest: digest, Size: blobSize}); err != nil {
 		return fmt.Errorf("Error writing blob: %v", err)
 	}
 	if digestingReader.validationFailed { // Coverage: This should never happen.
