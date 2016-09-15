@@ -52,7 +52,7 @@ func (i *genericImage) Close() {
 }
 
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
-// NOTE: It is essential for signature verification that Manifest returns the manifest from which ConfigDigest and LayerDigests is computed.
+// NOTE: It is essential for signature verification that Manifest returns the manifest from which ConfigInfo and LayerInfos is computed.
 func (i *genericImage) Manifest() ([]byte, string, error) {
 	if i.cachedManifest == nil {
 		m, mt, err := i.src.GetManifest()
@@ -105,9 +105,9 @@ type v1Image struct {
 // will support v1 one day...
 type genericManifest interface {
 	Config() ([]byte, error)
-	ConfigDigest() string
-	LayerDigests() []string
-	ImageInspectInfo() (*types.ImageInspectInfo, error)
+	ConfigInfo() types.BlobInfo
+	LayerInfos() []types.BlobInfo
+	ImageInspectInfo() (*types.ImageInspectInfo, error) // The caller will need to fill in Layers
 }
 
 // getParsedManifest parses the manifest into a data structure, cleans it up, and returns it.
@@ -140,26 +140,36 @@ func (i *genericImage) Inspect() (*types.ImageInspectInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return m.ImageInspectInfo()
+	info, err := m.ImageInspectInfo()
+	if err != nil {
+		return nil, err
+	}
+	layers := m.LayerInfos()
+	info.Layers = make([]string, len(layers))
+	for i, layer := range layers {
+		info.Layers[i] = layer.Digest
+	}
+	return info, nil
 }
 
-// ConfigDigest returns a blobLayerDigests digest for the separate config object, or "" if there isn't a separate object.
-// NOTE: It is essential for signature verification that ConfigDigest is computed from the same manifest which is returned by Manifest().
-func (i *genericImage) ConfigDigest() (string, error) {
+// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
+// NOTE: It is essential for signature verification that ConfigInfo is computed from the same manifest which is returned by Manifest().
+func (i *genericImage) ConfigInfo() (types.BlobInfo, error) {
 	m, err := i.getParsedManifest()
 	if err != nil {
-		return "", err
+		return types.BlobInfo{}, err
 	}
-	return m.ConfigDigest(), nil
+	return m.ConfigInfo(), nil
 }
 
-// LayerDigests returns a list of blob digests of layers referenced by this image, in order (the root layer first, and then successive layered layers).
-// NOTE: It is essential for signature verification that LayerDigests is computed from the same manifest which is returned by Manifest().
+// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
+// The Digest field is guaranteed to be provided; Size may be -1.
+// NOTE: It is essential for signature verification that LayerInfos is computed from the same manifest which is returned by Manifest().
 // WARNING: The list may contain duplicates, and they are semantically relevant.
-func (i *genericImage) LayerDigests() ([]string, error) {
+func (i *genericImage) LayerInfos() ([]types.BlobInfo, error) {
 	m, err := i.getParsedManifest()
 	if err != nil {
 		return nil, err
 	}
-	return m.LayerDigests(), nil
+	return m.LayerInfos(), nil
 }

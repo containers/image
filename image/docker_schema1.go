@@ -46,14 +46,14 @@ func manifestSchema1FromManifest(manifest []byte) (genericManifest, error) {
 	return mschema1, nil
 }
 
-func (m *manifestSchema1) ConfigDigest() string {
-	return ""
+func (m *manifestSchema1) ConfigInfo() types.BlobInfo {
+	return types.BlobInfo{}
 }
 
-func (m *manifestSchema1) LayerDigests() []string {
-	layers := make([]string, len(m.FSLayers))
+func (m *manifestSchema1) LayerInfos() []types.BlobInfo {
+	layers := make([]types.BlobInfo, len(m.FSLayers))
 	for i, layer := range m.FSLayers {
-		layers[(len(m.FSLayers)-1)-i] = layer.BlobSum
+		layers[(len(m.FSLayers)-1)-i] = types.BlobInfo{Digest: layer.BlobSum, Size: -1}
 	}
 	return layers
 }
@@ -78,7 +78,6 @@ func (m *manifestSchema1) ImageInspectInfo() (*types.ImageInspectInfo, error) {
 		Labels:        v1.Config.Labels,
 		Architecture:  v1.Architecture,
 		Os:            v1.OS,
-		Layers:        m.LayerDigests(),
 	}, nil
 }
 

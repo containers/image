@@ -27,14 +27,14 @@ func manifestSchema2FromManifest(src types.ImageSource, manifest []byte) (generi
 	return &v2s2, nil
 }
 
-func (m *manifestSchema2) ConfigDigest() string {
-	return m.ConfigDescriptor.Digest
+func (m *manifestSchema2) ConfigInfo() types.BlobInfo {
+	return types.BlobInfo{Digest: m.ConfigDescriptor.Digest, Size: m.ConfigDescriptor.Size}
 }
 
-func (m *manifestSchema2) LayerDigests() []string {
-	blobs := []string{}
+func (m *manifestSchema2) LayerInfos() []types.BlobInfo {
+	blobs := []types.BlobInfo{}
 	for _, layer := range m.LayersDescriptors {
-		blobs = append(blobs, layer.Digest)
+		blobs = append(blobs, types.BlobInfo{Digest: layer.Digest, Size: layer.Size})
 	}
 	return blobs
 }
@@ -64,6 +64,5 @@ func (m *manifestSchema2) ImageInspectInfo() (*types.ImageInspectInfo, error) {
 		Labels:        v1.Config.Labels,
 		Architecture:  v1.Architecture,
 		Os:            v1.OS,
-		Layers:        m.LayerDigests(),
 	}, nil
 }
