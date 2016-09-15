@@ -61,16 +61,16 @@ more general scopes is ignored.  For example, if _any_ configuration exists for
 A single configuration section is selected for a container image using the process
 described above.  The configuration section is a YAML mapping, with the following keys:
 
-- `sigstore-write` defines an URL of of the signature storage, used for editing it (adding or deleting signatures).
+- `sigstore-staging` defines an URL of of the signature storage, used for editing it (adding or deleting signatures).
 
    This key is optional; if it is missing, `sigstore` below is used.
 
 - `sigstore` defines an URL of the signature storage.
    This URL is used for reading existing signatures,
-   and if `sigstore-write` does not exist, also for adding or removing them.
+   and if `sigstore-staging` does not exist, also for adding or removing them.
 
    This key is optional; if it is missing, no signature storage is defined (no signatures
-   are download along with images, adding new signatures is impossible).
+   are download along with images, adding new signatures is possible only if `sigstore-staging` is defined).
 
 ## Examples
 
@@ -102,10 +102,10 @@ docker:
         sigstore: https://registry-sigstore.example.com
     registry.example.com/mydepartment:
         sigstore: https://sigstore.mydepartment.example.com
-        sigstore-write: file:///mnt/mydepartment/sigstore-staging
+        sigstore-staging: file:///mnt/mydepartment/sigstore-staging
     registry.example.com/mydepartment/myproject:mybranch:
         sigstore: http://localhost:4242/sigstore
-        sigstore-write: file:///home/useraccount/webroot/sigstore
+        sigstore-staging: file:///home/useraccount/webroot/sigstore
 ```
 
 ### A Global Default
@@ -115,5 +115,5 @@ without listing each domain individually. This is expected to rarely happen, usu
 
 ```yaml
 default-docker:
-    sigstore-write: file:///mnt/company/common-sigstore-staging
+    sigstore-staging: file:///mnt/company/common-sigstore-staging
 ```

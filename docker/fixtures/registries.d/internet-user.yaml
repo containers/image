@@ -7,6 +7,6 @@ docker:
         sigstore: https://sigstore.centos.org/
     docker.io/centos/mybetaprooduct:
         sigstore: http://localhost:9999/mybetaWIP/sigstore
-        sigstore-write: file:///srv/mybetaWIP/sigstore
+        sigstore-staging: file:///srv/mybetaWIP/sigstore
     docker.io/centos/mybetaproduct:latest:
         sigstore: https://sigstore.centos.org/
