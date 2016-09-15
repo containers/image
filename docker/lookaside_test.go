@@ -168,15 +168,15 @@ func TestLoadAndMergeConfig(t *testing.T) {
 		Docker: map[string]registryNamespace{
 			"example.com":                    {SigStore: "https://sigstore.example.com"},
 			"registry.test.example.com":      {SigStore: "http://registry.test.example.com/sigstore"},
-			"registry.test.example.com:8888": {SigStore: "http://registry.test.example.com:8889/sigstore", SigStoreWrite: "https://registry.test.example.com:8889/sigstore/specialAPIserverWhichDoesntExist"},
+			"registry.test.example.com:8888": {SigStore: "http://registry.test.example.com:8889/sigstore", SigStoreStaging: "https://registry.test.example.com:8889/sigstore/specialAPIserverWhichDoesntExist"},
 			"localhost":                      {SigStore: "file:///home/mitr/mydevelopment1"},
 			"localhost:8080":                 {SigStore: "file:///home/mitr/mydevelopment2"},
 			"localhost/invalid/url/test":     {SigStore: ":emptyscheme"},
 			"docker.io/contoso":              {SigStore: "https://sigstore.contoso.com/fordocker"},
 			"docker.io/centos":               {SigStore: "https://sigstore.centos.org/"},
 			"docker.io/centos/mybetaprooduct": {
-				SigStore:      "http://localhost:9999/mybetaWIP/sigstore",
-				SigStoreWrite: "file:///srv/mybetaWIP/sigstore",
+				SigStore:        "http://localhost:9999/mybetaWIP/sigstore",
+				SigStoreStaging: "file:///srv/mybetaWIP/sigstore",
 			},
 			"docker.io/centos/mybetaproduct:latest": {SigStore: "https://sigstore.centos.org/"},
 		},
@@ -185,7 +185,7 @@ func TestLoadAndMergeConfig(t *testing.T) {
 
 func TestRegistryConfigurationSignaureTopLevel(t *testing.T) {
 	config := registryConfiguration{
-		DefaultDocker: &registryNamespace{SigStore: "=default", SigStoreWrite: "=default+w"},
+		DefaultDocker: &registryNamespace{SigStore: "=default", SigStoreStaging: "=default+w"},
 		Docker:        map[string]registryNamespace{},
 	}
 	for _, ns := range []string{
@@ -197,7 +197,7 @@ func TestRegistryConfigurationSignaureTopLevel(t *testing.T) {
 		"example.com/ns1/ns2/repo",
 		"example.com/ns1/ns2/repo:notlatest",
 	} {
-		config.Docker[ns] = registryNamespace{SigStore: ns, SigStoreWrite: ns + "+w"}
+		config.Docker[ns] = registryNamespace{SigStore: ns, SigStoreStaging: ns + "+w"}
 	}
 
 	for _, c := range []struct{ input, expected string }{
@@ -221,7 +221,7 @@ func TestRegistryConfigurationSignaureTopLevel(t *testing.T) {
 
 	config = registryConfiguration{
 		Docker: map[string]registryNamespace{
-			"unmatched": {SigStore: "a", SigStoreWrite: "b"},
+			"unmatched": {SigStore: "a", SigStoreStaging: "b"},
 		},
 	}
 	dr := dockerRefFromString(t, "//thisisnotmatched")
@@ -237,12 +237,12 @@ func TestRegistryNamespaceSignatureTopLevel(t *testing.T) {
 		forWriting bool
 		expected   string
 	}{
-		{registryNamespace{SigStoreWrite: "a", SigStore: "b"}, true, "a"},
-		{registryNamespace{SigStoreWrite: "a", SigStore: "b"}, false, "b"},
+		{registryNamespace{SigStoreStaging: "a", SigStore: "b"}, true, "a"},
+		{registryNamespace{SigStoreStaging: "a", SigStore: "b"}, false, "b"},
 		{registryNamespace{SigStore: "b"}, true, "b"},
 		{registryNamespace{SigStore: "b"}, false, "b"},
-		{registryNamespace{SigStoreWrite: "a"}, true, "a"},
-		{registryNamespace{SigStoreWrite: "a"}, false, ""},
+		{registryNamespace{SigStoreStaging: "a"}, true, "a"},
+		{registryNamespace{SigStoreStaging: "a"}, false, ""},
 		{registryNamespace{}, true, ""},
 		{registryNamespace{}, false, ""},
 	} {

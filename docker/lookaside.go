@@ -34,8 +34,8 @@ type registryConfiguration struct {
 
 // registryNamespace defines lookaside locations for a single namespace.
 type registryNamespace struct {
-	SigStore      string `json:"sigstore"`       // For reading, and if SigStoreWrite is not present, for writing.
-	SigStoreWrite string `json:"sigstore-write"` // For writing only.
+	SigStore        string `json:"sigstore"`         // For reading, and if SigStoreStaging is not present, for writing.
+	SigStoreStaging string `json:"sigstore-staging"` // For writing only.
 }
 
 // signatureStorageBase is an "opaque" type representing a lookaside Docker signature storage.
@@ -175,9 +175,9 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 // ns.signatureTopLevel returns an URL string configured in ns for ref, for write access if “write”.
 // or "" if nothing has been configured.
 func (ns registryNamespace) signatureTopLevel(write bool) string {
-	if write && ns.SigStoreWrite != "" {
-		logrus.Debugf(`  Using %s`, ns.SigStoreWrite)
-		return ns.SigStoreWrite
+	if write && ns.SigStoreStaging != "" {
+		logrus.Debugf(`  Using %s`, ns.SigStoreStaging)
+		return ns.SigStoreStaging
 	}
 	if ns.SigStore != "" {
 		logrus.Debugf(`  Using %s`, ns.SigStore)
