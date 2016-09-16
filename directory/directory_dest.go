@@ -40,6 +40,11 @@ func (d *dirImageDestination) SupportsSignatures() error {
 	return nil
 }
 
+// ShouldCompressLayers returns true iff it is desirable to compress layer blobs written to this destination.
+func (d *dirImageDestination) ShouldCompressLayers() bool {
+	return false
+}
+
 // PutBlob writes contents of stream and returns data representing the result (with all data filled in).
 // inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
 // inputInfo.Size is the expected length of stream, if known.

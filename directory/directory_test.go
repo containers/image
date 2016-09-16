@@ -56,6 +56,8 @@ func TestGetPutBlob(t *testing.T) {
 	dest, err := ref.NewImageDestination(nil)
 	require.NoError(t, err)
 	defer dest.Close()
+	compress := dest.ShouldCompressLayers()
+	assert.False(t, compress)
 	info, err := dest.PutBlob(bytes.NewReader(blob), types.BlobInfo{Digest: digest, Size: int64(9)})
 	assert.NoError(t, err)
 	err = dest.Commit()
