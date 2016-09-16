@@ -67,6 +67,14 @@ func (d *dockerImageDestination) ShouldCompressLayers() bool {
 	return true
 }
 
+// sizeCounter is an io.Writer which only counts the total size of its input.
+type sizeCounter struct{ size int64 }
+
+func (c *sizeCounter) Write(p []byte) (n int, err error) {
+	c.size += int64(len(p))
+	return len(p), nil
+}
+
 // PutBlob writes contents of stream and returns data representing the result (with all data filled in).
 // inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
 // inputInfo.Size is the expected length of stream, if known.
@@ -112,7 +120,8 @@ func (d *dockerImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 	}
 
 	h := sha256.New()
-	tee := io.TeeReader(stream, h)
+	sizeCounter := &sizeCounter{}
+	tee := io.TeeReader(stream, io.MultiWriter(h, sizeCounter))
 	res, err = d.c.makeRequestToResolvedURL("PATCH", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, tee, inputInfo.Size)
 	if err != nil {
 		logrus.Debugf("Error uploading layer chunked, response %#v", *res)
@@ -144,7 +153,7 @@ func (d *dockerImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 	}
 
 	logrus.Debugf("Upload of layer %s complete", computedDigest)
-	return types.BlobInfo{Digest: computedDigest, Size: res.Request.ContentLength}, nil
+	return types.BlobInfo{Digest: computedDigest, Size: sizeCounter.size}, nil
 }
 
 func (d *dockerImageDestination) PutManifest(m []byte) error {
