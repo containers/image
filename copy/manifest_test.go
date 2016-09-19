@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	"github.com/opencontainers/image-spec/specs-go/v1"
@@ -55,6 +56,9 @@ func (f fakeImageSource) OCIConfig() (*v1.Image, error) {
 	panic("Unexpected call to a mock function")
 }
 func (f fakeImageSource) LayerInfos() []types.BlobInfo {
+	panic("Unexpected call to a mock function")
+}
+func (f fakeImageSource) EmbeddedDockerReferenceConflicts(ref reference.Named) bool {
 	panic("Unexpected call to a mock function")
 }
 func (f fakeImageSource) Inspect() (*types.ImageInspectInfo, error) {

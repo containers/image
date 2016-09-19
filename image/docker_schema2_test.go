@@ -242,6 +242,20 @@ func TestManifestSchema2LayerInfo(t *testing.T) {
 	}
 }
 
+func TestManifestSchema2EmbeddedDockerReferenceConflicts(t *testing.T) {
+	for _, m := range []genericManifest{
+		manifestSchema2FromFixture(t, unusedImageSource{}, "schema2.json"),
+		manifestSchema2FromComponentsLikeFixture(nil),
+	} {
+		for _, name := range []string{"busybox", "example.com:5555/ns/repo:tag"} {
+			ref, err := reference.ParseNormalizedNamed(name)
+			require.NoError(t, err)
+			conflicts := m.EmbeddedDockerReferenceConflicts(ref)
+			assert.False(t, conflicts)
+		}
+	}
+}
+
 func TestManifestSchema2ImageInspectInfo(t *testing.T) {
 	configJSON, err := ioutil.ReadFile("fixtures/schema2-config.json")
 	require.NoError(t, err)

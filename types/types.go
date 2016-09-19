@@ -226,6 +226,10 @@ type Image interface {
 	// The Digest field is guaranteed to be provided; Size may be -1.
 	// WARNING: The list may contain duplicates, and they are semantically relevant.
 	LayerInfos() []BlobInfo
+	// EmbeddedDockerReferenceConflicts whether a Docker reference embedded in the manifest, if any, conflicts with destination ref.
+	// It returns false if the manifest does not embed a Docker reference.
+	// (This embedding unfortunately happens for Docker schema1, please do not add support for this in any new formats.)
+	EmbeddedDockerReferenceConflicts(ref reference.Named) bool
 	// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
 	Inspect() (*ImageInspectInfo, error)
 	// UpdatedImageNeedsLayerDiffIDs returns true iff UpdatedImage(options) needs InformationOnly.LayerDiffIDs.

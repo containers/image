@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
+	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	"github.com/opencontainers/go-digest"
@@ -105,6 +106,13 @@ func (m *manifestOCI1) LayerInfos() []types.BlobInfo {
 		blobs = append(blobs, types.BlobInfo{Digest: layer.Digest, Size: layer.Size})
 	}
 	return blobs
+}
+
+// EmbeddedDockerReferenceConflicts whether a Docker reference embedded in the manifest, if any, conflicts with destination ref.
+// It returns false if the manifest does not embed a Docker reference.
+// (This embedding unfortunately happens for Docker schema1, please do not add support for this in any new formats.)
+func (m *manifestOCI1) EmbeddedDockerReferenceConflicts(ref reference.Named) bool {
+	return false
 }
 
 func (m *manifestOCI1) imageInspectInfo() (*types.ImageInspectInfo, error) {
