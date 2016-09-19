@@ -194,6 +194,14 @@ func (m *manifestSchema1) UpdatedImage(options types.ManifestUpdateOptions) (typ
 			copy.FSLayers[(len(options.LayerInfos)-1)-i].BlobSum = info.Digest
 		}
 	}
+	if options.EmbeddedDockerReference != nil {
+		copy.Name = reference.Path(options.EmbeddedDockerReference)
+		if tagged, isTagged := options.EmbeddedDockerReference.(reference.NamedTagged); isTagged {
+			copy.Tag = tagged.Tag()
+		} else {
+			copy.Tag = ""
+		}
+	}
 
 	switch options.ManifestMIMEType {
 	case "": // No conversion, OK

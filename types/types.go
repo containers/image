@@ -249,8 +249,9 @@ type Image interface {
 
 // ManifestUpdateOptions is a way to pass named optional arguments to Image.UpdatedManifest
 type ManifestUpdateOptions struct {
-	LayerInfos       []BlobInfo // Complete BlobInfos (size+digest+urls) which should replace the originals, in order (the root layer first, and then successive layered layers)
-	ManifestMIMEType string
+	LayerInfos              []BlobInfo // Complete BlobInfos (size+digest+urls) which should replace the originals, in order (the root layer first, and then successive layered layers)
+	EmbeddedDockerReference reference.Named
+	ManifestMIMEType        string
 	// The values below are NOT requests to modify the image; they provide optional context which may or may not be used.
 	InformationOnly ManifestUpdateInformation
 }

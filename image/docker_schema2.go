@@ -188,6 +188,7 @@ func (m *manifestSchema2) UpdatedImage(options types.ManifestUpdateOptions) (typ
 			copy.LayersDescriptors[i].URLs = info.URLs
 		}
 	}
+	// Ignore options.EmbeddedDockerReference: it may be set when converting from schema1 to schema2, but we really don't care.
 
 	switch options.ManifestMIMEType {
 	case "": // No conversion, OK

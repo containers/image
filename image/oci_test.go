@@ -302,6 +302,19 @@ func TestManifestOCI1UpdatedImage(t *testing.T) {
 	})
 	assert.Error(t, err)
 
+	// EmbeddedDockerReference:
+	// … is ignored
+	embeddedRef, err := reference.ParseNormalizedNamed("busybox")
+	require.NoError(t, err)
+	res, err = original.UpdatedImage(types.ManifestUpdateOptions{
+		EmbeddedDockerReference: embeddedRef,
+	})
+	require.NoError(t, err)
+	nonEmbeddedRef, err := reference.ParseNormalizedNamed("notbusybox:notlatest")
+	require.NoError(t, err)
+	conflicts := res.EmbeddedDockerReferenceConflicts(nonEmbeddedRef)
+	assert.False(t, conflicts)
+
 	// ManifestMIMEType:
 	// Only smoke-test the valid conversions, detailed tests are below. (This also verifies that “original” is not affected.)
 	for _, mime := range []string{

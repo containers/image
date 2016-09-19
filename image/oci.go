@@ -154,6 +154,7 @@ func (m *manifestOCI1) UpdatedImage(options types.ManifestUpdateOptions) (types.
 			copy.LayersDescriptors[i].Size = info.Size
 		}
 	}
+	// Ignore options.EmbeddedDockerReference: it may be set when converting from schema1, but we really don't care.
 
 	switch options.ManifestMIMEType {
 	case "": // No conversion, OK
