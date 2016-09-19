@@ -184,6 +184,7 @@ type Image interface {
 
 // ManifestUpdateOptions is a way to pass named optional arguments to Image.UpdatedManifest
 type ManifestUpdateOptions struct {
+	LayerInfos []BlobInfo // Complete BlobInfos (size+digest) which should replace the originals, in order (the root layer first, and then successive layered layers)
 }
 
 // ImageInspectInfo is a set of metadata describing Docker images, primarily their manifest and configuration.

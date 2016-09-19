@@ -2,6 +2,7 @@ package image
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 
 	"github.com/containers/image/types"
@@ -71,5 +72,14 @@ func (m *manifestSchema2) ImageInspectInfo() (*types.ImageInspectInfo, error) {
 
 func (m *manifestSchema2) UpdatedManifest(options types.ManifestUpdateOptions) ([]byte, error) {
 	copy := *m
+	if options.LayerInfos != nil {
+		if len(copy.LayersDescriptors) != len(options.LayerInfos) {
+			return nil, fmt.Errorf("Error preparing updated manifest: layer count changed from %d to %d", len(copy.LayersDescriptors), len(options.LayerInfos))
+		}
+		for i, info := range options.LayerInfos {
+			copy.LayersDescriptors[i].Digest = info.Digest
+			copy.LayersDescriptors[i].Size = info.Size
+		}
+	}
 	return json.Marshal(copy)
 }
