@@ -95,3 +95,21 @@ func MatchesDigest(manifest []byte, expectedDigest string) (bool, error) {
 	}
 	return expectedDigest == actualDigest, nil
 }
+
+// AddDummyV2S1Signature adds an JWS signature with a temporary key (i.e. useless) to a v2s1 manifest.
+// This is useful to make the manifest acceptable to a Docker Registry (even though nothing needs or wants the JWS signature).
+func AddDummyV2S1Signature(manifest []byte) ([]byte, error) {
+	key, err := libtrust.GenerateECP256PrivateKey()
+	if err != nil {
+		return nil, err // Coverage: This can fail only if rand.Reader fails.
+	}
+
+	js, err := libtrust.NewJSONSignature(manifest)
+	if err != nil {
+		return nil, err
+	}
+	if err := js.Sign(key); err != nil { // Coverage: This can fail basically only if rand.Reader fails.
+		return nil, err
+	}
+	return js.PrettySignature("signatures")
+}

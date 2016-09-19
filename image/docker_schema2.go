@@ -15,6 +15,8 @@ type descriptor struct {
 
 type manifestSchema2 struct {
 	src               types.ImageSource
+	SchemaVersion     int          `json:"schemaVersion"`
+	MediaType         string       `json:"mediaType"`
 	ConfigDescriptor  descriptor   `json:"config"`
 	LayersDescriptors []descriptor `json:"layers"`
 }
@@ -65,4 +67,9 @@ func (m *manifestSchema2) ImageInspectInfo() (*types.ImageInspectInfo, error) {
 		Architecture:  v1.Architecture,
 		Os:            v1.OS,
 	}, nil
+}
+
+func (m *manifestSchema2) UpdatedManifest(options types.ManifestUpdateOptions) ([]byte, error) {
+	copy := *m
+	return json.Marshal(copy)
 }

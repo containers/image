@@ -175,6 +175,13 @@ type Image interface {
 	LayerInfos() ([]BlobInfo, error)
 	// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
 	Inspect() (*ImageInspectInfo, error)
+	// UpdatedManifest returns the image's manifest modified according to options.
+	// This does not change the state of the Image object.
+	UpdatedManifest(options ManifestUpdateOptions) ([]byte, error)
+}
+
+// ManifestUpdateOptions is a way to pass named optional arguments to Image.UpdatedManifest
+type ManifestUpdateOptions struct {
 }
 
 // ImageInspectInfo is a set of metadata describing Docker images, primarily their manifest and configuration.
