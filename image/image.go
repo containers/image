@@ -108,6 +108,7 @@ type genericManifest interface {
 	ConfigInfo() types.BlobInfo
 	LayerInfos() []types.BlobInfo
 	ImageInspectInfo() (*types.ImageInspectInfo, error) // The caller will need to fill in Layers
+	UpdatedManifest(types.ManifestUpdateOptions) ([]byte, error)
 }
 
 // getParsedManifest parses the manifest into a data structure, cleans it up, and returns it.
@@ -172,4 +173,14 @@ func (i *genericImage) LayerInfos() ([]types.BlobInfo, error) {
 		return nil, err
 	}
 	return m.LayerInfos(), nil
+}
+
+// UpdatedManifest returns the image's manifest modified according to updateOptions.
+// This does not change the state of the Image object.
+func (i *genericImage) UpdatedManifest(options types.ManifestUpdateOptions) ([]byte, error) {
+	m, err := i.getParsedManifest()
+	if err != nil {
+		return nil, err
+	}
+	return m.UpdatedManifest(options)
 }

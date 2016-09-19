@@ -77,6 +77,9 @@ func (ref refImageMock) LayerInfos() ([]types.BlobInfo, error) {
 func (ref refImageMock) Inspect() (*types.ImageInspectInfo, error) {
 	panic("unexpected call to a mock function")
 }
+func (ref refImageMock) UpdatedManifest(options types.ManifestUpdateOptions) ([]byte, error) {
+	panic("unexpected call to a mock function")
+}
 func (ref refImageMock) GetRepositoryTags() ([]string, error) {
 	panic("unexpected call to a mock function")
 }
@@ -286,6 +289,9 @@ func (ref forbiddenImageMock) LayerInfos() ([]types.BlobInfo, error) {
 	panic("unexpected call to a mock function")
 }
 func (ref forbiddenImageMock) Inspect() (*types.ImageInspectInfo, error) {
+	panic("unexpected call to a mock function")
+}
+func (ref forbiddenImageMock) UpdatedManifest(options types.ManifestUpdateOptions) ([]byte, error) {
 	panic("unexpected call to a mock function")
 }
 func (ref forbiddenImageMock) GetRepositoryTags() ([]string, error) {

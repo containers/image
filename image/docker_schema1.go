@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 )
 
@@ -18,14 +19,14 @@ type fsLayersSchema1 struct {
 }
 
 type manifestSchema1 struct {
-	Name     string
-	Tag      string
-	FSLayers []fsLayersSchema1 `json:"fsLayers"`
-	History  []struct {
+	Name         string            `json:"name"`
+	Tag          string            `json:"tag"`
+	Architecture string            `json:"architecture"`
+	FSLayers     []fsLayersSchema1 `json:"fsLayers"`
+	History      []struct {
 		V1Compatibility string `json:"v1Compatibility"`
 	} `json:"history"`
-	// TODO(runcom) verify the downloaded manifest
-	//Signature []byte `json:"signature"`
+	SchemaVersion int `json:"schemaVersion"`
 }
 
 func manifestSchema1FromManifest(manifest []byte) (genericManifest, error) {
@@ -79,6 +80,16 @@ func (m *manifestSchema1) ImageInspectInfo() (*types.ImageInspectInfo, error) {
 		Architecture:  v1.Architecture,
 		Os:            v1.OS,
 	}, nil
+}
+
+func (m *manifestSchema1) UpdatedManifest(options types.ManifestUpdateOptions) ([]byte, error) {
+	copy := *m
+	// docker/distribution requires a signature even if the incoming data uses the nominally unsigned DockerV2Schema1MediaType.
+	unsigned, err := json.Marshal(copy)
+	if err != nil {
+		return nil, err
+	}
+	return manifest.AddDummyV2S1Signature(unsigned)
 }
 
 // fixManifestLayers, after validating the supplied manifest
