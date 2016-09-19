@@ -337,14 +337,14 @@ func (d *openshiftImageDestination) SupportsSignatures() error {
 	return nil
 }
 
-// PutBlob writes contents of stream and returns its computed digest and size.
-// A digest can be optionally provided if known, the specific image destination can decide to play with it or not.
-// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
+// PutBlob writes contents of stream and returns data representing the result (with all data filled in).
+// inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
+// inputInfo.Size is the expected length of stream, if known.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (d *openshiftImageDestination) PutBlob(stream io.Reader, digest string, expectedSize int64) (string, int64, error) {
-	return d.docker.PutBlob(stream, digest, expectedSize)
+func (d *openshiftImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobInfo) (types.BlobInfo, error) {
+	return d.docker.PutBlob(stream, inputInfo)
 }
 
 func (d *openshiftImageDestination) PutManifest(m []byte) error {

@@ -4,19 +4,12 @@
 package image
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"regexp"
 	"time"
 
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
-)
-
-var (
-	validHex = regexp.MustCompile(`^([a-f0-9]{64})$`)
 )
 
 // genericImage is a general set of utilities for working with container images,
@@ -59,7 +52,7 @@ func (i *genericImage) Close() {
 }
 
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
-// NOTE: It is essential for signature verification that Manifest returns the manifest from which BlobDigests is computed.
+// NOTE: It is essential for signature verification that Manifest returns the manifest from which ConfigInfo and LayerInfos is computed.
 func (i *genericImage) Manifest() ([]byte, string, error) {
 	if i.cachedManifest == nil {
 		m, mt, err := i.src.GetManifest()
@@ -92,15 +85,6 @@ func (i *genericImage) Signatures() ([][]byte, error) {
 	return i.cachedSignatures, nil
 }
 
-func (i *genericImage) Inspect() (*types.ImageInspectInfo, error) {
-	// TODO(runcom): unused version param for now, default to docker v2-1
-	m, err := i.getParsedManifest()
-	if err != nil {
-		return nil, err
-	}
-	return m.ImageInspectInfo()
-}
-
 type config struct {
 	Labels map[string]string
 }
@@ -121,121 +105,9 @@ type v1Image struct {
 // will support v1 one day...
 type genericManifest interface {
 	Config() ([]byte, error)
-	LayerDigests() []string
-	BlobDigests() []string
-	ImageInspectInfo() (*types.ImageInspectInfo, error)
-}
-
-type fsLayersSchema1 struct {
-	BlobSum string `json:"blobSum"`
-}
-
-// compile-time check that manifestSchema1 implements genericManifest
-var _ genericManifest = (*manifestSchema1)(nil)
-
-type manifestSchema1 struct {
-	Name     string
-	Tag      string
-	FSLayers []fsLayersSchema1 `json:"fsLayers"`
-	History  []struct {
-		V1Compatibility string `json:"v1Compatibility"`
-	} `json:"history"`
-	// TODO(runcom) verify the downloaded manifest
-	//Signature []byte `json:"signature"`
-}
-
-func (m *manifestSchema1) LayerDigests() []string {
-	layers := make([]string, len(m.FSLayers))
-	for i, layer := range m.FSLayers {
-		layers[i] = layer.BlobSum
-	}
-	return layers
-}
-
-func (m *manifestSchema1) BlobDigests() []string {
-	return m.LayerDigests()
-}
-
-func (m *manifestSchema1) Config() ([]byte, error) {
-	return []byte(m.History[0].V1Compatibility), nil
-}
-
-func (m *manifestSchema1) ImageInspectInfo() (*types.ImageInspectInfo, error) {
-	v1 := &v1Image{}
-	config, err := m.Config()
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(config, v1); err != nil {
-		return nil, err
-	}
-	return &types.ImageInspectInfo{
-		Tag:           m.Tag,
-		DockerVersion: v1.DockerVersion,
-		Created:       v1.Created,
-		Labels:        v1.Config.Labels,
-		Architecture:  v1.Architecture,
-		Os:            v1.OS,
-		Layers:        m.LayerDigests(),
-	}, nil
-}
-
-// compile-time check that manifestSchema2 implements genericManifest
-var _ genericManifest = (*manifestSchema2)(nil)
-
-type manifestSchema2 struct {
-	src               types.ImageSource
-	ConfigDescriptor  descriptor   `json:"config"`
-	LayersDescriptors []descriptor `json:"layers"`
-}
-
-type descriptor struct {
-	MediaType string `json:"mediaType"`
-	Size      int64  `json:"size"`
-	Digest    string `json:"digest"`
-}
-
-func (m *manifestSchema2) LayerDigests() []string {
-	blobs := []string{}
-	for _, layer := range m.LayersDescriptors {
-		blobs = append(blobs, layer.Digest)
-	}
-	return blobs
-}
-
-func (m *manifestSchema2) BlobDigests() []string {
-	blobs := m.LayerDigests()
-	blobs = append(blobs, m.ConfigDescriptor.Digest)
-	return blobs
-}
-
-func (m *manifestSchema2) Config() ([]byte, error) {
-	rawConfig, _, err := m.src.GetBlob(m.ConfigDescriptor.Digest)
-	if err != nil {
-		return nil, err
-	}
-	config, err := ioutil.ReadAll(rawConfig)
-	rawConfig.Close()
-	return config, err
-}
-
-func (m *manifestSchema2) ImageInspectInfo() (*types.ImageInspectInfo, error) {
-	config, err := m.Config()
-	if err != nil {
-		return nil, err
-	}
-	v1 := &v1Image{}
-	if err := json.Unmarshal(config, v1); err != nil {
-		return nil, err
-	}
-	return &types.ImageInspectInfo{
-		DockerVersion: v1.DockerVersion,
-		Created:       v1.Created,
-		Labels:        v1.Config.Labels,
-		Architecture:  v1.Architecture,
-		Os:            v1.OS,
-		Layers:        m.LayerDigests(),
-	}, nil
+	ConfigInfo() types.BlobInfo
+	LayerInfos() []types.BlobInfo
+	ImageInspectInfo() (*types.ImageInspectInfo, error) // The caller will need to fill in Layers
 }
 
 // getParsedManifest parses the manifest into a data structure, cleans it up, and returns it.
@@ -252,27 +124,9 @@ func (i *genericImage) getParsedManifest() (genericManifest, error) {
 	// This works for now, when nothing else seems to return "application/json"; if that were not true, the mapping/detection might
 	// need to happen within the ImageSource.
 	case manifest.DockerV2Schema1MediaType, manifest.DockerV2Schema1SignedMediaType, "application/json":
-		mschema1 := &manifestSchema1{}
-		if err := json.Unmarshal(manblob, mschema1); err != nil {
-			return nil, err
-		}
-		if err := fixManifestLayers(mschema1); err != nil {
-			return nil, err
-		}
-		// TODO(runcom): verify manifest schema 1, 2 etc
-		//if len(m.FSLayers) != len(m.History) {
-		//return nil, fmt.Errorf("length of history not equal to number of layers for %q", ref.String())
-		//}
-		//if len(m.FSLayers) == 0 {
-		//return nil, fmt.Errorf("no FSLayers in manifest for %q", ref.String())
-		//}
-		return mschema1, nil
+		return manifestSchema1FromManifest(manblob)
 	case manifest.DockerV2Schema2MediaType:
-		v2s2 := manifestSchema2{src: i.src}
-		if err := json.Unmarshal(manblob, &v2s2); err != nil {
-			return nil, err
-		}
-		return &v2s2, nil
+		return manifestSchema2FromManifest(i.src, manblob)
 	case "":
 		return nil, errors.New("could not guess manifest media type")
 	default:
@@ -280,86 +134,42 @@ func (i *genericImage) getParsedManifest() (genericManifest, error) {
 	}
 }
 
-// uniqueBlobDigests returns a list of blob digests referenced from a manifest.
-// The list will not contain duplicates; it is not intended to correspond to the "history" or "parent chain" of a Docker image.
-func uniqueBlobDigests(m genericManifest) []string {
-	var res []string
-	seen := make(map[string]struct{})
-	for _, digest := range m.BlobDigests() {
-		if _, ok := seen[digest]; ok {
-			continue
-		}
-		seen[digest] = struct{}{}
-		res = append(res, digest)
-	}
-	return res
-}
-
-// BlobDigests returns a list of blob digests referenced by this image.
-// The list will not contain duplicates; it is not intended to correspond to the "history" or "parent chain" of a Docker image.
-// NOTE: It is essential for signature verification that BlobDigests is computed from the same manifest which is returned by Manifest().
-func (i *genericImage) BlobDigests() ([]string, error) {
+func (i *genericImage) Inspect() (*types.ImageInspectInfo, error) {
+	// TODO(runcom): unused version param for now, default to docker v2-1
 	m, err := i.getParsedManifest()
 	if err != nil {
 		return nil, err
 	}
-	return uniqueBlobDigests(m), nil
+	info, err := m.ImageInspectInfo()
+	if err != nil {
+		return nil, err
+	}
+	layers := m.LayerInfos()
+	info.Layers = make([]string, len(layers))
+	for i, layer := range layers {
+		info.Layers[i] = layer.Digest
+	}
+	return info, nil
 }
 
-// fixManifestLayers, after validating the supplied manifest
-// (to use correctly-formatted IDs, and to not have non-consecutive ID collisions in manifest.History),
-// modifies manifest to only have one entry for each layer ID in manifest.History (deleting the older duplicates,
-// both from manifest.History and manifest.FSLayers).
-// Note that even after this succeeds, manifest.FSLayers may contain duplicate entries
-// (for Dockerfile operations which change the configuration but not the filesystem).
-func fixManifestLayers(manifest *manifestSchema1) error {
-	type imageV1 struct {
-		ID     string
-		Parent string
+// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
+// NOTE: It is essential for signature verification that ConfigInfo is computed from the same manifest which is returned by Manifest().
+func (i *genericImage) ConfigInfo() (types.BlobInfo, error) {
+	m, err := i.getParsedManifest()
+	if err != nil {
+		return types.BlobInfo{}, err
 	}
-	// Per the specification, we can assume that len(manifest.FSLayers) == len(manifest.History)
-	imgs := make([]*imageV1, len(manifest.FSLayers))
-	for i := range manifest.FSLayers {
-		img := &imageV1{}
-
-		if err := json.Unmarshal([]byte(manifest.History[i].V1Compatibility), img); err != nil {
-			return err
-		}
-
-		imgs[i] = img
-		if err := validateV1ID(img.ID); err != nil {
-			return err
-		}
-	}
-	if imgs[len(imgs)-1].Parent != "" {
-		return errors.New("Invalid parent ID in the base layer of the image.")
-	}
-	// check general duplicates to error instead of a deadlock
-	idmap := make(map[string]struct{})
-	var lastID string
-	for _, img := range imgs {
-		// skip IDs that appear after each other, we handle those later
-		if _, exists := idmap[img.ID]; img.ID != lastID && exists {
-			return fmt.Errorf("ID %+v appears multiple times in manifest", img.ID)
-		}
-		lastID = img.ID
-		idmap[lastID] = struct{}{}
-	}
-	// backwards loop so that we keep the remaining indexes after removing items
-	for i := len(imgs) - 2; i >= 0; i-- {
-		if imgs[i].ID == imgs[i+1].ID { // repeated ID. remove and continue
-			manifest.FSLayers = append(manifest.FSLayers[:i], manifest.FSLayers[i+1:]...)
-			manifest.History = append(manifest.History[:i], manifest.History[i+1:]...)
-		} else if imgs[i].Parent != imgs[i+1].ID {
-			return fmt.Errorf("Invalid parent ID. Expected %v, got %v.", imgs[i+1].ID, imgs[i].Parent)
-		}
-	}
-	return nil
+	return m.ConfigInfo(), nil
 }
 
-func validateV1ID(id string) error {
-	if ok := validHex.MatchString(id); !ok {
-		return fmt.Errorf("image ID %q is invalid", id)
+// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
+// The Digest field is guaranteed to be provided; Size may be -1.
+// NOTE: It is essential for signature verification that LayerInfos is computed from the same manifest which is returned by Manifest().
+// WARNING: The list may contain duplicates, and they are semantically relevant.
+func (i *genericImage) LayerInfos() ([]types.BlobInfo, error) {
+	m, err := i.getParsedManifest()
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	return m.LayerInfos(), nil
 }

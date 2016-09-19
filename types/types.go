@@ -86,6 +86,13 @@ type ImageReference interface {
 	DeleteImage(ctx *SystemContext) error
 }
 
+// BlobInfo collects known information about a blob (layer/config).
+// In some situations, some fields may be unknown, in others they may be mandatory; documenting an “unknown” value here does not override that.
+type BlobInfo struct {
+	Digest string // "" if unknown.
+	Size   int64  // -1 if unknown
+}
+
 // ImageSource is a service, possibly remote (= slow), to download components of a single image.
 // This is primarily useful for copying images around; for examining their properties, Image (below)
 // is usually more useful.
@@ -127,13 +134,13 @@ type ImageDestination interface {
 	// Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
 	SupportsSignatures() error
 
-	// PutBlob writes contents of stream and returns its computed digest and size.
-	// A digest can be optionally provided if known, the specific image destination can decide to play with it or not.
-	// The length of stream is expected to be expectedSize; if expectedSize == -1, it is not known.
+	// PutBlob writes contents of stream and returns data representing the result (with all data filled in).
+	// inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
+	// inputInfo.Size is the expected length of stream, if known.
 	// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 	// to any other readers for download using the supplied digest.
 	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-	PutBlob(stream io.Reader, digest string, expectedSize int64) (string, int64, error)
+	PutBlob(stream io.Reader, inputInfo BlobInfo) (BlobInfo, error)
 	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 	PutManifest([]byte) error
 	PutSignatures(signatures [][]byte) error
@@ -154,14 +161,18 @@ type Image interface {
 	Close()
 	// ref to repository?
 	// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
-	// NOTE: It is essential for signature verification that Manifest returns the manifest from which BlobDigests is computed.
+	// NOTE: It is essential for signature verification that Manifest returns the manifest from which ConfigInfo and LayerInfos is computed.
 	Manifest() ([]byte, string, error)
 	// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 	Signatures() ([][]byte, error)
-	// BlobDigests returns a list of blob digests referenced by this image.
-	// The list will not contain duplicates; it is not intended to correspond to the "history" or "parent chain" of a Docker image.
-	// NOTE: It is essential for signature verification that BlobDigests is computed from the same manifest which is returned by Manifest().
-	BlobDigests() ([]string, error)
+	// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
+	// NOTE: It is essential for signature verification that ConfigInfo is computed from the same manifest which is returned by Manifest().
+	ConfigInfo() (BlobInfo, error)
+	// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
+	// The Digest field is guaranteed to be provided; Size may be -1.
+	// NOTE: It is essential for signature verification that LayerInfos is computed from the same manifest which is returned by Manifest().
+	// WARNING: The list may contain duplicates, and they are semantically relevant.
+	LayerInfos() ([]BlobInfo, error)
 	// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
 	Inspect() (*ImageInspectInfo, error)
 }

@@ -121,31 +121,26 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		}
 	}
 
-	blobDigests, err := src.BlobDigests()
+	configInfo, err := src.ConfigInfo()
 	if err != nil {
 		return fmt.Errorf("Error parsing manifest: %v", err)
 	}
-	for _, digest := range blobDigests {
-		stream, blobSize, err := rawSource.GetBlob(digest)
-		if err != nil {
-			return fmt.Errorf("Error reading blob %s: %v", digest, err)
+	if configInfo.Digest != "" {
+		if err := copyBlob(dest, rawSource, configInfo.Digest); err != nil {
+			return err
 		}
-		defer stream.Close()
-
-		// Be paranoid; in case PutBlob somehow managed to ignore an error from digestingReader,
-		// use a separate validation failure indicator.
-		// Note that we don't use a stronger "validationSucceeded" indicator, because
-		// dest.PutBlob may detect that the layer already exists, in which case we don't
-		// read stream to the end, and validation does not happen.
-		digestingReader, err := newDigestingReader(stream, digest)
-		if err != nil {
-			return fmt.Errorf("Error preparing to verify blob %s: %v", digest, err)
-		}
-		if _, _, err := dest.PutBlob(digestingReader, digest, blobSize); err != nil {
-			return fmt.Errorf("Error writing blob: %v", err)
-		}
-		if digestingReader.validationFailed { // Coverage: This should never happen.
-			return fmt.Errorf("Internal error uploading blob %s, digest verification failed but was ignored", digest)
+	}
+	layerInfos, err := src.LayerInfos()
+	if err != nil {
+		return fmt.Errorf("Error parsing manifest: %v", err)
+	}
+	copiedLayers := map[string]struct{}{}
+	for _, info := range layerInfos {
+		if _, ok := copiedLayers[info.Digest]; !ok {
+			if err := copyBlob(dest, rawSource, info.Digest); err != nil {
+				return err
+			}
+			copiedLayers[info.Digest] = struct{}{}
 		}
 	}
 
@@ -178,5 +173,30 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		return fmt.Errorf("Error committing the finished image: %v", err)
 	}
 
+	return nil
+}
+
+func copyBlob(dest types.ImageDestination, src types.ImageSource, digest string) error {
+	stream, blobSize, err := src.GetBlob(digest)
+	if err != nil {
+		return fmt.Errorf("Error reading blob %s: %v", digest, err)
+	}
+	defer stream.Close()
+
+	// Be paranoid; in case PutBlob somehow managed to ignore an error from digestingReader,
+	// use a separate validation failure indicator.
+	// Note that we don't use a stronger "validationSucceeded" indicator, because
+	// dest.PutBlob may detect that the layer already exists, in which case we don't
+	// read stream to the end, and validation does not happen.
+	digestingReader, err := newDigestingReader(stream, digest)
+	if err != nil {
+		return fmt.Errorf("Error preparing to verify blob %s: %v", digest, err)
+	}
+	if _, err := dest.PutBlob(digestingReader, types.BlobInfo{Digest: digest, Size: blobSize}); err != nil {
+		return fmt.Errorf("Error writing blob: %v", err)
+	}
+	if digestingReader.validationFailed { // Coverage: This should never happen.
+		return fmt.Errorf("Internal error uploading blob %s, digest verification failed but was ignored", digest)
+	}
 	return nil
 }
