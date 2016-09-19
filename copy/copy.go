@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"reflect"
 	"strings"
 
 	"github.com/containers/image/image"
@@ -120,6 +121,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 			return fmt.Errorf("Can not copy signatures: %v", err)
 		}
 	}
+	canModifyManifest := len(sigs) == 0
 
 	configInfo, err := src.ConfigInfo()
 	if err != nil {
@@ -141,6 +143,18 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 				return err
 			}
 			copiedLayers[info.Digest] = struct{}{}
+		}
+	}
+
+	manifestUpdates := types.ManifestUpdateOptions{}
+
+	if !reflect.DeepEqual(manifestUpdates, types.ManifestUpdateOptions{}) {
+		if !canModifyManifest {
+			return fmt.Errorf("Internal error: copy needs an updated manifest but that was known to be forbidden")
+		}
+		manifest, err = src.UpdatedManifest(manifestUpdates)
+		if err != nil {
+			return fmt.Errorf("Error creating an updated manifest: %v", err)
 		}
 	}
 
