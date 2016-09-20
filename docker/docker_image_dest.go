@@ -165,14 +165,17 @@ func (d *dockerImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 }
 
 func (d *dockerImageDestination) PutManifest(m []byte) error {
-	// FIXME: This only allows upload by digest, not creating a tag.  See the
-	// corresponding comment in openshift.NewImageDestination.
 	digest, err := manifest.Digest(m)
 	if err != nil {
 		return err
 	}
 	d.manifestDigest = digest
-	url := fmt.Sprintf(manifestURL, d.ref.ref.RemoteName(), digest)
+
+	reference, err := d.ref.tagOrDigest()
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf(manifestURL, d.ref.ref.RemoteName(), reference)
 
 	headers := map[string][]string{}
 	mimeType := manifest.GuessMIMEType(m)

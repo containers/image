@@ -354,8 +354,6 @@ func (d *openshiftImageDestination) PutBlob(stream io.Reader, inputInfo types.Bl
 
 func (d *openshiftImageDestination) PutManifest(m []byte) error {
 	// FIXME? Can this eventually just call d.docker.PutManifest()?
-	// Right now we need this as a skeleton to attach signatures to, and
-	// to workaround our inability to change tags when uploading v2s1 manifests.
 
 	// Note: This does absolutely no kind/version checking or conversions.
 	manifestDigest, err := manifest.Digest(m)
