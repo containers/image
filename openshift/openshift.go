@@ -353,47 +353,13 @@ func (d *openshiftImageDestination) PutBlob(stream io.Reader, inputInfo types.Bl
 }
 
 func (d *openshiftImageDestination) PutManifest(m []byte) error {
-	// FIXME? Can this eventually just call d.docker.PutManifest()?
-
-	// Note: This does absolutely no kind/version checking or conversions.
 	manifestDigest, err := manifest.Digest(m)
 	if err != nil {
 		return err
 	}
 	d.imageStreamImageName = manifestDigest
-	// FIXME: We can't do what respositorymiddleware.go does because we don't know the internal address. Does any of this matter?
-	dockerImageReference := fmt.Sprintf("%s/%s/%s@%s", d.client.ref.dockerReference.Hostname(), d.client.ref.namespace, d.client.ref.stream, manifestDigest)
-	ism := imageStreamMapping{
-		typeMeta: typeMeta{
-			Kind:       "ImageStreamMapping",
-			APIVersion: "v1",
-		},
-		objectMeta: objectMeta{
-			Namespace: d.client.ref.namespace,
-			Name:      d.client.ref.stream,
-		},
-		Image: image{
-			objectMeta: objectMeta{
-				Name: manifestDigest,
-			},
-			DockerImageReference: dockerImageReference,
-			DockerImageManifest:  string(m),
-		},
-		Tag: d.client.ref.dockerReference.Tag(),
-	}
-	body, err := json.Marshal(ism)
-	if err != nil {
-		return err
-	}
 
-	// FIXME: validate components per validation.IsValidPathSegmentName?
-	path := fmt.Sprintf("/oapi/v1/namespaces/%s/imagestreammappings", d.client.ref.namespace)
-	body, err = d.client.doRequest("POST", path, body)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return d.docker.PutManifest(m)
 }
 
 func (d *openshiftImageDestination) PutSignatures(signatures [][]byte) error {
@@ -507,12 +473,6 @@ type imageSignature struct {
 	// Created *unversioned.Time `json:"created,omitempty"`
 	// IssuedBy SignatureIssuer `json:"issuedBy,omitempty"`
 	// IssuedTo SignatureSubject `json:"issuedTo,omitempty"`
-}
-type imageStreamMapping struct {
-	typeMeta   `json:",inline"`
-	objectMeta `json:"metadata,omitempty"`
-	Image      image  `json:"image"`
-	Tag        string `json:"tag"`
 }
 type typeMeta struct {
 	Kind       string `json:"kind,omitempty"`
