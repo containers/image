@@ -91,13 +91,21 @@ func (d *dockerImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 			return types.BlobInfo{}, err
 		}
 		defer res.Body.Close()
-		if res.StatusCode == http.StatusOK {
+		switch res.StatusCode {
+		case http.StatusOK:
 			logrus.Debugf("... already exists, not uploading")
 			blobLength, err := strconv.ParseInt(res.Header.Get("Content-Length"), 10, 64)
 			if err != nil {
 				return types.BlobInfo{}, err
 			}
 			return types.BlobInfo{Digest: inputInfo.Digest, Size: blobLength}, nil
+		case http.StatusUnauthorized:
+			logrus.Debugf("... not authorized")
+			return types.BlobInfo{}, fmt.Errorf("not authorized to read from destination repository %s", d.ref.ref.RemoteName())
+		case http.StatusNotFound:
+			// noop
+		default:
+			return types.BlobInfo{}, fmt.Errorf("failed to read from destination repository %s: %v", d.ref.ref.RemoteName(), http.StatusText(res.StatusCode))
 		}
 		logrus.Debugf("... failed, status %d", res.StatusCode)
 	}
