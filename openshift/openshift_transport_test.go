@@ -114,14 +114,7 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 	}, ref.PolicyConfigurationNamespaces())
 }
 
-func TestReferenceNewImage(t *testing.T) {
-	ref, err := ParseReference("registry.example.com:8443/ns/stream:notlatest")
-	require.NoError(t, err)
-	_, err = ref.NewImage(nil)
-	assert.Error(t, err)
-}
-
-// openshiftReference.NewImageSource, openshiftReference.NewImageDestination untested because they depend
+// openshiftReference.NewImage, openshiftReference.NewImageSource, openshiftReference.NewImageDestination untested because they depend
 // on per-user configuration when initializing httpClient.
 
 func TestReferenceDeleteImage(t *testing.T) {

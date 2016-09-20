@@ -1,12 +1,12 @@
 package openshift
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
 	"github.com/containers/image/docker/policyconfiguration"
+	genericImage "github.com/containers/image/image"
 	"github.com/containers/image/types"
 	"github.com/docker/docker/reference"
 )
@@ -121,7 +121,11 @@ func (ref openshiftReference) PolicyConfigurationNamespaces() []string {
 // NewImage returns a types.Image for this reference.
 // The caller must call .Close() on the returned Image.
 func (ref openshiftReference) NewImage(ctx *types.SystemContext) (types.Image, error) {
-	return nil, errors.New("Full Image support not implemented for atomic: image names")
+	src, err := newImageSource(ctx, ref, nil)
+	if err != nil {
+		return nil, err
+	}
+	return genericImage.FromSource(src), nil
 }
 
 // NewImageSource returns a types.ImageSource for this reference,
