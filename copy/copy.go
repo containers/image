@@ -148,7 +148,9 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 			return fmt.Errorf("Can not copy signatures: %v", err)
 		}
 	}
+
 	canModifyManifest := len(sigs) == 0
+	manifestUpdates := types.ManifestUpdateOptions{}
 
 	srcConfigInfo := src.ConfigInfo()
 	if srcConfigInfo.Digest != "" {
@@ -162,25 +164,8 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		}
 	}
 
-	srcLayerInfos := src.LayerInfos()
-	destLayerInfos := []types.BlobInfo{}
-	copiedLayers := map[string]types.BlobInfo{}
-	for _, srcLayer := range srcLayerInfos {
-		destLayer, ok := copiedLayers[srcLayer.Digest]
-		if !ok {
-			writeReport("Copying blob %s\n", srcLayer.Digest)
-			destLayer, err = copyBlob(dest, rawSource, srcLayer, canModifyManifest, reportWriter)
-			if err != nil {
-				return err
-			}
-			copiedLayers[srcLayer.Digest] = destLayer
-		}
-		destLayerInfos = append(destLayerInfos, destLayer)
-	}
-
-	manifestUpdates := types.ManifestUpdateOptions{}
-	if layerDigestsDiffer(srcLayerInfos, destLayerInfos) {
-		manifestUpdates.LayerInfos = destLayerInfos
+	if err := copyLayers(&manifestUpdates, dest, src, rawSource, canModifyManifest, reportWriter); err != nil {
+		return err
 	}
 
 	pendingImage := src
@@ -230,6 +215,30 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		return fmt.Errorf("Error committing the finished image: %v", err)
 	}
 
+	return nil
+}
+
+// copyLayers copies layers from src/rawSource to dest, updating manifestUpdates if necessary and canModifyManifest.
+func copyLayers(manifestUpdates *types.ManifestUpdateOptions, dest types.ImageDestination, src types.Image, rawSource types.ImageSource, canModifyManifest bool, reportWriter io.Writer) error {
+	srcInfos := src.LayerInfos()
+	destInfos := []types.BlobInfo{}
+	copiedLayers := map[string]types.BlobInfo{}
+	for _, srcLayer := range srcInfos {
+		destLayer, ok := copiedLayers[srcLayer.Digest]
+		if !ok {
+			fmt.Fprintf(reportWriter, "Copying blob %s\n", srcLayer.Digest)
+			dl, err := copyBlob(dest, rawSource, srcLayer, canModifyManifest, reportWriter)
+			if err != nil {
+				return err
+			}
+			destLayer = dl
+			copiedLayers[srcLayer.Digest] = destLayer
+		}
+		destInfos = append(destInfos, destLayer)
+	}
+	if layerDigestsDiffer(srcInfos, destInfos) {
+		manifestUpdates.LayerInfos = destInfos
+	}
 	return nil
 }
 
