@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/docker"
@@ -57,7 +56,6 @@ func newOpenshiftClient(ref openshiftReference) (*openshiftClient, error) {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
-	httpClient.Timeout = 1 * time.Minute
 
 	return &openshiftClient{
 		ref:         ref,
