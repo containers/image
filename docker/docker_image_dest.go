@@ -262,6 +262,8 @@ func (d *dockerImageDestination) putOneSignature(url *url.URL, signature []byte)
 		}
 		return nil
 
+	case "http", "https":
+		return fmt.Errorf("Writing directly to a %s sigstore %s is not supported. Configure a sigstore-staging: location.", url.Scheme, url.String())
 	default:
 		return fmt.Errorf("Unsupported scheme when writing signature to %s", url.String())
 	}
@@ -279,6 +281,8 @@ func (c *dockerClient) deleteOneSignature(url *url.URL) (missing bool, err error
 		}
 		return false, err
 
+	case "http", "https":
+		return false, fmt.Errorf("Writing directly to a %s sigstore %s is not supported. Configure a sigstore-staging: location.", url.Scheme, url.String())
 	default:
 		return false, fmt.Errorf("Unsupported scheme when deleting signature from %s", url.String())
 	}
