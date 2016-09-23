@@ -10,8 +10,11 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"io/ioutil"
 	"reflect"
 	"strings"
+
+	pb "gopkg.in/cheggaaa/pb.v1"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/image"
@@ -83,10 +86,17 @@ func (d *digestingReader) Read(p []byte) (int, error) {
 type Options struct {
 	RemoveSignatures bool   // Remove any pre-existing signatures. SignBy will still add a new signature.
 	SignBy           string // If non-empty, asks for a signature to be added during the copy, and specifies a key ID, as accepted by signature.NewGPGSigningMechanism().SignDockerManifest(),
+	ReportWriter     io.Writer
 }
 
 // Image copies image from srcRef to destRef, using policyContext to validate source image admissibility.
 func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, destRef, srcRef types.ImageReference, options *Options) error {
+	if options.ReportWriter == nil {
+		options.ReportWriter = ioutil.Discard
+	}
+	writeReport := func(f string, a ...interface{}) {
+		fmt.Fprintf(options.ReportWriter, f, a...)
+	}
 	dest, err := destRef.NewImageDestination(ctx)
 	if err != nil {
 		return fmt.Errorf("Error initializing destination %s: %v", transports.ImageName(destRef), err)
@@ -105,6 +115,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		return fmt.Errorf("Source image rejected: %v", err)
 	}
 
+	writeReport("Getting image source manifest\n")
 	manifest, _, err := src.Manifest()
 	if err != nil {
 		return fmt.Errorf("Error reading manifest: %v", err)
@@ -114,6 +125,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	if options != nil && options.RemoveSignatures {
 		sigs = [][]byte{}
 	} else {
+		writeReport("Getting image source signatures\n")
 		s, err := src.Signatures()
 		if err != nil {
 			return fmt.Errorf("Error reading signatures: %v", err)
@@ -121,18 +133,21 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		sigs = s
 	}
 	if len(sigs) != 0 {
+		writeReport("Checking if image destination supports signatures\n")
 		if err := dest.SupportsSignatures(); err != nil {
 			return fmt.Errorf("Can not copy signatures: %v", err)
 		}
 	}
 	canModifyManifest := len(sigs) == 0
 
+	writeReport("Getting image source configuration\n")
 	srcConfigInfo, err := src.ConfigInfo()
 	if err != nil {
 		return fmt.Errorf("Error parsing manifest: %v", err)
 	}
 	if srcConfigInfo.Digest != "" {
-		destConfigInfo, err := copyBlob(dest, rawSource, srcConfigInfo, false)
+		writeReport("Uploading blob %s\n", srcConfigInfo.Digest)
+		destConfigInfo, err := copyBlob(dest, rawSource, srcConfigInfo, false, options.ReportWriter)
 		if err != nil {
 			return err
 		}
@@ -150,7 +165,8 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	for _, srcLayer := range srcLayerInfos {
 		destLayer, ok := copiedLayers[srcLayer.Digest]
 		if !ok {
-			destLayer, err = copyBlob(dest, rawSource, srcLayer, canModifyManifest)
+			writeReport("Uploading blob %s\n", srcLayer.Digest)
+			destLayer, err = copyBlob(dest, rawSource, srcLayer, canModifyManifest, options.ReportWriter)
 			if err != nil {
 				return err
 			}
@@ -184,6 +200,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 			return fmt.Errorf("Cannot determine canonical Docker reference for destination %s", transports.ImageName(dest.Reference()))
 		}
 
+		writeReport("Signing manifest\n")
 		newSig, err := signature.SignDockerManifest(manifest, dockerReference.String(), mech, options.SignBy)
 		if err != nil {
 			return fmt.Errorf("Error creating signature: %v", err)
@@ -191,10 +208,12 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		sigs = append(sigs, newSig)
 	}
 
+	writeReport("Uploading manifest to image destination\n")
 	if err := dest.PutManifest(manifest); err != nil {
 		return fmt.Errorf("Error writing manifest: %v", err)
 	}
 
+	writeReport("Storing signatures\n")
 	if err := dest.PutSignatures(sigs); err != nil {
 		return fmt.Errorf("Error writing signatures: %v", err)
 	}
@@ -221,7 +240,7 @@ func layerDigestsDiffer(a, b []types.BlobInfo) bool {
 
 // copyBlob copies a blob with srcInfo (with known Digest and possibly known Size) in src to dest, perhaps compressing it if canCompress,
 // and returns a complete blobInfo of the copied blob.
-func copyBlob(dest types.ImageDestination, src types.ImageSource, srcInfo types.BlobInfo, canCompress bool) (types.BlobInfo, error) {
+func copyBlob(dest types.ImageDestination, src types.ImageSource, srcInfo types.BlobInfo, canCompress bool, reportWriter io.Writer) (types.BlobInfo, error) {
 	srcStream, srcBlobSize, err := src.GetBlob(srcInfo.Digest) // We currently completely ignore srcInfo.Size throughout.
 	if err != nil {
 		return types.BlobInfo{}, fmt.Errorf("Error reading blob %s: %v", srcInfo.Digest, err)
@@ -243,6 +262,20 @@ func copyBlob(dest types.ImageDestination, src types.ImageSource, srcInfo types.
 		return types.BlobInfo{}, fmt.Errorf("Error reading blob %s: %v", srcInfo.Digest, err)
 	}
 
+	bar := pb.New(int(srcInfo.Size)).SetUnits(pb.U_BYTES)
+	bar.Output = reportWriter
+	bar.SetMaxWidth(80)
+	bar.ShowTimeLeft = false
+	bar.ShowPercent = false
+	bar.Start()
+	destStream = bar.NewProxyReader(destStream)
+
+	defer func() {
+		if err != nil {
+			fmt.Fprint(reportWriter, "\n")
+		}
+	}()
+
 	var inputInfo types.BlobInfo
 	if !canCompress || isCompressed || !dest.ShouldCompressLayers() {
 		logrus.Debugf("Using original blob without modification")
@@ -261,6 +294,7 @@ func copyBlob(dest types.ImageDestination, src types.ImageSource, srcInfo types.
 		inputInfo.Digest = ""
 		inputInfo.Size = -1
 	}
+
 	uploadedInfo, err := dest.PutBlob(destStream, inputInfo)
 	if err != nil {
 		return types.BlobInfo{}, fmt.Errorf("Error writing blob: %v", err)
