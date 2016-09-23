@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/types"
@@ -73,9 +72,7 @@ func newDockerClient(ctx *types.SystemContext, ref dockerReference, write bool) 
 			TLSClientConfig: tlsc,
 		}
 	}
-	client := &http.Client{
-		Timeout: 1 * time.Minute,
-	}
+	client := &http.Client{}
 	if tr != nil {
 		client.Transport = tr
 	}
