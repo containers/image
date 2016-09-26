@@ -91,13 +91,14 @@ type Options struct {
 
 // Image copies image from srcRef to destRef, using policyContext to validate source image admissibility.
 func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, destRef, srcRef types.ImageReference, options *Options) error {
-	reportWriter := options.ReportWriter
-	if reportWriter == nil {
-		reportWriter = ioutil.Discard
+	reportWriter := ioutil.Discard
+	if options != nil && options.ReportWriter != nil {
+		reportWriter = options.ReportWriter
 	}
 	writeReport := func(f string, a ...interface{}) {
 		fmt.Fprintf(reportWriter, f, a...)
 	}
+
 	dest, err := destRef.NewImageDestination(ctx)
 	if err != nil {
 		return fmt.Errorf("Error initializing destination %s: %v", transports.ImageName(destRef), err)
@@ -148,7 +149,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	}
 	if srcConfigInfo.Digest != "" {
 		writeReport("Uploading blob %s\n", srcConfigInfo.Digest)
-		destConfigInfo, err := copyBlob(dest, rawSource, srcConfigInfo, false, options.ReportWriter)
+		destConfigInfo, err := copyBlob(dest, rawSource, srcConfigInfo, false, reportWriter)
 		if err != nil {
 			return err
 		}
@@ -167,7 +168,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		destLayer, ok := copiedLayers[srcLayer.Digest]
 		if !ok {
 			writeReport("Uploading blob %s\n", srcLayer.Digest)
-			destLayer, err = copyBlob(dest, rawSource, srcLayer, canModifyManifest, options.ReportWriter)
+			destLayer, err = copyBlob(dest, rawSource, srcLayer, canModifyManifest, reportWriter)
 			if err != nil {
 				return err
 			}
