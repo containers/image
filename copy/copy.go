@@ -270,11 +270,7 @@ func copyBlob(dest types.ImageDestination, src types.ImageSource, srcInfo types.
 	bar.Start()
 	destStream = bar.NewProxyReader(destStream)
 
-	defer func() {
-		if err != nil {
-			fmt.Fprint(reportWriter, "\n")
-		}
-	}()
+	defer fmt.Fprint(reportWriter, "\n")
 
 	var inputInfo types.BlobInfo
 	if !canCompress || isCompressed || !dest.ShouldCompressLayers() {
