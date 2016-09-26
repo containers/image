@@ -91,11 +91,12 @@ type Options struct {
 
 // Image copies image from srcRef to destRef, using policyContext to validate source image admissibility.
 func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, destRef, srcRef types.ImageReference, options *Options) error {
-	if options.ReportWriter == nil {
-		options.ReportWriter = ioutil.Discard
+	reportWriter := options.ReportWriter
+	if reportWriter == nil {
+		reportWriter = ioutil.Discard
 	}
 	writeReport := func(f string, a ...interface{}) {
-		fmt.Fprintf(options.ReportWriter, f, a...)
+		fmt.Fprintf(reportWriter, f, a...)
 	}
 	dest, err := destRef.NewImageDestination(ctx)
 	if err != nil {
