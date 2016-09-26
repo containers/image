@@ -332,7 +332,7 @@ func (c *dockerClient) ping() (*pingResponse, error) {
 		return pr, nil
 	}
 	pr, err := ping("https")
-	if err != nil && c.ctx.DockerInsecureSkipTLSVerify {
+	if err != nil && c.ctx != nil && c.ctx.DockerInsecureSkipTLSVerify {
 		pr, err = ping("http")
 	}
 	return pr, err
