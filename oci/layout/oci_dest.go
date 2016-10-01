@@ -13,7 +13,6 @@ import (
 
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
-	imgspec "github.com/opencontainers/image-spec/specs-go"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -153,7 +152,7 @@ func (d *ociImageDestination) PutManifest(m []byte) error {
 	if err != nil {
 		return err
 	}
-	desc := imgspec.Descriptor{}
+	desc := imgspecv1.Descriptor{}
 	desc.Digest = digest
 	// TODO(runcom): beaware and add support for OCI manifest list
 	desc.MediaType = mt
