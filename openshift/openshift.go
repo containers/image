@@ -196,6 +196,13 @@ func (s *openshiftImageSource) Close() {
 	}
 }
 
+func (s *openshiftImageSource) GetTargetManifest(digest string) ([]byte, string, error) {
+	if err := s.ensureImageIsResolved(); err != nil {
+		return nil, "", err
+	}
+	return s.docker.GetTargetManifest(digest)
+}
+
 func (s *openshiftImageSource) GetManifest() ([]byte, string, error) {
 	if err := s.ensureImageIsResolved(); err != nil {
 		return nil, "", err

@@ -1,6 +1,7 @@
 package directory
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -35,6 +36,10 @@ func (s *dirImageSource) GetManifest() ([]byte, string, error) {
 		return nil, "", err
 	}
 	return m, "", err
+}
+
+func (s *dirImageSource) GetTargetManifest(digest string) ([]byte, string, error) {
+	return nil, "", fmt.Errorf("Getting target manifest not supported by dir:")
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).

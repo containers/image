@@ -12,6 +12,10 @@ type nameOnlyImageMock struct {
 	forbiddenImageMock
 }
 
+func (nameOnlyImageMock) IsMultiImage() (bool, error) {
+	panic("unexpected call to a mock function")
+}
+
 func (nameOnlyImageMock) Reference() types.ImageReference {
 	return nameOnlyImageReferenceMock("== StringWithinTransport mock")
 }

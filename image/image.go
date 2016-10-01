@@ -120,6 +120,18 @@ func (i *genericImage) getParsedManifest() (genericManifest, error) {
 	if err != nil {
 		return nil, err
 	}
+	return manifestInstanceFromBlob(i.src, manblob, mt)
+}
+
+func (i *genericImage) IsMultiImage() (bool, error) {
+	_, mt, err := i.Manifest()
+	if err != nil {
+		return false, err
+	}
+	return mt == manifest.DockerV2ListMediaType, nil
+}
+
+func manifestInstanceFromBlob(src types.ImageSource, manblob []byte, mt string) (genericManifest, error) {
 	switch mt {
 	// "application/json" is a valid v2s1 value per https://github.com/docker/distribution/blob/master/docs/spec/manifest-v2-1.md .
 	// This works for now, when nothing else seems to return "application/json"; if that were not true, the mapping/detection might
@@ -127,7 +139,9 @@ func (i *genericImage) getParsedManifest() (genericManifest, error) {
 	case manifest.DockerV2Schema1MediaType, manifest.DockerV2Schema1SignedMediaType, "application/json":
 		return manifestSchema1FromManifest(manblob)
 	case manifest.DockerV2Schema2MediaType:
-		return manifestSchema2FromManifest(i.src, manblob)
+		return manifestSchema2FromManifest(src, manblob)
+	case manifest.DockerV2ListMediaType:
+		return manifestSchema2FromManifestList(src, manblob)
 	case "":
 		return nil, errors.New("could not guess manifest media type")
 	default:
