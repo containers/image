@@ -52,7 +52,7 @@ func newDockerClient(ctx *types.SystemContext, ref dockerReference, write bool) 
 	if registry == dockerHostname {
 		registry = dockerRegistry
 	}
-	username, password, err := getAuth(ref.ref.Hostname())
+	username, password, err := getAuth(ctx, ref.ref.Hostname())
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +243,10 @@ func (c *dockerClient) getBearerToken(realm, service, scope string) (string, err
 	return tokenStruct.Token, nil
 }
 
-func getAuth(registry string) (string, string, error) {
+func getAuth(ctx *types.SystemContext, registry string) (string, string, error) {
+	if ctx != nil && ctx.DockerAuthConfig != nil {
+		return ctx.DockerAuthConfig.Username, ctx.DockerAuthConfig.Password, nil
+	}
 	// TODO(runcom): get this from *cli.Context somehow
 	//if username != "" && password != "" {
 	//return username, password, nil
