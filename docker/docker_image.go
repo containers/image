@@ -32,6 +32,15 @@ func (i *Image) SourceRefFullName() string {
 	return i.src.ref.ref.FullName()
 }
 
+// GetTag returns an image's tag
+func (i *Image) GetTag() string {
+	tag, err := i.src.ref.tagOrDigest()
+	if err != nil {
+		fmt.Errorf("Error in determining image tag")
+	}
+	return tag
+}
+
 // GetRepositoryTags list all tags available in the repository. Note that this has no connection with the tag(s) used for this specific image, if any.
 func (i *Image) GetRepositoryTags() ([]string, error) {
 	url := fmt.Sprintf(tagsURL, i.src.ref.ref.RemoteName())
