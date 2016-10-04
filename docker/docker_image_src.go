@@ -15,12 +15,13 @@ import (
 	"github.com/containers/image/types"
 )
 
-type errFetchManifest struct {
+// ErrFetchManifest provides the error when fetching the manifest fails
+type ErrFetchManifest struct {
 	statusCode int
 	body       []byte
 }
 
-func (e errFetchManifest) Error() string {
+func (e ErrFetchManifest) Error() string {
 	return fmt.Sprintf("error fetching manifest: status code: %d, body: %s", e.statusCode, string(e.body))
 }
 
@@ -114,7 +115,7 @@ func (s *dockerImageSource) ensureManifestIsLoaded() error {
 		return err
 	}
 	if res.StatusCode != http.StatusOK {
-		return errFetchManifest{res.StatusCode, manblob}
+		return ErrFetchManifest{res.StatusCode, manblob}
 	}
 	// We might validate manblob against the Docker-Content-Digest header here to protect against transport errors.
 	s.cachedManifest = manblob
