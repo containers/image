@@ -88,14 +88,6 @@ func (i *genericImage) getParsedManifest() (genericManifest, error) {
 	return manifestInstanceFromBlob(i.src, manblob, mt)
 }
 
-func (i *genericImage) IsMultiImage() (bool, error) {
-	_, mt, err := i.Manifest()
-	if err != nil {
-		return false, err
-	}
-	return mt == manifest.DockerV2ListMediaType, nil
-}
-
 func (i *genericImage) Inspect() (*types.ImageInspectInfo, error) {
 	// TODO(runcom): unused version param for now, default to docker v2-1
 	m, err := i.getParsedManifest()
@@ -142,4 +134,12 @@ func (i *genericImage) UpdatedManifest(options types.ManifestUpdateOptions) ([]b
 		return nil, err
 	}
 	return m.UpdatedManifest(options)
+}
+
+func (i *genericImage) IsMultiImage() (bool, error) {
+	_, mt, err := i.Manifest()
+	if err != nil {
+		return false, err
+	}
+	return mt == manifest.DockerV2ListMediaType, nil
 }
