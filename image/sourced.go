@@ -22,12 +22,12 @@ func FromSource(src types.ImageSource) (types.Image, error) {
 	return FromUnparsedImage(UnparsedFromSource(src))
 }
 
-// genericImage is a general set of utilities for working with container images,
+// sourcedImage is a general set of utilities for working with container images,
 // whatever is their underlying location (i.e. dockerImageSource-independent).
 // Note the existence of skopeo/docker.Image: some instances of a `types.Image`
-// may not be a `genericImage` directly. However, most users of `types.Image`
+// may not be a `sourcedImage` directly. However, most users of `types.Image`
 // do not care, and those who care about `skopeo/docker.Image` know they do.
-type genericImage struct {
+type sourcedImage struct {
 	*UnparsedImage
 	manifestBlob     []byte
 	manifestMIMEType string
@@ -71,7 +71,7 @@ func FromUnparsedImage(unparsed *UnparsedImage) (types.Image, error) {
 		return nil, err
 	}
 
-	return &genericImage{
+	return &sourcedImage{
 		UnparsedImage:    unparsed,
 		manifestBlob:     manifestBlob,
 		manifestMIMEType: manifestMIMEType,
@@ -80,11 +80,11 @@ func FromUnparsedImage(unparsed *UnparsedImage) (types.Image, error) {
 }
 
 // Manifest overrides the UnparsedImage.Manifest to use the fields which we have already fetched, after guessing and overrides.
-func (i *genericImage) Manifest() ([]byte, string, error) {
+func (i *sourcedImage) Manifest() ([]byte, string, error) {
 	return i.manifestBlob, i.manifestMIMEType, nil
 }
 
-func (i *genericImage) Inspect() (*types.ImageInspectInfo, error) {
+func (i *sourcedImage) Inspect() (*types.ImageInspectInfo, error) {
 	info, err := i.genericManifest.imageInspectInfo()
 	if err != nil {
 		return nil, err
@@ -97,6 +97,6 @@ func (i *genericImage) Inspect() (*types.ImageInspectInfo, error) {
 	return info, nil
 }
 
-func (i *genericImage) IsMultiImage() bool {
+func (i *sourcedImage) IsMultiImage() bool {
 	return i.manifestMIMEType == manifest.DockerV2ListMediaType
 }
