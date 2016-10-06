@@ -191,7 +191,7 @@ type Image interface {
 	// This does not change the state of the Image object.
 	UpdatedManifest(options ManifestUpdateOptions) ([]byte, error)
 	// IsMultiImage returns true if the image's manifest is a list of images, false otherwise.
-	IsMultiImage() (bool, error)
+	IsMultiImage() bool
 }
 
 // ManifestUpdateOptions is a way to pass named optional arguments to Image.UpdatedManifest

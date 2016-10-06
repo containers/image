@@ -133,7 +133,7 @@ func (ref dirReference) PolicyConfigurationNamespaces() []string {
 // verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage.
 func (ref dirReference) NewImage(ctx *types.SystemContext) (types.Image, error) {
 	src := newImageSource(ref)
-	return image.FromSource(src), nil
+	return image.FromSource(src)
 }
 
 // NewImageSource returns a types.ImageSource for this reference,

@@ -127,7 +127,7 @@ func (ref openshiftReference) NewImage(ctx *types.SystemContext) (types.Image, e
 	if err != nil {
 		return nil, err
 	}
-	return genericImage.FromSource(src), nil
+	return genericImage.FromSource(src)
 }
 
 // NewImageSource returns a types.ImageSource for this reference,

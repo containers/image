@@ -120,15 +120,14 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	if allowed, err := policyContext.IsRunningImageAllowed(unparsedImage); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
 		return fmt.Errorf("Source image rejected: %v", err)
 	}
-	src := image.FromUnparsedImage(unparsedImage)
+	src, err := image.FromUnparsedImage(unparsedImage)
+	if err != nil {
+		return fmt.Errorf("Error initializing image from source %s: %v", transports.ImageName(srcRef), err)
+	}
 	unparsedImage = nil
 	defer src.Close()
 
-	multiImage, err := src.IsMultiImage()
-	if err != nil {
-		return err
-	}
-	if multiImage {
+	if src.IsMultiImage() {
 		return fmt.Errorf("can not copy %s: manifest contains multiple images", transports.ImageName(srcRef))
 	}
 
