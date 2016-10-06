@@ -70,8 +70,10 @@ type ImageReference interface {
 	// and each following element to be a prefix of the element preceding it.
 	PolicyConfigurationNamespaces() []string
 
-	// NewImage returns a types.Image for this reference.
+	// NewImage returns a types.Image for this reference, possibly specialized for this ImageTransport.
 	// The caller must call .Close() on the returned Image.
+	// NOTE: If any kind of signature verification should happen, build an UnparsedImage from the value returned by NewImageSource,
+	// verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage.
 	NewImage(ctx *SystemContext) (Image, error)
 	// NewImageSource returns a types.ImageSource for this reference,
 	// asking the backend to use a manifest from requestedManifestMIMETypes if possible.
@@ -176,14 +178,11 @@ type UnparsedImage interface {
 // Image is the primary API for inspecting properties of images.
 // Each Image should eventually be closed by calling Close().
 type Image interface {
-	// NOTE: It is essential for signature verification that Manifest returns the manifest from which ConfigInfo and LayerInfos is computed.
 	UnparsedImage
 	// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
-	// NOTE: It is essential for signature verification that ConfigInfo is computed from the same manifest which is returned by Manifest().
 	ConfigInfo() (BlobInfo, error)
 	// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
 	// The Digest field is guaranteed to be provided; Size may be -1.
-	// NOTE: It is essential for signature verification that LayerInfos is computed from the same manifest which is returned by Manifest().
 	// WARNING: The list may contain duplicates, and they are semantically relevant.
 	LayerInfos() ([]BlobInfo, error)
 	// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.

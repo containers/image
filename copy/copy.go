@@ -109,13 +109,20 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	if err != nil {
 		return fmt.Errorf("Error initializing source %s: %v", transports.ImageName(srcRef), err)
 	}
-	src := image.FromSource(rawSource)
-	defer src.Close()
+	unparsedImage := image.UnparsedFromSource(rawSource)
+	defer func() {
+		if unparsedImage != nil {
+			unparsedImage.Close()
+		}
+	}()
 
 	// Please keep this policy check BEFORE reading any other information about the image.
-	if allowed, err := policyContext.IsRunningImageAllowed(src); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
+	if allowed, err := policyContext.IsRunningImageAllowed(unparsedImage); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
 		return fmt.Errorf("Source image rejected: %v", err)
 	}
+	src := image.FromUnparsedImage(unparsedImage)
+	unparsedImage = nil
+	defer src.Close()
 
 	multiImage, err := src.IsMultiImage()
 	if err != nil {

@@ -127,8 +127,10 @@ func (ref dirReference) PolicyConfigurationNamespaces() []string {
 	return res
 }
 
-// NewImage returns a types.Image for this reference.
+// NewImage returns a types.Image for this reference, possibly specialized for this ImageTransport.
 // The caller must call .Close() on the returned Image.
+// NOTE: If any kind of signature verification should happen, build an UnparsedImage from the value returned by NewImageSource,
+// verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage.
 func (ref dirReference) NewImage(ctx *types.SystemContext) (types.Image, error) {
 	src := newImageSource(ref)
 	return image.FromSource(src), nil
