@@ -106,6 +106,9 @@ type ImageSource interface {
 	// GetManifest returns the image's manifest along with its MIME type. The empty string is returned if the MIME type is unknown.
 	// It may use a remote (= slow) service.
 	GetManifest() ([]byte, string, error)
+	// GetTargetManifest returns an image's manifest given a digest. This is mainly used to retrieve a single image's manifest
+	// out of a manifest list.
+	GetTargetManifest(digest string) ([]byte, string, error)
 	// GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 	GetBlob(digest string) (io.ReadCloser, int64, error)
 	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
@@ -180,6 +183,8 @@ type Image interface {
 	// UpdatedManifest returns the image's manifest modified according to options.
 	// This does not change the state of the Image object.
 	UpdatedManifest(options ManifestUpdateOptions) ([]byte, error)
+	// IsMultiImage returns true if the image's manifest is a list of images, false otherwise.
+	IsMultiImage() (bool, error)
 }
 
 // ManifestUpdateOptions is a way to pass named optional arguments to Image.UpdatedManifest

@@ -56,6 +56,9 @@ type refImageMock struct{ reference.Named }
 func (ref refImageMock) Reference() types.ImageReference {
 	return refImageReferenceMock{ref.Named}
 }
+func (ref refImageMock) IsMultiImage() (bool, error) {
+	panic("unexpected call to a mock function")
+}
 func (ref refImageMock) Close() {
 	panic("unexpected call to a mock function")
 }
@@ -267,6 +270,9 @@ func TestParseDockerReferences(t *testing.T) {
 // forbiddenImageMock is a mock of types.Image which ensures Reference is not called
 type forbiddenImageMock struct{}
 
+func (ref forbiddenImageMock) IsMultiImage() (bool, error) {
+	panic("unexpected call to a mock function")
+}
 func (ref forbiddenImageMock) Reference() types.ImageReference {
 	panic("unexpected call to a mock function")
 }

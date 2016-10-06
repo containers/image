@@ -84,6 +84,31 @@ func (s *dockerImageSource) GetManifest() ([]byte, string, error) {
 	return s.cachedManifest, s.cachedManifestMIMEType, nil
 }
 
+func (s *dockerImageSource) fetchManifest(tagOrDigest string) ([]byte, string, error) {
+	url := fmt.Sprintf(manifestURL, s.ref.ref.RemoteName(), tagOrDigest)
+	headers := make(map[string][]string)
+	headers["Accept"] = s.requestedManifestMIMETypes
+	res, err := s.c.makeRequest("GET", url, headers, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	defer res.Body.Close()
+	manblob, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, "", err
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, "", ErrFetchManifest{res.StatusCode, manblob}
+	}
+	return manblob, simplifyContentType(res.Header.Get("Content-Type")), nil
+}
+
+// GetTargetManifest returns an image's manifest given a digest.
+// This is mainly used to retrieve a single image's manifest out of a manifest list.
+func (s *dockerImageSource) GetTargetManifest(digest string) ([]byte, string, error) {
+	return s.fetchManifest(digest)
+}
+
 // ensureManifestIsLoaded sets s.cachedManifest and s.cachedManifestMIMEType
 //
 // ImageSource implementations are not required or expected to do any caching,
@@ -100,26 +125,14 @@ func (s *dockerImageSource) ensureManifestIsLoaded() error {
 	if err != nil {
 		return err
 	}
-	url := fmt.Sprintf(manifestURL, s.ref.ref.RemoteName(), reference)
-	// TODO(runcom) set manifest version header! schema1 for now - then schema2 etc etc and v1
-	// TODO(runcom) NO, switch on the resulter manifest like Docker is doing
-	headers := make(map[string][]string)
-	headers["Accept"] = s.requestedManifestMIMETypes
-	res, err := s.c.makeRequest("GET", url, headers, nil)
+
+	manblob, mt, err := s.fetchManifest(reference)
 	if err != nil {
 		return err
-	}
-	defer res.Body.Close()
-	manblob, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return err
-	}
-	if res.StatusCode != http.StatusOK {
-		return ErrFetchManifest{res.StatusCode, manblob}
 	}
 	// We might validate manblob against the Docker-Content-Digest header here to protect against transport errors.
 	s.cachedManifest = manblob
-	s.cachedManifestMIMEType = simplifyContentType(res.Header.Get("Content-Type"))
+	s.cachedManifestMIMEType = mt
 	return nil
 }
 
