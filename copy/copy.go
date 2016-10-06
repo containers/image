@@ -112,17 +112,17 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	src := image.FromSource(rawSource)
 	defer src.Close()
 
+	// Please keep this policy check BEFORE reading any other information about the image.
+	if allowed, err := policyContext.IsRunningImageAllowed(src); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
+		return fmt.Errorf("Source image rejected: %v", err)
+	}
+
 	multiImage, err := src.IsMultiImage()
 	if err != nil {
 		return err
 	}
 	if multiImage {
 		return fmt.Errorf("can not copy %s: manifest contains multiple images", transports.ImageName(srcRef))
-	}
-
-	// Please keep this policy check BEFORE reading any other information about the image.
-	if allowed, err := policyContext.IsRunningImageAllowed(src); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
-		return fmt.Errorf("Source image rejected: %v", err)
 	}
 
 	writeReport("Getting image source manifest\n")
