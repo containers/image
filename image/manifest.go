@@ -26,12 +26,21 @@ type v1Image struct {
 	OS string `json:"os,omitempty"`
 }
 
+// genericManifest is an interface for parsing, modifying image manifests and related data.
+// Note that the public methods are intended to be a subset of types.Image
+// so that embedding a genericManifest into structs works.
 // will support v1 one day...
 type genericManifest interface {
-	Config() ([]byte, error)
+	config() ([]byte, error)
+	// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
 	ConfigInfo() types.BlobInfo
+	// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
+	// The Digest field is guaranteed to be provided; Size may be -1.
+	// WARNING: The list may contain duplicates, and they are semantically relevant.
 	LayerInfos() []types.BlobInfo
-	ImageInspectInfo() (*types.ImageInspectInfo, error) // The caller will need to fill in Layers
+	imageInspectInfo() (*types.ImageInspectInfo, error) // The caller will need to fill in Layers
+	// UpdatedManifest returns the image's manifest modified according to options.
+	// This does not change the state of the Image object.
 	UpdatedManifest(types.ManifestUpdateOptions) ([]byte, error)
 }
 

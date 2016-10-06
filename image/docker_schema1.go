@@ -47,10 +47,14 @@ func manifestSchema1FromManifest(manifest []byte) (genericManifest, error) {
 	return mschema1, nil
 }
 
+// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
 func (m *manifestSchema1) ConfigInfo() types.BlobInfo {
 	return types.BlobInfo{}
 }
 
+// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
+// The Digest field is guaranteed to be provided; Size may be -1.
+// WARNING: The list may contain duplicates, and they are semantically relevant.
 func (m *manifestSchema1) LayerInfos() []types.BlobInfo {
 	layers := make([]types.BlobInfo, len(m.FSLayers))
 	for i, layer := range m.FSLayers { // NOTE: This includes empty layers (where m.History.V1Compatibility->ThrowAway)
@@ -59,13 +63,13 @@ func (m *manifestSchema1) LayerInfos() []types.BlobInfo {
 	return layers
 }
 
-func (m *manifestSchema1) Config() ([]byte, error) {
+func (m *manifestSchema1) config() ([]byte, error) {
 	return []byte(m.History[0].V1Compatibility), nil
 }
 
-func (m *manifestSchema1) ImageInspectInfo() (*types.ImageInspectInfo, error) {
+func (m *manifestSchema1) imageInspectInfo() (*types.ImageInspectInfo, error) {
 	v1 := &v1Image{}
-	config, err := m.Config()
+	config, err := m.config()
 	if err != nil {
 		return nil, err
 	}
@@ -82,6 +86,8 @@ func (m *manifestSchema1) ImageInspectInfo() (*types.ImageInspectInfo, error) {
 	}, nil
 }
 
+// UpdatedManifest returns the image's manifest modified according to options.
+// This does not change the state of the Image object.
 func (m *manifestSchema1) UpdatedManifest(options types.ManifestUpdateOptions) ([]byte, error) {
 	copy := *m
 	if options.LayerInfos != nil {

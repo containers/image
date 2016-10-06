@@ -180,11 +180,11 @@ type UnparsedImage interface {
 type Image interface {
 	UnparsedImage
 	// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
-	ConfigInfo() (BlobInfo, error)
+	ConfigInfo() BlobInfo
 	// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
 	// The Digest field is guaranteed to be provided; Size may be -1.
 	// WARNING: The list may contain duplicates, and they are semantically relevant.
-	LayerInfos() ([]BlobInfo, error)
+	LayerInfos() []BlobInfo
 	// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
 	Inspect() (*ImageInspectInfo, error)
 	// UpdatedManifest returns the image's manifest modified according to options.

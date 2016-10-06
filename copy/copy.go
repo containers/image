@@ -156,11 +156,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	}
 	canModifyManifest := len(sigs) == 0
 
-	writeReport("Getting image source configuration\n")
-	srcConfigInfo, err := src.ConfigInfo()
-	if err != nil {
-		return fmt.Errorf("Error parsing manifest: %v", err)
-	}
+	srcConfigInfo := src.ConfigInfo()
 	if srcConfigInfo.Digest != "" {
 		writeReport("Uploading blob %s\n", srcConfigInfo.Digest)
 		destConfigInfo, err := copyBlob(dest, rawSource, srcConfigInfo, false, reportWriter)
@@ -172,10 +168,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		}
 	}
 
-	srcLayerInfos, err := src.LayerInfos()
-	if err != nil {
-		return fmt.Errorf("Error parsing manifest: %v", err)
-	}
+	srcLayerInfos := src.LayerInfos()
 	destLayerInfos := []types.BlobInfo{}
 	copiedLayers := map[string]types.BlobInfo{}
 	for _, srcLayer := range srcLayerInfos {

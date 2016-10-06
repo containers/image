@@ -31,10 +31,10 @@ type genericImage struct {
 	*UnparsedImage
 	manifestBlob     []byte
 	manifestMIMEType string
-	// parsedManifest contains data corresponding to manifestBlob.
-	// NOTE: The manifest may have been modified in the process; DO NOT reserialize and store parsedManifest
+	// genericManifest contains data corresponding to manifestBlob.
+	// NOTE: The manifest may have been modified in the process; DO NOT reserialize and store genericManifest
 	// if you want to preserve the original manifest; use manifestBlob directly.
-	parsedManifest genericManifest
+	genericManifest
 }
 
 // FromUnparsedImage returns a types.Image implementation for unparsed.
@@ -75,7 +75,7 @@ func FromUnparsedImage(unparsed *UnparsedImage) (types.Image, error) {
 		UnparsedImage:    unparsed,
 		manifestBlob:     manifestBlob,
 		manifestMIMEType: manifestMIMEType,
-		parsedManifest:   parsedManifest,
+		genericManifest:  parsedManifest,
 	}, nil
 }
 
@@ -85,34 +85,16 @@ func (i *genericImage) Manifest() ([]byte, string, error) {
 }
 
 func (i *genericImage) Inspect() (*types.ImageInspectInfo, error) {
-	info, err := i.parsedManifest.ImageInspectInfo()
+	info, err := i.genericManifest.imageInspectInfo()
 	if err != nil {
 		return nil, err
 	}
-	layers := i.parsedManifest.LayerInfos()
+	layers := i.LayerInfos()
 	info.Layers = make([]string, len(layers))
 	for i, layer := range layers {
 		info.Layers[i] = layer.Digest
 	}
 	return info, nil
-}
-
-// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
-func (i *genericImage) ConfigInfo() (types.BlobInfo, error) {
-	return i.parsedManifest.ConfigInfo(), nil
-}
-
-// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
-// The Digest field is guaranteed to be provided; Size may be -1.
-// WARNING: The list may contain duplicates, and they are semantically relevant.
-func (i *genericImage) LayerInfos() ([]types.BlobInfo, error) {
-	return i.parsedManifest.LayerInfos(), nil
-}
-
-// UpdatedManifest returns the image's manifest modified according to updateOptions.
-// This does not change the state of the Image object.
-func (i *genericImage) UpdatedManifest(options types.ManifestUpdateOptions) ([]byte, error) {
-	return i.parsedManifest.UpdatedManifest(options)
 }
 
 func (i *genericImage) IsMultiImage() bool {
