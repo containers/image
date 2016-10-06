@@ -243,48 +243,57 @@ func (c *dockerClient) getBearerToken(realm, service, scope string) (string, err
 	return tokenStruct.Token, nil
 }
 
-func getAuth(hostname string) (string, string, error) {
+func getAuth(registry string) (string, string, error) {
 	// TODO(runcom): get this from *cli.Context somehow
 	//if username != "" && password != "" {
 	//return username, password, nil
 	//}
-	if hostname == dockerHostname {
-		hostname = dockerAuthRegistry
-	}
+	var dockerAuth dockerConfigFile
 	dockerCfgPath := filepath.Join(getDefaultConfigDir(".docker"), dockerCfgFileName)
 	if _, err := os.Stat(dockerCfgPath); err == nil {
 		j, err := ioutil.ReadFile(dockerCfgPath)
 		if err != nil {
 			return "", "", err
 		}
-		var dockerAuth dockerConfigFile
 		if err := json.Unmarshal(j, &dockerAuth); err != nil {
 			return "", "", err
 		}
-		// try the normal case
-		if c, ok := dockerAuth.AuthConfigs[hostname]; ok {
-			return decodeDockerAuth(c.Auth)
-		}
+
 	} else if os.IsNotExist(err) {
+		// try old config path
 		oldDockerCfgPath := filepath.Join(getDefaultConfigDir(dockerCfgObsolete))
 		if _, err := os.Stat(oldDockerCfgPath); err != nil {
-			return "", "", nil //missing file is not an error
+			if os.IsNotExist(err) {
+				return "", "", nil
+			}
+			return "", "", fmt.Errorf("%s - %v", oldDockerCfgPath, err)
 		}
+
 		j, err := ioutil.ReadFile(oldDockerCfgPath)
 		if err != nil {
 			return "", "", err
 		}
-		var dockerAuthOld map[string]dockerAuthConfigObsolete
-		if err := json.Unmarshal(j, &dockerAuthOld); err != nil {
+		if err := json.Unmarshal(j, &dockerAuth.AuthConfigs); err != nil {
 			return "", "", err
 		}
-		if c, ok := dockerAuthOld[hostname]; ok {
-			return decodeDockerAuth(c.Auth)
-		}
-	} else {
-		// if file is there but we can't stat it for any reason other
-		// than it doesn't exist then stop
+
+	} else if err != nil {
 		return "", "", fmt.Errorf("%s - %v", dockerCfgPath, err)
+	}
+
+	// I'm feeling lucky
+	if c, exists := dockerAuth.AuthConfigs[registry]; exists {
+		return decodeDockerAuth(c.Auth)
+	}
+
+	// bad luck; let's normalize the entries first
+	registry = normalizeRegistry(registry)
+	normalizedAuths := map[string]dockerAuthConfig{}
+	for k, v := range dockerAuth.AuthConfigs {
+		normalizedAuths[normalizeRegistry(k)] = v
+	}
+	if c, exists := normalizedAuths[registry]; exists {
+		return decodeDockerAuth(c.Auth)
 	}
 	return "", "", nil
 }
@@ -342,10 +351,6 @@ func getDefaultConfigDir(confPath string) string {
 	return filepath.Join(homedir.Get(), confPath)
 }
 
-type dockerAuthConfigObsolete struct {
-	Auth string `json:"auth"`
-}
-
 type dockerAuthConfig struct {
 	Auth string `json:"auth,omitempty"`
 }
@@ -367,4 +372,29 @@ func decodeDockerAuth(s string) (string, string, error) {
 	user := parts[0]
 	password := strings.Trim(parts[1], "\x00")
 	return user, password, nil
+}
+
+// convertToHostname converts a registry url which has http|https prepended
+// to just an hostname.
+// Copied from github.com/docker/docker/registry/auth.go
+func convertToHostname(url string) string {
+	stripped := url
+	if strings.HasPrefix(url, "http://") {
+		stripped = strings.TrimPrefix(url, "http://")
+	} else if strings.HasPrefix(url, "https://") {
+		stripped = strings.TrimPrefix(url, "https://")
+	}
+
+	nameParts := strings.SplitN(stripped, "/", 2)
+
+	return nameParts[0]
+}
+
+func normalizeRegistry(registry string) string {
+	normalized := convertToHostname(registry)
+	switch normalized {
+	case "registry-1.docker.io", "docker.io":
+		return "index.docker.io"
+	}
+	return normalized
 }
