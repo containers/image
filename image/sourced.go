@@ -85,16 +85,7 @@ func (i *sourcedImage) Manifest() ([]byte, string, error) {
 }
 
 func (i *sourcedImage) Inspect() (*types.ImageInspectInfo, error) {
-	info, err := i.genericManifest.imageInspectInfo()
-	if err != nil {
-		return nil, err
-	}
-	layers := i.LayerInfos()
-	info.Layers = make([]string, len(layers))
-	for i, layer := range layers {
-		info.Layers[i] = layer.Digest
-	}
-	return info, nil
+	return inspectManifest(i.genericManifest)
 }
 
 func (i *sourcedImage) IsMultiImage() bool {

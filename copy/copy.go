@@ -131,12 +131,6 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		return fmt.Errorf("can not copy %s: manifest contains multiple images", transports.ImageName(srcRef))
 	}
 
-	writeReport("Getting image source manifest\n")
-	manifest, _, err := src.Manifest()
-	if err != nil {
-		return fmt.Errorf("Error reading manifest: %v", err)
-	}
-
 	var sigs [][]byte
 	if options != nil && options.RemoveSignatures {
 		sigs = [][]byte{}
@@ -189,14 +183,19 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		manifestUpdates.LayerInfos = destLayerInfos
 	}
 
+	pendingImage := src
 	if !reflect.DeepEqual(manifestUpdates, types.ManifestUpdateOptions{}) {
 		if !canModifyManifest {
 			return fmt.Errorf("Internal error: copy needs an updated manifest but that was known to be forbidden")
 		}
-		manifest, err = src.UpdatedManifest(manifestUpdates)
+		pendingImage, err = src.UpdatedImage(manifestUpdates)
 		if err != nil {
 			return fmt.Errorf("Error creating an updated manifest: %v", err)
 		}
+	}
+	manifest, _, err := pendingImage.Manifest()
+	if err != nil {
+		return fmt.Errorf("Error reading manifest: %v", err)
 	}
 
 	if options != nil && options.SignBy != "" {

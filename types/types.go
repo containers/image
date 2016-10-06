@@ -178,6 +178,7 @@ type UnparsedImage interface {
 // Image is the primary API for inspecting properties of images.
 // Each Image should eventually be closed by calling Close().
 type Image interface {
+	// Note that Reference may return nil in the return value of UpdatedImage!
 	UnparsedImage
 	// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
 	ConfigInfo() BlobInfo
@@ -187,9 +188,9 @@ type Image interface {
 	LayerInfos() []BlobInfo
 	// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
 	Inspect() (*ImageInspectInfo, error)
-	// UpdatedManifest returns the image's manifest modified according to options.
-	// This does not change the state of the Image object.
-	UpdatedManifest(options ManifestUpdateOptions) ([]byte, error)
+	// UpdatedImage returns a types.Image modified according to options.
+	// This does not change the state of the original Image object.
+	UpdatedImage(options ManifestUpdateOptions) (Image, error)
 	// IsMultiImage returns true if the image's manifest is a list of images, false otherwise.
 	IsMultiImage() bool
 }

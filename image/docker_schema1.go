@@ -47,6 +47,15 @@ func manifestSchema1FromManifest(manifest []byte) (genericManifest, error) {
 	return mschema1, nil
 }
 
+func (m *manifestSchema1) serialize() ([]byte, error) {
+	// docker/distribution requires a signature even if the incoming data uses the nominally unsigned DockerV2Schema1MediaType.
+	unsigned, err := json.Marshal(*m)
+	if err != nil {
+		return nil, err
+	}
+	return manifest.AddDummyV2S1Signature(unsigned)
+}
+
 // ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
 func (m *manifestSchema1) ConfigInfo() types.BlobInfo {
 	return types.BlobInfo{}
@@ -86,9 +95,9 @@ func (m *manifestSchema1) imageInspectInfo() (*types.ImageInspectInfo, error) {
 	}, nil
 }
 
-// UpdatedManifest returns the image's manifest modified according to options.
-// This does not change the state of the Image object.
-func (m *manifestSchema1) UpdatedManifest(options types.ManifestUpdateOptions) ([]byte, error) {
+// UpdatedImage returns a types.Image modified according to options.
+// This does not change the state of the original Image object.
+func (m *manifestSchema1) UpdatedImage(options types.ManifestUpdateOptions) (types.Image, error) {
 	copy := *m
 	if options.LayerInfos != nil {
 		// Our LayerInfos includes empty layers (where m.History.V1Compatibility->ThrowAway), so expect them to be included here as well.
@@ -102,12 +111,7 @@ func (m *manifestSchema1) UpdatedManifest(options types.ManifestUpdateOptions) (
 			copy.FSLayers[(len(options.LayerInfos)-1)-i].BlobSum = info.Digest
 		}
 	}
-	// docker/distribution requires a signature even if the incoming data uses the nominally unsigned DockerV2Schema1MediaType.
-	unsigned, err := json.Marshal(copy)
-	if err != nil {
-		return nil, err
-	}
-	return manifest.AddDummyV2S1Signature(unsigned)
+	return memoryImageFromManifest(&copy, manifest.DockerV2Schema1SignedMediaType), nil
 }
 
 // fixManifestLayers, after validating the supplied manifest

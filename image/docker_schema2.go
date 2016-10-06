@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 )
 
@@ -28,6 +29,10 @@ func manifestSchema2FromManifest(src types.ImageSource, manifest []byte) (generi
 		return nil, err
 	}
 	return &v2s2, nil
+}
+
+func (m *manifestSchema2) serialize() ([]byte, error) {
+	return json.Marshal(*m)
 }
 
 // ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
@@ -74,9 +79,9 @@ func (m *manifestSchema2) imageInspectInfo() (*types.ImageInspectInfo, error) {
 	}, nil
 }
 
-// UpdatedManifest returns the image's manifest modified according to options.
-// This does not change the state of the Image object.
-func (m *manifestSchema2) UpdatedManifest(options types.ManifestUpdateOptions) ([]byte, error) {
+// UpdatedImage returns a types.Image modified according to options.
+// This does not change the state of the original Image object.
+func (m *manifestSchema2) UpdatedImage(options types.ManifestUpdateOptions) (types.Image, error) {
 	copy := *m
 	if options.LayerInfos != nil {
 		if len(copy.LayersDescriptors) != len(options.LayerInfos) {
@@ -87,5 +92,5 @@ func (m *manifestSchema2) UpdatedManifest(options types.ManifestUpdateOptions) (
 			copy.LayersDescriptors[i].Size = info.Size
 		}
 	}
-	return json.Marshal(copy)
+	return memoryImageFromManifest(&copy, manifest.DockerV2Schema2MediaType), nil
 }

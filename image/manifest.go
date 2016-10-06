@@ -31,6 +31,7 @@ type v1Image struct {
 // so that embedding a genericManifest into structs works.
 // will support v1 one day...
 type genericManifest interface {
+	serialize() ([]byte, error)
 	config() ([]byte, error)
 	// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
 	ConfigInfo() types.BlobInfo
@@ -38,10 +39,10 @@ type genericManifest interface {
 	// The Digest field is guaranteed to be provided; Size may be -1.
 	// WARNING: The list may contain duplicates, and they are semantically relevant.
 	LayerInfos() []types.BlobInfo
-	imageInspectInfo() (*types.ImageInspectInfo, error) // The caller will need to fill in Layers
-	// UpdatedManifest returns the image's manifest modified according to options.
-	// This does not change the state of the Image object.
-	UpdatedManifest(types.ManifestUpdateOptions) ([]byte, error)
+	imageInspectInfo() (*types.ImageInspectInfo, error) // To be called by inspectManifest
+	// UpdatedImage returns a types.Image modified according to options.
+	// This does not change the state of the original Image object.
+	UpdatedImage(options types.ManifestUpdateOptions) (types.Image, error)
 }
 
 func manifestInstanceFromBlob(src types.ImageSource, manblob []byte, mt string) (genericManifest, error) {
@@ -60,4 +61,18 @@ func manifestInstanceFromBlob(src types.ImageSource, manblob []byte, mt string) 
 	default:
 		return nil, fmt.Errorf("unsupported manifest media type %s", mt)
 	}
+}
+
+// inspectManifest is an implementation of types.Image.Inspect
+func inspectManifest(m genericManifest) (*types.ImageInspectInfo, error) {
+	info, err := m.imageInspectInfo()
+	if err != nil {
+		return nil, err
+	}
+	layers := m.LayerInfos()
+	info.Layers = make([]string, len(layers))
+	for i, layer := range layers {
+		info.Layers[i] = layer.Digest
+	}
+	return info, nil
 }
