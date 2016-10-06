@@ -13,7 +13,7 @@ import (
 	"github.com/containers/image/types"
 )
 
-func (pr *prSignedBy) isSignatureAuthorAccepted(image types.Image, sig []byte) (signatureAcceptanceResult, *Signature, error) {
+func (pr *prSignedBy) isSignatureAuthorAccepted(image types.UnparsedImage, sig []byte) (signatureAcceptanceResult, *Signature, error) {
 	switch pr.KeyType {
 	case SBKeyTypeGPGKeys:
 	case SBKeyTypeSignedByGPGKeys, SBKeyTypeX509Certificates, SBKeyTypeSignedByX509CAs:
@@ -97,7 +97,7 @@ func (pr *prSignedBy) isSignatureAuthorAccepted(image types.Image, sig []byte) (
 	return sarAccepted, signature, nil
 }
 
-func (pr *prSignedBy) isRunningImageAllowed(image types.Image) (bool, error) {
+func (pr *prSignedBy) isRunningImageAllowed(image types.UnparsedImage) (bool, error) {
 	sigs, err := image.Signatures()
 	if err != nil {
 		return false, err

@@ -171,9 +171,9 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 	}
 }
 
-// pcImageMock returns a types.Image for a directory, claiming a specified dockerReference and implementing PolicyConfigurationIdentity/PolicyConfigurationNamespaces.
+// pcImageMock returns a types.UnparsedImage for a directory, claiming a specified dockerReference and implementing PolicyConfigurationIdentity/PolicyConfigurationNamespaces.
 // The caller must call .Close() on the returned Image.
-func pcImageMock(t *testing.T, dir, dockerReference string) types.Image {
+func pcImageMock(t *testing.T, dir, dockerReference string) types.UnparsedImage {
 	ref, err := reference.ParseNamed(dockerReference)
 	require.NoError(t, err)
 	return dirImageMockWithRef(t, dir, pcImageReferenceMock{"docker", ref})

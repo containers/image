@@ -50,14 +50,11 @@ func TestParseImageAndDockerReference(t *testing.T) {
 	}
 }
 
-// refImageMock is a mock of types.Image which returns itself in Reference().DockerReference.
+// refImageMock is a mock of types.UnparsedImage which returns itself in Reference().DockerReference.
 type refImageMock struct{ reference.Named }
 
 func (ref refImageMock) Reference() types.ImageReference {
 	return refImageReferenceMock{ref.Named}
-}
-func (ref refImageMock) IsMultiImage() (bool, error) {
-	panic("unexpected call to a mock function")
 }
 func (ref refImageMock) Close() {
 	panic("unexpected call to a mock function")
@@ -65,25 +62,7 @@ func (ref refImageMock) Close() {
 func (ref refImageMock) Manifest() ([]byte, string, error) {
 	panic("unexpected call to a mock function")
 }
-func (ref refImageMock) ManifestMatchesDigest(expectedDigest string) (bool, error) {
-	panic("unexpected call to a mock function")
-}
 func (ref refImageMock) Signatures() ([][]byte, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageMock) ConfigInfo() (types.BlobInfo, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageMock) LayerInfos() ([]types.BlobInfo, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageMock) Inspect() (*types.ImageInspectInfo, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageMock) UpdatedManifest(options types.ManifestUpdateOptions) ([]byte, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageMock) GetRepositoryTags() ([]string, error) {
 	panic("unexpected call to a mock function")
 }
 
@@ -267,12 +246,9 @@ func TestParseDockerReferences(t *testing.T) {
 	}
 }
 
-// forbiddenImageMock is a mock of types.Image which ensures Reference is not called
+// forbiddenImageMock is a mock of types.UnparsedImage which ensures Reference is not called
 type forbiddenImageMock struct{}
 
-func (ref forbiddenImageMock) IsMultiImage() (bool, error) {
-	panic("unexpected call to a mock function")
-}
 func (ref forbiddenImageMock) Reference() types.ImageReference {
 	panic("unexpected call to a mock function")
 }
@@ -282,25 +258,7 @@ func (ref forbiddenImageMock) Close() {
 func (ref forbiddenImageMock) Manifest() ([]byte, string, error) {
 	panic("unexpected call to a mock function")
 }
-func (ref forbiddenImageMock) ManifestMatchesDigest(expectedDigest string) (bool, error) {
-	panic("unexpected call to a mock function")
-}
 func (ref forbiddenImageMock) Signatures() ([][]byte, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref forbiddenImageMock) ConfigInfo() (types.BlobInfo, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref forbiddenImageMock) LayerInfos() ([]types.BlobInfo, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref forbiddenImageMock) Inspect() (*types.ImageInspectInfo, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref forbiddenImageMock) UpdatedManifest(options types.ManifestUpdateOptions) ([]byte, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref forbiddenImageMock) GetRepositoryTags() ([]string, error) {
 	panic("unexpected call to a mock function")
 }
 

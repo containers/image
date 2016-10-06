@@ -11,7 +11,7 @@ import (
 )
 
 // parseImageAndDockerReference converts an image and a reference string into two parsed entities, failing on any error and handling unidentified images.
-func parseImageAndDockerReference(image types.Image, s2 string) (reference.Named, reference.Named, error) {
+func parseImageAndDockerReference(image types.UnparsedImage, s2 string) (reference.Named, reference.Named, error) {
 	r1 := image.Reference().DockerReference()
 	if r1 == nil {
 		return nil, nil, PolicyRequirementError(fmt.Sprintf("Docker reference match attempted on image %s with no known Docker reference identity",
@@ -24,7 +24,7 @@ func parseImageAndDockerReference(image types.Image, s2 string) (reference.Named
 	return r1, r2, nil
 }
 
-func (prm *prmMatchExact) matchesDockerReference(image types.Image, signatureDockerReference string) bool {
+func (prm *prmMatchExact) matchesDockerReference(image types.UnparsedImage, signatureDockerReference string) bool {
 	intended, signature, err := parseImageAndDockerReference(image, signatureDockerReference)
 	if err != nil {
 		return false
@@ -36,7 +36,7 @@ func (prm *prmMatchExact) matchesDockerReference(image types.Image, signatureDoc
 	return signature.String() == intended.String()
 }
 
-func (prm *prmMatchRepository) matchesDockerReference(image types.Image, signatureDockerReference string) bool {
+func (prm *prmMatchRepository) matchesDockerReference(image types.UnparsedImage, signatureDockerReference string) bool {
 	intended, signature, err := parseImageAndDockerReference(image, signatureDockerReference)
 	if err != nil {
 		return false
@@ -57,7 +57,7 @@ func parseDockerReferences(s1, s2 string) (reference.Named, reference.Named, err
 	return r1, r2, nil
 }
 
-func (prm *prmExactReference) matchesDockerReference(image types.Image, signatureDockerReference string) bool {
+func (prm *prmExactReference) matchesDockerReference(image types.UnparsedImage, signatureDockerReference string) bool {
 	intended, signature, err := parseDockerReferences(prm.DockerReference, signatureDockerReference)
 	if err != nil {
 		return false
@@ -69,7 +69,7 @@ func (prm *prmExactReference) matchesDockerReference(image types.Image, signatur
 	return signature.String() == intended.String()
 }
 
-func (prm *prmExactRepository) matchesDockerReference(image types.Image, signatureDockerReference string) bool {
+func (prm *prmExactRepository) matchesDockerReference(image types.UnparsedImage, signatureDockerReference string) bool {
 	intended, signature, err := parseDockerReferences(prm.DockerRepository, signatureDockerReference)
 	if err != nil {
 		return false

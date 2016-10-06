@@ -156,20 +156,28 @@ type ImageDestination interface {
 	Commit() error
 }
 
-// Image is the primary API for inspecting properties of images.
-// Each Image should eventually be closed by calling Close().
-type Image interface {
+// UnparsedImage is an Image-to-be; until it is verified and accepted, it only caries its identity and caches manifest and signature blobs.
+// Thus, an UnparsedImage can be created from an ImageSource simply by fetching blobs without interpreting them,
+// allowing cryptographic signature verification to happen first, before even fetching the manifest, or parsing anything else.
+// This also makes the UnparsedImage→Image conversion an explicitly visible step.
+// Each UnparsedImage should eventually be closed by calling Close().
+type UnparsedImage interface {
 	// Reference returns the reference used to set up this source, _as specified by the user_
 	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 	Reference() ImageReference
-	// Close removes resources associated with an initialized Image, if any.
+	// Close removes resources associated with an initialized UnparsedImage, if any.
 	Close()
-	// ref to repository?
 	// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
-	// NOTE: It is essential for signature verification that Manifest returns the manifest from which ConfigInfo and LayerInfos is computed.
 	Manifest() ([]byte, string, error)
 	// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 	Signatures() ([][]byte, error)
+}
+
+// Image is the primary API for inspecting properties of images.
+// Each Image should eventually be closed by calling Close().
+type Image interface {
+	// NOTE: It is essential for signature verification that Manifest returns the manifest from which ConfigInfo and LayerInfos is computed.
+	UnparsedImage
 	// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
 	// NOTE: It is essential for signature verification that ConfigInfo is computed from the same manifest which is returned by Manifest().
 	ConfigInfo() (BlobInfo, error)
