@@ -31,6 +31,10 @@ type genericImage struct {
 	*UnparsedImage
 	manifestBlob     []byte
 	manifestMIMEType string
+	// parsedManifest contains data corresponding to manifestBlob.
+	// NOTE: The manifest may have been modified in the process; DO NOT reserialize and store parsedManifest
+	// if you want to preserve the original manifest; use manifestBlob directly.
+	parsedManifest genericManifest
 }
 
 // FromUnparsedImage returns a types.Image implementation for unparsed.
@@ -62,10 +66,16 @@ func FromUnparsedImage(unparsed *UnparsedImage) (types.Image, error) {
 		manifestMIMEType = manifest.GuessMIMEType(manifestBlob)
 	}
 
+	parsedManifest, err := manifestInstanceFromBlob(unparsed.src, manifestBlob, manifestMIMEType)
+	if err != nil {
+		return nil, err
+	}
+
 	return &genericImage{
 		UnparsedImage:    unparsed,
 		manifestBlob:     manifestBlob,
 		manifestMIMEType: manifestMIMEType,
+		parsedManifest:   parsedManifest,
 	}, nil
 }
 
@@ -74,24 +84,12 @@ func (i *genericImage) Manifest() ([]byte, string, error) {
 	return i.manifestBlob, i.manifestMIMEType, nil
 }
 
-// getParsedManifest parses the manifest into a data structure, cleans it up, and returns it.
-// NOTE: The manifest may have been modified in the process; DO NOT reserialize and store the return value
-// if you want to preserve the original manifest; use the blob returned by Manifest() directly.
-func (i *genericImage) getParsedManifest() (genericManifest, error) {
-	return manifestInstanceFromBlob(i.src, i.manifestBlob, i.manifestMIMEType)
-}
-
 func (i *genericImage) Inspect() (*types.ImageInspectInfo, error) {
-	// TODO(runcom): unused version param for now, default to docker v2-1
-	m, err := i.getParsedManifest()
+	info, err := i.parsedManifest.ImageInspectInfo()
 	if err != nil {
 		return nil, err
 	}
-	info, err := m.ImageInspectInfo()
-	if err != nil {
-		return nil, err
-	}
-	layers := m.LayerInfos()
+	layers := i.parsedManifest.LayerInfos()
 	info.Layers = make([]string, len(layers))
 	for i, layer := range layers {
 		info.Layers[i] = layer.Digest
@@ -101,32 +99,20 @@ func (i *genericImage) Inspect() (*types.ImageInspectInfo, error) {
 
 // ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
 func (i *genericImage) ConfigInfo() (types.BlobInfo, error) {
-	m, err := i.getParsedManifest()
-	if err != nil {
-		return types.BlobInfo{}, err
-	}
-	return m.ConfigInfo(), nil
+	return i.parsedManifest.ConfigInfo(), nil
 }
 
 // LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
 // The Digest field is guaranteed to be provided; Size may be -1.
 // WARNING: The list may contain duplicates, and they are semantically relevant.
 func (i *genericImage) LayerInfos() ([]types.BlobInfo, error) {
-	m, err := i.getParsedManifest()
-	if err != nil {
-		return nil, err
-	}
-	return m.LayerInfos(), nil
+	return i.parsedManifest.LayerInfos(), nil
 }
 
 // UpdatedManifest returns the image's manifest modified according to updateOptions.
 // This does not change the state of the Image object.
 func (i *genericImage) UpdatedManifest(options types.ManifestUpdateOptions) ([]byte, error) {
-	m, err := i.getParsedManifest()
-	if err != nil {
-		return nil, err
-	}
-	return m.UpdatedManifest(options)
+	return i.parsedManifest.UpdatedManifest(options)
 }
 
 func (i *genericImage) IsMultiImage() bool {
