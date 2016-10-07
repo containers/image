@@ -171,7 +171,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		return fmt.Errorf("Error reading manifest: %v", err)
 	}
 
-	if err := copyConfig(dest, src, rawSource, reportWriter); err != nil {
+	if err := copyConfig(dest, pendingImage, reportWriter); err != nil {
 		return err
 	}
 
@@ -219,7 +219,7 @@ func copyLayers(manifestUpdates *types.ManifestUpdateOptions, dest types.ImageDe
 		destLayer, ok := copiedLayers[srcLayer.Digest]
 		if !ok {
 			fmt.Fprintf(reportWriter, "Copying blob %s\n", srcLayer.Digest)
-			dl, err := copyBlob(dest, rawSource, srcLayer, canModifyManifest, reportWriter)
+			dl, err := copyLayer(dest, rawSource, srcLayer, canModifyManifest, reportWriter)
 			if err != nil {
 				return err
 			}
@@ -247,12 +247,16 @@ func layerDigestsDiffer(a, b []types.BlobInfo) bool {
 	return false
 }
 
-// copyConfig copies config.json, if any, from src/rawSource to dest.
-func copyConfig(dest types.ImageDestination, src types.Image, rawSource types.ImageSource, reportWriter io.Writer) error {
+// copyConfig copies config.json, if any, from src to dest.
+func copyConfig(dest types.ImageDestination, src types.Image, reportWriter io.Writer) error {
 	srcInfo := src.ConfigInfo()
 	if srcInfo.Digest != "" {
 		fmt.Fprintf(reportWriter, "Copying config %s\n", srcInfo.Digest)
-		destInfo, err := copyBlob(dest, rawSource, srcInfo, false, reportWriter)
+		configBlob, err := src.ConfigBlob()
+		if err != nil {
+			return fmt.Errorf("Error reading config blob %s: %v", srcInfo.Digest, err)
+		}
+		destInfo, err := copyBlobFromStream(dest, bytes.NewReader(configBlob), srcInfo, false, reportWriter)
 		if err != nil {
 			return err
 		}
@@ -263,15 +267,20 @@ func copyConfig(dest types.ImageDestination, src types.Image, rawSource types.Im
 	return nil
 }
 
-// copyBlob copies a blob with srcInfo (with known Digest and possibly known Size) in src to dest, perhaps compressing it if canCompress,
-// and returns a complete blobInfo of the copied blob.
-func copyBlob(dest types.ImageDestination, src types.ImageSource, srcInfo types.BlobInfo, canCompress bool, reportWriter io.Writer) (types.BlobInfo, error) {
+// copyLayer copies a layer with srcInfo (with known Digest and possibly known Size) in src to dest, perhaps compressing it if canCompress,
+// and returns a complete blobInfo of the copied layer.
+func copyLayer(dest types.ImageDestination, src types.ImageSource, srcInfo types.BlobInfo, canCompress bool, reportWriter io.Writer) (types.BlobInfo, error) {
 	srcStream, srcBlobSize, err := src.GetBlob(srcInfo.Digest) // We currently completely ignore srcInfo.Size throughout.
 	if err != nil {
 		return types.BlobInfo{}, fmt.Errorf("Error reading blob %s: %v", srcInfo.Digest, err)
 	}
 	defer srcStream.Close()
+	return copyBlobFromStream(dest, srcStream, types.BlobInfo{Digest: srcInfo.Digest, Size: srcBlobSize}, canCompress, reportWriter)
+}
 
+// copyBlobFromStream copies a blob with srcInfo (with known Digest and possibly known Size) from srcStream to dest, perhaps compressing it if canCompress,
+// and returns a complete blobInfo of the copied blob.
+func copyBlobFromStream(dest types.ImageDestination, srcStream io.Reader, srcInfo types.BlobInfo, canCompress bool, reportWriter io.Writer) (types.BlobInfo, error) {
 	// Be paranoid; in case PutBlob somehow managed to ignore an error from digestingReader,
 	// use a separate validation failure indicator.
 	// Note that we don't use a stronger "validationSucceeded" indicator, because
@@ -300,8 +309,7 @@ func copyBlob(dest types.ImageDestination, src types.ImageSource, srcInfo types.
 	var inputInfo types.BlobInfo
 	if !canCompress || isCompressed || !dest.ShouldCompressLayers() {
 		logrus.Debugf("Using original blob without modification")
-		inputInfo.Digest = srcInfo.Digest
-		inputInfo.Size = srcBlobSize
+		inputInfo = srcInfo
 	} else {
 		logrus.Debugf("Compressing blob on the fly")
 		pipeReader, pipeWriter := io.Pipe()

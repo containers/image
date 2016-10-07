@@ -184,7 +184,11 @@ type Image interface {
 	// Note that Reference may return nil in the return value of UpdatedImage!
 	UnparsedImage
 	// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
+	// Note that the config object may not exist in the underlying storage in the return value of UpdatedImage! Use ConfigBlob() below.
 	ConfigInfo() BlobInfo
+	// ConfigBlob returns the blob described by ConfigInfo, iff ConfigInfo().Digest != ""; nil otherwise.
+	// The result is cached; it is OK to call this however often you need.
+	ConfigBlob() ([]byte, error)
 	// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
 	// The Digest field is guaranteed to be provided; Size may be -1.
 	// WARNING: The list may contain duplicates, and they are semantically relevant.
