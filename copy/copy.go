@@ -152,18 +152,6 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	canModifyManifest := len(sigs) == 0
 	manifestUpdates := types.ManifestUpdateOptions{}
 
-	srcConfigInfo := src.ConfigInfo()
-	if srcConfigInfo.Digest != "" {
-		writeReport("Copying blob %s\n", srcConfigInfo.Digest)
-		destConfigInfo, err := copyBlob(dest, rawSource, srcConfigInfo, false, reportWriter)
-		if err != nil {
-			return err
-		}
-		if destConfigInfo.Digest != srcConfigInfo.Digest {
-			return fmt.Errorf("Internal error: copying uncompressed config blob %s changed digest to %s", srcConfigInfo.Digest, destConfigInfo.Digest)
-		}
-	}
-
 	if err := copyLayers(&manifestUpdates, dest, src, rawSource, canModifyManifest, reportWriter); err != nil {
 		return err
 	}
@@ -181,6 +169,18 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	manifest, _, err := pendingImage.Manifest()
 	if err != nil {
 		return fmt.Errorf("Error reading manifest: %v", err)
+	}
+
+	srcConfigInfo := src.ConfigInfo()
+	if srcConfigInfo.Digest != "" {
+		writeReport("Copying blob %s\n", srcConfigInfo.Digest)
+		destConfigInfo, err := copyBlob(dest, rawSource, srcConfigInfo, false, reportWriter)
+		if err != nil {
+			return err
+		}
+		if destConfigInfo.Digest != srcConfigInfo.Digest {
+			return fmt.Errorf("Internal error: copying uncompressed config blob %s changed digest to %s", srcConfigInfo.Digest, destConfigInfo.Digest)
+		}
 	}
 
 	if options != nil && options.SignBy != "" {
