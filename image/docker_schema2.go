@@ -1,6 +1,8 @@
 package image
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -15,11 +17,12 @@ type descriptor struct {
 }
 
 type manifestSchema2 struct {
-	src               types.ImageSource
-	SchemaVersion     int          `json:"schemaVersion"`
-	MediaType         string       `json:"mediaType"`
-	ConfigDescriptor  descriptor   `json:"config"`
-	LayersDescriptors []descriptor `json:"layers"`
+	src               types.ImageSource // May be nil if configBlob is not nil
+	configBlob        []byte            // If set, corresponds to contents of ConfigDescriptor.
+	SchemaVersion     int               `json:"schemaVersion"`
+	MediaType         string            `json:"mediaType"`
+	ConfigDescriptor  descriptor        `json:"config"`
+	LayersDescriptors []descriptor      `json:"layers"`
 }
 
 func manifestSchema2FromManifest(src types.ImageSource, manifest []byte) (genericManifest, error) {
@@ -39,8 +42,35 @@ func (m *manifestSchema2) manifestMIMEType() string {
 }
 
 // ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
+// Note that the config object may not exist in the underlying storage in the return value of UpdatedImage! Use ConfigBlob() below.
 func (m *manifestSchema2) ConfigInfo() types.BlobInfo {
 	return types.BlobInfo{Digest: m.ConfigDescriptor.Digest, Size: m.ConfigDescriptor.Size}
+}
+
+// ConfigBlob returns the blob described by ConfigInfo, iff ConfigInfo().Digest != ""; nil otherwise.
+// The result is cached; it is OK to call this however often you need.
+func (m *manifestSchema2) ConfigBlob() ([]byte, error) {
+	if m.configBlob == nil {
+		if m.src == nil {
+			return nil, fmt.Errorf("Internal error: neither src nor configBlob set in manifestSchema2")
+		}
+		stream, _, err := m.src.GetBlob(m.ConfigDescriptor.Digest)
+		if err != nil {
+			return nil, err
+		}
+		defer stream.Close()
+		blob, err := ioutil.ReadAll(stream)
+		if err != nil {
+			return nil, err
+		}
+		hash := sha256.Sum256(blob)
+		computedDigest := "sha256:" + hex.EncodeToString(hash[:])
+		if computedDigest != m.ConfigDescriptor.Digest {
+			return nil, fmt.Errorf("Download config.json digest %s does not match expected %s", computedDigest, m.ConfigDescriptor.Digest)
+		}
+		m.configBlob = blob
+	}
+	return m.configBlob, nil
 }
 
 // LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
@@ -54,18 +84,8 @@ func (m *manifestSchema2) LayerInfos() []types.BlobInfo {
 	return blobs
 }
 
-func (m *manifestSchema2) config() ([]byte, error) {
-	rawConfig, _, err := m.src.GetBlob(m.ConfigDescriptor.Digest)
-	if err != nil {
-		return nil, err
-	}
-	config, err := ioutil.ReadAll(rawConfig)
-	rawConfig.Close()
-	return config, err
-}
-
 func (m *manifestSchema2) imageInspectInfo() (*types.ImageInspectInfo, error) {
-	config, err := m.config()
+	config, err := m.ConfigBlob()
 	if err != nil {
 		return nil, err
 	}

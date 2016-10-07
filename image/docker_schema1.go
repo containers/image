@@ -61,8 +61,15 @@ func (m *manifestSchema1) manifestMIMEType() string {
 }
 
 // ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
+// Note that the config object may not exist in the underlying storage in the return value of UpdatedImage! Use ConfigBlob() below.
 func (m *manifestSchema1) ConfigInfo() types.BlobInfo {
 	return types.BlobInfo{}
+}
+
+// ConfigBlob returns the blob described by ConfigInfo, iff ConfigInfo().Digest != ""; nil otherwise.
+// The result is cached; it is OK to call this however often you need.
+func (m *manifestSchema1) ConfigBlob() ([]byte, error) {
+	return nil, nil
 }
 
 // LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
@@ -76,17 +83,9 @@ func (m *manifestSchema1) LayerInfos() []types.BlobInfo {
 	return layers
 }
 
-func (m *manifestSchema1) config() ([]byte, error) {
-	return []byte(m.History[0].V1Compatibility), nil
-}
-
 func (m *manifestSchema1) imageInspectInfo() (*types.ImageInspectInfo, error) {
 	v1 := &v1Image{}
-	config, err := m.config()
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(config, v1); err != nil {
+	if err := json.Unmarshal([]byte(m.History[0].V1Compatibility), v1); err != nil {
 		return nil, err
 	}
 	return &types.ImageInspectInfo{
