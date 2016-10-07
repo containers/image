@@ -14,14 +14,12 @@ import (
 // from a memoryImage.
 type memoryImage struct {
 	genericManifest
-	manifestMIMEType   string
 	serializedManifest []byte // A private cache for Manifest()
 }
 
-func memoryImageFromManifest(m genericManifest, mimeType string) types.Image {
+func memoryImageFromManifest(m genericManifest) types.Image {
 	return &memoryImage{
 		genericManifest:    m,
-		manifestMIMEType:   mimeType,
 		serializedManifest: nil,
 	}
 }
@@ -46,7 +44,7 @@ func (i *memoryImage) Manifest() ([]byte, string, error) {
 		}
 		i.serializedManifest = m
 	}
-	return i.serializedManifest, i.manifestMIMEType, nil
+	return i.serializedManifest, i.genericManifest.manifestMIMEType(), nil
 }
 
 // Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 )
 
@@ -33,6 +32,10 @@ func manifestSchema2FromManifest(src types.ImageSource, manifest []byte) (generi
 
 func (m *manifestSchema2) serialize() ([]byte, error) {
 	return json.Marshal(*m)
+}
+
+func (m *manifestSchema2) manifestMIMEType() string {
+	return m.MediaType
 }
 
 // ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
@@ -92,5 +95,5 @@ func (m *manifestSchema2) UpdatedImage(options types.ManifestUpdateOptions) (typ
 			copy.LayersDescriptors[i].Size = info.Size
 		}
 	}
-	return memoryImageFromManifest(&copy, manifest.DockerV2Schema2MediaType), nil
+	return memoryImageFromManifest(&copy), nil
 }

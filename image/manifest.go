@@ -32,6 +32,7 @@ type v1Image struct {
 // will support v1 one day...
 type genericManifest interface {
 	serialize() ([]byte, error)
+	manifestMIMEType() string
 	config() ([]byte, error)
 	// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
 	ConfigInfo() types.BlobInfo

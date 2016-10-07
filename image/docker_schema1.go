@@ -56,6 +56,10 @@ func (m *manifestSchema1) serialize() ([]byte, error) {
 	return manifest.AddDummyV2S1Signature(unsigned)
 }
 
+func (m *manifestSchema1) manifestMIMEType() string {
+	return manifest.DockerV2Schema1SignedMediaType
+}
+
 // ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
 func (m *manifestSchema1) ConfigInfo() types.BlobInfo {
 	return types.BlobInfo{}
@@ -111,7 +115,7 @@ func (m *manifestSchema1) UpdatedImage(options types.ManifestUpdateOptions) (typ
 			copy.FSLayers[(len(options.LayerInfos)-1)-i].BlobSum = info.Digest
 		}
 	}
-	return memoryImageFromManifest(&copy, manifest.DockerV2Schema1SignedMediaType), nil
+	return memoryImageFromManifest(&copy), nil
 }
 
 // fixManifestLayers, after validating the supplied manifest
