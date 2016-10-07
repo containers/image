@@ -171,16 +171,8 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		return fmt.Errorf("Error reading manifest: %v", err)
 	}
 
-	srcConfigInfo := src.ConfigInfo()
-	if srcConfigInfo.Digest != "" {
-		writeReport("Copying blob %s\n", srcConfigInfo.Digest)
-		destConfigInfo, err := copyBlob(dest, rawSource, srcConfigInfo, false, reportWriter)
-		if err != nil {
-			return err
-		}
-		if destConfigInfo.Digest != srcConfigInfo.Digest {
-			return fmt.Errorf("Internal error: copying uncompressed config blob %s changed digest to %s", srcConfigInfo.Digest, destConfigInfo.Digest)
-		}
+	if err := copyConfig(dest, src, rawSource, reportWriter); err != nil {
+		return err
 	}
 
 	if options != nil && options.SignBy != "" {
@@ -253,6 +245,22 @@ func layerDigestsDiffer(a, b []types.BlobInfo) bool {
 		}
 	}
 	return false
+}
+
+// copyConfig copies config.json, if any, from src/rawSource to dest.
+func copyConfig(dest types.ImageDestination, src types.Image, rawSource types.ImageSource, reportWriter io.Writer) error {
+	srcInfo := src.ConfigInfo()
+	if srcInfo.Digest != "" {
+		fmt.Fprintf(reportWriter, "Copying config %s\n", srcInfo.Digest)
+		destInfo, err := copyBlob(dest, rawSource, srcInfo, false, reportWriter)
+		if err != nil {
+			return err
+		}
+		if destInfo.Digest != srcInfo.Digest {
+			return fmt.Errorf("Internal error: copying uncompressed config blob %s changed digest to %s", srcInfo.Digest, destInfo.Digest)
+		}
+	}
+	return nil
 }
 
 // copyBlob copies a blob with srcInfo (with known Digest and possibly known Size) in src to dest, perhaps compressing it if canCompress,
