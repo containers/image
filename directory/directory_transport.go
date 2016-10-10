@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/containers/image/directory/explicitfilepath"
+	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/image"
 	"github.com/containers/image/types"
-	"github.com/docker/docker/reference"
 )
 
 // Transport is an ImageTransport for directory paths.
