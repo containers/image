@@ -164,8 +164,10 @@ func (ref ociReference) PolicyConfigurationNamespaces() []string {
 	return res
 }
 
-// NewImage returns a types.Image for this reference.
+// NewImage returns a types.Image for this reference, possibly specialized for this ImageTransport.
 // The caller must call .Close() on the returned Image.
+// NOTE: If any kind of signature verification should happen, build an UnparsedImage from the value returned by NewImageSource,
+// verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage.
 func (ref ociReference) NewImage(ctx *types.SystemContext) (types.Image, error) {
 	return nil, errors.New("Full Image support not implemented for oci: image names")
 }

@@ -70,8 +70,10 @@ type ImageReference interface {
 	// and each following element to be a prefix of the element preceding it.
 	PolicyConfigurationNamespaces() []string
 
-	// NewImage returns a types.Image for this reference.
+	// NewImage returns a types.Image for this reference, possibly specialized for this ImageTransport.
 	// The caller must call .Close() on the returned Image.
+	// NOTE: If any kind of signature verification should happen, build an UnparsedImage from the value returned by NewImageSource,
+	// verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage.
 	NewImage(ctx *SystemContext) (Image, error)
 	// NewImageSource returns a types.ImageSource for this reference,
 	// asking the backend to use a manifest from requestedManifestMIMETypes if possible.
@@ -156,35 +158,41 @@ type ImageDestination interface {
 	Commit() error
 }
 
-// Image is the primary API for inspecting properties of images.
-// Each Image should eventually be closed by calling Close().
-type Image interface {
+// UnparsedImage is an Image-to-be; until it is verified and accepted, it only caries its identity and caches manifest and signature blobs.
+// Thus, an UnparsedImage can be created from an ImageSource simply by fetching blobs without interpreting them,
+// allowing cryptographic signature verification to happen first, before even fetching the manifest, or parsing anything else.
+// This also makes the UnparsedImage→Image conversion an explicitly visible step.
+// Each UnparsedImage should eventually be closed by calling Close().
+type UnparsedImage interface {
 	// Reference returns the reference used to set up this source, _as specified by the user_
 	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 	Reference() ImageReference
-	// Close removes resources associated with an initialized Image, if any.
+	// Close removes resources associated with an initialized UnparsedImage, if any.
 	Close()
-	// ref to repository?
 	// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
-	// NOTE: It is essential for signature verification that Manifest returns the manifest from which ConfigInfo and LayerInfos is computed.
 	Manifest() ([]byte, string, error)
 	// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 	Signatures() ([][]byte, error)
+}
+
+// Image is the primary API for inspecting properties of images.
+// Each Image should eventually be closed by calling Close().
+type Image interface {
+	// Note that Reference may return nil in the return value of UpdatedImage!
+	UnparsedImage
 	// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
-	// NOTE: It is essential for signature verification that ConfigInfo is computed from the same manifest which is returned by Manifest().
-	ConfigInfo() (BlobInfo, error)
+	ConfigInfo() BlobInfo
 	// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
 	// The Digest field is guaranteed to be provided; Size may be -1.
-	// NOTE: It is essential for signature verification that LayerInfos is computed from the same manifest which is returned by Manifest().
 	// WARNING: The list may contain duplicates, and they are semantically relevant.
-	LayerInfos() ([]BlobInfo, error)
+	LayerInfos() []BlobInfo
 	// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
 	Inspect() (*ImageInspectInfo, error)
-	// UpdatedManifest returns the image's manifest modified according to options.
-	// This does not change the state of the Image object.
-	UpdatedManifest(options ManifestUpdateOptions) ([]byte, error)
+	// UpdatedImage returns a types.Image modified according to options.
+	// This does not change the state of the original Image object.
+	UpdatedImage(options ManifestUpdateOptions) (Image, error)
 	// IsMultiImage returns true if the image's manifest is a list of images, false otherwise.
-	IsMultiImage() (bool, error)
+	IsMultiImage() bool
 }
 
 // ManifestUpdateOptions is a way to pass named optional arguments to Image.UpdatedManifest

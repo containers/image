@@ -149,6 +149,15 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 func TestReferenceNewImage(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)
+
+	dest, err := ref.NewImageDestination(nil)
+	require.NoError(t, err)
+	defer dest.Close()
+	err = dest.PutManifest([]byte(`{"schemaVersion":2}`))
+	assert.NoError(t, err)
+	err = dest.Commit()
+	assert.NoError(t, err)
+
 	img, err := ref.NewImage(nil)
 	assert.NoError(t, err)
 	defer img.Close()

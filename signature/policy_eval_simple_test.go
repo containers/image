@@ -7,13 +7,9 @@ import (
 	"github.com/docker/docker/reference"
 )
 
-// nameOnlyImageMock is a mock of types.Image which only allows transports.ImageName to work
+// nameOnlyImageMock is a mock of types.UnparsedImage which only allows transports.ImageName to work
 type nameOnlyImageMock struct {
 	forbiddenImageMock
-}
-
-func (nameOnlyImageMock) IsMultiImage() (bool, error) {
-	panic("unexpected call to a mock function")
 }
 
 func (nameOnlyImageMock) Reference() types.ImageReference {

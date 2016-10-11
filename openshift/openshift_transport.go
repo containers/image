@@ -118,14 +118,16 @@ func (ref openshiftReference) PolicyConfigurationNamespaces() []string {
 	return policyconfiguration.DockerReferenceNamespaces(ref.dockerReference)
 }
 
-// NewImage returns a types.Image for this reference.
+// NewImage returns a types.Image for this reference, possibly specialized for this ImageTransport.
 // The caller must call .Close() on the returned Image.
+// NOTE: If any kind of signature verification should happen, build an UnparsedImage from the value returned by NewImageSource,
+// verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage.
 func (ref openshiftReference) NewImage(ctx *types.SystemContext) (types.Image, error) {
 	src, err := newImageSource(ctx, ref, nil)
 	if err != nil {
 		return nil, err
 	}
-	return genericImage.FromSource(src), nil
+	return genericImage.FromSource(src)
 }
 
 // NewImageSource returns a types.ImageSource for this reference,

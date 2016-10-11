@@ -47,10 +47,27 @@ func manifestSchema1FromManifest(manifest []byte) (genericManifest, error) {
 	return mschema1, nil
 }
 
+func (m *manifestSchema1) serialize() ([]byte, error) {
+	// docker/distribution requires a signature even if the incoming data uses the nominally unsigned DockerV2Schema1MediaType.
+	unsigned, err := json.Marshal(*m)
+	if err != nil {
+		return nil, err
+	}
+	return manifest.AddDummyV2S1Signature(unsigned)
+}
+
+func (m *manifestSchema1) manifestMIMEType() string {
+	return manifest.DockerV2Schema1SignedMediaType
+}
+
+// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
 func (m *manifestSchema1) ConfigInfo() types.BlobInfo {
 	return types.BlobInfo{}
 }
 
+// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
+// The Digest field is guaranteed to be provided; Size may be -1.
+// WARNING: The list may contain duplicates, and they are semantically relevant.
 func (m *manifestSchema1) LayerInfos() []types.BlobInfo {
 	layers := make([]types.BlobInfo, len(m.FSLayers))
 	for i, layer := range m.FSLayers { // NOTE: This includes empty layers (where m.History.V1Compatibility->ThrowAway)
@@ -59,13 +76,13 @@ func (m *manifestSchema1) LayerInfos() []types.BlobInfo {
 	return layers
 }
 
-func (m *manifestSchema1) Config() ([]byte, error) {
+func (m *manifestSchema1) config() ([]byte, error) {
 	return []byte(m.History[0].V1Compatibility), nil
 }
 
-func (m *manifestSchema1) ImageInspectInfo() (*types.ImageInspectInfo, error) {
+func (m *manifestSchema1) imageInspectInfo() (*types.ImageInspectInfo, error) {
 	v1 := &v1Image{}
-	config, err := m.Config()
+	config, err := m.config()
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +99,9 @@ func (m *manifestSchema1) ImageInspectInfo() (*types.ImageInspectInfo, error) {
 	}, nil
 }
 
-func (m *manifestSchema1) UpdatedManifest(options types.ManifestUpdateOptions) ([]byte, error) {
+// UpdatedImage returns a types.Image modified according to options.
+// This does not change the state of the original Image object.
+func (m *manifestSchema1) UpdatedImage(options types.ManifestUpdateOptions) (types.Image, error) {
 	copy := *m
 	if options.LayerInfos != nil {
 		// Our LayerInfos includes empty layers (where m.History.V1Compatibility->ThrowAway), so expect them to be included here as well.
@@ -96,12 +115,7 @@ func (m *manifestSchema1) UpdatedManifest(options types.ManifestUpdateOptions) (
 			copy.FSLayers[(len(options.LayerInfos)-1)-i].BlobSum = info.Digest
 		}
 	}
-	// docker/distribution requires a signature even if the incoming data uses the nominally unsigned DockerV2Schema1MediaType.
-	unsigned, err := json.Marshal(copy)
-	if err != nil {
-		return nil, err
-	}
-	return manifest.AddDummyV2S1Signature(unsigned)
+	return memoryImageFromManifest(&copy), nil
 }
 
 // fixManifestLayers, after validating the supplied manifest

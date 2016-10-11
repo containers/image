@@ -109,26 +109,26 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	if err != nil {
 		return fmt.Errorf("Error initializing source %s: %v", transports.ImageName(srcRef), err)
 	}
-	src := image.FromSource(rawSource)
-	defer src.Close()
-
-	multiImage, err := src.IsMultiImage()
-	if err != nil {
-		return err
-	}
-	if multiImage {
-		return fmt.Errorf("can not copy %s: manifest contains multiple images", transports.ImageName(srcRef))
-	}
+	unparsedImage := image.UnparsedFromSource(rawSource)
+	defer func() {
+		if unparsedImage != nil {
+			unparsedImage.Close()
+		}
+	}()
 
 	// Please keep this policy check BEFORE reading any other information about the image.
-	if allowed, err := policyContext.IsRunningImageAllowed(src); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
+	if allowed, err := policyContext.IsRunningImageAllowed(unparsedImage); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
 		return fmt.Errorf("Source image rejected: %v", err)
 	}
-
-	writeReport("Getting image source manifest\n")
-	manifest, _, err := src.Manifest()
+	src, err := image.FromUnparsedImage(unparsedImage)
 	if err != nil {
-		return fmt.Errorf("Error reading manifest: %v", err)
+		return fmt.Errorf("Error initializing image from source %s: %v", transports.ImageName(srcRef), err)
+	}
+	unparsedImage = nil
+	defer src.Close()
+
+	if src.IsMultiImage() {
+		return fmt.Errorf("can not copy %s: manifest contains multiple images", transports.ImageName(srcRef))
 	}
 
 	var sigs [][]byte
@@ -150,11 +150,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	}
 	canModifyManifest := len(sigs) == 0
 
-	writeReport("Getting image source configuration\n")
-	srcConfigInfo, err := src.ConfigInfo()
-	if err != nil {
-		return fmt.Errorf("Error parsing manifest: %v", err)
-	}
+	srcConfigInfo := src.ConfigInfo()
 	if srcConfigInfo.Digest != "" {
 		writeReport("Uploading blob %s\n", srcConfigInfo.Digest)
 		destConfigInfo, err := copyBlob(dest, rawSource, srcConfigInfo, false, reportWriter)
@@ -166,10 +162,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		}
 	}
 
-	srcLayerInfos, err := src.LayerInfos()
-	if err != nil {
-		return fmt.Errorf("Error parsing manifest: %v", err)
-	}
+	srcLayerInfos := src.LayerInfos()
 	destLayerInfos := []types.BlobInfo{}
 	copiedLayers := map[string]types.BlobInfo{}
 	for _, srcLayer := range srcLayerInfos {
@@ -190,14 +183,19 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		manifestUpdates.LayerInfos = destLayerInfos
 	}
 
+	pendingImage := src
 	if !reflect.DeepEqual(manifestUpdates, types.ManifestUpdateOptions{}) {
 		if !canModifyManifest {
 			return fmt.Errorf("Internal error: copy needs an updated manifest but that was known to be forbidden")
 		}
-		manifest, err = src.UpdatedManifest(manifestUpdates)
+		pendingImage, err = src.UpdatedImage(manifestUpdates)
 		if err != nil {
 			return fmt.Errorf("Error creating an updated manifest: %v", err)
 		}
+	}
+	manifest, _, err := pendingImage.Manifest()
+	if err != nil {
+		return fmt.Errorf("Error reading manifest: %v", err)
 	}
 
 	if options != nil && options.SignBy != "" {

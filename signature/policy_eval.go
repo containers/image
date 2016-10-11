@@ -54,14 +54,14 @@ type PolicyRequirement interface {
 	//   a container based on this image; use IsRunningImageAllowed instead.
 	// - Just because a signature is accepted does not automatically mean the contents of the
 	//   signature are authorized to run code as root, or to affect system or cluster configuration.
-	isSignatureAuthorAccepted(image types.Image, sig []byte) (signatureAcceptanceResult, *Signature, error)
+	isSignatureAuthorAccepted(image types.UnparsedImage, sig []byte) (signatureAcceptanceResult, *Signature, error)
 
 	// isRunningImageAllowed returns true if the requirement allows running an image.
 	// If it returns false, err must be non-nil, and should be an PolicyRequirementError if evaluation
 	// succeeded but the result was rejection.
 	// WARNING: This validates signatures and the manifest, but does not download or validate the
 	// layers. Users must validate that the layers match their expected digests.
-	isRunningImageAllowed(image types.Image) (bool, error)
+	isRunningImageAllowed(image types.UnparsedImage) (bool, error)
 }
 
 // PolicyReferenceMatch specifies a set of image identities accepted in PolicyRequirement.
@@ -70,7 +70,7 @@ type PolicyReferenceMatch interface {
 	// matchesDockerReference decides whether a specific image identity is accepted for an image
 	// (or, usually, for the image's Reference().DockerReference()).  Note that
 	// image.Reference().DockerReference() may be nil.
-	matchesDockerReference(image types.Image, signatureDockerReference string) bool
+	matchesDockerReference(image types.UnparsedImage, signatureDockerReference string) bool
 }
 
 // PolicyContext encapsulates a policy and possible cached state
@@ -174,7 +174,7 @@ func (pc *PolicyContext) requirementsForImageRef(ref types.ImageReference) Polic
 //   a container based on this image; use IsRunningImageAllowed instead.
 // - Just because a signature is accepted does not automatically mean the contents of the
 //   signature are authorized to run code as root, or to affect system or cluster configuration.
-func (pc *PolicyContext) GetSignaturesWithAcceptedAuthor(image types.Image) (sigs []*Signature, finalErr error) {
+func (pc *PolicyContext) GetSignaturesWithAcceptedAuthor(image types.UnparsedImage) (sigs []*Signature, finalErr error) {
 	if err := pc.changeState(pcReady, pcInUse); err != nil {
 		return nil, err
 	}
@@ -254,7 +254,7 @@ func (pc *PolicyContext) GetSignaturesWithAcceptedAuthor(image types.Image) (sig
 // succeeded but the result was rejection.
 // WARNING: This validates signatures and the manifest, but does not download or validate the
 // layers. Users must validate that the layers match their expected digests.
-func (pc *PolicyContext) IsRunningImageAllowed(image types.Image) (res bool, finalErr error) {
+func (pc *PolicyContext) IsRunningImageAllowed(image types.UnparsedImage) (res bool, finalErr error) {
 	if err := pc.changeState(pcReady, pcInUse); err != nil {
 		return false, err
 	}

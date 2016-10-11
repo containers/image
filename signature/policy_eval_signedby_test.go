@@ -14,21 +14,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// dirImageMock returns a types.Image for a directory, claiming a specified dockerReference.
-func dirImageMock(t *testing.T, dir, dockerReference string) types.Image {
+// dirImageMock returns a types.UnparsedImage for a directory, claiming a specified dockerReference.
+// The caller must call .Close() on the returned UnparsedImage.
+func dirImageMock(t *testing.T, dir, dockerReference string) types.UnparsedImage {
 	ref, err := reference.ParseNamed(dockerReference)
 	require.NoError(t, err)
 	return dirImageMockWithRef(t, dir, refImageReferenceMock{ref})
 }
 
-// dirImageMockWithRef returns a types.Image for a directory, claiming a specified ref.
-// The caller must call .Close() on the returned Image.
-func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) types.Image {
+// dirImageMockWithRef returns a types.UnparsedImage for a directory, claiming a specified ref.
+// The caller must call .Close() on the returned UnparsedImage.
+func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) types.UnparsedImage {
 	srcRef, err := directory.NewReference(dir)
 	require.NoError(t, err)
 	src, err := srcRef.NewImageSource(nil, nil)
 	require.NoError(t, err)
-	return image.FromSource(&dirImageSourceMock{
+	return image.UnparsedFromSource(&dirImageSourceMock{
 		ImageSource: src,
 		ref:         ref,
 	})
