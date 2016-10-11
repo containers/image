@@ -4,7 +4,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/docker/docker/reference"
+	"github.com/containers/image/docker/reference"
 )
 
 // ImageTransport is a top-level namespace for ways to to store/load an image.
