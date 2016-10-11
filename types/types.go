@@ -205,6 +205,12 @@ type ImageInspectInfo struct {
 	Layers        []string
 }
 
+// DockerAuthConfig contains authorization information for connecting to a registry.
+type DockerAuthConfig struct {
+	Username string
+	Password string
+}
+
 // SystemContext allows parametrizing access to implicitly-accessed resources,
 // like configuration files in /etc and users' login state in their home directory.
 // Various components can share the same field only if their semantics is exactly
@@ -228,4 +234,6 @@ type SystemContext struct {
 	// === docker.Transport overrides ===
 	DockerCertPath              string // If not "", a directory containing "cert.pem" and "key.pem" used when talking to a Docker Registry
 	DockerInsecureSkipTLSVerify bool   // Allow contacting docker registries over HTTP, or HTTPS with failed TLS verification. Note that this does not affect other TLS connections.
+	// if nil, the library tries to parse ~/.docker/config.json to retrieve credentials
+	DockerAuthConfig *DockerAuthConfig
 }
