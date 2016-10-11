@@ -125,6 +125,9 @@ func (c *dockerClient) makeRequestToResolvedURL(method, url string, headers map[
 			req.Header.Add(n, hh)
 		}
 	}
+	if c.ctx != nil && c.ctx.DockerRegistryUserAgent != "" {
+		req.Header.Add("User-Agent", c.ctx.DockerRegistryUserAgent)
+	}
 	if c.wwwAuthenticate != "" {
 		if err := c.setupRequestAuth(req); err != nil {
 			return nil, err
@@ -317,7 +320,7 @@ type pingResponse struct {
 func (c *dockerClient) ping() (*pingResponse, error) {
 	ping := func(scheme string) (*pingResponse, error) {
 		url := fmt.Sprintf(baseURL, scheme, c.registry)
-		resp, err := c.client.Get(url)
+		resp, err := c.makeRequestToResolvedURL("GET", url, nil, nil, -1)
 		logrus.Debugf("Ping %s err %#v", url, err)
 		if err != nil {
 			return nil, err
