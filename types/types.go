@@ -244,4 +244,6 @@ type SystemContext struct {
 	DockerInsecureSkipTLSVerify bool   // Allow contacting docker registries over HTTP, or HTTPS with failed TLS verification. Note that this does not affect other TLS connections.
 	// if nil, the library tries to parse ~/.docker/config.json to retrieve credentials
 	DockerAuthConfig *DockerAuthConfig
+	// if not "", an User-Agent header is added to each request when contacting a registry.
+	DockerRegistryUserAgent string
 }
