@@ -297,11 +297,12 @@ func copyBlobFromStream(dest types.ImageDestination, srcStream io.Reader, srcInf
 	var destStream io.Reader = digestingReader
 
 	// === Detect compression of the input stream.
-	// This requires us to “peek ahead” into the stream to read the initial part, which requires us to chain through another io.Reader returned by isStreamCompressed.
-	isCompressed, destStream, err := isStreamCompressed(destStream) // We could skip this in some cases, but let's keep the code path uniform
+	// This requires us to “peek ahead” into the stream to read the initial part, which requires us to chain through another io.Reader returned by detectCompression.
+	decompressor, destStream, err := detectCompression(destStream) // We could skip this in some cases, but let's keep the code path uniform
 	if err != nil {
 		return types.BlobInfo{}, fmt.Errorf("Error reading blob %s: %v", srcInfo.Digest, err)
 	}
+	isCompressed := decompressor != nil
 
 	// === Report progress using a pb.Reader.
 	bar := pb.New(int(srcInfo.Size)).SetUnits(pb.U_BYTES)
