@@ -152,7 +152,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 
 	srcConfigInfo := src.ConfigInfo()
 	if srcConfigInfo.Digest != "" {
-		writeReport("Uploading blob %s\n", srcConfigInfo.Digest)
+		writeReport("Copying blob %s\n", srcConfigInfo.Digest)
 		destConfigInfo, err := copyBlob(dest, rawSource, srcConfigInfo, false, reportWriter)
 		if err != nil {
 			return err
@@ -168,7 +168,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	for _, srcLayer := range srcLayerInfos {
 		destLayer, ok := copiedLayers[srcLayer.Digest]
 		if !ok {
-			writeReport("Uploading blob %s\n", srcLayer.Digest)
+			writeReport("Copying blob %s\n", srcLayer.Digest)
 			destLayer, err = copyBlob(dest, rawSource, srcLayer, canModifyManifest, reportWriter)
 			if err != nil {
 				return err
@@ -216,7 +216,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		sigs = append(sigs, newSig)
 	}
 
-	writeReport("Uploading manifest to image destination\n")
+	writeReport("Writing manifest to image destination\n")
 	if err := dest.PutManifest(manifest); err != nil {
 		return fmt.Errorf("Error writing manifest: %v", err)
 	}
@@ -304,10 +304,10 @@ func copyBlob(dest types.ImageDestination, src types.ImageSource, srcInfo types.
 		return types.BlobInfo{}, fmt.Errorf("Error writing blob: %v", err)
 	}
 	if digestingReader.validationFailed { // Coverage: This should never happen.
-		return types.BlobInfo{}, fmt.Errorf("Internal error uploading blob %s, digest verification failed but was ignored", srcInfo.Digest)
+		return types.BlobInfo{}, fmt.Errorf("Internal error writing blob %s, digest verification failed but was ignored", srcInfo.Digest)
 	}
 	if inputInfo.Digest != "" && uploadedInfo.Digest != inputInfo.Digest {
-		return types.BlobInfo{}, fmt.Errorf("Internal error uploading blob %s, blob with digest %s uploaded with digest %s", srcInfo.Digest, inputInfo.Digest, uploadedInfo.Digest)
+		return types.BlobInfo{}, fmt.Errorf("Internal error writing blob %s, blob with digest %s saved with digest %s", srcInfo.Digest, inputInfo.Digest, uploadedInfo.Digest)
 	}
 	return uploadedInfo, nil
 }
