@@ -5,25 +5,51 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/docker/engine-api/types/strslice"
+
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 )
 
 type config struct {
+	Cmd    strslice.StrSlice
 	Labels map[string]string
 }
 
 type v1Image struct {
+	ID              string    `json:"id,omitempty"`
+	Parent          string    `json:"parent,omitempty"`
+	Comment         string    `json:"comment,omitempty"`
+	Created         time.Time `json:"created"`
+	ContainerConfig *config   `json:"container_config,omitempty"`
+	DockerVersion   string    `json:"docker_version,omitempty"`
+	Author          string    `json:"author,omitempty"`
 	// Config is the configuration of the container received from the client
 	Config *config `json:"config,omitempty"`
-	// DockerVersion specifies version on which image is built
-	DockerVersion string `json:"docker_version,omitempty"`
-	// Created timestamp when image was created
-	Created time.Time `json:"created"`
 	// Architecture is the hardware that the image is build and runs on
 	Architecture string `json:"architecture,omitempty"`
 	// OS is the operating system used to build and run the image
 	OS string `json:"os,omitempty"`
+}
+
+type image struct {
+	v1Image
+	History []imageHistory `json:"history,omitempty"`
+	RootFS  *rootFS        `json:"rootfs,omitempty"`
+}
+
+type imageHistory struct {
+	Created    time.Time `json:"created"`
+	Author     string    `json:"author,omitempty"`
+	CreatedBy  string    `json:"created_by,omitempty"`
+	Comment    string    `json:"comment,omitempty"`
+	EmptyLayer bool      `json:"empty_layer,omitempty"`
+}
+
+type rootFS struct {
+	Type      string   `json:"type"`
+	DiffIDs   []string `json:"diff_ids,omitempty"`
+	BaseLayer string   `json:"base_layer,omitempty"`
 }
 
 // genericManifest is an interface for parsing, modifying image manifests and related data.
