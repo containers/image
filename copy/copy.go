@@ -281,6 +281,10 @@ func copyLayer(dest types.ImageDestination, src types.ImageSource, srcInfo types
 // copyBlobFromStream copies a blob with srcInfo (with known Digest and possibly known Size) from srcStream to dest, perhaps compressing it if canCompress,
 // and returns a complete blobInfo of the copied blob.
 func copyBlobFromStream(dest types.ImageDestination, srcStream io.Reader, srcInfo types.BlobInfo, canCompress bool, reportWriter io.Writer) (types.BlobInfo, error) {
+	// The copying happens through a pipeline of connected io.Readers.
+	// === Input: srcStream
+
+	// === Process input through digestingReader to validate against the expected digest.
 	// Be paranoid; in case PutBlob somehow managed to ignore an error from digestingReader,
 	// use a separate validation failure indicator.
 	// Note that we don't use a stronger "validationSucceeded" indicator, because
@@ -291,11 +295,15 @@ func copyBlobFromStream(dest types.ImageDestination, srcStream io.Reader, srcInf
 		return types.BlobInfo{}, fmt.Errorf("Error preparing to verify blob %s: %v", srcInfo.Digest, err)
 	}
 	var destStream io.Reader = digestingReader
+
+	// === Detect compression of the input stream.
+	// This requires us to “peek ahead” into the stream to read the initial part, which requires us to chain through another io.Reader returned by isStreamCompressed.
 	isCompressed, destStream, err := isStreamCompressed(destStream) // We could skip this in some cases, but let's keep the code path uniform
 	if err != nil {
 		return types.BlobInfo{}, fmt.Errorf("Error reading blob %s: %v", srcInfo.Digest, err)
 	}
 
+	// === Report progress using a pb.Reader.
 	bar := pb.New(int(srcInfo.Size)).SetUnits(pb.U_BYTES)
 	bar.Output = reportWriter
 	bar.SetMaxWidth(80)
@@ -303,9 +311,9 @@ func copyBlobFromStream(dest types.ImageDestination, srcStream io.Reader, srcInf
 	bar.ShowPercent = false
 	bar.Start()
 	destStream = bar.NewProxyReader(destStream)
-
 	defer fmt.Fprint(reportWriter, "\n")
 
+	// === Compress the layer if it is uncompressed and compression is desired
 	var inputInfo types.BlobInfo
 	if !canCompress || isCompressed || !dest.ShouldCompressLayers() {
 		logrus.Debugf("Using original blob without modification")
@@ -324,6 +332,7 @@ func copyBlobFromStream(dest types.ImageDestination, srcStream io.Reader, srcInf
 		inputInfo.Size = -1
 	}
 
+	// === Finally, send the layer stream to dest.
 	uploadedInfo, err := dest.PutBlob(destStream, inputInfo)
 	if err != nil {
 		return types.BlobInfo{}, fmt.Errorf("Error writing blob: %v", err)
