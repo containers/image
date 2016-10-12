@@ -196,6 +196,7 @@ type Image interface {
 	// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
 	Inspect() (*ImageInspectInfo, error)
 	// UpdatedImage returns a types.Image modified according to options.
+	// Everything in options.InformationOnly should be provided, other fields should be set only if a modification is desired.
 	// This does not change the state of the original Image object.
 	UpdatedImage(options ManifestUpdateOptions) (Image, error)
 	// IsMultiImage returns true if the image's manifest is a list of images, false otherwise.
@@ -205,6 +206,11 @@ type Image interface {
 // ManifestUpdateOptions is a way to pass named optional arguments to Image.UpdatedManifest
 type ManifestUpdateOptions struct {
 	LayerInfos []BlobInfo // Complete BlobInfos (size+digest) which should replace the originals, in order (the root layer first, and then successive layered layers)
+	// The values below are NOT requests to modify the image; they provide optional context which may or may not be used.
+	InformationOnly struct {
+		Destination ImageDestination // and yes, UpdatedManifest may write to Destination (see the schema2 → schema1 conversion logic in image/docker_schema2.go)
+		LayerInfos  []BlobInfo       // Complete BlobInfos (size+digest) which have been uploaded, in order (the root layer first, and then successive layered layers)
+	}
 }
 
 // ImageInspectInfo is a set of metadata describing Docker images, primarily their manifest and configuration.
