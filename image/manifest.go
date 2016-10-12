@@ -44,6 +44,10 @@ type genericManifest interface {
 	// WARNING: The list may contain duplicates, and they are semantically relevant.
 	LayerInfos() []types.BlobInfo
 	imageInspectInfo() (*types.ImageInspectInfo, error) // To be called by inspectManifest
+	// UpdatedImageNeedsLayerDiffIDs returns true iff UpdatedImage(options) needs InformationOnly.LayerDiffIDs.
+	// This is a horribly specific interface, but computing InformationOnly.LayerDiffIDs can be very expensive to compute
+	// (most importantly it forces us to download the full layers even if they are already present at the destination).
+	UpdatedImageNeedsLayerDiffIDs(options types.ManifestUpdateOptions) bool
 	// UpdatedImage returns a types.Image modified according to options.
 	// This does not change the state of the original Image object.
 	UpdatedImage(options types.ManifestUpdateOptions) (types.Image, error)

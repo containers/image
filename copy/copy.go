@@ -211,25 +211,39 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	return nil
 }
 
-// copyLayers copies layers from src/rawSource to dest, updating manifestUpdates if necessary and canModifyManifest.
-func copyLayers(manifestUpdates *types.ManifestUpdateOptions, dest types.ImageDestination, src types.Image, rawSource types.ImageSource, canModifyManifest bool, reportWriter io.Writer) error {
+// copyLayers copies layers from src/rawSource to dest, using and updating manifestUpdates if necessary and canModifyManifest.
+// If src.UpdatedImageNeedsLayerDiffIDs(manifestUpdates) will be true, it needs to be true by the time this function is called.
+func copyLayers(manifestUpdates *types.ManifestUpdateOptions, dest types.ImageDestination, src types.Image, rawSource types.ImageSource,
+	canModifyManifest bool, reportWriter io.Writer) error {
+	type copiedLayer struct {
+		blobInfo types.BlobInfo
+		diffID   string
+	}
+
+	diffIDsAreNeeded := src.UpdatedImageNeedsLayerDiffIDs(*manifestUpdates)
+
 	srcInfos := src.LayerInfos()
 	destInfos := []types.BlobInfo{}
-	copiedLayers := map[string]types.BlobInfo{}
+	diffIDs := []string{}
+	copiedLayers := map[string]copiedLayer{}
 	for _, srcLayer := range srcInfos {
-		destLayer, ok := copiedLayers[srcLayer.Digest]
+		cl, ok := copiedLayers[srcLayer.Digest]
 		if !ok {
 			fmt.Fprintf(reportWriter, "Copying blob %s\n", srcLayer.Digest)
-			dl, err := copyLayer(dest, rawSource, srcLayer, canModifyManifest, reportWriter)
+			destInfo, diffID, err := copyLayer(dest, rawSource, srcLayer, diffIDsAreNeeded, canModifyManifest, reportWriter)
 			if err != nil {
 				return err
 			}
-			destLayer = dl
-			copiedLayers[srcLayer.Digest] = destLayer
+			cl = copiedLayer{blobInfo: destInfo, diffID: diffID}
+			copiedLayers[srcLayer.Digest] = cl
 		}
-		destInfos = append(destInfos, destLayer)
+		destInfos = append(destInfos, cl.blobInfo)
+		diffIDs = append(diffIDs, cl.diffID)
 	}
 	manifestUpdates.InformationOnly.LayerInfos = destInfos
+	if diffIDsAreNeeded {
+		manifestUpdates.InformationOnly.LayerDiffIDs = diffIDs
+	}
 	if layerDigestsDiffer(srcInfos, destInfos) {
 		manifestUpdates.LayerInfos = destInfos
 	}
@@ -258,7 +272,7 @@ func copyConfig(dest types.ImageDestination, src types.Image, reportWriter io.Wr
 		if err != nil {
 			return fmt.Errorf("Error reading config blob %s: %v", srcInfo.Digest, err)
 		}
-		destInfo, err := copyBlobFromStream(dest, bytes.NewReader(configBlob), srcInfo, false, reportWriter)
+		destInfo, err := copyBlobFromStream(dest, bytes.NewReader(configBlob), srcInfo, nil, false, reportWriter)
 		if err != nil {
 			return err
 		}
@@ -269,20 +283,112 @@ func copyConfig(dest types.ImageDestination, src types.Image, reportWriter io.Wr
 	return nil
 }
 
-// copyLayer copies a layer with srcInfo (with known Digest and possibly known Size) in src to dest, perhaps compressing it if canCompress,
-// and returns a complete blobInfo of the copied layer.
-func copyLayer(dest types.ImageDestination, src types.ImageSource, srcInfo types.BlobInfo, canCompress bool, reportWriter io.Writer) (types.BlobInfo, error) {
-	srcStream, srcBlobSize, err := src.GetBlob(srcInfo.Digest) // We currently completely ignore srcInfo.Size throughout.
-	if err != nil {
-		return types.BlobInfo{}, fmt.Errorf("Error reading blob %s: %v", srcInfo.Digest, err)
-	}
-	defer srcStream.Close()
-	return copyBlobFromStream(dest, srcStream, types.BlobInfo{Digest: srcInfo.Digest, Size: srcBlobSize}, canCompress, reportWriter)
+// diffIDResult contains both a digest value and an error from diffIDComputationGoroutine.
+// We could also send the error through the pipeReader, but this more cleanly separates the copying of the layer and the DiffID computation.
+type diffIDResult struct {
+	digest string
+	err    error
 }
 
-// copyBlobFromStream copies a blob with srcInfo (with known Digest and possibly known Size) from srcStream to dest, perhaps compressing it if canCompress,
+// copyLayer copies a layer with srcInfo (with known Digest and possibly known Size) in src to dest, perhaps compressing it if canCompress,
+// and returns a complete blobInfo of the copied layer, and a value for LayerDiffIDs if diffIDIsNeeded
+func copyLayer(dest types.ImageDestination, src types.ImageSource, srcInfo types.BlobInfo,
+	diffIDIsNeeded bool, canCompress bool, reportWriter io.Writer) (types.BlobInfo, string, error) {
+	srcStream, srcBlobSize, err := src.GetBlob(srcInfo.Digest) // We currently completely ignore srcInfo.Size throughout.
+	if err != nil {
+		return types.BlobInfo{}, "", fmt.Errorf("Error reading blob %s: %v", srcInfo.Digest, err)
+	}
+	defer srcStream.Close()
+
+	blobInfo, diffIDChan, err := copyLayerFromStream(dest, srcStream, types.BlobInfo{Digest: srcInfo.Digest, Size: srcBlobSize},
+		diffIDIsNeeded, canCompress, reportWriter)
+	if err != nil {
+		return types.BlobInfo{}, "", err
+	}
+	var diffIDResult diffIDResult // = {digest:""}
+	if diffIDIsNeeded {
+		diffIDResult = <-diffIDChan
+		if diffIDResult.err != nil {
+			return types.BlobInfo{}, "", fmt.Errorf("Error computing layer DiffID: %v", diffIDResult.err)
+		}
+		logrus.Debugf("Computed DiffID %s for layer %s", diffIDResult.digest, srcInfo.Digest)
+	}
+	return blobInfo, diffIDResult.digest, nil
+}
+
+// copyLayerFromStream is an implementation detail of copyLayer; mostly providing a separate “defer” scope.
+// it copies a blob with srcInfo (with known Digest and possibly known Size) from srcStream to dest,
+// perhaps compressing the stream if canCompress,
+// and returns a complete blobInfo of the copied blob and perhaps a <-chan diffIDResult if diffIDIsNeeded, to be read by the caller.
+func copyLayerFromStream(dest types.ImageDestination, srcStream io.Reader, srcInfo types.BlobInfo,
+	diffIDIsNeeded bool, canCompress bool, reportWriter io.Writer) (types.BlobInfo, <-chan diffIDResult, error) {
+	var getDiffIDRecorder func(decompressorFunc) io.Writer // = nil
+	var diffIDChan chan diffIDResult
+
+	err := errors.New("Internal error: unexpected panic in copyLayer") // For pipeWriter.CloseWithError below
+	if diffIDIsNeeded {
+		diffIDChan = make(chan diffIDResult, 1) // Buffered, so that sending a value after this or our caller has failed and exited does not block.
+		pipeReader, pipeWriter := io.Pipe()
+		defer func() { // Note that this is not the same as {defer pipeWriter.CloseWithError(err)}; we need err to be evaluated lazily.
+			pipeWriter.CloseWithError(err) // CloseWithError(nil) is equivalent to Close()
+		}()
+
+		getDiffIDRecorder = func(decompressor decompressorFunc) io.Writer {
+			// If this fails, e.g. because we have exited and due to pipeWriter.CloseWithError() above further
+			// reading from the pipe has failed, we don’t really care.
+			// We only read from diffIDChan if the rest of the flow has succeeded, and when we do read from it,
+			// the return value includes an error indication, which we do check.
+			//
+			// If this gets never called, pipeReader will not be used anywhere, but pipeWriter will only be
+			// closed above, so we are happy enough with both pipeReader and pipeWriter to just get collected by GC.
+			go diffIDComputationGoroutine(diffIDChan, pipeReader, decompressor) // Closes pipeReader
+			return pipeWriter
+		}
+	}
+	blobInfo, err := copyBlobFromStream(dest, srcStream, srcInfo,
+		getDiffIDRecorder, canCompress, reportWriter) // Sets err to nil on success
+	return blobInfo, diffIDChan, err
+	// We need the defer … pipeWriter.CloseWithError() to happen HERE so that the caller can block on reading from diffIDChan
+}
+
+// diffIDComputationGoroutine reads all input from layerStream, uncompresses using decompressor if necessary, and sends its digest, and status, if any, to dest.
+func diffIDComputationGoroutine(dest chan<- diffIDResult, layerStream io.ReadCloser, decompressor decompressorFunc) {
+	result := diffIDResult{
+		digest: "",
+		err:    errors.New("Internal error: unexpected panic in diffIDComputationGoroutine"),
+	}
+	defer func() { dest <- result }()
+	defer layerStream.Close() // We do not care to bother the other end of the pipe with other failures; we send them to dest instead.
+
+	result.digest, result.err = computeDiffID(layerStream, decompressor)
+}
+
+// computeDiffID reads all input from layerStream, uncompresses it using decompressor if necessary, and returns its digest.
+func computeDiffID(stream io.Reader, decompressor decompressorFunc) (string, error) {
+	if decompressor != nil {
+		s, err := decompressor(stream)
+		if err != nil {
+			return "", err
+		}
+		stream = s
+	}
+
+	h := sha256.New()
+	_, err := io.Copy(h, stream)
+	if err != nil {
+		return "", err
+	}
+	hash := h.Sum(nil)
+	return "sha256:" + hex.EncodeToString(hash[:]), nil
+}
+
+// copyBlobFromStream copies a blob with srcInfo (with known Digest and possibly known Size) from srcStream to dest,
+// perhaps sending a copy to an io.Writer if getOriginalLayerCopyWriter != nil,
+// perhaps compressing it if canCompress,
 // and returns a complete blobInfo of the copied blob.
-func copyBlobFromStream(dest types.ImageDestination, srcStream io.Reader, srcInfo types.BlobInfo, canCompress bool, reportWriter io.Writer) (types.BlobInfo, error) {
+func copyBlobFromStream(dest types.ImageDestination, srcStream io.Reader, srcInfo types.BlobInfo,
+	getOriginalLayerCopyWriter func(decompressor decompressorFunc) io.Writer, canCompress bool,
+	reportWriter io.Writer) (types.BlobInfo, error) {
 	// The copying happens through a pipeline of connected io.Readers.
 	// === Input: srcStream
 
@@ -316,6 +422,13 @@ func copyBlobFromStream(dest types.ImageDestination, srcStream io.Reader, srcInf
 	destStream = bar.NewProxyReader(destStream)
 	defer fmt.Fprint(reportWriter, "\n")
 
+	// === Send a copy of the original, uncompressed, stream, to a separate path if necessary.
+	var originalLayerReader io.Reader // DO NOT USE this other than to drain the input if no other consumer in the pipeline has done so.
+	if getOriginalLayerCopyWriter != nil {
+		destStream = io.TeeReader(destStream, getOriginalLayerCopyWriter(decompressor))
+		originalLayerReader = destStream
+	}
+
 	// === Compress the layer if it is uncompressed and compression is desired
 	var inputInfo types.BlobInfo
 	if !canCompress || isCompressed || !dest.ShouldCompressLayers() {
@@ -340,6 +453,19 @@ func copyBlobFromStream(dest types.ImageDestination, srcStream io.Reader, srcInf
 	if err != nil {
 		return types.BlobInfo{}, fmt.Errorf("Error writing blob: %v", err)
 	}
+
+	// This is fairly horrible: the writer from getOriginalLayerCopyWriter wants to consumer
+	// all of the input (to compute DiffIDs), even if dest.PutBlob does not need it.
+	// So, read everything from originalLayerReader, which will cause the rest to be
+	// sent there if we are not already at EOF.
+	if getOriginalLayerCopyWriter != nil {
+		logrus.Debugf("Consuming rest of the original blob to satisfy getOriginalLayerCopyWriter")
+		_, err := io.Copy(ioutil.Discard, originalLayerReader)
+		if err != nil {
+			return types.BlobInfo{}, fmt.Errorf("Error reading input blob %s: %v", srcInfo.Digest, err)
+		}
+	}
+
 	if digestingReader.validationFailed { // Coverage: This should never happen.
 		return types.BlobInfo{}, fmt.Errorf("Internal error writing blob %s, digest verification failed but was ignored", srcInfo.Digest)
 	}

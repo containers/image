@@ -195,6 +195,10 @@ type Image interface {
 	LayerInfos() []BlobInfo
 	// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
 	Inspect() (*ImageInspectInfo, error)
+	// UpdatedImageNeedsLayerDiffIDs returns true iff UpdatedImage(options) needs InformationOnly.LayerDiffIDs.
+	// This is a horribly specific interface, but computing InformationOnly.LayerDiffIDs can be very expensive to compute
+	// (most importantly it forces us to download the full layers even if they are already present at the destination).
+	UpdatedImageNeedsLayerDiffIDs(options ManifestUpdateOptions) bool
 	// UpdatedImage returns a types.Image modified according to options.
 	// Everything in options.InformationOnly should be provided, other fields should be set only if a modification is desired.
 	// This does not change the state of the original Image object.
@@ -208,8 +212,9 @@ type ManifestUpdateOptions struct {
 	LayerInfos []BlobInfo // Complete BlobInfos (size+digest) which should replace the originals, in order (the root layer first, and then successive layered layers)
 	// The values below are NOT requests to modify the image; they provide optional context which may or may not be used.
 	InformationOnly struct {
-		Destination ImageDestination // and yes, UpdatedManifest may write to Destination (see the schema2 → schema1 conversion logic in image/docker_schema2.go)
-		LayerInfos  []BlobInfo       // Complete BlobInfos (size+digest) which have been uploaded, in order (the root layer first, and then successive layered layers)
+		Destination  ImageDestination // and yes, UpdatedManifest may write to Destination (see the schema2 → schema1 conversion logic in image/docker_schema2.go)
+		LayerInfos   []BlobInfo       // Complete BlobInfos (size+digest) which have been uploaded, in order (the root layer first, and then successive layered layers)
+		LayerDiffIDs []string         // Digest values for the _uncompressed_ contents of the blobs which have been uploaded, in the same order.
 	}
 }
 

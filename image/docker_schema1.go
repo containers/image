@@ -98,6 +98,13 @@ func (m *manifestSchema1) imageInspectInfo() (*types.ImageInspectInfo, error) {
 	}, nil
 }
 
+// UpdatedImageNeedsLayerDiffIDs returns true iff UpdatedImage(options) needs InformationOnly.LayerDiffIDs.
+// This is a horribly specific interface, but computing InformationOnly.LayerDiffIDs can be very expensive to compute
+// (most importantly it forces us to download the full layers even if they are already present at the destination).
+func (m *manifestSchema1) UpdatedImageNeedsLayerDiffIDs(options types.ManifestUpdateOptions) bool {
+	return false
+}
+
 // UpdatedImage returns a types.Image modified according to options.
 // This does not change the state of the original Image object.
 func (m *manifestSchema1) UpdatedImage(options types.ManifestUpdateOptions) (types.Image, error) {
