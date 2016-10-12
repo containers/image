@@ -157,10 +157,11 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 	}
 
 	pendingImage := src
-	if !reflect.DeepEqual(manifestUpdates, types.ManifestUpdateOptions{}) {
+	if !reflect.DeepEqual(manifestUpdates, types.ManifestUpdateOptions{InformationOnly: manifestUpdates.InformationOnly}) {
 		if !canModifyManifest {
 			return fmt.Errorf("Internal error: copy needs an updated manifest but that was known to be forbidden")
 		}
+		manifestUpdates.InformationOnly.Destination = dest
 		pendingImage, err = src.UpdatedImage(manifestUpdates)
 		if err != nil {
 			return fmt.Errorf("Error creating an updated image manifest: %v", err)
@@ -228,6 +229,7 @@ func copyLayers(manifestUpdates *types.ManifestUpdateOptions, dest types.ImageDe
 		}
 		destInfos = append(destInfos, destLayer)
 	}
+	manifestUpdates.InformationOnly.LayerInfos = destInfos
 	if layerDigestsDiffer(srcInfos, destInfos) {
 		manifestUpdates.LayerInfos = destInfos
 	}
