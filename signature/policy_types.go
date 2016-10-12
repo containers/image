@@ -6,7 +6,9 @@
 
 package signature
 
-// Policy defines requirements for considering a signature valid.
+// NOTE: Keep this in sync with docs/policy.json.md!
+
+// Policy defines requirements for considering a signature, or an image, valid.
 type Policy struct {
 	// Default applies to any image which does not have a matching policy in Transports.
 	// Note that this can happen even if a matching PolicyTransportScopes exists in Transports

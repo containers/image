@@ -16,6 +16,8 @@ var KnownTransports map[string]types.ImageTransport
 
 func init() {
 	KnownTransports = make(map[string]types.ImageTransport)
+	// NOTE: Make sure docs/policy.json.md is updated when adding or updating
+	// a transport.
 	for _, t := range []types.ImageTransport{
 		directory.Transport,
 		docker.Transport,
