@@ -190,7 +190,7 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		}
 		pendingImage, err = src.UpdatedImage(manifestUpdates)
 		if err != nil {
-			return fmt.Errorf("Error creating an updated manifest: %v", err)
+			return fmt.Errorf("Error creating an updated image manifest: %v", err)
 		}
 	}
 	manifest, _, err := pendingImage.Manifest()
