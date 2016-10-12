@@ -209,13 +209,18 @@ type Image interface {
 
 // ManifestUpdateOptions is a way to pass named optional arguments to Image.UpdatedManifest
 type ManifestUpdateOptions struct {
-	LayerInfos []BlobInfo // Complete BlobInfos (size+digest) which should replace the originals, in order (the root layer first, and then successive layered layers)
+	LayerInfos       []BlobInfo // Complete BlobInfos (size+digest) which should replace the originals, in order (the root layer first, and then successive layered layers)
+	ManifestMIMEType string
 	// The values below are NOT requests to modify the image; they provide optional context which may or may not be used.
-	InformationOnly struct {
-		Destination  ImageDestination // and yes, UpdatedManifest may write to Destination (see the schema2 → schema1 conversion logic in image/docker_schema2.go)
-		LayerInfos   []BlobInfo       // Complete BlobInfos (size+digest) which have been uploaded, in order (the root layer first, and then successive layered layers)
-		LayerDiffIDs []string         // Digest values for the _uncompressed_ contents of the blobs which have been uploaded, in the same order.
-	}
+	InformationOnly ManifestUpdateInformation
+}
+
+// ManifestUpdateInformation is a component of ManifestUpdateOptions, named here
+// only to make writing struct literals possible.
+type ManifestUpdateInformation struct {
+	Destination  ImageDestination // and yes, UpdatedManifest may write to Destination (see the schema2 → schema1 conversion logic in image/docker_schema2.go)
+	LayerInfos   []BlobInfo       // Complete BlobInfos (size+digest) which have been uploaded, in order (the root layer first, and then successive layered layers)
+	LayerDiffIDs []string         // Digest values for the _uncompressed_ contents of the blobs which have been uploaded, in the same order.
 }
 
 // ImageInspectInfo is a set of metadata describing Docker images, primarily their manifest and configuration.

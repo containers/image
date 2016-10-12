@@ -18,10 +18,16 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/image"
+	"github.com/containers/image/manifest"
 	"github.com/containers/image/signature"
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
 )
+
+// preferredManifestMIMETypes lists manifest MIME types in order of our preference, if we can't use the original manifest and need to convert.
+// Prefer v2s2 to v2s1 because v2s2 does not need to be changed when uploading to a different location.
+// Include v2s1 signed but not v2s1 unsigned, because docker/distribution requires a signature even if the unsigned MIME type is used.
+var preferredManifestMIMETypes = []string{manifest.DockerV2Schema2MediaType, manifest.DockerV2Schema1SignedMediaType}
 
 // supportedDigests lists the supported blob digest types.
 var supportedDigests = map[string]func() hash.Hash{
@@ -104,8 +110,9 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		return fmt.Errorf("Error initializing destination %s: %v", transports.ImageName(destRef), err)
 	}
 	defer dest.Close()
+	destSupportedManifestMIMETypes := dest.SupportedManifestMIMETypes()
 
-	rawSource, err := srcRef.NewImageSource(ctx, dest.SupportedManifestMIMETypes())
+	rawSource, err := srcRef.NewImageSource(ctx, destSupportedManifestMIMETypes)
 	if err != nil {
 		return fmt.Errorf("Error initializing source %s: %v", transports.ImageName(srcRef), err)
 	}
@@ -151,6 +158,10 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 
 	canModifyManifest := len(sigs) == 0
 	manifestUpdates := types.ManifestUpdateOptions{}
+
+	if err := determineManifestConversion(&manifestUpdates, src, destSupportedManifestMIMETypes, canModifyManifest); err != nil {
+		return err
+	}
 
 	if err := copyLayers(&manifestUpdates, dest, src, rawSource, canModifyManifest, reportWriter); err != nil {
 		return err
@@ -486,4 +497,42 @@ func compressGoroutine(dest *io.PipeWriter, src io.Reader) {
 	defer zipper.Close()
 
 	_, err = io.Copy(zipper, src) // Sets err to nil, i.e. causes dest.Close()
+}
+
+// determineManifestConversion updates manifestUpdates to convert manifest to a supported MIME type, if necessary and canModifyManifest.
+// Note that the conversion will only happen later, through src.UpdatedImage
+func determineManifestConversion(manifestUpdates *types.ManifestUpdateOptions, src types.Image, destSupportedManifestMIMETypes []string, canModifyManifest bool) error {
+	if len(destSupportedManifestMIMETypes) == 0 {
+		return nil // Anything goes
+	}
+	supportedByDest := map[string]struct{}{}
+	for _, t := range destSupportedManifestMIMETypes {
+		supportedByDest[t] = struct{}{}
+	}
+
+	_, srcType, err := src.Manifest()
+	if err != nil { // This should have been cached?!
+		return fmt.Errorf("Error reading manifest: %v", err)
+	}
+	if _, ok := supportedByDest[srcType]; ok {
+		logrus.Debugf("Manifest MIME type %s is declared supported by the destination", srcType)
+		return nil
+	}
+
+	// OK, we should convert the manifest.
+	if !canModifyManifest {
+		logrus.Debugf("Manifest MIME type %s is not supported by the destination, but we can't modify the manifest, hoping for the best...")
+		return nil // Take our chances - FIXME? Or should we fail without trying?
+	}
+
+	var chosenType = destSupportedManifestMIMETypes[0] // This one is known to be supported.
+	for _, t := range preferredManifestMIMETypes {
+		if _, ok := supportedByDest[t]; ok {
+			chosenType = t
+			break
+		}
+	}
+	logrus.Debugf("Will convert manifest from MIME type %s to %s", srcType, chosenType)
+	manifestUpdates.ManifestMIMEType = chosenType
+	return nil
 }
