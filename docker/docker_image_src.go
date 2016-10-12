@@ -13,17 +13,8 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/registry/client"
 )
-
-// ErrFetchManifest provides the error when fetching the manifest fails
-type ErrFetchManifest struct {
-	statusCode int
-	body       []byte
-}
-
-func (e ErrFetchManifest) Error() string {
-	return fmt.Sprintf("error fetching manifest: status code: %d, body: %s", e.statusCode, string(e.body))
-}
 
 type dockerImageSource struct {
 	ref                        dockerReference
@@ -93,12 +84,12 @@ func (s *dockerImageSource) fetchManifest(tagOrDigest string) ([]byte, string, e
 		return nil, "", err
 	}
 	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil, "", client.HandleErrorResponse(res)
+	}
 	manblob, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, "", err
-	}
-	if res.StatusCode != http.StatusOK {
-		return nil, "", ErrFetchManifest{res.StatusCode, manblob}
 	}
 	return manblob, simplifyContentType(res.Header.Get("Content-Type")), nil
 }
