@@ -2,8 +2,11 @@ package copy
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,4 +59,63 @@ func TestDigestingReaderRead(t *testing.T) {
 		assert.Error(t, err, c.digest)
 		assert.True(t, reader.validationFailed)
 	}
+}
+
+func goDiffIDComputationGoroutineWithTimeout(layerStream io.ReadCloser, decompressor decompressorFunc) *diffIDResult {
+	ch := make(chan diffIDResult)
+	go diffIDComputationGoroutine(ch, layerStream, nil)
+	timeout := time.After(time.Second)
+	select {
+	case res := <-ch:
+		return &res
+	case <-timeout:
+		return nil
+	}
+}
+
+func TestDiffIDComputationGoroutine(t *testing.T) {
+	stream, err := os.Open("fixtures/Hello.uncompressed")
+	require.NoError(t, err)
+	res := goDiffIDComputationGoroutineWithTimeout(stream, nil)
+	require.NotNil(t, res)
+	assert.NoError(t, res.err)
+	assert.Equal(t, "sha256:185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969", res.digest)
+
+	// Error reading input
+	reader, writer := io.Pipe()
+	writer.CloseWithError(errors.New("Expected error reading input in diffIDComputationGoroutine"))
+	res = goDiffIDComputationGoroutineWithTimeout(reader, nil)
+	require.NotNil(t, res)
+	assert.Error(t, res.err)
+}
+
+func TestComputeDiffID(t *testing.T) {
+	for _, c := range []struct {
+		filename     string
+		decompressor decompressorFunc
+		result       string
+	}{
+		{"fixtures/Hello.uncompressed", nil, "sha256:185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969"},
+		{"fixtures/Hello.gz", nil, "sha256:0bd4409dcd76476a263b8f3221b4ce04eb4686dec40bfdcc2e86a7403de13609"},
+		{"fixtures/Hello.gz", gzipDecompressor, "sha256:185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969"},
+	} {
+		stream, err := os.Open(c.filename)
+		require.NoError(t, err, c.filename)
+		defer stream.Close()
+
+		diffID, err := computeDiffID(stream, c.decompressor)
+		require.NoError(t, err, c.filename)
+		assert.Equal(t, c.result, diffID)
+	}
+
+	// Error initializing decompression
+	_, err := computeDiffID(bytes.NewReader([]byte{}), gzipDecompressor)
+	assert.Error(t, err)
+
+	// Error reading input
+	reader, writer := io.Pipe()
+	defer reader.Close()
+	writer.CloseWithError(errors.New("Expected error reading input in computeDiffID"))
+	_, err = computeDiffID(reader, nil)
+	assert.Error(t, err)
 }
