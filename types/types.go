@@ -99,6 +99,9 @@ type BlobInfo struct {
 // This is primarily useful for copying images around; for examining their properties, Image (below)
 // is usually more useful.
 // Each ImageSource should eventually be closed by calling Close().
+//
+// WARNING: Various methods which return an object identified by digest generally do not
+// validate that the returned data actually matches that digest; this is the caller’s responsibility.
 type ImageSource interface {
 	// Reference returns the reference used to set up this source, _as specified by the user_
 	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
