@@ -157,7 +157,7 @@ func TestSign(t *testing.T) {
 			}
 			return nil
 		},
-		validateSignedDockerReference: func(signedDockerReference string) error {
+		validateSignedDockerReference: func(signedDockerReference, signedManifestDigest string) error {
 			if signedDockerReference != sig.DockerReference {
 				return fmt.Errorf("Unexpected signedDockerReference")
 			}
@@ -199,7 +199,7 @@ func TestVerifyAndExtractSignature(t *testing.T) {
 			}
 			return nil
 		},
-		validateSignedDockerReference: func(signedDockerReference string) error {
+		validateSignedDockerReference: func(signedDockerReference, signedManifestDigest string) error {
 			recorded.signedDockerReference = signedDockerReference
 			if signedDockerReference != wanted.signedDockerReference {
 				return fmt.Errorf("signedDockerReference mismatch")

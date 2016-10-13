@@ -161,7 +161,7 @@ func (s privateSignature) sign(mech SigningMechanism, keyIdentity string) ([]byt
 // named members of this struct are more explicit.
 type signatureAcceptanceRules struct {
 	validateKeyIdentity                func(string) error
-	validateSignedDockerReference      func(string) error
+	validateSignedDockerReference      func(string, string) error
 	validateSignedDockerManifestDigest func(string) error
 }
 
@@ -183,7 +183,7 @@ func verifyAndExtractSignature(mech SigningMechanism, unverifiedSignature []byte
 	if err := rules.validateSignedDockerManifestDigest(unmatchedSignature.DockerManifestDigest); err != nil {
 		return nil, err
 	}
-	if err := rules.validateSignedDockerReference(unmatchedSignature.DockerReference); err != nil {
+	if err := rules.validateSignedDockerReference(unmatchedSignature.DockerReference, unmatchedSignature.DockerManifestDigest); err != nil {
 		return nil, err
 	}
 	signature := unmatchedSignature.Signature // Policy OK.

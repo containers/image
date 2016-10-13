@@ -204,7 +204,7 @@ func tryUnmarshalModifiedPolicy(t *testing.T, p *Policy, validJSON []byte, modif
 
 // xNewPRSignedByKeyPath is like NewPRSignedByKeyPath, except it must not fail.
 func xNewPRSignedByKeyPath(keyType sbKeyType, keyPath string, signedIdentity PolicyReferenceMatch) PolicyRequirement {
-	pr, err := NewPRSignedByKeyPath(keyType, keyPath, signedIdentity)
+	pr, err := NewPRSignedByKeyPath(keyType, keyPath, signedIdentity, SBKeyTypeUntaggedReferenceAllow)
 	if err != nil {
 		panic("xNewPRSignedByKeyPath failed")
 	}
@@ -213,7 +213,7 @@ func xNewPRSignedByKeyPath(keyType sbKeyType, keyPath string, signedIdentity Pol
 
 // xNewPRSignedByKeyData is like NewPRSignedByKeyData, except it must not fail.
 func xNewPRSignedByKeyData(keyType sbKeyType, keyData []byte, signedIdentity PolicyReferenceMatch) PolicyRequirement {
-	pr, err := NewPRSignedByKeyData(keyType, keyData, signedIdentity)
+	pr, err := NewPRSignedByKeyData(keyType, keyData, signedIdentity, SBKeyTypeUntaggedReferenceAllow)
 	if err != nil {
 		panic("xNewPRSignedByKeyData failed")
 	}
@@ -635,7 +635,7 @@ func TestNewPRSignedBy(t *testing.T) {
 	testIdentity := NewPRMMatchExact()
 
 	// Success
-	pr, err := newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, testIdentity)
+	pr, err := newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, testIdentity, SBKeyTypeUntaggedReferenceAllow)
 	require.NoError(t, err)
 	assert.Equal(t, &prSignedBy{
 		prCommon:       prCommon{prTypeSignedBy},
@@ -644,7 +644,7 @@ func TestNewPRSignedBy(t *testing.T) {
 		KeyData:        nil,
 		SignedIdentity: testIdentity,
 	}, pr)
-	pr, err = newPRSignedBy(SBKeyTypeGPGKeys, "", testData, testIdentity)
+	pr, err = newPRSignedBy(SBKeyTypeGPGKeys, "", testData, testIdentity, SBKeyTypeUntaggedReferenceAllow)
 	require.NoError(t, err)
 	assert.Equal(t, &prSignedBy{
 		prCommon:       prCommon{prTypeSignedBy},
@@ -655,23 +655,23 @@ func TestNewPRSignedBy(t *testing.T) {
 	}, pr)
 
 	// Invalid keyType
-	pr, err = newPRSignedBy(sbKeyType(""), testPath, nil, testIdentity)
+	pr, err = newPRSignedBy(sbKeyType(""), testPath, nil, testIdentity, SBKeyTypeUntaggedReferenceAllow)
 	assert.Error(t, err)
-	pr, err = newPRSignedBy(sbKeyType("this is invalid"), testPath, nil, testIdentity)
+	pr, err = newPRSignedBy(sbKeyType("this is invalid"), testPath, nil, testIdentity, SBKeyTypeUntaggedReferenceAllow)
 	assert.Error(t, err)
 
 	// Both keyPath and keyData specified
-	pr, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, testData, testIdentity)
+	pr, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, testData, testIdentity, SBKeyTypeUntaggedReferenceAllow)
 	assert.Error(t, err)
 
 	// Invalid signedIdentity
-	pr, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, nil)
+	pr, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, nil, SBKeyTypeUntaggedReferenceAllow)
 	assert.Error(t, err)
 }
 
 func TestNewPRSignedByKeyPath(t *testing.T) {
 	const testPath = "/foo/bar"
-	_pr, err := NewPRSignedByKeyPath(SBKeyTypeGPGKeys, testPath, NewPRMMatchExact())
+	_pr, err := NewPRSignedByKeyPath(SBKeyTypeGPGKeys, testPath, NewPRMMatchExact(), SBKeyTypeUntaggedReferenceAllow)
 	require.NoError(t, err)
 	pr, ok := _pr.(*prSignedBy)
 	require.True(t, ok)
@@ -681,7 +681,7 @@ func TestNewPRSignedByKeyPath(t *testing.T) {
 
 func TestNewPRSignedByKeyData(t *testing.T) {
 	testData := []byte("abc")
-	_pr, err := NewPRSignedByKeyData(SBKeyTypeGPGKeys, testData, NewPRMMatchExact())
+	_pr, err := NewPRSignedByKeyData(SBKeyTypeGPGKeys, testData, NewPRMMatchExact(), SBKeyTypeUntaggedReferenceAllow)
 	require.NoError(t, err)
 	pr, ok := _pr.(*prSignedBy)
 	require.True(t, ok)
@@ -710,7 +710,7 @@ func TestPRSignedByUnmarshalJSON(t *testing.T) {
 	testInvalidJSONInput(t, &pr)
 
 	// Start with a valid JSON.
-	validPR, err := NewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("abc"), NewPRMMatchExact())
+	validPR, err := NewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("abc"), NewPRMMatchExact(), SBKeyTypeUntaggedReferenceAllow)
 	require.NoError(t, err)
 	validJSON, err := json.Marshal(validPR)
 	require.NoError(t, err)
@@ -722,7 +722,7 @@ func TestPRSignedByUnmarshalJSON(t *testing.T) {
 	assert.Equal(t, validPR, &pr)
 
 	// Success with KeyPath
-	kpPR, err := NewPRSignedByKeyPath(SBKeyTypeGPGKeys, "/foo/bar", NewPRMMatchExact())
+	kpPR, err := NewPRSignedByKeyPath(SBKeyTypeGPGKeys, "/foo/bar", NewPRMMatchExact(), SBKeyTypeUntaggedReferenceAllow)
 	require.NoError(t, err)
 	testJSON, err := json.Marshal(kpPR)
 	require.NoError(t, err)
@@ -782,7 +782,7 @@ func TestPRSignedByUnmarshalJSON(t *testing.T) {
 		assert.Error(t, err)
 	}
 	// Handle "keyPath", which is not in validJSON, specially
-	pathPR, err := NewPRSignedByKeyPath(SBKeyTypeGPGKeys, "/foo/bar", NewPRMMatchExact())
+	pathPR, err := NewPRSignedByKeyPath(SBKeyTypeGPGKeys, "/foo/bar", NewPRMMatchExact(), SBKeyTypeUntaggedReferenceAllow)
 	require.NoError(t, err)
 	testJSON, err = json.Marshal(pathPR)
 	require.NoError(t, err)

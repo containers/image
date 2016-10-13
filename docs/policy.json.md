@@ -146,13 +146,25 @@ This requirement requires an image to be signed with an expected identity, or ac
     "keyType": "GPGKeys", /* The only currently supported value */
     "keyPath": "/path/to/local/keyring/file",
     "keyData": "base64-encoded-keyring-data",
-    "signedIdentity": identity_requirement
+    "signedIdentity": identity_requirement,
+    "referencesByDigest": refs_by_digest_requirement
 }
 ```
 <!-- Later: other keyType values -->
 
 Exactly one of `keyPath` and `keyData` must be present, containing a GPG keyring of one or more public keys.  Only signatures made by these keys are accepted.
 
+The `referencesByDigest` field controls whether an reference with a digest should be taken into consideration when checking signatures or be rejected altogheter.
+One of the following alternatives are supported:
+
+- References by digest are allowed (default). In this case, the digest should match the one from the signature for the verification to be successful.
+  ```json
+  {"referencesByDigest: allow"}
+  ```
+- References by digest are rejected and no signature verification is performed.
+  ```json
+  {"referencesByDigest: reject"}
+  ```
 The `signedIdentity` field, a JSON object, specifies what image identity the signature claims about the image.
 One of the following alternatives are supported:
 
@@ -257,27 +269,3 @@ selectively allow individual transports and scopes as desired.
     "default": [{"type": "insecureAcceptAnything"}]
 }
 ```
-
-### A _temporary_ work-around to allow accessing any image by digest
-
-Usually, identities in signatures use the _repository_`:`_tag_ format,
-which is not matched when pulling a specific image using a digest.
-To allow such operations, a policy may set `signedIdentity` to `matchRepository`, similar
-to the following fragment:
-
-```json
-            "hostname:5000/allow/pull/by/tag": [
-                {
-                    "type": "signedBy",
-                    "keyType": "GPGKeys",
-                    "keyPath": "/path/to/some.gpg"
-                    "signedIdentity": {
-                        "type": "matchRepository"
-                    }
-                }
-            ]
-```
-
-*Warning*: This completely turns off tag matching for the signature check in question,
-allowing also pulls by tag to accept signatures for any other tag.
-A more granular solution for this situation will be provided in the future ( https://github.com/containers/image/issues/99 ).

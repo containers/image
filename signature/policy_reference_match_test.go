@@ -196,11 +196,11 @@ func TestPRMMatchExactMatchesDockerReference(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		res := prm.matchesDockerReference(refImageMock{imageRef}, test.sigRef)
+		res := prm.matchesDockerReference(refImageMock{imageRef}, test.sigRef, "", false)
 		assert.Equal(t, test.result, res, fmt.Sprintf("%s vs. %s", test.imageRef, test.sigRef))
 	}
 	// Even if they are signed with an empty string as a reference, unidentified images are rejected.
-	res := prm.matchesDockerReference(refImageMock{nil}, "")
+	res := prm.matchesDockerReference(refImageMock{nil}, "", "", false)
 	assert.False(t, res, `unidentified vs. ""`)
 }
 
@@ -213,11 +213,11 @@ func TestPRMMatchRepositoryMatchesDockerReference(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		res := prm.matchesDockerReference(refImageMock{imageRef}, test.sigRef)
+		res := prm.matchesDockerReference(refImageMock{imageRef}, test.sigRef, "", false)
 		assert.Equal(t, test.result, res, fmt.Sprintf("%s vs. %s", test.imageRef, test.sigRef))
 	}
 	// Even if they are signed with an empty string as a reference, unidentified images are rejected.
-	res := prm.matchesDockerReference(refImageMock{nil}, "")
+	res := prm.matchesDockerReference(refImageMock{nil}, "", "", false)
 	assert.False(t, res, `unidentified vs. ""`)
 }
 
@@ -267,7 +267,7 @@ func TestPRMExactReferenceMatchesDockerReference(t *testing.T) {
 		// Do not use NewPRMExactReference, we want to also test the case with an invalid DockerReference,
 		// even though NewPRMExactReference should never let it happen.
 		prm := prmExactReference{DockerReference: test.imageRef}
-		res := prm.matchesDockerReference(forbiddenImageMock{}, test.sigRef)
+		res := prm.matchesDockerReference(forbiddenImageMock{}, test.sigRef, "", false)
 		assert.Equal(t, test.result, res, fmt.Sprintf("%s vs. %s", test.imageRef, test.sigRef))
 	}
 }
@@ -277,7 +277,7 @@ func TestPRMExactRepositoryMatchesDockerReference(t *testing.T) {
 		// Do not use NewPRMExactRepository, we want to also test the case with an invalid DockerReference,
 		// even though NewPRMExactRepository should never let it happen.
 		prm := prmExactRepository{DockerRepository: test.imageRef}
-		res := prm.matchesDockerReference(forbiddenImageMock{}, test.sigRef)
+		res := prm.matchesDockerReference(forbiddenImageMock{}, test.sigRef, "", false)
 		assert.Equal(t, test.result, res, fmt.Sprintf("%s vs. %s", test.imageRef, test.sigRef))
 	}
 }

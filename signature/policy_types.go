@@ -79,7 +79,17 @@ type prSignedBy struct {
 	// SignedIdentity specifies what image identity the signature must be claiming about the image.
 	// Defaults to "match-exact" if not specified.
 	SignedIdentity PolicyReferenceMatch `json:"signedIdentity"`
+
+	// ReferencesByDigest specifies whether the signature is valid when the reference isn't tagged (e.g. canonical).
+	ReferencesByDigest sbUntaggedReferenceMatch `json:"referencesByDigest"`
 }
+
+type sbUntaggedReferenceMatch string
+
+const (
+	SBKeyTypeUntaggedReferenceAllow  sbUntaggedReferenceMatch = "allow"
+	SBKeyTypeUntaggedReferenceReject sbUntaggedReferenceMatch = "reject"
+)
 
 // sbKeyType are the allowed values for prSignedBy.KeyType
 type sbKeyType string
@@ -140,6 +150,27 @@ type prmExactReference struct {
 
 // prmExactRepository is a PolicyReferenceMatch with type = prmExactRepository: matches a specified repository, with any tag.
 type prmExactRepository struct {
+	prmCommon
+	DockerRepository string `json:"dockerRepository"`
+}
+
+// TODO(runcom): document stuff below
+
+const (
+	prmTypeUntaggedProhibit       prmTypeIdentifier = "prohibit"
+	prmTypeUntaggedMatchAnyTag    prmTypeIdentifier = "matchAnyTag"
+	prmTypeUntaggedMatchPrecisely prmTypeIdentifier = "matchPrecisely"
+)
+
+type prmUntaggedProhibit struct {
+	prmCommon
+}
+
+type prmUntaggedMatchAnyTag struct {
+	prmCommon
+}
+
+type prmUntaggedMatchPrecisely struct {
 	prmCommon
 	DockerRepository string `json:"dockerRepository"`
 }
