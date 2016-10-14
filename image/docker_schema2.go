@@ -85,11 +85,12 @@ func (m *manifestSchema2) imageInspectInfo() (*types.ImageInspectInfo, error) {
 // UpdatedImage returns a types.Image modified according to options.
 // This does not change the state of the original Image object.
 func (m *manifestSchema2) UpdatedImage(options types.ManifestUpdateOptions) (types.Image, error) {
-	copy := *m
+	copy := *m // NOTE: This is not a deep copy, it still shares slices etc.
 	if options.LayerInfos != nil {
 		if len(copy.LayersDescriptors) != len(options.LayerInfos) {
 			return nil, fmt.Errorf("Error preparing updated manifest: layer count changed from %d to %d", len(copy.LayersDescriptors), len(options.LayerInfos))
 		}
+		copy.LayersDescriptors = make([]descriptor, len(options.LayerInfos))
 		for i, info := range options.LayerInfos {
 			copy.LayersDescriptors[i].Digest = info.Digest
 			copy.LayersDescriptors[i].Size = info.Size
