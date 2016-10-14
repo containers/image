@@ -1,5 +1,6 @@
-<!-- NOTE: Keep this in sync with signature/policy_types.go! -->
-
+% REGISTRIES.D(5) Registries.d Man Page
+% Miloslav Trmač
+% August 2016
 # Registries Configuration Directory
 
 The registries configuration directory contains configuration for various registries
@@ -117,3 +118,7 @@ without listing each domain individually. This is expected to rarely happen, usu
 default-docker:
     sigstore-staging: file:///mnt/company/common-sigstore-staging
 ```
+
+# AUTHORS
+
+Miloslav Trmač <mitr@redhat.com>
