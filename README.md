@@ -10,4 +10,4 @@ ASL 2.0
 ## Contact
 
 - Mailing list: [containers-dev](https://groups.google.com/forum/?hl=en#!forum/containers-dev)
-- IRC: #[container-projects](irc://irc.freenode.org:6667/#container-projects) on freenode.org
+- IRC: #[container-projects](irc://irc.freenode.net:6667/#container-projects) on freenode.net
