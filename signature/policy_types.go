@@ -42,7 +42,7 @@ type prCommon struct {
 type prTypeIdentifier string
 
 const (
-	prTypeInsecureAcceptAnything prTypeIdentifier = "insecureAcceptAnything"
+	prTypeInsecureAcceptAnything prTypeIdentifier = "accept"
 	prTypeReject                 prTypeIdentifier = "reject"
 	prTypeSignedBy               prTypeIdentifier = "signedBy"
 	prTypeSignedBaseLayer        prTypeIdentifier = "signedBaseLayer"

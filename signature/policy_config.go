@@ -247,7 +247,7 @@ func newPRInsecureAcceptAnything() *prInsecureAcceptAnything {
 	return &prInsecureAcceptAnything{prCommon{Type: prTypeInsecureAcceptAnything}}
 }
 
-// NewPRInsecureAcceptAnything returns a new "insecureAcceptAnything" PolicyRequirement.
+// NewPRInsecureAcceptAnything returns a new "accept" PolicyRequirement.
 func NewPRInsecureAcceptAnything() PolicyRequirement {
 	return newPRInsecureAcceptAnything()
 }
