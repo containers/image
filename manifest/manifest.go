@@ -19,6 +19,10 @@ const (
 	DockerV2Schema1SignedMediaType = "application/vnd.docker.distribution.manifest.v1+prettyjws"
 	// DockerV2Schema2MediaType MIME type represents Docker manifest schema 2
 	DockerV2Schema2MediaType = "application/vnd.docker.distribution.manifest.v2+json"
+	// DockerV2Schema2ConfigMediaType is the MIME type used for schema 2 config blobs.
+	DockerV2Schema2ConfigMediaType = "application/vnd.docker.container.image.v1+json"
+	// DockerV2Schema2LayerMediaType is the MIME type used for schema 2 layers.
+	DockerV2Schema2LayerMediaType = "application/vnd.docker.image.rootfs.diff.tar.gzip"
 	// DockerV2ListMediaType MIME type represents Docker manifest schema 2 list
 	DockerV2ListMediaType = "application/vnd.docker.distribution.manifest.list.v2+json"
 )
