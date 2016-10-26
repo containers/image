@@ -118,21 +118,19 @@ func (name nameImageTransportMock) ValidatePolicyConfigurationScope(scope string
 	panic("unexpected call to a mock function")
 }
 
-type prmTableTest struct {
-	imageRef, sigRef string
-	result           bool
+type prmSymmetricTableTest struct {
+	refA, refB string
+	result     bool
 }
 
-// Test cases for exact reference match
-var prmExactMatchTestTable = []prmTableTest{
+// Test cases for exact reference match. The behavior is supposed to be symmetric.
+var prmExactMatchTestTable = []prmSymmetricTableTest{
 	// Success, simple matches
 	{"busybox:latest", "busybox:latest", true},
 	{fullRHELRef, fullRHELRef, true},
 	// Non-canonical reference format is canonicalized
 	{"library/busybox:latest", "busybox:latest", true},
-	{"busybox:latest", "library/busybox:latest", true},
 	{"docker.io/library/busybox:latest", "busybox:latest", true},
-	{"busybox:latest", "docker.io/library/busybox:latest", true},
 	// Mismatch
 	{"busybox:latest", "busybox:notlatest", false},
 	{"busybox:latest", "notbusybox:latest", false},
@@ -141,26 +139,22 @@ var prmExactMatchTestTable = []prmTableTest{
 	{"busybox:latest", fullRHELRef, false},
 	// Missing tags
 	{"busybox", "busybox:latest", false},
-	{"busybox:latest", "busybox", false},
 	{"busybox", "busybox", false},
 	// Invalid format
 	{"UPPERCASE_IS_INVALID_IN_DOCKER_REFERENCES", "busybox:latest", false},
-	{"busybox:latest", "UPPERCASE_IS_INVALID_IN_DOCKER_REFERENCES", false},
 	{"", "UPPERCASE_IS_INVALID_IN_DOCKER_REFERENCES", false},
 	// Even if they are exactly equal, invalid values are rejected.
 	{"INVALID", "INVALID", false},
 }
 
-// Test cases for repository-only reference match
-var prmRepositoryMatchTestTable = []prmTableTest{
+// Test cases for repository-only reference match. The behavior is supposed to be symmetric.
+var prmRepositoryMatchTestTable = []prmSymmetricTableTest{
 	// Success, simple matches
 	{"busybox:latest", "busybox:latest", true},
 	{fullRHELRef, fullRHELRef, true},
 	// Non-canonical reference format is canonicalized
 	{"library/busybox:latest", "busybox:latest", true},
-	{"busybox:latest", "library/busybox:latest", true},
 	{"docker.io/library/busybox:latest", "busybox:latest", true},
-	{"busybox:latest", "docker.io/library/busybox:latest", true},
 	// The same as above, but with mismatching tags
 	{"busybox:latest", "busybox:notlatest", true},
 	{fullRHELRef + "tagsuffix", fullRHELRef, true},
@@ -172,32 +166,34 @@ var prmRepositoryMatchTestTable = []prmTableTest{
 	{"busybox", "busybox:notlatest", true},
 	{fullRHELRef, untaggedRHELRef, true},
 	{"library/busybox", "busybox", true},
-	{"busybox", "library/busybox", true},
 	{"docker.io/library/busybox", "busybox", true},
-	{"busybox", "docker.io/library/busybox", true},
 	// Mismatch
 	{"busybox:latest", "notbusybox:latest", false},
 	{"hostname/library/busybox:latest", "busybox:notlatest", false},
 	{"busybox:latest", fullRHELRef, false},
 	// Invalid format
 	{"UPPERCASE_IS_INVALID_IN_DOCKER_REFERENCES", "busybox:latest", false},
-	{"busybox:latest", "UPPERCASE_IS_INVALID_IN_DOCKER_REFERENCES", false},
 	{"", "UPPERCASE_IS_INVALID_IN_DOCKER_REFERENCES", false},
 	// Even if they are exactly equal, invalid values are rejected.
 	{"INVALID", "INVALID", false},
 }
 
+func testImageAndSig(t *testing.T, prm PolicyReferenceMatch, imageRef, sigRef string, result bool) {
+	// This assumes that all ways to obtain a reference.Named perform equivalent validation,
+	// and therefore values refused by reference.ParseNamed can not happen in practice.
+	parsedImageRef, err := reference.ParseNamed(imageRef)
+	if err != nil {
+		return
+	}
+	res := prm.matchesDockerReference(refImageMock{parsedImageRef}, sigRef)
+	assert.Equal(t, result, res, fmt.Sprintf("%s vs. %s", imageRef, sigRef))
+}
+
 func TestPRMMatchExactMatchesDockerReference(t *testing.T) {
 	prm := NewPRMMatchExact()
 	for _, test := range prmExactMatchTestTable {
-		// This assumes that all ways to obtain a reference.Named perform equivalent validation,
-		// and therefore values refused by reference.ParseNamed can not happen in practice.
-		imageRef, err := reference.ParseNamed(test.imageRef)
-		if err != nil {
-			continue
-		}
-		res := prm.matchesDockerReference(refImageMock{imageRef}, test.sigRef)
-		assert.Equal(t, test.result, res, fmt.Sprintf("%s vs. %s", test.imageRef, test.sigRef))
+		testImageAndSig(t, prm, test.refA, test.refB, test.result)
+		testImageAndSig(t, prm, test.refB, test.refA, test.result)
 	}
 	// Even if they are signed with an empty string as a reference, unidentified images are rejected.
 	res := prm.matchesDockerReference(refImageMock{nil}, "")
@@ -207,14 +203,8 @@ func TestPRMMatchExactMatchesDockerReference(t *testing.T) {
 func TestPRMMatchRepositoryMatchesDockerReference(t *testing.T) {
 	prm := NewPRMMatchRepository()
 	for _, test := range prmRepositoryMatchTestTable {
-		// This assumes that all ways to obtain a reference.Named perform equivalent validation,
-		// and therefore values refused by reference.ParseNamed can not happen in practice.
-		imageRef, err := reference.ParseNamed(test.imageRef)
-		if err != nil {
-			continue
-		}
-		res := prm.matchesDockerReference(refImageMock{imageRef}, test.sigRef)
-		assert.Equal(t, test.result, res, fmt.Sprintf("%s vs. %s", test.imageRef, test.sigRef))
+		testImageAndSig(t, prm, test.refA, test.refB, test.result)
+		testImageAndSig(t, prm, test.refB, test.refA, test.result)
 	}
 	// Even if they are signed with an empty string as a reference, unidentified images are rejected.
 	res := prm.matchesDockerReference(refImageMock{nil}, "")
@@ -262,22 +252,34 @@ func (ref forbiddenImageMock) Signatures() ([][]byte, error) {
 	panic("unexpected call to a mock function")
 }
 
+func testExactPRMAndSig(t *testing.T, prmFactory func(string) PolicyReferenceMatch, imageRef, sigRef string, result bool) {
+	prm := prmFactory(imageRef)
+	res := prm.matchesDockerReference(forbiddenImageMock{}, sigRef)
+	assert.Equal(t, result, res, fmt.Sprintf("%s vs. %s", imageRef, sigRef))
+}
+
+func prmExactReferenceFactory(ref string) PolicyReferenceMatch {
+	// Do not use NewPRMExactReference, we want to also test the case with an invalid DockerReference,
+	// even though NewPRMExactReference should never let it happen.
+	return &prmExactReference{DockerReference: ref}
+}
+
 func TestPRMExactReferenceMatchesDockerReference(t *testing.T) {
 	for _, test := range prmExactMatchTestTable {
-		// Do not use NewPRMExactReference, we want to also test the case with an invalid DockerReference,
-		// even though NewPRMExactReference should never let it happen.
-		prm := prmExactReference{DockerReference: test.imageRef}
-		res := prm.matchesDockerReference(forbiddenImageMock{}, test.sigRef)
-		assert.Equal(t, test.result, res, fmt.Sprintf("%s vs. %s", test.imageRef, test.sigRef))
+		testExactPRMAndSig(t, prmExactReferenceFactory, test.refA, test.refB, test.result)
+		testExactPRMAndSig(t, prmExactReferenceFactory, test.refB, test.refA, test.result)
 	}
+}
+
+func prmExactRepositoryFactory(ref string) PolicyReferenceMatch {
+	// Do not use NewPRMExactRepository, we want to also test the case with an invalid DockerReference,
+	// even though NewPRMExactRepository should never let it happen.
+	return &prmExactRepository{DockerRepository: ref}
 }
 
 func TestPRMExactRepositoryMatchesDockerReference(t *testing.T) {
 	for _, test := range prmRepositoryMatchTestTable {
-		// Do not use NewPRMExactRepository, we want to also test the case with an invalid DockerReference,
-		// even though NewPRMExactRepository should never let it happen.
-		prm := prmExactRepository{DockerRepository: test.imageRef}
-		res := prm.matchesDockerReference(forbiddenImageMock{}, test.sigRef)
-		assert.Equal(t, test.result, res, fmt.Sprintf("%s vs. %s", test.imageRef, test.sigRef))
+		testExactPRMAndSig(t, prmExactRepositoryFactory, test.refA, test.refB, test.result)
+		testExactPRMAndSig(t, prmExactRepositoryFactory, test.refB, test.refA, test.result)
 	}
 }
