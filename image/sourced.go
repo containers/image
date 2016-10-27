@@ -57,14 +57,6 @@ func FromUnparsedImage(unparsed *UnparsedImage) (types.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	if manifestMIMEType == "" || manifestMIMEType == "text/plain" {
-		// Crane registries can return "text/plain".
-		// This makes no real sense, but it happens
-		// because requests for manifests are
-		// redirected to a content distribution
-		// network which is configured that way.
-		manifestMIMEType = manifest.GuessMIMEType(manifestBlob)
-	}
 
 	parsedManifest, err := manifestInstanceFromBlob(unparsed.src, manifestBlob, manifestMIMEType)
 	if err != nil {
