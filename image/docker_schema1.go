@@ -54,16 +54,19 @@ func manifestSchema1FromManifest(manifest []byte) (genericManifest, error) {
 	if err := json.Unmarshal(manifest, mschema1); err != nil {
 		return nil, err
 	}
+	if mschema1.SchemaVersion != 1 {
+		return nil, fmt.Errorf("unsupported schema version %d", mschema1.SchemaVersion)
+	}
+	if len(mschema1.FSLayers) != len(mschema1.History) {
+		return nil, errors.New("length of history not equal to number of layers")
+	}
+	if len(mschema1.FSLayers) == 0 {
+		return nil, errors.New("no FSLayers in manifest")
+	}
+
 	if err := fixManifestLayers(mschema1); err != nil {
 		return nil, err
 	}
-	// TODO(runcom): verify manifest schema 1, 2 etc
-	//if len(m.FSLayers) != len(m.History) {
-	//return nil, fmt.Errorf("length of history not equal to number of layers for %q", ref.String())
-	//}
-	//if len(m.FSLayers) == 0 {
-	//return nil, fmt.Errorf("no FSLayers in manifest for %q", ref.String())
-	//}
 	return mschema1, nil
 }
 

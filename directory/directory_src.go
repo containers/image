@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 )
 
@@ -35,7 +36,7 @@ func (s *dirImageSource) GetManifest() ([]byte, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	return m, "", err
+	return m, manifest.GuessMIMEType(m), err
 }
 
 func (s *dirImageSource) GetTargetManifest(digest string) ([]byte, string, error) {

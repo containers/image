@@ -1,8 +1,6 @@
 package image
 
 import (
-	"errors"
-	"fmt"
 	"time"
 
 	"github.com/docker/engine-api/types/strslice"
@@ -90,10 +88,17 @@ func manifestInstanceFromBlob(src types.ImageSource, manblob []byte, mt string) 
 		return manifestSchema2FromManifest(src, manblob)
 	case manifest.DockerV2ListMediaType:
 		return manifestSchema2FromManifestList(src, manblob)
-	case "":
-		return nil, errors.New("could not guess manifest media type")
 	default:
-		return nil, fmt.Errorf("unsupported manifest media type %s", mt)
+		// if it's not a recognized manifest media type we'll try the last time
+		// to deserialize using v2s1 as per https://github.com/docker/distribution/blob/master/manifests.go#L108
+		// and https://github.com/docker/distribution/blob/master/manifest/schema1/manifest.go#L50
+		//
+		// Crane registries can return "text/plain" also.
+		// This makes no real sense, but it happens
+		// because requests for manifests are
+		// redirected to a content distribution
+		// network which is configured that way. See https://bugzilla.redhat.com/show_bug.cgi?id=1389442
+		return manifestSchema1FromManifest(manblob)
 	}
 }
 
