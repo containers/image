@@ -153,7 +153,9 @@ func TestReferenceNewImage(t *testing.T) {
 	dest, err := ref.NewImageDestination(nil)
 	require.NoError(t, err)
 	defer dest.Close()
-	err = dest.PutManifest([]byte(`{"schemaVersion":2}`))
+	mFixture, err := ioutil.ReadFile("../manifest/fixtures/v2s1.manifest.json")
+	require.NoError(t, err)
+	err = dest.PutManifest(mFixture)
 	assert.NoError(t, err)
 	err = dest.Commit()
 	assert.NoError(t, err)
@@ -161,6 +163,22 @@ func TestReferenceNewImage(t *testing.T) {
 	img, err := ref.NewImage(nil)
 	assert.NoError(t, err)
 	defer img.Close()
+}
+
+func TestReferenceNewImageNoValidManifest(t *testing.T) {
+	ref, tmpDir := refToTempDir(t)
+	defer os.RemoveAll(tmpDir)
+
+	dest, err := ref.NewImageDestination(nil)
+	require.NoError(t, err)
+	defer dest.Close()
+	err = dest.PutManifest([]byte(`{"schemaVersion":1}`))
+	assert.NoError(t, err)
+	err = dest.Commit()
+	assert.NoError(t, err)
+
+	_, err = ref.NewImage(nil)
+	assert.Error(t, err)
 }
 
 func TestReferenceNewImageSource(t *testing.T) {
