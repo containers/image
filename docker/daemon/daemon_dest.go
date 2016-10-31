@@ -105,7 +105,7 @@ func (d *daemonImageDestination) Reference() types.ImageReference {
 // If an empty slice or nil it's returned, then any mime type can be tried to upload
 func (d *daemonImageDestination) SupportedManifestMIMETypes() []string {
 	return []string{
-		manifest.DockerV2Schema2MediaType, // FIXME: Handle others.
+		manifest.DockerV2Schema2MediaType, // We rely on the types.Image.UpdatedImage schema conversion capabilities.
 	}
 }
 
@@ -167,7 +167,6 @@ func (d *daemonImageDestination) PutManifest(m []byte) error {
 		return fmt.Errorf("Error parsing manifest: %v", err)
 	}
 	if man.SchemaVersion != 2 || man.MediaType != manifest.DockerV2Schema2MediaType {
-		// FIXME FIXME: Teach copy.go about this.
 		return fmt.Errorf("Unsupported manifest type, need a Docker schema 2 manifest")
 	}
 
