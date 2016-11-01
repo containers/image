@@ -71,7 +71,7 @@ func FromUnparsedImage(unparsed *UnparsedImage) (types.Image, error) {
 	}, nil
 }
 
-// Manifest overrides the UnparsedImage.Manifest to use the fields which we have already fetched, after guessing and overrides.
+// Manifest overrides the UnparsedImage.Manifest to always use the fields which we have already fetched.
 func (i *sourcedImage) Manifest() ([]byte, string, error) {
 	return i.manifestBlob, i.manifestMIMEType, nil
 }
