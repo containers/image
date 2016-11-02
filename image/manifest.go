@@ -89,11 +89,11 @@ func manifestInstanceFromBlob(src types.ImageSource, manblob []byte, mt string) 
 	case manifest.DockerV2ListMediaType:
 		return manifestSchema2FromManifestList(src, manblob)
 	default:
-		// if it's not a recognized manifest media type we'll try the last time
+		// If it's not a recognized manifest media type, or we have failed determining the type, we'll try one last time
 		// to deserialize using v2s1 as per https://github.com/docker/distribution/blob/master/manifests.go#L108
 		// and https://github.com/docker/distribution/blob/master/manifest/schema1/manifest.go#L50
 		//
-		// Crane registries can return "text/plain" also.
+		// Crane registries can also return "text/plain", or pretty much anything else depending on a file extension “recognized” in the tag.
 		// This makes no real sense, but it happens
 		// because requests for manifests are
 		// redirected to a content distribution

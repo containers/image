@@ -290,7 +290,7 @@ func (s *daemonImageSource) prepareLayerData(tarManifest *manifestItem, parsedCo
 	return knownLayers, nil
 }
 
-// GetManifest returns the image's manifest along with its MIME type. The empty string is returned if the MIME type is unknown.
+// GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).
 // It may use a remote (= slow) service.
 func (s *daemonImageSource) GetManifest() ([]byte, string, error) {
 	if s.generatedManifest == nil {

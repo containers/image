@@ -67,6 +67,8 @@ func simplifyContentType(contentType string) string {
 	return mimeType
 }
 
+// GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).
+// It may use a remote (= slow) service.
 func (s *dockerImageSource) GetManifest() ([]byte, string, error) {
 	err := s.ensureManifestIsLoaded()
 	if err != nil {
