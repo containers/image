@@ -72,8 +72,8 @@ func (s *ociImageSource) GetTargetManifest(digest digest.Digest) ([]byte, string
 }
 
 // GetBlob returns a stream for the specified blob, and the blob's size.
-func (s *ociImageSource) GetBlob(digest digest.Digest) (io.ReadCloser, int64, error) {
-	path, err := s.ref.blobPath(digest)
+func (s *ociImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, error) {
+	path, err := s.ref.blobPath(info.Digest)
 	if err != nil {
 		return nil, 0, err
 	}

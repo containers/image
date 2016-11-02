@@ -335,16 +335,16 @@ func (s *daemonImageSource) GetTargetManifest(digest digest.Digest) ([]byte, str
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
-func (s *daemonImageSource) GetBlob(digest digest.Digest) (io.ReadCloser, int64, error) {
+func (s *daemonImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, error) {
 	if err := s.ensureCachedDataIsPresent(); err != nil {
 		return nil, 0, err
 	}
 
-	if digest == s.configDigest { // FIXME? Implement a more general algorithm matching instead of assuming sha256.
+	if info.Digest == s.configDigest { // FIXME? Implement a more general algorithm matching instead of assuming sha256.
 		return ioutil.NopCloser(bytes.NewReader(s.configBytes)), int64(len(s.configBytes)), nil
 	}
 
-	if li, ok := s.knownLayers[diffID(digest)]; ok { // diffID is a digest of the uncompressed tarball,
+	if li, ok := s.knownLayers[diffID(info.Digest)]; ok { // diffID is a digest of the uncompressed tarball,
 		stream, err := s.openTarComponent(li.path)
 		if err != nil {
 			return nil, 0, err
@@ -352,7 +352,7 @@ func (s *daemonImageSource) GetBlob(digest digest.Digest) (io.ReadCloser, int64,
 		return stream, li.size, nil
 	}
 
-	return nil, 0, fmt.Errorf("Unknown blob %s", digest)
+	return nil, 0, fmt.Errorf("Unknown blob %s", info.Digest)
 }
 
 // GetSignatures returns the image's signatures.  It may use a remote (= slow) service.

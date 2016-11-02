@@ -224,10 +224,26 @@ func copyLayers(manifestUpdates *types.ManifestUpdateOptions, dest types.ImageDe
 	for _, srcLayer := range srcInfos {
 		cl, ok := copiedLayers[srcLayer.Digest]
 		if !ok {
-			fmt.Fprintf(reportWriter, "Copying blob %s\n", srcLayer.Digest)
-			destInfo, diffID, err := copyLayer(dest, rawSource, srcLayer, diffIDsAreNeeded, canModifyManifest, reportWriter)
-			if err != nil {
-				return err
+			var (
+				destInfo types.BlobInfo
+				diffID   digest.Digest
+				err      error
+			)
+			if dest.AcceptsForeignLayerURLs() && len(srcLayer.URLs) != 0 {
+				// DiffIDs are, currently, needed only when converting from schema1.
+				// In which case src.LayerInfos will not have URLs because schema1
+				// does not support them.
+				if diffIDsAreNeeded {
+					return errors.New("getting DiffID for foreign layers is unimplemented")
+				}
+				destInfo = srcLayer
+				fmt.Fprintf(reportWriter, "Skipping foreign layer %q copy to %s\n", destInfo.Digest, dest.Reference().Transport().Name())
+			} else {
+				fmt.Fprintf(reportWriter, "Copying blob %s\n", srcLayer.Digest)
+				destInfo, diffID, err = copyLayer(dest, rawSource, srcLayer, diffIDsAreNeeded, canModifyManifest, reportWriter)
+				if err != nil {
+					return err
+				}
 			}
 			cl = copiedLayer{blobInfo: destInfo, diffID: diffID}
 			copiedLayers[srcLayer.Digest] = cl
@@ -289,7 +305,7 @@ type diffIDResult struct {
 // and returns a complete blobInfo of the copied layer, and a value for LayerDiffIDs if diffIDIsNeeded
 func copyLayer(dest types.ImageDestination, src types.ImageSource, srcInfo types.BlobInfo,
 	diffIDIsNeeded bool, canCompress bool, reportWriter io.Writer) (types.BlobInfo, digest.Digest, error) {
-	srcStream, srcBlobSize, err := src.GetBlob(srcInfo.Digest) // We currently completely ignore srcInfo.Size throughout.
+	srcStream, srcBlobSize, err := src.GetBlob(srcInfo)
 	if err != nil {
 		return types.BlobInfo{}, "", fmt.Errorf("Error reading blob %s: %v", srcInfo.Digest, err)
 	}

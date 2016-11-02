@@ -46,8 +46,8 @@ func (s *dirImageSource) GetTargetManifest(digest digest.Digest) ([]byte, string
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
-func (s *dirImageSource) GetBlob(digest digest.Digest) (io.ReadCloser, int64, error) {
-	r, err := os.Open(s.ref.layerPath(digest))
+func (s *dirImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, error) {
+	r, err := os.Open(s.ref.layerPath(info.Digest))
 	if err != nil {
 		return nil, 0, nil
 	}

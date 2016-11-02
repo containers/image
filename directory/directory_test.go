@@ -66,7 +66,7 @@ func TestGetPutBlob(t *testing.T) {
 	src, err := ref.NewImageSource(nil, nil)
 	require.NoError(t, err)
 	defer src.Close()
-	rc, size, err := src.GetBlob(info.Digest)
+	rc, size, err := src.GetBlob(info)
 	assert.NoError(t, err)
 	defer rc.Close()
 	b, err := ioutil.ReadAll(rc)

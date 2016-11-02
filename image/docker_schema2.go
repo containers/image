@@ -31,6 +31,7 @@ type descriptor struct {
 	MediaType string        `json:"mediaType"`
 	Size      int64         `json:"size"`
 	Digest    digest.Digest `json:"digest"`
+	URLs      []string      `json:"urls,omitempty"`
 }
 
 type manifestSchema2 struct {
@@ -83,7 +84,11 @@ func (m *manifestSchema2) ConfigBlob() ([]byte, error) {
 		if m.src == nil {
 			return nil, fmt.Errorf("Internal error: neither src nor configBlob set in manifestSchema2")
 		}
-		stream, _, err := m.src.GetBlob(m.ConfigDescriptor.Digest)
+		stream, _, err := m.src.GetBlob(types.BlobInfo{
+			Digest: m.ConfigDescriptor.Digest,
+			Size:   m.ConfigDescriptor.Size,
+			URLs:   m.ConfigDescriptor.URLs,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -107,7 +112,11 @@ func (m *manifestSchema2) ConfigBlob() ([]byte, error) {
 func (m *manifestSchema2) LayerInfos() []types.BlobInfo {
 	blobs := []types.BlobInfo{}
 	for _, layer := range m.LayersDescriptors {
-		blobs = append(blobs, types.BlobInfo{Digest: layer.Digest, Size: layer.Size})
+		blobs = append(blobs, types.BlobInfo{
+			Digest: layer.Digest,
+			Size:   layer.Size,
+			URLs:   layer.URLs,
+		})
 	}
 	return blobs
 }
@@ -149,6 +158,7 @@ func (m *manifestSchema2) UpdatedImage(options types.ManifestUpdateOptions) (typ
 		for i, info := range options.LayerInfos {
 			copy.LayersDescriptors[i].Digest = info.Digest
 			copy.LayersDescriptors[i].Size = info.Size
+			copy.LayersDescriptors[i].URLs = info.URLs
 		}
 	}
 

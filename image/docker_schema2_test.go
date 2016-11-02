@@ -33,7 +33,7 @@ func (f unusedImageSource) GetManifest() ([]byte, string, error) {
 func (f unusedImageSource) GetTargetManifest(digest digest.Digest) ([]byte, string, error) {
 	panic("Unexpected call to a mock function")
 }
-func (f unusedImageSource) GetBlob(digest digest.Digest) (io.ReadCloser, int64, error) {
+func (f unusedImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, error) {
 	panic("Unexpected call to a mock function")
 }
 func (f unusedImageSource) GetSignatures() ([][]byte, error) {
@@ -149,11 +149,11 @@ type configBlobImageSource struct {
 	f                 func(digest digest.Digest) (io.ReadCloser, int64, error)
 }
 
-func (f configBlobImageSource) GetBlob(digest digest.Digest) (io.ReadCloser, int64, error) {
-	if digest.String() != "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f" {
+func (f configBlobImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, error) {
+	if info.Digest.String() != "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f" {
 		panic("Unexpected digest in GetBlob")
 	}
-	return f.f(digest)
+	return f.f(info.Digest)
 }
 
 func TestManifestSchema2ConfigBlob(t *testing.T) {
@@ -355,6 +355,9 @@ func (d *memoryImageDest) SupportsSignatures() error {
 	panic("Unexpected call to a mock function")
 }
 func (d *memoryImageDest) ShouldCompressLayers() bool {
+	panic("Unexpected call to a mock function")
+}
+func (d *memoryImageDest) AcceptsForeignLayerURLs() bool {
 	panic("Unexpected call to a mock function")
 }
 func (d *memoryImageDest) PutBlob(stream io.Reader, inputInfo types.BlobInfo) (types.BlobInfo, error) {

@@ -214,11 +214,11 @@ func (s *openshiftImageSource) GetManifest() ([]byte, string, error) {
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
-func (s *openshiftImageSource) GetBlob(digest digest.Digest) (io.ReadCloser, int64, error) {
+func (s *openshiftImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, error) {
 	if err := s.ensureImageIsResolved(); err != nil {
 		return nil, 0, err
 	}
-	return s.docker.GetBlob(digest)
+	return s.docker.GetBlob(info)
 }
 
 func (s *openshiftImageSource) GetSignatures() ([][]byte, error) {
@@ -347,6 +347,12 @@ func (d *openshiftImageDestination) SupportsSignatures() error {
 
 // ShouldCompressLayers returns true iff it is desirable to compress layer blobs written to this destination.
 func (d *openshiftImageDestination) ShouldCompressLayers() bool {
+	return true
+}
+
+// AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
+// uploaded to the image destination, true otherwise.
+func (d *openshiftImageDestination) AcceptsForeignLayerURLs() bool {
 	return true
 }
 
