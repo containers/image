@@ -34,7 +34,7 @@ type daemonImageDestination struct {
 // newImageDestination returns a types.ImageDestination for the specified image reference.
 func newImageDestination(systemCtx *types.SystemContext, ref daemonReference) (types.ImageDestination, error) {
 	// FIXME: Do something with ref
-	c, err := client.NewClient(client.DefaultDockerHost, "1.22", nil, nil) // FIXME: overridable host
+	c, err := client.NewEnvClient()
 	if err != nil {
 		return nil, fmt.Errorf("Error initializing docker engine client: %v", err)
 	}
