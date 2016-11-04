@@ -213,7 +213,7 @@ func TestReferenceNewImageSource(t *testing.T) {
 	ref, tmpDir := refToTempOCI(t)
 	defer os.RemoveAll(tmpDir)
 	_, err := ref.NewImageSource(nil, nil)
-	assert.Error(t, err)
+	assert.NoError(t, err)
 }
 
 func TestReferenceNewImageDestination(t *testing.T) {
