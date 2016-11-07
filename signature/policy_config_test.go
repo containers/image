@@ -28,7 +28,7 @@ var policyFixtureContents = &Policy{
 			"example.com/production": {
 				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys,
 					"/keys/employee-gpg-keyring",
-					NewPRMMatchExact()),
+					NewPRMMatchRepoDigestOrExact()),
 			},
 			"example.com/hardened": {
 				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys,
@@ -45,17 +45,17 @@ var policyFixtureContents = &Policy{
 					NewPRMMatchRepository()),
 				xNewPRSignedByKeyPath(SBKeyTypeSignedByX509CAs,
 					"/keys/public-key-signing-ca-file",
-					NewPRMMatchExact()),
+					NewPRMMatchRepoDigestOrExact()),
 			},
 			"registry.access.redhat.com": {
 				xNewPRSignedByKeyPath(SBKeyTypeSignedByGPGKeys,
 					"/keys/RH-key-signing-key-gpg-keyring",
-					NewPRMMatchExact()),
+					NewPRMMatchRepoDigestOrExact()),
 			},
 			"bogus/key-data-example": {
 				xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys,
 					[]byte("nonsense"),
-					NewPRMMatchExact()),
+					NewPRMMatchRepoDigestOrExact()),
 			},
 			"bogus/signed-identity-example": {
 				xNewPRSignedBaseLayer(xNewPRMExactReference("registry.access.redhat.com/rhel7/rhel:latest")),
@@ -228,12 +228,12 @@ func TestPolicyUnmarshalJSON(t *testing.T) {
 	// Start with a valid JSON.
 	validPolicy := Policy{
 		Default: []PolicyRequirement{
-			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("abc"), NewPRMMatchExact()),
+			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("abc"), NewPRMMatchRepoDigestOrExact()),
 		},
 		Transports: map[string]PolicyTransportScopes{
 			"docker": {
 				"docker.io/library/busybox": []PolicyRequirement{
-					xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("def"), NewPRMMatchExact()),
+					xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("def"), NewPRMMatchRepoDigestOrExact()),
 				},
 				"registry.access.redhat.com": []PolicyRequirement{
 					xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RH"), NewPRMMatchRepository()),
@@ -310,7 +310,7 @@ func TestPolicyTransportScopesUnmarshalJSON(t *testing.T) {
 	// Start with a valid JSON.
 	validPTS := PolicyTransportScopes{
 		"": []PolicyRequirement{
-			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("global"), NewPRMMatchExact()),
+			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("global"), NewPRMMatchRepoDigestOrExact()),
 		},
 	}
 	validJSON, err := json.Marshal(validPTS)
@@ -355,13 +355,13 @@ func TestPolicyTransportScopesWithTransportUnmarshalJSON(t *testing.T) {
 	// Start with a valid JSON.
 	validPTS := PolicyTransportScopes{
 		"docker.io/library/busybox": []PolicyRequirement{
-			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("def"), NewPRMMatchExact()),
+			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("def"), NewPRMMatchRepoDigestOrExact()),
 		},
 		"registry.access.redhat.com": []PolicyRequirement{
 			xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RH"), NewPRMMatchRepository()),
 		},
 		"": []PolicyRequirement{
-			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("global"), NewPRMMatchExact()),
+			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("global"), NewPRMMatchRepoDigestOrExact()),
 		},
 	}
 	validJSON, err := json.Marshal(validPTS)
@@ -440,7 +440,7 @@ func TestPolicyRequirementsUnmarshalJSON(t *testing.T) {
 
 	// Start with a valid JSON.
 	validReqs := PolicyRequirements{
-		xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("def"), NewPRMMatchExact()),
+		xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("def"), NewPRMMatchRepoDigestOrExact()),
 		xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RH"), NewPRMMatchRepository()),
 	}
 	validJSON, err := json.Marshal(validReqs)
@@ -632,7 +632,7 @@ func TestPRRejectUnmarshalJSON(t *testing.T) {
 func TestNewPRSignedBy(t *testing.T) {
 	const testPath = "/foo/bar"
 	testData := []byte("abc")
-	testIdentity := NewPRMMatchExact()
+	testIdentity := NewPRMMatchRepoDigestOrExact()
 
 	// Success
 	pr, err := newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, testIdentity)
@@ -671,7 +671,7 @@ func TestNewPRSignedBy(t *testing.T) {
 
 func TestNewPRSignedByKeyPath(t *testing.T) {
 	const testPath = "/foo/bar"
-	_pr, err := NewPRSignedByKeyPath(SBKeyTypeGPGKeys, testPath, NewPRMMatchExact())
+	_pr, err := NewPRSignedByKeyPath(SBKeyTypeGPGKeys, testPath, NewPRMMatchRepoDigestOrExact())
 	require.NoError(t, err)
 	pr, ok := _pr.(*prSignedBy)
 	require.True(t, ok)
@@ -681,7 +681,7 @@ func TestNewPRSignedByKeyPath(t *testing.T) {
 
 func TestNewPRSignedByKeyData(t *testing.T) {
 	testData := []byte("abc")
-	_pr, err := NewPRSignedByKeyData(SBKeyTypeGPGKeys, testData, NewPRMMatchExact())
+	_pr, err := NewPRSignedByKeyData(SBKeyTypeGPGKeys, testData, NewPRMMatchRepoDigestOrExact())
 	require.NoError(t, err)
 	pr, ok := _pr.(*prSignedBy)
 	require.True(t, ok)
@@ -710,7 +710,7 @@ func TestPRSignedByUnmarshalJSON(t *testing.T) {
 	testInvalidJSONInput(t, &pr)
 
 	// Start with a valid JSON.
-	validPR, err := NewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("abc"), NewPRMMatchExact())
+	validPR, err := NewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("abc"), NewPRMMatchRepoDigestOrExact())
 	require.NoError(t, err)
 	validJSON, err := json.Marshal(validPR)
 	require.NoError(t, err)
@@ -722,7 +722,7 @@ func TestPRSignedByUnmarshalJSON(t *testing.T) {
 	assert.Equal(t, validPR, &pr)
 
 	// Success with KeyPath
-	kpPR, err := NewPRSignedByKeyPath(SBKeyTypeGPGKeys, "/foo/bar", NewPRMMatchExact())
+	kpPR, err := NewPRSignedByKeyPath(SBKeyTypeGPGKeys, "/foo/bar", NewPRMMatchRepoDigestOrExact())
 	require.NoError(t, err)
 	testJSON, err := json.Marshal(kpPR)
 	require.NoError(t, err)
@@ -782,7 +782,7 @@ func TestPRSignedByUnmarshalJSON(t *testing.T) {
 		assert.Error(t, err)
 	}
 	// Handle "keyPath", which is not in validJSON, specially
-	pathPR, err := NewPRSignedByKeyPath(SBKeyTypeGPGKeys, "/foo/bar", NewPRMMatchExact())
+	pathPR, err := NewPRSignedByKeyPath(SBKeyTypeGPGKeys, "/foo/bar", NewPRMMatchRepoDigestOrExact())
 	require.NoError(t, err)
 	testJSON, err = json.Marshal(pathPR)
 	require.NoError(t, err)
@@ -801,6 +801,18 @@ func TestPRSignedByUnmarshalJSON(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	// Various ways to set signedIdentity to the default value
+	signedIdentityDefaultFns := []func(mSI){
+		// Set signedIdentity to the default explicitly
+		func(v mSI) { v["signedIdentity"] = NewPRMMatchRepoDigestOrExact() },
+		// Delete the signedIdentity field
+		func(v mSI) { delete(v, "signedIdentity") },
+	}
+	for _, fn := range signedIdentityDefaultFns {
+		err = tryUnmarshalModifiedSignedBy(t, &pr, validJSON, fn)
+		require.NoError(t, err)
+		assert.Equal(t, NewPRMMatchRepoDigestOrExact(), pr.SignedIdentity)
+	}
 }
 
 func TestSBKeyTypeIsValid(t *testing.T) {
@@ -945,7 +957,7 @@ func TestPRSignedBaseLayerUnmarshalJSON(t *testing.T) {
 
 func TestNewPolicyReferenceMatchFromJSON(t *testing.T) {
 	// Sample success. Others tested in the individual PolicyReferenceMatch.UnmarshalJSON implementations.
-	validPRM := NewPRMMatchExact()
+	validPRM := NewPRMMatchRepoDigestOrExact()
 	validJSON, err := json.Marshal(validPRM)
 	require.NoError(t, err)
 	prm, err := newPolicyReferenceMatchFromJSON(validJSON)
@@ -1031,6 +1043,68 @@ func TestPRMMatchExactUnmarshalJSON(t *testing.T) {
 		testJSON := addExtraJSONMember(t, validJSON, field, tmp[field])
 
 		prm = prmMatchExact{}
+		err = json.Unmarshal(testJSON, &prm)
+		assert.Error(t, err)
+	}
+}
+
+func TestNewPRMMatchRepoDigestOrExact(t *testing.T) {
+	_prm := NewPRMMatchRepoDigestOrExact()
+	prm, ok := _prm.(*prmMatchRepoDigestOrExact)
+	require.True(t, ok)
+	assert.Equal(t, &prmMatchRepoDigestOrExact{prmCommon{prmTypeMatchRepoDigestOrExact}}, prm)
+}
+
+func TestPRMMatchRepoDigestOrExactUnmarshalJSON(t *testing.T) {
+	var prm prmMatchRepoDigestOrExact
+
+	testInvalidJSONInput(t, &prm)
+
+	// Start with a valid JSON.
+	validPR := NewPRMMatchRepoDigestOrExact()
+	validJSON, err := json.Marshal(validPR)
+	require.NoError(t, err)
+
+	// Success
+	prm = prmMatchRepoDigestOrExact{}
+	err = json.Unmarshal(validJSON, &prm)
+	require.NoError(t, err)
+	assert.Equal(t, validPR, &prm)
+
+	// newPolicyReferenceMatchFromJSON recognizes this type
+	_pr, err := newPolicyReferenceMatchFromJSON(validJSON)
+	require.NoError(t, err)
+	assert.Equal(t, validPR, _pr)
+
+	for _, invalid := range []mSI{
+		// Missing "type" field
+		{},
+		// Wrong "type" field
+		{"type": 1},
+		{"type": "this is invalid"},
+		// Extra fields
+		{
+			"type":    string(prmTypeMatchRepoDigestOrExact),
+			"unknown": "foo",
+		},
+	} {
+		testJSON, err := json.Marshal(invalid)
+		require.NoError(t, err)
+
+		prm = prmMatchRepoDigestOrExact{}
+		err = json.Unmarshal(testJSON, &prm)
+		assert.Error(t, err, string(testJSON))
+	}
+
+	// Duplicated fields
+	for _, field := range []string{"type"} {
+		var tmp mSI
+		err := json.Unmarshal(validJSON, &tmp)
+		require.NoError(t, err)
+
+		testJSON := addExtraJSONMember(t, validJSON, field, tmp[field])
+
+		prm = prmMatchRepoDigestOrExact{}
 		err = json.Unmarshal(testJSON, &prm)
 		assert.Error(t, err)
 	}

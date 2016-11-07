@@ -12,8 +12,10 @@ import (
 )
 
 const (
-	fullRHELRef     = "registry.access.redhat.com/rhel7/rhel:7.2.3"
-	untaggedRHELRef = "registry.access.redhat.com/rhel7/rhel"
+	fullRHELRef       = "registry.access.redhat.com/rhel7/rhel:7.2.3"
+	untaggedRHELRef   = "registry.access.redhat.com/rhel7/rhel"
+	digestSuffix      = "@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	digestSuffixOther = "@sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 )
 
 func TestParseImageAndDockerReference(t *testing.T) {
@@ -128,18 +130,33 @@ var prmExactMatchTestTable = []prmSymmetricTableTest{
 	// Success, simple matches
 	{"busybox:latest", "busybox:latest", true},
 	{fullRHELRef, fullRHELRef, true},
+	{"busybox" + digestSuffix, "busybox" + digestSuffix, true}, // NOTE: This is not documented; signing digests is not recommended at this time.
 	// Non-canonical reference format is canonicalized
 	{"library/busybox:latest", "busybox:latest", true},
 	{"docker.io/library/busybox:latest", "busybox:latest", true},
+	{"library/busybox" + digestSuffix, "busybox" + digestSuffix, true},
 	// Mismatch
 	{"busybox:latest", "busybox:notlatest", false},
 	{"busybox:latest", "notbusybox:latest", false},
 	{"busybox:latest", "hostname/library/busybox:notlatest", false},
 	{"hostname/library/busybox:latest", "busybox:notlatest", false},
 	{"busybox:latest", fullRHELRef, false},
-	// Missing tags
+	{"busybox" + digestSuffix, "notbusybox" + digestSuffix, false},
+	{"busybox:latest", "busybox" + digestSuffix, false},
+	{"busybox" + digestSuffix, "busybox" + digestSuffixOther, false},
+	// NameOnly references
 	{"busybox", "busybox:latest", false},
+	{"busybox", "busybox" + digestSuffix, false},
 	{"busybox", "busybox", false},
+	// References with both tags and digests: `reference.WithName` essentially drops the tag.
+	// This is not _particularly_ desirable but it is the semantics used throughout containers/image; at least, with the digest it is clear which image the reference means,
+	// even if the tag may reflect a different user intent.
+	// NOTE: Again, this is not documented behavior; the recommendation is to sign tags, not digests, and then tag-and-digest references won’t match the signed identity.
+	{"busybox:latest" + digestSuffix, "busybox:latest" + digestSuffix, true},
+	{"busybox:latest" + digestSuffix, "busybox:latest" + digestSuffixOther, false},
+	{"busybox:latest" + digestSuffix, "busybox:notlatest" + digestSuffix, true}, // Ugly.  Do not rely on this.
+	{"busybox:latest" + digestSuffix, "busybox" + digestSuffix, true},           // Ugly.  Do not rely on this.
+	{"busybox:latest" + digestSuffix, "busybox:latest", false},
 	// Invalid format
 	{"UPPERCASE_IS_INVALID_IN_DOCKER_REFERENCES", "busybox:latest", false},
 	{"", "UPPERCASE_IS_INVALID_IN_DOCKER_REFERENCES", false},
@@ -152,9 +169,11 @@ var prmRepositoryMatchTestTable = []prmSymmetricTableTest{
 	// Success, simple matches
 	{"busybox:latest", "busybox:latest", true},
 	{fullRHELRef, fullRHELRef, true},
+	{"busybox" + digestSuffix, "busybox" + digestSuffix, true}, // NOTE: This is not documented; signing digests is not recommended at this time.
 	// Non-canonical reference format is canonicalized
 	{"library/busybox:latest", "busybox:latest", true},
 	{"docker.io/library/busybox:latest", "busybox:latest", true},
+	{"library/busybox" + digestSuffix, "busybox" + digestSuffix, true},
 	// The same as above, but with mismatching tags
 	{"busybox:latest", "busybox:notlatest", true},
 	{fullRHELRef + "tagsuffix", fullRHELRef, true},
@@ -162,15 +181,25 @@ var prmRepositoryMatchTestTable = []prmSymmetricTableTest{
 	{"busybox:latest", "library/busybox:notlatest", true},
 	{"docker.io/library/busybox:notlatest", "busybox:latest", true},
 	{"busybox:notlatest", "docker.io/library/busybox:latest", true},
+	{"busybox:latest", "busybox" + digestSuffix, true},
+	{"busybox" + digestSuffix, "busybox" + digestSuffixOther, true}, // Even this is accepted here. (This could more reasonably happen with two different digest algorithms.)
 	// The same as above, but with defaulted tags (should not actually happen)
 	{"busybox", "busybox:notlatest", true},
 	{fullRHELRef, untaggedRHELRef, true},
+	{"busybox", "busybox" + digestSuffix, true},
 	{"library/busybox", "busybox", true},
 	{"docker.io/library/busybox", "busybox", true},
 	// Mismatch
 	{"busybox:latest", "notbusybox:latest", false},
 	{"hostname/library/busybox:latest", "busybox:notlatest", false},
 	{"busybox:latest", fullRHELRef, false},
+	{"busybox" + digestSuffix, "notbusybox" + digestSuffix, false},
+	// References with both tags and digests: `reference.WithName` essentially drops the tag, and we ignore both anyway.
+	{"busybox:latest" + digestSuffix, "busybox:latest" + digestSuffix, true},
+	{"busybox:latest" + digestSuffix, "busybox:latest" + digestSuffixOther, true},
+	{"busybox:latest" + digestSuffix, "busybox:notlatest" + digestSuffix, true},
+	{"busybox:latest" + digestSuffix, "busybox" + digestSuffix, true},
+	{"busybox:latest" + digestSuffix, "busybox:latest", true},
 	// Invalid format
 	{"UPPERCASE_IS_INVALID_IN_DOCKER_REFERENCES", "busybox:latest", false},
 	{"", "UPPERCASE_IS_INVALID_IN_DOCKER_REFERENCES", false},
@@ -198,6 +227,62 @@ func TestPRMMatchExactMatchesDockerReference(t *testing.T) {
 	// Even if they are signed with an empty string as a reference, unidentified images are rejected.
 	res := prm.matchesDockerReference(refImageMock{nil}, "")
 	assert.False(t, res, `unidentified vs. ""`)
+}
+
+func TestPMMMatchRepoDigestOrExactMatchesDockerReference(t *testing.T) {
+	prm := NewPRMMatchRepoDigestOrExact()
+
+	// prmMatchRepoDigestOrExact is a middle ground between prmMatchExact and prmMatchRepository:
+	// It accepts anything prmMatchExact accepts,…
+	for _, test := range prmExactMatchTestTable {
+		if test.result == true {
+			testImageAndSig(t, prm, test.refA, test.refB, test.result)
+			testImageAndSig(t, prm, test.refB, test.refA, test.result)
+		}
+	}
+	// … and it rejects everything prmMatchRepository rejects.
+	for _, test := range prmRepositoryMatchTestTable {
+		if test.result == false {
+			testImageAndSig(t, prm, test.refA, test.refB, test.result)
+			testImageAndSig(t, prm, test.refB, test.refA, test.result)
+		}
+	}
+
+	// The other cases, possibly assymetrical:
+	for _, test := range []struct {
+		imageRef, sigRef string
+		result           bool
+	}{
+		// Tag mismatch
+		{"busybox:latest", "busybox:notlatest", false},
+		{fullRHELRef + "tagsuffix", fullRHELRef, false},
+		{"library/busybox:latest", "busybox:notlatest", false},
+		{"busybox:latest", "library/busybox:notlatest", false},
+		{"docker.io/library/busybox:notlatest", "busybox:latest", false},
+		{"busybox:notlatest", "docker.io/library/busybox:latest", false},
+		// NameOnly references
+		{"busybox", "busybox:latest", false},
+		{"busybox:latest", "busybox", false},
+		{"busybox", "busybox" + digestSuffix, false},
+		{"busybox" + digestSuffix, "busybox", false},
+		{fullRHELRef, untaggedRHELRef, false},
+		{"busybox", "busybox", false},
+		// Tag references only accept signatures with matching tags.
+		{"busybox:latest", "busybox" + digestSuffix, false},
+		// Digest references accept any signature with matching repository.
+		{"busybox" + digestSuffix, "busybox:latest", true},
+		{"busybox" + digestSuffix, "busybox" + digestSuffixOther, true}, // Even this is accepted here. (This could more reasonably happen with two different digest algorithms.)
+		// References with both tags and digests: `reference.WithName` essentially drops the tag.
+		// This is not _particularly_ desirable but it is the semantics used throughout containers/image; at least, with the digest it is clear which image the reference means,
+		// even if the tag may reflect a different user intent.
+		{"busybox:latest" + digestSuffix, "busybox:latest", true},
+		{"busybox:latest" + digestSuffix, "busybox:notlatest", true},
+		{"busybox:latest", "busybox:latest" + digestSuffix, false},
+		{"busybox:latest" + digestSuffix, "busybox:latest" + digestSuffixOther, true},    // Even this is accepted here. (This could more reasonably happen with two different digest algorithms.)
+		{"busybox:latest" + digestSuffix, "busybox:notlatest" + digestSuffixOther, true}, // Ugly.  Do not rely on this.
+	} {
+		testImageAndSig(t, prm, test.imageRef, test.sigRef, test.result)
+	}
 }
 
 func TestPRMMatchRepositoryMatchesDockerReference(t *testing.T) {
