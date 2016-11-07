@@ -35,7 +35,7 @@ func VerifyDockerManifestSignature(unverifiedSignature, unverifiedManifest []byt
 			}
 			return nil
 		},
-		validateSignedDockerReference: func(signedDockerReference string) error {
+		validateSignedDockerReference: func(signedDockerReference, digest string) error {
 			if signedDockerReference != expectedDockerReference {
 				return InvalidSignatureError{msg: fmt.Sprintf("Docker reference %s does not match %s",
 					signedDockerReference, expectedDockerReference)}

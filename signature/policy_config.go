@@ -313,7 +313,7 @@ func (pr *prReject) UnmarshalJSON(data []byte) error {
 }
 
 // newPRSignedBy returns a new prSignedBy if parameters are valid.
-func newPRSignedBy(keyType sbKeyType, keyPath string, keyData []byte, signedIdentity PolicyReferenceMatch) (*prSignedBy, error) {
+func newPRSignedBy(keyType sbKeyType, keyPath string, keyData []byte, signedIdentity PolicyReferenceMatch, referencesByDigest sbUntaggedReferenceMatch) (*prSignedBy, error) {
 	if !keyType.IsValid() {
 		return nil, InvalidPolicyFormatError(fmt.Sprintf("invalid keyType \"%s\"", keyType))
 	}
@@ -323,33 +323,37 @@ func newPRSignedBy(keyType sbKeyType, keyPath string, keyData []byte, signedIden
 	if signedIdentity == nil {
 		return nil, InvalidPolicyFormatError("signedIdentity not specified")
 	}
+	if referencesByDigest != SBKeyTypeUntaggedReferenceAllow && referencesByDigest != SBKeyTypeUntaggedReferenceReject {
+		return nil, InvalidPolicyFormatError("referencesByDigest accepts either allow or reject")
+	}
 	return &prSignedBy{
-		prCommon:       prCommon{Type: prTypeSignedBy},
-		KeyType:        keyType,
-		KeyPath:        keyPath,
-		KeyData:        keyData,
-		SignedIdentity: signedIdentity,
+		prCommon:           prCommon{Type: prTypeSignedBy},
+		KeyType:            keyType,
+		KeyPath:            keyPath,
+		KeyData:            keyData,
+		SignedIdentity:     signedIdentity,
+		ReferencesByDigest: referencesByDigest,
 	}, nil
 }
 
 // newPRSignedByKeyPath is NewPRSignedByKeyPath, except it returns the private type.
-func newPRSignedByKeyPath(keyType sbKeyType, keyPath string, signedIdentity PolicyReferenceMatch) (*prSignedBy, error) {
-	return newPRSignedBy(keyType, keyPath, nil, signedIdentity)
+func newPRSignedByKeyPath(keyType sbKeyType, keyPath string, signedIdentity PolicyReferenceMatch, referencesByDigest sbUntaggedReferenceMatch) (*prSignedBy, error) {
+	return newPRSignedBy(keyType, keyPath, nil, signedIdentity, referencesByDigest)
 }
 
 // NewPRSignedByKeyPath returns a new "signedBy" PolicyRequirement using a KeyPath
-func NewPRSignedByKeyPath(keyType sbKeyType, keyPath string, signedIdentity PolicyReferenceMatch) (PolicyRequirement, error) {
-	return newPRSignedByKeyPath(keyType, keyPath, signedIdentity)
+func NewPRSignedByKeyPath(keyType sbKeyType, keyPath string, signedIdentity PolicyReferenceMatch, referencesByDigest sbUntaggedReferenceMatch) (PolicyRequirement, error) {
+	return newPRSignedByKeyPath(keyType, keyPath, signedIdentity, referencesByDigest)
 }
 
 // newPRSignedByKeyData is NewPRSignedByKeyData, except it returns the private type.
-func newPRSignedByKeyData(keyType sbKeyType, keyData []byte, signedIdentity PolicyReferenceMatch) (*prSignedBy, error) {
-	return newPRSignedBy(keyType, "", keyData, signedIdentity)
+func newPRSignedByKeyData(keyType sbKeyType, keyData []byte, signedIdentity PolicyReferenceMatch, referencesByDigest sbUntaggedReferenceMatch) (*prSignedBy, error) {
+	return newPRSignedBy(keyType, "", keyData, signedIdentity, referencesByDigest)
 }
 
 // NewPRSignedByKeyData returns a new "signedBy" PolicyRequirement using a KeyData
-func NewPRSignedByKeyData(keyType sbKeyType, keyData []byte, signedIdentity PolicyReferenceMatch) (PolicyRequirement, error) {
-	return newPRSignedByKeyData(keyType, keyData, signedIdentity)
+func NewPRSignedByKeyData(keyType sbKeyType, keyData []byte, signedIdentity PolicyReferenceMatch, referencesByDigest sbUntaggedReferenceMatch) (PolicyRequirement, error) {
+	return newPRSignedByKeyData(keyType, keyData, signedIdentity, referencesByDigest)
 }
 
 // Compile-time check that prSignedBy implements json.Unmarshaler.
@@ -375,6 +379,8 @@ func (pr *prSignedBy) UnmarshalJSON(data []byte) error {
 			return &tmp.KeyData
 		case "signedIdentity":
 			return &signedIdentity
+		case "referencesByDigest":
+			return &tmp.ReferencesByDigest
 		default:
 			return nil
 		}
@@ -395,15 +401,19 @@ func (pr *prSignedBy) UnmarshalJSON(data []byte) error {
 		tmp.SignedIdentity = si
 	}
 
+	if tmp.ReferencesByDigest == "" {
+		tmp.ReferencesByDigest = SBKeyTypeUntaggedReferenceAllow
+	}
+
 	var res *prSignedBy
 	var err error
 	switch {
 	case gotKeyPath && gotKeyData:
 		return InvalidPolicyFormatError("keyPath and keyData cannot be used simultaneously")
 	case gotKeyPath && !gotKeyData:
-		res, err = newPRSignedByKeyPath(tmp.KeyType, tmp.KeyPath, tmp.SignedIdentity)
+		res, err = newPRSignedByKeyPath(tmp.KeyType, tmp.KeyPath, tmp.SignedIdentity, tmp.ReferencesByDigest)
 	case !gotKeyPath && gotKeyData:
-		res, err = newPRSignedByKeyData(tmp.KeyType, tmp.KeyData, tmp.SignedIdentity)
+		res, err = newPRSignedByKeyData(tmp.KeyType, tmp.KeyData, tmp.SignedIdentity, tmp.ReferencesByDigest)
 	case !gotKeyPath && !gotKeyData:
 		return InvalidPolicyFormatError("At least one of keyPath and keyData mus be specified")
 	default: // Coverage: This should never happen
@@ -501,7 +511,7 @@ func (pr *prSignedBaseLayer) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// newPolicyRequirementFromJSON parses JSON data into a PolicyReferenceMatch implementation.
+// newPolicyReferenceFromJSON parses JSON data into a PolicyReferenceMatch implementation.
 func newPolicyReferenceMatchFromJSON(data []byte) (PolicyReferenceMatch, error) {
 	var typeField prmCommon
 	if err := json.Unmarshal(data, &typeField); err != nil {

@@ -70,7 +70,10 @@ type PolicyReferenceMatch interface {
 	// matchesDockerReference decides whether a specific image identity is accepted for an image
 	// (or, usually, for the image's Reference().DockerReference()).  Note that
 	// image.Reference().DockerReference() may be nil.
-	matchesDockerReference(image types.UnparsedImage, signatureDockerReference string) bool
+	//
+	// TODO(runcom): document byDigest
+	// TODO(runcom): document digest
+	matchesDockerReference(image types.UnparsedImage, signatureDockerReference, signatureManifstDigest string, byDigest bool) bool
 }
 
 // PolicyContext encapsulates a policy and possible cached state

@@ -24,11 +24,19 @@ func parseImageAndDockerReference(image types.UnparsedImage, s2 string) (referen
 	return r1, r2, nil
 }
 
-func (prm *prmMatchExact) matchesDockerReference(image types.UnparsedImage, signatureDockerReference string) bool {
+func (prm *prmMatchExact) matchesDockerReference(image types.UnparsedImage, signatureDockerReference, signatureManifestDigest string, byDigest bool) bool {
 	intended, signature, err := parseImageAndDockerReference(image, signatureDockerReference)
 	if err != nil {
 		return false
 	}
+
+	if intendedCanonical, ok := intended.(reference.Canonical); ok {
+		if byDigest {
+			return signature.Name() == intended.Name() &&
+				signatureManifestDigest == intendedCanonical.Digest().String()
+		}
+	}
+
 	// Do not add default tags: image.Reference().DockerReference() should contain it already, and signatureDockerReference should be exact; so, verify that now.
 	if reference.IsNameOnly(intended) || reference.IsNameOnly(signature) {
 		return false
@@ -36,10 +44,17 @@ func (prm *prmMatchExact) matchesDockerReference(image types.UnparsedImage, sign
 	return signature.String() == intended.String()
 }
 
-func (prm *prmMatchRepository) matchesDockerReference(image types.UnparsedImage, signatureDockerReference string) bool {
+func (prm *prmMatchRepository) matchesDockerReference(image types.UnparsedImage, signatureDockerReference, signatureManifestDigest string, byDigest bool) bool {
 	intended, signature, err := parseImageAndDockerReference(image, signatureDockerReference)
 	if err != nil {
 		return false
+	}
+	if intendedCanonical, ok := intended.(reference.Canonical); ok {
+		if byDigest {
+			if signatureManifestDigest != intendedCanonical.Digest().String() {
+				return false
+			}
+		}
 	}
 	return signature.Name() == intended.Name()
 }
@@ -57,7 +72,7 @@ func parseDockerReferences(s1, s2 string) (reference.Named, reference.Named, err
 	return r1, r2, nil
 }
 
-func (prm *prmExactReference) matchesDockerReference(image types.UnparsedImage, signatureDockerReference string) bool {
+func (prm *prmExactReference) matchesDockerReference(image types.UnparsedImage, signatureDockerReference, signatureManifestDigest string, byDigest bool) bool {
 	intended, signature, err := parseDockerReferences(prm.DockerReference, signatureDockerReference)
 	if err != nil {
 		return false
@@ -66,13 +81,26 @@ func (prm *prmExactReference) matchesDockerReference(image types.UnparsedImage, 
 	if reference.IsNameOnly(intended) || reference.IsNameOnly(signature) {
 		return false
 	}
+	if intendedCanonical, ok := intended.(reference.Canonical); ok {
+		if byDigest {
+			return signature.Name() == intended.Name() &&
+				signatureManifestDigest == intendedCanonical.Digest().String()
+		}
+	}
 	return signature.String() == intended.String()
 }
 
-func (prm *prmExactRepository) matchesDockerReference(image types.UnparsedImage, signatureDockerReference string) bool {
+func (prm *prmExactRepository) matchesDockerReference(image types.UnparsedImage, signatureDockerReference, signatureManifestDigest string, byDigest bool) bool {
 	intended, signature, err := parseDockerReferences(prm.DockerRepository, signatureDockerReference)
 	if err != nil {
 		return false
+	}
+	if intendedCanonical, ok := intended.(reference.Canonical); ok {
+		if byDigest {
+			if signatureManifestDigest != intendedCanonical.Digest().String() {
+				return false
+			}
+		}
 	}
 	return signature.Name() == intended.Name()
 }

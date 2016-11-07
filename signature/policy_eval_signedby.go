@@ -69,8 +69,8 @@ func (pr *prSignedBy) isSignatureAuthorAccepted(image types.UnparsedImage, sig [
 			// not be reachable.
 			return PolicyRequirementError(fmt.Sprintf("Signature by key %s is not accepted", keyIdentity))
 		},
-		validateSignedDockerReference: func(ref string) error {
-			if !pr.SignedIdentity.matchesDockerReference(image, ref) {
+		validateSignedDockerReference: func(ref, digest string) error {
+			if !pr.SignedIdentity.matchesDockerReference(image, ref, digest, pr.ReferencesByDigest == SBKeyTypeUntaggedReferenceAllow) {
 				return PolicyRequirementError(fmt.Sprintf("Signature for identity %s is not accepted", ref))
 			}
 			return nil
