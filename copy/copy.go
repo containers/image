@@ -91,8 +91,9 @@ func (d *digestingReader) Read(p []byte) (int, error) {
 
 // Options allows supplying non-default configuration modifying the behavior of CopyImage.
 type Options struct {
-	RemoveSignatures bool   // Remove any pre-existing signatures. SignBy will still add a new signature.
-	SignBy           string // If non-empty, asks for a signature to be added during the copy, and specifies a key ID, as accepted by signature.NewGPGSigningMechanism().SignDockerManifest(),
+	RemoveSignatures bool                       // Remove any pre-existing signatures. SignBy will still add a new signature.
+	SignBy           string                     // If non-empty, asks for a signature to be added during the copy, and specifies a key ID, as accepted by signature.NewGPGSigningMechanism().SignDockerManifest(),
+	LayerSubset      map[digest.Digest]struct{} // If not nil, a set of layer digests (as they appear in the source manifest; usually not DiffIDs!) which should be copied. Prevents modifying the manifest.
 	ReportWriter     io.Writer
 	SourceCtx        *types.SystemContext
 	DestinationCtx   *types.SystemContext
@@ -184,7 +185,8 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		}
 	}
 
-	canModifyManifest := len(sigs) == 0
+	// We prohibit manifest modification if options.LayerSubset is used because we can't collect the information expected in manifestUpdates.InformationOnly.
+	canModifyManifest := len(sigs) == 0 && options.LayerSubset == nil
 	manifestUpdates := types.ManifestUpdateOptions{}
 
 	if err := determineManifestConversion(&manifestUpdates, src, destSupportedManifestMIMETypes, canModifyManifest); err != nil {
@@ -206,7 +208,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		progress:          options.Progress,
 	}
 
-	if err := ic.copyLayers(); err != nil {
+	if err := ic.copyLayers(options.LayerSubset); err != nil {
 		return err
 	}
 
@@ -271,11 +273,22 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 }
 
 // copyLayers copies layers from src/rawSource to dest, using and updating ic.manifestUpdates if necessary and ic.canModifyManifest.
-func (ic *imageCopier) copyLayers() error {
+// layerSubset, if not nil, restricts the layers to the specified layer digests (as they appear in the source manifest; usually not DiffIDs!).
+func (ic *imageCopier) copyLayers(layerSubset map[digest.Digest]struct{}) error {
+	if ic.diffIDsAreNeeded && layerSubset != nil {
+		return errors.New("Internal error: Need to compute layer Diff IDs, but only copying a subset of layers")
+	}
+
 	srcInfos := ic.src.LayerInfos()
 	destInfos := []types.BlobInfo{}
 	diffIDs := []digest.Digest{}
 	for _, srcLayer := range srcInfos {
+		if layerSubset != nil {
+			if _, ok := layerSubset[srcLayer.Digest]; !ok {
+				logrus.Debugf("Skipping layer %s, not in options.LayerSubset", srcLayer.Digest)
+				continue
+			}
+		}
 		var (
 			destInfo types.BlobInfo
 			diffID   digest.Digest
@@ -299,12 +312,14 @@ func (ic *imageCopier) copyLayers() error {
 		destInfos = append(destInfos, destInfo)
 		diffIDs = append(diffIDs, diffID)
 	}
-	ic.manifestUpdates.InformationOnly.LayerInfos = destInfos
-	if ic.diffIDsAreNeeded {
-		ic.manifestUpdates.InformationOnly.LayerDiffIDs = diffIDs
-	}
-	if layerDigestsDiffer(srcInfos, destInfos) {
-		ic.manifestUpdates.LayerInfos = destInfos
+	if layerSubset == nil { // Better to set no information than partial information? It should not be used anyway.
+		ic.manifestUpdates.InformationOnly.LayerInfos = destInfos
+		if ic.diffIDsAreNeeded {
+			ic.manifestUpdates.InformationOnly.LayerDiffIDs = diffIDs
+		}
+		if layerDigestsDiffer(srcInfos, destInfos) {
+			ic.manifestUpdates.LayerInfos = destInfos
+		}
 	}
 	return nil
 }
