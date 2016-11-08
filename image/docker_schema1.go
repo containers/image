@@ -1,8 +1,6 @@
 package image
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +11,7 @@ import (
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/digest"
 )
 
 var (
@@ -20,7 +19,7 @@ var (
 )
 
 type fsLayersSchema1 struct {
-	BlobSum string `json:"blobSum"`
+	BlobSum digest.Digest `json:"blobSum"`
 }
 
 type historySchema1 struct {
@@ -287,11 +286,10 @@ func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.Bl
 	if err != nil {
 		return nil, err
 	}
-	configHash := sha256.Sum256(configJSON)
 	configDescriptor := descriptor{
 		MediaType: "application/vnd.docker.container.image.v1+json",
 		Size:      int64(len(configJSON)),
-		Digest:    "sha256:" + hex.EncodeToString(configHash[:]),
+		Digest:    digest.FromBytes(configJSON),
 	}
 
 	m2 := manifestSchema2FromComponents(configDescriptor, configJSON, layers)

@@ -11,6 +11,7 @@ import (
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/image"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/digest"
 )
 
 // Transport is an ImageTransport for OCI directories.
@@ -199,12 +200,11 @@ func (ref ociReference) ociLayoutPath() string {
 }
 
 // blobPath returns a path for a blob within a directory using OCI image-layout conventions.
-func (ref ociReference) blobPath(digest string) (string, error) {
-	pts := strings.SplitN(digest, ":", 2)
-	if len(pts) != 2 {
-		return "", fmt.Errorf("unexpected digest reference %s", digest)
+func (ref ociReference) blobPath(digest digest.Digest) (string, error) {
+	if err := digest.Validate(); err != nil {
+		return "", fmt.Errorf("unexpected digest reference %s: %v", digest, err)
 	}
-	return filepath.Join(ref.dir, "blobs", pts[0], pts[1]), nil
+	return filepath.Join(ref.dir, "blobs", digest.Algorithm().String(), digest.Hex()), nil
 }
 
 // descriptorPath returns a path for the manifest within a directory using OCI conventions.

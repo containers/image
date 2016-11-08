@@ -10,6 +10,7 @@ import (
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/image"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/digest"
 )
 
 // Transport is an ImageTransport for directory paths.
@@ -161,9 +162,9 @@ func (ref dirReference) manifestPath() string {
 }
 
 // layerPath returns a path for a layer tarball within a directory using our conventions.
-func (ref dirReference) layerPath(digest string) string {
+func (ref dirReference) layerPath(digest digest.Digest) string {
 	// FIXME: Should we keep the digest identification?
-	return filepath.Join(ref.path, strings.TrimPrefix(digest, "sha256:")+".tar")
+	return filepath.Join(ref.path, digest.Hex()+".tar")
 }
 
 // signaturePath returns a path for a signature within a directory using our conventions.

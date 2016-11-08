@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/docker/distribution/digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -163,7 +164,7 @@ func TestSign(t *testing.T) {
 			}
 			return nil
 		},
-		validateSignedDockerManifestDigest: func(signedDockerManifestDigest string) error {
+		validateSignedDockerManifestDigest: func(signedDockerManifestDigest digest.Digest) error {
 			if signedDockerManifestDigest != sig.DockerManifestDigest {
 				return fmt.Errorf("Unexpected signedDockerManifestDigest")
 			}
@@ -187,7 +188,11 @@ func TestVerifyAndExtractSignature(t *testing.T) {
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
 	require.NoError(t, err)
 
-	type triple struct{ keyIdentity, signedDockerReference, signedDockerManifestDigest string }
+	type triple struct {
+		keyIdentity                string
+		signedDockerReference      string
+		signedDockerManifestDigest digest.Digest
+	}
 	var wanted, recorded triple
 	// recordingRules are a plausible signatureAcceptanceRules implementations, but equally
 	// importantly record that we are passing the correct values to the rule callbacks.
@@ -206,7 +211,7 @@ func TestVerifyAndExtractSignature(t *testing.T) {
 			}
 			return nil
 		},
-		validateSignedDockerManifestDigest: func(signedDockerManifestDigest string) error {
+		validateSignedDockerManifestDigest: func(signedDockerManifestDigest digest.Digest) error {
 			recorded.signedDockerManifestDigest = signedDockerManifestDigest
 			if signedDockerManifestDigest != wanted.signedDockerManifestDigest {
 				return fmt.Errorf("signedDockerManifestDigest mismatch")

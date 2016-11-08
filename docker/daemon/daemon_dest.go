@@ -3,8 +3,6 @@ package daemon
 import (
 	"archive/tar"
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +15,7 @@ import (
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/digest"
 	"github.com/docker/engine-api/client"
 	"golang.org/x/net/context"
 )
@@ -137,7 +136,7 @@ func (d *daemonImageDestination) ShouldCompressLayers() bool {
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (d *daemonImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobInfo) (types.BlobInfo, error) {
-	if inputInfo.Digest == "" {
+	if inputInfo.Digest.String() == "" {
 		return types.BlobInfo{}, fmt.Errorf(`"Can not stream a blob with unknown digest to "docker-daemon:"`)
 	}
 
@@ -163,12 +162,12 @@ func (d *daemonImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 		logrus.Debugf("… streaming done")
 	}
 
-	hash := sha256.New()
-	tee := io.TeeReader(stream, hash)
-	if err := d.sendFile(inputInfo.Digest, inputInfo.Size, tee); err != nil {
+	digester := digest.Canonical.New()
+	tee := io.TeeReader(stream, digester.Hash())
+	if err := d.sendFile(inputInfo.Digest.String(), inputInfo.Size, tee); err != nil {
 		return types.BlobInfo{}, err
 	}
-	return types.BlobInfo{Digest: "sha256:" + hex.EncodeToString(hash.Sum(nil)), Size: inputInfo.Size}, nil
+	return types.BlobInfo{Digest: digester.Digest(), Size: inputInfo.Size}, nil
 }
 
 func (d *daemonImageDestination) PutManifest(m []byte) error {
@@ -182,7 +181,7 @@ func (d *daemonImageDestination) PutManifest(m []byte) error {
 
 	layerPaths := []string{}
 	for _, l := range man.Layers {
-		layerPaths = append(layerPaths, l.Digest)
+		layerPaths = append(layerPaths, l.Digest.String())
 	}
 
 	// For github.com/docker/docker consumers, this works just as well as
@@ -204,7 +203,7 @@ func (d *daemonImageDestination) PutManifest(m []byte) error {
 	refString := fmt.Sprintf("%s:%s", d.namedTaggedRef.FullName(), d.namedTaggedRef.Tag())
 
 	items := []manifestItem{{
-		Config:       man.Config.Digest,
+		Config:       man.Config.Digest.String(),
 		RepoTags:     []string{refString},
 		Layers:       layerPaths,
 		Parent:       "",

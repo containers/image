@@ -8,6 +8,7 @@ import (
 
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/digest"
 )
 
 type platformSpec struct {
@@ -36,7 +37,7 @@ func manifestSchema2FromManifestList(src types.ImageSource, manblob []byte) (gen
 	if err := json.Unmarshal(manblob, &list); err != nil {
 		return nil, err
 	}
-	var targetManifestDigest string
+	var targetManifestDigest digest.Digest
 	for _, d := range list.Manifests {
 		if d.Platform.Architecture == runtime.GOARCH && d.Platform.OS == runtime.GOOS {
 			targetManifestDigest = d.Digest

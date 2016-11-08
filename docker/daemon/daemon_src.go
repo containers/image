@@ -3,8 +3,6 @@ package daemon
 import (
 	"archive/tar"
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +12,7 @@ import (
 
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/digest"
 	"github.com/docker/engine-api/client"
 	"golang.org/x/net/context"
 )
@@ -26,7 +25,7 @@ type daemonImageSource struct {
 	// The following data is only available after ensureCachedDataIsPresent() succeeds
 	tarManifest       *manifestItem // nil if not available yet.
 	configBytes       []byte
-	configDigest      string
+	configDigest      digest.Digest
 	orderedDiffIDList []diffID
 	knownLayers       map[diffID]*layerInfo
 	// Other state
@@ -213,10 +212,9 @@ func (s *daemonImageSource) ensureCachedDataIsPresent() error {
 	}
 
 	// Success; commit.
-	configHash := sha256.Sum256(configBytes)
 	s.tarManifest = tarManifest
 	s.configBytes = configBytes
-	s.configDigest = "sha256:" + hex.EncodeToString(configHash[:])
+	s.configDigest = digest.FromBytes(configBytes)
 	s.orderedDiffIDList = parsedConfig.RootFS.DiffIDs
 	s.knownLayers = knownLayers
 	return nil
@@ -315,7 +313,7 @@ func (s *daemonImageSource) GetManifest() ([]byte, string, error) {
 				return nil, "", fmt.Errorf("Internal inconsistency: Information about layer %s missing", diffID)
 			}
 			m.Layers = append(m.Layers, distributionDescriptor{
-				Digest:    string(diffID), // diffID is a digest of the uncompressed tarball
+				Digest:    digest.Digest(diffID), // diffID is a digest of the uncompressed tarball
 				MediaType: manifest.DockerV2Schema2LayerMediaType,
 				Size:      li.size,
 			})
@@ -331,13 +329,13 @@ func (s *daemonImageSource) GetManifest() ([]byte, string, error) {
 
 // GetTargetManifest returns an image's manifest given a digest. This is mainly used to retrieve a single image's manifest
 // out of a manifest list.
-func (s *daemonImageSource) GetTargetManifest(digest string) ([]byte, string, error) {
+func (s *daemonImageSource) GetTargetManifest(digest digest.Digest) ([]byte, string, error) {
 	// How did we even get here? GetManifest() above has returned a manifest.DockerV2Schema2MediaType.
 	return nil, "", fmt.Errorf(`Manifest lists are not supported by "docker-daemon:"`)
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
-func (s *daemonImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
+func (s *daemonImageSource) GetBlob(digest digest.Digest) (io.ReadCloser, int64, error) {
 	if err := s.ensureCachedDataIsPresent(); err != nil {
 		return nil, 0, err
 	}

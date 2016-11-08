@@ -13,6 +13,7 @@ import (
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,10 +30,10 @@ func (f unusedImageSource) Close() {
 func (f unusedImageSource) GetManifest() ([]byte, string, error) {
 	panic("Unexpected call to a mock function")
 }
-func (f unusedImageSource) GetTargetManifest(digest string) ([]byte, string, error) {
+func (f unusedImageSource) GetTargetManifest(digest digest.Digest) ([]byte, string, error) {
 	panic("Unexpected call to a mock function")
 }
-func (f unusedImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
+func (f unusedImageSource) GetBlob(digest digest.Digest) (io.ReadCloser, int64, error) {
 	panic("Unexpected call to a mock function")
 }
 func (f unusedImageSource) GetSignatures() ([][]byte, error) {
@@ -145,11 +146,11 @@ func TestManifestSchema2ConfigInfo(t *testing.T) {
 // configBlobImageSource allows testing various GetBlob behaviors in .ConfigBlob()
 type configBlobImageSource struct {
 	unusedImageSource // We inherit almost all of the methods, which just panic()
-	f                 func(digest string) (io.ReadCloser, int64, error)
+	f                 func(digest digest.Digest) (io.ReadCloser, int64, error)
 }
 
-func (f configBlobImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
-	if digest != "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f" {
+func (f configBlobImageSource) GetBlob(digest digest.Digest) (io.ReadCloser, int64, error) {
+	if digest.String() != "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f" {
 		panic("Unexpected digest in GetBlob")
 	}
 	return f.f(digest)
@@ -160,24 +161,24 @@ func TestManifestSchema2ConfigBlob(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, c := range []struct {
-		cbISfn func(digest string) (io.ReadCloser, int64, error)
+		cbISfn func(digest digest.Digest) (io.ReadCloser, int64, error)
 		blob   []byte
 	}{
 		// Success
-		{func(digest string) (io.ReadCloser, int64, error) {
+		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
 			return ioutil.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
 		}, realConfigJSON},
 		// Various kinds of failures
 		{nil, nil},
-		{func(digest string) (io.ReadCloser, int64, error) {
+		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
 			return nil, -1, errors.New("Error returned from GetBlob")
 		}, nil},
-		{func(digest string) (io.ReadCloser, int64, error) {
+		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
 			reader, writer := io.Pipe()
 			writer.CloseWithError(errors.New("Expected error reading input in ConfigBlob"))
 			return reader, 1, nil
 		}, nil},
-		{func(digest string) (io.ReadCloser, int64, error) {
+		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
 			nonmatchingJSON := []byte("This does not match ConfigDescriptor.Digest")
 			return ioutil.NopCloser(bytes.NewReader(nonmatchingJSON)), int64(len(nonmatchingJSON)), nil
 		}, nil},
@@ -328,7 +329,7 @@ func newSchema2ImageSource(t *testing.T, dockerRef string) *schema2ImageSource {
 
 	return &schema2ImageSource{
 		configBlobImageSource: configBlobImageSource{
-			f: func(digest string) (io.ReadCloser, int64, error) {
+			f: func(digest digest.Digest) (io.ReadCloser, int64, error) {
 				return ioutil.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
 			},
 		},
@@ -338,7 +339,7 @@ func newSchema2ImageSource(t *testing.T, dockerRef string) *schema2ImageSource {
 
 type memoryImageDest struct {
 	ref         reference.Named
-	storedBlobs map[string][]byte
+	storedBlobs map[digest.Digest][]byte
 }
 
 func (d *memoryImageDest) Reference() types.ImageReference {
@@ -358,9 +359,9 @@ func (d *memoryImageDest) ShouldCompressLayers() bool {
 }
 func (d *memoryImageDest) PutBlob(stream io.Reader, inputInfo types.BlobInfo) (types.BlobInfo, error) {
 	if d.storedBlobs == nil {
-		d.storedBlobs = make(map[string][]byte)
+		d.storedBlobs = make(map[digest.Digest][]byte)
 	}
-	if inputInfo.Digest == "" {
+	if inputInfo.Digest.String() == "" {
 		panic("inputInfo.Digest unexpectedly empty")
 	}
 	contents, err := ioutil.ReadAll(stream)
