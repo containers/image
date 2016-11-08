@@ -69,7 +69,10 @@
                 {
                     "type": "signedBy",
                     "keyType": "signedByGPGKeys",
-                    "keyPath": "/keys/RH-key-signing-key-gpg-keyring"
+                    "keyPath": "/keys/RH-key-signing-key-gpg-keyring",
+                    "signedIdentity": {
+                        "type": "matchRepoDigestOrExact"
+                    }
                 }
             ],
             "bogus/key-data-example": [

@@ -156,10 +156,18 @@ Exactly one of `keyPath` and `keyData` must be present, containing a GPG keyring
 The `signedIdentity` field, a JSON object, specifies what image identity the signature claims about the image.
 One of the following alternatives are supported:
 
-- The identity in the signature must exactly match the image identity:
+- The identity in the signature must exactly match the image identity.  Note that with this, referencing an image by digest (with a signature claiming a _repository_`:`_tag_ identity) will fail.
 
   ```json
   {"type":"matchExact"}
+  ```
+- If the image identity carries a tag, the identity in the signature must exactly match;
+  if the image identity uses a digest reference, the identity in the signature must be in the same repository as the image identity (using any tag).
+
+  (Note that with images identified using digest references, the digest from the reference is validated even before signature verification starts.)
+
+  ```json
+  {"type":"matchRepoDigestOrExact"}
   ```
 - The identity in the signature must be in the same repository as the image identity.  This is useful e.g. to pull an image using the `:latest` tag when the image is signed with a tag specifing an exact image version.
 
@@ -185,9 +193,9 @@ One of the following alternatives are supported:
   }
   ```
 
-If the `signedIdentity` field is missing, it is treated as `matchExact`.
+If the `signedIdentity` field is missing, it is treated as `matchRepoDigestOrExact`.
 
-*Note*: `matchExact` and `matchRepository` can be only used if a Docker-like image identity is
+*Note*: `matchExact`, `matchRepoDigestOrExact` and `matchRepository` can be only used if a Docker-like image identity is
 provided by the transport.  In particular, the `dir:` and `oci:` transports can be only
 used with `exactReference` or `exactRepository`.
 
@@ -257,27 +265,3 @@ selectively allow individual transports and scopes as desired.
     "default": [{"type": "insecureAcceptAnything"}]
 }
 ```
-
-### A _temporary_ work-around to allow accessing any image by digest
-
-Usually, identities in signatures use the _repository_`:`_tag_ format,
-which is not matched when pulling a specific image using a digest.
-To allow such operations, a policy may set `signedIdentity` to `matchRepository`, similar
-to the following fragment:
-
-```json
-            "hostname:5000/allow/pull/by/tag": [
-                {
-                    "type": "signedBy",
-                    "keyType": "GPGKeys",
-                    "keyPath": "/path/to/some.gpg"
-                    "signedIdentity": {
-                        "type": "matchRepository"
-                    }
-                }
-            ]
-```
-
-*Warning*: This completely turns off tag matching for the signature check in question,
-allowing also pulls by tag to accept signatures for any other tag.
-A more granular solution for this situation will be provided in the future ( https://github.com/containers/image/issues/99 ).

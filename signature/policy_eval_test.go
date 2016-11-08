@@ -105,7 +105,7 @@ func (ref pcImageReferenceMock) DeleteImage(ctx *types.SystemContext) error {
 
 func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 	ktGPG := SBKeyTypeGPGKeys
-	prm := NewPRMMatchExact()
+	prm := NewPRMMatchRepoDigestOrExact()
 
 	policy := &Policy{
 		Default:    PolicyRequirements{NewPRReject()},
