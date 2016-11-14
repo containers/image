@@ -70,7 +70,7 @@ func (s *ociImageSource) GetTargetManifest(digest string) ([]byte, string, error
 	return m, manifest.GuessMIMEType(m), nil
 }
 
-// GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
+// GetBlob returns a stream for the specified blob, and the blob's size.
 func (s *ociImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
 	path, err := s.ref.blobPath(digest)
 	if err != nil {
@@ -79,11 +79,11 @@ func (s *ociImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
 
 	r, err := os.Open(path)
 	if err != nil {
-		return nil, 0, nil
+		return nil, 0, err
 	}
 	fi, err := r.Stat()
 	if err != nil {
-		return nil, 0, nil
+		return nil, 0, err
 	}
 	return r, fi.Size(), nil
 }
