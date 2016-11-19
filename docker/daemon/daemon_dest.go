@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	"github.com/docker/engine-api/client"
@@ -33,7 +34,13 @@ type daemonImageDestination struct {
 
 // newImageDestination returns a types.ImageDestination for the specified image reference.
 func newImageDestination(systemCtx *types.SystemContext, ref daemonReference) (types.ImageDestination, error) {
-	// FIXME: Do something with ref
+	if ref.ref == nil {
+		return nil, fmt.Errorf("Invalid destination docker-daemon:%s: a destination must be a name:tag", ref.StringWithinTransport())
+	}
+	if _, ok := ref.ref.(reference.NamedTagged); !ok {
+		return nil, fmt.Errorf("Invalid destination docker-daemon:%s: a destination must be a name:tag", ref.StringWithinTransport())
+	}
+
 	c, err := client.NewClient(client.DefaultDockerHost, "1.22", nil, nil) // FIXME: overridable host
 	if err != nil {
 		return nil, fmt.Errorf("Error initializing docker engine client: %v", err)
@@ -176,7 +183,7 @@ func (d *daemonImageDestination) PutManifest(m []byte) error {
 	}
 	items := []manifestItem{{
 		Config:       man.Config.Digest,
-		RepoTags:     []string{string(d.ref)}, // FIXME: Only if ref is a NamedTagged
+		RepoTags:     []string{d.ref.ref.String()}, // newImageDestination ensures that d.ref.ref is a reference.NamedTagged
 		Layers:       layerPaths,
 		Parent:       "",
 		LayerSources: nil,

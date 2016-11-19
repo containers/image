@@ -52,7 +52,9 @@ func newImageSource(ctx *types.SystemContext, ref daemonReference) (types.ImageS
 	if err != nil {
 		return nil, fmt.Errorf("Error initializing docker engine client: %v", err)
 	}
-	inputStream, err := c.ImageSave(context.TODO(), []string{string(ref)}) // FIXME: ref should be per docker/reference.ParseIDOrReference, and we don't want NameOnly
+	// Per NewReference(), ref.StringWithinTransport() is either an image ID (config digest), or a !reference.NameOnly() reference.
+	// Either way ImageSave should create a tarball with exactly one image.
+	inputStream, err := c.ImageSave(context.TODO(), []string{ref.StringWithinTransport()})
 	if err != nil {
 		return nil, fmt.Errorf("Error loading image from docker engine: %v", err)
 	}
