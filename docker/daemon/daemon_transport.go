@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/containers/image/docker/reference"
+	"github.com/containers/image/image"
 	"github.com/containers/image/types"
 )
 
@@ -79,13 +80,18 @@ func (ref daemonReference) PolicyConfigurationIdentity() string {
 // It is STRONGLY recommended for the first element, if any, to be a prefix of PolicyConfigurationIdentity(),
 // and each following element to be a prefix of the element preceding it.
 func (ref daemonReference) PolicyConfigurationNamespaces() []string {
-	return []string{} // FIXME FIXME?
+	// See the explanation in daemonReference.PolicyConfigurationIdentity.
+	return []string{}
 }
 
 // NewImage returns a types.Image for this reference.
 // The caller must call .Close() on the returned Image.
 func (ref daemonReference) NewImage(ctx *types.SystemContext) (types.Image, error) {
-	panic("FIXME FIXME")
+	src, err := newImageSource(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return image.FromSource(src)
 }
 
 // NewImageSource returns a types.ImageSource for this reference,
