@@ -20,30 +20,59 @@ and usually the entire operation, to be rejected.
 The purpose of the policy file is to define a set of *policy requirements* for a container image,
 usually depending on its location (where it is being pulled from) or otherwise defined identity.
 
-Policy requirements can be defined for:
+Images may be referenced by *name* (e.g. `busybox:1.25.1`) or by
+*digest*
+(e.g. `sha256:29f5d56d12684887bdfa50dcd29fc31eea4aaf4ad3bec43daf19026a7ce69912`).
 
-- An individual *scope* in a *transport*.
-  The *transport* values are the same as the transport prefixes when pushing/pulling images (e.g. `docker:`, `atomic:`),
-  and *scope* values are defined by each transport; see below for more details.
+Policy requirements can be associated via the following attributes:
 
-  Usually, a scope can be defined to match a single image, and various prefixes of
-  such a most specific scope define namespaces of matching images.
-- A default policy for a single transport, expressed using an empty string as a scope
-- A global default policy.
+* Image *names* (e.g. `busybox:1.25.1`).
+* Image *name prefixes* (e.g. `busybox:`, `busybox:1.25`).
+* *Reference transports* (e.g. `docker:/library`, `atomic:5000/vendor/product`).
+* *CAS transports* (e.g. `docker:/library/busybox`, `oci:/var/lib/oci/images`).
+
+The policy requirements matching a given image are, in order of
+decreasing specificity:
+
+1. A combination of transports and names.
+2. Names.
+3. A combination of transports and name prefixes.
+4. Name prefixes.
+5. Transports.
+6. A global default policy.
 
 If multiple policy requirements match a given image, only the requirements from the most specific match apply,
 the more general policy requirements definitions are ignored.
+
+For images referenced by digest, only the pure-transport and global policies apply.
 
 This is expressed in JSON using the top-level syntax
 ```js
 {
     "default": [/* policy requirements: global default */]
+    "names": {
+        image_name: [/* policy requirements: default for $image_name */],
+        image_name_2: [/*…*/],
+        /*…*/
+    },
+    "prefixes": {
+        image_name_prefix: [/* policy requirements: default for $image_name_prefix */],
+        image_name_prefix_2: [/*…*/],
+        /*…*/
+    },
     "transports": {
         transport_name: {
-            "": [/* policy requirements: default for transport $transport_name */],
-            scope_1: [/* policy requirements: default for $scope_1 in $transport_name */],
-            scope_2: [/*…*/]
-            /*…*/
+            "default": [/* policy requirements: default for transport $transport_name */],
+            "names": {
+                image_name_3: [/* policy requirements: default for $image_name_3 over $transport_name */],
+                image_name_4: [/*…*/],
+                /*…*/
+            },
+            "prefixes": {
+                image_name_prefix_3: [/* policy requirements: default for $image_name_prefix_3 over $transport_name */],
+                image_name_prefix_4: [/*…*/],
+                /*…*/
+            },
         },
         transport_name_2: {/*…*/}
         /*…*/
@@ -51,51 +80,47 @@ This is expressed in JSON using the top-level syntax
 }
 ```
 
-The global `default` set of policy requirements is mandatory; all of the other fields
-(`transports` itself, any specific transport, the transport-specific default, etc.) are optional.
+The global `default` set of policy requirements is mandatory; all of
+the other fields (`names`, `prefixes`, `transports`; any specific
+name, prefix, or transport; the transport-specific default; etc.) are
+optional.
 
 <!-- NOTE: Keep this in sync with transports/transports.go! -->
-## Supported transports and their scopes
+## Supported transports
 
-### `atomic:`
+### `atomic:[<hostname>[:<port>][/<namespace>]]`
 
-The `atomic:` transport refers to images in an Atomic Registry.
+The `atomic:[<hostname>[:<port>][/<namespace>]]` transport
+refers to images in an Atomic Registry.
 
-Supported scopes use the form _hostname_[`:`_port_][`/`_namespace_[`/`_imagestream_ [`:`_tag_]]],
-i.e. either specifying a complete name of a tagged image, or prefix denoting
-a host/namespace/image stream.
-
-*Note:* The _hostname_ and _port_ refer to the Docker registry host and port (the one used
+*Note:* The `<hostname>` and `<port>` refer to the Docker registry host and port (the one used
 e.g. for `docker pull`), _not_ to the OpenShift API host and port.
 
-### `dir:`
+### `dir:[<dirname>]`
 
-The `dir:` transport refers to images stored in local directories.
+The `dir:[<dirname>]` transport refers to images stored in local
+directories.
 
-Supported scopes are paths of directories (either containing a single image or
-subdirectories possibly containing images).
+Supported names are paths of subdirectories (either containing a
+single image or subdirectories possibly containing images).
 
-*Note:* The paths must be absolute and contain no symlinks. Paths violating these requirements may be silently ignored.
+*Note:* `<dirname>` must be absolute and contain no symlinks.
 
-The top-level scope `"/"` is forbidden; use the transport default scope `""`,
-for consistency with other transports.
+### `docker:[<hostname>]/<namespace>[/<repository>]`
 
-### `docker:`
+The `docker:[<hostname>]/<namespace>[/<repository>]` transport
+refers to images in a registry implementing the "Docker Registry HTTP
+API V2".
 
-The `docker:` transport refers to images in a registry implementing the "Docker Registry HTTP API V2".
+For images referenced by name, `<repository>` is optional.  If set, the
+name must start with `<repository>/`.
 
-Scopes matching individual images are named Docker references *in the fully expanded form*, either
-using a tag or digest. For example, `docker.io/library/busybox:latest` (*not* `busybox:latest`).
+For images referenced by digest, `<repository>` is required.
 
-More general scopes are prefixes of individual-image scopes, and specify a repository (by omitting the tag or digest),
-a repository namespace, or a registry host (by only specifying the host name).
+### `oci:[<dirname>]`
 
-### `oci:`
-
-The `oci:` transport refers to images in directories compliant with "Open Container Image Layout Specification".
-
-Supported scopes use the form _directory_`:`_tag_, and _directory_ referring to
-a directory containing one or more tags, or any of the parent directories.
+The `oci:[<dirname>]` transport refers to images in directories
+compliant with "Open Container Image Layout Specification".
 
 *Note:* See `dir:` above for semantics and restrictions on the directory paths, they apply to `oci:` equivalently.
 
@@ -122,7 +147,7 @@ This requirement accepts any image (but note that other requirements in the arra
 
 When deciding to accept an individual signature, this requirement does not have any effect; it does *not* cause the signature to be accepted, though.
 
-This is useful primarily for policy scopes where no signature verification is required;
+This is useful primarily for transports where no signature verification is required;
 because the array of policy requirements must not be empty, this requirement is used
 to represent the lack of requirements explicitly.
 
@@ -136,9 +161,30 @@ A simple requirement with the following syntax:
 
 This requirement rejects every image, and every signature.
 
+### `digestOnly`
+
+This requirement accepts images referenced by digest and rejects
+images referenced by name.
+
+```json
+{"type":"digestOnly"}
+```
+
+### `nameOnly`
+
+This requirement accepts images referenced by name and rejects
+images referenced by digest.
+
+```json
+{"type":"nameOnly"}
+```
+
 ### `signedBy`
 
-This requirement requires an image to be signed with an expected identity, or accepts a signature if it is using an expected identity and key.
+This requirement requires an image referenced by name to be signed
+with an expected identity, or accepts a signature if it is using an
+expected identity and key.  This requirement accepts images referenced
+by digest.
 
 ```js
 {
@@ -156,48 +202,20 @@ Exactly one of `keyPath` and `keyData` must be present, containing a GPG keyring
 The `signedIdentity` field, a JSON object, specifies what image identity the signature claims about the image.
 One of the following alternatives are supported:
 
-- The identity in the signature must exactly match the image identity.  Note that with this, referencing an image by digest (with a signature claiming a _repository_`:`_tag_ identity) will fail.
+- The identity in the signature must exactly match the image name.
 
   ```json
   {"type":"matchExact"}
-  ```
-- If the image identity carries a tag, the identity in the signature must exactly match;
-  if the image identity uses a digest reference, the identity in the signature must be in the same repository as the image identity (using any tag).
-
-  (Note that with images identified using digest references, the digest from the reference is validated even before signature verification starts.)
-
-  ```json
-  {"type":"matchRepoDigestOrExact"}
   ```
 - The identity in the signature must be in the same repository as the image identity.  This is useful e.g. to pull an image using the `:latest` tag when the image is signed with a tag specifing an exact image version.
 
   ```json
   {"type":"matchRepository"}
   ```
-- The identity in the signature must exactly match a specified identity.
-  This is useful e.g. when locally mirroring images signed using their public identity.
 
-  ```js
-  {
-      "type": "exactReference",
-      "dockerReference": docker_reference_value
-  }
-  ```
-- The identity in the signature must be in the same repository as a specified identity.
-  This combines the properties of `matchRepository` and `exactReference`.
+  This policy may only be used in transports which include _repository_.
 
-  ```js
-  {
-      "type": "exactRepository",
-      "dockerRepository": docker_repository_value
-  }
-  ```
-
-If the `signedIdentity` field is missing, it is treated as `matchRepoDigestOrExact`.
-
-*Note*: `matchExact`, `matchRepoDigestOrExact` and `matchRepository` can be only used if a Docker-like image identity is
-provided by the transport.  In particular, the `dir:` and `oci:` transports can be only
-used with `exactReference` or `exactRepository`.
+If the `signedIdentity` field is missing, it is treated as `matchExact`.
 
 <!-- ### `signedBaseLayer` -->
 
@@ -213,39 +231,70 @@ selectively allow individual transports and scopes as desired.
 ```js
 {
     "default": [{"type": "reject"}], /* Reject anything not explicitly allowed */
-    "transports": {
-        "docker": {
-            /* Allow installing images from a specific repository namespace, without cryptographic verification.
-               This namespace includes images like openshift/hello-openshift and openshift/origin. */
-            "docker.io/openshift": [{"type": "insecureAcceptAnything"}],
-            /* Similarly, allow installing the “official” busybox images.  Note how the fully expanded
-               form, with the explicit /library/, must be used. */
-            "docker.io/library/busybox": [{"type": "insecureAcceptAnything"}]
-            /* Other docker: images use the global default policy and are rejected */
-        },
-        "dir": {
-            "": [{"type": "insecureAcceptAnything"}] /* Allow any images originating in local directories */
-        },
-        "atomic": {
-            /* The common case: using a known key for a repository or set of repositories */
-            "hostname:5000/myns/official": [
+    "names": {
+        "alpine:3.4": {
+            /* Trust alpine:3.4 signed by QA */
+            "default": [
                 {
                     "type": "signedBy",
                     "keyType": "GPGKeys",
                     "keyPath": "/path/to/official-pubkey.gpg"
                 }
             ],
-            /* A more complex example, for a repository which contains a mirror of a third-party product,
-               which must be signed-off by local IT */
-            "hostname:5000/vendor/product": [
-                { /* Require the image to be signed by the original vendor, using the vendor's repository location. */
+    "prefixes": {
+        "busybox:": [
+            /* Trust any BusyBox release signed by a lead developer */
+            {
+                "type": "signedBy",
+                "keyType": "GPGKeys",
+                "keyPath": "/path/to/pubkey/47B70C55ACC9965B.gpg"
+            }
+        ]
+    }
+    "transports": {
+        "docker:docker.io/openshift": {
+            /* Allow installing images from a specific repository namespace, without cryptographic verification.
+               This namespace includes images like openshift/hello-openshift and openshift/origin. */
+            "default": [{"type": "insecureAcceptAnything"}]
+        },
+        "docker:docker.io/library/nginx": {
+            /* Allow installing the “official” Nginx images with repository
+               name matching, but do not allow fetching by digest. */
+            "default": [
+                {"type": "nameOnly"},
+                {
                     "type": "signedBy",
                     "keyType": "GPGKeys",
-                    "keyPath": "/path/to/vendor-pubkey.gpg",
+                    "keyPath": "/path/to/official-pubkey.gpg"
                     "signedIdentity": {
-                        "type": "exactRepository",
-                        "dockerRepository": "vendor-hostname/product/repository"
+                        "type": "matchRepository"
                     }
+                }
+            ]
+        },
+        /* Other docker: images use the global default policy and are rejected */
+        "dir:/var/lib/oci/runtime": {
+            /* Allow any runtime images originating in local directories beneath /var/lib/oci/runtime */
+            "default": [{"type": "insecureAcceptAnything"}]
+        },
+        "atomic:example.com:5000/myns/official": {
+            /* The common case: using a known key for a repository or set of repositories */
+            "default": [
+                {
+                    "type": "signedBy",
+                    "keyType": "GPGKeys",
+                    "keyPath": "/path/to/official-pubkey.gpg"
+                }
+            ],
+        },
+        "atomic:example.com:5000/vendor": [
+            /* A more complex example, for a repository which contains a mirror of a third-party product,
+               which must be signed-off by local IT */
+            "default": [
+                { /* Require the image to be signed by the original vendor. */
+                    "type": "signedBy",
+                    "keyType": "GPGKeys",
+                    "keyPath": "/path/to/vendor-pubkey.gpg"
                 },
                 { /* Require the image to _also_ be signed by a local reviewer. */
                     "type": "signedBy",
