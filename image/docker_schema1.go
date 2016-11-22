@@ -204,7 +204,7 @@ func fixManifestLayers(manifest *manifestSchema1) error {
 		}
 	}
 	if imgs[len(imgs)-1].Parent != "" {
-		return errors.New("Invalid parent ID in the base layer of the image.")
+		return errors.New("Invalid parent ID in the base layer of the image")
 	}
 	// check general duplicates to error instead of a deadlock
 	idmap := make(map[string]struct{})
@@ -223,7 +223,7 @@ func fixManifestLayers(manifest *manifestSchema1) error {
 			manifest.FSLayers = append(manifest.FSLayers[:i], manifest.FSLayers[i+1:]...)
 			manifest.History = append(manifest.History[:i], manifest.History[i+1:]...)
 		} else if imgs[i].Parent != imgs[i+1].ID {
-			return fmt.Errorf("Invalid parent ID. Expected %v, got %v.", imgs[i+1].ID, imgs[i].Parent)
+			return fmt.Errorf("Invalid parent ID. Expected %v, got %v", imgs[i+1].ID, imgs[i].Parent)
 		}
 	}
 	return nil
