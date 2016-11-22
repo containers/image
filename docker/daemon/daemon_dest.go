@@ -128,7 +128,7 @@ func (d *daemonImageDestination) ShouldCompressLayers() bool {
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (d *daemonImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobInfo) (types.BlobInfo, error) {
 	if inputInfo.Digest == "" {
-		return types.BlobInfo{}, fmt.Errorf("Can not stream a blob with unknown digest to docker-daemon:")
+		return types.BlobInfo{}, fmt.Errorf(`"Can not stream a blob with unknown digest to "docker-daemon:"`)
 	}
 
 	if inputInfo.Size == -1 { // Ouch, we need to stream the blob into a temporary file just to determine the size.

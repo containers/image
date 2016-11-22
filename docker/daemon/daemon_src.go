@@ -331,7 +331,7 @@ func (s *daemonImageSource) GetManifest() ([]byte, string, error) {
 // out of a manifest list.
 func (s *daemonImageSource) GetTargetManifest(digest string) ([]byte, string, error) {
 	// How did we even get here? GetManifest() above has returned a manifest.DockerV2Schema2MediaType.
-	return nil, "", fmt.Errorf("Manifests list are not supported by docker-daemon:")
+	return nil, "", fmt.Errorf(`Manifest lists are not supported by "docker-daemon:"`)
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
