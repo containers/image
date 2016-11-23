@@ -52,7 +52,9 @@ func newImageSource(ctx *types.SystemContext, ref daemonReference) (types.ImageS
 	if err != nil {
 		return nil, fmt.Errorf("Error initializing docker engine client: %v", err)
 	}
-	inputStream, err := c.ImageSave(context.TODO(), []string{string(ref)}) // FIXME: ref should be per docker/reference.ParseIDOrReference, and we don't want NameOnly
+	// Per NewReference(), ref.StringWithinTransport() is either an image ID (config digest), or a !reference.NameOnly() reference.
+	// Either way ImageSave should create a tarball with exactly one image.
+	inputStream, err := c.ImageSave(context.TODO(), []string{ref.StringWithinTransport()})
 	if err != nil {
 		return nil, fmt.Errorf("Error loading image from docker engine: %v", err)
 	}
@@ -200,7 +202,7 @@ func (s *daemonImageSource) ensureCachedDataIsPresent() error {
 	if err != nil {
 		return err
 	}
-	var parsedConfig image // Most fields ommitted, we only care about layer DiffIDs.
+	var parsedConfig dockerImage // Most fields ommitted, we only care about layer DiffIDs.
 	if err := json.Unmarshal(configBytes, &parsedConfig); err != nil {
 		return fmt.Errorf("Error decoding tar config %s: %v", tarManifest.Config, err)
 	}
@@ -237,7 +239,7 @@ func (s *daemonImageSource) loadTarManifest() (*manifestItem, error) {
 	return &items[0], nil
 }
 
-func (s *daemonImageSource) prepareLayerData(tarManifest *manifestItem, parsedConfig *image) (map[diffID]*layerInfo, error) {
+func (s *daemonImageSource) prepareLayerData(tarManifest *manifestItem, parsedConfig *dockerImage) (map[diffID]*layerInfo, error) {
 	// Collect layer data available in manifest and config.
 	if len(tarManifest.Layers) != len(parsedConfig.RootFS.DiffIDs) {
 		return nil, fmt.Errorf("Inconsistent layer count: %d in manifest, %d in config", len(tarManifest.Layers), len(parsedConfig.RootFS.DiffIDs))
