@@ -97,7 +97,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		if err != nil {
 			return nil, err
 		}
-	} else {
+	} else { // Coverage: len(refInfo) is always 1 or 2
 		// Anything else: store specified in a form we don't
 		// recognize.
 		return nil, ErrInvalidReference
@@ -254,7 +254,7 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 		if id.Validate() == nil {
 			return ErrInvalidReference
 		}
-		if name == nil {
+		if name == nil { // Coverge: This shouldn't happen, err should be nil if both name and id are missing.
 			return ErrInvalidReference
 		}
 	} else if len(scopeInfo) == 2 && scopeInfo[0] != "" && scopeInfo[1] != "" {
@@ -265,7 +265,7 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 		if id.Validate() == nil {
 			return ErrInvalidReference
 		}
-		if name == nil {
+		if name == nil { // Coverge: This shouldn't happen, err should be nil if both name and id are missing.
 			return ErrInvalidReference
 		}
 		id, name, err = reference.ParseIDOrReference(scopeInfo[1])
@@ -275,7 +275,7 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 		if id.Validate() != nil {
 			return ErrInvalidReference
 		}
-		if name != nil {
+		if name != nil { // Coverge: This shouldn't happen, err should be nil if both name and id are missing.
 			return ErrInvalidReference
 		}
 	} else {
