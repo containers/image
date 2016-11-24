@@ -228,6 +228,10 @@ func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, i
 }
 
 func TestWriteRead(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("TestWriteRead requires root privileges")
+	}
+
 	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
 	sum := ddigest.SHA256.FromBytes([]byte(config))
 	configInfo := types.BlobInfo{
@@ -454,6 +458,10 @@ func TestWriteRead(t *testing.T) {
 }
 
 func TestDuplicateName(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("TestDuplicateName requires root privileges")
+	}
+
 	newStore(t)
 
 	ref, err := Transport.ParseReference("test")
@@ -503,6 +511,10 @@ func TestDuplicateName(t *testing.T) {
 }
 
 func TestDuplicateID(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("TestDuplicateID requires root privileges")
+	}
+
 	newStore(t)
 
 	ref, err := Transport.ParseReference("@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -555,6 +567,10 @@ func TestDuplicateID(t *testing.T) {
 }
 
 func TestDuplicateNameID(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("TestDuplicateNameID requires root privileges")
+	}
+
 	newStore(t)
 
 	ref, err := Transport.ParseReference("test@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -646,6 +662,10 @@ func TestNamespaces(t *testing.T) {
 }
 
 func TestSize(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("TestSize requires root privileges")
+	}
+
 	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
 	sum := ddigest.SHA256.FromBytes([]byte(config))
 	configInfo := types.BlobInfo{
@@ -730,6 +750,10 @@ func TestSize(t *testing.T) {
 }
 
 func TestDuplicateBlob(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("TestDuplicateBlob requires root privileges")
+	}
+
 	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
 	sum := ddigest.SHA256.FromBytes([]byte(config))
 	configInfo := types.BlobInfo{
