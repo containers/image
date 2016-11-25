@@ -285,10 +285,6 @@ func getAuth(ctx *types.SystemContext, registry string) (string, string, error) 
 	if ctx != nil && ctx.DockerAuthConfig != nil {
 		return ctx.DockerAuthConfig.Username, ctx.DockerAuthConfig.Password, nil
 	}
-	// TODO(runcom): get this from *cli.Context somehow
-	//if username != "" && password != "" {
-	//return username, password, nil
-	//}
 	var dockerAuth dockerConfigFile
 	dockerCfgPath := filepath.Join(getDefaultConfigDir(".docker"), dockerCfgFileName)
 	if _, err := os.Stat(dockerCfgPath); err == nil {
