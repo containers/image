@@ -54,7 +54,7 @@ func manifestSchema2FromComponentsLikeFixture(configBlob []byte) genericManifest
 		MediaType: "application/octet-stream",
 		Size:      5940,
 		Digest:    "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f",
-	}, configBlob, []descriptor{
+	}, nil, configBlob, []descriptor{
 		{
 			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 			Digest:    "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
