@@ -153,7 +153,7 @@ func (m *manifestSchema2) UpdatedImage(options types.ManifestUpdateOptions) (typ
 	}
 
 	switch options.ManifestMIMEType {
-	case "": // No conversion, OK
+	case "", manifest.DockerV2Schema2MediaType: // No conversion, OK
 	case manifest.DockerV2Schema1SignedMediaType, manifest.DockerV2Schema1MediaType:
 		return copy.convertToManifestSchema1(options.InformationOnly.Destination)
 	default:
