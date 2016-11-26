@@ -67,7 +67,7 @@ func (d *Destination) SupportedManifestMIMETypes() []string {
 // SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
 // Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
 func (d *Destination) SupportsSignatures() error {
-	return errors.Errorf("Storing signatures for docker tarfile: destinations is not supported")
+	return errors.Errorf("Storing signatures for docker tar files is not supported")
 }
 
 // ShouldCompressLayers returns true iff it is desirable to compress layer blobs written to this destination.
@@ -238,7 +238,7 @@ func (d *Destination) sendFile(path string, expectedSize int64, stream io.Reader
 // contents)
 func (d *Destination) PutSignatures(signatures [][]byte) error {
 	if len(signatures) != 0 {
-		return errors.Errorf("Storing signatures for docker tarfile: destinations is not supported")
+		return errors.Errorf("Storing signatures for docker tar files is not supported")
 	}
 	return nil
 }

@@ -36,6 +36,9 @@ type layerInfo struct {
 
 // NewSource returns a tarfile.Source for the specified path.
 func NewSource(path string) *Source {
+	// TODO: We could add support for multiple images in a single archive, so
+	//       that people could use docker-archive:opensuse.tar:opensuse:leap as
+	//       the source of an image.
 	return &Source{
 		tarPath: path,
 	}
