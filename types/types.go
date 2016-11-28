@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/containers/image/docker/reference"
+	"github.com/docker/distribution/digest"
 )
 
 // ImageTransport is a top-level namespace for ways to to store/load an image.
@@ -91,8 +92,8 @@ type ImageReference interface {
 // BlobInfo collects known information about a blob (layer/config).
 // In some situations, some fields may be unknown, in others they may be mandatory; documenting an “unknown” value here does not override that.
 type BlobInfo struct {
-	Digest string // "" if unknown.
-	Size   int64  // -1 if unknown
+	Digest digest.Digest // "" if unknown.
+	Size   int64         // -1 if unknown
 }
 
 // ImageSource is a service, possibly remote (= slow), to download components of a single image.
@@ -113,9 +114,9 @@ type ImageSource interface {
 	GetManifest() ([]byte, string, error)
 	// GetTargetManifest returns an image's manifest given a digest. This is mainly used to retrieve a single image's manifest
 	// out of a manifest list.
-	GetTargetManifest(digest string) ([]byte, string, error)
+	GetTargetManifest(digest digest.Digest) ([]byte, string, error)
 	// GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
-	GetBlob(digest string) (io.ReadCloser, int64, error)
+	GetBlob(digest digest.Digest) (io.ReadCloser, int64, error)
 	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
 	GetSignatures() ([][]byte, error)
 }

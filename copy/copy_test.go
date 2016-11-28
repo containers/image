@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/distribution/digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +16,7 @@ import (
 func TestNewDigestingReader(t *testing.T) {
 	// Only the failure cases, success is tested in TestDigestingReaderRead below.
 	source := bytes.NewReader([]byte("abc"))
-	for _, input := range []string{
+	for _, input := range []digest.Digest{
 		"abc",             // Not algo:hexvalue
 		"crc32:",          // Unknown algorithm, empty value
 		"crc32:012345678", // Unknown algorithm
@@ -24,14 +25,14 @@ func TestNewDigestingReader(t *testing.T) {
 		"sha256:01",       // Invalid length of hex value
 	} {
 		_, err := newDigestingReader(source, input)
-		assert.Error(t, err, input)
+		assert.Error(t, err, input.String())
 	}
 }
 
 func TestDigestingReaderRead(t *testing.T) {
 	cases := []struct {
 		input  []byte
-		digest string
+		digest digest.Digest
 	}{
 		{[]byte(""), "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
 		{[]byte("abc"), "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"},
@@ -41,22 +42,22 @@ func TestDigestingReaderRead(t *testing.T) {
 	for _, c := range cases {
 		source := bytes.NewReader(c.input)
 		reader, err := newDigestingReader(source, c.digest)
-		require.NoError(t, err, c.digest)
+		require.NoError(t, err, c.digest.String())
 		dest := bytes.Buffer{}
 		n, err := io.Copy(&dest, reader)
-		assert.NoError(t, err, c.digest)
-		assert.Equal(t, int64(len(c.input)), n, c.digest)
-		assert.Equal(t, c.input, dest.Bytes(), c.digest)
-		assert.False(t, reader.validationFailed, c.digest)
+		assert.NoError(t, err, c.digest.String())
+		assert.Equal(t, int64(len(c.input)), n, c.digest.String())
+		assert.Equal(t, c.input, dest.Bytes(), c.digest.String())
+		assert.False(t, reader.validationFailed, c.digest.String())
 	}
 	// Modified input
 	for _, c := range cases {
 		source := bytes.NewReader(bytes.Join([][]byte{c.input, []byte("x")}, nil))
 		reader, err := newDigestingReader(source, c.digest)
-		require.NoError(t, err, c.digest)
+		require.NoError(t, err, c.digest.String())
 		dest := bytes.Buffer{}
 		_, err = io.Copy(&dest, reader)
-		assert.Error(t, err, c.digest)
+		assert.Error(t, err, c.digest.String())
 		assert.True(t, reader.validationFailed)
 	}
 }
@@ -79,7 +80,7 @@ func TestDiffIDComputationGoroutine(t *testing.T) {
 	res := goDiffIDComputationGoroutineWithTimeout(stream, nil)
 	require.NotNil(t, res)
 	assert.NoError(t, res.err)
-	assert.Equal(t, "sha256:185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969", res.digest)
+	assert.Equal(t, "sha256:185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969", res.digest.String())
 
 	// Error reading input
 	reader, writer := io.Pipe()
@@ -93,7 +94,7 @@ func TestComputeDiffID(t *testing.T) {
 	for _, c := range []struct {
 		filename     string
 		decompressor decompressorFunc
-		result       string
+		result       digest.Digest
 	}{
 		{"fixtures/Hello.uncompressed", nil, "sha256:185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969"},
 		{"fixtures/Hello.gz", nil, "sha256:0bd4409dcd76476a263b8f3221b4ce04eb4686dec40bfdcc2e86a7403de13609"},

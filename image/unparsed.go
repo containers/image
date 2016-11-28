@@ -53,7 +53,7 @@ func (i *UnparsedImage) Manifest() ([]byte, string, error) {
 		ref := i.Reference().DockerReference()
 		if ref != nil {
 			if canonical, ok := ref.(reference.Canonical); ok {
-				digest := canonical.Digest().String()
+				digest := canonical.Digest()
 				matches, err := manifest.MatchesDigest(m, digest)
 				if err != nil {
 					return nil, "", fmt.Errorf("Error computing manifest digest: %v", err)

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/containers/image/version"
+	"github.com/docker/distribution/digest"
 )
 
 const (
@@ -26,7 +27,7 @@ func (err InvalidSignatureError) Error() string {
 
 // Signature is a parsed content of a signature.
 type Signature struct {
-	DockerManifestDigest string // FIXME: more precise type?
+	DockerManifestDigest digest.Digest
 	DockerReference      string // FIXME: more precise type?
 }
 
@@ -50,7 +51,7 @@ func (s privateSignature) marshalJSONWithVariables(timestamp int64, creatorID st
 	}
 	critical := map[string]interface{}{
 		"type":     signatureType,
-		"image":    map[string]string{"docker-manifest-digest": s.DockerManifestDigest},
+		"image":    map[string]string{"docker-manifest-digest": s.DockerManifestDigest.String()},
 		"identity": map[string]string{"docker-reference": s.DockerReference},
 	}
 	optional := map[string]interface{}{
@@ -122,11 +123,11 @@ func (s *privateSignature) strictUnmarshalJSON(data []byte) error {
 	if err := validateExactMapKeys(image, "docker-manifest-digest"); err != nil {
 		return err
 	}
-	digest, err := stringField(image, "docker-manifest-digest")
+	digestString, err := stringField(image, "docker-manifest-digest")
 	if err != nil {
 		return err
 	}
-	s.DockerManifestDigest = digest
+	s.DockerManifestDigest = digest.Digest(digestString)
 
 	identity, err := mapField(c, "identity")
 	if err != nil {
@@ -162,7 +163,7 @@ func (s privateSignature) sign(mech SigningMechanism, keyIdentity string) ([]byt
 type signatureAcceptanceRules struct {
 	validateKeyIdentity                func(string) error
 	validateSignedDockerReference      func(string) error
-	validateSignedDockerManifestDigest func(string) error
+	validateSignedDockerManifestDigest func(digest.Digest) error
 }
 
 // verifyAndExtractSignature verifies that unverifiedSignature has been signed, and that its principial components

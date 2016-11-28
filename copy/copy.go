@@ -3,16 +3,11 @@ package copy
 import (
 	"bytes"
 	"compress/gzip"
-	"crypto/sha256"
-	"crypto/subtle"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"hash"
 	"io"
 	"io/ioutil"
 	"reflect"
-	"strings"
 
 	pb "gopkg.in/cheggaaa/pb.v1"
 
@@ -22,6 +17,7 @@ import (
 	"github.com/containers/image/signature"
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/digest"
 )
 
 // preferredManifestMIMETypes lists manifest MIME types in order of our preference, if we can't use the original manifest and need to convert.
@@ -29,40 +25,26 @@ import (
 // Include v2s1 signed but not v2s1 unsigned, because docker/distribution requires a signature even if the unsigned MIME type is used.
 var preferredManifestMIMETypes = []string{manifest.DockerV2Schema2MediaType, manifest.DockerV2Schema1SignedMediaType}
 
-// supportedDigests lists the supported blob digest types.
-var supportedDigests = map[string]func() hash.Hash{
-	"sha256": sha256.New,
-}
-
 type digestingReader struct {
 	source           io.Reader
-	digest           hash.Hash
-	expectedDigest   []byte
+	digester         digest.Digester
+	expectedDigest   digest.Digest
 	validationFailed bool
 }
 
 // newDigestingReader returns an io.Reader implementation with contents of source, which will eventually return a non-EOF error
-// and set validationFailed to true if the source stream does not match expectedDigestString.
-func newDigestingReader(source io.Reader, expectedDigestString string) (*digestingReader, error) {
-	fields := strings.SplitN(expectedDigestString, ":", 2)
-	if len(fields) != 2 {
-		return nil, fmt.Errorf("Invalid digest specification %s", expectedDigestString)
+// and set validationFailed to true if the source stream does not match expectedDigest.
+func newDigestingReader(source io.Reader, expectedDigest digest.Digest) (*digestingReader, error) {
+	if err := expectedDigest.Validate(); err != nil {
+		return nil, fmt.Errorf("Invalid digest specification %s", expectedDigest)
 	}
-	fn, ok := supportedDigests[fields[0]]
-	if !ok {
-		return nil, fmt.Errorf("Invalid digest specification %s: unknown digest type %s", expectedDigestString, fields[0])
-	}
-	digest := fn()
-	expectedDigest, err := hex.DecodeString(fields[1])
-	if err != nil {
-		return nil, fmt.Errorf("Invalid digest value %s: %v", expectedDigestString, err)
-	}
-	if len(expectedDigest) != digest.Size() {
-		return nil, fmt.Errorf("Invalid digest specification %s: length %d does not match %d", expectedDigestString, len(expectedDigest), digest.Size())
+	digestAlgorithm := expectedDigest.Algorithm()
+	if !digestAlgorithm.Available() {
+		return nil, fmt.Errorf("Invalid digest specification %s: unsupported digest algorithm %s", expectedDigest, digestAlgorithm)
 	}
 	return &digestingReader{
 		source:           source,
-		digest:           digest,
+		digester:         digestAlgorithm.New(),
 		expectedDigest:   expectedDigest,
 		validationFailed: false,
 	}, nil
@@ -71,7 +53,7 @@ func newDigestingReader(source io.Reader, expectedDigestString string) (*digesti
 func (d *digestingReader) Read(p []byte) (int, error) {
 	n, err := d.source.Read(p)
 	if n > 0 {
-		if n2, err := d.digest.Write(p[:n]); n2 != n || err != nil {
+		if n2, err := d.digester.Hash().Write(p[:n]); n2 != n || err != nil {
 			// Coverage: This should not happen, the hash.Hash interface requires
 			// d.digest.Write to never return an error, and the io.Writer interface
 			// requires n2 == len(input) if no error is returned.
@@ -79,10 +61,10 @@ func (d *digestingReader) Read(p []byte) (int, error) {
 		}
 	}
 	if err == io.EOF {
-		actualDigest := d.digest.Sum(nil)
-		if subtle.ConstantTimeCompare(actualDigest, d.expectedDigest) != 1 {
+		actualDigest := d.digester.Digest()
+		if actualDigest != d.expectedDigest {
 			d.validationFailed = true
-			return 0, fmt.Errorf("Digest did not match, expected %s, got %s", hex.EncodeToString(d.expectedDigest), hex.EncodeToString(actualDigest))
+			return 0, fmt.Errorf("Digest did not match, expected %s, got %s", d.expectedDigest, actualDigest)
 		}
 	}
 	return n, err
@@ -236,7 +218,7 @@ func copyLayers(manifestUpdates *types.ManifestUpdateOptions, dest types.ImageDe
 	srcInfos := src.LayerInfos()
 	destInfos := []types.BlobInfo{}
 	diffIDs := []string{}
-	copiedLayers := map[string]copiedLayer{}
+	copiedLayers := map[digest.Digest]copiedLayer{}
 	for _, srcLayer := range srcInfos {
 		cl, ok := copiedLayers[srcLayer.Digest]
 		if !ok {
@@ -245,7 +227,7 @@ func copyLayers(manifestUpdates *types.ManifestUpdateOptions, dest types.ImageDe
 			if err != nil {
 				return err
 			}
-			cl = copiedLayer{blobInfo: destInfo, diffID: diffID}
+			cl = copiedLayer{blobInfo: destInfo, diffID: diffID.String()}
 			copiedLayers[srcLayer.Digest] = cl
 		}
 		destInfos = append(destInfos, cl.blobInfo)
@@ -297,14 +279,14 @@ func copyConfig(dest types.ImageDestination, src types.Image, reportWriter io.Wr
 // diffIDResult contains both a digest value and an error from diffIDComputationGoroutine.
 // We could also send the error through the pipeReader, but this more cleanly separates the copying of the layer and the DiffID computation.
 type diffIDResult struct {
-	digest string
+	digest digest.Digest
 	err    error
 }
 
 // copyLayer copies a layer with srcInfo (with known Digest and possibly known Size) in src to dest, perhaps compressing it if canCompress,
 // and returns a complete blobInfo of the copied layer, and a value for LayerDiffIDs if diffIDIsNeeded
 func copyLayer(dest types.ImageDestination, src types.ImageSource, srcInfo types.BlobInfo,
-	diffIDIsNeeded bool, canCompress bool, reportWriter io.Writer) (types.BlobInfo, string, error) {
+	diffIDIsNeeded bool, canCompress bool, reportWriter io.Writer) (types.BlobInfo, digest.Digest, error) {
 	srcStream, srcBlobSize, err := src.GetBlob(srcInfo.Digest) // We currently completely ignore srcInfo.Size throughout.
 	if err != nil {
 		return types.BlobInfo{}, "", fmt.Errorf("Error reading blob %s: %v", srcInfo.Digest, err)
@@ -375,7 +357,7 @@ func diffIDComputationGoroutine(dest chan<- diffIDResult, layerStream io.ReadClo
 }
 
 // computeDiffID reads all input from layerStream, uncompresses it using decompressor if necessary, and returns its digest.
-func computeDiffID(stream io.Reader, decompressor decompressorFunc) (string, error) {
+func computeDiffID(stream io.Reader, decompressor decompressorFunc) (digest.Digest, error) {
 	if decompressor != nil {
 		s, err := decompressor(stream)
 		if err != nil {
@@ -384,13 +366,7 @@ func computeDiffID(stream io.Reader, decompressor decompressorFunc) (string, err
 		stream = s
 	}
 
-	h := sha256.New()
-	_, err := io.Copy(h, stream)
-	if err != nil {
-		return "", err
-	}
-	hash := h.Sum(nil)
-	return "sha256:" + hex.EncodeToString(hash[:]), nil
+	return digest.Canonical.FromReader(stream)
 }
 
 // copyBlobFromStream copies a blob with srcInfo (with known Digest and possibly known Size) from srcStream to dest,

@@ -8,6 +8,7 @@ import (
 
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -44,7 +45,7 @@ func (s *ociImageSource) GetManifest() ([]byte, string, error) {
 		return nil, "", err
 	}
 
-	manifestPath, err := s.ref.blobPath(desc.Digest)
+	manifestPath, err := s.ref.blobPath(digest.Digest(desc.Digest))
 	if err != nil {
 		return nil, "", err
 	}
@@ -56,7 +57,7 @@ func (s *ociImageSource) GetManifest() ([]byte, string, error) {
 	return m, manifest.GuessMIMEType(m), nil
 }
 
-func (s *ociImageSource) GetTargetManifest(digest string) ([]byte, string, error) {
+func (s *ociImageSource) GetTargetManifest(digest digest.Digest) ([]byte, string, error) {
 	manifestPath, err := s.ref.blobPath(digest)
 	if err != nil {
 		return nil, "", err
@@ -71,7 +72,7 @@ func (s *ociImageSource) GetTargetManifest(digest string) ([]byte, string, error
 }
 
 // GetBlob returns a stream for the specified blob, and the blob's size.
-func (s *ociImageSource) GetBlob(digest string) (io.ReadCloser, int64, error) {
+func (s *ociImageSource) GetBlob(digest digest.Digest) (io.ReadCloser, int64, error) {
 	path, err := s.ref.blobPath(digest)
 	if err != nil {
 		return nil, 0, err

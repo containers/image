@@ -2,14 +2,13 @@ package directory
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
 
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,20 +50,18 @@ func TestGetPutBlob(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)
 
-	digest := "digest-test"
 	blob := []byte("test-blob")
 	dest, err := ref.NewImageDestination(nil)
 	require.NoError(t, err)
 	defer dest.Close()
 	compress := dest.ShouldCompressLayers()
 	assert.False(t, compress)
-	info, err := dest.PutBlob(bytes.NewReader(blob), types.BlobInfo{Digest: digest, Size: int64(9)})
+	info, err := dest.PutBlob(bytes.NewReader(blob), types.BlobInfo{Digest: digest.Digest("sha256:digest-test"), Size: int64(9)})
 	assert.NoError(t, err)
 	err = dest.Commit()
 	assert.NoError(t, err)
 	assert.Equal(t, int64(9), info.Size)
-	hash := sha256.Sum256(blob)
-	assert.Equal(t, "sha256:"+hex.EncodeToString(hash[:]), info.Digest)
+	assert.Equal(t, digest.FromBytes(blob), info.Digest)
 
 	src, err := ref.NewImageSource(nil, nil)
 	require.NoError(t, err)
@@ -88,7 +85,7 @@ func (fn readerFromFunc) Read(p []byte) (int, error) {
 // TestPutBlobDigestFailure simulates behavior on digest verification failure.
 func TestPutBlobDigestFailure(t *testing.T) {
 	const digestErrorString = "Simulated digest error"
-	const blobDigest = "test-digest"
+	const blobDigest = digest.Digest("sha256:test-digest")
 
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)

@@ -1,12 +1,11 @@
 package manifest
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"io/ioutil"
 	"path/filepath"
 	"testing"
 
+	"github.com/docker/distribution/digest"
 	"github.com/docker/libtrust"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
@@ -40,8 +39,8 @@ func TestGuessMIMEType(t *testing.T) {
 
 func TestDigest(t *testing.T) {
 	cases := []struct {
-		path   string
-		digest string
+		path           string
+		expectedDigest digest.Digest
 	}{
 		{"v2s2.manifest.json", TestDockerV2S2ManifestDigest},
 		{"v2s1.manifest.json", TestDockerV2S1ManifestDigest},
@@ -50,26 +49,26 @@ func TestDigest(t *testing.T) {
 	for _, c := range cases {
 		manifest, err := ioutil.ReadFile(filepath.Join("fixtures", c.path))
 		require.NoError(t, err)
-		digest, err := Digest(manifest)
+		actualDigest, err := Digest(manifest)
 		require.NoError(t, err)
-		assert.Equal(t, c.digest, digest)
+		assert.Equal(t, c.expectedDigest, actualDigest)
 	}
 
 	manifest, err := ioutil.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
 	require.NoError(t, err)
-	digest, err := Digest(manifest)
+	actualDigest, err := Digest(manifest)
 	assert.Error(t, err)
 
-	digest, err = Digest([]byte{})
+	actualDigest, err = Digest([]byte{})
 	require.NoError(t, err)
-	assert.Equal(t, "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", digest)
+	assert.Equal(t, digest.Digest(digest.DigestSha256EmptyTar), actualDigest)
 }
 
 func TestMatchesDigest(t *testing.T) {
 	cases := []struct {
-		path   string
-		digest string
-		result bool
+		path           string
+		expectedDigest digest.Digest
+		result         bool
 	}{
 		// Success
 		{"v2s2.manifest.json", TestDockerV2S2ManifestDigest, true},
@@ -78,16 +77,16 @@ func TestMatchesDigest(t *testing.T) {
 		{"v2s2.manifest.json", TestDockerV2S1ManifestDigest, false},
 		{"v2s1.manifest.json", TestDockerV2S2ManifestDigest, false},
 		// Unrecognized algorithm
-		{"v2s2.manifest.json", "md5:2872f31c5c1f62a694fbd20c1e85257c", false},
+		{"v2s2.manifest.json", digest.Digest("md5:2872f31c5c1f62a694fbd20c1e85257c"), false},
 		// Mangled format
-		{"v2s2.manifest.json", TestDockerV2S2ManifestDigest + "abc", false},
-		{"v2s2.manifest.json", TestDockerV2S2ManifestDigest[:20], false},
-		{"v2s2.manifest.json", "", false},
+		{"v2s2.manifest.json", digest.Digest(TestDockerV2S2ManifestDigest.String() + "abc"), false},
+		{"v2s2.manifest.json", digest.Digest(TestDockerV2S2ManifestDigest.String()[:20]), false},
+		{"v2s2.manifest.json", digest.Digest(""), false},
 	}
 	for _, c := range cases {
 		manifest, err := ioutil.ReadFile(filepath.Join("fixtures", c.path))
 		require.NoError(t, err)
-		res, err := MatchesDigest(manifest, c.digest)
+		res, err := MatchesDigest(manifest, c.expectedDigest)
 		require.NoError(t, err)
 		assert.Equal(t, c.result, res)
 	}
@@ -95,12 +94,11 @@ func TestMatchesDigest(t *testing.T) {
 	manifest, err := ioutil.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
 	require.NoError(t, err)
 	// Even a correct SHA256 hash is rejected if we can't strip the JSON signature.
-	hash := sha256.Sum256(manifest)
-	res, err := MatchesDigest(manifest, "sha256:"+hex.EncodeToString(hash[:]))
+	res, err := MatchesDigest(manifest, digest.FromBytes(manifest))
 	assert.False(t, res)
 	assert.Error(t, err)
 
-	res, err = MatchesDigest([]byte{}, "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+	res, err = MatchesDigest([]byte{}, digest.Digest(digest.DigestSha256EmptyTar))
 	assert.True(t, res)
 	assert.NoError(t, err)
 }

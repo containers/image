@@ -1,8 +1,6 @@
 package layout
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +11,7 @@ import (
 
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -75,14 +74,14 @@ func (d *ociImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobInfo
 		}
 	}()
 
-	h := sha256.New()
-	tee := io.TeeReader(stream, h)
+	digester := digest.Canonical.New()
+	tee := io.TeeReader(stream, digester.Hash())
 
 	size, err := io.Copy(blobFile, tee)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
-	computedDigest := "sha256:" + hex.EncodeToString(h.Sum(nil))
+	computedDigest := digester.Digest()
 	if inputInfo.Size != -1 && size != inputInfo.Size {
 		return types.BlobInfo{}, fmt.Errorf("Size mismatch when copying %s, expected %d, got %d", computedDigest, inputInfo.Size, size)
 	}
@@ -153,7 +152,7 @@ func (d *ociImageDestination) PutManifest(m []byte) error {
 		return err
 	}
 	desc := imgspecv1.Descriptor{}
-	desc.Digest = digest
+	desc.Digest = digest.String()
 	// TODO(runcom): beaware and add support for OCI manifest list
 	desc.MediaType = mt
 	desc.Size = int64(len(ociMan))

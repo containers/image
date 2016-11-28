@@ -114,7 +114,7 @@ func inspectManifest(m genericManifest) (*types.ImageInspectInfo, error) {
 	layers := m.LayerInfos()
 	info.Layers = make([]string, len(layers))
 	for i, layer := range layers {
-		info.Layers[i] = layer.Digest
+		info.Layers[i] = layer.Digest.String()
 	}
 	return info, nil
 }

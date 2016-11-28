@@ -1,10 +1,9 @@
 package manifest
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 
+	"github.com/docker/distribution/digest"
 	"github.com/docker/libtrust"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -70,7 +69,7 @@ func GuessMIMEType(manifest []byte) string {
 }
 
 // Digest returns the a digest of a docker manifest, with any necessary implied transformations like stripping v1s1 signatures.
-func Digest(manifest []byte) (string, error) {
+func Digest(manifest []byte) (digest.Digest, error) {
 	if GuessMIMEType(manifest) == DockerV2Schema1SignedMediaType {
 		sig, err := libtrust.ParsePrettySignature(manifest, "signatures")
 		if err != nil {
@@ -84,15 +83,14 @@ func Digest(manifest []byte) (string, error) {
 		}
 	}
 
-	hash := sha256.Sum256(manifest)
-	return "sha256:" + hex.EncodeToString(hash[:]), nil
+	return digest.FromBytes(manifest), nil
 }
 
 // MatchesDigest returns true iff the manifest matches expectedDigest.
 // Error may be set if this returns false.
 // Note that this is not doing ConstantTimeCompare; by the time we get here, the cryptographic signature must already have been verified,
 // or we are not using a cryptographic channel and the attacker can modify the digest along with the manifest blob.
-func MatchesDigest(manifest []byte, expectedDigest string) (bool, error) {
+func MatchesDigest(manifest []byte, expectedDigest digest.Digest) (bool, error) {
 	// This should eventually support various digest types.
 	actualDigest, err := Digest(manifest)
 	if err != nil {

@@ -1,14 +1,13 @@
 package directory
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/digest"
 )
 
 type dirImageDestination struct {
@@ -64,14 +63,14 @@ func (d *dirImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobInfo
 		}
 	}()
 
-	h := sha256.New()
-	tee := io.TeeReader(stream, h)
+	digester := digest.Canonical.New()
+	tee := io.TeeReader(stream, digester.Hash())
 
 	size, err := io.Copy(blobFile, tee)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
-	computedDigest := hex.EncodeToString(h.Sum(nil))
+	computedDigest := digester.Digest()
 	if inputInfo.Size != -1 && size != inputInfo.Size {
 		return types.BlobInfo{}, fmt.Errorf("Size mismatch when copying %s, expected %d, got %d", computedDigest, inputInfo.Size, size)
 	}
@@ -86,7 +85,7 @@ func (d *dirImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobInfo
 		return types.BlobInfo{}, err
 	}
 	succeeded = true
-	return types.BlobInfo{Digest: "sha256:" + computedDigest, Size: size}, nil
+	return types.BlobInfo{Digest: computedDigest, Size: size}, nil
 }
 
 func (d *dirImageDestination) PutManifest(manifest []byte) error {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/containers/image/manifest"
+	"github.com/docker/distribution/digest"
 )
 
 // SignDockerManifest returns a signature for manifest as the specified dockerReference,
@@ -42,7 +43,7 @@ func VerifyDockerManifestSignature(unverifiedSignature, unverifiedManifest []byt
 			}
 			return nil
 		},
-		validateSignedDockerManifestDigest: func(signedDockerManifestDigest string) error {
+		validateSignedDockerManifestDigest: func(signedDockerManifestDigest digest.Digest) error {
 			matches, err := manifest.MatchesDigest(unverifiedManifest, signedDockerManifestDigest)
 			if err != nil {
 				return err

@@ -11,6 +11,7 @@ import (
 
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/digest"
 )
 
 func (pr *prSignedBy) isSignatureAuthorAccepted(image types.UnparsedImage, sig []byte) (signatureAcceptanceResult, *Signature, error) {
@@ -75,7 +76,7 @@ func (pr *prSignedBy) isSignatureAuthorAccepted(image types.UnparsedImage, sig [
 			}
 			return nil
 		},
-		validateSignedDockerManifestDigest: func(digest string) error {
+		validateSignedDockerManifestDigest: func(digest digest.Digest) error {
 			m, _, err := image.Manifest()
 			if err != nil {
 				return err
