@@ -221,7 +221,7 @@ type ManifestUpdateOptions struct {
 type ManifestUpdateInformation struct {
 	Destination  ImageDestination // and yes, UpdatedManifest may write to Destination (see the schema2 → schema1 conversion logic in image/docker_schema2.go)
 	LayerInfos   []BlobInfo       // Complete BlobInfos (size+digest) which have been uploaded, in order (the root layer first, and then successive layered layers)
-	LayerDiffIDs []string         // Digest values for the _uncompressed_ contents of the blobs which have been uploaded, in the same order.
+	LayerDiffIDs []digest.Digest  // Digest values for the _uncompressed_ contents of the blobs which have been uploaded, in the same order.
 }
 
 // ImageInspectInfo is a set of metadata describing Docker images, primarily their manifest and configuration.

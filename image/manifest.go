@@ -3,6 +3,7 @@ package image
 import (
 	"time"
 
+	"github.com/docker/distribution/digest"
 	"github.com/docker/engine-api/types/strslice"
 
 	"github.com/containers/image/manifest"
@@ -46,9 +47,9 @@ type imageHistory struct {
 }
 
 type rootFS struct {
-	Type      string   `json:"type"`
-	DiffIDs   []string `json:"diff_ids,omitempty"`
-	BaseLayer string   `json:"base_layer,omitempty"`
+	Type      string          `json:"type"`
+	DiffIDs   []digest.Digest `json:"diff_ids,omitempty"`
+	BaseLayer string          `json:"base_layer,omitempty"`
 }
 
 // genericManifest is an interface for parsing, modifying image manifests and related data.

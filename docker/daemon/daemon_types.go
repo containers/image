@@ -22,7 +22,7 @@ type manifestItem struct {
 }
 
 type imageID string
-type diffID string
+type diffID digest.Digest
 
 // Based on github.com/docker/distribution/blobs.go
 type distributionDescriptor struct {
