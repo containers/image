@@ -210,14 +210,14 @@ func copyLayers(manifestUpdates *types.ManifestUpdateOptions, dest types.ImageDe
 	canModifyManifest bool, reportWriter io.Writer) error {
 	type copiedLayer struct {
 		blobInfo types.BlobInfo
-		diffID   string
+		diffID   digest.Digest
 	}
 
 	diffIDsAreNeeded := src.UpdatedImageNeedsLayerDiffIDs(*manifestUpdates)
 
 	srcInfos := src.LayerInfos()
 	destInfos := []types.BlobInfo{}
-	diffIDs := []string{}
+	diffIDs := []digest.Digest{}
 	copiedLayers := map[digest.Digest]copiedLayer{}
 	for _, srcLayer := range srcInfos {
 		cl, ok := copiedLayers[srcLayer.Digest]
@@ -227,7 +227,7 @@ func copyLayers(manifestUpdates *types.ManifestUpdateOptions, dest types.ImageDe
 			if err != nil {
 				return err
 			}
-			cl = copiedLayer{blobInfo: destInfo, diffID: diffID.String()}
+			cl = copiedLayer{blobInfo: destInfo, diffID: diffID}
 			copiedLayers[srcLayer.Digest] = cl
 		}
 		destInfos = append(destInfos, cl.blobInfo)

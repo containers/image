@@ -236,7 +236,7 @@ func validateV1ID(id string) error {
 }
 
 // Based on github.com/docker/docker/distribution/pull_v2.go
-func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.BlobInfo, layerDiffIDs []string) (types.Image, error) {
+func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.BlobInfo, layerDiffIDs []digest.Digest) (types.Image, error) {
 	if len(m.History) == 0 {
 		// What would this even mean?! Anyhow, the rest of the code depends on fsLayers[0] and history[0] existing.
 		return nil, fmt.Errorf("Cannot convert an image with 0 history entries to %s", manifest.DockerV2Schema2MediaType)
@@ -253,7 +253,7 @@ func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.Bl
 
 	rootFS := rootFS{
 		Type:      "layers",
-		DiffIDs:   []string{},
+		DiffIDs:   []digest.Digest{},
 		BaseLayer: "",
 	}
 	var layers []descriptor
