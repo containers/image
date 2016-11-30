@@ -19,6 +19,10 @@ type storageReference struct {
 }
 
 func newReference(transport storageTransport, reference, id string, name reference.Named) *storageReference {
+	// We take a copy of the transport, which contains a pointer to the
+	// store that it used for resolving this reference, so that the
+	// transport that we'll return from Transport() won't be affected by
+	// further calls to the original transport's SetStore() method.
 	return &storageReference{
 		transport: transport,
 		reference: reference,
@@ -60,11 +64,10 @@ func (s storageReference) StringWithinTransport() string {
 	if s.name == nil {
 		return storeSpec + "@" + s.id
 	}
-	reference := verboseName(s.name)
 	if s.id == "" {
-		return storeSpec + reference
+		return storeSpec + s.reference
 	}
-	return storeSpec + reference + "@" + s.id
+	return storeSpec + s.reference + "@" + s.id
 }
 
 func (s storageReference) PolicyConfigurationIdentity() string {
@@ -80,6 +83,10 @@ func (s storageReference) PolicyConfigurationNamespaces() []string {
 	driverlessStoreSpec := "[" + s.transport.store.GetGraphRoot() + "]"
 	namespaces := []string{}
 	if s.name != nil {
+		if s.id != "" {
+			// The reference without the ID is also a valid namespace.
+			namespaces = append(namespaces, storeSpec+s.reference)
+		}
 		components := strings.Split(s.name.FullName(), "/")
 		for len(components) > 0 {
 			namespaces = append(namespaces, storeSpec+strings.Join(components, "/"))

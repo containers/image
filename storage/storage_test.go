@@ -152,11 +152,11 @@ func TestParse(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ParseReference(%q) returned error: %v", strRef, err)
 		}
-		if ref.(*storageReference).id != reference.id {
+		if ref.id != reference.id {
 			t.Fatalf("ParseReference(%q) failed to extract ID", s)
 		}
-		if ref.(*storageReference).reference != reference.reference {
-			t.Fatalf("ParseReference(%q) failed to extract reference (%q!=%q)", s, ref.(*storageReference).reference, reference.reference)
+		if ref.reference != reference.reference {
+			t.Fatalf("ParseReference(%q) failed to extract reference (%q!=%q)", s, ref.reference, reference.reference)
 		}
 	}
 }
@@ -424,7 +424,7 @@ func TestWriteRead(t *testing.T) {
 		}
 		for _, layerInfo := range layerInfos {
 			buf := bytes.Buffer{}
-			layer, size, err := src.GetBlob(layerInfo.Digest)
+			layer, size, err := src.GetBlob(layerInfo)
 			if err != nil {
 				t.Fatalf("Error reading layer %q from %q", layerInfo.Digest, ref.StringWithinTransport())
 			}
@@ -859,7 +859,7 @@ func TestDuplicateBlob(t *testing.T) {
 	}
 	layers := []string{}
 	for _, layerInfo := range img.LayerInfos() {
-		rc, _, layerID, err := source.GetBlobAndLayerID(layerInfo.Digest)
+		rc, _, layerID, err := source.getBlobAndLayerID(layerInfo)
 		if err != nil {
 			t.Fatalf("GetBlobAndLayerID(%q) returned error %v", layerInfo.Digest, err)
 		}

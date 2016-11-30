@@ -11,6 +11,7 @@ import (
 	"github.com/containers/image/types"
 	"github.com/containers/storage/storage"
 	"github.com/docker/distribution/digest"
+	ddigest "github.com/docker/distribution/digest"
 )
 
 var (
@@ -40,7 +41,7 @@ type StoreTransport interface {
 	GetStoreImage(storage.Store, types.ImageReference) (*storage.Image, error)
 	// ParseStoreReference parses a reference, overriding any store
 	// specification that it may contain.
-	ParseStoreReference(store storage.Store, reference string) (types.ImageReference, error)
+	ParseStoreReference(store storage.Store, reference string) (*storageReference, error)
 }
 
 type storageTransport struct {
@@ -63,7 +64,7 @@ func (s *storageTransport) SetStore(store storage.Store) {
 
 // ParseStoreReference takes a name or an ID, tries to figure out which it is
 // relative to the given store, and returns it in a reference object.
-func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (types.ImageReference, error) {
+func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (*storageReference, error) {
 	var name reference.Named
 	var sum digest.Digest
 	var err error
@@ -80,13 +81,13 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	}
 	refInfo := strings.SplitN(ref, "@", 2)
 	if len(refInfo) == 1 {
-		// A name or an ID, doesn't matter which.
-		sum, name, err = reference.ParseIDOrReference(refInfo[0])
+		// A name.
+		name, err = reference.ParseNamed(refInfo[0])
 		if err != nil {
 			return nil, err
 		}
 	} else if len(refInfo) == 2 {
-		// A name and an ID.
+		// An ID, possibly preceded by a name.
 		if refInfo[0] != "" {
 			name, err = reference.ParseNamed(refInfo[0])
 			if err != nil {
@@ -144,7 +145,11 @@ func (s *storageTransport) ParseReference(reference string) (types.ImageReferenc
 	if err != nil {
 		return nil, err
 	}
-	// Check if there's a store location prefix.
+	// Check if there's a store location prefix.  If there is, then it
+	// needs to match a store that was previously initialized using
+	// storage.GetStore(), or that the storage library has out-of-band
+	// knowledge of that allows it to fill in the rest of the information
+	// that it needs.
 	if reference[0] == '[' {
 		close := strings.IndexRune(reference, ']')
 		if close < 1 {
@@ -211,72 +216,57 @@ func (s *storageTransport) GetImage(ref types.ImageReference) (*storage.Image, e
 }
 
 func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
-	// Check if there's a store location prefix.
-	if scope[0] == '[' {
-		close := strings.IndexRune(scope, ']')
-		if close < 1 {
-			return ErrInvalidReference
+	// Check that there's a store location prefix.  Values we're passed are
+	// expected to come from PolicyConfigurationIdentity or
+	// PolicyConfigurationNamespaces, so if there's no store location,
+	// something's wrong.
+	if scope[0] != '[' {
+		return ErrInvalidReference
+	}
+	// Parse the store location prefix.
+	close := strings.IndexRune(scope, ']')
+	if close < 1 {
+		return ErrInvalidReference
+	}
+	storeSpec := scope[1:close]
+	scope = scope[close+1:]
+	storeInfo := strings.SplitN(storeSpec, "@", 2)
+	if len(storeInfo) == 1 && storeInfo[0] != "" {
+		// One component: the graph root.
+		if !filepath.IsAbs(storeInfo[0]) {
+			return ErrPathNotAbsolute
 		}
-		storeSpec := scope[1:close]
-		scope = scope[close+1:]
-		storeInfo := strings.SplitN(storeSpec, "@", 2)
-		if len(storeInfo) == 1 && storeInfo[0] != "" {
-			// One component: the graph root.
-			if !filepath.IsAbs(storeInfo[0]) {
-				return ErrPathNotAbsolute
-			}
-		} else if len(storeInfo) == 2 && storeInfo[0] != "" && storeInfo[1] != "" {
-			// Two components: the driver type and the graph root.
-			if !filepath.IsAbs(storeInfo[1]) {
-				return ErrPathNotAbsolute
-			}
-		} else {
-			// Anything else: store specified in a form we don't
-			// recognize.
-			return ErrInvalidReference
+	} else if len(storeInfo) == 2 && storeInfo[0] != "" && storeInfo[1] != "" {
+		// Two components: the driver type and the graph root.
+		if !filepath.IsAbs(storeInfo[1]) {
+			return ErrPathNotAbsolute
 		}
+	} else {
+		// Anything else: store specified in a form we don't
+		// recognize.
+		return ErrInvalidReference
 	}
 	// That might be all of it, and that's okay.
 	if scope == "" {
 		return nil
 	}
 	// But if there is anything left, it has to be a name, with or without
-	// an ID.
-	if scope[0] == '@' {
-		return ErrInvalidReference
-	}
+	// a tag, with or without an ID, since we don't return namespace values
+	// that are just bare IDs.
 	scopeInfo := strings.SplitN(scope, "@", 2)
 	if len(scopeInfo) == 1 && scopeInfo[0] != "" {
-		id, name, err := reference.ParseIDOrReference(scopeInfo[0])
+		_, err := reference.ParseNamed(scopeInfo[0])
 		if err != nil {
 			return err
-		}
-		if id.Validate() == nil {
-			return ErrInvalidReference
-		}
-		if name == nil { // Coverge: This shouldn't happen, err should be nil if both name and id are missing.
-			return ErrInvalidReference
 		}
 	} else if len(scopeInfo) == 2 && scopeInfo[0] != "" && scopeInfo[1] != "" {
-		id, name, err := reference.ParseIDOrReference(scopeInfo[0])
+		_, err := reference.ParseNamed(scopeInfo[0])
 		if err != nil {
 			return err
 		}
-		if id.Validate() == nil {
-			return ErrInvalidReference
-		}
-		if name == nil { // Coverge: This shouldn't happen, err should be nil if both name and id are missing.
-			return ErrInvalidReference
-		}
-		id, name, err = reference.ParseIDOrReference(scopeInfo[1])
+		_, err = ddigest.ParseDigest("sha256:" + scopeInfo[1])
 		if err != nil {
 			return err
-		}
-		if id.Validate() != nil {
-			return ErrInvalidReference
-		}
-		if name != nil { // Coverge: This shouldn't happen, err should be nil if both name and id are missing.
-			return ErrInvalidReference
 		}
 	} else {
 		return ErrInvalidReference

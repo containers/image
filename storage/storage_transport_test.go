@@ -42,13 +42,11 @@ func TestTransportParseStoreReference(t *testing.T) {
 		{"busybox:notlatest@" + sha256digestHex, "docker.io/library/busybox:notlatest", sha256digestHex},                   // Valid two-component name, explicit tag
 		{"docker.io/library/busybox:notlatest@" + sha256digestHex, "docker.io/library/busybox:notlatest", sha256digestHex}, // Valid two-component name, everything explicit
 	} {
-		ref, err := Transport.ParseStoreReference(Transport.(*storageTransport).store, c.input)
+		storageRef, err := Transport.ParseStoreReference(Transport.(*storageTransport).store, c.input)
 		if c.expectedRef == "" && c.expectedID == "" {
 			assert.Error(t, err, c.input)
 		} else {
 			require.NoError(t, err, c.input)
-			storageRef, ok := ref.(*storageReference)
-			require.True(t, ok, c.input)
 			assert.Equal(t, *(Transport.(*storageTransport)), storageRef.transport, c.input)
 			assert.Equal(t, c.expectedRef, storageRef.reference, c.input)
 			assert.Equal(t, c.expectedID, storageRef.id, c.input)
