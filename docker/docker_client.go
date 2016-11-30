@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -31,11 +32,16 @@ const (
 	dockerCfgObsolete = ".dockercfg"
 
 	baseURL       = "%s://%s/v2/"
+	baseURLV1     = "%s://%s/v1/_ping"
 	tagsURL       = "%s/tags/list"
 	manifestURL   = "%s/manifests/%s"
 	blobsURL      = "%s/blobs/%s"
 	blobUploadURL = "%s/blobs/uploads/"
 )
+
+// ErrV1NotSupported is returned when we're trying to talk to a
+// docker V1 registry.
+var ErrV1NotSupported = errors.New("can't talk to a V1 docker registry")
 
 // dockerClient is configuration for dealing with a single Docker registry.
 type dockerClient struct {
@@ -381,6 +387,32 @@ func (c *dockerClient) ping() (*pingResponse, error) {
 	pr, err := ping("https")
 	if err != nil && c.ctx != nil && c.ctx.DockerInsecureSkipTLSVerify {
 		pr, err = ping("http")
+	}
+	if err != nil {
+		// best effort to understand if we're talking to a V1 registry
+		pingV1 := func(scheme string) bool {
+			url := fmt.Sprintf(baseURLV1, scheme, c.registry)
+			resp, err := c.makeRequestToResolvedURL("GET", url, nil, nil, -1, true)
+			logrus.Debugf("Ping %s err %#v", url, err)
+			if err != nil {
+				return false
+			}
+			defer resp.Body.Close()
+			logrus.Debugf("Ping %s status %d", scheme+"://"+c.registry+"/v1/_ping", resp.StatusCode)
+			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
+				return false
+			}
+			return true
+		}
+		isV1 := pingV1("https")
+		if !isV1 && c.ctx != nil && c.ctx.DockerInsecureSkipTLSVerify {
+			isV1 = pingV1("http")
+		}
+		if isV1 {
+			err = ErrV1NotSupported
+		} else {
+			err = fmt.Errorf("pinging docker registry returned %+v", err)
+		}
 	}
 	return pr, err
 }
