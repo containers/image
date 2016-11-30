@@ -94,6 +94,7 @@ type ImageReference interface {
 type BlobInfo struct {
 	Digest digest.Digest // "" if unknown.
 	Size   int64         // -1 if unknown
+	URLs   []string
 }
 
 // ImageSource is a service, possibly remote (= slow), to download components of a single image.
@@ -116,7 +117,8 @@ type ImageSource interface {
 	// out of a manifest list.
 	GetTargetManifest(digest digest.Digest) ([]byte, string, error)
 	// GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
-	GetBlob(digest digest.Digest) (io.ReadCloser, int64, error)
+	// The Digest field in BlobInfo is guaranteed to be provided; Size may be -1.
+	GetBlob(BlobInfo) (io.ReadCloser, int64, error)
 	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
 	GetSignatures() ([][]byte, error)
 }
@@ -144,6 +146,10 @@ type ImageDestination interface {
 	SupportsSignatures() error
 	// ShouldCompressLayers returns true iff it is desirable to compress layer blobs written to this destination.
 	ShouldCompressLayers() bool
+
+	// AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
+	// uploaded to the image destination, true otherwise.
+	AcceptsForeignLayerURLs() bool
 
 	// PutBlob writes contents of stream and returns data representing the result (with all data filled in).
 	// inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
@@ -210,7 +216,7 @@ type Image interface {
 
 // ManifestUpdateOptions is a way to pass named optional arguments to Image.UpdatedManifest
 type ManifestUpdateOptions struct {
-	LayerInfos       []BlobInfo // Complete BlobInfos (size+digest) which should replace the originals, in order (the root layer first, and then successive layered layers)
+	LayerInfos       []BlobInfo // Complete BlobInfos (size+digest+urls) which should replace the originals, in order (the root layer first, and then successive layered layers)
 	ManifestMIMEType string
 	// The values below are NOT requests to modify the image; they provide optional context which may or may not be used.
 	InformationOnly ManifestUpdateInformation

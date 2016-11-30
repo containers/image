@@ -52,6 +52,12 @@ func (d *ociImageDestination) ShouldCompressLayers() bool {
 	return false
 }
 
+// AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
+// uploaded to the image destination, true otherwise.
+func (d *ociImageDestination) AcceptsForeignLayerURLs() bool {
+	return false
+}
+
 // PutBlob writes contents of stream and returns data representing the result (with all data filled in).
 // inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
 // inputInfo.Size is the expected length of stream, if known.
@@ -121,8 +127,12 @@ func createManifest(m []byte) ([]byte, string, error) {
 			return nil, "", err
 		}
 		om.MediaType = imgspecv1.MediaTypeImageManifest
-		for i := range om.Layers {
-			om.Layers[i].MediaType = imgspecv1.MediaTypeImageLayer
+		for i, l := range om.Layers {
+			if l.MediaType == manifest.DockerV2Schema2ForeignLayerMediaType {
+				om.Layers[i].MediaType = imgspecv1.MediaTypeImageLayerNonDistributable
+			} else {
+				om.Layers[i].MediaType = imgspecv1.MediaTypeImageLayer
+			}
 		}
 		om.Config.MediaType = imgspecv1.MediaTypeImageConfig
 		b, err := json.Marshal(om)

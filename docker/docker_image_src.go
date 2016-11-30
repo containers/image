@@ -130,9 +130,42 @@ func (s *dockerImageSource) ensureManifestIsLoaded() error {
 	return nil
 }
 
+func (s *dockerImageSource) getExternalBlob(urls []string) (io.ReadCloser, int64, error) {
+	var (
+		resp *http.Response
+		err  error
+	)
+	for _, url := range urls {
+		resp, err = s.c.makeRequestToResolvedURL("GET", url, nil, nil, -1, false)
+		if err == nil {
+			if resp.StatusCode != http.StatusOK {
+				err = fmt.Errorf("error fetching external blob from %q: %d", url, resp.StatusCode)
+				logrus.Debug(err)
+				continue
+			}
+		}
+	}
+	if resp.Body != nil && err == nil {
+		return resp.Body, getBlobSize(resp), nil
+	}
+	return nil, 0, err
+}
+
+func getBlobSize(resp *http.Response) int64 {
+	size, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
+	if err != nil {
+		size = -1
+	}
+	return size
+}
+
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
-func (s *dockerImageSource) GetBlob(digest digest.Digest) (io.ReadCloser, int64, error) {
-	url := fmt.Sprintf(blobsURL, s.ref.ref.RemoteName(), digest.String())
+func (s *dockerImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, error) {
+	if len(info.URLs) != 0 {
+		return s.getExternalBlob(info.URLs)
+	}
+
+	url := fmt.Sprintf(blobsURL, s.ref.ref.RemoteName(), info.Digest.String())
 	logrus.Debugf("Downloading %s", url)
 	res, err := s.c.makeRequest("GET", url, nil, nil)
 	if err != nil {
@@ -142,11 +175,7 @@ func (s *dockerImageSource) GetBlob(digest digest.Digest) (io.ReadCloser, int64,
 		// print url also
 		return nil, 0, fmt.Errorf("Invalid status code returned when fetching blob %d", res.StatusCode)
 	}
-	size, err := strconv.ParseInt(res.Header.Get("Content-Length"), 10, 64)
-	if err != nil {
-		size = -1
-	}
-	return res.Body, size, nil
+	return res.Body, getBlobSize(res), nil
 }
 
 func (s *dockerImageSource) GetSignatures() ([][]byte, error) {

@@ -139,13 +139,14 @@ func (c *dockerClient) makeRequest(method, url string, headers map[string][]stri
 	}
 
 	url = fmt.Sprintf(baseURL, c.scheme, c.registry) + url
-	return c.makeRequestToResolvedURL(method, url, headers, stream, -1)
+	return c.makeRequestToResolvedURL(method, url, headers, stream, -1, true)
 }
 
 // makeRequestToResolvedURL creates and executes a http.Request with the specified parameters, adding authentication and TLS options for the Docker client.
 // streamLen, if not -1, specifies the length of the data expected on stream.
 // makeRequest should generally be preferred.
-func (c *dockerClient) makeRequestToResolvedURL(method, url string, headers map[string][]string, stream io.Reader, streamLen int64) (*http.Response, error) {
+// TODO(runcom): too many arguments here, use a struct
+func (c *dockerClient) makeRequestToResolvedURL(method, url string, headers map[string][]string, stream io.Reader, streamLen int64, sendAuth bool) (*http.Response, error) {
 	req, err := http.NewRequest(method, url, stream)
 	if err != nil {
 		return nil, err
@@ -162,7 +163,7 @@ func (c *dockerClient) makeRequestToResolvedURL(method, url string, headers map[
 	if c.ctx != nil && c.ctx.DockerRegistryUserAgent != "" {
 		req.Header.Add("User-Agent", c.ctx.DockerRegistryUserAgent)
 	}
-	if c.wwwAuthenticate != "" {
+	if c.wwwAuthenticate != "" && sendAuth {
 		if err := c.setupRequestAuth(req); err != nil {
 			return nil, err
 		}
@@ -351,7 +352,7 @@ type pingResponse struct {
 func (c *dockerClient) ping() (*pingResponse, error) {
 	ping := func(scheme string) (*pingResponse, error) {
 		url := fmt.Sprintf(baseURL, scheme, c.registry)
-		resp, err := c.makeRequestToResolvedURL("GET", url, nil, nil, -1)
+		resp, err := c.makeRequestToResolvedURL("GET", url, nil, nil, -1, true)
 		logrus.Debugf("Ping %s err %#v", url, err)
 		if err != nil {
 			return nil, err

@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/manifest"
@@ -66,6 +65,12 @@ func (d *dockerImageDestination) ShouldCompressLayers() bool {
 	return true
 }
 
+// AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
+// uploaded to the image destination, true otherwise.
+func (d *dockerImageDestination) AcceptsForeignLayerURLs() bool {
+	return true
+}
+
 // sizeCounter is an io.Writer which only counts the total size of its input.
 type sizeCounter struct{ size int64 }
 
@@ -93,11 +98,7 @@ func (d *dockerImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 		switch res.StatusCode {
 		case http.StatusOK:
 			logrus.Debugf("... already exists, not uploading")
-			blobLength, err := strconv.ParseInt(res.Header.Get("Content-Length"), 10, 64)
-			if err != nil {
-				return types.BlobInfo{}, err
-			}
-			return types.BlobInfo{Digest: inputInfo.Digest, Size: blobLength}, nil
+			return types.BlobInfo{Digest: inputInfo.Digest, Size: getBlobSize(res)}, nil
 		case http.StatusUnauthorized:
 			logrus.Debugf("... not authorized")
 			return types.BlobInfo{}, fmt.Errorf("not authorized to read from destination repository %s", d.ref.ref.RemoteName())
@@ -129,7 +130,7 @@ func (d *dockerImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 	digester := digest.Canonical.New()
 	sizeCounter := &sizeCounter{}
 	tee := io.TeeReader(stream, io.MultiWriter(digester.Hash(), sizeCounter))
-	res, err = d.c.makeRequestToResolvedURL("PATCH", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, tee, inputInfo.Size)
+	res, err = d.c.makeRequestToResolvedURL("PATCH", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, tee, inputInfo.Size, true)
 	if err != nil {
 		logrus.Debugf("Error uploading layer chunked, response %#v", *res)
 		return types.BlobInfo{}, err
@@ -148,7 +149,7 @@ func (d *dockerImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 	// TODO: check inputInfo.Digest == computedDigest https://github.com/containers/image/pull/70#discussion_r77646717
 	locationQuery.Set("digest", computedDigest.String())
 	uploadLocation.RawQuery = locationQuery.Encode()
-	res, err = d.c.makeRequestToResolvedURL("PUT", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, nil, -1)
+	res, err = d.c.makeRequestToResolvedURL("PUT", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, nil, -1, true)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
