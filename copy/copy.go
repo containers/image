@@ -75,10 +75,12 @@ type Options struct {
 	RemoveSignatures bool   // Remove any pre-existing signatures. SignBy will still add a new signature.
 	SignBy           string // If non-empty, asks for a signature to be added during the copy, and specifies a key ID, as accepted by signature.NewGPGSigningMechanism().SignDockerManifest(),
 	ReportWriter     io.Writer
+	SourceCtx        *types.SystemContext
+	DestinationCtx   *types.SystemContext
 }
 
 // Image copies image from srcRef to destRef, using policyContext to validate source image admissibility.
-func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, destRef, srcRef types.ImageReference, options *Options) error {
+func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageReference, options *Options) error {
 	reportWriter := ioutil.Discard
 	if options != nil && options.ReportWriter != nil {
 		reportWriter = options.ReportWriter
@@ -87,14 +89,14 @@ func Image(ctx *types.SystemContext, policyContext *signature.PolicyContext, des
 		fmt.Fprintf(reportWriter, f, a...)
 	}
 
-	dest, err := destRef.NewImageDestination(ctx)
+	dest, err := destRef.NewImageDestination(options.DestinationCtx)
 	if err != nil {
 		return fmt.Errorf("Error initializing destination %s: %v", transports.ImageName(destRef), err)
 	}
 	defer dest.Close()
 	destSupportedManifestMIMETypes := dest.SupportedManifestMIMETypes()
 
-	rawSource, err := srcRef.NewImageSource(ctx, destSupportedManifestMIMETypes)
+	rawSource, err := srcRef.NewImageSource(options.SourceCtx, destSupportedManifestMIMETypes)
 	if err != nil {
 		return fmt.Errorf("Error initializing source %s: %v", transports.ImageName(srcRef), err)
 	}
