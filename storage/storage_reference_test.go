@@ -26,7 +26,11 @@ func TestStorageReferenceDockerReference(t *testing.T) {
 	assert.Equal(t, "busybox:latest", dr.String())
 
 	ref, err = Transport.ParseReference(sha256digestHex)
+	require.Error(t, err)
+
+	ref, err = Transport.ParseReference("@" + sha256digestHex)
 	require.NoError(t, err)
+
 	dr = ref.DockerReference()
 	assert.Nil(t, dr)
 }
@@ -44,11 +48,13 @@ var validReferenceTestCases = []struct {
 		"example.com/myns/ns2/busybox:notlatest", "example.com/myns/ns2/busybox:notlatest",
 		[]string{"example.com/myns/ns2/busybox", "example.com/myns/ns2", "example.com/myns", "example.com"},
 	},
-	{sha256digestHex, "@" + sha256digestHex, []string{}},
+	{
+		"@" + sha256digestHex, "@" + sha256digestHex,
+		[]string{},
+	},
 	{
 		"busybox@" + sha256digestHex, "docker.io/library/busybox:latest@" + sha256digestHex,
-        // FIXME: This should start with "docker.io/library/busybox:latest",
-		[]string{"docker.io/library/busybox", "docker.io/library", "docker.io"},
+		[]string{"docker.io/library/busybox:latest", "docker.io/library/busybox", "docker.io/library", "docker.io"},
 	},
 }
 

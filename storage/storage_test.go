@@ -861,7 +861,7 @@ func TestDuplicateBlob(t *testing.T) {
 	for _, layerInfo := range img.LayerInfos() {
 		rc, _, layerID, err := source.getBlobAndLayerID(layerInfo)
 		if err != nil {
-			t.Fatalf("GetBlobAndLayerID(%q) returned error %v", layerInfo.Digest, err)
+			t.Fatalf("getBlobAndLayerID(%q) returned error %v", layerInfo.Digest, err)
 		}
 		io.Copy(ioutil.Discard, rc)
 		rc.Close()
