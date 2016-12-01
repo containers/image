@@ -374,6 +374,30 @@ func (d *memoryImageDest) PutBlob(stream io.Reader, inputInfo types.BlobInfo) (t
 	d.storedBlobs[inputInfo.Digest] = contents
 	return types.BlobInfo{Digest: inputInfo.Digest, Size: int64(len(contents))}, nil
 }
+func (d *memoryImageDest) HasBlob(inputInfo types.BlobInfo) (bool, int64, error) {
+	if inputInfo.Digest.String() == "" {
+		panic("inputInfo.Digest unexpectedly empty")
+	}
+	if d.storedBlobs == nil {
+		d.storedBlobs = make(map[digest.Digest][]byte)
+	}
+	if contents, ok := d.storedBlobs[inputInfo.Digest]; ok {
+		return true, int64(len(contents)), nil
+	}
+	return false, -1, nil
+}
+func (d *memoryImageDest) ReapplyBlob(inputInfo types.BlobInfo) (types.BlobInfo, error) {
+	if d.storedBlobs == nil {
+		d.storedBlobs = make(map[digest.Digest][]byte)
+	}
+	if inputInfo.Digest.String() == "" {
+		panic("inputInfo.Digest unexpectedly empty")
+	}
+	if contents, ok := d.storedBlobs[inputInfo.Digest]; ok {
+		return types.BlobInfo{Digest: inputInfo.Digest, Size: int64(len(contents))}, nil
+	}
+	panic("called ReapplyBlob for blob we don't have")
+}
 func (d *memoryImageDest) PutManifest([]byte) error {
 	panic("Unexpected call to a mock function")
 }

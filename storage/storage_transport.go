@@ -147,9 +147,8 @@ func (s *storageTransport) ParseReference(reference string) (types.ImageReferenc
 	}
 	// Check if there's a store location prefix.  If there is, then it
 	// needs to match a store that was previously initialized using
-	// storage.GetStore(), or that the storage library has out-of-band
-	// knowledge of that allows it to fill in the rest of the information
-	// that it needs.
+	// storage.GetStore(), or be enough to let the storage library fill out
+	// the rest using knowledge that it has from elsewhere.
 	if reference[0] == '[' {
 		close := strings.IndexRune(reference, ']')
 		if close < 1 {

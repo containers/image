@@ -220,36 +220,30 @@ func copyLayers(manifestUpdates *types.ManifestUpdateOptions, dest types.ImageDe
 	srcInfos := src.LayerInfos()
 	destInfos := []types.BlobInfo{}
 	diffIDs := []digest.Digest{}
-	copiedLayers := map[digest.Digest]copiedLayer{}
+	lc := layerCopier{}
 	for _, srcLayer := range srcInfos {
-		cl, ok := copiedLayers[srcLayer.Digest]
-		if !ok {
-			var (
-				destInfo types.BlobInfo
-				diffID   digest.Digest
-				err      error
-			)
-			if dest.AcceptsForeignLayerURLs() && len(srcLayer.URLs) != 0 {
-				// DiffIDs are, currently, needed only when converting from schema1.
-				// In which case src.LayerInfos will not have URLs because schema1
-				// does not support them.
-				if diffIDsAreNeeded {
-					return errors.New("getting DiffID for foreign layers is unimplemented")
-				}
-				destInfo = srcLayer
-				fmt.Fprintf(reportWriter, "Skipping foreign layer %q copy to %s\n", destInfo.Digest, dest.Reference().Transport().Name())
-			} else {
-				fmt.Fprintf(reportWriter, "Copying blob %s\n", srcLayer.Digest)
-				destInfo, diffID, err = copyLayer(dest, rawSource, srcLayer, diffIDsAreNeeded, canModifyManifest, reportWriter)
-				if err != nil {
-					return err
-				}
+		var (
+			destInfo types.BlobInfo
+			diffID   digest.Digest
+			err      error
+		)
+		if dest.AcceptsForeignLayerURLs() && len(srcLayer.URLs) != 0 {
+			// DiffIDs are, currently, needed only when converting from schema1.
+			// In which case src.LayerInfos will not have URLs because schema1
+			// does not support them.
+			if diffIDsAreNeeded {
+				return errors.New("getting DiffID for foreign layers is unimplemented")
 			}
-			cl = copiedLayer{blobInfo: destInfo, diffID: diffID}
-			copiedLayers[srcLayer.Digest] = cl
+			destInfo = srcLayer
+			fmt.Fprintf(reportWriter, "Skipping foreign layer %q copy to %s\n", destInfo.Digest, dest.Reference().Transport().Name())
+		} else {
+			destInfo, diffID, err = lc.copyLayer(dest, rawSource, srcLayer, diffIDsAreNeeded, canModifyManifest, reportWriter)
+			if err != nil {
+				return err
+			}
 		}
-		destInfos = append(destInfos, cl.blobInfo)
-		diffIDs = append(diffIDs, cl.diffID)
+		destInfos = append(destInfos, destInfo)
+		diffIDs = append(diffIDs, diffID)
 	}
 	manifestUpdates.InformationOnly.LayerInfos = destInfos
 	if diffIDsAreNeeded {
@@ -301,10 +295,43 @@ type diffIDResult struct {
 	err    error
 }
 
+// layerCopier allows copyLayer to cache mappings between srcInfo.Digest values and returned diffIDs, so that it can return diffIDs even when it's taking the ReapplyBlob shortcut.
+type layerCopier struct {
+	cachedDiffIDs map[digest.Digest]digest.Digest
+}
+
 // copyLayer copies a layer with srcInfo (with known Digest and possibly known Size) in src to dest, perhaps compressing it if canCompress,
 // and returns a complete blobInfo of the copied layer, and a value for LayerDiffIDs if diffIDIsNeeded
-func copyLayer(dest types.ImageDestination, src types.ImageSource, srcInfo types.BlobInfo,
+func (lc *layerCopier) copyLayer(dest types.ImageDestination, src types.ImageSource, srcInfo types.BlobInfo,
 	diffIDIsNeeded bool, canCompress bool, reportWriter io.Writer) (types.BlobInfo, digest.Digest, error) {
+	if lc.cachedDiffIDs == nil {
+		lc.cachedDiffIDs = make(map[digest.Digest]digest.Digest)
+	}
+	// Check if we already have a blob with this digest
+	haveBlob, extantBlobSize, err := dest.HasBlob(srcInfo)
+	if err != nil {
+		return types.BlobInfo{}, "", fmt.Errorf("Error checking for blob %s at destination: %v", srcInfo.Digest, err)
+	}
+	// If we already have a cached diffID for this blob, we don't need to compute it
+	diffIDIsNeeded = diffIDIsNeeded && (lc.cachedDiffIDs[srcInfo.Digest] == "")
+	// If we already have the blob, and we don't need to recompute the diffID, then we might be able to avoid reading it again
+	if haveBlob && !diffIDIsNeeded {
+		// Check the blob sizes match, if we were given a size this time
+		if srcInfo.Size != -1 && srcInfo.Size != extantBlobSize {
+			return types.BlobInfo{}, "", fmt.Errorf("Error checking blob size for %s: %v", srcInfo.Digest, err)
+		}
+		srcInfo.Size = extantBlobSize
+		// Tell the image destination that this blob's delta is being applied again.  For some image destinations, this can be faster than using GetBlob/PutBlob
+		blobinfo, err := dest.ReapplyBlob(srcInfo)
+		if err != nil {
+			return types.BlobInfo{}, "", fmt.Errorf("Error reapplying blob %s at destination: %v", srcInfo.Digest, err)
+		}
+		fmt.Fprintf(reportWriter, "Skipping fetch of repeat blob %s\n", srcInfo.Digest)
+		return blobinfo, lc.cachedDiffIDs[srcInfo.Digest], err
+	}
+
+	// Fallback: copy the layer, computing the diffID if we need to do so
+	fmt.Fprintf(reportWriter, "Copying blob %s\n", srcInfo.Digest)
 	srcStream, srcBlobSize, err := src.GetBlob(srcInfo)
 	if err != nil {
 		return types.BlobInfo{}, "", fmt.Errorf("Error reading blob %s: %v", srcInfo.Digest, err)
@@ -316,13 +343,14 @@ func copyLayer(dest types.ImageDestination, src types.ImageSource, srcInfo types
 	if err != nil {
 		return types.BlobInfo{}, "", err
 	}
-	var diffIDResult diffIDResult // = {digest:""}
+	diffIDResult := diffIDResult{digest: lc.cachedDiffIDs[srcInfo.Digest]}
 	if diffIDIsNeeded {
 		diffIDResult = <-diffIDChan
 		if diffIDResult.err != nil {
 			return types.BlobInfo{}, "", fmt.Errorf("Error computing layer DiffID: %v", diffIDResult.err)
 		}
 		logrus.Debugf("Computed DiffID %s for layer %s", diffIDResult.digest, srcInfo.Digest)
+		lc.cachedDiffIDs[srcInfo.Digest] = diffIDResult.digest
 	}
 	return blobInfo, diffIDResult.digest, nil
 }

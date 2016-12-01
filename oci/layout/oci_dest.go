@@ -112,6 +112,28 @@ func (d *ociImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobInfo
 	return types.BlobInfo{Digest: computedDigest, Size: size}, nil
 }
 
+func (d *ociImageDestination) HasBlob(info types.BlobInfo) (bool, int64, error) {
+	if info.Digest == "" {
+		return false, -1, fmt.Errorf(`"Can not check for a blob with unknown digest`)
+	}
+	blobPath, err := d.ref.blobPath(info.Digest)
+	if err != nil {
+		return false, -1, err
+	}
+	finfo, err := os.Stat(blobPath)
+	if err != nil && os.IsNotExist(err) {
+		return false, -1, nil
+	}
+	if err != nil {
+		return false, -1, err
+	}
+	return true, finfo.Size(), nil
+}
+
+func (d *ociImageDestination) ReapplyBlob(info types.BlobInfo) (types.BlobInfo, error) {
+	return info, nil
+}
+
 func createManifest(m []byte) ([]byte, string, error) {
 	om := imgspecv1.Manifest{}
 	mt := manifest.GuessMIMEType(m)

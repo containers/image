@@ -29,7 +29,8 @@ type daemonImageDestination struct {
 	writer          *io.PipeWriter
 	tar             *tar.Writer
 	// Other state
-	committed bool // writer has been closed
+	committed bool             // writer has been closed
+	blobs     []types.BlobInfo // list of already-sent blobs
 }
 
 // newImageDestination returns a types.ImageDestination for the specified image reference.
@@ -173,7 +174,24 @@ func (d *daemonImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 	if err := d.sendFile(inputInfo.Digest.String(), inputInfo.Size, tee); err != nil {
 		return types.BlobInfo{}, err
 	}
+	d.blobs = append(d.blobs, types.BlobInfo{Digest: digester.Digest(), Size: inputInfo.Size})
 	return types.BlobInfo{Digest: digester.Digest(), Size: inputInfo.Size}, nil
+}
+
+func (d *daemonImageDestination) HasBlob(info types.BlobInfo) (bool, int64, error) {
+	if info.Digest == "" {
+		return false, -1, fmt.Errorf(`"Can not check for a blob with unknown digest`)
+	}
+	for _, blob := range d.blobs {
+		if blob.Digest == info.Digest {
+			return true, blob.Size, nil
+		}
+	}
+	return false, -1, nil
+}
+
+func (d *daemonImageDestination) ReapplyBlob(info types.BlobInfo) (types.BlobInfo, error) {
+	return info, nil
 }
 
 func (d *daemonImageDestination) PutManifest(m []byte) error {

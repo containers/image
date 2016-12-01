@@ -20,9 +20,6 @@ import (
 )
 
 var (
-	// ErrInvalidBlobDigest is returned when PutBlob() is given a blob
-	// with a digest-based name that can't be used as a map key.
-	ErrInvalidBlobDigest = errors.New("invalid blob digest")
 	// ErrBlobDigestMismatch is returned when PutBlob() is given a blob
 	// with a digest-based name that doesn't match its contents.
 	ErrBlobDigestMismatch = errors.New("blob digest mismatch")
@@ -42,7 +39,7 @@ type storageImageSource struct {
 	Tag            string                      `json:"tag,omitempty"`
 	Created        time.Time                   `json:"created-time,omitempty"`
 	ID             string                      `json:"id"`
-	BlobList       []ddigest.Digest            `json:"blob-list,omitempty"` // Ordered list of every blob the image has been told to handle
+	BlobList       []types.BlobInfo            `json:"blob-list,omitempty"` // Ordered list of every blob the image has been told to handle
 	Layers         map[ddigest.Digest][]string `json:"layers,omitempty"`    // Map from digests of blobs to lists of layer IDs
 	LayerPosition  map[ddigest.Digest]int      `json:"-"`                   // Where we are in reading a blob's layers
 	SignatureSizes []int                       `json:"signature-sizes"`     // List of sizes of each signature slice
@@ -53,7 +50,7 @@ type storageImageDestination struct {
 	Tag            string                      `json:"tag,omitempty"`
 	Created        time.Time                   `json:"created-time,omitempty"`
 	ID             string                      `json:"id"`
-	BlobList       []ddigest.Digest            `json:"blob-list,omitempty"` // Ordered list of every blob the image has been told to handle
+	BlobList       []types.BlobInfo            `json:"blob-list,omitempty"` // Ordered list of every blob the image has been told to handle
 	Layers         map[ddigest.Digest][]string `json:"layers,omitempty"`    // Map from digests of blobs to lists of layer IDs
 	BlobData       map[ddigest.Digest][]byte   `json:"-"`                   // Map from names of blobs that aren't layers to contents, temporary
 	Manifest       []byte                      `json:"-"`                   // Manifest contents, temporary
@@ -94,7 +91,7 @@ func newImageSource(imageRef storageReference) (*storageImageSource, error) {
 		imageRef:       imageRef,
 		Created:        time.Now(),
 		ID:             img.ID,
-		BlobList:       []ddigest.Digest{},
+		BlobList:       []types.BlobInfo{},
 		Layers:         make(map[ddigest.Digest][]string),
 		LayerPosition:  make(map[ddigest.Digest]int),
 		SignatureSizes: []int{},
@@ -113,7 +110,7 @@ func newImageDestination(imageRef storageReference) (*storageImageDestination, e
 		Tag:            imageRef.reference,
 		Created:        time.Now(),
 		ID:             imageRef.id,
-		BlobList:       []ddigest.Digest{},
+		BlobList:       []types.BlobInfo{},
 		Layers:         make(map[ddigest.Digest][]string),
 		BlobData:       make(map[ddigest.Digest][]byte),
 		SignatureSizes: []int{},
@@ -136,9 +133,9 @@ func (s storageImageDestination) Close() {
 }
 
 func (s storageImageDestination) ShouldCompressLayers() bool {
-	// The storage layer automatically decompresses layers as part of
-	// applying them, so callers shouldn't bother compressing them if
-	// they're not already compressed.
+	// We ultimately have to decompress layers to populate trees on disk,
+	// so callers shouldn't bother compressing them before handing them to
+	// us, if they're not already compressed.
 	return false
 }
 
@@ -178,7 +175,7 @@ func (s *storageImageDestination) PutBlob(stream io.Reader, blobinfo types.BlobI
 		parentLayer := ""
 		if len(s.BlobList) > 0 {
 			for _, blob := range s.BlobList {
-				if layerList, ok := s.Layers[blob]; ok {
+				if layerList, ok := s.Layers[blob.Digest]; ok {
 					parentLayer = layerList[len(layerList)-1]
 				}
 			}
@@ -247,7 +244,7 @@ func (s *storageImageDestination) PutBlob(stream io.Reader, blobinfo types.BlobI
 		// ended up having.  This is a list, in case the same blob is
 		// being applied more than once.
 		s.Layers[digest] = append(s.Layers[digest], id)
-		s.BlobList = append(s.BlobList, digest)
+		s.BlobList = append(s.BlobList, types.BlobInfo{Digest: digest, Size: blobSize})
 		if layer != nil {
 			logrus.Debugf("blob %q imported as a filesystem layer %q", blobinfo.Digest, id)
 		} else {
@@ -280,7 +277,7 @@ func (s *storageImageDestination) PutBlob(stream io.Reader, blobinfo types.BlobI
 		}
 		// Save the blob for when we Commit().
 		s.BlobData[digest] = blob
-		s.BlobList = append(s.BlobList, digest)
+		s.BlobList = append(s.BlobList, types.BlobInfo{Digest: digest, Size: blobSize})
 		logrus.Debugf("blob %q imported as opaque data %q", blobinfo.Digest, digest)
 	}
 	return types.BlobInfo{
@@ -289,12 +286,44 @@ func (s *storageImageDestination) PutBlob(stream io.Reader, blobinfo types.BlobI
 	}, nil
 }
 
+func (s *storageImageDestination) HasBlob(blobinfo types.BlobInfo) (bool, int64, error) {
+	if blobinfo.Digest == "" {
+		return false, -1, fmt.Errorf(`"Can not check for a blob with unknown digest`)
+	}
+	for _, blob := range s.BlobList {
+		if blob.Digest == blobinfo.Digest {
+			return true, blob.Size, nil
+		}
+	}
+	return false, -1, nil
+}
+
+func (s *storageImageDestination) ReapplyBlob(blobinfo types.BlobInfo) (types.BlobInfo, error) {
+	err := ddigest.Digest(blobinfo.Digest).Validate()
+	if err != nil {
+		return types.BlobInfo{}, err
+	}
+	if layerList, ok := s.Layers[blobinfo.Digest]; !ok || len(layerList) < 1 {
+		b, err := s.imageRef.transport.store.GetImageBigData(s.ID, blobinfo.Digest.String())
+		if err != nil {
+			return types.BlobInfo{}, err
+		}
+		return types.BlobInfo{Digest: blobinfo.Digest, Size: int64(len(b))}, nil
+	}
+	layerList := s.Layers[blobinfo.Digest]
+	rc, _, err := diffLayer(s.imageRef.transport.store, layerList[len(layerList)-1], false)
+	if err != nil {
+		return types.BlobInfo{}, err
+	}
+	return s.PutBlob(rc, blobinfo)
+}
+
 func (s *storageImageDestination) Commit() error {
 	// Create the image record.
 	lastLayer := ""
 	if len(s.BlobList) > 0 {
 		for _, blob := range s.BlobList {
-			if layerList, ok := s.Layers[blob]; ok {
+			if layerList, ok := s.Layers[blob.Digest]; ok {
 				lastLayer = layerList[len(layerList)-1]
 			}
 		}
@@ -427,7 +456,7 @@ func (s *storageImageSource) getBlobAndLayerID(info types.BlobInfo) (rc io.ReadC
 			return nil, -1, "", err
 		}
 		r := bytes.NewReader(b)
-		logrus.Debugf("exporting opaque data as blob %q", info.Digest)
+		logrus.Debugf("exporting opaque data as blob %q", info.Digest.String())
 		return ioutil.NopCloser(r), int64(r.Len()), "", nil
 	}
 	// If the blob was "put" more than once, we have multiple layer IDs
@@ -441,12 +470,12 @@ func (s *storageImageSource) getBlobAndLayerID(info types.BlobInfo) (rc io.ReadC
 	}
 	s.LayerPosition[info.Digest] = (position + 1) % len(layerList)
 	logrus.Debugf("exporting filesystem layer %q for blob %q", layerList[position], info.Digest)
-	rc, n, err = s.diffLayer(layerList[position], false)
+	rc, n, err = diffLayer(s.imageRef.transport.store, layerList[position], false)
 	return rc, n, layerList[position], err
 }
 
-func (s *storageImageSource) diffLayer(layerID string, requireSize bool) (rc io.ReadCloser, n int64, err error) {
-	layer, err := s.imageRef.transport.store.GetLayer(layerID)
+func diffLayer(store storage.Store, layerID string, requireSize bool) (rc io.ReadCloser, n int64, err error) {
+	layer, err := store.GetLayer(layerID)
 	if err != nil {
 		return nil, -1, err
 	}
@@ -461,7 +490,7 @@ func (s *storageImageSource) diffLayer(layerID string, requireSize bool) (rc io.
 	}
 	if layerMeta.CompressedSize <= 0 {
 		if requireSize {
-			n, err = s.imageRef.transport.store.DiffSize("", layer.ID)
+			n, err = store.DiffSize("", layer.ID)
 			if err != nil {
 				return nil, -1, err
 			}
@@ -471,7 +500,7 @@ func (s *storageImageSource) diffLayer(layerID string, requireSize bool) (rc io.
 	} else {
 		n = layerMeta.CompressedSize
 	}
-	diff, err := s.imageRef.transport.store.Diff("", layer.ID)
+	diff, err := store.Diff("", layer.ID)
 	if err != nil {
 		return nil, -1, err
 	}

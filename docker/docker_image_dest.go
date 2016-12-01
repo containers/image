@@ -163,6 +163,38 @@ func (d *dockerImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 	return types.BlobInfo{Digest: computedDigest, Size: sizeCounter.size}, nil
 }
 
+func (d *dockerImageDestination) HasBlob(info types.BlobInfo) (bool, int64, error) {
+	if info.Digest == "" {
+		return false, -1, fmt.Errorf(`"Can not check for a blob with unknown digest`)
+	}
+	checkURL := fmt.Sprintf(blobsURL, d.ref.ref.RemoteName(), info.Digest.String())
+
+	logrus.Debugf("Checking %s", checkURL)
+	res, err := d.c.makeRequest("HEAD", checkURL, nil, nil)
+	if err != nil {
+		return false, -1, err
+	}
+	defer res.Body.Close()
+	switch res.StatusCode {
+	case http.StatusOK:
+		logrus.Debugf("... already exists")
+		return true, getBlobSize(res), nil
+	case http.StatusUnauthorized:
+		logrus.Debugf("... not authorized")
+		return false, -1, fmt.Errorf("not authorized to read from destination repository %s", d.ref.ref.RemoteName())
+	case http.StatusNotFound:
+		// noop
+	default:
+		return false, -1, fmt.Errorf("failed to read from destination repository %s: %v", d.ref.ref.RemoteName(), http.StatusText(res.StatusCode))
+	}
+	logrus.Debugf("... failed, status %d, ignoring", res.StatusCode)
+	return false, -1, nil
+}
+
+func (d *dockerImageDestination) ReapplyBlob(info types.BlobInfo) (types.BlobInfo, error) {
+	return info, nil
+}
+
 func (d *dockerImageDestination) PutManifest(m []byte) error {
 	digest, err := manifest.Digest(m)
 	if err != nil {

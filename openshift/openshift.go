@@ -366,6 +366,14 @@ func (d *openshiftImageDestination) PutBlob(stream io.Reader, inputInfo types.Bl
 	return d.docker.PutBlob(stream, inputInfo)
 }
 
+func (d *openshiftImageDestination) HasBlob(info types.BlobInfo) (bool, int64, error) {
+	return d.docker.HasBlob(info)
+}
+
+func (d *openshiftImageDestination) ReapplyBlob(info types.BlobInfo) (types.BlobInfo, error) {
+	return d.docker.ReapplyBlob(info)
+}
+
 func (d *openshiftImageDestination) PutManifest(m []byte) error {
 	manifestDigest, err := manifest.Digest(m)
 	if err != nil {

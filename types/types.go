@@ -158,6 +158,10 @@ type ImageDestination interface {
 	// to any other readers for download using the supplied digest.
 	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 	PutBlob(stream io.Reader, inputInfo BlobInfo) (BlobInfo, error)
+	// HasBlob returns true iff the image destination already contains a blob with the matching digest.  If HasBlob returns true, the size of the blob must also be returned.
+	HasBlob(info BlobInfo) (bool, int64, error)
+	// ReapplyBlob informs the image destination that a blob for which HasBlob previously returned true would have been passed to PutBlob if it had returned false.  If the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree.
+	ReapplyBlob(info BlobInfo) (BlobInfo, error)
 	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 	PutManifest([]byte) error
 	PutSignatures(signatures [][]byte) error
