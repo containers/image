@@ -342,17 +342,10 @@ func getAuth(ctx *types.SystemContext, registry string) (string, string, error) 
 	return "", "", nil
 }
 
-type apiErr struct {
-	Code    string
-	Message string
-	Detail  interface{}
-}
-
 type pingResponse struct {
 	WWWAuthenticate string
 	APIVersion      string
 	scheme          string
-	errors          []apiErr
 }
 
 func (c *dockerClient) ping() (*pingResponse, error) {
@@ -372,16 +365,6 @@ func (c *dockerClient) ping() (*pingResponse, error) {
 		pr.WWWAuthenticate = resp.Header.Get("WWW-Authenticate")
 		pr.APIVersion = resp.Header.Get("Docker-Distribution-Api-Version")
 		pr.scheme = scheme
-		if resp.StatusCode == http.StatusUnauthorized {
-			type APIErrors struct {
-				Errors []apiErr
-			}
-			errs := &APIErrors{}
-			if err := json.NewDecoder(resp.Body).Decode(errs); err != nil {
-				return nil, err
-			}
-			pr.errors = errs.Errors
-		}
 		return pr, nil
 	}
 	pr, err := ping("https")
