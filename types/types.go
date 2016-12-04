@@ -276,4 +276,8 @@ type SystemContext struct {
 	DockerAuthConfig *DockerAuthConfig
 	// if not "", an User-Agent header is added to each request when contacting a registry.
 	DockerRegistryUserAgent string
+	// if true, a V1 ping attempt isn't done to give users a better error. Default is false.
+	// Note that this field is used mainly to integrate containers/image into projectatomic/docker
+	// in order to not break any existing docker's integration tests.
+	DockerDisableV1Ping bool
 }
