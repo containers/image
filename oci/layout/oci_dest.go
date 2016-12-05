@@ -49,7 +49,7 @@ func (d *ociImageDestination) SupportsSignatures() error {
 
 // ShouldCompressLayers returns true iff it is desirable to compress layer blobs written to this destination.
 func (d *ociImageDestination) ShouldCompressLayers() bool {
-	return false
+	return true
 }
 
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
