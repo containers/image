@@ -86,9 +86,9 @@ func manifestInstanceFromBlob(src types.ImageSource, manblob []byte, mt string) 
 	// need to happen within the ImageSource.
 	case manifest.DockerV2Schema1MediaType, manifest.DockerV2Schema1SignedMediaType, "application/json":
 		return manifestSchema1FromManifest(manblob)
-	case manifest.DockerV2Schema2MediaType, imgspecv1.MediaTypeImageManifest:
-		// FIXME: OCI v1 is compatible with Docker Schema2, "docker_schema2.go" is good enough for reading images, but this will
-		// need to be modified for write support due to differing MIME types.
+	case imgspecv1.MediaTypeImageManifest:
+		return manifestOCI1FromManifest(src, manblob)
+	case manifest.DockerV2Schema2MediaType:
 		return manifestSchema2FromManifest(src, manblob)
 	case manifest.DockerV2ListMediaType:
 		return manifestSchema2FromManifestList(src, manblob)

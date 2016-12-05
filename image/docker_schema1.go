@@ -292,7 +292,7 @@ func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.Bl
 		Digest:    digest.FromBytes(configJSON),
 	}
 
-	m2 := manifestSchema2FromComponents(configDescriptor, configJSON, layers)
+	m2 := manifestSchema2FromComponents(configDescriptor, nil, configJSON, layers)
 	return memoryImageFromManifest(m2), nil
 }
 

@@ -52,9 +52,9 @@ func manifestSchema2FromManifest(src types.ImageSource, manifest []byte) (generi
 }
 
 // manifestSchema2FromComponents builds a new manifestSchema2 from the supplied data:
-func manifestSchema2FromComponents(config descriptor, configBlob []byte, layers []descriptor) genericManifest {
+func manifestSchema2FromComponents(config descriptor, src types.ImageSource, configBlob []byte, layers []descriptor) genericManifest {
 	return &manifestSchema2{
-		src:               nil,
+		src:               src,
 		configBlob:        configBlob,
 		SchemaVersion:     2,
 		MediaType:         manifest.DockerV2Schema2MediaType,
