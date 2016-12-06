@@ -372,6 +372,10 @@ func (c *dockerClient) ping() (*pingResponse, error) {
 		pr, err = ping("http")
 	}
 	if err != nil {
+		err = fmt.Errorf("pinging docker registry returned %+v", err)
+		if c.ctx.DockerDisableV1Ping {
+			return nil, err
+		}
 		// best effort to understand if we're talking to a V1 registry
 		pingV1 := func(scheme string) bool {
 			url := fmt.Sprintf(baseURLV1, scheme, c.registry)
@@ -393,8 +397,6 @@ func (c *dockerClient) ping() (*pingResponse, error) {
 		}
 		if isV1 {
 			err = ErrV1NotSupported
-		} else {
-			err = fmt.Errorf("pinging docker registry returned %+v", err)
 		}
 	}
 	return pr, err
