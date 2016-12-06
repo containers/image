@@ -20,6 +20,7 @@ import (
 	"github.com/docker/docker/pkg/homedir"
 	"github.com/docker/go-connections/sockets"
 	"github.com/docker/go-connections/tlsconfig"
+	errorspkg "github.com/pkg/errors"
 )
 
 const (
@@ -394,7 +395,7 @@ func (c *dockerClient) ping() (*pingResponse, error) {
 		if isV1 {
 			err = ErrV1NotSupported
 		} else {
-			err = fmt.Errorf("pinging docker registry returned %+v", err)
+			err = errorspkg.Wrap(err, "pinging docker registry returned")
 		}
 	}
 	return pr, err
