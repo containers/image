@@ -167,11 +167,9 @@ func (s *storageImageDestination) PutBlob(stream io.Reader, blobinfo types.BlobI
 		// image, we assume that the most recently added layer is its
 		// parent.
 		parentLayer := ""
-		if len(s.BlobList) > 0 {
-			for _, blob := range s.BlobList {
-				if layerList, ok := s.Layers[blob.Digest]; ok {
-					parentLayer = layerList[len(layerList)-1]
-				}
+		for _, blob := range s.BlobList {
+			if layerList, ok := s.Layers[blob.Digest]; ok {
+				parentLayer = layerList[len(layerList)-1]
 			}
 		}
 		// If we have an expected content digest, generate a layer ID
@@ -293,7 +291,7 @@ func (s *storageImageDestination) HasBlob(blobinfo types.BlobInfo) (bool, int64,
 }
 
 func (s *storageImageDestination) ReapplyBlob(blobinfo types.BlobInfo) (types.BlobInfo, error) {
-	err := ddigest.Digest(blobinfo.Digest).Validate()
+	err := blobinfo.Digest.Validate()
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
@@ -315,11 +313,9 @@ func (s *storageImageDestination) ReapplyBlob(blobinfo types.BlobInfo) (types.Bl
 func (s *storageImageDestination) Commit() error {
 	// Create the image record.
 	lastLayer := ""
-	if len(s.BlobList) > 0 {
-		for _, blob := range s.BlobList {
-			if layerList, ok := s.Layers[blob.Digest]; ok {
-				lastLayer = layerList[len(layerList)-1]
-			}
+	for _, blob := range s.BlobList {
+		if layerList, ok := s.Layers[blob.Digest]; ok {
+			lastLayer = layerList[len(layerList)-1]
 		}
 	}
 	img, err := s.imageRef.transport.store.CreateImage(s.ID, nil, lastLayer, "", nil)
@@ -356,24 +352,20 @@ func (s *storageImageDestination) Commit() error {
 		delete(s.BlobData, key)
 	}
 	// Save the manifest, if we have one.
-	if len(s.Manifest) > 0 {
-		if err := s.imageRef.transport.store.SetImageBigData(s.ID, "manifest", s.Manifest); err != nil {
-			if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
-				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
-			}
-			logrus.Debugf("error saving manifest for image %q: %v", img.ID, err)
-			return err
+	if err := s.imageRef.transport.store.SetImageBigData(s.ID, "manifest", s.Manifest); err != nil {
+		if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
+			logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
 		}
+		logrus.Debugf("error saving manifest for image %q: %v", img.ID, err)
+		return err
 	}
 	// Save the signatures, if we have any.
-	if len(s.Signatures) > 0 {
-		if err := s.imageRef.transport.store.SetImageBigData(s.ID, "signatures", s.Signatures); err != nil {
-			if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
-				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
-			}
-			logrus.Debugf("error saving signatures for image %q: %v", img.ID, err)
-			return err
+	if err := s.imageRef.transport.store.SetImageBigData(s.ID, "signatures", s.Signatures); err != nil {
+		if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
+			logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
 		}
+		logrus.Debugf("error saving signatures for image %q: %v", img.ID, err)
+		return err
 	}
 	// Save our metadata.
 	metadata, err := json.Marshal(s)
@@ -440,7 +432,7 @@ func (s *storageImageSource) GetBlob(info types.BlobInfo) (rc io.ReadCloser, n i
 }
 
 func (s *storageImageSource) getBlobAndLayerID(info types.BlobInfo) (rc io.ReadCloser, n int64, layerID string, err error) {
-	err = ddigest.Digest(info.Digest).Validate()
+	err = info.Digest.Validate()
 	if err != nil {
 		return nil, -1, "", err
 	}
