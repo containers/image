@@ -41,8 +41,6 @@ func (err InvalidPolicyFormatError) Error() string {
 	return string(err)
 }
 
-// FIXME: NewDefaultPolicy, from default file (or environment if trusted?)
-
 // DefaultPolicy returns the default policy of the system.
 // Most applications should be using this method to get the policy configured
 // by the system administrator.
