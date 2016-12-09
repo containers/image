@@ -127,6 +127,7 @@ type ImageSource interface {
 //
 // There is a specific required order for some of the calls:
 // PutBlob on the various blobs, if any, MUST be called before PutManifest (manifest references blobs, which may be created or compressed only at push time)
+// ReapplyBlob, if used, MUST only be called if HasBlob returned true for the same blob digest
 // PutSignatures, if called, MUST be called after PutManifest (signatures reference manifest contents)
 // Finally, Commit MUST be called if the caller wants the image, as formed by the components saved above, to persist.
 //
@@ -158,9 +159,9 @@ type ImageDestination interface {
 	// to any other readers for download using the supplied digest.
 	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 	PutBlob(stream io.Reader, inputInfo BlobInfo) (BlobInfo, error)
-	// HasBlob returns true iff the image destination already contains a blob with the matching digest.  If HasBlob returns true, the size of the blob must also be returned.
+	// HasBlob returns true iff the image destination already contains a blob with the matching digest which can be reapplied using ReapplyBlob.  Unlike PutBlob, the digest can not be empty.  If HasBlob returns true, the size of the blob must also be returned.
 	HasBlob(info BlobInfo) (bool, int64, error)
-	// ReapplyBlob informs the image destination that a blob for which HasBlob previously returned true would have been passed to PutBlob if it had returned false.  If the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree.
+	// ReapplyBlob informs the image destination that a blob for which HasBlob previously returned true would have been passed to PutBlob if it had returned false.  Like HasBlob and unlike PutBlob, the digest can not be empty.  If the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree.
 	ReapplyBlob(info BlobInfo) (BlobInfo, error)
 	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 	PutManifest([]byte) error
