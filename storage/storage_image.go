@@ -303,7 +303,7 @@ func (s *storageImageDestination) ReapplyBlob(blobinfo types.BlobInfo) (types.Bl
 		return types.BlobInfo{Digest: blobinfo.Digest, Size: int64(len(b))}, nil
 	}
 	layerList := s.Layers[blobinfo.Digest]
-	rc, _, err := diffLayer(s.imageRef.transport.store, layerList[len(layerList)-1], false)
+	rc, _, err := diffLayer(s.imageRef.transport.store, layerList[len(layerList)-1])
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
@@ -456,11 +456,11 @@ func (s *storageImageSource) getBlobAndLayerID(info types.BlobInfo) (rc io.ReadC
 	}
 	s.LayerPosition[info.Digest] = (position + 1) % len(layerList)
 	logrus.Debugf("exporting filesystem layer %q for blob %q", layerList[position], info.Digest)
-	rc, n, err = diffLayer(s.imageRef.transport.store, layerList[position], false)
+	rc, n, err = diffLayer(s.imageRef.transport.store, layerList[position])
 	return rc, n, layerList[position], err
 }
 
-func diffLayer(store storage.Store, layerID string, requireSize bool) (rc io.ReadCloser, n int64, err error) {
+func diffLayer(store storage.Store, layerID string) (rc io.ReadCloser, n int64, err error) {
 	layer, err := store.GetLayer(layerID)
 	if err != nil {
 		return nil, -1, err
@@ -475,14 +475,7 @@ func diffLayer(store storage.Store, layerID string, requireSize bool) (rc io.Rea
 		}
 	}
 	if layerMeta.CompressedSize <= 0 {
-		if requireSize {
-			n, err = store.DiffSize("", layer.ID)
-			if err != nil {
-				return nil, -1, err
-			}
-		} else {
-			n = -1
-		}
+		n = -1
 	} else {
 		n = layerMeta.CompressedSize
 	}
