@@ -29,8 +29,8 @@ type daemonImageDestination struct {
 	writer          *io.PipeWriter
 	tar             *tar.Writer
 	// Other state
-	committed bool             // writer has been closed
-	blobs     []types.BlobInfo // list of already-sent blobs
+	committed bool                             // writer has been closed
+	blobs     map[digest.Digest]types.BlobInfo // list of already-sent blobs
 }
 
 // newImageDestination returns a types.ImageDestination for the specified image reference.
@@ -63,6 +63,7 @@ func newImageDestination(systemCtx *types.SystemContext, ref daemonReference) (t
 		writer:          writer,
 		tar:             tar.NewWriter(writer),
 		committed:       false,
+		blobs:           make(map[digest.Digest]types.BlobInfo),
 	}, nil
 }
 
@@ -143,8 +144,8 @@ func (d *daemonImageDestination) AcceptsForeignLayerURLs() bool {
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (d *daemonImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobInfo) (types.BlobInfo, error) {
-	if inputInfo.Digest.String() == "" {
-		return types.BlobInfo{}, fmt.Errorf(`"Can not stream a blob with unknown digest to "docker-daemon:"`)
+	if ok, size, err := d.HasBlob(inputInfo); err == nil && ok {
+		return types.BlobInfo{Digest: inputInfo.Digest, Size: size}, nil
 	}
 
 	if inputInfo.Size == -1 { // Ouch, we need to stream the blob into a temporary file just to determine the size.
@@ -174,7 +175,7 @@ func (d *daemonImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 	if err := d.sendFile(inputInfo.Digest.String(), inputInfo.Size, tee); err != nil {
 		return types.BlobInfo{}, err
 	}
-	d.blobs = append(d.blobs, types.BlobInfo{Digest: digester.Digest(), Size: inputInfo.Size})
+	d.blobs[inputInfo.Digest] = types.BlobInfo{Digest: digester.Digest(), Size: inputInfo.Size}
 	return types.BlobInfo{Digest: digester.Digest(), Size: inputInfo.Size}, nil
 }
 
@@ -182,10 +183,8 @@ func (d *daemonImageDestination) HasBlob(info types.BlobInfo) (bool, int64, erro
 	if info.Digest == "" {
 		return false, -1, fmt.Errorf(`"Can not check for a blob with unknown digest`)
 	}
-	for _, blob := range d.blobs {
-		if blob.Digest == info.Digest {
-			return true, blob.Size, nil
-		}
+	if blob, ok := d.blobs[info.Digest]; ok {
+		return true, blob.Size, nil
 	}
 	return false, -1, nil
 }
