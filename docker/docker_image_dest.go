@@ -209,8 +209,8 @@ func (d *dockerImageDestination) PutSignatures(signatures [][]byte) error {
 		return fmt.Errorf("Pushing signatures to a Docker Registry is not supported, and there is no applicable signature storage configured")
 	}
 
-	// FIXME: This assumption that signatures are stored after the manifest rather breaks the model.
 	if d.manifestDigest.String() == "" {
+		// This shouldn’t happen, ImageDestination users are required to call PutManifest before PutSignatures
 		return fmt.Errorf("Unknown manifest digest, can't add signatures")
 	}
 
