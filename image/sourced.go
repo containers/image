@@ -71,6 +71,11 @@ func FromUnparsedImage(unparsed *UnparsedImage) (types.Image, error) {
 	}, nil
 }
 
+// Size returns the size of the image as stored, if it's known, or -1 if it isn't.
+func (i *sourcedImage) Size() (int64, error) {
+	return -1, nil
+}
+
 // Manifest overrides the UnparsedImage.Manifest to always use the fields which we have already fetched.
 func (i *sourcedImage) Manifest() ([]byte, string, error) {
 	return i.manifestBlob, i.manifestMIMEType, nil

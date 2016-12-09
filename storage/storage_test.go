@@ -739,8 +739,8 @@ func TestSize(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewImage(%q) returned error %v", ref.StringWithinTransport(), err)
 	}
-	usize, err := img.(Sizer).Size()
-	if usize == -1 {
+	usize, err := img.Size()
+	if usize == -1 || err != nil {
 		t.Fatalf("Error calculating image size: %v", err)
 	}
 	if int(usize) != layerSize*2+len(manifest) {

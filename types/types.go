@@ -217,6 +217,9 @@ type Image interface {
 	UpdatedImage(options ManifestUpdateOptions) (Image, error)
 	// IsMultiImage returns true if the image's manifest is a list of images, false otherwise.
 	IsMultiImage() bool
+	// Size returns an approximation of the amount of disk space which is consumed by the image in its current
+	// location.  If the size is not known, -1 will be returned.
+	Size() (int64, error)
 }
 
 // ManifestUpdateOptions is a way to pass named optional arguments to Image.UpdatedManifest

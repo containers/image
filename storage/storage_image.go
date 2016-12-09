@@ -69,12 +69,6 @@ type storageImage struct {
 	size int64
 }
 
-// A Sizer is an object which can return the size of its contents, or -1 if it
-// knows how but couldn't find the answer.
-type Sizer interface {
-	Size() (int64, error)
-}
-
 // newImageSource sets us up to read out an image, which needs to already exist.
 func newImageSource(imageRef storageReference) (*storageImageSource, error) {
 	id := imageRef.resolveID()
