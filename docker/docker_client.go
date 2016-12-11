@@ -428,7 +428,7 @@ func (c *dockerClient) ping() (*pingResponse, error) {
 	}
 	if err != nil {
 		err = fmt.Errorf("pinging docker registry returned %+v", err)
-		if c.ctx.DockerDisableV1Ping {
+		if c.ctx != nil && c.ctx.DockerDisableV1Ping {
 			return nil, err
 		}
 		// best effort to understand if we're talking to a V1 registry
