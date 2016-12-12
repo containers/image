@@ -25,9 +25,6 @@ func TestStorageReferenceDockerReference(t *testing.T) {
 	require.NotNil(t, dr)
 	assert.Equal(t, "busybox:latest", dr.String())
 
-	ref, err = Transport.ParseReference(sha256digestHex)
-	require.Error(t, err)
-
 	ref, err = Transport.ParseReference("@" + sha256digestHex)
 	require.NoError(t, err)
 

@@ -139,7 +139,9 @@ func (s *storageTransport) GetStore() (storage.Store, error) {
 // ParseReference takes a name and/or an ID ("_name_"/"@_id_"/"_name_@_id_"),
 // possibly prefixed with a store specifier in the form "[_graphroot_]" or
 // "[_driver_@_graphroot_]", tries to figure out which it is, and returns it in
-// a reference object.
+// a reference object.  If the _graphroot_ is a location other than the default,
+// it needs to have been previously opened using storage.GetStore(), so that it
+// can figure out which run root goes with the graph root.
 func (s *storageTransport) ParseReference(reference string) (types.ImageReference, error) {
 	store, err := s.GetStore()
 	if err != nil {
