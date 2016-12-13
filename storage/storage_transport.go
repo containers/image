@@ -73,11 +73,11 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	}
 	if ref[0] == '[' {
 		// Ignore the store specifier.
-		close := strings.IndexRune(ref, ']')
-		if close < 1 {
+		closeIndex := strings.IndexRune(ref, ']')
+		if closeIndex < 1 {
 			return nil, ErrInvalidReference
 		}
-		ref = ref[close+1:]
+		ref = ref[closeIndex+1:]
 	}
 	refInfo := strings.SplitN(ref, "@", 2)
 	if len(refInfo) == 1 {
@@ -152,12 +152,12 @@ func (s *storageTransport) ParseReference(reference string) (types.ImageReferenc
 	// storage.GetStore(), or be enough to let the storage library fill out
 	// the rest using knowledge that it has from elsewhere.
 	if reference[0] == '[' {
-		close := strings.IndexRune(reference, ']')
-		if close < 1 {
+		closeIndex := strings.IndexRune(reference, ']')
+		if closeIndex < 1 {
 			return nil, ErrInvalidReference
 		}
-		storeSpec := reference[1:close]
-		reference = reference[close+1:]
+		storeSpec := reference[1:closeIndex]
+		reference = reference[closeIndex+1:]
 		storeInfo := strings.SplitN(storeSpec, "@", 2)
 		if len(storeInfo) == 1 && storeInfo[0] != "" {
 			// One component: the graph root.
@@ -225,12 +225,12 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 		return ErrInvalidReference
 	}
 	// Parse the store location prefix.
-	close := strings.IndexRune(scope, ']')
-	if close < 1 {
+	closeIndex := strings.IndexRune(scope, ']')
+	if closeIndex < 1 {
 		return ErrInvalidReference
 	}
-	storeSpec := scope[1:close]
-	scope = scope[close+1:]
+	storeSpec := scope[1:closeIndex]
+	scope = scope[closeIndex+1:]
 	storeInfo := strings.SplitN(storeSpec, "@", 2)
 	if len(storeInfo) == 1 && storeInfo[0] != "" {
 		// One component: the graph root.
