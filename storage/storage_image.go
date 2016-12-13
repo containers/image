@@ -81,7 +81,7 @@ func newImageSource(imageRef storageReference) (*storageImageSource, error) {
 		logrus.Errorf("error reading image %q: %v", id, err)
 		return nil, err
 	}
-	image := storageImageSource{
+	image := &storageImageSource{
 		imageRef:       imageRef,
 		Created:        time.Now(),
 		ID:             img.ID,
@@ -90,16 +90,16 @@ func newImageSource(imageRef storageReference) (*storageImageSource, error) {
 		LayerPosition:  make(map[ddigest.Digest]int),
 		SignatureSizes: []int{},
 	}
-	if err := json.Unmarshal([]byte(img.Metadata), &image); err != nil {
+	if err := json.Unmarshal([]byte(img.Metadata), image); err != nil {
 		logrus.Errorf("error decoding metadata for source image: %v", err)
 		return nil, err
 	}
-	return &image, nil
+	return image, nil
 }
 
 // newImageDestination sets us up to write a new image.
 func newImageDestination(imageRef storageReference) (*storageImageDestination, error) {
-	image := storageImageDestination{
+	image := &storageImageDestination{
 		imageRef:       imageRef,
 		Tag:            imageRef.reference,
 		Created:        time.Now(),
@@ -109,7 +109,7 @@ func newImageDestination(imageRef storageReference) (*storageImageDestination, e
 		BlobData:       make(map[ddigest.Digest][]byte),
 		SignatureSizes: []int{},
 	}
-	return &image, nil
+	return image, nil
 }
 
 func (s storageImageSource) Reference() types.ImageReference {
@@ -203,7 +203,7 @@ func (s *storageImageDestination) PutBlob(stream io.Reader, blobinfo types.BlobI
 				CompressedSize: counter.Count,
 				Size:           uncompressedSize,
 			}
-			if metadata, err := json.Marshal(layerMeta); len(metadata) != 0 && err == nil {
+			if metadata, err := json.Marshal(&layerMeta); len(metadata) != 0 && err == nil {
 				s.imageRef.transport.store.SetMetadata(layer.ID, string(metadata))
 			}
 			// Hang on to the new layer's ID.
