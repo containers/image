@@ -318,7 +318,7 @@ type diffIDResult struct {
 func (ic *imageCopier) copyLayer(srcInfo types.BlobInfo) (types.BlobInfo, digest.Digest, error) {
 	// Check if we already have a blob with this digest
 	haveBlob, extantBlobSize, err := ic.dest.HasBlob(srcInfo)
-	if err != nil {
+	if err != nil && err != types.ErrBlobNotFound {
 		return types.BlobInfo{}, "", fmt.Errorf("Error checking for blob %s at destination: %v", srcInfo.Digest, err)
 	}
 	// If we already have a cached diffID for this blob, we don't need to compute it

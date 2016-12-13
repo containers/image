@@ -186,7 +186,7 @@ func (d *daemonImageDestination) HasBlob(info types.BlobInfo) (bool, int64, erro
 	if blob, ok := d.blobs[info.Digest]; ok {
 		return true, blob.Size, nil
 	}
-	return false, -1, nil
+	return false, -1, types.ErrBlobNotFound
 }
 
 func (d *daemonImageDestination) ReapplyBlob(info types.BlobInfo) (types.BlobInfo, error) {

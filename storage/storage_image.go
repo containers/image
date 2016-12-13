@@ -287,7 +287,7 @@ func (s *storageImageDestination) HasBlob(blobinfo types.BlobInfo) (bool, int64,
 			return true, blob.Size, nil
 		}
 	}
-	return false, -1, nil
+	return false, -1, types.ErrBlobNotFound
 }
 
 func (s *storageImageDestination) ReapplyBlob(blobinfo types.BlobInfo) (types.BlobInfo, error) {

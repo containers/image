@@ -122,7 +122,7 @@ func (d *ociImageDestination) HasBlob(info types.BlobInfo) (bool, int64, error) 
 	}
 	finfo, err := os.Stat(blobPath)
 	if err != nil && os.IsNotExist(err) {
-		return false, -1, nil
+		return false, -1, types.ErrBlobNotFound
 	}
 	if err != nil {
 		return false, -1, err
