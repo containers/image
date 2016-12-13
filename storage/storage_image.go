@@ -78,8 +78,7 @@ func newImageSource(imageRef storageReference) (*storageImageSource, error) {
 	}
 	img, err := imageRef.transport.store.GetImage(id)
 	if err != nil {
-		logrus.Errorf("error reading image %q: %v", id, err)
-		return nil, err
+		return nil, fmt.Errorf("error reading image %q: %v", id, err)
 	}
 	image := &storageImageSource{
 		imageRef:       imageRef,
@@ -91,8 +90,7 @@ func newImageSource(imageRef storageReference) (*storageImageSource, error) {
 		SignatureSizes: []int{},
 	}
 	if err := json.Unmarshal([]byte(img.Metadata), image); err != nil {
-		logrus.Errorf("error decoding metadata for source image: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("error decoding metadata for source image: %v", err)
 	}
 	return image, nil
 }
@@ -470,8 +468,7 @@ func diffLayer(store storage.Store, layerID string) (rc io.ReadCloser, n int64, 
 	}
 	if layer.Metadata != "" {
 		if err := json.Unmarshal([]byte(layer.Metadata), &layerMeta); err != nil {
-			logrus.Errorf("error decoding metadata for layer %q: %v", layerID, err)
-			return nil, -1, err
+			return nil, -1, fmt.Errorf("error decoding metadata for layer %q: %v", layerID, err)
 		}
 	}
 	if layerMeta.CompressedSize <= 0 {
@@ -516,14 +513,12 @@ func (s *storageImageSource) getSize() (int64, error) {
 	var sum int64
 	names, err := s.imageRef.transport.store.ListImageBigData(s.imageRef.id)
 	if err != nil {
-		logrus.Errorf("error reading image %q: %v", s.imageRef.id, err)
-		return -1, err
+		return -1, fmt.Errorf("error reading image %q: %v", s.imageRef.id, err)
 	}
 	for _, name := range names {
 		bigSize, err := s.imageRef.transport.store.GetImageBigDataSize(s.imageRef.id, name)
 		if err != nil {
-			logrus.Errorf("error reading data blob size %q for %q: %v", name, s.imageRef.id, err)
-			return -1, err
+			return -1, fmt.Errorf("error reading data blob size %q for %q: %v", name, s.imageRef.id, err)
 		}
 		sum += bigSize
 	}
@@ -541,13 +536,11 @@ func (s *storageImageSource) getSize() (int64, error) {
 			}
 			if layer.Metadata != "" {
 				if err := json.Unmarshal([]byte(layer.Metadata), &layerMeta); err != nil {
-					logrus.Errorf("error decoding metadata for layer %q: %v", layerID, err)
-					return -1, err
+					return -1, fmt.Errorf("error decoding metadata for layer %q: %v", layerID, err)
 				}
 			}
 			if layerMeta.Size < 0 {
-				logrus.Errorf("size for layer %q is unknown, failing getSize()", layerID)
-				return -1, nil
+				return -1, fmt.Errorf("size for layer %q is unknown, failing getSize()", layerID)
 			}
 			sum += layerMeta.Size
 		}
