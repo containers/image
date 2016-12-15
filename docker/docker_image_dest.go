@@ -186,7 +186,7 @@ func (d *dockerImageDestination) HasBlob(info types.BlobInfo) (bool, int64, erro
 		logrus.Debugf("... not present")
 		return false, -1, types.ErrBlobNotFound
 	default:
-		return false, -1, fmt.Errorf("failed to read from destination repository %s: %v", d.ref.ref.RemoteName(), http.StatusText(res.StatusCode))
+		logrus.Errorf("failed to read from destination repository %s: %v", d.ref.ref.RemoteName(), http.StatusText(res.StatusCode))
 	}
 	logrus.Debugf("... failed, status %d, ignoring", res.StatusCode)
 	return false, -1, types.ErrBlobNotFound
