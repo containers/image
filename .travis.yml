@@ -13,4 +13,6 @@
   addons:
     apt:
       packages:
+        - btrfs-tools
+        - libdevmapper-dev
         - libgpgme11-dev

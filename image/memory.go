@@ -35,6 +35,15 @@ func (i *memoryImage) Reference() types.ImageReference {
 func (i *memoryImage) Close() {
 }
 
+// Size returns the size of the image as stored, if known, or -1 if not.
+func (i *memoryImage) Size() (int64, error) {
+	s, err := i.serialize()
+	if err != nil {
+		return -1, err
+	}
+	return int64(len(s)), nil
+}
+
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
 func (i *memoryImage) Manifest() ([]byte, string, error) {
 	if i.serializedManifest == nil {

@@ -1,6 +1,7 @@
 package types
 
 import (
+	"errors"
 	"io"
 	"time"
 
@@ -127,6 +128,7 @@ type ImageSource interface {
 //
 // There is a specific required order for some of the calls:
 // PutBlob on the various blobs, if any, MUST be called before PutManifest (manifest references blobs, which may be created or compressed only at push time)
+// ReapplyBlob, if used, MUST only be called if HasBlob returned true for the same blob digest
 // PutSignatures, if called, MUST be called after PutManifest (signatures reference manifest contents)
 // Finally, Commit MUST be called if the caller wants the image, as formed by the components saved above, to persist.
 //
@@ -158,6 +160,10 @@ type ImageDestination interface {
 	// to any other readers for download using the supplied digest.
 	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 	PutBlob(stream io.Reader, inputInfo BlobInfo) (BlobInfo, error)
+	// HasBlob returns true iff the image destination already contains a blob with the matching digest which can be reapplied using ReapplyBlob.  Unlike PutBlob, the digest can not be empty.  If HasBlob returns true, the size of the blob must also be returned.  A false result will often be accompanied by an ErrBlobNotFound error.
+	HasBlob(info BlobInfo) (bool, int64, error)
+	// ReapplyBlob informs the image destination that a blob for which HasBlob previously returned true would have been passed to PutBlob if it had returned false.  Like HasBlob and unlike PutBlob, the digest can not be empty.  If the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree.
+	ReapplyBlob(info BlobInfo) (BlobInfo, error)
 	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 	PutManifest([]byte) error
 	PutSignatures(signatures [][]byte) error
@@ -212,6 +218,9 @@ type Image interface {
 	UpdatedImage(options ManifestUpdateOptions) (Image, error)
 	// IsMultiImage returns true if the image's manifest is a list of images, false otherwise.
 	IsMultiImage() bool
+	// Size returns an approximation of the amount of disk space which is consumed by the image in its current
+	// location.  If the size is not known, -1 will be returned.
+	Size() (int64, error)
 }
 
 // ManifestUpdateOptions is a way to pass named optional arguments to Image.UpdatedManifest
@@ -284,3 +293,8 @@ type SystemContext struct {
 	// in order to not break any existing docker's integration tests.
 	DockerDisableV1Ping bool
 }
+
+var (
+	// ErrBlobNotFound can be returned by an ImageDestination's HasBlob() method
+	ErrBlobNotFound = errors.New("no such blob present")
+)

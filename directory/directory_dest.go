@@ -94,6 +94,25 @@ func (d *dirImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobInfo
 	return types.BlobInfo{Digest: computedDigest, Size: size}, nil
 }
 
+func (d *dirImageDestination) HasBlob(info types.BlobInfo) (bool, int64, error) {
+	if info.Digest == "" {
+		return false, -1, fmt.Errorf(`"Can not check for a blob with unknown digest`)
+	}
+	blobPath := d.ref.layerPath(info.Digest)
+	finfo, err := os.Stat(blobPath)
+	if err != nil && os.IsNotExist(err) {
+		return false, -1, types.ErrBlobNotFound
+	}
+	if err != nil {
+		return false, -1, err
+	}
+	return true, finfo.Size(), nil
+}
+
+func (d *dirImageDestination) ReapplyBlob(info types.BlobInfo) (types.BlobInfo, error) {
+	return info, nil
+}
+
 func (d *dirImageDestination) PutManifest(manifest []byte) error {
 	return ioutil.WriteFile(d.ref.manifestPath(), manifest, 0644)
 }

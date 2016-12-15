@@ -17,7 +17,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/types"
-	"github.com/docker/docker/pkg/homedir"
+	"github.com/containers/storage/pkg/homedir"
 	"github.com/docker/go-connections/sockets"
 	"github.com/docker/go-connections/tlsconfig"
 )

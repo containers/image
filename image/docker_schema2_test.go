@@ -374,6 +374,12 @@ func (d *memoryImageDest) PutBlob(stream io.Reader, inputInfo types.BlobInfo) (t
 	d.storedBlobs[inputInfo.Digest] = contents
 	return types.BlobInfo{Digest: inputInfo.Digest, Size: int64(len(contents))}, nil
 }
+func (d *memoryImageDest) HasBlob(inputInfo types.BlobInfo) (bool, int64, error) {
+	panic("Unexpected call to a mock function")
+}
+func (d *memoryImageDest) ReapplyBlob(inputInfo types.BlobInfo) (types.BlobInfo, error) {
+	panic("Unexpected call to a mock function")
+}
 func (d *memoryImageDest) PutManifest([]byte) error {
 	panic("Unexpected call to a mock function")
 }
