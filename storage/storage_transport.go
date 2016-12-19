@@ -1,10 +1,11 @@
 package storage
 
 import (
-	"errors"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/docker/reference"

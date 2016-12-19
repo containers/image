@@ -2,11 +2,11 @@ package signature
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"testing"
 
 	"github.com/docker/distribution/digest"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -154,19 +154,19 @@ func TestSign(t *testing.T) {
 	verified, err := verifyAndExtractSignature(mech, signature, signatureAcceptanceRules{
 		validateKeyIdentity: func(keyIdentity string) error {
 			if keyIdentity != TestKeyFingerprint {
-				return fmt.Errorf("Unexpected keyIdentity")
+				return errors.Errorf("Unexpected keyIdentity")
 			}
 			return nil
 		},
 		validateSignedDockerReference: func(signedDockerReference string) error {
 			if signedDockerReference != sig.DockerReference {
-				return fmt.Errorf("Unexpected signedDockerReference")
+				return errors.Errorf("Unexpected signedDockerReference")
 			}
 			return nil
 		},
 		validateSignedDockerManifestDigest: func(signedDockerManifestDigest digest.Digest) error {
 			if signedDockerManifestDigest != sig.DockerManifestDigest {
-				return fmt.Errorf("Unexpected signedDockerManifestDigest")
+				return errors.Errorf("Unexpected signedDockerManifestDigest")
 			}
 			return nil
 		},
@@ -200,21 +200,21 @@ func TestVerifyAndExtractSignature(t *testing.T) {
 		validateKeyIdentity: func(keyIdentity string) error {
 			recorded.keyIdentity = keyIdentity
 			if keyIdentity != wanted.keyIdentity {
-				return fmt.Errorf("keyIdentity mismatch")
+				return errors.Errorf("keyIdentity mismatch")
 			}
 			return nil
 		},
 		validateSignedDockerReference: func(signedDockerReference string) error {
 			recorded.signedDockerReference = signedDockerReference
 			if signedDockerReference != wanted.signedDockerReference {
-				return fmt.Errorf("signedDockerReference mismatch")
+				return errors.Errorf("signedDockerReference mismatch")
 			}
 			return nil
 		},
 		validateSignedDockerManifestDigest: func(signedDockerManifestDigest digest.Digest) error {
 			recorded.signedDockerManifestDigest = signedDockerManifestDigest
 			if signedDockerManifestDigest != wanted.signedDockerManifestDigest {
-				return fmt.Errorf("signedDockerManifestDigest mismatch")
+				return errors.Errorf("signedDockerManifestDigest mismatch")
 			}
 			return nil
 		},

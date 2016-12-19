@@ -2,11 +2,12 @@ package copy
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/docker/distribution/digest"
 	"github.com/stretchr/testify/assert"

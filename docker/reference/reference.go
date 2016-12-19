@@ -1,10 +1,10 @@
 package reference
 
 import (
-	"errors"
-	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/docker/distribution/digest"
 	distreference "github.com/docker/distribution/reference"
@@ -55,7 +55,7 @@ type Canonical interface {
 func ParseNamed(s string) (Named, error) {
 	named, err := distreference.ParseNamed(s)
 	if err != nil {
-		return nil, fmt.Errorf("Error parsing reference: %q is not a valid repository/tag", s)
+		return nil, errors.Errorf("Error parsing reference: %q is not a valid repository/tag", s)
 	}
 	r, err := WithName(named.Name())
 	if err != nil {
@@ -207,14 +207,14 @@ var validHex = regexp.MustCompile(`^([a-f0-9]{64})$`)
 
 func validateID(id string) error {
 	if ok := validHex.MatchString(id); !ok {
-		return fmt.Errorf("image ID %q is invalid", id)
+		return errors.Errorf("image ID %q is invalid", id)
 	}
 	return nil
 }
 
 func validateName(name string) error {
 	if err := validateID(name); err == nil {
-		return fmt.Errorf("Invalid repository name (%s), cannot specify 64-byte hexadecimal strings", name)
+		return errors.Errorf("Invalid repository name (%s), cannot specify 64-byte hexadecimal strings", name)
 	}
 	return nil
 }

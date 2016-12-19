@@ -1,9 +1,10 @@
 package types
 
 import (
-	"errors"
 	"io"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/containers/image/docker/reference"
 	"github.com/docker/distribution/digest"
