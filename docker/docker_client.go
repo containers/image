@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -20,6 +19,7 @@ import (
 	"github.com/containers/storage/pkg/homedir"
 	"github.com/docker/go-connections/sockets"
 	"github.com/docker/go-connections/tlsconfig"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -101,7 +101,7 @@ func setupCertificates(dir string, tlsc *tls.Config) error {
 		if strings.HasSuffix(f.Name(), ".crt") {
 			systemPool, err := tlsconfig.SystemCertPool()
 			if err != nil {
-				return fmt.Errorf("unable to get system cert pool: %v", err)
+				return errors.Wrap(err, "unable to get system cert pool")
 			}
 			tlsc.RootCAs = systemPool
 			logrus.Debugf("crt: %s", fullPath)
@@ -116,7 +116,7 @@ func setupCertificates(dir string, tlsc *tls.Config) error {
 			keyName := certName[:len(certName)-5] + ".key"
 			logrus.Debugf("cert: %s", fullPath)
 			if !hasFile(fs, keyName) {
-				return fmt.Errorf("missing key %s for client certificate %s. Note that CA certificates should use the extension .crt", keyName, certName)
+				return errors.Errorf("missing key %s for client certificate %s. Note that CA certificates should use the extension .crt", keyName, certName)
 			}
 			cert, err := tls.LoadX509KeyPair(filepath.Join(dir, certName), filepath.Join(dir, keyName))
 			if err != nil {
@@ -129,7 +129,7 @@ func setupCertificates(dir string, tlsc *tls.Config) error {
 			certName := keyName[:len(keyName)-4] + ".cert"
 			logrus.Debugf("key: %s", fullPath)
 			if !hasFile(fs, certName) {
-				return fmt.Errorf("missing client certificate %s for key %s", certName, keyName)
+				return errors.Errorf("missing client certificate %s for key %s", certName, keyName)
 			}
 		}
 	}
@@ -240,7 +240,7 @@ func (c *dockerClient) makeRequestToResolvedURL(method, url string, headers map[
 func (c *dockerClient) setupRequestAuth(req *http.Request) error {
 	tokens := strings.SplitN(strings.TrimSpace(c.wwwAuthenticate), " ", 2)
 	if len(tokens) != 2 {
-		return fmt.Errorf("expected 2 tokens in WWW-Authenticate: %d, %s", len(tokens), c.wwwAuthenticate)
+		return errors.Errorf("expected 2 tokens in WWW-Authenticate: %d, %s", len(tokens), c.wwwAuthenticate)
 	}
 	switch tokens[0] {
 	case "Basic":
@@ -271,11 +271,11 @@ func (c *dockerClient) setupRequestAuth(req *http.Request) error {
 		// Arbitrarily use the first challenge, there is no reason to expect more than one.
 		challenge := chs[0]
 		if challenge.Scheme != "bearer" { // Another artifact of trying to handle WWW-Authenticate before it actually happens.
-			return fmt.Errorf("Unimplemented: WWW-Authenticate Bearer replaced by %#v", challenge.Scheme)
+			return errors.Errorf("Unimplemented: WWW-Authenticate Bearer replaced by %#v", challenge.Scheme)
 		}
 		realm, ok := challenge.Parameters["realm"]
 		if !ok {
-			return fmt.Errorf("missing realm in bearer auth challenge")
+			return errors.Errorf("missing realm in bearer auth challenge")
 		}
 		service, _ := challenge.Parameters["service"] // Will be "" if not present
 		scope, _ := challenge.Parameters["scope"]     // Will be "" if not present
@@ -286,7 +286,7 @@ func (c *dockerClient) setupRequestAuth(req *http.Request) error {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		return nil
 	}
-	return fmt.Errorf("no handler for %s authentication", tokens[0])
+	return errors.Errorf("no handler for %s authentication", tokens[0])
 	// support docker bearer with authconfig's Auth string? see docker2aci
 }
 
@@ -317,11 +317,11 @@ func (c *dockerClient) getBearerToken(realm, service, scope string) (string, err
 	defer res.Body.Close()
 	switch res.StatusCode {
 	case http.StatusUnauthorized:
-		return "", fmt.Errorf("unable to retrieve auth token: 401 unauthorized")
+		return "", errors.Errorf("unable to retrieve auth token: 401 unauthorized")
 	case http.StatusOK:
 		break
 	default:
-		return "", fmt.Errorf("unexpected http code: %d, URL: %s", res.StatusCode, authReq.URL)
+		return "", errors.Errorf("unexpected http code: %d, URL: %s", res.StatusCode, authReq.URL)
 	}
 	tokenBlob, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -365,7 +365,7 @@ func getAuth(ctx *types.SystemContext, registry string) (string, string, error) 
 			if os.IsNotExist(err) {
 				return "", "", nil
 			}
-			return "", "", fmt.Errorf("%s - %v", oldDockerCfgPath, err)
+			return "", "", errors.Wrap(err, oldDockerCfgPath)
 		}
 
 		j, err := ioutil.ReadFile(oldDockerCfgPath)
@@ -377,7 +377,7 @@ func getAuth(ctx *types.SystemContext, registry string) (string, string, error) 
 		}
 
 	} else if err != nil {
-		return "", "", fmt.Errorf("%s - %v", dockerCfgPath, err)
+		return "", "", errors.Wrap(err, dockerCfgPath)
 	}
 
 	// I'm feeling lucky
@@ -414,7 +414,7 @@ func (c *dockerClient) ping() (*pingResponse, error) {
 		defer resp.Body.Close()
 		logrus.Debugf("Ping %s status %d", scheme+"://"+c.registry+"/v2/", resp.StatusCode)
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
-			return nil, fmt.Errorf("error pinging repository, response code %d", resp.StatusCode)
+			return nil, errors.Errorf("error pinging repository, response code %d", resp.StatusCode)
 		}
 		pr := &pingResponse{}
 		pr.WWWAuthenticate = resp.Header.Get("WWW-Authenticate")
@@ -427,7 +427,7 @@ func (c *dockerClient) ping() (*pingResponse, error) {
 		pr, err = ping("http")
 	}
 	if err != nil {
-		err = fmt.Errorf("pinging docker registry returned %+v", err)
+		err = errors.Wrap(err, "pinging docker registry returned")
 		if c.ctx != nil && c.ctx.DockerDisableV1Ping {
 			return nil, err
 		}

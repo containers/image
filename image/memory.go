@@ -1,7 +1,7 @@
 package image
 
 import (
-	"errors"
+	"github.com/pkg/errors"
 
 	"github.com/containers/image/types"
 )

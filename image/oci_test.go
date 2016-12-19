@@ -3,12 +3,13 @@ package image
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io"
 	"io/ioutil"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"

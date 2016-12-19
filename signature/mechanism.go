@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/mtrmac/gpgme"
+	"github.com/pkg/errors"
 )
 
 // SigningMechanism abstracts a way to sign binary blobs and verify their signatures.
@@ -77,7 +78,7 @@ func (m gpgSigningMechanism) Sign(input []byte, keyIdentity string) ([]byte, err
 	key, err := m.ctx.GetKey(keyIdentity, true)
 	if err != nil {
 		if e, ok := err.(gpgme.Error); ok && e.Code() == gpgme.ErrorEOF {
-			return nil, fmt.Errorf("key %q not found", keyIdentity)
+			return nil, errors.Errorf("key %q not found", keyIdentity)
 		}
 		return nil, err
 	}

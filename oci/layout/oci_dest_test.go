@@ -1,11 +1,11 @@
 package layout
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
 	"github.com/containers/image/types"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,7 +43,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 			}
 			return len(p), nil
 		}
-		return 0, fmt.Errorf(digestErrorString)
+		return 0, errors.Errorf(digestErrorString)
 	})
 
 	dest, err := ref.NewImageDestination(nil)
