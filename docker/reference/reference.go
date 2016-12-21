@@ -6,6 +6,9 @@ import (
 
 	"github.com/pkg/errors"
 
+	// "docker/distribution/digest" requires us to load the algorithms that we
+	// want to use into the binary (it calls .Available).
+	_ "crypto/sha256"
 	"github.com/docker/distribution/digest"
 	distreference "github.com/docker/distribution/reference"
 )
@@ -55,7 +58,7 @@ type Canonical interface {
 func ParseNamed(s string) (Named, error) {
 	named, err := distreference.ParseNamed(s)
 	if err != nil {
-		return nil, errors.Errorf("Error parsing reference: %q is not a valid repository/tag", s)
+		return nil, errors.Wrapf(err, "Error parsing reference: %q is not a valid repository/tag", s)
 	}
 	r, err := WithName(named.Name())
 	if err != nil {
