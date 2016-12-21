@@ -5,7 +5,8 @@ SKOPEO_REPO = projectatomic/skopeo
 SKOPEO_BRANCH = master
 # Set SUDO=sudo to run container integration tests using sudo.
 SUDO =
-BUILDFLAGS = -tags "btrfs_noversion libdm_no_deferred_remove"
+BUILDTAGS   = btrfs_noversion libdm_no_deferred_remove
+BUILDFLAGS := -tags "$(BUILDTAGS)"
 
 all: deps .gitvalidation test validate
 
@@ -30,7 +31,7 @@ test-skopeo:
 		git clone -b $(SKOPEO_BRANCH) https://github.com/$(SKOPEO_REPO) $${skopeo_path} && \
 		rm -rf $${vendor_path} && cp -r . $${vendor_path} && \
 		cd $${skopeo_path} && \
-		make binary-local test-all-local && \
+		make BUILDTAGS="$(BUILDTAGS)" binary-local test-all-local && \
 		$(SUDO) make check && \
 		rm -rf $${skopeo_path}
 
