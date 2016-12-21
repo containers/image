@@ -3,6 +3,7 @@ package reference
 import (
 	"testing"
 
+	_ "crypto/sha256"
 	"github.com/docker/distribution/digest"
 )
 
