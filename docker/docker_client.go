@@ -264,8 +264,25 @@ func (c *dockerClient) setupRequestAuth(req *http.Request) error {
 			return err
 		}
 		chs := parseAuthHeader(res.Header)
+		// We could end up in this "if" statement if the /v2/ call (during ping)
+		// returned 401 with a valid WWW-Authenticate=Bearer header.
+		// That doesn't **always** mean, however, that the specific API request
+		// (different from /v2/) actually needs to be authorized.
+		// One example of this _weird_ scenario happens with GCR.io docker
+		// registries.
 		if res.StatusCode != http.StatusUnauthorized || chs == nil || len(chs) == 0 {
-			// try again one last time with Basic Auth (gcr.io for instance)
+			// With gcr.io, the /v2/ call returns a 401 with a valid WWW-Authenticate=Bearer
+			// header but the repository could be _public_ (no authorization is needed).
+			// Hence, the registry response contains no challenges and the status
+			// code is not 401.
+			// We just skip this case as it's not standard on docker/distribution
+			// registries (https://github.com/docker/distribution/blob/master/docs/spec/api.md#api-version-check)
+			if res.StatusCode != http.StatusUnauthorized {
+				return nil
+			}
+			// gcr.io private repositories pull instead requires us to send user:pass pair in
+			// order to retrieve a token and setup the correct Bearer token.
+			// try again one last time with Basic Auth
 			testReq2 := *req
 			// Do not use the body stream, or we couldn't reuse it for the "real" call later.
 			testReq2.Body = nil
