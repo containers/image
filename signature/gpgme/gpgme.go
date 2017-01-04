@@ -1,27 +1,12 @@
-// Note: Consider the API unstable until the code supports at least three different image formats or transports.
-
-package signature
+package gpgme
 
 import (
 	"bytes"
 	"fmt"
 
+	"github.com/containers/image/types"
 	"github.com/mtrmac/gpgme"
 )
-
-// SigningMechanism abstracts a way to sign binary blobs and verify their signatures.
-// FIXME: Eventually expand on keyIdentity (namespace them between mechanisms to
-// eliminate ambiguities, support CA signatures and perhaps other key properties)
-type SigningMechanism interface {
-	// ImportKeysFromBytes imports public keys from the supplied blob and returns their identities.
-	// The blob is assumed to have an appropriate format (the caller is expected to know which one).
-	// NOTE: This may modify long-term state (e.g. key storage in a directory underlying the mechanism).
-	ImportKeysFromBytes(blob []byte) ([]string, error)
-	// Sign creates a (non-detached) signature of input using keyidentity
-	Sign(input []byte, keyIdentity string) ([]byte, error)
-	// Verify parses unverifiedSignature and returns the content and the signer's identity
-	Verify(unverifiedSignature []byte) (contents []byte, keyIdentity string, err error)
-}
 
 // A GPG/OpenPGP signing mechanism.
 type gpgSigningMechanism struct {
@@ -29,12 +14,12 @@ type gpgSigningMechanism struct {
 }
 
 // NewGPGSigningMechanism returns a new GPG/OpenPGP signing mechanism.
-func NewGPGSigningMechanism() (SigningMechanism, error) {
+func NewGPGSigningMechanism() (types.SigningMechanism, error) {
 	return newGPGSigningMechanismInDirectory("")
 }
 
 // newGPGSigningMechanismInDirectory returns a new GPG/OpenPGP signing mechanism, using optionalDir if not empty.
-func newGPGSigningMechanismInDirectory(optionalDir string) (SigningMechanism, error) {
+func newGPGSigningMechanismInDirectory(optionalDir string) (types.SigningMechanism, error) {
 	ctx, err := gpgme.New()
 	if err != nil {
 		return nil, err
@@ -109,13 +94,13 @@ func (m gpgSigningMechanism) Verify(unverifiedSignature []byte) (contents []byte
 		return nil, "", err
 	}
 	if len(sigs) != 1 {
-		return nil, "", InvalidSignatureError{msg: fmt.Sprintf("Unexpected GPG signature count %d", len(sigs))}
+		return nil, "", types.NewInvalidSignatureError(fmt.Sprintf("Unexpected GPG signature count %d", len(sigs)))
 	}
 	sig := sigs[0]
 	// This is sig.Summary == gpgme.SigSumValid except for key trust, which we handle ourselves
 	if sig.Status != nil || sig.Validity == gpgme.ValidityNever || sig.ValidityReason != nil || sig.WrongKeyUsage {
 		// FIXME: Better error reporting eventually
-		return nil, "", InvalidSignatureError{msg: fmt.Sprintf("Invalid GPG signature: %#v", sig)}
+		return nil, "", types.NewInvalidSignatureError(fmt.Sprintf("Invalid GPG signature: %#v", sig))
 	}
 	return signedBuffer.Bytes(), sig.Fingerprint, nil
 }

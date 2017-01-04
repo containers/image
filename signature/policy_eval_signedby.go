@@ -15,7 +15,7 @@ import (
 	"github.com/opencontainers/go-digest"
 )
 
-func (pr *prSignedBy) isSignatureAuthorAccepted(image types.UnparsedImage, sig []byte) (signatureAcceptanceResult, *Signature, error) {
+func (pr *prSignedBy) isSignatureAuthorAccepted(mechanism types.SigningMechanism, image types.UnparsedImage, sig []byte) (signatureAcceptanceResult, *Signature, error) {
 	switch pr.KeyType {
 	case SBKeyTypeGPGKeys:
 	case SBKeyTypeSignedByGPGKeys, SBKeyTypeX509Certificates, SBKeyTypeSignedByX509CAs:
@@ -47,12 +47,14 @@ func (pr *prSignedBy) isSignatureAuthorAccepted(image types.UnparsedImage, sig [
 		return sarRejected, nil, err
 	}
 	defer os.RemoveAll(dir)
-	mech, err := newGPGSigningMechanismInDirectory(dir)
-	if err != nil {
-		return sarRejected, nil, err
-	}
+	/*
+		mech, err := newGPGtypes.SigningMechanismInDirectory(dir)
+		if err != nil {
+			return sarRejected, nil, err
+		}
+	*/
 
-	trustedIdentities, err := mech.ImportKeysFromBytes(data)
+	trustedIdentities, err := mechanism.ImportKeysFromBytes(data)
 	if err != nil {
 		return sarRejected, nil, err
 	}
@@ -60,7 +62,7 @@ func (pr *prSignedBy) isSignatureAuthorAccepted(image types.UnparsedImage, sig [
 		return sarRejected, nil, PolicyRequirementError("No public keys imported")
 	}
 
-	signature, err := verifyAndExtractSignature(mech, sig, signatureAcceptanceRules{
+	signature, err := verifyAndExtractSignature(mechanism, sig, signatureAcceptanceRules{
 		validateKeyIdentity: func(keyIdentity string) error {
 			for _, trustedIdentity := range trustedIdentities {
 				if keyIdentity == trustedIdentity {
@@ -99,7 +101,7 @@ func (pr *prSignedBy) isSignatureAuthorAccepted(image types.UnparsedImage, sig [
 	return sarAccepted, signature, nil
 }
 
-func (pr *prSignedBy) isRunningImageAllowed(image types.UnparsedImage) (bool, error) {
+func (pr *prSignedBy) isRunningImageAllowed(mechanism types.SigningMechanism, image types.UnparsedImage) (bool, error) {
 	sigs, err := image.Signatures()
 	if err != nil {
 		return false, err
@@ -107,7 +109,7 @@ func (pr *prSignedBy) isRunningImageAllowed(image types.UnparsedImage) (bool, er
 	var rejections []error
 	for _, s := range sigs {
 		var reason error
-		switch res, _, err := pr.isSignatureAuthorAccepted(image, s); res {
+		switch res, _, err := pr.isSignatureAuthorAccepted(mechanism, image, s); res {
 		case sarAccepted:
 			// One accepted signature is enough.
 			return true, nil

@@ -10,7 +10,7 @@ func TestPRSignedBaseLayerIsSignatureAuthorAccepted(t *testing.T) {
 	pr, err := NewPRSignedBaseLayer(NewPRMMatchRepository())
 	require.NoError(t, err)
 	// Pass nil pointers to, kind of, test that the return value does not depend on the parameters.
-	sar, parsedSig, err := pr.isSignatureAuthorAccepted(nil, nil)
+	sar, parsedSig, err := pr.isSignatureAuthorAccepted(nil, nil, nil)
 	assertSARUnknown(t, sar, parsedSig, err)
 }
 
@@ -19,6 +19,6 @@ func TestPRSignedBaseLayerIsRunningImageAllowed(t *testing.T) {
 	pr, err := NewPRSignedBaseLayer(NewPRMMatchRepository())
 	require.NoError(t, err)
 	// Pass a nil pointer to, kind of, test that the return value does not depend on the image.
-	res, err := pr.isRunningImageAllowed(nil)
+	res, err := pr.isRunningImageAllowed(nil, nil)
 	assertRunningRejectedPolicyRequirement(t, res, err)
 }
