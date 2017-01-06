@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/httpdump"
 	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/iolimits"
@@ -562,7 +563,7 @@ func (s *dockerImageSource) getOneSignature(ctx context.Context, sigURL *url.URL
 		if err != nil {
 			return nil, false, err
 		}
-		res, err := s.c.client.Do(req)
+		res, err := httpdump.DoRequest(s.c.client, req)
 		if err != nil {
 			return nil, false, err
 		}
