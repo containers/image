@@ -113,11 +113,10 @@ func (c *sizeCounter) Write(p []byte) (n int, err error) {
 func (d *dockerImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobInfo) (types.BlobInfo, error) {
 	if inputInfo.Digest.String() != "" {
 		haveBlob, size, err := d.HasBlob(inputInfo)
-		if err != nil && err != types.ErrBlobNotFound {
+		if err != nil {
 			return types.BlobInfo{}, err
 		}
-		// Now err == nil || err == types.ErrBlobNotFound
-		if err == nil && haveBlob {
+		if haveBlob {
 			return types.BlobInfo{Digest: inputInfo.Digest, Size: size}, nil
 		}
 	}
@@ -175,6 +174,10 @@ func (d *dockerImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 	return types.BlobInfo{Digest: computedDigest, Size: sizeCounter.size}, nil
 }
 
+// HasBlob returns true iff the image destination already contains a blob with the matching digest which can be reapplied using ReapplyBlob.
+// Unlike PutBlob, the digest can not be empty.  If HasBlob returns true, the size of the blob must also be returned.
+// If the destination does not contain the blob, or it is unknown, HasBlob ordinarily returns (false, -1, nil);
+// it returns a non-nil error only on an unexpected failure.
 func (d *dockerImageDestination) HasBlob(info types.BlobInfo) (bool, int64, error) {
 	if info.Digest == "" {
 		return false, -1, errors.Errorf(`"Can not check for a blob with unknown digest`)
@@ -196,7 +199,7 @@ func (d *dockerImageDestination) HasBlob(info types.BlobInfo) (bool, int64, erro
 		return false, -1, errors.Errorf("not authorized to read from destination repository %s", reference.Path(d.ref.ref))
 	case http.StatusNotFound:
 		logrus.Debugf("... not present")
-		return false, -1, types.ErrBlobNotFound
+		return false, -1, nil
 	default:
 		return false, -1, errors.Errorf("failed to read from destination repository %s: %v", reference.Path(d.ref.ref), http.StatusText(res.StatusCode))
 	}
