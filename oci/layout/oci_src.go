@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/containers/image/v5/internal/httpdump"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/tlsclientconfig"
 	"github.com/containers/image/v5/types"
@@ -154,7 +155,7 @@ func (s *ociImageSource) getExternalBlob(ctx context.Context, urls []string) (io
 			continue
 		}
 
-		resp, err := s.client.Do(req.WithContext(ctx))
+		resp, err := httpdump.DoRequest(s.client, req.WithContext(ctx))
 		if err != nil {
 			errWrap = errors.Wrapf(errWrap, "fetching %s failed %s", url, err.Error())
 			continue
