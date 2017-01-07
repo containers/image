@@ -147,6 +147,10 @@ func (d *daemonImageDestination) AcceptsForeignLayerURLs() bool {
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (d *daemonImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobInfo) (types.BlobInfo, error) {
+	if inputInfo.Digest.String() == "" {
+		return types.BlobInfo{}, errors.Errorf(`Can not stream a blob with unknown digest to "docker-daemon:"`)
+	}
+
 	if ok, size, err := d.HasBlob(inputInfo); err == nil && ok {
 		return types.BlobInfo{Digest: inputInfo.Digest, Size: size}, nil
 	}
