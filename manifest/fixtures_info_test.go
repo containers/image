@@ -1,6 +1,6 @@
 package manifest
 
-import "github.com/docker/distribution/digest"
+import "github.com/opencontainers/go-digest"
 
 const (
 	// TestV2S2ManifestDigest is the Docker manifest digest of "v2s2.manifest.json"

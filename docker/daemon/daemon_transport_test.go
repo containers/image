@@ -5,7 +5,7 @@ import (
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
-	"github.com/docker/distribution/digest"
+	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -108,7 +108,7 @@ var validNamedReferenceTestCases = []struct{ input, dockerRef, stringWithinTrans
 
 func TestNewReference(t *testing.T) {
 	// An ID reference.
-	id, err := digest.ParseDigest(sha256digest)
+	id, err := digest.Parse(sha256digest)
 	require.NoError(t, err)
 	ref, err := NewReference(id, nil)
 	require.NoError(t, err)

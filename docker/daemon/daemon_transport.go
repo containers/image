@@ -6,7 +6,7 @@ import (
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/image"
 	"github.com/containers/image/types"
-	"github.com/docker/distribution/digest"
+	"github.com/opencontainers/go-digest"
 )
 
 // Transport is an ImageTransport for images managed by a local Docker daemon.
@@ -51,7 +51,7 @@ func ParseReference(refString string) (types.ImageReference, error) {
 
 	// digest:hexstring is structurally the same as a reponame:tag (meaning docker.io/library/reponame:tag).
 	// reference.ParseIDOrReference interprets such strings as digests.
-	if dgst, err := digest.ParseDigest(refString); err == nil {
+	if dgst, err := digest.Parse(refString); err == nil {
 		// The daemon explicitly refuses to tag images with a reponame equal to digest.Canonical - but _only_ this digest name.
 		// Other digest references are ambiguous, so refuse them.
 		if dgst.Algorithm() != digest.Canonical {

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	_ "crypto/sha256"
-	"github.com/docker/distribution/digest"
 )
 
 func TestValidateReferenceName(t *testing.T) {
@@ -269,8 +268,5 @@ func TestInvalidReferenceComponents(t *testing.T) {
 	}
 	if _, err := WithTag(ref, "-foo"); err == nil {
 		t.Fatal("Expected WithName to detect invalid tag")
-	}
-	if _, err := WithDigest(ref, digest.Digest("foo")); err == nil {
-		t.Fatal("Expected WithName to detect invalid digest")
 	}
 }

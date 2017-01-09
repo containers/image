@@ -13,8 +13,8 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
-	"github.com/docker/distribution/digest"
 	"github.com/docker/distribution/registry/client"
+	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 

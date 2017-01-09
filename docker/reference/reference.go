@@ -4,13 +4,13 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/pkg/errors"
-
-	// "docker/distribution/digest" requires us to load the algorithms that we
+	// "opencontainers/go-digest" requires us to load the algorithms that we
 	// want to use into the binary (it calls .Available).
 	_ "crypto/sha256"
-	"github.com/docker/distribution/digest"
+
 	distreference "github.com/docker/distribution/reference"
+	"github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -65,7 +65,11 @@ func ParseNamed(s string) (Named, error) {
 		return nil, err
 	}
 	if canonical, isCanonical := named.(distreference.Canonical); isCanonical {
-		return WithDigest(r, canonical.Digest())
+		r, err := distreference.WithDigest(r, canonical.Digest())
+		if err != nil {
+			return nil, err
+		}
+		return &canonicalRef{namedRef{r}}, nil
 	}
 	if tagged, isTagged := named.(distreference.NamedTagged); isTagged {
 		return WithTag(r, tagged.Tag())
@@ -100,16 +104,6 @@ func WithTag(name Named, tag string) (NamedTagged, error) {
 	return &taggedRef{namedRef{r}}, nil
 }
 
-// WithDigest combines the name from "name" and the digest from "digest" to form
-// a reference incorporating both the name and the digest.
-func WithDigest(name Named, digest digest.Digest) (Canonical, error) {
-	r, err := distreference.WithDigest(name, digest)
-	if err != nil {
-		return nil, err
-	}
-	return &canonicalRef{namedRef{r}}, nil
-}
-
 type namedRef struct {
 	distreference.Named
 }
@@ -136,7 +130,7 @@ func (r *taggedRef) Tag() string {
 	return r.namedRef.Named.(distreference.NamedTagged).Tag()
 }
 func (r *canonicalRef) Digest() digest.Digest {
-	return r.namedRef.Named.(distreference.Canonical).Digest()
+	return digest.Digest(r.namedRef.Named.(distreference.Canonical).Digest())
 }
 
 // WithDefaultTag adds a default tag to a reference if it only has a repo name.
@@ -164,7 +158,7 @@ func ParseIDOrReference(idOrRef string) (digest.Digest, Named, error) {
 	if err := validateID(idOrRef); err == nil {
 		idOrRef = "sha256:" + idOrRef
 	}
-	if dgst, err := digest.ParseDigest(idOrRef); err == nil {
+	if dgst, err := digest.Parse(idOrRef); err == nil {
 		return dgst, nil, nil
 	}
 	ref, err := ParseNamed(idOrRef)

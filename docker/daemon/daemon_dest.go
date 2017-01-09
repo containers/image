@@ -14,8 +14,8 @@ import (
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
-	"github.com/docker/distribution/digest"
 	"github.com/docker/engine-api/client"
+	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -170,7 +170,7 @@ func (d *daemonImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 		logrus.Debugf("… streaming done")
 	}
 
-	digester := digest.Canonical.New()
+	digester := digest.Canonical.Digester()
 	tee := io.TeeReader(stream, digester.Hash())
 	if err := d.sendFile(inputInfo.Digest.String(), inputInfo.Size, tee); err != nil {
 		return types.BlobInfo{}, err
