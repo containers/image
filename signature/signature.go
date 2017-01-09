@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/containers/image/version"
-	"github.com/docker/distribution/digest"
+	"github.com/opencontainers/go-digest"
 )
 
 const (

@@ -5,11 +5,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/docker/distribution/digest"
 	"github.com/docker/libtrust"
+	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	digestSha256EmptyTar = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 )
 
 func TestGuessMIMEType(t *testing.T) {
@@ -61,7 +65,7 @@ func TestDigest(t *testing.T) {
 
 	actualDigest, err = Digest([]byte{})
 	require.NoError(t, err)
-	assert.Equal(t, digest.Digest(digest.DigestSha256EmptyTar), actualDigest)
+	assert.Equal(t, digest.Digest(digestSha256EmptyTar), actualDigest)
 }
 
 func TestMatchesDigest(t *testing.T) {
@@ -98,7 +102,7 @@ func TestMatchesDigest(t *testing.T) {
 	assert.False(t, res)
 	assert.Error(t, err)
 
-	res, err = MatchesDigest([]byte{}, digest.Digest(digest.DigestSha256EmptyTar))
+	res, err = MatchesDigest([]byte{}, digest.Digest(digestSha256EmptyTar))
 	assert.True(t, res)
 	assert.NoError(t, err)
 }

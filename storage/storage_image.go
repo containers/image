@@ -16,7 +16,7 @@ import (
 	"github.com/containers/storage/pkg/archive"
 	"github.com/containers/storage/pkg/ioutils"
 	"github.com/containers/storage/storage"
-	ddigest "github.com/docker/distribution/digest"
+	ddigest "github.com/opencontainers/go-digest"
 )
 
 var (
@@ -150,10 +150,10 @@ func (s *storageImageDestination) PutBlob(stream io.Reader, blobinfo types.BlobI
 	// Set up to read the whole blob (the initial snippet, plus the rest)
 	// while digesting it with either the default, or the passed-in digest,
 	// if one was specified.
-	hasher := ddigest.Canonical.New()
+	hasher := ddigest.Canonical.Digester()
 	if digest.Validate() == nil {
 		if a := digest.Algorithm(); a.Available() {
-			hasher = a.New()
+			hasher = a.Digester()
 		}
 	}
 	hash := ""

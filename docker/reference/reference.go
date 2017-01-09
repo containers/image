@@ -4,14 +4,13 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/pkg/errors"
-
-	// "docker/distribution/digest" requires us to load the algorithms that we
+	// "opencontainers/go-digest" requires us to load the algorithms that we
 	// want to use into the binary (it calls .Available).
 	_ "crypto/sha256"
 
-	"github.com/docker/distribution/digest"
 	distreference "github.com/docker/distribution/reference"
+	"github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -131,7 +130,7 @@ func (r *taggedRef) Tag() string {
 	return r.namedRef.Named.(distreference.NamedTagged).Tag()
 }
 func (r *canonicalRef) Digest() digest.Digest {
-	return r.namedRef.Named.(distreference.Canonical).Digest()
+	return digest.Digest(r.namedRef.Named.(distreference.Canonical).Digest())
 }
 
 // WithDefaultTag adds a default tag to a reference if it only has a repo name.
@@ -159,7 +158,7 @@ func ParseIDOrReference(idOrRef string) (digest.Digest, Named, error) {
 	if err := validateID(idOrRef); err == nil {
 		idOrRef = "sha256:" + idOrRef
 	}
-	if dgst, err := digest.ParseDigest(idOrRef); err == nil {
+	if dgst, err := digest.Parse(idOrRef); err == nil {
 		return dgst, nil, nil
 	}
 	ref, err := ParseNamed(idOrRef)

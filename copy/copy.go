@@ -16,7 +16,7 @@ import (
 	"github.com/containers/image/signature"
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
-	"github.com/docker/distribution/digest"
+	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 
@@ -59,7 +59,7 @@ func newDigestingReader(source io.Reader, expectedDigest digest.Digest) (*digest
 	}
 	return &digestingReader{
 		source:           source,
-		digester:         digestAlgorithm.New(),
+		digester:         digestAlgorithm.Digester(),
 		expectedDigest:   expectedDigest,
 		validationFailed: false,
 	}, nil

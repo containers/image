@@ -1,6 +1,6 @@
 package signature
 
-import "github.com/docker/distribution/digest"
+import "github.com/opencontainers/go-digest"
 
 const (
 	// TestImageManifestDigest is the Docker manifest digest of "image.manifest.json"
