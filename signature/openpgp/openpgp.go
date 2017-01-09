@@ -32,18 +32,12 @@ func (m OpenPGPMechanism) ImportKeysFromBytes(blob []byte) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	keyIdentities := []string{}
 	for _, entity := range keyring {
 		if entity.PrimaryKey == nil {
 			continue
 		}
 		m.ctx.keyring = append(m.ctx.keyring, entity)
-	}
-	if len(m.ctx.keyring) == 0 {
-		return nil, errors.New("no public keys found")
-	}
-	keyIdentities := []string{}
-	for _, entity := range m.ctx.keyring {
-		// Uppercase the fingerprint to be compatible with gpgme
 		keyIdentities = append(keyIdentities, strings.ToUpper(fmt.Sprintf("%x", entity.PrimaryKey.Fingerprint)))
 	}
 	return keyIdentities, nil
