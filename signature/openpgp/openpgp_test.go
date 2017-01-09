@@ -21,6 +21,7 @@ func TestImportKeysFromBytes(t *testing.T) {
 func TestVerify(t *testing.T) {
 
 	type tc struct {
+		title        string
 		fixture      string
 		fixtureBytes []byte
 		isValid      bool
@@ -30,45 +31,55 @@ func TestVerify(t *testing.T) {
 
 	cases := []tc{
 		{
+			title:     "should verify valid signature using public key",
 			fixture:   "image.signature",
 			publicKey: "public-key.gpg",
 			identity:  signature.TestKeyFingerprint,
 			isValid:   true,
 		},
 		{
+			title:   "should fail verifying valid signature with no public key",
 			fixture: "image.signature",
 		},
 		{
+			title:        "should fail verifying empty signature with valid public key",
 			fixtureBytes: []byte{},
 			publicKey:    "public-key.gpg",
 		},
 		{
+			title:        "should fail verifying invalid signature with valid public key",
 			fixtureBytes: []byte("invalid signature"),
 			publicKey:    "public-key.gpg",
 		},
 		{
+			title:     "should fail verifying unknown signature with valid public key",
 			fixture:   "unknown-key.signature",
 			publicKey: "public-key.gpg",
 		},
 		{
+			title:     "should fail verifying unsigned but encrypted signature with valid public key",
 			fixture:   "unsigned-encrypted.signature",
 			publicKey: "public-key.gpg",
 		},
 		{
+			title:     "should fail verifying unsigned literal signature with valid public key",
 			fixture:   "unsigned-literal.signature",
 			publicKey: "public-key.gpg",
 		},
 		{
+			title:     "should fail verifying expired signature with valid public key",
 			fixture:   "expired.signature",
 			publicKey: "public-key.gpg",
 		},
 		{
+			title:     "should fail verifying corrupted signature with valid public key",
 			fixture:   "corrupt.signature",
 			publicKey: "public-key.gpg",
 		},
 	}
 
-	for i, c := range cases {
+	for _, c := range cases {
+		t.Logf("it %s", c.title)
 		m, _ := NewOpenPGPSigningMechanism()
 		if len(c.publicKey) > 0 {
 			key, err := ioutil.ReadFile("../fixtures/" + c.publicKey)
@@ -78,13 +89,11 @@ func TestVerify(t *testing.T) {
 		}
 		var s []byte
 		if len(c.fixture) > 0 {
-			t.Logf("#%d case: %q", i, c.fixture)
 			var err error
 			s, err = ioutil.ReadFile("../fixtures/" + c.fixture)
 			require.NoError(t, err)
 		}
 		if len(c.fixtureBytes) > 0 {
-			t.Logf("#%d case: %q", i, c.fixtureBytes)
 			s = c.fixtureBytes
 		}
 		_, identity, err := m.Verify(s)
