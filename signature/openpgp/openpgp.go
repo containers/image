@@ -22,8 +22,6 @@ type pgpSigningMechanism struct {
 	ctx *context
 }
 
-const armoredGPGPrefix = "-----BEGIN PGP PUBLIC KEY"
-
 // NewOpenPGPSigningMechanism initializes the pgpSigningMechanism
 func NewOpenPGPSigningMechanism() (types.SigningMechanism, error) {
 	return pgpSigningMechanism{ctx: &context{
@@ -33,18 +31,18 @@ func NewOpenPGPSigningMechanism() (types.SigningMechanism, error) {
 
 // ImportKeysFromBytes implements SigningMechanism.ImportKeysFromBytes
 func (m pgpSigningMechanism) ImportKeysFromBytes(blob []byte) ([]string, error) {
-	isArmored := strings.HasPrefix(string(blob), armoredGPGPrefix)
 	var (
 		keyring openpgp.EntityList
 		err     error
 	)
-	if isArmored {
-		keyring, err = openpgp.ReadArmoredKeyRing(bytes.NewReader(blob))
-	} else {
+	// Try to import armored keyring and if it fails fallback to try import not-armored.
+	keyring, err = openpgp.ReadArmoredKeyRing(bytes.NewReader(blob))
+	if err != nil {
 		keyring, err = openpgp.ReadKeyRing(bytes.NewReader(blob))
 	}
 	if err != nil {
-		return nil, err
+		// FIXME: need a better error message
+		return nil, errors.New("unable to import keys to keyring")
 	}
 	keyIdentities := []string{}
 	for _, entity := range keyring {

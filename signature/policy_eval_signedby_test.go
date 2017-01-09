@@ -118,10 +118,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	require.NoError(t, err)
 	// Pass nil pointers to, kind of, test that the return value does not depend on the parameters.
 	sar, parsedSig, err = pr.isSignatureAuthorAccepted(m, nil, nil)
-	// FIXME: The error is: errors.InvalidArgumentError("no armored data found") but for
-	// some reason it is surfaced here and not translated to PolicyRequirementError.
-	// However the sar is rejected...
-	assertSARRejectedPolicyRequirement(t, sar, parsedSig, PolicyRequirementError(""))
+	assertSARRejectedPolicyRequirement(t, sar, parsedSig, err)
 
 	// A signature which does not GPG verify
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
@@ -140,10 +137,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	// Pass a nil pointer to, kind of, test that the return value does not depend on the
 	// image parameter..
 	sar, parsedSig, err = pr.isSignatureAuthorAccepted(m, nil, sig)
-	// FIXME: The error is: errors.InvalidArgumentError("no armored data found") but for
-	// some reason it is surfaced here and not translated to PolicyRequirementError.
-	// However the sar is rejected...
-	assertSARRejected(t, sar, parsedSig, PolicyRequirementError(""))
+	assertSARRejected(t, sar, parsedSig, err)
 
 	// A valid signature of an invalid JSON.
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
