@@ -7,7 +7,7 @@ import (
 
 	"github.com/containers/image/signature/openpgp"
 	"github.com/containers/image/types"
-	"github.com/docker/distribution/digest"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

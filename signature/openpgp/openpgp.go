@@ -17,18 +17,32 @@ type context struct {
 	keyring openpgp.EntityList
 }
 
-type OpenPGPMechanism struct {
+// pgpSigningMechanism is a SignatureMechanism implementation using native Go
+type pgpSigningMechanism struct {
 	ctx *context
 }
 
+const armoredGPGPrefix = "-----BEGIN PGP PUBLIC KEY"
+
+// NewOpenPGPSigningMechanism initializes the pgpSigningMechanism
 func NewOpenPGPSigningMechanism() (types.SigningMechanism, error) {
-	return OpenPGPMechanism{ctx: &context{
+	return pgpSigningMechanism{ctx: &context{
 		keyring: openpgp.EntityList{},
 	}}, nil
 }
 
-func (m OpenPGPMechanism) ImportKeysFromBytes(blob []byte) ([]string, error) {
-	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(blob))
+// ImportKeysFromBytes implements SigningMechanism.ImportKeysFromBytes
+func (m pgpSigningMechanism) ImportKeysFromBytes(blob []byte) ([]string, error) {
+	isArmored := strings.HasPrefix(string(blob), armoredGPGPrefix)
+	var (
+		keyring openpgp.EntityList
+		err     error
+	)
+	if isArmored {
+		keyring, err = openpgp.ReadArmoredKeyRing(bytes.NewReader(blob))
+	} else {
+		keyring, err = openpgp.ReadKeyRing(bytes.NewReader(blob))
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -43,27 +57,29 @@ func (m OpenPGPMechanism) ImportKeysFromBytes(blob []byte) ([]string, error) {
 	return keyIdentities, nil
 }
 
-func (m OpenPGPMechanism) Sign(input []byte, keyIdentity string) ([]byte, error) {
+// Sign implements SigningMechanism.Sign
+func (m pgpSigningMechanism) Sign(input []byte, keyIdentity string) ([]byte, error) {
 	return nil, errors.New("signing not implemented")
 }
 
-func (m OpenPGPMechanism) Verify(unverifiedSignature []byte) (contents []byte, keyIdentity string, err error) {
+// Verify implements SigningMechanism.Verify
+func (m pgpSigningMechanism) Verify(unverifiedSignature []byte) (contents []byte, keyIdentity string, err error) {
 	md, err := openpgp.ReadMessage(bytes.NewReader(unverifiedSignature), m.ctx.keyring, nil, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	content, err := ioutil.ReadAll(md.UnverifiedBody)
 	if err != nil {
 		return nil, "", err
 	}
 	if !md.IsSigned {
 		return nil, "", errors.New("not signed")
 	}
-	content, err := ioutil.ReadAll(md.UnverifiedBody)
-	if err != nil {
-		return nil, "", err
-	}
 	if md.SignatureError != nil {
 		return nil, "", fmt.Errorf("signature error: %v", md.SignatureError)
 	}
 	if md.SignedBy == nil {
-		return nil, "", types.NewInvalidSignatureError(fmt.Sprintf("Invalid GPG signature: %#v", md.Signature))
+		return nil, "", types.NewInvalidSignatureError("invalid GPG signature")
 	}
 	if md.Signature.SigLifetimeSecs != nil {
 		expiry := md.Signature.CreationTime.Add(time.Duration(*md.Signature.SigLifetimeSecs) * time.Second)

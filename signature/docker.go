@@ -7,7 +7,7 @@ import (
 
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
-	"github.com/docker/distribution/digest"
+	digest "github.com/opencontainers/go-digest"
 )
 
 // SignDockerManifest returns a signature for manifest as the specified dockerReference,

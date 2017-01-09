@@ -320,6 +320,7 @@ type InvalidSignatureError struct {
 	msg string
 }
 
+// NewInvalidSignatureError returns an InvalidSignatureError
 func NewInvalidSignatureError(msg string) error {
 	return InvalidSignatureError{msg: msg}
 }
