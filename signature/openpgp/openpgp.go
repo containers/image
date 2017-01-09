@@ -48,9 +48,6 @@ func (m OpenPGPMechanism) Sign(input []byte, keyIdentity string) ([]byte, error)
 }
 
 func (m OpenPGPMechanism) Verify(unverifiedSignature []byte) (contents []byte, keyIdentity string, err error) {
-	if len(m.ctx.keyring) == 0 {
-		return nil, "", errors.New("no public keys imported")
-	}
 	md, err := openpgp.ReadMessage(bytes.NewReader(unverifiedSignature), m.ctx.keyring, nil, nil)
 	if err != nil {
 		return nil, "", err
