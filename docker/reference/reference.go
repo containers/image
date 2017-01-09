@@ -9,6 +9,7 @@ import (
 	// "docker/distribution/digest" requires us to load the algorithms that we
 	// want to use into the binary (it calls .Available).
 	_ "crypto/sha256"
+
 	"github.com/docker/distribution/digest"
 	distreference "github.com/docker/distribution/reference"
 )
@@ -65,7 +66,11 @@ func ParseNamed(s string) (Named, error) {
 		return nil, err
 	}
 	if canonical, isCanonical := named.(distreference.Canonical); isCanonical {
-		return WithDigest(r, canonical.Digest())
+		r, err := distreference.WithDigest(r, canonical.Digest())
+		if err != nil {
+			return nil, err
+		}
+		return &canonicalRef{namedRef{r}}, nil
 	}
 	if tagged, isTagged := named.(distreference.NamedTagged); isTagged {
 		return WithTag(r, tagged.Tag())
@@ -98,16 +103,6 @@ func WithTag(name Named, tag string) (NamedTagged, error) {
 		return nil, err
 	}
 	return &taggedRef{namedRef{r}}, nil
-}
-
-// WithDigest combines the name from "name" and the digest from "digest" to form
-// a reference incorporating both the name and the digest.
-func WithDigest(name Named, digest digest.Digest) (Canonical, error) {
-	r, err := distreference.WithDigest(name, digest)
-	if err != nil {
-		return nil, err
-	}
-	return &canonicalRef{namedRef{r}}, nil
 }
 
 type namedRef struct {
