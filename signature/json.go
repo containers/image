@@ -50,7 +50,7 @@ func stringField(m map[string]interface{}, fieldName string) (string, error) {
 	}
 	v, ok := untyped.(string)
 	if !ok {
-		return "", jsonFormatError(fmt.Sprintf("Field %s is not a JSON object", fieldName))
+		return "", jsonFormatError(fmt.Sprintf("Field %s is not a string", fieldName))
 	}
 	return v, nil
 }
