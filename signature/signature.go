@@ -37,6 +37,27 @@ type Signature struct {
 type untrustedSignature struct {
 	UntrustedDockerManifestDigest digest.Digest
 	UntrustedDockerReference      string // FIXME: more precise type?
+	UntrustedCreatorID            *string
+	// This is intentionally an int64; the native JSON float64 type would allow to represent _some_ sub-second precision,
+	// but not nearly enough (with current timestamp values, a single unit in the last place is on the order of hundreds of nanoseconds).
+	// So, this is explicitly an int64, and we reject fractional values. If we did need more precise timestamps eventually,
+	// we would add another field, UntrustedTimestampNS int64.
+	UntrustedTimestamp *int64
+}
+
+// newUntrustedSignature returns an untrustedSignature object with
+// the specified primary contents and appropriate metadata.
+func newUntrustedSignature(dockerManifestDigest digest.Digest, dockerReference string) untrustedSignature {
+	// Use intermediate variables for these values so that we can take their addresses.
+	// Golang guarantees that they will have a new address on every execution.
+	creatorID := "atomic " + version.Version
+	timestamp := time.Now().Unix()
+	return untrustedSignature{
+		UntrustedDockerManifestDigest: dockerManifestDigest,
+		UntrustedDockerReference:      dockerReference,
+		UntrustedCreatorID:            &creatorID,
+		UntrustedTimestamp:            &timestamp,
+	}
 }
 
 // Compile-time check that untrustedSignature implements json.Marshaler
@@ -44,11 +65,6 @@ var _ json.Marshaler = (*untrustedSignature)(nil)
 
 // MarshalJSON implements the json.Marshaler interface.
 func (s untrustedSignature) MarshalJSON() ([]byte, error) {
-	return s.marshalJSONWithVariables(time.Now().Unix(), "atomic "+version.Version)
-}
-
-// Implementation of MarshalJSON, with a caller-chosen values of the variable items to help testing.
-func (s untrustedSignature) marshalJSONWithVariables(timestamp int64, creatorID string) ([]byte, error) {
 	if s.UntrustedDockerManifestDigest == "" || s.UntrustedDockerReference == "" {
 		return nil, errors.New("Unexpected empty signature content")
 	}
@@ -57,9 +73,12 @@ func (s untrustedSignature) marshalJSONWithVariables(timestamp int64, creatorID 
 		"image":    map[string]string{"docker-manifest-digest": s.UntrustedDockerManifestDigest.String()},
 		"identity": map[string]string{"docker-reference": s.UntrustedDockerReference},
 	}
-	optional := map[string]interface{}{
-		"creator":   creatorID,
-		"timestamp": timestamp,
+	optional := map[string]interface{}{}
+	if s.UntrustedCreatorID != nil {
+		optional["creator"] = *s.UntrustedCreatorID
+	}
+	if s.UntrustedTimestamp != nil {
+		optional["timestamp"] = *s.UntrustedTimestamp
 	}
 	signature := map[string]interface{}{
 		"critical": critical,
@@ -109,7 +128,20 @@ func (s *untrustedSignature) strictUnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	_ = optional // We don't use anything from here for now.
+	if _, ok := optional["creator"]; ok {
+		creatorID, err := stringField(optional, "creator")
+		if err != nil {
+			return err
+		}
+		s.UntrustedCreatorID = &creatorID
+	}
+	if _, ok := optional["timestamp"]; ok {
+		timestamp, err := int64Field(optional, "timestamp")
+		if err != nil {
+			return err
+		}
+		s.UntrustedTimestamp = &timestamp
+	}
 
 	t, err := stringField(c, "type")
 	if err != nil {

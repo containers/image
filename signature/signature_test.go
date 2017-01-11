@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"testing"
+	"time"
 
+	"github.com/containers/image/version"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -18,26 +20,62 @@ func TestInvalidSignatureError(t *testing.T) {
 	assert.Equal(t, s, err.Error())
 }
 
+func TestNewUntrustedSignature(t *testing.T) {
+	timeBefore := time.Now()
+	sig := newUntrustedSignature(TestImageManifestDigest, TestImageSignatureReference)
+	assert.Equal(t, TestImageManifestDigest, sig.UntrustedDockerManifestDigest)
+	assert.Equal(t, TestImageSignatureReference, sig.UntrustedDockerReference)
+	require.NotNil(t, sig.UntrustedCreatorID)
+	assert.Equal(t, "atomic "+version.Version, *sig.UntrustedCreatorID)
+	require.NotNil(t, sig.UntrustedTimestamp)
+	timeAfter := time.Now()
+	assert.True(t, timeBefore.Unix() <= *sig.UntrustedTimestamp)
+	assert.True(t, *sig.UntrustedTimestamp <= timeAfter.Unix())
+}
+
 func TestMarshalJSON(t *testing.T) {
 	// Empty string values
-	s := untrustedSignature{UntrustedDockerManifestDigest: "", UntrustedDockerReference: "_"}
+	s := newUntrustedSignature("", "_")
 	_, err := s.MarshalJSON()
 	assert.Error(t, err)
-	s = untrustedSignature{UntrustedDockerManifestDigest: "_", UntrustedDockerReference: ""}
+	s = newUntrustedSignature("_", "")
 	_, err = s.MarshalJSON()
 	assert.Error(t, err)
 
 	// Success
-	s = untrustedSignature{UntrustedDockerManifestDigest: "digest!@#", UntrustedDockerReference: "reference#@!"}
-	marshaled, err := s.marshalJSONWithVariables(0, "CREATOR")
-	require.NoError(t, err)
-	assert.Equal(t, []byte("{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"digest!@#\"},\"type\":\"atomic container signature\"},\"optional\":{\"creator\":\"CREATOR\",\"timestamp\":0}}"),
-		marshaled)
+	// Use intermediate variables for these values so that we can take their addresses.
+	creatorID := "CREATOR"
+	timestamp := int64(1484683104)
+	for _, c := range []struct {
+		input    untrustedSignature
+		expected string
+	}{
+		{
+			untrustedSignature{
+				UntrustedDockerManifestDigest: "digest!@#",
+				UntrustedDockerReference:      "reference#@!",
+				UntrustedCreatorID:            &creatorID,
+				UntrustedTimestamp:            &timestamp,
+			},
+			"{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"digest!@#\"},\"type\":\"atomic container signature\"},\"optional\":{\"creator\":\"CREATOR\",\"timestamp\":1484683104}}",
+		},
+		{
+			untrustedSignature{
+				UntrustedDockerManifestDigest: "digest!@#",
+				UntrustedDockerReference:      "reference#@!",
+			},
+			"{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"digest!@#\"},\"type\":\"atomic container signature\"},\"optional\":{}}",
+		},
+	} {
+		marshaled, err := c.input.MarshalJSON()
+		require.NoError(t, err)
+		assert.Equal(t, []byte(c.expected), marshaled)
 
-	// We can't test MarshalJSON directly because the timestamp will keep changing, so just test that
-	// it doesn't fail. And call it through the JSON package for a good measure.
-	_, err = json.Marshal(s)
-	assert.NoError(t, err)
+		// Also call MarshalJSON through the JSON package.
+		marshaled, err = json.Marshal(c.input)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte(c.expected), marshaled)
+	}
 }
 
 // Return the result of modifying validJSON with fn and unmarshaling it into *sig
@@ -69,10 +107,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	assert.Error(t, err)
 
 	// Start with a valid JSON.
-	validSig := untrustedSignature{
-		UntrustedDockerManifestDigest: "digest!@#",
-		UntrustedDockerReference:      "reference#@!",
-	}
+	validSig := newUntrustedSignature("digest!@#", "reference#@!")
 	validJSON, err := validSig.MarshalJSON()
 	require.NoError(t, err)
 
@@ -114,34 +149,47 @@ func TestUnmarshalJSON(t *testing.T) {
 		func(v mSI) { x(v, "critical", "identity")["unexpected"] = 1 },
 		// Invalid "docker-reference"
 		func(v mSI) { x(v, "critical", "identity")["docker-reference"] = 1 },
+		// Invalid "creator"
+		func(v mSI) { x(v, "optional")["creator"] = 1 },
+		// Invalid "timestamp"
+		func(v mSI) { x(v, "optional")["timestamp"] = "unexpected" },
 	}
 	for _, fn := range breakFns {
 		err = tryUnmarshalModifiedSignature(t, &s, validJSON, fn)
 		assert.Error(t, err)
 	}
 
-	// Modifications to "optional" are allowed and ignored
+	// Modifications to unrecognized fields in "optional" are allowed and ignored
 	allowedModificationFns := []func(mSI){
 		// Add an optional field
 		func(v mSI) { x(v, "optional")["unexpected"] = 1 },
-		// Delete an optional field
-		func(v mSI) { delete(x(v, "optional"), "creator") },
 	}
 	for _, fn := range allowedModificationFns {
 		err = tryUnmarshalModifiedSignature(t, &s, validJSON, fn)
 		require.NoError(t, err)
 		assert.Equal(t, validSig, s)
 	}
+
+	// Optional fields can be missing
+	validSig = untrustedSignature{
+		UntrustedDockerManifestDigest: "digest!@#",
+		UntrustedDockerReference:      "reference#@!",
+		UntrustedCreatorID:            nil,
+		UntrustedTimestamp:            nil,
+	}
+	validJSON, err = validSig.MarshalJSON()
+	require.NoError(t, err)
+	s = untrustedSignature{}
+	err = json.Unmarshal(validJSON, &s)
+	require.NoError(t, err)
+	assert.Equal(t, validSig, s)
 }
 
 func TestSign(t *testing.T) {
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
 	require.NoError(t, err)
 
-	sig := untrustedSignature{
-		UntrustedDockerManifestDigest: "digest!@#",
-		UntrustedDockerReference:      "reference#@!",
-	}
+	sig := newUntrustedSignature("digest!@#", "reference#@!")
 
 	// Successful signing
 	signature, err := sig.sign(mech, TestKeyFingerprint)
