@@ -20,15 +20,15 @@ func TestInvalidSignatureError(t *testing.T) {
 
 func TestMarshalJSON(t *testing.T) {
 	// Empty string values
-	s := privateSignature{Signature{DockerManifestDigest: "", DockerReference: "_"}}
+	s := untrustedSignature{UntrustedDockerManifestDigest: "", UntrustedDockerReference: "_"}
 	_, err := s.MarshalJSON()
 	assert.Error(t, err)
-	s = privateSignature{Signature{DockerManifestDigest: "_", DockerReference: ""}}
+	s = untrustedSignature{UntrustedDockerManifestDigest: "_", UntrustedDockerReference: ""}
 	_, err = s.MarshalJSON()
 	assert.Error(t, err)
 
 	// Success
-	s = privateSignature{Signature{DockerManifestDigest: "digest!@#", DockerReference: "reference#@!"}}
+	s = untrustedSignature{UntrustedDockerManifestDigest: "digest!@#", UntrustedDockerReference: "reference#@!"}
 	marshaled, err := s.marshalJSONWithVariables(0, "CREATOR")
 	require.NoError(t, err)
 	assert.Equal(t, []byte("{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"digest!@#\"},\"type\":\"atomic container signature\"},\"optional\":{\"creator\":\"CREATOR\",\"timestamp\":0}}"),
@@ -41,7 +41,7 @@ func TestMarshalJSON(t *testing.T) {
 }
 
 // Return the result of modifying validJSON with fn and unmarshaling it into *sig
-func tryUnmarshalModifiedSignature(t *testing.T, sig *privateSignature, validJSON []byte, modifyFn func(mSI)) error {
+func tryUnmarshalModifiedSignature(t *testing.T, sig *untrustedSignature, validJSON []byte, modifyFn func(mSI)) error {
 	var tmp mSI
 	err := json.Unmarshal(validJSON, &tmp)
 	require.NoError(t, err)
@@ -51,12 +51,12 @@ func tryUnmarshalModifiedSignature(t *testing.T, sig *privateSignature, validJSO
 	testJSON, err := json.Marshal(tmp)
 	require.NoError(t, err)
 
-	*sig = privateSignature{}
+	*sig = untrustedSignature{}
 	return json.Unmarshal(testJSON, sig)
 }
 
 func TestUnmarshalJSON(t *testing.T) {
-	var s privateSignature
+	var s untrustedSignature
 	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
 	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
 	err := json.Unmarshal([]byte("&"), &s)
@@ -69,17 +69,15 @@ func TestUnmarshalJSON(t *testing.T) {
 	assert.Error(t, err)
 
 	// Start with a valid JSON.
-	validSig := privateSignature{
-		Signature{
-			DockerManifestDigest: "digest!@#",
-			DockerReference:      "reference#@!",
-		},
+	validSig := untrustedSignature{
+		UntrustedDockerManifestDigest: "digest!@#",
+		UntrustedDockerReference:      "reference#@!",
 	}
 	validJSON, err := validSig.MarshalJSON()
 	require.NoError(t, err)
 
 	// Success
-	s = privateSignature{}
+	s = untrustedSignature{}
 	err = json.Unmarshal(validJSON, &s)
 	require.NoError(t, err)
 	assert.Equal(t, validSig, s)
@@ -140,11 +138,9 @@ func TestSign(t *testing.T) {
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
 	require.NoError(t, err)
 
-	sig := privateSignature{
-		Signature{
-			DockerManifestDigest: "digest!@#",
-			DockerReference:      "reference#@!",
-		},
+	sig := untrustedSignature{
+		UntrustedDockerManifestDigest: "digest!@#",
+		UntrustedDockerReference:      "reference#@!",
 	}
 
 	// Successful signing
@@ -159,13 +155,13 @@ func TestSign(t *testing.T) {
 			return nil
 		},
 		validateSignedDockerReference: func(signedDockerReference string) error {
-			if signedDockerReference != sig.DockerReference {
+			if signedDockerReference != sig.UntrustedDockerReference {
 				return errors.Errorf("Unexpected signedDockerReference")
 			}
 			return nil
 		},
 		validateSignedDockerManifestDigest: func(signedDockerManifestDigest digest.Digest) error {
-			if signedDockerManifestDigest != sig.DockerManifestDigest {
+			if signedDockerManifestDigest != sig.UntrustedDockerManifestDigest {
 				return errors.Errorf("Unexpected signedDockerManifestDigest")
 			}
 			return nil
@@ -173,10 +169,11 @@ func TestSign(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assert.Equal(t, sig.Signature, *verified)
+	assert.Equal(t, sig.UntrustedDockerManifestDigest, verified.DockerManifestDigest)
+	assert.Equal(t, sig.UntrustedDockerReference, verified.DockerReference)
 
 	// Error creating blob to sign
-	_, err = privateSignature{}.sign(mech, TestKeyFingerprint)
+	_, err = untrustedSignature{}.sign(mech, TestKeyFingerprint)
 	assert.Error(t, err)
 
 	// Error signing
