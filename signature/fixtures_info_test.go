@@ -9,4 +9,6 @@ const (
 	TestImageSignatureReference = "testing/manifest"
 	// TestKeyFingerprint is the fingerprint of the private key in this directory.
 	TestKeyFingerprint = "1D8230F6CDB6A06716E414C1DB72F2188BB46CC8"
+	// TestKeyShortID is the short ID of the private key in this directory.
+	TestKeyShortID = "DB72F2188BB46CC8"
 )
