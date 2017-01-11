@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/mtrmac/gpgme"
@@ -14,14 +15,13 @@ import (
 )
 
 // SigningMechanism abstracts a way to sign binary blobs and verify their signatures.
+// Each mechanism should eventually be closed by calling Close().
 // FIXME: Eventually expand on keyIdentity (namespace them between mechanisms to
 // eliminate ambiguities, support CA signatures and perhaps other key properties)
 type SigningMechanism interface {
-	// ImportKeysFromBytes imports public keys from the supplied blob and returns their identities.
-	// The blob is assumed to have an appropriate format (the caller is expected to know which one).
-	// NOTE: This may modify long-term state (e.g. key storage in a directory underlying the mechanism).
-	ImportKeysFromBytes(blob []byte) ([]string, error)
-	// Sign creates a (non-detached) signature of input using keyidentity
+	// Close removes resources associated with the mechanism, if any.
+	Close() error
+	// Sign creates a (non-detached) signature of input using keyIdentity.
 	Sign(input []byte, keyIdentity string) ([]byte, error)
 	// Verify parses unverifiedSignature and returns the content and the signer's identity
 	Verify(unverifiedSignature []byte) (contents []byte, keyIdentity string, err error)
@@ -35,16 +35,64 @@ type SigningMechanism interface {
 
 // A GPG/OpenPGP signing mechanism.
 type gpgSigningMechanism struct {
-	ctx *gpgme.Context
+	ctx          *gpgme.Context
+	ephemeralDir string // If not "", a directory to be removed on Close()
 }
 
-// NewGPGSigningMechanism returns a new GPG/OpenPGP signing mechanism.
+// NewGPGSigningMechanism returns a new GPG/OpenPGP signing mechanism for the user’s default
+// GPG configuration ($GNUPGHOME / ~/.gnupg)
+// The caller must call .Close() on the returned SigningMechanism.
 func NewGPGSigningMechanism() (SigningMechanism, error) {
 	return newGPGSigningMechanismInDirectory("")
 }
 
 // newGPGSigningMechanismInDirectory returns a new GPG/OpenPGP signing mechanism, using optionalDir if not empty.
+// The caller must call .Close() on the returned SigningMechanism.
 func newGPGSigningMechanismInDirectory(optionalDir string) (SigningMechanism, error) {
+	ctx, err := newGPGMEContext(optionalDir)
+	if err != nil {
+		return nil, err
+	}
+	return &gpgSigningMechanism{
+		ctx:          ctx,
+		ephemeralDir: "",
+	}, nil
+}
+
+// NewEphemeralGPGSigningMechanism returns a new GPG/OpenPGP signing mechanism which
+// recognizes _only_ public keys from the supplied blob, and returns the identities
+// of these keys.
+// The caller must call .Close() on the returned SigningMechanism.
+func NewEphemeralGPGSigningMechanism(blob []byte) (SigningMechanism, []string, error) {
+	dir, err := ioutil.TempDir("", "containers-ephemeral-gpg-")
+	if err != nil {
+		return nil, nil, err
+	}
+	removeDir := true
+	defer func() {
+		if removeDir {
+			os.RemoveAll(dir)
+		}
+	}()
+	ctx, err := newGPGMEContext(dir)
+	if err != nil {
+		return nil, nil, err
+	}
+	mech := &gpgSigningMechanism{
+		ctx:          ctx,
+		ephemeralDir: dir,
+	}
+	keyIdentities, err := mech.importKeysFromBytes(blob)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	removeDir = false
+	return mech, keyIdentities, nil
+}
+
+// newGPGMEContext returns a new *gpgme.Context, using optionalDir if not empty.
+func newGPGMEContext(optionalDir string) (*gpgme.Context, error) {
 	ctx, err := gpgme.New()
 	if err != nil {
 		return nil, err
@@ -60,11 +108,21 @@ func newGPGSigningMechanismInDirectory(optionalDir string) (SigningMechanism, er
 	}
 	ctx.SetArmor(false)
 	ctx.SetTextMode(false)
-	return gpgSigningMechanism{ctx: ctx}, nil
+	return ctx, nil
 }
 
-// ImportKeysFromBytes implements SigningMechanism.ImportKeysFromBytes
-func (m gpgSigningMechanism) ImportKeysFromBytes(blob []byte) ([]string, error) {
+func (m *gpgSigningMechanism) Close() error {
+	if m.ephemeralDir != "" {
+		os.RemoveAll(m.ephemeralDir) // Ignore an error, if any
+	}
+	return nil
+}
+
+// importKeysFromBytes imports public keys from the supplied blob and returns their identities.
+// The blob is assumed to have an appropriate format (the caller is expected to know which one).
+// NOTE: This may modify long-term state (e.g. key storage in a directory underlying the mechanism);
+// but we do not make this public, it can only be used through newEphemeralGPGSigningMechanism.
+func (m *gpgSigningMechanism) importKeysFromBytes(blob []byte) ([]string, error) {
 	inputData, err := gpgme.NewDataBytes(blob)
 	if err != nil {
 		return nil, err
@@ -82,7 +140,7 @@ func (m gpgSigningMechanism) ImportKeysFromBytes(blob []byte) ([]string, error) 
 	return keyIdentities, nil
 }
 
-// Sign implements SigningMechanism.Sign
+// Sign creates a (non-detached) signature of input using keyIdentity.
 func (m gpgSigningMechanism) Sign(input []byte, keyIdentity string) ([]byte, error) {
 	key, err := m.ctx.GetKey(keyIdentity, true)
 	if err != nil {
@@ -103,7 +161,7 @@ func (m gpgSigningMechanism) Sign(input []byte, keyIdentity string) ([]byte, err
 	return sigBuffer.Bytes(), nil
 }
 
-// Verify implements SigningMechanism.Verify
+// Verify parses unverifiedSignature and returns the content and the signer's identity
 func (m gpgSigningMechanism) Verify(unverifiedSignature []byte) (contents []byte, keyIdentity string, err error) {
 	signedBuffer := bytes.Buffer{}
 	signedData, err := gpgme.NewDataWriter(&signedBuffer)

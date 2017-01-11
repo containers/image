@@ -189,6 +189,7 @@ func TestUnmarshalJSON(t *testing.T) {
 func TestSign(t *testing.T) {
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
 	require.NoError(t, err)
+	defer mech.Close()
 
 	sig := newUntrustedSignature("digest!@#", "reference#@!")
 
@@ -233,6 +234,7 @@ func TestSign(t *testing.T) {
 func TestVerifyAndExtractSignature(t *testing.T) {
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
 	require.NoError(t, err)
+	defer mech.Close()
 
 	type triple struct {
 		keyIdentity                string

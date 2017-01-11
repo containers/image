@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,26 +17,25 @@ const (
 
 func TestNewGPGSigningMechanism(t *testing.T) {
 	// A dumb test just for code coverage. We test more with newGPGSigningMechanismInDirectory().
-	_, err := NewGPGSigningMechanism()
+	mech, err := NewGPGSigningMechanism()
 	assert.NoError(t, err)
+	mech.Close()
 }
 
 func TestNewGPGSigningMechanismInDirectory(t *testing.T) {
 	// A dumb test just for code coverage.
-	_, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
+	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
 	assert.NoError(t, err)
+	mech.Close()
 	// The various GPG failure cases are not obviously easy to reach.
 }
 
-func TestGPGSigningMechanismImportKeysFromBytes(t *testing.T) {
-	testDir, err := ioutil.TempDir("", "gpg-import-keys")
-	require.NoError(t, err)
-	defer os.RemoveAll(testDir)
-
-	mech, err := newGPGSigningMechanismInDirectory(testDir)
-	require.NoError(t, err)
-
+func TestNewEphemeralGPGSigningMechanism(t *testing.T) {
 	// Try validating a signature when the key is unknown.
+	mech, keyIdentities, err := NewEphemeralGPGSigningMechanism([]byte{})
+	require.NoError(t, err)
+	defer mech.Close()
+	assert.Empty(t, keyIdentities)
 	signature, err := ioutil.ReadFile("./fixtures/invalid-blob.signature")
 	require.NoError(t, err)
 	content, signingFingerprint, err := mech.Verify(signature)
@@ -44,10 +44,10 @@ func TestGPGSigningMechanismImportKeysFromBytes(t *testing.T) {
 	// Successful import
 	keyBlob, err := ioutil.ReadFile("./fixtures/public-key.gpg")
 	require.NoError(t, err)
-	keyIdentities, err := mech.ImportKeysFromBytes(keyBlob)
+	mech, keyIdentities, err = NewEphemeralGPGSigningMechanism(keyBlob)
 	require.NoError(t, err)
+	defer mech.Close()
 	assert.Equal(t, []string{TestKeyFingerprint}, keyIdentities)
-
 	// After import, the signature should validate.
 	content, signingFingerprint, err = mech.Verify(signature)
 	require.NoError(t, err)
@@ -55,20 +55,50 @@ func TestGPGSigningMechanismImportKeysFromBytes(t *testing.T) {
 	assert.Equal(t, TestKeyFingerprint, signingFingerprint)
 
 	// Two keys: just concatenate the valid input twice.
-	keyIdentities, err = mech.ImportKeysFromBytes(bytes.Join([][]byte{keyBlob, keyBlob}, nil))
+	mech, keyIdentities, err = NewEphemeralGPGSigningMechanism(bytes.Join([][]byte{keyBlob, keyBlob}, nil))
 	require.NoError(t, err)
+	defer mech.Close()
 	assert.Equal(t, []string{TestKeyFingerprint, TestKeyFingerprint}, keyIdentities)
 
 	// Invalid input: This is accepted anyway by GPG, just returns no keys.
-	keyIdentities, err = mech.ImportKeysFromBytes([]byte("This is invalid"))
+	mech, keyIdentities, err = NewEphemeralGPGSigningMechanism([]byte("This is invalid"))
 	require.NoError(t, err)
+	defer mech.Close()
 	assert.Equal(t, []string{}, keyIdentities)
 	// The various GPG/GPGME failures cases are not obviously easy to reach.
+}
+
+func TestGPGSigningMechanismClose(t *testing.T) {
+	// Closing a non-ephemeral mechanism does not remove anything in the directory.
+	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
+	require.NoError(t, err)
+	err = mech.Close()
+	assert.NoError(t, err)
+	_, err = os.Lstat(testGPGHomeDirectory)
+	assert.NoError(t, err)
+	_, err = os.Lstat(filepath.Join(testGPGHomeDirectory, "pubring.gpg"))
+	assert.NoError(t, err)
+
+	// Closing an ephemeral mechanism does remove the directory.
+	mech, _, err = NewEphemeralGPGSigningMechanism([]byte{})
+	require.NoError(t, err)
+	gpgMech, ok := mech.(*gpgSigningMechanism)
+	require.True(t, ok)
+	dir := gpgMech.ephemeralDir
+	assert.NotEmpty(t, dir)
+	_, err = os.Lstat(dir)
+	require.NoError(t, err)
+	err = mech.Close()
+	assert.NoError(t, err)
+	_, err = os.Lstat(dir)
+	require.Error(t, err)
+	assert.True(t, os.IsNotExist(err))
 }
 
 func TestGPGSigningMechanismSign(t *testing.T) {
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
 	require.NoError(t, err)
+	defer mech.Close()
 
 	// Successful signing
 	content := []byte("content")
@@ -95,6 +125,7 @@ func assertSigningError(t *testing.T, content []byte, fingerprint string, err er
 func TestGPGSigningMechanismVerify(t *testing.T) {
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
 	require.NoError(t, err)
+	defer mech.Close()
 
 	// Successful verification
 	signature, err := ioutil.ReadFile("./fixtures/invalid-blob.signature")
@@ -149,8 +180,9 @@ func TestGPGSigningMechanismVerify(t *testing.T) {
 }
 
 func TestGPGSigningMechanismUntrustedSignatureContents(t *testing.T) {
-	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
+	mech, _, err := NewEphemeralGPGSigningMechanism([]byte{})
 	require.NoError(t, err)
+	defer mech.Close()
 
 	// A valid signature
 	signature, err := ioutil.ReadFile("./fixtures/invalid-blob.signature")

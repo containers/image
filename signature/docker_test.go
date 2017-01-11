@@ -11,6 +11,7 @@ import (
 func TestSignDockerManifest(t *testing.T) {
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
 	require.NoError(t, err)
+	defer mech.Close()
 	manifest, err := ioutil.ReadFile("fixtures/image.manifest.json")
 	require.NoError(t, err)
 
@@ -41,6 +42,7 @@ func TestSignDockerManifest(t *testing.T) {
 func TestVerifyDockerManifestSignature(t *testing.T) {
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
 	require.NoError(t, err)
+	defer mech.Close()
 	manifest, err := ioutil.ReadFile("fixtures/image.manifest.json")
 	require.NoError(t, err)
 	signature, err := ioutil.ReadFile("fixtures/image.signature")
