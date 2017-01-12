@@ -57,7 +57,7 @@ func ParseReference(ref string) (types.ImageReference, error) {
 	}
 	tagged, ok := r.(reference.NamedTagged)
 	if !ok {
-		return nil, errors.Errorf("invalid image reference %s, %#v", ref, r)
+		return nil, errors.Errorf("invalid image reference %s, expected format: 'hostname/namespace/stream:tag'", ref)
 	}
 	return NewReference(tagged)
 }
@@ -66,7 +66,8 @@ func ParseReference(ref string) (types.ImageReference, error) {
 func NewReference(dockerRef reference.NamedTagged) (types.ImageReference, error) {
 	r := strings.SplitN(dockerRef.RemoteName(), "/", 3)
 	if len(r) != 2 {
-		return nil, errors.Errorf("invalid image reference %s", dockerRef.String())
+		return nil, errors.Errorf("invalid image reference: %s, expected format: 'hostname/namespace/stream:tag'",
+			dockerRef.String())
 	}
 	return openshiftReference{
 		namespace:       r[0],
