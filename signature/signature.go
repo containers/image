@@ -44,7 +44,7 @@ var _ json.Marshaler = (*untrustedSignature)(nil)
 
 // MarshalJSON implements the json.Marshaler interface.
 func (s untrustedSignature) MarshalJSON() ([]byte, error) {
-	return s.marshalJSONWithVariables(time.Now().UTC().Unix(), "atomic "+version.Version)
+	return s.marshalJSONWithVariables(time.Now().Unix(), "atomic "+version.Version)
 }
 
 // Implementation of MarshalJSON, with a caller-chosen values of the variable items to help testing.
