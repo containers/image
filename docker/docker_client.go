@@ -45,14 +45,13 @@ var ErrV1NotSupported = errors.New("can't talk to a V1 docker registry")
 
 // dockerClient is configuration for dealing with a single Docker registry.
 type dockerClient struct {
-	ctx             *types.SystemContext
-	registry        string
-	username        string
-	password        string
-	wwwAuthenticate string // Cache of a value set by ping() if scheme is not empty
-	scheme          string // Cache of a value returned by a successful ping() if not empty
-	client          *http.Client
-	signatureBase   signatureStorageBase
+	ctx           *types.SystemContext
+	registry      string
+	username      string
+	password      string
+	scheme        string // Cache of a value returned by a successful ping() if not empty
+	client        *http.Client
+	signatureBase signatureStorageBase
 }
 
 // this is cloned from docker/go-connections because upstream docker has changed
@@ -195,7 +194,6 @@ func (c *dockerClient) makeRequest(method, url string, headers map[string][]stri
 		if err != nil {
 			return nil, err
 		}
-		c.wwwAuthenticate = pr.WWWAuthenticate
 		c.scheme = pr.scheme
 	}
 
@@ -224,7 +222,7 @@ func (c *dockerClient) makeRequestToResolvedURL(method, url string, headers map[
 	if c.ctx != nil && c.ctx.DockerRegistryUserAgent != "" {
 		req.Header.Add("User-Agent", c.ctx.DockerRegistryUserAgent)
 	}
-	if c.wwwAuthenticate != "" && sendAuth {
+	if sendAuth {
 		if err := c.setupRequestAuth(req); err != nil {
 			return nil, err
 		}
@@ -238,71 +236,33 @@ func (c *dockerClient) makeRequestToResolvedURL(method, url string, headers map[
 }
 
 func (c *dockerClient) setupRequestAuth(req *http.Request) error {
-	tokens := strings.SplitN(strings.TrimSpace(c.wwwAuthenticate), " ", 2)
-	if len(tokens) != 2 {
-		return errors.Errorf("expected 2 tokens in WWW-Authenticate: %d, %s", len(tokens), c.wwwAuthenticate)
+	// FIXME? This gets a new token for every API request;
+	// we may be easily able to reuse a previous token, e.g.
+	// for OpenShift the token only identifies the user and does not vary
+	// across operations.  Should we just try the request first, and
+	// only get a new token on failure?
+	// OTOH what to do with the single-use body stream in that case?
+
+	// Try performing the request, expecting it to fail.
+	testReq := *req
+	// Do not use the body stream, or we couldn't reuse it for the "real" call later.
+	testReq.Body = nil
+	testReq.ContentLength = 0
+	res, err := c.client.Do(&testReq)
+	if err != nil {
+		return err
 	}
-	switch tokens[0] {
-	case "Basic":
+	chs := parseAuthHeader(res.Header)
+	if chs == nil || len(chs) == 0 {
+		return nil
+	}
+	// Arbitrarily use the first challenge, there is no reason to expect more than one.
+	challenge := chs[0]
+	switch challenge.Scheme {
+	case "basic":
 		req.SetBasicAuth(c.username, c.password)
 		return nil
-	case "Bearer":
-		// FIXME? This gets a new token for every API request;
-		// we may be easily able to reuse a previous token, e.g.
-		// for OpenShift the token only identifies the user and does not vary
-		// across operations.  Should we just try the request first, and
-		// only get a new token on failure?
-		// OTOH what to do with the single-use body stream in that case?
-
-		// Try performing the request, expecting it to fail.
-		testReq := *req
-		// Do not use the body stream, or we couldn't reuse it for the "real" call later.
-		testReq.Body = nil
-		testReq.ContentLength = 0
-		res, err := c.client.Do(&testReq)
-		if err != nil {
-			return err
-		}
-		chs := parseAuthHeader(res.Header)
-		// We could end up in this "if" statement if the /v2/ call (during ping)
-		// returned 401 with a valid WWW-Authenticate=Bearer header.
-		// That doesn't **always** mean, however, that the specific API request
-		// (different from /v2/) actually needs to be authorized.
-		// One example of this _weird_ scenario happens with GCR.io docker
-		// registries.
-		if res.StatusCode != http.StatusUnauthorized || chs == nil || len(chs) == 0 {
-			// With gcr.io, the /v2/ call returns a 401 with a valid WWW-Authenticate=Bearer
-			// header but the repository could be _public_ (no authorization is needed).
-			// Hence, the registry response contains no challenges and the status
-			// code is not 401.
-			// We just skip this case as it's not standard on docker/distribution
-			// registries (https://github.com/docker/distribution/blob/master/docs/spec/api.md#api-version-check)
-			if res.StatusCode != http.StatusUnauthorized {
-				return nil
-			}
-			// gcr.io private repositories pull instead requires us to send user:pass pair in
-			// order to retrieve a token and setup the correct Bearer token.
-			// try again one last time with Basic Auth
-			testReq2 := *req
-			// Do not use the body stream, or we couldn't reuse it for the "real" call later.
-			testReq2.Body = nil
-			testReq2.ContentLength = 0
-			testReq2.SetBasicAuth(c.username, c.password)
-			res, err := c.client.Do(&testReq2)
-			if err != nil {
-				return err
-			}
-			chs = parseAuthHeader(res.Header)
-			if res.StatusCode != http.StatusUnauthorized || chs == nil || len(chs) == 0 {
-				// no need for bearer? wtf?
-				return nil
-			}
-		}
-		// Arbitrarily use the first challenge, there is no reason to expect more than one.
-		challenge := chs[0]
-		if challenge.Scheme != "bearer" { // Another artifact of trying to handle WWW-Authenticate before it actually happens.
-			return errors.Errorf("Unimplemented: WWW-Authenticate Bearer replaced by %#v", challenge.Scheme)
-		}
+	case "bearer":
 		realm, ok := challenge.Parameters["realm"]
 		if !ok {
 			return errors.Errorf("missing realm in bearer auth challenge")
@@ -316,8 +276,7 @@ func (c *dockerClient) setupRequestAuth(req *http.Request) error {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		return nil
 	}
-	return errors.Errorf("no handler for %s authentication", tokens[0])
-	// support docker bearer with authconfig's Auth string? see docker2aci
+	return errors.Errorf("no handler for %q authentication", challenge.Scheme)
 }
 
 func (c *dockerClient) getBearerToken(realm, service, scope string) (string, error) {
@@ -428,15 +387,14 @@ func getAuth(ctx *types.SystemContext, registry string) (string, string, error) 
 }
 
 type pingResponse struct {
-	WWWAuthenticate string
-	APIVersion      string
-	scheme          string
+	APIVersion string
+	scheme     string
 }
 
 func (c *dockerClient) ping() (*pingResponse, error) {
 	ping := func(scheme string) (*pingResponse, error) {
 		url := fmt.Sprintf(baseURL, scheme, c.registry)
-		resp, err := c.makeRequestToResolvedURL("GET", url, nil, nil, -1, true)
+		resp, err := c.makeRequestToResolvedURL("GET", url, nil, nil, -1, false)
 		logrus.Debugf("Ping %s err %#v", url, err)
 		if err != nil {
 			return nil, err
@@ -447,7 +405,6 @@ func (c *dockerClient) ping() (*pingResponse, error) {
 			return nil, errors.Errorf("error pinging repository, response code %d", resp.StatusCode)
 		}
 		pr := &pingResponse{}
-		pr.WWWAuthenticate = resp.Header.Get("WWW-Authenticate")
 		pr.APIVersion = resp.Header.Get("Docker-Distribution-Api-Version")
 		pr.scheme = scheme
 		return pr, nil
