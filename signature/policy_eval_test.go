@@ -5,8 +5,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/containers/image/docker"
 	"github.com/containers/image/docker/policyconfiguration"
 	"github.com/containers/image/docker/reference"
+	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -101,6 +103,37 @@ func (ref pcImageReferenceMock) NewImageDestination(ctx *types.SystemContext) (t
 }
 func (ref pcImageReferenceMock) DeleteImage(ctx *types.SystemContext) error {
 	panic("unexpected call to a mock function")
+}
+
+func TestPolicyContextRequirementsForImageRefNotRegisteredTransport(t *testing.T) {
+	transports.Delete("docker")
+	assert.Nil(t, transports.Get("docker"))
+
+	defer func() {
+		assert.Nil(t, transports.Get("docker"))
+		transports.Register(docker.Transport)
+		assert.NotNil(t, transports.Get("docker"))
+	}()
+
+	pr := []PolicyRequirement{
+		xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RH"), NewPRMMatchRepository()),
+	}
+	policy := &Policy{
+		Default: PolicyRequirements{NewPRReject()},
+		Transports: map[string]PolicyTransportScopes{
+			"docker": {
+				"registry.access.redhat.com": pr,
+			},
+		},
+	}
+	pc, err := NewPolicyContext(policy)
+	require.NoError(t, err)
+	ref, err := reference.ParseNormalizedNamed("registry.access.redhat.com/rhel7:latest")
+	require.NoError(t, err)
+	reqs := pc.requirementsForImageRef(pcImageReferenceMock{"docker", ref})
+	assert.True(t, &(reqs[0]) == &(pr[0]))
+	assert.True(t, len(reqs) == len(pr))
+
 }
 
 func TestPolicyContextRequirementsForImageRef(t *testing.T) {

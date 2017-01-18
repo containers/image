@@ -122,10 +122,8 @@ func (m *policyTransportsMap) UnmarshalJSON(data []byte) error {
 	// So, use a temporary map of pointers-to-slices and convert.
 	tmpMap := map[string]*PolicyTransportScopes{}
 	if err := paranoidUnmarshalJSONObject(data, func(key string) interface{} {
-		transport, ok := transports.KnownTransports[key]
-		if !ok {
-			return nil
-		}
+		// transport can be nil
+		transport := transports.Get(key)
 		// paranoidUnmarshalJSONObject detects key duplication for us, check just to be safe.
 		if _, ok := tmpMap[key]; ok {
 			return nil
@@ -155,7 +153,7 @@ func (m *PolicyTransportScopes) UnmarshalJSON(data []byte) error {
 }
 
 // policyTransportScopesWithTransport is a way to unmarshal a PolicyTransportScopes
-// while validating using a specific ImageTransport.
+// while validating using a specific ImageTransport if not nil.
 type policyTransportScopesWithTransport struct {
 	transport types.ImageTransport
 	dest      *PolicyTransportScopes
@@ -174,7 +172,7 @@ func (m *policyTransportScopesWithTransport) UnmarshalJSON(data []byte) error {
 		if _, ok := tmpMap[key]; ok {
 			return nil
 		}
-		if key != "" {
+		if key != "" && m.transport != nil {
 			if err := m.transport.ValidatePolicyConfigurationScope(key); err != nil {
 				return nil
 			}
