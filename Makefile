@@ -15,6 +15,12 @@ deps:
 	go get -u $(BUILDFLAGS) github.com/golang/lint/golint
 	go get $(BUILDFLAGS) github.com/vbatts/git-validation
 
+docker-build:
+	docker build -t containers/image:test .
+
+test-pristine: docker-build
+	docker run --privileged -e TRAVIS_COMMIT_RANGE=$(TRAVIS_COMMIT_RANGE) -e TRAVIS_BRANCH=$(TRAVIS_BRANCH) -e TRAVIS_COMMIT=$(TRAVIS_COMMIT) -e TRAVIS=$(TRAVIS) -it containers/image:test
+
 test:
 	@go test $(BUILDFLAGS) -cover ./...
 
