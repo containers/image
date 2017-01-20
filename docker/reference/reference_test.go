@@ -21,6 +21,7 @@ func TestValidateReferenceName(t *testing.T) {
 		"127.0.0.1:5000/library/debian",
 		"127.0.0.1:5000/debian",
 		"thisisthesongthatneverendsitgoesonandonandonthisisthesongthatnev",
+		"docker.io/1a3f5e7d9c1b3a5f7e9d1c3b5a7f9e1d3c5b7a9f1e3d5d7c9b1a3f5e7d9c1b3a",
 	}
 	invalidRepoNames := []string{
 		"https://github.com/docker/docker",
@@ -32,7 +33,6 @@ func TestValidateReferenceName(t *testing.T) {
 		"docker.io/docker/Docker",
 		"docker.io/docker///docker",
 		"1a3f5e7d9c1b3a5f7e9d1c3b5a7f9e1d3c5b7a9f1e3d5d7c9b1a3f5e7d9c1b3a",
-		"docker.io/1a3f5e7d9c1b3a5f7e9d1c3b5a7f9e1d3c5b7a9f1e3d5d7c9b1a3f5e7d9c1b3a",
 	}
 
 	for _, name := range invalidRepoNames {
