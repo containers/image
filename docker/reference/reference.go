@@ -26,7 +26,7 @@ const (
 // XCanonical reference is an object with a fully unique
 // name including a name with hostname and digest
 type XCanonical interface {
-	distreference.Named
+	distreference.Canonical
 	XDigest() digest.Digest
 }
 
@@ -48,7 +48,7 @@ func XParseNamed(s string) (distreference.Named, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &canonicalRef{namedRef{r}}, nil
+		return &canonicalRef{Canonical: r, namedRef: namedRef{r}}, nil
 	}
 	if tagged, isTagged := named.(distreference.NamedTagged); isTagged {
 		return distreference.WithTag(r, tagged.Tag())
@@ -71,6 +71,7 @@ type namedRef struct {
 	distreference.Named // FIXME: must implement private distreference.NamedRepository
 }
 type canonicalRef struct {
+	distreference.Canonical
 	namedRef
 }
 
