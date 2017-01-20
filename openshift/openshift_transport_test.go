@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/containers/image/docker/reference"
+	distreference "github.com/docker/distribution/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -64,7 +65,7 @@ func TestParseReference(t *testing.T) {
 	assert.Equal(t, "ns", osRef.namespace)
 	assert.Equal(t, "stream", osRef.stream)
 	assert.Equal(t, "notlatest", osRef.dockerReference.XTag())
-	assert.Equal(t, "registry.example.com:8443", osRef.dockerReference.XHostname())
+	assert.Equal(t, "registry.example.com:8443", distreference.Domain(osRef.dockerReference))
 
 	// Components creating an invalid Docker Reference name
 	_, err = ParseReference("registry.example.com/ns/UPPERCASEISINVALID:notlatest")

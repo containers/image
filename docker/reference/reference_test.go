@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	_ "crypto/sha256"
+
+	distreference "github.com/docker/distribution/reference"
 )
 
 func TestValidateReferenceName(t *testing.T) {
@@ -231,7 +233,7 @@ func TestParseRepositoryInfo(t *testing.T) {
 			if expected, actual := tcase.FullName, r.Name(); expected != actual {
 				t.Fatalf("Invalid normalized reference for %q. Expected %q, got %q", r, expected, actual)
 			}
-			if expected, actual := tcase.Hostname, r.XHostname(); expected != actual {
+			if expected, actual := tcase.Hostname, distreference.Domain(r); expected != actual {
 				t.Fatalf("Invalid hostname for %q. Expected %q, got %q", r, expected, actual)
 			}
 			if expected, actual := tcase.RemoteName, r.XRemoteName(); expected != actual {

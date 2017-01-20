@@ -17,6 +17,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/types"
 	"github.com/containers/storage/pkg/homedir"
+	"github.com/docker/distribution/reference"
 	"github.com/docker/go-connections/sockets"
 	"github.com/docker/go-connections/tlsconfig"
 	"github.com/pkg/errors"
@@ -164,11 +165,11 @@ func hasFile(files []os.FileInfo, name string) bool {
 // newDockerClient returns a new dockerClient instance for refHostname (a host a specified in the Docker image reference, not canonicalized to dockerRegistry)
 // “write” specifies whether the client will be used for "write" access (in particular passed to lookaside.go:toplevelFromSection)
 func newDockerClient(ctx *types.SystemContext, ref dockerReference, write bool, actions string) (*dockerClient, error) {
-	registry := ref.ref.XHostname()
+	registry := reference.Domain(ref.ref)
 	if registry == dockerHostname {
 		registry = dockerRegistry
 	}
-	username, password, err := getAuth(ctx, ref.ref.XHostname())
+	username, password, err := getAuth(ctx, reference.Domain(ref.ref))
 	if err != nil {
 		return nil, err
 	}
