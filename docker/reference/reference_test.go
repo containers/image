@@ -268,7 +268,7 @@ func TestInvalidReferenceComponents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := XWithTag(ref, "-foo"); err == nil {
+	if _, err := distreference.WithTag(ref, "-foo"); err == nil {
 		t.Fatal("Expected WithName to detect invalid tag")
 	}
 }

@@ -51,7 +51,7 @@ func XParseNamed(s string) (distreference.Named, error) {
 		return &canonicalRef{namedRef{r}}, nil
 	}
 	if tagged, isTagged := named.(distreference.NamedTagged); isTagged {
-		return XWithTag(r, tagged.Tag())
+		return distreference.WithTag(r, tagged.Tag())
 	}
 	return r, nil
 }
@@ -65,12 +65,6 @@ func XWithName(name string) (*namedRef, error) {
 		return nil, err
 	}
 	return &namedRef{r}, nil
-}
-
-// XWithTag combines the name from "name" and the tag from "tag" to form a
-// reference incorporating both the name and the tag.
-func XWithTag(name distreference.Named, tag string) (distreference.NamedTagged, error) {
-	return distreference.WithTag(name, tag)
 }
 
 type namedRef struct {
@@ -112,8 +106,7 @@ func (r *canonicalRef) XDigest() digest.Digest {
 // XWithDefaultTag adds a default tag to a reference if it only has a repo name.
 func XWithDefaultTag(ref distreference.Named) distreference.Named {
 	if XIsNameOnly(ref) {
-		// FIXME: uses *namedRef to expose the distreference.Named implementations. Should use ref without a cast.
-		ref, _ = XWithTag(ref.(*namedRef), XDefaultTag)
+		ref, _ = distreference.WithTag(ref, XDefaultTag)
 	}
 	return ref
 }
