@@ -162,10 +162,10 @@ func (r *namedRef) XRemoteName() string {
 	return remoteName
 }
 func (r *taggedRef) XTag() string {
-	return r.namedRef.our.(distreference.NamedTagged).Tag()
+	return r.namedRef.upstream.(distreference.NamedTagged).Tag()
 }
 func (r *canonicalRef) XDigest() digest.Digest {
-	return digest.Digest(r.namedRef.our.(distreference.Canonical).Digest())
+	return digest.Digest(r.namedRef.upstream.(distreference.Canonical).Digest())
 }
 
 // XWithDefaultTag adds a default tag to a reference if it only has a repo name.
