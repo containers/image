@@ -150,16 +150,13 @@ func (r *namedRef) XString() string {
 	return r.our.String()
 }
 func (r *namedRef) XFullName() string {
-	hostname, remoteName := splitHostname(r.XName())
-	return hostname + "/" + remoteName
+	return r.upstream.Name()
 }
 func (r *namedRef) XHostname() string {
-	hostname, _ := splitHostname(r.XName())
-	return hostname
+	return distreference.Domain(r.upstream)
 }
 func (r *namedRef) XRemoteName() string {
-	_, remoteName := splitHostname(r.XName())
-	return remoteName
+	return distreference.Path(r.upstream)
 }
 func (r *taggedRef) XTag() string {
 	return r.namedRef.upstream.(distreference.NamedTagged).Tag()
