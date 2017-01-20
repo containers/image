@@ -42,7 +42,7 @@ func (t daemonTransport) ValidatePolicyConfigurationScope(scope string) error {
 //  Using the config digest requires the caller to parse the manifest themselves, which is very cumbersome; so, for now, we don’t bother.)
 type daemonReference struct {
 	id  digest.Digest
-	ref distreference.Named // !reference.XIsNameOnly
+	ref distreference.Named // !reference.IsNameOnly
 }
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an ImageReference.
@@ -71,13 +71,13 @@ func ParseReference(refString string) (types.ImageReference, error) {
 	return NewReference("", ref)
 }
 
-// NewReference returns a docker-daemon reference for either the supplied image ID (config digest) or the supplied reference (which must satisfy !reference.XIsNameOnly)
+// NewReference returns a docker-daemon reference for either the supplied image ID (config digest) or the supplied reference (which must satisfy !reference.IsNameOnly)
 func NewReference(id digest.Digest, ref distreference.Named) (types.ImageReference, error) {
 	if id != "" && ref != nil {
 		return nil, errors.New("docker-daemon: reference must not have an image ID and a reference string specified at the same time")
 	}
 	if ref != nil {
-		if reference.XIsNameOnly(ref) {
+		if distreference.IsNameOnly(ref) {
 			return nil, errors.Errorf("docker-daemon: reference %s has neither a tag nor a digest", distreference.FamiliarString(ref))
 		}
 		// A github.com/distribution/reference value can have a tag and a digest at the same time!
@@ -116,7 +116,7 @@ func (ref daemonReference) StringWithinTransport() string {
 }
 
 // DockerReference returns a Docker reference associated with this reference
-// (fully explicit, i.e. !reference.XIsNameOnly, but reflecting user intent,
+// (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
 func (ref daemonReference) DockerReference() distreference.Named {
 	return ref.ref // May be nil

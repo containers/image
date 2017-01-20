@@ -38,7 +38,7 @@ func (t dockerTransport) ValidatePolicyConfigurationScope(scope string) error {
 
 // dockerReference is an ImageReference for Docker images.
 type dockerReference struct {
-	ref distreference.Named // By construction we know that !reference.XIsNameOnly(ref)
+	ref distreference.Named // By construction we know that !reference.IsNameOnly(ref)
 }
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an Docker ImageReference.
@@ -54,9 +54,9 @@ func ParseReference(refString string) (types.ImageReference, error) {
 	return NewReference(ref)
 }
 
-// NewReference returns a Docker reference for a named reference. The reference must satisfy !reference.XIsNameOnly().
+// NewReference returns a Docker reference for a named reference. The reference must satisfy !reference.IsNameOnly().
 func NewReference(ref distreference.Named) (types.ImageReference, error) {
-	if reference.XIsNameOnly(ref) {
+	if distreference.IsNameOnly(ref) {
 		return nil, errors.Errorf("Docker reference %s has neither a tag nor a digest", distreference.FamiliarString(ref))
 	}
 	// A github.com/distribution/reference value can have a tag and a digest at the same time!
@@ -87,7 +87,7 @@ func (ref dockerReference) StringWithinTransport() string {
 }
 
 // DockerReference returns a Docker reference associated with this reference
-// (fully explicit, i.e. !reference.XIsNameOnly, but reflecting user intent,
+// (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
 func (ref dockerReference) DockerReference() distreference.Named {
 	return ref.ref
@@ -152,6 +152,6 @@ func (ref dockerReference) tagOrDigest() (string, error) {
 	if ref, ok := ref.ref.(distreference.NamedTagged); ok {
 		return ref.Tag(), nil
 	}
-	// This should not happen, NewReference above refuses reference.XIsNameOnly values.
+	// This should not happen, NewReference above refuses reference.IsNameOnly values.
 	return "", errors.Errorf("Internal inconsistency: Reference %s unexpectedly has neither a digest nor a tag", distreference.FamiliarString(ref.ref))
 }

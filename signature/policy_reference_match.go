@@ -31,7 +31,7 @@ func (prm *prmMatchExact) matchesDockerReference(image types.UnparsedImage, sign
 		return false
 	}
 	// Do not add default tags: image.Reference().DockerReference() should contain it already, and signatureDockerReference should be exact; so, verify that now.
-	if reference.XIsNameOnly(intended) || reference.XIsNameOnly(signature) {
+	if distreference.IsNameOnly(intended) || distreference.IsNameOnly(signature) {
 		return false
 	}
 	return signature.String() == intended.String()
@@ -44,7 +44,7 @@ func (prm *prmMatchRepoDigestOrExact) matchesDockerReference(image types.Unparse
 	}
 
 	// Do not add default tags: image.Reference().DockerReference() should contain it already, and signatureDockerReference should be exact; so, verify that now.
-	if reference.XIsNameOnly(signature) {
+	if distreference.IsNameOnly(signature) {
 		return false
 	}
 	switch intended.(type) {
@@ -55,7 +55,7 @@ func (prm *prmMatchRepoDigestOrExact) matchesDockerReference(image types.Unparse
 		// Becase UnparsedImage.Manifest verifies the intended.Digest() against the manifest, and prSignedBy verifies the signature digest against the manifest,
 		// we know that signature digest matches intended.Digest() (but intended.Digest() and signature digest may use different algorithms)
 		return signature.Name() == intended.Name()
-	default: // !reference.XIsNameOnly(intended)
+	default: // !reference.IsNameOnly(intended)
 		return false
 	}
 }
@@ -87,7 +87,7 @@ func (prm *prmExactReference) matchesDockerReference(image types.UnparsedImage, 
 		return false
 	}
 	// prm.DockerReference and signatureDockerReference should be exact; so, verify that now.
-	if reference.XIsNameOnly(intended) || reference.XIsNameOnly(signature) {
+	if distreference.IsNameOnly(intended) || distreference.IsNameOnly(signature) {
 		return false
 	}
 	return signature.String() == intended.String()

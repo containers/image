@@ -19,11 +19,11 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
+	distreference "github.com/docker/distribution/reference"
+	"github.com/pkg/errors"
 )
 
 // systemDefaultPolicyPath is the policy path used for DefaultPolicy().
@@ -638,7 +638,7 @@ func newPRMExactReference(dockerReference string) (*prmExactReference, error) {
 	if err != nil {
 		return nil, InvalidPolicyFormatError(fmt.Sprintf("Invalid format of dockerReference %s: %s", dockerReference, err.Error()))
 	}
-	if reference.XIsNameOnly(ref) {
+	if distreference.IsNameOnly(ref) {
 		return nil, InvalidPolicyFormatError(fmt.Sprintf("dockerReference %s contains neither a tag nor digest", dockerReference))
 	}
 	return &prmExactReference{
