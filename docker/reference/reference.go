@@ -74,21 +74,12 @@ func XWithName(name string) (*namedRef, error) {
 
 // XWithTag combines the name from "name" and the tag from "tag" to form a
 // reference incorporating both the name and the tag.
-// FIXME: expects *namedRef to expose the distreference.Named implementation. Should revert to distreference.Named.
-func XWithTag(name *namedRef, tag string) (XNamedTagged, error) {
-	r, err := distreference.WithTag(name, tag)
-	if err != nil {
-		return nil, err
-	}
-	return &taggedRef{NamedTagged: r, namedRef: namedRef{r}}, nil
+func XWithTag(name distreference.Named, tag string) (XNamedTagged, error) {
+	return distreference.WithTag(name, tag)
 }
 
 type namedRef struct {
 	distreference.Named // FIXME: must implement private distreference.NamedRepository
-}
-type taggedRef struct {
-	distreference.NamedTagged
-	namedRef
 }
 type canonicalRef struct {
 	namedRef
