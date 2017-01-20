@@ -159,7 +159,7 @@ func (s privateSignature) sign(mech SigningMechanism, keyIdentity string) ([]byt
 // signatureAcceptanceRules specifies how to decide whether an untrusted signature is acceptable.
 // We centralize the actual parsing and data extraction in verifyAndExtractSignature; this supplies
 // the policy.  We use an object instead of supplying func parameters to verifyAndExtractSignature
-// because all of the functions have the same type, so there is a risk of exchanging the functions;
+// because the functions have the same or similar types, so there is a risk of exchanging the functions;
 // named members of this struct are more explicit.
 type signatureAcceptanceRules struct {
 	validateKeyIdentity                func(string) error
