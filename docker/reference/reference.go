@@ -27,7 +27,6 @@ const (
 // name including a name with hostname and digest
 type XCanonical interface {
 	distreference.Canonical
-	XDigest() digest.Digest
 }
 
 // XParseNamed parses s and returns a syntactically valid reference implementing
@@ -98,10 +97,6 @@ func (r *namedRef) Path() string {
 }
 func (r *namedRef) Familiar() distreference.Named {
 	return r.Named.(drPRIVATEInterfaces).Familiar()
-}
-
-func (r *canonicalRef) XDigest() digest.Digest {
-	return digest.Digest(r.Canonical.Digest())
 }
 
 // XWithDefaultTag adds a default tag to a reference if it only has a repo name.

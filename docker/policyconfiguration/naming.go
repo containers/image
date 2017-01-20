@@ -24,7 +24,7 @@ func DockerReferenceIdentity(ref distreference.Named) (string, error) {
 	case isTagged:
 		res = res + ":" + tagged.Tag()
 	case isDigested:
-		res = res + "@" + digested.XDigest().String()
+		res = res + "@" + digested.Digest().String()
 	default: // Coverage: The above was supposed to be exhaustive.
 		return "", errors.New("Internal inconsistency, unexpected default branch")
 	}

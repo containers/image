@@ -147,7 +147,7 @@ func (ref dockerReference) DeleteImage(ctx *types.SystemContext) error {
 // tagOrDigest returns a tag or digest from the reference.
 func (ref dockerReference) tagOrDigest() (string, error) {
 	if ref, ok := ref.ref.(reference.XCanonical); ok {
-		return ref.XDigest().String(), nil
+		return ref.Digest().String(), nil
 	}
 	if ref, ok := ref.ref.(distreference.NamedTagged); ok {
 		return ref.Tag(), nil
