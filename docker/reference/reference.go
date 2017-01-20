@@ -1,7 +1,6 @@
 package reference
 
 import (
-	"regexp"
 
 	// "opencontainers/go-digest" requires us to load the algorithms that we
 	// want to use into the binary (it calls .Available).
@@ -15,21 +14,15 @@ import (
 // XParseIDOrReference parses string for an image ID or a reference. ID can be
 // without a default prefix.
 func XParseIDOrReference(idOrRef string) (digest.Digest, distreference.Named, error) {
-	if err := validateID(idOrRef); err == nil {
-		idOrRef = "sha256:" + idOrRef
+	ref, err := distreference.ParseAnyReference(idOrRef)
+	if err != nil {
+		return "", nil, err
 	}
-	if dgst, err := digest.Parse(idOrRef); err == nil {
-		return dgst, nil, nil
+	if named, ok := ref.(distreference.Named); ok {
+		return "", named, nil
 	}
-	ref, err := distreference.ParseNormalizedNamed(idOrRef)
-	return "", ref, err
-}
-
-var validHex = regexp.MustCompile(`^([a-f0-9]{64})$`)
-
-func validateID(id string) error {
-	if ok := validHex.MatchString(id); !ok {
-		return errors.Errorf("image ID %q is invalid", id)
+	if digested, ok := ref.(distreference.Digested); ok {
+		return digest.Digest(digested.Digest()), nil, nil
 	}
-	return nil
+	return "", nil, errors.New("Unexpected inconsistency: %#v, the result of ParseAnyReference is neither a Named or nor a Digested")
 }
