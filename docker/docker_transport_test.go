@@ -42,18 +42,18 @@ func TestParseReference(t *testing.T) {
 // testParseReference is a test shared for Transport.ParseReference and ParseReference.
 func testParseReference(t *testing.T, fn func(string) (types.ImageReference, error)) {
 	for _, c := range []struct{ input, expected string }{
-		{"busybox", ""},                                        // Missing // prefix
-		{"//busybox:notlatest", "busybox:notlatest"},           // Explicit tag
-		{"//busybox" + sha256digest, "busybox" + sha256digest}, // Explicit digest
-		{"//busybox", "busybox:latest"},                        // Default tag
+		{"busybox", ""}, // Missing // prefix
+		{"//busybox:notlatest", "docker.io/library/busybox:notlatest"},           // Explicit tag
+		{"//busybox" + sha256digest, "docker.io/library/busybox" + sha256digest}, // Explicit digest
+		{"//busybox", "docker.io/library/busybox:latest"},                        // Default tag
 		// A github.com/distribution/reference value can have a tag and a digest at the same time!
 		// github.com/docker/reference handles that by dropping the tag. That is not obviously the
 		// right thing to do, but it is at least reasonable, so test that we keep behaving reasonably.
 		// This test case should not be construed to make this an API promise.
 		// FIXME? Instead work extra hard to reject such input?
-		{"//busybox:latest" + sha256digest, "busybox" + sha256digest}, // Both tag and digest
-		{"//docker.io/library/busybox:latest", "busybox:latest"},      // All implied values explicitly specified
-		{"//UPPERCASEISINVALID", ""},                                  // Invalid input
+		{"//busybox:latest" + sha256digest, "docker.io/library/busybox" + sha256digest}, // Both tag and digest
+		{"//docker.io/library/busybox:latest", "docker.io/library/busybox:latest"},      // All implied values explicitly specified
+		{"//UPPERCASEISINVALID", ""},                                                    // Invalid input
 	} {
 		ref, err := fn(c.input)
 		if c.expected == "" {
@@ -62,7 +62,7 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 			require.NoError(t, err, c.input)
 			dockerRef, ok := ref.(dockerReference)
 			require.True(t, ok, c.input)
-			assert.Equal(t, c.expected, dockerRef.ref.XString(), c.input)
+			assert.Equal(t, c.expected, dockerRef.ref.String(), c.input)
 		}
 	}
 }
@@ -76,10 +76,10 @@ func (ref refWithTagAndDigest) XTag() string {
 
 // A common list of reference formats to test for the various ImageReference methods.
 var validReferenceTestCases = []struct{ input, dockerRef, stringWithinTransport string }{
-	{"busybox:notlatest", "busybox:notlatest", "//busybox:notlatest"},                // Explicit tag
-	{"busybox" + sha256digest, "busybox" + sha256digest, "//busybox" + sha256digest}, // Explicit digest
-	{"docker.io/library/busybox:latest", "busybox:latest", "//busybox:latest"},       // All implied values explicitly specified
-	{"example.com/ns/foo:bar", "example.com/ns/foo:bar", "//example.com/ns/foo:bar"}, // All values explicitly specified
+	{"busybox:notlatest", "docker.io/library/busybox:notlatest", "//busybox:notlatest"},                // Explicit tag
+	{"busybox" + sha256digest, "docker.io/library/busybox" + sha256digest, "//busybox" + sha256digest}, // Explicit digest
+	{"docker.io/library/busybox:latest", "docker.io/library/busybox:latest", "//busybox:latest"},       // All implied values explicitly specified
+	{"example.com/ns/foo:bar", "example.com/ns/foo:bar", "//example.com/ns/foo:bar"},                   // All values explicitly specified
 }
 
 func TestNewReference(t *testing.T) {
@@ -90,7 +90,7 @@ func TestNewReference(t *testing.T) {
 		require.NoError(t, err, c.input)
 		dockerRef, ok := ref.(dockerReference)
 		require.True(t, ok, c.input)
-		assert.Equal(t, c.dockerRef, dockerRef.ref.XString(), c.input)
+		assert.Equal(t, c.dockerRef, dockerRef.ref.String(), c.input)
 	}
 
 	// Neither a tag nor digest
@@ -135,7 +135,7 @@ func TestReferenceDockerReference(t *testing.T) {
 		require.NoError(t, err, c.input)
 		dockerRef := ref.DockerReference()
 		require.NotNil(t, dockerRef, c.input)
-		assert.Equal(t, c.dockerRef, dockerRef.XString(), c.input)
+		assert.Equal(t, c.dockerRef, dockerRef.String(), c.input)
 	}
 }
 

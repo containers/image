@@ -78,7 +78,7 @@ func NewReference(id digest.Digest, ref reference.XNamed) (types.ImageReference,
 	}
 	if ref != nil {
 		if reference.XIsNameOnly(ref) {
-			return nil, errors.Errorf("docker-daemon: reference %s has neither a tag nor a digest", ref.XString())
+			return nil, errors.Errorf("docker-daemon: reference %s has neither a tag nor a digest", distreference.FamiliarString(ref))
 		}
 		// A github.com/distribution/reference value can have a tag and a digest at the same time!
 		// docker/reference does not handle that, so fail.
@@ -109,7 +109,7 @@ func (ref daemonReference) StringWithinTransport() string {
 	case ref.id != "":
 		return ref.id.String()
 	case ref.ref != nil:
-		return ref.ref.XString()
+		return distreference.FamiliarString(ref.ref)
 	default: // Coverage: Should never happen, NewReference above should refuse such values.
 		panic("Internal inconsistency: daemonReference has empty id and nil ref")
 	}

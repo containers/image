@@ -33,7 +33,7 @@ func (prm *prmMatchExact) matchesDockerReference(image types.UnparsedImage, sign
 	if reference.XIsNameOnly(intended) || reference.XIsNameOnly(signature) {
 		return false
 	}
-	return signature.XString() == intended.XString()
+	return signature.String() == intended.String()
 }
 
 func (prm *prmMatchRepoDigestOrExact) matchesDockerReference(image types.UnparsedImage, signatureDockerReference string) bool {
@@ -48,7 +48,7 @@ func (prm *prmMatchRepoDigestOrExact) matchesDockerReference(image types.Unparse
 	}
 	switch intended.(type) {
 	case reference.XNamedTagged: // Includes the case when intended has both a tag and a digest.
-		return signature.XString() == intended.XString()
+		return signature.String() == intended.String()
 	case reference.XCanonical:
 		// We don’t actually compare the manifest digest against the signature here; that happens prSignedBy.in UnparsedImage.Manifest.
 		// Becase UnparsedImage.Manifest verifies the intended.Digest() against the manifest, and prSignedBy verifies the signature digest against the manifest,
@@ -89,7 +89,7 @@ func (prm *prmExactReference) matchesDockerReference(image types.UnparsedImage, 
 	if reference.XIsNameOnly(intended) || reference.XIsNameOnly(signature) {
 		return false
 	}
-	return signature.XString() == intended.XString()
+	return signature.String() == intended.String()
 }
 
 func (prm *prmExactRepository) matchesDockerReference(image types.UnparsedImage, signatureDockerReference string) bool {

@@ -26,8 +26,6 @@ const (
 // XNamed is an object with a full name
 type XNamed interface {
 	distreference.Named
-	// XString returns full reference, like "ubuntu@sha256:abcdef..."
-	XString() string
 }
 
 // XNamedTagged is an object including a name and tag.
@@ -126,9 +124,6 @@ func (r *namedRef) Familiar() distreference.Named {
 	return r.Named.(drPRIVATEInterfaces).Familiar()
 }
 
-func (r *namedRef) XString() string {
-	return distreference.FamiliarString(r)
-}
 func (r *taggedRef) XTag() string {
 	return r.namedRef.Named.(distreference.NamedTagged).Tag()
 }

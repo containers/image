@@ -6,7 +6,7 @@ import (
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
-
+	distreference "github.com/docker/distribution/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,8 +30,8 @@ func TestParseImageAndDockerReference(t *testing.T) {
 	require.NoError(t, err)
 	r1, r2, err := parseImageAndDockerReference(refImageMock{ref}, ok2)
 	require.NoError(t, err)
-	assert.Equal(t, ok1, r1.XString())
-	assert.Equal(t, ok2, r2.XString())
+	assert.Equal(t, ok1, distreference.FamiliarString(r1))
+	assert.Equal(t, ok2, distreference.FamiliarString(r2))
 
 	// Unidentified images are rejected.
 	_, _, err = parseImageAndDockerReference(refImageMock{nil}, ok2)
@@ -307,8 +307,8 @@ func TestParseDockerReferences(t *testing.T) {
 	// Success
 	r1, r2, err := parseDockerReferences(ok1, ok2)
 	require.NoError(t, err)
-	assert.Equal(t, ok1, r1.XString())
-	assert.Equal(t, ok2, r2.XString())
+	assert.Equal(t, ok1, distreference.FamiliarString(r1))
+	assert.Equal(t, ok2, distreference.FamiliarString(r2))
 
 	// Failures
 	for _, refs := range [][]string{

@@ -7,6 +7,7 @@ import (
 	"github.com/containers/image/docker/policyconfiguration"
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
+	distreference "github.com/docker/distribution/reference"
 	"github.com/pkg/errors"
 )
 
@@ -56,7 +57,7 @@ func ParseReference(refString string) (types.ImageReference, error) {
 // NewReference returns a Docker reference for a named reference. The reference must satisfy !reference.XIsNameOnly().
 func NewReference(ref reference.XNamed) (types.ImageReference, error) {
 	if reference.XIsNameOnly(ref) {
-		return nil, errors.Errorf("Docker reference %s has neither a tag nor a digest", ref.XString())
+		return nil, errors.Errorf("Docker reference %s has neither a tag nor a digest", distreference.FamiliarString(ref))
 	}
 	// A github.com/distribution/reference value can have a tag and a digest at the same time!
 	// docker/reference does not handle that, so fail.
@@ -82,7 +83,7 @@ func (ref dockerReference) Transport() types.ImageTransport {
 // e.g. default attribute values omitted by the user may be filled in in the return value, or vice versa.
 // WARNING: Do not use the return value in the UI to describe an image, it does not contain the Transport().Name() prefix.
 func (ref dockerReference) StringWithinTransport() string {
-	return "//" + ref.ref.XString()
+	return "//" + distreference.FamiliarString(ref.ref)
 }
 
 // DockerReference returns a Docker reference associated with this reference
@@ -152,5 +153,5 @@ func (ref dockerReference) tagOrDigest() (string, error) {
 		return ref.XTag(), nil
 	}
 	// This should not happen, NewReference above refuses reference.XIsNameOnly values.
-	return "", errors.Errorf("Internal inconsistency: Reference %s unexpectedly has neither a digest nor a tag", ref.ref.XString())
+	return "", errors.Errorf("Internal inconsistency: Reference %s unexpectedly has neither a digest nor a tag", distreference.FamiliarString(ref.ref))
 }

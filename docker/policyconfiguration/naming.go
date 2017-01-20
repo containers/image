@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/containers/image/docker/reference"
+	distreference "github.com/docker/distribution/reference"
 )
 
 // DockerReferenceIdentity returns a string representation of the reference, suitable for policy lookup,
@@ -17,9 +18,9 @@ func DockerReferenceIdentity(ref reference.XNamed) (string, error) {
 	digested, isDigested := ref.(reference.XCanonical)
 	switch {
 	case isTagged && isDigested: // This should not happen, docker/reference.XParseNamed drops the tag.
-		return "", errors.Errorf("Unexpected Docker reference %s with both a name and a digest", ref.XString())
+		return "", errors.Errorf("Unexpected Docker reference %s with both a name and a digest", distreference.FamiliarString(ref))
 	case !isTagged && !isDigested: // This should not happen, the caller is expected to ensure !reference.XIsNameOnly()
-		return "", errors.Errorf("Internal inconsistency: Docker reference %s with neither a tag nor a digest", ref.XString())
+		return "", errors.Errorf("Internal inconsistency: Docker reference %s with neither a tag nor a digest", distreference.FamiliarString(ref))
 	case isTagged:
 		res = res + ":" + tagged.XTag()
 	case isDigested:

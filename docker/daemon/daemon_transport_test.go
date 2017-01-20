@@ -50,15 +50,15 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 		{"sha256:XX23456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "", ""}, // Invalid digest value
 		{"UPPERCASEISINVALID", "", ""},                                                      // Invalid reference input
 		{"busybox", "", ""},                                                                 // Missing tag or digest
-		{"busybox:latest", "", "busybox:latest"},                                            // Explicit tag
-		{"busybox@" + sha256digest, "", "busybox@" + sha256digest},                          // Explicit digest
+		{"busybox:latest", "", "docker.io/library/busybox:latest"},                          // Explicit tag
+		{"busybox@" + sha256digest, "", "docker.io/library/busybox@" + sha256digest},        // Explicit digest
 		// A github.com/distribution/reference value can have a tag and a digest at the same time!
 		// github.com/docker/reference handles that by dropping the tag. That is not obviously the
 		// right thing to do, but it is at least reasonable, so test that we keep behaving reasonably.
 		// This test case should not be construed to make this an API promise.
 		// FIXME? Instead work extra hard to reject such input?
-		{"busybox:latest@" + sha256digest, "", "busybox@" + sha256digest}, // Both tag and digest
-		{"docker.io/library/busybox:latest", "", "busybox:latest"},        // All implied values explicitly specified
+		{"busybox:latest@" + sha256digest, "", "docker.io/library/busybox@" + sha256digest}, // Both tag and digest
+		{"docker.io/library/busybox:latest", "", "docker.io/library/busybox:latest"},        // All implied values explicitly specified
 	} {
 		ref, err := fn(c.input)
 		if c.expectedID == "" && c.expectedRef == "" {
@@ -80,11 +80,11 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 			} else {
 				assert.Equal(t, "", daemonRef.id.String(), c.input)
 				require.NotNil(t, daemonRef.ref, c.input)
-				assert.Equal(t, c.expectedRef, daemonRef.ref.XString(), c.input)
+				assert.Equal(t, c.expectedRef, daemonRef.ref.String(), c.input)
 
 				assert.Equal(t, "", dockerID.String(), c.input)
 				require.NotNil(t, dockerRef, c.input)
-				assert.Equal(t, c.expectedRef, dockerRef.XString(), c.input)
+				assert.Equal(t, c.expectedRef, dockerRef.String(), c.input)
 			}
 		}
 	}
@@ -100,10 +100,10 @@ func (ref refWithTagAndDigest) XTag() string {
 // A common list of reference formats to test for the various ImageReference methods.
 // (For IDs it is much simpler, we simply use them unmodified)
 var validNamedReferenceTestCases = []struct{ input, dockerRef, stringWithinTransport string }{
-	{"busybox:notlatest", "busybox:notlatest", "busybox:notlatest"},                // Explicit tag
-	{"busybox" + sha256digest, "busybox" + sha256digest, "busybox" + sha256digest}, // Explicit digest
-	{"docker.io/library/busybox:latest", "busybox:latest", "busybox:latest"},       // All implied values explicitly specified
-	{"example.com/ns/foo:bar", "example.com/ns/foo:bar", "example.com/ns/foo:bar"}, // All values explicitly specified
+	{"busybox:notlatest", "docker.io/library/busybox:notlatest", "busybox:notlatest"},                // Explicit tag
+	{"busybox" + sha256digest, "docker.io/library/busybox" + sha256digest, "busybox" + sha256digest}, // Explicit digest
+	{"docker.io/library/busybox:latest", "docker.io/library/busybox:latest", "busybox:latest"},       // All implied values explicitly specified
+	{"example.com/ns/foo:bar", "example.com/ns/foo:bar", "example.com/ns/foo:bar"},                   // All values explicitly specified
 }
 
 func TestNewReference(t *testing.T) {
@@ -127,7 +127,7 @@ func TestNewReference(t *testing.T) {
 		require.True(t, ok, c.input)
 		assert.Equal(t, "", daemonRef.id.String())
 		require.NotNil(t, daemonRef.ref)
-		assert.Equal(t, c.dockerRef, daemonRef.ref.XString(), c.input)
+		assert.Equal(t, c.dockerRef, daemonRef.ref.String(), c.input)
 	}
 
 	// Both an ID and a named reference provided
@@ -190,7 +190,7 @@ func TestReferenceDockerReference(t *testing.T) {
 		require.NoError(t, err, c.input)
 		dockerRef := ref.DockerReference()
 		require.NotNil(t, dockerRef, c.input)
-		assert.Equal(t, c.dockerRef, dockerRef.XString(), c.input)
+		assert.Equal(t, c.dockerRef, dockerRef.String(), c.input)
 	}
 }
 

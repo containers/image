@@ -66,7 +66,7 @@ func configuredSignatureStorageBase(ctx *types.SystemContext, ref dockerReferenc
 	// FIXME? Restrict to explicitly supported schemes?
 	repo := ref.ref.Name()        // Note that this is without a tag or digest.
 	if path.Clean(repo) != repo { // Coverage: This should not be reachable because /./ and /../ components are not valid in docker references
-		return nil, errors.Errorf("Unexpected path elements in Docker reference %s for signature storage", ref.ref.XString())
+		return nil, errors.Errorf("Unexpected path elements in Docker reference %s for signature storage", ref.ref.String())
 	}
 	url.Path = url.Path + "/" + repo
 	return url, nil
