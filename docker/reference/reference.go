@@ -43,11 +43,7 @@ func XParseNamed(s string) (distreference.Named, error) {
 		return nil, err
 	}
 	if canonical, isCanonical := named.(distreference.Canonical); isCanonical {
-		r, err := distreference.WithDigest(r, canonical.Digest())
-		if err != nil {
-			return nil, err
-		}
-		return &canonicalRef{Canonical: r, namedRef: namedRef{r}}, nil
+		return distreference.WithDigest(r, canonical.Digest())
 	}
 	if tagged, isTagged := named.(distreference.NamedTagged); isTagged {
 		return distreference.WithTag(r, tagged.Tag())
@@ -68,10 +64,6 @@ func XWithName(name string) (*namedRef, error) {
 
 type namedRef struct {
 	distreference.Named // FIXME: must implement private distreference.NamedRepository
-}
-type canonicalRef struct {
-	distreference.Canonical
-	namedRef
 }
 
 // TEMPORARY: distreference.WithDigest and distreference.WithTag can work with any distreference.Named,
