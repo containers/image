@@ -32,7 +32,7 @@ func XParseNamed(s string) (distreference.Named, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "Error parsing reference: %q is not a valid repository/tag", s)
 	}
-	r, err := distreference.ParseNormalizedNamed(named.Name())
+	r, err := distreference.WithName(named.Name())
 	if err != nil {
 		return nil, err
 	}
