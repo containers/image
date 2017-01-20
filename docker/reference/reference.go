@@ -23,12 +23,6 @@ const (
 	XDefaultRepoPrefix = "library/"
 )
 
-// XCanonical reference is an object with a fully unique
-// name including a name with hostname and digest
-type XCanonical interface {
-	distreference.Canonical
-}
-
 // XParseNamed parses s and returns a syntactically valid reference implementing
 // the Named interface. The reference must have a name, otherwise an error is
 // returned.
@@ -104,7 +98,7 @@ func XIsNameOnly(ref distreference.Named) bool {
 	if _, ok := ref.(distreference.NamedTagged); ok {
 		return false
 	}
-	if _, ok := ref.(XCanonical); ok {
+	if _, ok := ref.(distreference.Canonical); ok {
 		return false
 	}
 	return true

@@ -1,9 +1,9 @@
 package image
 
 import (
-	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
@@ -52,7 +52,7 @@ func (i *UnparsedImage) Manifest() ([]byte, string, error) {
 		// this immediately protects also any user of types.Image.
 		ref := i.Reference().DockerReference()
 		if ref != nil {
-			if canonical, ok := ref.(reference.XCanonical); ok {
+			if canonical, ok := ref.(reference.Canonical); ok {
 				digest := digest.Digest(canonical.Digest())
 				matches, err := manifest.MatchesDigest(m, digest)
 				if err != nil {

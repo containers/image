@@ -5,6 +5,7 @@ import (
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
+	distreference "github.com/docker/distribution/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -67,8 +68,8 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 	}
 }
 
-// refWithTagAndDigest is a reference.NamedTagged and reference.XCanonical at the same time.
-type refWithTagAndDigest struct{ reference.XCanonical }
+// refWithTagAndDigest is a reference.NamedTagged and reference.Canonical at the same time.
+type refWithTagAndDigest struct{ distreference.Canonical }
 
 func (ref refWithTagAndDigest) Tag() string {
 	return "notLatest"
@@ -102,7 +103,7 @@ func TestNewReference(t *testing.T) {
 	// A github.com/distribution/reference value can have a tag and a digest at the same time!
 	parsed, err = reference.XParseNamed("busybox" + sha256digest)
 	require.NoError(t, err)
-	refDigested, ok := parsed.(reference.XCanonical)
+	refDigested, ok := parsed.(distreference.Canonical)
 	require.True(t, ok)
 	tagDigestRef := refWithTagAndDigest{refDigested}
 	_, err = NewReference(tagDigestRef)

@@ -252,7 +252,7 @@ func TestParseReferenceWithTagAndDigest(t *testing.T) {
 	if _, isTagged := ref.(distreference.NamedTagged); isTagged {
 		t.Fatalf("Reference from %q should not support tag", ref)
 	}
-	if _, isCanonical := ref.(XCanonical); !isCanonical {
+	if _, isCanonical := ref.(distreference.Canonical); !isCanonical {
 		t.Fatalf("Reference from %q should not support digest", ref)
 	}
 	if expected, actual := "busybox@sha256:86e0e091d0da6bde2456dbb48306f3956bbeb2eae1b5b9a43045843f69fe4aaa", distreference.FamiliarString(ref); actual != expected {

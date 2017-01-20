@@ -3,24 +3,22 @@ package policyconfiguration
 import (
 	"strings"
 
+	"github.com/docker/distribution/reference"
 	"github.com/pkg/errors"
-
-	"github.com/containers/image/docker/reference"
-	distreference "github.com/docker/distribution/reference"
 )
 
 // DockerReferenceIdentity returns a string representation of the reference, suitable for policy lookup,
 // as a backend for ImageReference.PolicyConfigurationIdentity.
 // The reference must satisfy !reference.XIsNameOnly().
-func DockerReferenceIdentity(ref distreference.Named) (string, error) {
+func DockerReferenceIdentity(ref reference.Named) (string, error) {
 	res := ref.Name()
-	tagged, isTagged := ref.(distreference.NamedTagged)
-	digested, isDigested := ref.(reference.XCanonical)
+	tagged, isTagged := ref.(reference.NamedTagged)
+	digested, isDigested := ref.(reference.Canonical)
 	switch {
 	case isTagged && isDigested: // This should not happen, docker/reference.XParseNamed drops the tag.
-		return "", errors.Errorf("Unexpected Docker reference %s with both a name and a digest", distreference.FamiliarString(ref))
+		return "", errors.Errorf("Unexpected Docker reference %s with both a name and a digest", reference.FamiliarString(ref))
 	case !isTagged && !isDigested: // This should not happen, the caller is expected to ensure !reference.XIsNameOnly()
-		return "", errors.Errorf("Internal inconsistency: Docker reference %s with neither a tag nor a digest", distreference.FamiliarString(ref))
+		return "", errors.Errorf("Internal inconsistency: Docker reference %s with neither a tag nor a digest", reference.FamiliarString(ref))
 	case isTagged:
 		res = res + ":" + tagged.Tag()
 	case isDigested:
@@ -34,7 +32,7 @@ func DockerReferenceIdentity(ref distreference.Named) (string, error) {
 // DockerReferenceNamespaces returns a list of other policy configuration namespaces to search,
 // as a backend for ImageReference.PolicyConfigurationIdentity.
 // The reference must satisfy !reference.XIsNameOnly().
-func DockerReferenceNamespaces(ref distreference.Named) []string {
+func DockerReferenceNamespaces(ref reference.Named) []string {
 	// Look for a match of the repository, and then of the possible parent
 	// namespaces. Note that this only happens on the expanded host names
 	// and repository names, i.e. "busybox" is looked up as "docker.io/library/busybox",

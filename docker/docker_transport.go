@@ -64,7 +64,7 @@ func NewReference(ref distreference.Named) (types.ImageReference, error) {
 	// (Even if it were supported, the semantics of policy namespaces are unclear - should we drop
 	// the tag or the digest first?)
 	_, isTagged := ref.(distreference.NamedTagged)
-	_, isDigested := ref.(reference.XCanonical)
+	_, isDigested := ref.(distreference.Canonical)
 	if isTagged && isDigested {
 		return nil, errors.Errorf("Docker references with both a tag and digest are currently not supported")
 	}
@@ -146,7 +146,7 @@ func (ref dockerReference) DeleteImage(ctx *types.SystemContext) error {
 
 // tagOrDigest returns a tag or digest from the reference.
 func (ref dockerReference) tagOrDigest() (string, error) {
-	if ref, ok := ref.ref.(reference.XCanonical); ok {
+	if ref, ok := ref.ref.(distreference.Canonical); ok {
 		return ref.Digest().String(), nil
 	}
 	if ref, ok := ref.ref.(distreference.NamedTagged); ok {
