@@ -121,7 +121,7 @@ func (r *namedRef) Familiar() distreference.Named {
 }
 
 func (r *taggedRef) XTag() string {
-	return r.namedRef.Named.(distreference.NamedTagged).Tag()
+	return r.NamedTagged.Tag()
 }
 func (r *canonicalRef) XDigest() digest.Digest {
 	return digest.Digest(r.namedRef.Named.(distreference.Canonical).Digest())
