@@ -25,6 +25,7 @@ const (
 
 // XNamed is an object with a full name
 type XNamed interface {
+	distreference.Named
 	// XName returns normalized repository name, like "ubuntu".
 	XName() string
 	// XString returns full reference, like "ubuntu@sha256:abcdef..."
@@ -64,11 +65,11 @@ func XParseNamed(s string) (XNamed, error) {
 		return nil, err
 	}
 	if canonical, isCanonical := named.(distreference.Canonical); isCanonical {
-		r, err := distreference.WithDigest(r.upstream, canonical.Digest())
+		r, err := distreference.WithDigest(r, canonical.Digest())
 		if err != nil {
 			return nil, err
 		}
-		return &canonicalRef{namedRef{upstream: r}}, nil
+		return &canonicalRef{namedRef{r}}, nil
 	}
 	if tagged, isTagged := named.(distreference.NamedTagged); isTagged {
 		return XWithTag(r, tagged.Tag())
@@ -78,29 +79,28 @@ func XParseNamed(s string) (XNamed, error) {
 
 // XWithName returns a named object representing the given string. If the input
 // is invalid ErrReferenceInvalidFormat will be returned.
-// FIXME: returns *namedRef to expose the upstream field. Should revert to XNamed/Named.
+// FIXME: returns *namedRef to expose the distreference.Named implementation. Should revert to XNamed/Named.
 func XWithName(name string) (*namedRef, error) {
 	r, err := distreference.ParseNormalizedNamed(name)
 	if err != nil {
 		return nil, err
 	}
-	return &namedRef{upstream: r}, nil
+	return &namedRef{r}, nil
 }
 
 // XWithTag combines the name from "name" and the tag from "tag" to form a
 // reference incorporating both the name and the tag.
-// FIXME: expects *namedRef to expose the upstream field. Should revert to XNamed/Named.
+// FIXME: expects *namedRef to expose the distreference.Named implementation. Should revert to XNamed/Named.
 func XWithTag(name *namedRef, tag string) (XNamedTagged, error) {
-	r, err := distreference.WithTag(name.upstream, tag)
+	r, err := distreference.WithTag(name, tag)
 	if err != nil {
 		return nil, err
 	}
-	return &taggedRef{namedRef{upstream: r}}, nil
+	return &taggedRef{namedRef{r}}, nil
 }
 
 type namedRef struct {
-	// upstream uses the normalization from distreference.ParseNormalizedNamed
-	upstream distreference.Named
+	distreference.Named // FIXME: must implement private distreference.NamedRepository
 }
 type taggedRef struct {
 	namedRef
@@ -109,32 +109,57 @@ type canonicalRef struct {
 	namedRef
 }
 
+// TEMPORARY: distreference.WithDigest and distreference.WithTag can work with any distreference.Named,
+// but if so, they break the values of distreference.Domain() and distreference.Path(),
+// and hence also distreference.FamiliarName()/distreference.FamiliarString().  To preserve this,
+// we need to implement a PRIVATE distreference.namedRepository.
+// Similarly, we need to implement a PRIVATE distreference.normalizedNamed so that distreference.Familiar*()
+// knows how to compute the minimal form.
+// Right now that happens by these REALLY UGLY methods; eventually we will eliminate namedRef entirely in favor of
+// distreference.Named, and distreference can keep its implementation games to itself.
+type drPRIVATEInterfaces interface {
+	distreference.Named
+	Domain() string
+	Path() string
+	Familiar() distreference.Named
+}
+
+func (r *namedRef) Domain() string {
+	return r.Named.(drPRIVATEInterfaces).Domain()
+}
+func (r *namedRef) Path() string {
+	return r.Named.(drPRIVATEInterfaces).Path()
+}
+func (r *namedRef) Familiar() distreference.Named {
+	return r.Named.(drPRIVATEInterfaces).Familiar()
+}
+
 func (r *namedRef) XName() string {
-	return distreference.FamiliarName(r.upstream)
+	return distreference.FamiliarName(r)
 }
 func (r *namedRef) XString() string {
-	return distreference.FamiliarString(r.upstream)
+	return distreference.FamiliarString(r)
 }
 func (r *namedRef) XFullName() string {
-	return r.upstream.Name()
+	return r.Name()
 }
 func (r *namedRef) XHostname() string {
-	return distreference.Domain(r.upstream)
+	return distreference.Domain(r)
 }
 func (r *namedRef) XRemoteName() string {
-	return distreference.Path(r.upstream)
+	return distreference.Path(r)
 }
 func (r *taggedRef) XTag() string {
-	return r.namedRef.upstream.(distreference.NamedTagged).Tag()
+	return r.namedRef.Named.(distreference.NamedTagged).Tag()
 }
 func (r *canonicalRef) XDigest() digest.Digest {
-	return digest.Digest(r.namedRef.upstream.(distreference.Canonical).Digest())
+	return digest.Digest(r.namedRef.Named.(distreference.Canonical).Digest())
 }
 
 // XWithDefaultTag adds a default tag to a reference if it only has a repo name.
 func XWithDefaultTag(ref XNamed) XNamed {
 	if XIsNameOnly(ref) {
-		// FIXME: uses *namedRef to expose the upstream fields. Should use ref without a cast.
+		// FIXME: uses *namedRef to expose the distreference.Named implementations. Should use ref without a cast.
 		ref, _ = XWithTag(ref.(*namedRef), XDefaultTag)
 	}
 	return ref
