@@ -236,7 +236,7 @@ func TestParseRepositoryInfo(t *testing.T) {
 			if expected, actual := tcase.Hostname, distreference.Domain(r); expected != actual {
 				t.Fatalf("Invalid hostname for %q. Expected %q, got %q", r, expected, actual)
 			}
-			if expected, actual := tcase.RemoteName, r.XRemoteName(); expected != actual {
+			if expected, actual := tcase.RemoteName, distreference.Path(r); expected != actual {
 				t.Fatalf("Invalid remoteName for %q. Expected %q, got %q", r, expected, actual)
 			}
 

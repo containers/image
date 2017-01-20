@@ -30,8 +30,6 @@ type XNamed interface {
 	XName() string
 	// XString returns full reference, like "ubuntu@sha256:abcdef..."
 	XString() string
-	// XRemoteName returns the repository component of the full name, like "library/ubuntu"
-	XRemoteName() string
 }
 
 // XNamedTagged is an object including a name and tag.
@@ -135,9 +133,6 @@ func (r *namedRef) XName() string {
 }
 func (r *namedRef) XString() string {
 	return distreference.FamiliarString(r)
-}
-func (r *namedRef) XRemoteName() string {
-	return distreference.Path(r)
 }
 func (r *taggedRef) XTag() string {
 	return r.namedRef.Named.(distreference.NamedTagged).Tag()

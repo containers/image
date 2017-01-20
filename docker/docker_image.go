@@ -7,6 +7,7 @@ import (
 
 	"github.com/containers/image/image"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/reference"
 	"github.com/pkg/errors"
 )
 
@@ -39,7 +40,7 @@ func (i *Image) SourceRefFullName() string {
 
 // GetRepositoryTags list all tags available in the repository. Note that this has no connection with the tag(s) used for this specific image, if any.
 func (i *Image) GetRepositoryTags() ([]string, error) {
-	url := fmt.Sprintf(tagsURL, i.src.ref.ref.XRemoteName())
+	url := fmt.Sprintf(tagsURL, reference.Path(i.src.ref.ref))
 	res, err := i.src.c.makeRequest("GET", url, nil, nil)
 	if err != nil {
 		return nil, err

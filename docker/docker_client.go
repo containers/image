@@ -203,7 +203,7 @@ func newDockerClient(ctx *types.SystemContext, ref dockerReference, write bool, 
 		signatureBase: sigBase,
 		scope: authScope{
 			actions:    actions,
-			remoteName: ref.ref.XRemoteName(),
+			remoteName: reference.Path(ref.ref),
 		},
 	}, nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/containers/image/docker/reference"
 	genericImage "github.com/containers/image/image"
 	"github.com/containers/image/types"
+	distreference "github.com/docker/distribution/reference"
 	"github.com/pkg/errors"
 )
 
@@ -64,7 +65,7 @@ func ParseReference(ref string) (types.ImageReference, error) {
 
 // NewReference returns an OpenShift reference for a reference.XNamedTagged
 func NewReference(dockerRef reference.XNamedTagged) (types.ImageReference, error) {
-	r := strings.SplitN(dockerRef.XRemoteName(), "/", 3)
+	r := strings.SplitN(distreference.Path(dockerRef), "/", 3)
 	if len(r) != 2 {
 		return nil, errors.Errorf("invalid image reference: %s, expected format: 'hostname/namespace/stream:tag'",
 			dockerRef.XString())
