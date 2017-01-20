@@ -32,7 +32,7 @@ func XParseNamed(s string) (distreference.Named, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "Error parsing reference: %q is not a valid repository/tag", s)
 	}
-	r, err := XWithName(named.Name())
+	r, err := distreference.ParseNormalizedNamed(named.Name())
 	if err != nil {
 		return nil, err
 	}
@@ -43,12 +43,6 @@ func XParseNamed(s string) (distreference.Named, error) {
 		return distreference.WithTag(r, tagged.Tag())
 	}
 	return r, nil
-}
-
-// XWithName returns a named object representing the given string. If the input
-// is invalid ErrReferenceInvalidFormat will be returned.
-func XWithName(name string) (distreference.Named, error) {
-	return distreference.ParseNormalizedNamed(name)
 }
 
 // XParseIDOrReference parses string for an image ID or a reference. ID can be

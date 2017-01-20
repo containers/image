@@ -219,7 +219,7 @@ func TestParseRepositoryInfo(t *testing.T) {
 				t.Fatal(err)
 			}
 			refs = append(refs, named)
-			named, err = XWithName(r)
+			named, err = distreference.ParseNormalizedNamed(r)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -257,18 +257,5 @@ func TestParseReferenceWithTagAndDigest(t *testing.T) {
 	}
 	if expected, actual := "busybox@sha256:86e0e091d0da6bde2456dbb48306f3956bbeb2eae1b5b9a43045843f69fe4aaa", distreference.FamiliarString(ref); actual != expected {
 		t.Fatalf("Invalid parsed reference for %q: expected %q, got %q", ref, expected, actual)
-	}
-}
-
-func TestInvalidReferenceComponents(t *testing.T) {
-	if _, err := XWithName("-foo"); err == nil {
-		t.Fatal("Expected WithName to detect invalid name")
-	}
-	ref, err := XWithName("busybox")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := distreference.WithTag(ref, "-foo"); err == nil {
-		t.Fatal("Expected WithName to detect invalid tag")
 	}
 }
