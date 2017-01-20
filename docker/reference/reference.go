@@ -144,10 +144,10 @@ type canonicalRef struct {
 }
 
 func (r *namedRef) XName() string {
-	return r.our.Name()
+	return distreference.FamiliarName(r.upstream)
 }
 func (r *namedRef) XString() string {
-	return r.our.String()
+	return distreference.FamiliarString(r.upstream)
 }
 func (r *namedRef) XFullName() string {
 	return r.upstream.Name()
