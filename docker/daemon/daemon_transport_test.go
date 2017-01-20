@@ -54,12 +54,9 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 		{"busybox:latest", "", "docker.io/library/busybox:latest"},                          // Explicit tag
 		{"busybox@" + sha256digest, "", "docker.io/library/busybox@" + sha256digest},        // Explicit digest
 		// A github.com/distribution/reference value can have a tag and a digest at the same time!
-		// github.com/docker/reference handles that by dropping the tag. That is not obviously the
-		// right thing to do, but it is at least reasonable, so test that we keep behaving reasonably.
-		// This test case should not be construed to make this an API promise.
-		// FIXME? Instead work extra hard to reject such input?
-		{"busybox:latest@" + sha256digest, "", "docker.io/library/busybox@" + sha256digest}, // Both tag and digest
-		{"docker.io/library/busybox:latest", "", "docker.io/library/busybox:latest"},        // All implied values explicitly specified
+		// Most versions of docker/reference do not handle that (ignoring the tag), so we reject such input.
+		{"busybox:latest@" + sha256digest, "", ""},                                   // Both tag and digest
+		{"docker.io/library/busybox:latest", "", "docker.io/library/busybox:latest"}, // All implied values explicitly specified
 	} {
 		ref, err := fn(c.input)
 		if c.expectedID == "" && c.expectedRef == "" {

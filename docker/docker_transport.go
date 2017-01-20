@@ -60,7 +60,8 @@ func NewReference(ref distreference.Named) (types.ImageReference, error) {
 		return nil, errors.Errorf("Docker reference %s has neither a tag nor a digest", distreference.FamiliarString(ref))
 	}
 	// A github.com/distribution/reference value can have a tag and a digest at the same time!
-	// docker/reference does not handle that, so fail.
+	// The docker/distribution API does not really support that (we can’t ask for an image with a specific
+	// tag and digest), so fail.  This MAY be accepted in the future.
 	// (Even if it were supported, the semantics of policy namespaces are unclear - should we drop
 	// the tag or the digest first?)
 	_, isTagged := ref.(distreference.NamedTagged)

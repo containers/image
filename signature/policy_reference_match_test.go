@@ -148,14 +148,12 @@ var prmExactMatchTestTable = []prmSymmetricTableTest{
 	{"busybox", "busybox:latest", false},
 	{"busybox", "busybox" + digestSuffix, false},
 	{"busybox", "busybox", false},
-	// References with both tags and digests: `reference.XParseNamed` essentially drops the tag.
-	// This is not _particularly_ desirable but it is the semantics used throughout containers/image; at least, with the digest it is clear which image the reference means,
-	// even if the tag may reflect a different user intent.
+	// References with both tags and digests: We match them exactly (requiring BOTH to match)
 	// NOTE: Again, this is not documented behavior; the recommendation is to sign tags, not digests, and then tag-and-digest references won’t match the signed identity.
 	{"busybox:latest" + digestSuffix, "busybox:latest" + digestSuffix, true},
 	{"busybox:latest" + digestSuffix, "busybox:latest" + digestSuffixOther, false},
-	{"busybox:latest" + digestSuffix, "busybox:notlatest" + digestSuffix, true}, // Ugly.  Do not rely on this.
-	{"busybox:latest" + digestSuffix, "busybox" + digestSuffix, true},           // Ugly.  Do not rely on this.
+	{"busybox:latest" + digestSuffix, "busybox:notlatest" + digestSuffix, false},
+	{"busybox:latest" + digestSuffix, "busybox" + digestSuffix, false},
 	{"busybox:latest" + digestSuffix, "busybox:latest", false},
 	// Invalid format
 	{"UPPERCASE_IS_INVALID_IN_DOCKER_REFERENCES", "busybox:latest", false},
@@ -194,7 +192,7 @@ var prmRepositoryMatchTestTable = []prmSymmetricTableTest{
 	{"hostname/library/busybox:latest", "busybox:notlatest", false},
 	{"busybox:latest", fullRHELRef, false},
 	{"busybox" + digestSuffix, "notbusybox" + digestSuffix, false},
-	// References with both tags and digests: `reference.XParseNamed` essentially drops the tag, and we ignore both anyway.
+	// References with both tags and digests: We ignore both anyway.
 	{"busybox:latest" + digestSuffix, "busybox:latest" + digestSuffix, true},
 	{"busybox:latest" + digestSuffix, "busybox:latest" + digestSuffixOther, true},
 	{"busybox:latest" + digestSuffix, "busybox:notlatest" + digestSuffix, true},
@@ -272,14 +270,12 @@ func TestPMMMatchRepoDigestOrExactMatchesDockerReference(t *testing.T) {
 		// Digest references accept any signature with matching repository.
 		{"busybox" + digestSuffix, "busybox:latest", true},
 		{"busybox" + digestSuffix, "busybox" + digestSuffixOther, true}, // Even this is accepted here. (This could more reasonably happen with two different digest algorithms.)
-		// References with both tags and digests: `reference.XParseNamed` essentially drops the tag.
-		// This is not _particularly_ desirable but it is the semantics used throughout containers/image; at least, with the digest it is clear which image the reference means,
-		// even if the tag may reflect a different user intent.
-		{"busybox:latest" + digestSuffix, "busybox:latest", true},
-		{"busybox:latest" + digestSuffix, "busybox:notlatest", true},
+		// References with both tags and digests: We match them exactly (requiring BOTH to match).
+		{"busybox:latest" + digestSuffix, "busybox:latest", false},
+		{"busybox:latest" + digestSuffix, "busybox:notlatest", false},
 		{"busybox:latest", "busybox:latest" + digestSuffix, false},
-		{"busybox:latest" + digestSuffix, "busybox:latest" + digestSuffixOther, true},    // Even this is accepted here. (This could more reasonably happen with two different digest algorithms.)
-		{"busybox:latest" + digestSuffix, "busybox:notlatest" + digestSuffixOther, true}, // Ugly.  Do not rely on this.
+		{"busybox:latest" + digestSuffix, "busybox:latest" + digestSuffixOther, false},
+		{"busybox:latest" + digestSuffix, "busybox:notlatest" + digestSuffixOther, false},
 	} {
 		testImageAndSig(t, prm, test.imageRef, test.sigRef, test.result)
 	}

@@ -81,7 +81,8 @@ func NewReference(id digest.Digest, ref distreference.Named) (types.ImageReferen
 			return nil, errors.Errorf("docker-daemon: reference %s has neither a tag nor a digest", distreference.FamiliarString(ref))
 		}
 		// A github.com/distribution/reference value can have a tag and a digest at the same time!
-		// docker/reference does not handle that, so fail.
+		// Most versions of docker/reference do not handle that (ignoring the tag), so reject such input.
+		// This MAY be accepted in the future.
 		_, isTagged := ref.(distreference.NamedTagged)
 		_, isDigested := ref.(distreference.Canonical)
 		if isTagged && isDigested {

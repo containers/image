@@ -36,11 +36,6 @@ func TestDockerReference(t *testing.T) {
 		for inputSuffix, mappedSuffix := range map[string]string{
 			":tag":       ":tag",
 			sha256Digest: sha256Digest,
-			// A github.com/distribution/reference value can have a tag and a digest at the same time!
-			// github.com/docker/reference handles that by dropping the tag. That is not obviously the
-			// right thing to do, but it is at least reasonable, so test that we keep behaving reasonably.
-			// This test case should not be construed to make this an API promise.
-			":tag" + sha256Digest: sha256Digest,
 		} {
 			fullInput := inputName + inputSuffix
 			ref, err := reference.XParseNamed(fullInput)
@@ -81,12 +76,13 @@ func TestDockerReferenceIdentity(t *testing.T) {
 	assert.Error(t, err)
 
 	// A github.com/distribution/reference value can have a tag and a digest at the same time!
-	parsed, err = reference.XParseNamed("busybox@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+	parsed, err = reference.XParseNamed("busybox:notlatest@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 	require.NoError(t, err)
-	refDigested, ok := parsed.(distreference.Canonical)
+	_, ok := parsed.(distreference.Canonical)
 	require.True(t, ok)
-	tagDigestRef := refWithTagAndDigest{refDigested}
-	id, err = DockerReferenceIdentity(tagDigestRef)
+	_, ok = parsed.(distreference.NamedTagged)
+	require.True(t, ok)
+	id, err = DockerReferenceIdentity(parsed)
 	assert.Equal(t, "", id)
 	assert.Error(t, err)
 }

@@ -17,21 +17,7 @@ import (
 // returned.
 // If an error was encountered it is returned, along with a nil Reference.
 func XParseNamed(s string) (distreference.Named, error) {
-	named, err := distreference.ParseNormalizedNamed(s)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Error parsing reference: %q is not a valid repository/tag", s)
-	}
-	r, err := distreference.WithName(named.Name())
-	if err != nil {
-		return nil, err
-	}
-	if canonical, isCanonical := named.(distreference.Canonical); isCanonical {
-		return distreference.WithDigest(r, canonical.Digest())
-	}
-	if tagged, isTagged := named.(distreference.NamedTagged); isTagged {
-		return distreference.WithTag(r, tagged.Tag())
-	}
-	return r, nil
+	return distreference.ParseNormalizedNamed(s)
 }
 
 // XParseIDOrReference parses string for an image ID or a reference. ID can be
