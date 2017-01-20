@@ -23,21 +23,16 @@ const (
 	XDefaultRepoPrefix = "library/"
 )
 
-// XNamed is an object with a full name
-type XNamed interface {
-	distreference.Named
-}
-
 // XNamedTagged is an object including a name and tag.
 type XNamedTagged interface {
-	XNamed
+	distreference.Named
 	XTag() string
 }
 
 // XCanonical reference is an object with a fully unique
 // name including a name with hostname and digest
 type XCanonical interface {
-	XNamed
+	distreference.Named
 	XDigest() digest.Digest
 }
 
@@ -45,7 +40,7 @@ type XCanonical interface {
 // the Named interface. The reference must have a name, otherwise an error is
 // returned.
 // If an error was encountered it is returned, along with a nil Reference.
-func XParseNamed(s string) (XNamed, error) {
+func XParseNamed(s string) (distreference.Named, error) {
 	named, err := distreference.ParseNormalizedNamed(s)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Error parsing reference: %q is not a valid repository/tag", s)
@@ -69,7 +64,7 @@ func XParseNamed(s string) (XNamed, error) {
 
 // XWithName returns a named object representing the given string. If the input
 // is invalid ErrReferenceInvalidFormat will be returned.
-// FIXME: returns *namedRef to expose the distreference.Named implementation. Should revert to XNamed/Named.
+// FIXME: returns *namedRef to expose the distreference.Named implementation. Should revert to distreference.Named.
 func XWithName(name string) (*namedRef, error) {
 	r, err := distreference.ParseNormalizedNamed(name)
 	if err != nil {
@@ -80,7 +75,7 @@ func XWithName(name string) (*namedRef, error) {
 
 // XWithTag combines the name from "name" and the tag from "tag" to form a
 // reference incorporating both the name and the tag.
-// FIXME: expects *namedRef to expose the distreference.Named implementation. Should revert to XNamed/Named.
+// FIXME: expects *namedRef to expose the distreference.Named implementation. Should revert to distreference.Named.
 func XWithTag(name *namedRef, tag string) (XNamedTagged, error) {
 	r, err := distreference.WithTag(name, tag)
 	if err != nil {
@@ -132,7 +127,7 @@ func (r *canonicalRef) XDigest() digest.Digest {
 }
 
 // XWithDefaultTag adds a default tag to a reference if it only has a repo name.
-func XWithDefaultTag(ref XNamed) XNamed {
+func XWithDefaultTag(ref distreference.Named) distreference.Named {
 	if XIsNameOnly(ref) {
 		// FIXME: uses *namedRef to expose the distreference.Named implementations. Should use ref without a cast.
 		ref, _ = XWithTag(ref.(*namedRef), XDefaultTag)
@@ -141,7 +136,7 @@ func XWithDefaultTag(ref XNamed) XNamed {
 }
 
 // XIsNameOnly returns true if reference only contains a repo name.
-func XIsNameOnly(ref XNamed) bool {
+func XIsNameOnly(ref distreference.Named) bool {
 	if _, ok := ref.(XNamedTagged); ok {
 		return false
 	}
@@ -153,7 +148,7 @@ func XIsNameOnly(ref XNamed) bool {
 
 // XParseIDOrReference parses string for an image ID or a reference. ID can be
 // without a default prefix.
-func XParseIDOrReference(idOrRef string) (digest.Digest, XNamed, error) {
+func XParseIDOrReference(idOrRef string) (digest.Digest, distreference.Named, error) {
 	if err := validateID(idOrRef); err == nil {
 		idOrRef = "sha256:" + idOrRef
 	}

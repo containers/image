@@ -212,7 +212,7 @@ func TestParseRepositoryInfo(t *testing.T) {
 			refStrings = append(refStrings, tcase.AmbiguousName)
 		}
 
-		var refs []XNamed
+		var refs []distreference.Named
 		for _, r := range refStrings {
 			named, err := XParseNamed(r)
 			if err != nil {

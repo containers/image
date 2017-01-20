@@ -38,7 +38,7 @@ func (t dockerTransport) ValidatePolicyConfigurationScope(scope string) error {
 
 // dockerReference is an ImageReference for Docker images.
 type dockerReference struct {
-	ref reference.XNamed // By construction we know that !reference.XIsNameOnly(ref)
+	ref distreference.Named // By construction we know that !reference.XIsNameOnly(ref)
 }
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an Docker ImageReference.
@@ -55,7 +55,7 @@ func ParseReference(refString string) (types.ImageReference, error) {
 }
 
 // NewReference returns a Docker reference for a named reference. The reference must satisfy !reference.XIsNameOnly().
-func NewReference(ref reference.XNamed) (types.ImageReference, error) {
+func NewReference(ref distreference.Named) (types.ImageReference, error) {
 	if reference.XIsNameOnly(ref) {
 		return nil, errors.Errorf("Docker reference %s has neither a tag nor a digest", distreference.FamiliarString(ref))
 	}
@@ -89,7 +89,7 @@ func (ref dockerReference) StringWithinTransport() string {
 // DockerReference returns a Docker reference associated with this reference
 // (fully explicit, i.e. !reference.XIsNameOnly, but reflecting user intent,
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
-func (ref dockerReference) DockerReference() reference.XNamed {
+func (ref dockerReference) DockerReference() distreference.Named {
 	return ref.ref
 }
 

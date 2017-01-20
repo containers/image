@@ -8,9 +8,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/containers/image/directory/explicitfilepath"
-	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/image"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -93,7 +93,7 @@ func (ref dirReference) StringWithinTransport() string {
 // DockerReference returns a Docker reference associated with this reference
 // (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
-func (ref dirReference) DockerReference() reference.XNamed {
+func (ref dirReference) DockerReference() reference.Named {
 	return nil
 }
 

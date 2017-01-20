@@ -8,10 +8,11 @@ import (
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
+	distreference "github.com/docker/distribution/reference"
 )
 
 // parseImageAndDockerReference converts an image and a reference string into two parsed entities, failing on any error and handling unidentified images.
-func parseImageAndDockerReference(image types.UnparsedImage, s2 string) (reference.XNamed, reference.XNamed, error) {
+func parseImageAndDockerReference(image types.UnparsedImage, s2 string) (distreference.Named, distreference.Named, error) {
 	r1 := image.Reference().DockerReference()
 	if r1 == nil {
 		return nil, nil, PolicyRequirementError(fmt.Sprintf("Docker reference match attempted on image %s with no known Docker reference identity",
@@ -68,7 +69,7 @@ func (prm *prmMatchRepository) matchesDockerReference(image types.UnparsedImage,
 }
 
 // parseDockerReferences converts two reference strings into parsed entities, failing on any error
-func parseDockerReferences(s1, s2 string) (reference.XNamed, reference.XNamed, error) {
+func parseDockerReferences(s1, s2 string) (distreference.Named, distreference.Named, error) {
 	r1, err := reference.XParseNamed(s1)
 	if err != nil {
 		return nil, nil, err

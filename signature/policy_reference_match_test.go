@@ -53,10 +53,10 @@ func TestParseImageAndDockerReference(t *testing.T) {
 }
 
 // refImageMock is a mock of types.UnparsedImage which returns itself in Reference().DockerReference.
-type refImageMock struct{ reference.XNamed }
+type refImageMock struct{ distreference.Named }
 
 func (ref refImageMock) Reference() types.ImageReference {
-	return refImageReferenceMock{ref.XNamed}
+	return refImageReferenceMock{ref.Named}
 }
 func (ref refImageMock) Close() {
 	panic("unexpected call to a mock function")
@@ -69,24 +69,24 @@ func (ref refImageMock) Signatures() ([][]byte, error) {
 }
 
 // refImageReferenceMock is a mock of types.ImageReference which returns itself in DockerReference.
-type refImageReferenceMock struct{ reference.XNamed }
+type refImageReferenceMock struct{ distreference.Named }
 
 func (ref refImageReferenceMock) Transport() types.ImageTransport {
-	// We use this in error messages, so sadly we must return something. But right now we do so only when DockerReference is nil, so restrict to that.
-	if ref.XNamed == nil {
+	// We use this in error messages, so sady we must return something. But right now we do so only when DockerReference is nil, so restrict to that.
+	if ref.Named == nil {
 		return nameImageTransportMock("== Transport mock")
 	}
 	panic("unexpected call to a mock function")
 }
 func (ref refImageReferenceMock) StringWithinTransport() string {
 	// We use this in error messages, so sadly we must return something. But right now we do so only when DockerReference is nil, so restrict to that.
-	if ref.XNamed == nil {
+	if ref.Named == nil {
 		return "== StringWithinTransport for an image with no Docker support"
 	}
 	panic("unexpected call to a mock function")
 }
-func (ref refImageReferenceMock) DockerReference() reference.XNamed {
-	return ref.XNamed
+func (ref refImageReferenceMock) DockerReference() distreference.Named {
+	return ref.Named
 }
 func (ref refImageReferenceMock) PolicyConfigurationIdentity() string {
 	panic("unexpected call to a mock function")
@@ -208,7 +208,7 @@ var prmRepositoryMatchTestTable = []prmSymmetricTableTest{
 }
 
 func testImageAndSig(t *testing.T, prm PolicyReferenceMatch, imageRef, sigRef string, result bool) {
-	// This assumes that all ways to obtain a reference.XNamed perform equivalent validation,
+	// This assumes that all ways to obtain a distreference.Named perform equivalent validation,
 	// and therefore values refused by reference.XParseNamed can not happen in practice.
 	parsedImageRef, err := reference.XParseNamed(imageRef)
 	if err != nil {

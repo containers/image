@@ -4,10 +4,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/pkg/errors"
-
-	"github.com/containers/image/docker/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 )
 
 // ImageTransport is a top-level namespace for ways to to store/load an image.
@@ -55,7 +54,7 @@ type ImageReference interface {
 	// DockerReference returns a Docker reference associated with this reference
 	// (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
 	// not e.g. after redirect or alias processing), or nil if unknown/not applicable.
-	DockerReference() reference.XNamed
+	DockerReference() reference.Named
 
 	// PolicyConfigurationIdentity returns a string representation of the reference, suitable for policy lookup.
 	// This MUST reflect user intent, not e.g. after processing of third-party redirects or aliases;

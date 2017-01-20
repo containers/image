@@ -12,7 +12,7 @@ import (
 // DockerReferenceIdentity returns a string representation of the reference, suitable for policy lookup,
 // as a backend for ImageReference.PolicyConfigurationIdentity.
 // The reference must satisfy !reference.XIsNameOnly().
-func DockerReferenceIdentity(ref reference.XNamed) (string, error) {
+func DockerReferenceIdentity(ref distreference.Named) (string, error) {
 	res := ref.Name()
 	tagged, isTagged := ref.(reference.XNamedTagged)
 	digested, isDigested := ref.(reference.XCanonical)
@@ -34,7 +34,7 @@ func DockerReferenceIdentity(ref reference.XNamed) (string, error) {
 // DockerReferenceNamespaces returns a list of other policy configuration namespaces to search,
 // as a backend for ImageReference.PolicyConfigurationIdentity.
 // The reference must satisfy !reference.XIsNameOnly().
-func DockerReferenceNamespaces(ref reference.XNamed) []string {
+func DockerReferenceNamespaces(ref distreference.Named) []string {
 	// Look for a match of the repository, and then of the possible parent
 	// namespaces. Note that this only happens on the expanded host names
 	// and repository names, i.e. "busybox" is looked up as "docker.io/library/busybox",

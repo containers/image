@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/reference"
 )
 
 // A storageReference holds an arbitrary name and/or an ID, which is a 32-byte
@@ -15,10 +15,10 @@ type storageReference struct {
 	transport storageTransport
 	reference string
 	id        string
-	name      reference.XNamed
+	name      reference.Named
 }
 
-func newReference(transport storageTransport, reference, id string, name reference.XNamed) *storageReference {
+func newReference(transport storageTransport, reference, id string, name reference.Named) *storageReference {
 	// We take a copy of the transport, which contains a pointer to the
 	// store that it used for resolving this reference, so that the
 	// transport that we'll return from Transport() won't be affected by
@@ -52,7 +52,7 @@ func (s storageReference) Transport() types.ImageTransport {
 }
 
 // Return a name with a tag, if we have a name to base them on.
-func (s storageReference) DockerReference() reference.XNamed {
+func (s storageReference) DockerReference() reference.Named {
 	return s.name
 }
 

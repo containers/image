@@ -11,6 +11,7 @@ import (
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
 	"github.com/containers/storage/storage"
+	distreference "github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	ddigest "github.com/opencontainers/go-digest"
 )
@@ -66,7 +67,7 @@ func (s *storageTransport) SetStore(store storage.Store) {
 // ParseStoreReference takes a name or an ID, tries to figure out which it is
 // relative to the given store, and returns it in a reference object.
 func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (*storageReference, error) {
-	var name reference.XNamed
+	var name distreference.Named
 	var sum digest.Digest
 	var err error
 	if ref == "" {
@@ -276,7 +277,7 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 	return nil
 }
 
-func verboseName(name reference.XNamed) string {
+func verboseName(name distreference.Named) string {
 	name = reference.XWithDefaultTag(name)
 	tag := ""
 	if tagged, ok := name.(reference.XNamedTagged); ok {

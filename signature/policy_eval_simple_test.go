@@ -3,8 +3,8 @@ package signature
 import (
 	"testing"
 
-	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/reference"
 )
 
 // nameOnlyImageMock is a mock of types.UnparsedImage which only allows transports.ImageName to work
@@ -25,7 +25,7 @@ func (ref nameOnlyImageReferenceMock) Transport() types.ImageTransport {
 func (ref nameOnlyImageReferenceMock) StringWithinTransport() string {
 	return string(ref)
 }
-func (ref nameOnlyImageReferenceMock) DockerReference() reference.XNamed {
+func (ref nameOnlyImageReferenceMock) DockerReference() reference.Named {
 	panic("unexpected call to a mock function")
 }
 func (ref nameOnlyImageReferenceMock) PolicyConfigurationIdentity() string {

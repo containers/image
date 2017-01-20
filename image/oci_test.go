@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	distreference "github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -249,7 +249,7 @@ func TestManifestOCI1UpdatedImageNeedsLayerDiffIDs(t *testing.T) {
 // oci1ImageSource is plausible enough for schema conversions in manifestOCI1.UpdatedImage() to work.
 type oci1ImageSource struct {
 	configBlobImageSource
-	ref reference.XNamed
+	ref distreference.Named
 }
 
 func (OCIis *oci1ImageSource) Reference() types.ImageReference {

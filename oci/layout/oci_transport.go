@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/containers/image/directory/explicitfilepath"
-	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/image"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
@@ -130,7 +130,7 @@ func (ref ociReference) StringWithinTransport() string {
 // DockerReference returns a Docker reference associated with this reference
 // (fully explicit, i.e. !reference.XIsNameOnly, but reflecting user intent,
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
-func (ref ociReference) DockerReference() reference.XNamed {
+func (ref ociReference) DockerReference() reference.Named {
 	return nil
 }
 

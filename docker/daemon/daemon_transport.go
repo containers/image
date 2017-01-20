@@ -42,7 +42,7 @@ func (t daemonTransport) ValidatePolicyConfigurationScope(scope string) error {
 //  Using the config digest requires the caller to parse the manifest themselves, which is very cumbersome; so, for now, we don’t bother.)
 type daemonReference struct {
 	id  digest.Digest
-	ref reference.XNamed // !reference.XIsNameOnly
+	ref distreference.Named // !reference.XIsNameOnly
 }
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an ImageReference.
@@ -72,7 +72,7 @@ func ParseReference(refString string) (types.ImageReference, error) {
 }
 
 // NewReference returns a docker-daemon reference for either the supplied image ID (config digest) or the supplied reference (which must satisfy !reference.XIsNameOnly)
-func NewReference(id digest.Digest, ref reference.XNamed) (types.ImageReference, error) {
+func NewReference(id digest.Digest, ref distreference.Named) (types.ImageReference, error) {
 	if id != "" && ref != nil {
 		return nil, errors.New("docker-daemon: reference must not have an image ID and a reference string specified at the same time")
 	}
@@ -118,7 +118,7 @@ func (ref daemonReference) StringWithinTransport() string {
 // DockerReference returns a Docker reference associated with this reference
 // (fully explicit, i.e. !reference.XIsNameOnly, but reflecting user intent,
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
-func (ref daemonReference) DockerReference() reference.XNamed {
+func (ref daemonReference) DockerReference() distreference.Named {
 	return ref.ref // May be nil
 }
 
