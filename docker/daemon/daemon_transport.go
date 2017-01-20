@@ -6,6 +6,7 @@ import (
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/image"
 	"github.com/containers/image/types"
+	distreference "github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -64,7 +65,7 @@ func ParseReference(refString string) (types.ImageReference, error) {
 	if err != nil {
 		return nil, err
 	}
-	if ref.XName() == digest.Canonical.String() {
+	if distreference.FamiliarName(ref) == digest.Canonical.String() {
 		return nil, errors.Errorf("Invalid docker-daemon: reference %s: The %s repository name is reserved for (non-shortened) digest references", refString, digest.Canonical)
 	}
 	return NewReference("", ref)

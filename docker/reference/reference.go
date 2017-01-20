@@ -26,8 +26,6 @@ const (
 // XNamed is an object with a full name
 type XNamed interface {
 	distreference.Named
-	// XName returns normalized repository name, like "ubuntu".
-	XName() string
 	// XString returns full reference, like "ubuntu@sha256:abcdef..."
 	XString() string
 }
@@ -128,9 +126,6 @@ func (r *namedRef) Familiar() distreference.Named {
 	return r.Named.(drPRIVATEInterfaces).Familiar()
 }
 
-func (r *namedRef) XName() string {
-	return distreference.FamiliarName(r)
-}
 func (r *namedRef) XString() string {
 	return distreference.FamiliarString(r)
 }

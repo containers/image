@@ -53,7 +53,7 @@ func (prm *prmMatchRepoDigestOrExact) matchesDockerReference(image types.Unparse
 		// We don’t actually compare the manifest digest against the signature here; that happens prSignedBy.in UnparsedImage.Manifest.
 		// Becase UnparsedImage.Manifest verifies the intended.Digest() against the manifest, and prSignedBy verifies the signature digest against the manifest,
 		// we know that signature digest matches intended.Digest() (but intended.Digest() and signature digest may use different algorithms)
-		return signature.XName() == intended.XName()
+		return signature.Name() == intended.Name()
 	default: // !reference.XIsNameOnly(intended)
 		return false
 	}
@@ -64,7 +64,7 @@ func (prm *prmMatchRepository) matchesDockerReference(image types.UnparsedImage,
 	if err != nil {
 		return false
 	}
-	return signature.XName() == intended.XName()
+	return signature.Name() == intended.Name()
 }
 
 // parseDockerReferences converts two reference strings into parsed entities, failing on any error
@@ -97,5 +97,5 @@ func (prm *prmExactRepository) matchesDockerReference(image types.UnparsedImage,
 	if err != nil {
 		return false
 	}
-	return signature.XName() == intended.XName()
+	return signature.Name() == intended.Name()
 }
