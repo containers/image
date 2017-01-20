@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/containers/image/types"
 	"github.com/containers/image/version"
 	"github.com/opencontainers/go-digest"
 )
@@ -16,15 +17,6 @@ import (
 const (
 	signatureType = "atomic container signature"
 )
-
-// InvalidSignatureError is returned when parsing an invalid signature.
-type InvalidSignatureError struct {
-	msg string
-}
-
-func (err InvalidSignatureError) Error() string {
-	return err.msg
-}
 
 // Signature is a parsed content of a signature.
 type Signature struct {
@@ -74,7 +66,7 @@ func (s *privateSignature) UnmarshalJSON(data []byte) error {
 	err := s.strictUnmarshalJSON(data)
 	if err != nil {
 		if _, ok := err.(jsonFormatError); ok {
-			err = InvalidSignatureError{msg: err.Error()}
+			err = types.NewInvalidSignatureError(err.Error())
 		}
 	}
 	return err
@@ -89,7 +81,7 @@ func (s *privateSignature) strictUnmarshalJSON(data []byte) error {
 	}
 	o, ok := untyped.(map[string]interface{})
 	if !ok {
-		return InvalidSignatureError{msg: "Invalid signature format"}
+		return types.NewInvalidSignatureError("Invalid signature format")
 	}
 	if err := validateExactMapKeys(o, "critical", "optional"); err != nil {
 		return err
@@ -114,7 +106,7 @@ func (s *privateSignature) strictUnmarshalJSON(data []byte) error {
 		return err
 	}
 	if t != signatureType {
-		return InvalidSignatureError{msg: fmt.Sprintf("Unrecognized signature type %s", t)}
+		return types.NewInvalidSignatureError(fmt.Sprintf("Unrecognized signature type %s", t))
 	}
 
 	image, err := mapField(c, "image")
@@ -147,7 +139,7 @@ func (s *privateSignature) strictUnmarshalJSON(data []byte) error {
 }
 
 // Sign formats the signature and returns a blob signed using mech and keyIdentity
-func (s privateSignature) sign(mech SigningMechanism, keyIdentity string) ([]byte, error) {
+func (s privateSignature) sign(mech types.SigningMechanism, keyIdentity string) ([]byte, error) {
 	json, err := json.Marshal(s)
 	if err != nil {
 		return nil, err
@@ -169,7 +161,7 @@ type signatureAcceptanceRules struct {
 
 // verifyAndExtractSignature verifies that unverifiedSignature has been signed, and that its principial components
 // match expected values, both as specified by rules, and returns it
-func verifyAndExtractSignature(mech SigningMechanism, unverifiedSignature []byte, rules signatureAcceptanceRules) (*Signature, error) {
+func verifyAndExtractSignature(mech types.SigningMechanism, unverifiedSignature []byte, rules signatureAcceptanceRules) (*Signature, error) {
 	signed, keyIdentity, err := mech.Verify(unverifiedSignature)
 	if err != nil {
 		return nil, err
@@ -180,7 +172,7 @@ func verifyAndExtractSignature(mech SigningMechanism, unverifiedSignature []byte
 
 	var unmatchedSignature privateSignature
 	if err := json.Unmarshal(signed, &unmatchedSignature); err != nil {
-		return nil, InvalidSignatureError{msg: err.Error()}
+		return nil, types.NewInvalidSignatureError(err.Error())
 	}
 	if err := rules.validateSignedDockerManifestDigest(unmatchedSignature.DockerManifestDigest); err != nil {
 		return nil, err

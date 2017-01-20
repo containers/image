@@ -90,6 +90,7 @@ type Options struct {
 	RemoveSignatures bool   // Remove any pre-existing signatures. SignBy will still add a new signature.
 	SignBy           string // If non-empty, asks for a signature to be added during the copy, and specifies a key ID, as accepted by signature.NewGPGSigningMechanism().SignDockerManifest(),
 	ReportWriter     io.Writer
+	Mechanism        types.SigningMechanism
 	SourceCtx        *types.SystemContext
 	DestinationCtx   *types.SystemContext
 }
@@ -123,7 +124,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	}()
 
 	// Please keep this policy check BEFORE reading any other information about the image.
-	if allowed, err := policyContext.IsRunningImageAllowed(unparsedImage); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
+	if allowed, err := policyContext.IsRunningImageAllowed(options.Mechanism, unparsedImage); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
 		return errors.Wrap(err, "Source image rejected")
 	}
 	src, err := image.FromUnparsedImage(unparsedImage)
@@ -200,17 +201,13 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	}
 
 	if options != nil && options.SignBy != "" {
-		mech, err := signature.NewGPGSigningMechanism()
-		if err != nil {
-			return errors.Wrap(err, "Error initializing GPG")
-		}
 		dockerReference := dest.Reference().DockerReference()
 		if dockerReference == nil {
 			return errors.Errorf("Cannot determine canonical Docker reference for destination %s", transports.ImageName(dest.Reference()))
 		}
 
 		writeReport("Signing manifest\n")
-		newSig, err := signature.SignDockerManifest(manifest, dockerReference.String(), mech, options.SignBy)
+		newSig, err := signature.SignDockerManifest(manifest, dockerReference.String(), options.Mechanism, options.SignBy)
 		if err != nil {
 			return errors.Wrap(err, "Error creating signature")
 		}

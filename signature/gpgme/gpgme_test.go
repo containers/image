@@ -1,4 +1,4 @@
-package signature
+package gpgme
 
 import (
 	"bytes"
@@ -6,12 +6,13 @@ import (
 	"os"
 	"testing"
 
+	"github.com/containers/image/signature"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	testGPGHomeDirectory = "./fixtures"
+	testGPGHomeDirectory = "../fixtures"
 )
 
 func TestNewGPGSigningMechanism(t *testing.T) {
@@ -36,28 +37,28 @@ func TestGPGSigningMechanismImportKeysFromBytes(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try validating a signature when the key is unknown.
-	signature, err := ioutil.ReadFile("./fixtures/invalid-blob.signature")
+	s, err := ioutil.ReadFile("./../fixtures/invalid-blob.signature")
 	require.NoError(t, err)
-	content, signingFingerprint, err := mech.Verify(signature)
+	content, signingFingerprint, err := mech.Verify(s)
 	require.Error(t, err)
 
 	// Successful import
-	keyBlob, err := ioutil.ReadFile("./fixtures/public-key.gpg")
+	keyBlob, err := ioutil.ReadFile("./../fixtures/public-key.gpg")
 	require.NoError(t, err)
 	keyIdentities, err := mech.ImportKeysFromBytes(keyBlob)
 	require.NoError(t, err)
-	assert.Equal(t, []string{TestKeyFingerprint}, keyIdentities)
+	assert.Equal(t, []string{signature.TestKeyFingerprint}, keyIdentities)
 
 	// After import, the signature should validate.
-	content, signingFingerprint, err = mech.Verify(signature)
+	content, signingFingerprint, err = mech.Verify(s)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("This is not JSON\n"), content)
-	assert.Equal(t, TestKeyFingerprint, signingFingerprint)
+	assert.Equal(t, signature.TestKeyFingerprint, signingFingerprint)
 
 	// Two keys: just concatenate the valid input twice.
 	keyIdentities, err = mech.ImportKeysFromBytes(bytes.Join([][]byte{keyBlob, keyBlob}, nil))
 	require.NoError(t, err)
-	assert.Equal(t, []string{TestKeyFingerprint, TestKeyFingerprint}, keyIdentities)
+	assert.Equal(t, []string{signature.TestKeyFingerprint, signature.TestKeyFingerprint}, keyIdentities)
 
 	// Invalid input: This is accepted anyway by GPG, just returns no keys.
 	keyIdentities, err = mech.ImportKeysFromBytes([]byte("This is invalid"))
@@ -72,13 +73,13 @@ func TestGPGSigningMechanismSign(t *testing.T) {
 
 	// Successful signing
 	content := []byte("content")
-	signature, err := mech.Sign(content, TestKeyFingerprint)
+	s, err := mech.Sign(content, signature.TestKeyFingerprint)
 	require.NoError(t, err)
 
-	signedContent, signingFingerprint, err := mech.Verify(signature)
+	signedContent, signingFingerprint, err := mech.Verify(s)
 	require.NoError(t, err)
 	assert.EqualValues(t, content, signedContent)
-	assert.Equal(t, TestKeyFingerprint, signingFingerprint)
+	assert.Equal(t, signature.TestKeyFingerprint, signingFingerprint)
 
 	// Error signing
 	_, err = mech.Sign(content, "this fingerprint doesn't exist")
@@ -97,12 +98,12 @@ func TestGPGSigningMechanismVerify(t *testing.T) {
 	require.NoError(t, err)
 
 	// Successful verification
-	signature, err := ioutil.ReadFile("./fixtures/invalid-blob.signature")
+	s, err := ioutil.ReadFile("./../fixtures/invalid-blob.signature")
 	require.NoError(t, err)
-	content, signingFingerprint, err := mech.Verify(signature)
+	content, signingFingerprint, err := mech.Verify(s)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("This is not JSON\n"), content)
-	assert.Equal(t, TestKeyFingerprint, signingFingerprint)
+	assert.Equal(t, signature.TestKeyFingerprint, signingFingerprint)
 
 	// For extra paranoia, test that we return nil data on error.
 
@@ -114,35 +115,35 @@ func TestGPGSigningMechanismVerify(t *testing.T) {
 	assertSigningError(t, content, signingFingerprint, err)
 
 	// Literal packet, not a signature
-	signature, err = ioutil.ReadFile("./fixtures/unsigned-literal.signature")
+	s, err = ioutil.ReadFile("./../fixtures/unsigned-literal.signature")
 	require.NoError(t, err)
-	content, signingFingerprint, err = mech.Verify(signature)
+	content, signingFingerprint, err = mech.Verify(s)
 	assertSigningError(t, content, signingFingerprint, err)
 
 	// Encrypted data, not a signature.
-	signature, err = ioutil.ReadFile("./fixtures/unsigned-encrypted.signature")
+	s, err = ioutil.ReadFile("./../fixtures/unsigned-encrypted.signature")
 	require.NoError(t, err)
-	content, signingFingerprint, err = mech.Verify(signature)
+	content, signingFingerprint, err = mech.Verify(s)
 	assertSigningError(t, content, signingFingerprint, err)
 
 	// FIXME? Is there a way to create a multi-signature so that gpgme_op_verify returns multiple signatures?
 
 	// Expired signature
-	signature, err = ioutil.ReadFile("./fixtures/expired.signature")
+	s, err = ioutil.ReadFile("./../fixtures/expired.signature")
 	require.NoError(t, err)
-	content, signingFingerprint, err = mech.Verify(signature)
+	content, signingFingerprint, err = mech.Verify(s)
 	assertSigningError(t, content, signingFingerprint, err)
 
 	// Corrupt signature
-	signature, err = ioutil.ReadFile("./fixtures/corrupt.signature")
+	s, err = ioutil.ReadFile("./../fixtures/corrupt.signature")
 	require.NoError(t, err)
-	content, signingFingerprint, err = mech.Verify(signature)
+	content, signingFingerprint, err = mech.Verify(s)
 	assertSigningError(t, content, signingFingerprint, err)
 
 	// Valid signature with an unknown key
-	signature, err = ioutil.ReadFile("./fixtures/unknown-key.signature")
+	s, err = ioutil.ReadFile("./../fixtures/unknown-key.signature")
 	require.NoError(t, err)
-	content, signingFingerprint, err = mech.Verify(signature)
+	content, signingFingerprint, err = mech.Verify(s)
 	assertSigningError(t, content, signingFingerprint, err)
 
 	// The various GPG/GPGME failures cases are not obviously easy to reach.

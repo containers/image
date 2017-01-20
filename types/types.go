@@ -34,6 +34,20 @@ type ImageTransport interface {
 	ValidatePolicyConfigurationScope(scope string) error
 }
 
+// SigningMechanism abstracts a way to sign binary blobs and verify their signatures.
+// FIXME: Eventually expand on keyIdentity (namespace them between mechanisms to
+// eliminate ambiguities, support CA signatures and perhaps other key properties)
+type SigningMechanism interface {
+	// ImportKeysFromBytes imports public keys from the supplied blob and returns their identities.
+	// The blob is assumed to have an appropriate format (the caller is expected to know which one).
+	// NOTE: This may modify long-term state (e.g. key storage in a directory underlying the mechanism).
+	ImportKeysFromBytes(blob []byte) ([]string, error)
+	// Sign creates a (non-detached) signature of input using keyidentity
+	Sign(input []byte, keyIdentity string) ([]byte, error)
+	// Verify parses unverifiedSignature and returns the content and the signer's identity
+	Verify(unverifiedSignature []byte) (contents []byte, keyIdentity string, err error)
+}
+
 // ImageReference is an abstracted way to refer to an image location, namespaced within an ImageTransport.
 //
 // The object should preferably be immutable after creation, with any parsing/state-dependent resolving happening
@@ -299,3 +313,18 @@ var (
 	// ErrBlobNotFound can be returned by an ImageDestination's HasBlob() method
 	ErrBlobNotFound = errors.New("no such blob present")
 )
+
+// InvalidSignatureError is returned when parsing an invalid signature.
+// TODO: move this into errors package
+type InvalidSignatureError struct {
+	msg string
+}
+
+// NewInvalidSignatureError returns an InvalidSignatureError
+func NewInvalidSignatureError(msg string) error {
+	return InvalidSignatureError{msg: msg}
+}
+
+func (err InvalidSignatureError) Error() string {
+	return err.msg
+}

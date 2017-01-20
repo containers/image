@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/containers/image/docker/reference"
+	"github.com/containers/image/signature/openpgp"
 	"github.com/containers/image/types"
 )
 
@@ -49,26 +50,30 @@ func (ref nameOnlyImageReferenceMock) DeleteImage(ctx *types.SystemContext) erro
 
 func TestPRInsecureAcceptAnythingIsSignatureAuthorAccepted(t *testing.T) {
 	pr := NewPRInsecureAcceptAnything()
+	m, _ := openpgp.NewOpenPGPSigningMechanism()
 	// Pass nil signature to, kind of, test that the return value does not depend on it.
-	sar, parsedSig, err := pr.isSignatureAuthorAccepted(nameOnlyImageMock{}, nil)
+	sar, parsedSig, err := pr.isSignatureAuthorAccepted(m, nameOnlyImageMock{}, nil)
 	assertSARUnknown(t, sar, parsedSig, err)
 }
 
 func TestPRInsecureAcceptAnythingIsRunningImageAllowed(t *testing.T) {
 	pr := NewPRInsecureAcceptAnything()
-	res, err := pr.isRunningImageAllowed(nameOnlyImageMock{})
+	m, _ := openpgp.NewOpenPGPSigningMechanism()
+	res, err := pr.isRunningImageAllowed(m, nameOnlyImageMock{})
 	assertRunningAllowed(t, res, err)
 }
 
 func TestPRRejectIsSignatureAuthorAccepted(t *testing.T) {
 	pr := NewPRReject()
+	m, _ := openpgp.NewOpenPGPSigningMechanism()
 	// Pass nil signature to, kind of, test that the return value does not depend on it.
-	sar, parsedSig, err := pr.isSignatureAuthorAccepted(nameOnlyImageMock{}, nil)
+	sar, parsedSig, err := pr.isSignatureAuthorAccepted(m, nameOnlyImageMock{}, nil)
 	assertSARRejectedPolicyRequirement(t, sar, parsedSig, err)
 }
 
 func TestPRRejectIsRunningImageAllowed(t *testing.T) {
 	pr := NewPRReject()
-	res, err := pr.isRunningImageAllowed(nameOnlyImageMock{})
+	m, _ := openpgp.NewOpenPGPSigningMechanism()
+	res, err := pr.isRunningImageAllowed(m, nameOnlyImageMock{})
 	assertRunningRejectedPolicyRequirement(t, res, err)
 }

@@ -53,14 +53,14 @@ type PolicyRequirement interface {
 	//   a container based on this image; use IsRunningImageAllowed instead.
 	// - Just because a signature is accepted does not automatically mean the contents of the
 	//   signature are authorized to run code as root, or to affect system or cluster configuration.
-	isSignatureAuthorAccepted(image types.UnparsedImage, sig []byte) (signatureAcceptanceResult, *Signature, error)
+	isSignatureAuthorAccepted(mechanism types.SigningMechanism, image types.UnparsedImage, sig []byte) (signatureAcceptanceResult, *Signature, error)
 
 	// isRunningImageAllowed returns true if the requirement allows running an image.
 	// If it returns false, err must be non-nil, and should be an PolicyRequirementError if evaluation
 	// succeeded but the result was rejection.
 	// WARNING: This validates signatures and the manifest, but does not download or validate the
 	// layers. Users must validate that the layers match their expected digests.
-	isRunningImageAllowed(image types.UnparsedImage) (bool, error)
+	isRunningImageAllowed(mechanism types.SigningMechanism, image types.UnparsedImage) (bool, error)
 }
 
 // PolicyReferenceMatch specifies a set of image identities accepted in PolicyRequirement.
@@ -173,7 +173,7 @@ func (pc *PolicyContext) requirementsForImageRef(ref types.ImageReference) Polic
 //   a container based on this image; use IsRunningImageAllowed instead.
 // - Just because a signature is accepted does not automatically mean the contents of the
 //   signature are authorized to run code as root, or to affect system or cluster configuration.
-func (pc *PolicyContext) GetSignaturesWithAcceptedAuthor(image types.UnparsedImage) (sigs []*Signature, finalErr error) {
+func (pc *PolicyContext) GetSignaturesWithAcceptedAuthor(mechanism types.SigningMechanism, image types.UnparsedImage) (sigs []*Signature, finalErr error) {
 	if err := pc.changeState(pcReady, pcInUse); err != nil {
 		return nil, err
 	}
@@ -203,7 +203,7 @@ func (pc *PolicyContext) GetSignaturesWithAcceptedAuthor(image types.UnparsedIma
 		for reqNumber, req := range reqs {
 			// FIXME: Log the requirement itself? For now, we use just the number.
 			// FIXME: supply state
-			switch res, as, err := req.isSignatureAuthorAccepted(image, sig); res {
+			switch res, as, err := req.isSignatureAuthorAccepted(mechanism, image, sig); res {
 			case sarAccepted:
 				if as == nil { // Coverage: this should never happen
 					logrus.Debugf(" Requirement %d: internal inconsistency: sarAccepted but no parsed contents", reqNumber)
@@ -253,7 +253,7 @@ func (pc *PolicyContext) GetSignaturesWithAcceptedAuthor(image types.UnparsedIma
 // succeeded but the result was rejection.
 // WARNING: This validates signatures and the manifest, but does not download or validate the
 // layers. Users must validate that the layers match their expected digests.
-func (pc *PolicyContext) IsRunningImageAllowed(image types.UnparsedImage) (res bool, finalErr error) {
+func (pc *PolicyContext) IsRunningImageAllowed(mechanism types.SigningMechanism, image types.UnparsedImage) (res bool, finalErr error) {
 	if err := pc.changeState(pcReady, pcInUse); err != nil {
 		return false, err
 	}
@@ -273,7 +273,7 @@ func (pc *PolicyContext) IsRunningImageAllowed(image types.UnparsedImage) (res b
 
 	for reqNumber, req := range reqs {
 		// FIXME: supply state
-		allowed, err := req.isRunningImageAllowed(image)
+		allowed, err := req.isRunningImageAllowed(mechanism, image)
 		if !allowed {
 			logrus.Debugf("Requirement %d: denied, done", reqNumber)
 			return false, err
