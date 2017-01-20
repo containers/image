@@ -230,7 +230,7 @@ func (d *daemonImageDestination) PutManifest(m []byte) error {
 	// a hostname-qualified reference.
 	// See https://github.com/containers/image/issues/72 for a more detailed
 	// analysis and explanation.
-	refString := fmt.Sprintf("%s:%s", d.namedTaggedRef.XFullName(), d.namedTaggedRef.XTag())
+	refString := fmt.Sprintf("%s:%s", d.namedTaggedRef.Name(), d.namedTaggedRef.XTag())
 
 	items := []manifestItem{{
 		Config:       man.Config.Digest.String(),

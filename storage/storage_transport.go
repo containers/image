@@ -282,5 +282,5 @@ func verboseName(name reference.XNamed) string {
 	if tagged, ok := name.(reference.XNamedTagged); ok {
 		tag = tagged.XTag()
 	}
-	return name.XFullName() + ":" + tag
+	return name.Name() + ":" + tag
 }

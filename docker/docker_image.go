@@ -34,7 +34,7 @@ func newImage(ctx *types.SystemContext, ref dockerReference) (types.Image, error
 
 // SourceRefFullName returns a fully expanded name for the repository this image is in.
 func (i *Image) SourceRefFullName() string {
-	return i.src.ref.ref.XFullName()
+	return i.src.ref.ref.Name()
 }
 
 // GetRepositoryTags list all tags available in the repository. Note that this has no connection with the tag(s) used for this specific image, if any.

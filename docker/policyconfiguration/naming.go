@@ -12,7 +12,7 @@ import (
 // as a backend for ImageReference.PolicyConfigurationIdentity.
 // The reference must satisfy !reference.XIsNameOnly().
 func DockerReferenceIdentity(ref reference.XNamed) (string, error) {
-	res := ref.XFullName()
+	res := ref.Name()
 	tagged, isTagged := ref.(reference.XNamedTagged)
 	digested, isDigested := ref.(reference.XCanonical)
 	switch {
@@ -43,7 +43,7 @@ func DockerReferenceNamespaces(ref reference.XNamed) []string {
 	// ref.FullName() == ref.Hostname() + "/" + ref.RemoteName(), so the last
 	// iteration matches the host name (for any namespace).
 	res := []string{}
-	name := ref.XFullName()
+	name := ref.Name()
 	for {
 		res = append(res, name)
 

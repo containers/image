@@ -30,8 +30,6 @@ type XNamed interface {
 	XName() string
 	// XString returns full reference, like "ubuntu@sha256:abcdef..."
 	XString() string
-	// XFullName returns full repository name with hostname, like "docker.io/library/ubuntu"
-	XFullName() string
 	// XHostname returns hostname for the reference, like "docker.io"
 	XHostname() string
 	// XRemoteName returns the repository component of the full name, like "library/ubuntu"
@@ -139,9 +137,6 @@ func (r *namedRef) XName() string {
 }
 func (r *namedRef) XString() string {
 	return distreference.FamiliarString(r)
-}
-func (r *namedRef) XFullName() string {
-	return r.Name()
 }
 func (r *namedRef) XHostname() string {
 	return distreference.Domain(r)
