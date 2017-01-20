@@ -249,7 +249,7 @@ func TestParseReferenceWithTagAndDigest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, isTagged := ref.(XNamedTagged); isTagged {
+	if _, isTagged := ref.(distreference.NamedTagged); isTagged {
 		t.Fatalf("Reference from %q should not support tag", ref)
 	}
 	if _, isCanonical := ref.(XCanonical); !isCanonical {

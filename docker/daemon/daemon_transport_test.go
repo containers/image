@@ -90,7 +90,7 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 	}
 }
 
-// refWithTagAndDigest is a reference.XNamedTagged and reference.XCanonical at the same time.
+// refWithTagAndDigest is a reference.NamedTagged and reference.XCanonical at the same time.
 type refWithTagAndDigest struct{ reference.XCanonical }
 
 func (ref refWithTagAndDigest) Tag() string {

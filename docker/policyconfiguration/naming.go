@@ -14,7 +14,7 @@ import (
 // The reference must satisfy !reference.XIsNameOnly().
 func DockerReferenceIdentity(ref distreference.Named) (string, error) {
 	res := ref.Name()
-	tagged, isTagged := ref.(reference.XNamedTagged)
+	tagged, isTagged := ref.(distreference.NamedTagged)
 	digested, isDigested := ref.(reference.XCanonical)
 	switch {
 	case isTagged && isDigested: // This should not happen, docker/reference.XParseNamed drops the tag.

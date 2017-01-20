@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/client"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -22,7 +22,7 @@ import (
 
 type daemonImageDestination struct {
 	ref            daemonReference
-	namedTaggedRef reference.XNamedTagged // Strictly speaking redundant with ref above; having the field makes it structurally impossible for later users to fail.
+	namedTaggedRef reference.NamedTagged // Strictly speaking redundant with ref above; having the field makes it structurally impossible for later users to fail.
 	// For talking to imageLoadGoroutine
 	goroutineCancel context.CancelFunc
 	statusChannel   <-chan error
@@ -38,7 +38,7 @@ func newImageDestination(systemCtx *types.SystemContext, ref daemonReference) (t
 	if ref.ref == nil {
 		return nil, errors.Errorf("Invalid destination docker-daemon:%s: a destination must be a name:tag", ref.StringWithinTransport())
 	}
-	namedTaggedRef, ok := ref.ref.(reference.XNamedTagged)
+	namedTaggedRef, ok := ref.ref.(reference.NamedTagged)
 	if !ok {
 		return nil, errors.Errorf("Invalid destination docker-daemon:%s: a destination must be a name:tag", ref.StringWithinTransport())
 	}

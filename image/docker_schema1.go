@@ -6,10 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
-	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
@@ -70,11 +69,11 @@ func manifestSchema1FromManifest(manifest []byte) (genericManifest, error) {
 }
 
 // manifestSchema1FromComponents builds a new manifestSchema1 from the supplied data.
-func manifestSchema1FromComponents(ref distreference.Named, fsLayers []fsLayersSchema1, history []historySchema1, architecture string) genericManifest {
+func manifestSchema1FromComponents(ref reference.Named, fsLayers []fsLayersSchema1, history []historySchema1, architecture string) genericManifest {
 	var name, tag string
 	if ref != nil { // Well, what to do if it _is_ nil? Most consumers actually don't use these fields nowadays, so we might as well try not supplying them.
-		name = distreference.Path(ref)
-		if tagged, ok := ref.(reference.XNamedTagged); ok {
+		name = reference.Path(ref)
+		if tagged, ok := ref.(reference.NamedTagged); ok {
 			tag = tagged.Tag()
 		}
 	}

@@ -23,11 +23,6 @@ const (
 	XDefaultRepoPrefix = "library/"
 )
 
-// XNamedTagged is an object including a name and tag.
-type XNamedTagged interface {
-	distreference.NamedTagged
-}
-
 // XCanonical reference is an object with a fully unique
 // name including a name with hostname and digest
 type XCanonical interface {
@@ -74,7 +69,7 @@ func XWithName(name string) (*namedRef, error) {
 
 // XWithTag combines the name from "name" and the tag from "tag" to form a
 // reference incorporating both the name and the tag.
-func XWithTag(name distreference.Named, tag string) (XNamedTagged, error) {
+func XWithTag(name distreference.Named, tag string) (distreference.NamedTagged, error) {
 	return distreference.WithTag(name, tag)
 }
 
@@ -125,7 +120,7 @@ func XWithDefaultTag(ref distreference.Named) distreference.Named {
 
 // XIsNameOnly returns true if reference only contains a repo name.
 func XIsNameOnly(ref distreference.Named) bool {
-	if _, ok := ref.(XNamedTagged); ok {
+	if _, ok := ref.(distreference.NamedTagged); ok {
 		return false
 	}
 	if _, ok := ref.(XCanonical); ok {

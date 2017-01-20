@@ -48,7 +48,7 @@ func (prm *prmMatchRepoDigestOrExact) matchesDockerReference(image types.Unparse
 		return false
 	}
 	switch intended.(type) {
-	case reference.XNamedTagged: // Includes the case when intended has both a tag and a digest.
+	case distreference.NamedTagged: // Includes the case when intended has both a tag and a digest.
 		return signature.String() == intended.String()
 	case reference.XCanonical:
 		// We don’t actually compare the manifest digest against the signature here; that happens prSignedBy.in UnparsedImage.Manifest.

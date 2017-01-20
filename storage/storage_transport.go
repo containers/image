@@ -280,7 +280,7 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 func verboseName(name distreference.Named) string {
 	name = reference.XWithDefaultTag(name)
 	tag := ""
-	if tagged, ok := name.(reference.XNamedTagged); ok {
+	if tagged, ok := name.(distreference.NamedTagged); ok {
 		tag = tagged.Tag()
 	}
 	return name.Name() + ":" + tag

@@ -45,7 +45,7 @@ func (t openshiftTransport) ValidatePolicyConfigurationScope(scope string) error
 
 // openshiftReference is an ImageReference for OpenShift images.
 type openshiftReference struct {
-	dockerReference reference.XNamedTagged
+	dockerReference distreference.NamedTagged
 	namespace       string // Computed from dockerReference in advance.
 	stream          string // Computed from dockerReference in advance.
 }
@@ -56,15 +56,15 @@ func ParseReference(ref string) (types.ImageReference, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to parse image reference %q", ref)
 	}
-	tagged, ok := r.(reference.XNamedTagged)
+	tagged, ok := r.(distreference.NamedTagged)
 	if !ok {
 		return nil, errors.Errorf("invalid image reference %s, expected format: 'hostname/namespace/stream:tag'", ref)
 	}
 	return NewReference(tagged)
 }
 
-// NewReference returns an OpenShift reference for a reference.XNamedTagged
-func NewReference(dockerRef reference.XNamedTagged) (types.ImageReference, error) {
+// NewReference returns an OpenShift reference for a distreference.NamedTagged
+func NewReference(dockerRef distreference.NamedTagged) (types.ImageReference, error) {
 	r := strings.SplitN(distreference.Path(dockerRef), "/", 3)
 	if len(r) != 2 {
 		return nil, errors.Errorf("invalid image reference: %s, expected format: 'hostname/namespace/stream:tag'",

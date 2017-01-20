@@ -43,14 +43,14 @@ func TestNewReference(t *testing.T) {
 	// too many ns
 	r, err := reference.XParseNamed("registry.example.com/ns1/ns2/ns3/stream:tag")
 	require.NoError(t, err)
-	tagged, ok := r.(reference.XNamedTagged)
+	tagged, ok := r.(distreference.NamedTagged)
 	require.True(t, ok)
 	_, err = NewReference(tagged)
 	assert.Error(t, err)
 
 	r, err = reference.XParseNamed("registry.example.com/ns/stream:tag")
 	require.NoError(t, err)
-	tagged, ok = r.(reference.XNamedTagged)
+	tagged, ok = r.(distreference.NamedTagged)
 	require.True(t, ok)
 	_, err = NewReference(tagged)
 	assert.NoError(t, err)
