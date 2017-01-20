@@ -25,7 +25,7 @@ const (
 
 // XNamedTagged is an object including a name and tag.
 type XNamedTagged interface {
-	distreference.Named
+	distreference.NamedTagged
 	XTag() string
 }
 
@@ -81,13 +81,14 @@ func XWithTag(name *namedRef, tag string) (XNamedTagged, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &taggedRef{namedRef{r}}, nil
+	return &taggedRef{NamedTagged: r, namedRef: namedRef{r}}, nil
 }
 
 type namedRef struct {
 	distreference.Named // FIXME: must implement private distreference.NamedRepository
 }
 type taggedRef struct {
+	distreference.NamedTagged
 	namedRef
 }
 type canonicalRef struct {

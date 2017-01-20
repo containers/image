@@ -68,6 +68,9 @@ type refWithTagAndDigest struct{ reference.XCanonical }
 func (ref refWithTagAndDigest) XTag() string {
 	return "notLatest"
 }
+func (ref refWithTagAndDigest) Tag() string {
+	return "notLatest"
+}
 
 func TestDockerReferenceIdentity(t *testing.T) {
 	// TestDockerReference above has tested the core of the functionality, this tests only the failure cases.

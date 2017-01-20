@@ -96,6 +96,9 @@ type refWithTagAndDigest struct{ reference.XCanonical }
 func (ref refWithTagAndDigest) XTag() string {
 	return "notLatest"
 }
+func (ref refWithTagAndDigest) Tag() string {
+	return "notLatest"
+}
 
 // A common list of reference formats to test for the various ImageReference methods.
 // (For IDs it is much simpler, we simply use them unmodified)
