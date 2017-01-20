@@ -47,42 +47,8 @@ func XParseNamed(s string) (distreference.Named, error) {
 
 // XWithName returns a named object representing the given string. If the input
 // is invalid ErrReferenceInvalidFormat will be returned.
-// FIXME: returns *namedRef to expose the distreference.Named implementation. Should revert to distreference.Named.
-func XWithName(name string) (*namedRef, error) {
-	r, err := distreference.ParseNormalizedNamed(name)
-	if err != nil {
-		return nil, err
-	}
-	return &namedRef{r}, nil
-}
-
-type namedRef struct {
-	distreference.Named // FIXME: must implement private distreference.NamedRepository
-}
-
-// TEMPORARY: distreference.WithDigest and distreference.WithTag can work with any distreference.Named,
-// but if so, they break the values of distreference.Domain() and distreference.Path(),
-// and hence also distreference.FamiliarName()/distreference.FamiliarString().  To preserve this,
-// we need to implement a PRIVATE distreference.namedRepository.
-// Similarly, we need to implement a PRIVATE distreference.normalizedNamed so that distreference.Familiar*()
-// knows how to compute the minimal form.
-// Right now that happens by these REALLY UGLY methods; eventually we will eliminate namedRef entirely in favor of
-// distreference.Named, and distreference can keep its implementation games to itself.
-type drPRIVATEInterfaces interface {
-	distreference.Named
-	Domain() string
-	Path() string
-	Familiar() distreference.Named
-}
-
-func (r *namedRef) Domain() string {
-	return r.Named.(drPRIVATEInterfaces).Domain()
-}
-func (r *namedRef) Path() string {
-	return r.Named.(drPRIVATEInterfaces).Path()
-}
-func (r *namedRef) Familiar() distreference.Named {
-	return r.Named.(drPRIVATEInterfaces).Familiar()
+func XWithName(name string) (distreference.Named, error) {
+	return distreference.ParseNormalizedNamed(name)
 }
 
 // XParseIDOrReference parses string for an image ID or a reference. ID can be
