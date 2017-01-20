@@ -22,7 +22,7 @@ func DockerReferenceIdentity(ref distreference.Named) (string, error) {
 	case !isTagged && !isDigested: // This should not happen, the caller is expected to ensure !reference.XIsNameOnly()
 		return "", errors.Errorf("Internal inconsistency: Docker reference %s with neither a tag nor a digest", distreference.FamiliarString(ref))
 	case isTagged:
-		res = res + ":" + tagged.XTag()
+		res = res + ":" + tagged.Tag()
 	case isDigested:
 		res = res + "@" + digested.XDigest().String()
 	default: // Coverage: The above was supposed to be exhaustive.

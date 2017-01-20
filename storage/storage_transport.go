@@ -281,7 +281,7 @@ func verboseName(name distreference.Named) string {
 	name = reference.XWithDefaultTag(name)
 	tag := ""
 	if tagged, ok := name.(reference.XNamedTagged); ok {
-		tag = tagged.XTag()
+		tag = tagged.Tag()
 	}
 	return name.Name() + ":" + tag
 }

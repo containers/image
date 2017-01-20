@@ -75,7 +75,7 @@ func manifestSchema1FromComponents(ref distreference.Named, fsLayers []fsLayersS
 	if ref != nil { // Well, what to do if it _is_ nil? Most consumers actually don't use these fields nowadays, so we might as well try not supplying them.
 		name = distreference.Path(ref)
 		if tagged, ok := ref.(reference.XNamedTagged); ok {
-			tag = tagged.XTag()
+			tag = tagged.Tag()
 		}
 	}
 	return &manifestSchema1{

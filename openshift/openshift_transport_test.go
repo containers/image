@@ -64,7 +64,7 @@ func TestParseReference(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "ns", osRef.namespace)
 	assert.Equal(t, "stream", osRef.stream)
-	assert.Equal(t, "notlatest", osRef.dockerReference.XTag())
+	assert.Equal(t, "notlatest", osRef.dockerReference.Tag())
 	assert.Equal(t, "registry.example.com:8443", distreference.Domain(osRef.dockerReference))
 
 	// Components creating an invalid Docker Reference name

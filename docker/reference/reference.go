@@ -26,7 +26,6 @@ const (
 // XNamedTagged is an object including a name and tag.
 type XNamedTagged interface {
 	distreference.NamedTagged
-	XTag() string
 }
 
 // XCanonical reference is an object with a fully unique
@@ -120,9 +119,6 @@ func (r *namedRef) Familiar() distreference.Named {
 	return r.Named.(drPRIVATEInterfaces).Familiar()
 }
 
-func (r *taggedRef) XTag() string {
-	return r.NamedTagged.Tag()
-}
 func (r *canonicalRef) XDigest() digest.Digest {
 	return digest.Digest(r.namedRef.Named.(distreference.Canonical).Digest())
 }

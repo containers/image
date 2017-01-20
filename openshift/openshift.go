@@ -259,7 +259,7 @@ func (s *openshiftImageSource) ensureImageIsResolved() error {
 	}
 	var te *tagEvent
 	for _, tag := range is.Status.Tags {
-		if tag.Tag != s.client.ref.dockerReference.XTag() {
+		if tag.Tag != s.client.ref.dockerReference.Tag() {
 			continue
 		}
 		if len(tag.Items) > 0 {
@@ -306,7 +306,7 @@ func newImageDestination(ctx *types.SystemContext, ref openshiftReference) (type
 	// FIXME: Should this always use a digest, not a tag? Uploading to Docker by tag requires the tag _inside_ the manifest to match,
 	// i.e. a single signed image cannot be available under multiple tags.  But with types.ImageDestination, we don't know
 	// the manifest digest at this point.
-	dockerRefString := fmt.Sprintf("//%s/%s/%s:%s", reference.Domain(client.ref.dockerReference), client.ref.namespace, client.ref.stream, client.ref.dockerReference.XTag())
+	dockerRefString := fmt.Sprintf("//%s/%s/%s:%s", reference.Domain(client.ref.dockerReference), client.ref.namespace, client.ref.stream, client.ref.dockerReference.Tag())
 	dockerRef, err := docker.ParseReference(dockerRefString)
 	if err != nil {
 		return nil, err

@@ -150,7 +150,7 @@ func (ref dockerReference) tagOrDigest() (string, error) {
 		return ref.XDigest().String(), nil
 	}
 	if ref, ok := ref.ref.(reference.XNamedTagged); ok {
-		return ref.XTag(), nil
+		return ref.Tag(), nil
 	}
 	// This should not happen, NewReference above refuses reference.XIsNameOnly values.
 	return "", errors.Errorf("Internal inconsistency: Reference %s unexpectedly has neither a digest nor a tag", distreference.FamiliarString(ref.ref))
