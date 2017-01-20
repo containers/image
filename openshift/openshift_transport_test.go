@@ -3,8 +3,7 @@ package openshift
 import (
 	"testing"
 
-	"github.com/containers/image/docker/reference"
-	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,16 +40,16 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 
 func TestNewReference(t *testing.T) {
 	// too many ns
-	r, err := reference.XParseNamed("registry.example.com/ns1/ns2/ns3/stream:tag")
+	r, err := reference.ParseNormalizedNamed("registry.example.com/ns1/ns2/ns3/stream:tag")
 	require.NoError(t, err)
-	tagged, ok := r.(distreference.NamedTagged)
+	tagged, ok := r.(reference.NamedTagged)
 	require.True(t, ok)
 	_, err = NewReference(tagged)
 	assert.Error(t, err)
 
-	r, err = reference.XParseNamed("registry.example.com/ns/stream:tag")
+	r, err = reference.ParseNormalizedNamed("registry.example.com/ns/stream:tag")
 	require.NoError(t, err)
-	tagged, ok = r.(distreference.NamedTagged)
+	tagged, ok = r.(reference.NamedTagged)
 	require.True(t, ok)
 	_, err = NewReference(tagged)
 	assert.NoError(t, err)
@@ -65,7 +64,7 @@ func TestParseReference(t *testing.T) {
 	assert.Equal(t, "ns", osRef.namespace)
 	assert.Equal(t, "stream", osRef.stream)
 	assert.Equal(t, "notlatest", osRef.dockerReference.Tag())
-	assert.Equal(t, "registry.example.com:8443", distreference.Domain(osRef.dockerReference))
+	assert.Equal(t, "registry.example.com:8443", reference.Domain(osRef.dockerReference))
 
 	// Components creating an invalid Docker Reference name
 	_, err = ParseReference("registry.example.com/ns/UPPERCASEISINVALID:notlatest")

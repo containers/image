@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
-	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,12 +25,12 @@ func TestParseImageAndDockerReference(t *testing.T) {
 		bad2 = ""
 	)
 	// Success
-	ref, err := reference.XParseNamed(ok1)
+	ref, err := reference.ParseNormalizedNamed(ok1)
 	require.NoError(t, err)
 	r1, r2, err := parseImageAndDockerReference(refImageMock{ref}, ok2)
 	require.NoError(t, err)
-	assert.Equal(t, ok1, distreference.FamiliarString(r1))
-	assert.Equal(t, ok2, distreference.FamiliarString(r2))
+	assert.Equal(t, ok1, reference.FamiliarString(r1))
+	assert.Equal(t, ok2, reference.FamiliarString(r2))
 
 	// Unidentified images are rejected.
 	_, _, err = parseImageAndDockerReference(refImageMock{nil}, ok2)
@@ -44,7 +43,7 @@ func TestParseImageAndDockerReference(t *testing.T) {
 		{ok1, bad2},
 		{bad1, bad2},
 	} {
-		ref, err := reference.XParseNamed(refs[0])
+		ref, err := reference.ParseNormalizedNamed(refs[0])
 		if err == nil {
 			_, _, err := parseImageAndDockerReference(refImageMock{ref}, refs[1])
 			assert.Error(t, err)
@@ -53,7 +52,7 @@ func TestParseImageAndDockerReference(t *testing.T) {
 }
 
 // refImageMock is a mock of types.UnparsedImage which returns itself in Reference().DockerReference.
-type refImageMock struct{ distreference.Named }
+type refImageMock struct{ reference.Named }
 
 func (ref refImageMock) Reference() types.ImageReference {
 	return refImageReferenceMock{ref.Named}
@@ -69,7 +68,7 @@ func (ref refImageMock) Signatures() ([][]byte, error) {
 }
 
 // refImageReferenceMock is a mock of types.ImageReference which returns itself in DockerReference.
-type refImageReferenceMock struct{ distreference.Named }
+type refImageReferenceMock struct{ reference.Named }
 
 func (ref refImageReferenceMock) Transport() types.ImageTransport {
 	// We use this in error messages, so sady we must return something. But right now we do so only when DockerReference is nil, so restrict to that.
@@ -85,7 +84,7 @@ func (ref refImageReferenceMock) StringWithinTransport() string {
 	}
 	panic("unexpected call to a mock function")
 }
-func (ref refImageReferenceMock) DockerReference() distreference.Named {
+func (ref refImageReferenceMock) DockerReference() reference.Named {
 	return ref.Named
 }
 func (ref refImageReferenceMock) PolicyConfigurationIdentity() string {
@@ -206,9 +205,9 @@ var prmRepositoryMatchTestTable = []prmSymmetricTableTest{
 }
 
 func testImageAndSig(t *testing.T, prm PolicyReferenceMatch, imageRef, sigRef string, result bool) {
-	// This assumes that all ways to obtain a distreference.Named perform equivalent validation,
-	// and therefore values refused by reference.XParseNamed can not happen in practice.
-	parsedImageRef, err := reference.XParseNamed(imageRef)
+	// This assumes that all ways to obtain a reference.Named perform equivalent validation,
+	// and therefore values refused by reference.ParseNormalizedNamed can not happen in practice.
+	parsedImageRef, err := reference.ParseNormalizedNamed(imageRef)
 	if err != nil {
 		return
 	}
@@ -303,8 +302,8 @@ func TestParseDockerReferences(t *testing.T) {
 	// Success
 	r1, r2, err := parseDockerReferences(ok1, ok2)
 	require.NoError(t, err)
-	assert.Equal(t, ok1, distreference.FamiliarString(r1))
-	assert.Equal(t, ok2, distreference.FamiliarString(r2))
+	assert.Equal(t, ok1, reference.FamiliarString(r1))
+	assert.Equal(t, ok2, reference.FamiliarString(r2))
 
 	// Failures
 	for _, refs := range [][]string{

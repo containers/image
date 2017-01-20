@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/containers/image/docker/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -54,7 +54,7 @@ func TestTransportParseStoreReference(t *testing.T) {
 			if c.expectedRef == "" {
 				assert.Nil(t, storageRef.name, c.input)
 			} else {
-				dockerRef, err := reference.XParseNamed(c.expectedRef)
+				dockerRef, err := reference.ParseNormalizedNamed(c.expectedRef)
 				require.NoError(t, err)
 				require.NotNil(t, storageRef.name, c.input)
 				assert.Equal(t, dockerRef.String(), storageRef.name.String())

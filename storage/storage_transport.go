@@ -8,10 +8,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
 	"github.com/containers/storage/storage"
-	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	ddigest "github.com/opencontainers/go-digest"
 )
@@ -67,7 +66,7 @@ func (s *storageTransport) SetStore(store storage.Store) {
 // ParseStoreReference takes a name or an ID, tries to figure out which it is
 // relative to the given store, and returns it in a reference object.
 func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (*storageReference, error) {
-	var name distreference.Named
+	var name reference.Named
 	var sum digest.Digest
 	var err error
 	if ref == "" {
@@ -84,14 +83,14 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	refInfo := strings.SplitN(ref, "@", 2)
 	if len(refInfo) == 1 {
 		// A name.
-		name, err = reference.XParseNamed(refInfo[0])
+		name, err = reference.ParseNormalizedNamed(refInfo[0])
 		if err != nil {
 			return nil, err
 		}
 	} else if len(refInfo) == 2 {
 		// An ID, possibly preceded by a name.
 		if refInfo[0] != "" {
-			name, err = reference.XParseNamed(refInfo[0])
+			name, err = reference.ParseNormalizedNamed(refInfo[0])
 			if err != nil {
 				return nil, err
 			}
@@ -112,7 +111,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	}
 	refname := ""
 	if name != nil {
-		name = distreference.TagNameOnly(name)
+		name = reference.TagNameOnly(name)
 		refname = verboseName(name)
 	}
 	if refname == "" {
@@ -258,12 +257,12 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 	// that are just bare IDs.
 	scopeInfo := strings.SplitN(scope, "@", 2)
 	if len(scopeInfo) == 1 && scopeInfo[0] != "" {
-		_, err := reference.XParseNamed(scopeInfo[0])
+		_, err := reference.ParseNormalizedNamed(scopeInfo[0])
 		if err != nil {
 			return err
 		}
 	} else if len(scopeInfo) == 2 && scopeInfo[0] != "" && scopeInfo[1] != "" {
-		_, err := reference.XParseNamed(scopeInfo[0])
+		_, err := reference.ParseNormalizedNamed(scopeInfo[0])
 		if err != nil {
 			return err
 		}
@@ -277,10 +276,10 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 	return nil
 }
 
-func verboseName(name distreference.Named) string {
-	name = distreference.TagNameOnly(name)
+func verboseName(name reference.Named) string {
+	name = reference.TagNameOnly(name)
 	tag := ""
-	if tagged, ok := name.(distreference.NamedTagged); ok {
+	if tagged, ok := name.(reference.NamedTagged); ok {
 		tag = tagged.Tag()
 	}
 	return name.Name() + ":" + tag

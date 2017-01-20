@@ -3,10 +3,9 @@ package daemon
 import (
 	"github.com/pkg/errors"
 
-	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/image"
 	"github.com/containers/image/types"
-	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -42,7 +41,7 @@ func (t daemonTransport) ValidatePolicyConfigurationScope(scope string) error {
 //  Using the config digest requires the caller to parse the manifest themselves, which is very cumbersome; so, for now, we don’t bother.)
 type daemonReference struct {
 	id  digest.Digest
-	ref distreference.Named // !reference.IsNameOnly
+	ref reference.Named // !reference.IsNameOnly
 }
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an ImageReference.
@@ -61,30 +60,30 @@ func ParseReference(refString string) (types.ImageReference, error) {
 		return NewReference(dgst, nil)
 	}
 
-	ref, err := reference.XParseNamed(refString) // This also rejects unprefixed digest values
+	ref, err := reference.ParseNormalizedNamed(refString) // This also rejects unprefixed digest values
 	if err != nil {
 		return nil, err
 	}
-	if distreference.FamiliarName(ref) == digest.Canonical.String() {
+	if reference.FamiliarName(ref) == digest.Canonical.String() {
 		return nil, errors.Errorf("Invalid docker-daemon: reference %s: The %s repository name is reserved for (non-shortened) digest references", refString, digest.Canonical)
 	}
 	return NewReference("", ref)
 }
 
 // NewReference returns a docker-daemon reference for either the supplied image ID (config digest) or the supplied reference (which must satisfy !reference.IsNameOnly)
-func NewReference(id digest.Digest, ref distreference.Named) (types.ImageReference, error) {
+func NewReference(id digest.Digest, ref reference.Named) (types.ImageReference, error) {
 	if id != "" && ref != nil {
 		return nil, errors.New("docker-daemon: reference must not have an image ID and a reference string specified at the same time")
 	}
 	if ref != nil {
-		if distreference.IsNameOnly(ref) {
-			return nil, errors.Errorf("docker-daemon: reference %s has neither a tag nor a digest", distreference.FamiliarString(ref))
+		if reference.IsNameOnly(ref) {
+			return nil, errors.Errorf("docker-daemon: reference %s has neither a tag nor a digest", reference.FamiliarString(ref))
 		}
 		// A github.com/distribution/reference value can have a tag and a digest at the same time!
 		// Most versions of docker/reference do not handle that (ignoring the tag), so reject such input.
 		// This MAY be accepted in the future.
-		_, isTagged := ref.(distreference.NamedTagged)
-		_, isDigested := ref.(distreference.Canonical)
+		_, isTagged := ref.(reference.NamedTagged)
+		_, isDigested := ref.(reference.Canonical)
 		if isTagged && isDigested {
 			return nil, errors.Errorf("docker-daemon: references with both a tag and digest are currently not supported")
 		}
@@ -110,7 +109,7 @@ func (ref daemonReference) StringWithinTransport() string {
 	case ref.id != "":
 		return ref.id.String()
 	case ref.ref != nil:
-		return distreference.FamiliarString(ref.ref)
+		return reference.FamiliarString(ref.ref)
 	default: // Coverage: Should never happen, NewReference above should refuse such values.
 		panic("Internal inconsistency: daemonReference has empty id and nil ref")
 	}
@@ -119,7 +118,7 @@ func (ref daemonReference) StringWithinTransport() string {
 // DockerReference returns a Docker reference associated with this reference
 // (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
-func (ref daemonReference) DockerReference() distreference.Named {
+func (ref daemonReference) DockerReference() reference.Named {
 	return ref.ref // May be nil
 }
 

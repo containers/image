@@ -9,10 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
-	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -284,7 +283,7 @@ func TestManifestSchema2UpdatedImageNeedsLayerDiffIDs(t *testing.T) {
 // schema2ImageSource is plausible enough for schema conversions in manifestSchema2.UpdatedImage() to work.
 type schema2ImageSource struct {
 	configBlobImageSource
-	ref distreference.Named
+	ref reference.Named
 }
 
 func (s2is *schema2ImageSource) Reference() types.ImageReference {
@@ -292,7 +291,7 @@ func (s2is *schema2ImageSource) Reference() types.ImageReference {
 }
 
 // refImageReferenceMock is a mock of types.ImageReference which returns itself in DockerReference.
-type refImageReferenceMock struct{ distreference.Named }
+type refImageReferenceMock struct{ reference.Named }
 
 func (ref refImageReferenceMock) Transport() types.ImageTransport {
 	panic("unexpected call to a mock function")
@@ -300,7 +299,7 @@ func (ref refImageReferenceMock) Transport() types.ImageTransport {
 func (ref refImageReferenceMock) StringWithinTransport() string {
 	panic("unexpected call to a mock function")
 }
-func (ref refImageReferenceMock) DockerReference() distreference.Named {
+func (ref refImageReferenceMock) DockerReference() reference.Named {
 	return ref.Named
 }
 func (ref refImageReferenceMock) PolicyConfigurationIdentity() string {
@@ -326,7 +325,7 @@ func newSchema2ImageSource(t *testing.T, dockerRef string) *schema2ImageSource {
 	realConfigJSON, err := ioutil.ReadFile("fixtures/schema2-config.json")
 	require.NoError(t, err)
 
-	ref, err := reference.XParseNamed(dockerRef)
+	ref, err := reference.ParseNormalizedNamed(dockerRef)
 	require.NoError(t, err)
 
 	return &schema2ImageSource{
@@ -340,7 +339,7 @@ func newSchema2ImageSource(t *testing.T, dockerRef string) *schema2ImageSource {
 }
 
 type memoryImageDest struct {
-	ref         distreference.Named
+	ref         reference.Named
 	storedBlobs map[digest.Digest][]byte
 }
 

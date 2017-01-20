@@ -6,9 +6,8 @@ import (
 	"testing"
 
 	"github.com/containers/image/docker/policyconfiguration"
-	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
-	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -65,7 +64,7 @@ func TestPolicyContextNewDestroy(t *testing.T) {
 // and handles PolicyConfigurationIdentity and PolicyConfigurationReference consistently.
 type pcImageReferenceMock struct {
 	transportName string
-	ref           distreference.Named
+	ref           reference.Named
 }
 
 func (ref pcImageReferenceMock) Transport() types.ImageTransport {
@@ -75,7 +74,7 @@ func (ref pcImageReferenceMock) StringWithinTransport() string {
 	// We use this in error messages, so sadly we must return something.
 	return "== StringWithinTransport mock"
 }
-func (ref pcImageReferenceMock) DockerReference() distreference.Named {
+func (ref pcImageReferenceMock) DockerReference() reference.Named {
 	return ref.ref
 }
 func (ref pcImageReferenceMock) PolicyConfigurationIdentity() string {
@@ -149,7 +148,7 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 		// No match within a matched transport which doesn't have a "" scope
 		{"atomic", "this.doesnt/match:anything", "", ""},
 		// No configuration available for this transport at all
-		{"dir", "what/ever", "", ""}, // "what/ever" is not a valid scope for the real "dir" transport, but we only need it to be a valid distreference.Named.
+		{"dir", "what/ever", "", ""}, // "what/ever" is not a valid scope for the real "dir" transport, but we only need it to be a valid reference.Named.
 	} {
 		var expected PolicyRequirements
 		if c.matchedTransport != "" {
@@ -160,7 +159,7 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 			expected = policy.Default
 		}
 
-		ref, err := reference.XParseNamed(c.input)
+		ref, err := reference.ParseNormalizedNamed(c.input)
 		require.NoError(t, err)
 		reqs := pc.requirementsForImageRef(pcImageReferenceMock{c.inputTransport, ref})
 		comment := fmt.Sprintf("case %s:%s: %#v", c.inputTransport, c.input, reqs[0])
@@ -175,7 +174,7 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 // pcImageMock returns a types.UnparsedImage for a directory, claiming a specified dockerReference and implementing PolicyConfigurationIdentity/PolicyConfigurationNamespaces.
 // The caller must call .Close() on the returned Image.
 func pcImageMock(t *testing.T, dir, dockerReference string) types.UnparsedImage {
-	ref, err := reference.XParseNamed(dockerReference)
+	ref, err := reference.ParseNormalizedNamed(dockerReference)
 	require.NoError(t, err)
 	return dirImageMockWithRef(t, dir, pcImageReferenceMock{"docker", ref})
 }

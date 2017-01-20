@@ -3,9 +3,8 @@ package docker
 import (
 	"testing"
 
-	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
-	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -66,13 +65,6 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 	}
 }
 
-// refWithTagAndDigest is a reference.NamedTagged and reference.Canonical at the same time.
-type refWithTagAndDigest struct{ distreference.Canonical }
-
-func (ref refWithTagAndDigest) Tag() string {
-	return "notLatest"
-}
-
 // A common list of reference formats to test for the various ImageReference methods.
 var validReferenceTestCases = []struct{ input, dockerRef, stringWithinTransport string }{
 	{"busybox:notlatest", "docker.io/library/busybox:notlatest", "//busybox:notlatest"},                // Explicit tag
@@ -83,7 +75,7 @@ var validReferenceTestCases = []struct{ input, dockerRef, stringWithinTransport 
 
 func TestNewReference(t *testing.T) {
 	for _, c := range validReferenceTestCases {
-		parsed, err := reference.XParseNamed(c.input)
+		parsed, err := reference.ParseNormalizedNamed(c.input)
 		require.NoError(t, err)
 		ref, err := NewReference(parsed)
 		require.NoError(t, err, c.input)
@@ -93,18 +85,19 @@ func TestNewReference(t *testing.T) {
 	}
 
 	// Neither a tag nor digest
-	parsed, err := reference.XParseNamed("busybox")
+	parsed, err := reference.ParseNormalizedNamed("busybox")
 	require.NoError(t, err)
 	_, err = NewReference(parsed)
 	assert.Error(t, err)
 
 	// A github.com/distribution/reference value can have a tag and a digest at the same time!
-	parsed, err = reference.XParseNamed("busybox" + sha256digest)
+	parsed, err = reference.ParseNormalizedNamed("busybox:notlatest" + sha256digest)
 	require.NoError(t, err)
-	refDigested, ok := parsed.(distreference.Canonical)
+	_, ok := parsed.(reference.Canonical)
 	require.True(t, ok)
-	tagDigestRef := refWithTagAndDigest{refDigested}
-	_, err = NewReference(tagDigestRef)
+	_, ok = parsed.(reference.NamedTagged)
+	require.True(t, ok)
+	_, err = NewReference(parsed)
 	assert.Error(t, err)
 }
 
@@ -195,7 +188,7 @@ func TestReferenceTagOrDigest(t *testing.T) {
 	}
 
 	// Invalid input
-	ref, err := reference.XParseNamed("busybox")
+	ref, err := reference.ParseNormalizedNamed("busybox")
 	require.NoError(t, err)
 	dockerRef := dockerReference{ref: ref}
 	_, err = dockerRef.tagOrDigest()

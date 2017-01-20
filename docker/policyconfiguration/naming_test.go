@@ -1,13 +1,11 @@
 package policyconfiguration
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
-	"fmt"
-
-	"github.com/containers/image/docker/reference"
-	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,7 +36,7 @@ func TestDockerReference(t *testing.T) {
 			sha256Digest: sha256Digest,
 		} {
 			fullInput := inputName + inputSuffix
-			ref, err := reference.XParseNamed(fullInput)
+			ref, err := reference.ParseNormalizedNamed(fullInput)
 			require.NoError(t, err, fullInput)
 
 			identity, err := DockerReferenceIdentity(ref)
@@ -58,29 +56,22 @@ func TestDockerReference(t *testing.T) {
 	}
 }
 
-// refWithTagAndDigest is a reference.NamedTagged and reference.Canonical at the same time.
-type refWithTagAndDigest struct{ distreference.Canonical }
-
-func (ref refWithTagAndDigest) Tag() string {
-	return "notLatest"
-}
-
 func TestDockerReferenceIdentity(t *testing.T) {
 	// TestDockerReference above has tested the core of the functionality, this tests only the failure cases.
 
 	// Neither a tag nor digest
-	parsed, err := reference.XParseNamed("busybox")
+	parsed, err := reference.ParseNormalizedNamed("busybox")
 	require.NoError(t, err)
 	id, err := DockerReferenceIdentity(parsed)
 	assert.Equal(t, "", id)
 	assert.Error(t, err)
 
 	// A github.com/distribution/reference value can have a tag and a digest at the same time!
-	parsed, err = reference.XParseNamed("busybox:notlatest@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+	parsed, err = reference.ParseNormalizedNamed("busybox:notlatest@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 	require.NoError(t, err)
-	_, ok := parsed.(distreference.Canonical)
+	_, ok := parsed.(reference.Canonical)
 	require.True(t, ok)
-	_, ok = parsed.(distreference.NamedTagged)
+	_, ok = parsed.(reference.NamedTagged)
 	require.True(t, ok)
 	id, err = DockerReferenceIdentity(parsed)
 	assert.Equal(t, "", id)

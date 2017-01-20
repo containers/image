@@ -6,10 +6,9 @@ import (
 	"strings"
 
 	"github.com/containers/image/docker/policyconfiguration"
-	"github.com/containers/image/docker/reference"
 	genericImage "github.com/containers/image/image"
 	"github.com/containers/image/types"
-	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/pkg/errors"
 )
 
@@ -45,30 +44,30 @@ func (t openshiftTransport) ValidatePolicyConfigurationScope(scope string) error
 
 // openshiftReference is an ImageReference for OpenShift images.
 type openshiftReference struct {
-	dockerReference distreference.NamedTagged
+	dockerReference reference.NamedTagged
 	namespace       string // Computed from dockerReference in advance.
 	stream          string // Computed from dockerReference in advance.
 }
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an OpenShift ImageReference.
 func ParseReference(ref string) (types.ImageReference, error) {
-	r, err := reference.XParseNamed(ref)
+	r, err := reference.ParseNormalizedNamed(ref)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to parse image reference %q", ref)
 	}
-	tagged, ok := r.(distreference.NamedTagged)
+	tagged, ok := r.(reference.NamedTagged)
 	if !ok {
 		return nil, errors.Errorf("invalid image reference %s, expected format: 'hostname/namespace/stream:tag'", ref)
 	}
 	return NewReference(tagged)
 }
 
-// NewReference returns an OpenShift reference for a distreference.NamedTagged
-func NewReference(dockerRef distreference.NamedTagged) (types.ImageReference, error) {
-	r := strings.SplitN(distreference.Path(dockerRef), "/", 3)
+// NewReference returns an OpenShift reference for a reference.NamedTagged
+func NewReference(dockerRef reference.NamedTagged) (types.ImageReference, error) {
+	r := strings.SplitN(reference.Path(dockerRef), "/", 3)
 	if len(r) != 2 {
 		return nil, errors.Errorf("invalid image reference: %s, expected format: 'hostname/namespace/stream:tag'",
-			distreference.FamiliarString(dockerRef))
+			reference.FamiliarString(dockerRef))
 	}
 	return openshiftReference{
 		namespace:       r[0],
@@ -87,13 +86,13 @@ func (ref openshiftReference) Transport() types.ImageTransport {
 // e.g. default attribute values omitted by the user may be filled in in the return value, or vice versa.
 // WARNING: Do not use the return value in the UI to describe an image, it does not contain the Transport().Name() prefix.
 func (ref openshiftReference) StringWithinTransport() string {
-	return distreference.FamiliarString(ref.dockerReference)
+	return reference.FamiliarString(ref.dockerReference)
 }
 
 // DockerReference returns a Docker reference associated with this reference
 // (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
-func (ref openshiftReference) DockerReference() distreference.Named {
+func (ref openshiftReference) DockerReference() reference.Named {
 	return ref.dockerReference
 }
 

@@ -12,14 +12,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// XParseNamed parses s and returns a syntactically valid reference implementing
-// the Named interface. The reference must have a name, otherwise an error is
-// returned.
-// If an error was encountered it is returned, along with a nil Reference.
-func XParseNamed(s string) (distreference.Named, error) {
-	return distreference.ParseNormalizedNamed(s)
-}
-
 // XParseIDOrReference parses string for an image ID or a reference. ID can be
 // without a default prefix.
 func XParseIDOrReference(idOrRef string) (digest.Digest, distreference.Named, error) {
@@ -29,7 +21,7 @@ func XParseIDOrReference(idOrRef string) (digest.Digest, distreference.Named, er
 	if dgst, err := digest.Parse(idOrRef); err == nil {
 		return dgst, nil, nil
 	}
-	ref, err := XParseNamed(idOrRef)
+	ref, err := distreference.ParseNormalizedNamed(idOrRef)
 	return "", ref, err
 }
 

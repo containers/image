@@ -88,13 +88,6 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 	}
 }
 
-// refWithTagAndDigest is a reference.NamedTagged and reference.Canonical at the same time.
-type refWithTagAndDigest struct{ distreference.Canonical }
-
-func (ref refWithTagAndDigest) Tag() string {
-	return "notLatest"
-}
-
 // A common list of reference formats to test for the various ImageReference methods.
 // (For IDs it is much simpler, we simply use them unmodified)
 var validNamedReferenceTestCases = []struct{ input, dockerRef, stringWithinTransport string }{
@@ -117,7 +110,7 @@ func TestNewReference(t *testing.T) {
 
 	// Named references
 	for _, c := range validNamedReferenceTestCases {
-		parsed, err := reference.XParseNamed(c.input)
+		parsed, err := distreference.ParseNormalizedNamed(c.input)
 		require.NoError(t, err)
 		ref, err := NewReference("", parsed)
 		require.NoError(t, err, c.input)
@@ -129,24 +122,25 @@ func TestNewReference(t *testing.T) {
 	}
 
 	// Both an ID and a named reference provided
-	parsed, err := reference.XParseNamed("busybox:latest")
+	parsed, err := distreference.ParseNormalizedNamed("busybox:latest")
 	require.NoError(t, err)
 	_, err = NewReference(id, parsed)
 	assert.Error(t, err)
 
 	// A reference with neither a tag nor digest
-	parsed, err = reference.XParseNamed("busybox")
+	parsed, err = distreference.ParseNormalizedNamed("busybox")
 	require.NoError(t, err)
 	_, err = NewReference("", parsed)
 	assert.Error(t, err)
 
 	// A github.com/distribution/reference value can have a tag and a digest at the same time!
-	parsed, err = reference.XParseNamed("busybox@" + sha256digest)
+	parsed, err = distreference.ParseNormalizedNamed("busybox:notlatest@" + sha256digest)
 	require.NoError(t, err)
-	refDigested, ok := parsed.(distreference.Canonical)
+	_, ok = parsed.(distreference.Canonical)
 	require.True(t, ok)
-	tagDigestRef := refWithTagAndDigest{refDigested}
-	_, err = NewReference("", tagDigestRef)
+	_, ok = parsed.(distreference.NamedTagged)
+	require.True(t, ok)
+	_, err = NewReference("", parsed)
 	assert.Error(t, err)
 }
 
