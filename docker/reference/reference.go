@@ -87,10 +87,7 @@ func (r *namedRef) Familiar() distreference.Named {
 
 // XWithDefaultTag adds a default tag to a reference if it only has a repo name.
 func XWithDefaultTag(ref distreference.Named) distreference.Named {
-	if distreference.IsNameOnly(ref) {
-		ref, _ = distreference.WithTag(ref, XDefaultTag)
-	}
-	return ref
+	return distreference.TagNameOnly(ref)
 }
 
 // XParseIDOrReference parses string for an image ID or a reference. ID can be
