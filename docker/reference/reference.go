@@ -101,7 +101,7 @@ func (r *namedRef) Familiar() distreference.Named {
 }
 
 func (r *canonicalRef) XDigest() digest.Digest {
-	return digest.Digest(r.namedRef.Named.(distreference.Canonical).Digest())
+	return digest.Digest(r.Canonical.Digest())
 }
 
 // XWithDefaultTag adds a default tag to a reference if it only has a repo name.
