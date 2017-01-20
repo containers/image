@@ -40,16 +40,16 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 
 func TestNewReference(t *testing.T) {
 	// too many ns
-	r, err := reference.ParseNamed("registry.example.com/ns1/ns2/ns3/stream:tag")
+	r, err := reference.XParseNamed("registry.example.com/ns1/ns2/ns3/stream:tag")
 	require.NoError(t, err)
-	tagged, ok := r.(reference.NamedTagged)
+	tagged, ok := r.(reference.XNamedTagged)
 	require.True(t, ok)
 	_, err = NewReference(tagged)
 	assert.Error(t, err)
 
-	r, err = reference.ParseNamed("registry.example.com/ns/stream:tag")
+	r, err = reference.XParseNamed("registry.example.com/ns/stream:tag")
 	require.NoError(t, err)
-	tagged, ok = r.(reference.NamedTagged)
+	tagged, ok = r.(reference.XNamedTagged)
 	require.True(t, ok)
 	_, err = NewReference(tagged)
 	assert.NoError(t, err)
@@ -63,8 +63,8 @@ func TestParseReference(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "ns", osRef.namespace)
 	assert.Equal(t, "stream", osRef.stream)
-	assert.Equal(t, "notlatest", osRef.dockerReference.Tag())
-	assert.Equal(t, "registry.example.com:8443", osRef.dockerReference.Hostname())
+	assert.Equal(t, "notlatest", osRef.dockerReference.XTag())
+	assert.Equal(t, "registry.example.com:8443", osRef.dockerReference.XHostname())
 
 	// Components creating an invalid Docker Reference name
 	_, err = ParseReference("registry.example.com/ns/UPPERCASEISINVALID:notlatest")
@@ -79,7 +79,7 @@ func TestReferenceDockerReference(t *testing.T) {
 	require.NoError(t, err)
 	dockerRef := ref.DockerReference()
 	require.NotNil(t, dockerRef)
-	assert.Equal(t, "registry.example.com:8443/ns/stream:notlatest", dockerRef.String())
+	assert.Equal(t, "registry.example.com:8443/ns/stream:notlatest", dockerRef.XString())
 }
 
 func TestReferenceTransport(t *testing.T) {

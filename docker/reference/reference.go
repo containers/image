@@ -14,72 +14,73 @@ import (
 )
 
 const (
-	// DefaultTag defines the default tag used when performing images related actions and no tag or digest is specified
-	DefaultTag = "latest"
-	// DefaultHostname is the default built-in hostname
-	DefaultHostname = "docker.io"
-	// LegacyDefaultHostname is automatically converted to DefaultHostname
-	LegacyDefaultHostname = "index.docker.io"
-	// DefaultRepoPrefix is the prefix used for default repositories in default host
-	DefaultRepoPrefix = "library/"
+	// XDefaultTag defines the default tag used when performing images related actions and no tag or digest is specified
+	XDefaultTag = "latest"
+	// XDefaultHostname is the default built-in hostname
+	XDefaultHostname = "docker.io"
+	// XLegacyDefaultHostname is automatically converted to DefaultHostname
+	XLegacyDefaultHostname = "index.docker.io"
+	// XDefaultRepoPrefix is the prefix used for default repositories in default host
+	XDefaultRepoPrefix = "library/"
 )
 
-// Named is an object with a full name
-type Named interface {
-	// Name returns normalized repository name, like "ubuntu".
-	Name() string
-	// String returns full reference, like "ubuntu@sha256:abcdef..."
-	String() string
-	// FullName returns full repository name with hostname, like "docker.io/library/ubuntu"
-	FullName() string
-	// Hostname returns hostname for the reference, like "docker.io"
-	Hostname() string
-	// RemoteName returns the repository component of the full name, like "library/ubuntu"
-	RemoteName() string
+// XNamed is an object with a full name
+type XNamed interface {
+	// XName returns normalized repository name, like "ubuntu".
+	XName() string
+	// XString returns full reference, like "ubuntu@sha256:abcdef..."
+	XString() string
+	// XFullName returns full repository name with hostname, like "docker.io/library/ubuntu"
+	XFullName() string
+	// XHostname returns hostname for the reference, like "docker.io"
+	XHostname() string
+	// XRemoteName returns the repository component of the full name, like "library/ubuntu"
+	XRemoteName() string
 }
 
-// NamedTagged is an object including a name and tag.
-type NamedTagged interface {
-	Named
-	Tag() string
+// XNamedTagged is an object including a name and tag.
+type XNamedTagged interface {
+	XNamed
+	XTag() string
 }
 
-// Canonical reference is an object with a fully unique
+// XCanonical reference is an object with a fully unique
 // name including a name with hostname and digest
-type Canonical interface {
-	Named
-	Digest() digest.Digest
+type XCanonical interface {
+	XNamed
+	XDigest() digest.Digest
 }
 
-// ParseNamed parses s and returns a syntactically valid reference implementing
+// XParseNamed parses s and returns a syntactically valid reference implementing
 // the Named interface. The reference must have a name, otherwise an error is
 // returned.
 // If an error was encountered it is returned, along with a nil Reference.
-func ParseNamed(s string) (Named, error) {
+func XParseNamed(s string) (XNamed, error) {
 	named, err := distreference.ParseNormalizedNamed(s)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Error parsing reference: %q is not a valid repository/tag", s)
 	}
-	r, err := WithName(named.Name())
+	r, err := XWithName(named.Name())
 	if err != nil {
 		return nil, err
 	}
 	if canonical, isCanonical := named.(distreference.Canonical); isCanonical {
-		r, err := distreference.WithDigest(r, canonical.Digest())
+		// FIXME: depends on XWithName returning a *namedRef.
+		r, err := distreference.WithDigest(r.(*namedRef).Named, canonical.Digest())
 		if err != nil {
 			return nil, err
 		}
 		return &canonicalRef{namedRef{r}}, nil
 	}
 	if tagged, isTagged := named.(distreference.NamedTagged); isTagged {
-		return WithTag(r, tagged.Tag())
+		return XWithTag(r, tagged.Tag())
 	}
 	return r, nil
 }
 
-// WithName returns a named object representing the given string. If the input
+// XWithName returns a named object representing the given string. If the input
 // is invalid ErrReferenceInvalidFormat will be returned.
-func WithName(name string) (Named, error) {
+func XWithName(name string) (XNamed, error) {
 	name, err := normalize(name)
 	if err != nil {
 		return nil, err
@@ -94,10 +95,11 @@ func WithName(name string) (Named, error) {
 	return &namedRef{r}, nil
 }
 
-// WithTag combines the name from "name" and the tag from "tag" to form a
+// XWithTag combines the name from "name" and the tag from "tag" to form a
 // reference incorporating both the name and the tag.
-func WithTag(name Named, tag string) (NamedTagged, error) {
-	r, err := distreference.WithTag(name, tag)
+func XWithTag(name XNamed, tag string) (XNamedTagged, error) {
+	// FIXME: depends on XWithName returning a *namedRef, and that this is only called on XNameOnly values.
+	r, err := distreference.WithTag(name.(*namedRef).Named, tag)
 	if err != nil {
 		return nil, err
 	}
@@ -114,54 +116,60 @@ type canonicalRef struct {
 	namedRef
 }
 
-func (r *namedRef) FullName() string {
-	hostname, remoteName := splitHostname(r.Name())
+func (r *namedRef) XName() string {
+	return r.Named.Name()
+}
+func (r *namedRef) XString() string {
+	return r.Named.String()
+}
+func (r *namedRef) XFullName() string {
+	hostname, remoteName := splitHostname(r.XName())
 	return hostname + "/" + remoteName
 }
-func (r *namedRef) Hostname() string {
-	hostname, _ := splitHostname(r.Name())
+func (r *namedRef) XHostname() string {
+	hostname, _ := splitHostname(r.XName())
 	return hostname
 }
-func (r *namedRef) RemoteName() string {
-	_, remoteName := splitHostname(r.Name())
+func (r *namedRef) XRemoteName() string {
+	_, remoteName := splitHostname(r.XName())
 	return remoteName
 }
-func (r *taggedRef) Tag() string {
+func (r *taggedRef) XTag() string {
 	return r.namedRef.Named.(distreference.NamedTagged).Tag()
 }
-func (r *canonicalRef) Digest() digest.Digest {
+func (r *canonicalRef) XDigest() digest.Digest {
 	return digest.Digest(r.namedRef.Named.(distreference.Canonical).Digest())
 }
 
-// WithDefaultTag adds a default tag to a reference if it only has a repo name.
-func WithDefaultTag(ref Named) Named {
-	if IsNameOnly(ref) {
-		ref, _ = WithTag(ref, DefaultTag)
+// XWithDefaultTag adds a default tag to a reference if it only has a repo name.
+func XWithDefaultTag(ref XNamed) XNamed {
+	if XIsNameOnly(ref) {
+		ref, _ = XWithTag(ref, XDefaultTag)
 	}
 	return ref
 }
 
-// IsNameOnly returns true if reference only contains a repo name.
-func IsNameOnly(ref Named) bool {
-	if _, ok := ref.(NamedTagged); ok {
+// XIsNameOnly returns true if reference only contains a repo name.
+func XIsNameOnly(ref XNamed) bool {
+	if _, ok := ref.(XNamedTagged); ok {
 		return false
 	}
-	if _, ok := ref.(Canonical); ok {
+	if _, ok := ref.(XCanonical); ok {
 		return false
 	}
 	return true
 }
 
-// ParseIDOrReference parses string for an image ID or a reference. ID can be
+// XParseIDOrReference parses string for an image ID or a reference. ID can be
 // without a default prefix.
-func ParseIDOrReference(idOrRef string) (digest.Digest, Named, error) {
+func XParseIDOrReference(idOrRef string) (digest.Digest, XNamed, error) {
 	if err := validateID(idOrRef); err == nil {
 		idOrRef = "sha256:" + idOrRef
 	}
 	if dgst, err := digest.Parse(idOrRef); err == nil {
 		return dgst, nil, nil
 	}
-	ref, err := ParseNamed(idOrRef)
+	ref, err := XParseNamed(idOrRef)
 	return "", ref, err
 }
 
@@ -171,15 +179,15 @@ func ParseIDOrReference(idOrRef string) (digest.Digest, Named, error) {
 func splitHostname(name string) (hostname, remoteName string) {
 	i := strings.IndexRune(name, '/')
 	if i == -1 || (!strings.ContainsAny(name[:i], ".:") && name[:i] != "localhost") {
-		hostname, remoteName = DefaultHostname, name
+		hostname, remoteName = XDefaultHostname, name
 	} else {
 		hostname, remoteName = name[:i], name[i+1:]
 	}
-	if hostname == LegacyDefaultHostname {
-		hostname = DefaultHostname
+	if hostname == XLegacyDefaultHostname {
+		hostname = XDefaultHostname
 	}
-	if hostname == DefaultHostname && !strings.ContainsRune(remoteName, '/') {
-		remoteName = DefaultRepoPrefix + remoteName
+	if hostname == XDefaultHostname && !strings.ContainsRune(remoteName, '/') {
+		remoteName = XDefaultRepoPrefix + remoteName
 	}
 	return
 }
@@ -191,9 +199,9 @@ func normalize(name string) (string, error) {
 	if strings.ToLower(remoteName) != remoteName {
 		return "", errors.New("invalid reference format: repository name must be lowercase")
 	}
-	if host == DefaultHostname {
-		if strings.HasPrefix(remoteName, DefaultRepoPrefix) {
-			return strings.TrimPrefix(remoteName, DefaultRepoPrefix), nil
+	if host == XDefaultHostname {
+		if strings.HasPrefix(remoteName, XDefaultRepoPrefix) {
+			return strings.TrimPrefix(remoteName, XDefaultRepoPrefix), nil
 		}
 		return remoteName, nil
 	}

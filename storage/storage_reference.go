@@ -15,10 +15,10 @@ type storageReference struct {
 	transport storageTransport
 	reference string
 	id        string
-	name      reference.Named
+	name      reference.XNamed
 }
 
-func newReference(transport storageTransport, reference, id string, name reference.Named) *storageReference {
+func newReference(transport storageTransport, reference, id string, name reference.XNamed) *storageReference {
 	// We take a copy of the transport, which contains a pointer to the
 	// store that it used for resolving this reference, so that the
 	// transport that we'll return from Transport() won't be affected by
@@ -52,7 +52,7 @@ func (s storageReference) Transport() types.ImageTransport {
 }
 
 // Return a name with a tag, if we have a name to base them on.
-func (s storageReference) DockerReference() reference.Named {
+func (s storageReference) DockerReference() reference.XNamed {
 	return s.name
 }
 
@@ -87,7 +87,7 @@ func (s storageReference) PolicyConfigurationNamespaces() []string {
 			// The reference without the ID is also a valid namespace.
 			namespaces = append(namespaces, storeSpec+s.reference)
 		}
-		components := strings.Split(s.name.FullName(), "/")
+		components := strings.Split(s.name.XFullName(), "/")
 		for len(components) > 0 {
 			namespaces = append(namespaces, storeSpec+strings.Join(components, "/"))
 			components = components[:len(components)-1]

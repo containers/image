@@ -42,7 +42,7 @@ func TestDockerReference(t *testing.T) {
 			":tag" + sha256Digest: sha256Digest,
 		} {
 			fullInput := inputName + inputSuffix
-			ref, err := reference.ParseNamed(fullInput)
+			ref, err := reference.XParseNamed(fullInput)
 			require.NoError(t, err, fullInput)
 
 			identity, err := DockerReferenceIdentity(ref)
@@ -62,10 +62,10 @@ func TestDockerReference(t *testing.T) {
 	}
 }
 
-// refWithTagAndDigest is a reference.NamedTagged and reference.Canonical at the same time.
-type refWithTagAndDigest struct{ reference.Canonical }
+// refWithTagAndDigest is a reference.XNamedTagged and reference.XCanonical at the same time.
+type refWithTagAndDigest struct{ reference.XCanonical }
 
-func (ref refWithTagAndDigest) Tag() string {
+func (ref refWithTagAndDigest) XTag() string {
 	return "notLatest"
 }
 
@@ -73,16 +73,16 @@ func TestDockerReferenceIdentity(t *testing.T) {
 	// TestDockerReference above has tested the core of the functionality, this tests only the failure cases.
 
 	// Neither a tag nor digest
-	parsed, err := reference.ParseNamed("busybox")
+	parsed, err := reference.XParseNamed("busybox")
 	require.NoError(t, err)
 	id, err := DockerReferenceIdentity(parsed)
 	assert.Equal(t, "", id)
 	assert.Error(t, err)
 
 	// A github.com/distribution/reference value can have a tag and a digest at the same time!
-	parsed, err = reference.ParseNamed("busybox@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+	parsed, err = reference.XParseNamed("busybox@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 	require.NoError(t, err)
-	refDigested, ok := parsed.(reference.Canonical)
+	refDigested, ok := parsed.(reference.XCanonical)
 	require.True(t, ok)
 	tagDigestRef := refWithTagAndDigest{refDigested}
 	id, err = DockerReferenceIdentity(tagDigestRef)

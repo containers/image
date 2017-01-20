@@ -25,7 +25,7 @@ func (ref nameOnlyImageReferenceMock) Transport() types.ImageTransport {
 func (ref nameOnlyImageReferenceMock) StringWithinTransport() string {
 	return string(ref)
 }
-func (ref nameOnlyImageReferenceMock) DockerReference() reference.Named {
+func (ref nameOnlyImageReferenceMock) DockerReference() reference.XNamed {
 	panic("unexpected call to a mock function")
 }
 func (ref nameOnlyImageReferenceMock) PolicyConfigurationIdentity() string {

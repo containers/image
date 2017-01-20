@@ -51,8 +51,8 @@ func (i *UnparsedImage) Manifest() ([]byte, string, error) {
 		// this immediately protects also any user of types.Image.
 		ref := i.Reference().DockerReference()
 		if ref != nil {
-			if canonical, ok := ref.(reference.Canonical); ok {
-				digest := canonical.Digest()
+			if canonical, ok := ref.(reference.XCanonical); ok {
+				digest := canonical.XDigest()
 				matches, err := manifest.MatchesDigest(m, digest)
 				if err != nil {
 					return nil, "", errors.Wrap(err, "Error computing manifest digest")

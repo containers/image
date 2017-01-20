@@ -634,11 +634,11 @@ func (prm *prmMatchRepository) UnmarshalJSON(data []byte) error {
 
 // newPRMExactReference is NewPRMExactReference, except it resturns the private type.
 func newPRMExactReference(dockerReference string) (*prmExactReference, error) {
-	ref, err := reference.ParseNamed(dockerReference)
+	ref, err := reference.XParseNamed(dockerReference)
 	if err != nil {
 		return nil, InvalidPolicyFormatError(fmt.Sprintf("Invalid format of dockerReference %s: %s", dockerReference, err.Error()))
 	}
-	if reference.IsNameOnly(ref) {
+	if reference.XIsNameOnly(ref) {
 		return nil, InvalidPolicyFormatError(fmt.Sprintf("dockerReference %s contains neither a tag nor digest", dockerReference))
 	}
 	return &prmExactReference{
@@ -686,7 +686,7 @@ func (prm *prmExactReference) UnmarshalJSON(data []byte) error {
 
 // newPRMExactRepository is NewPRMExactRepository, except it resturns the private type.
 func newPRMExactRepository(dockerRepository string) (*prmExactRepository, error) {
-	if _, err := reference.ParseNamed(dockerRepository); err != nil {
+	if _, err := reference.XParseNamed(dockerRepository); err != nil {
 		return nil, InvalidPolicyFormatError(fmt.Sprintf("Invalid format of dockerRepository %s: %s", dockerRepository, err.Error()))
 	}
 	return &prmExactRepository{

@@ -22,7 +22,7 @@ import (
 
 type daemonImageDestination struct {
 	ref            daemonReference
-	namedTaggedRef reference.NamedTagged // Strictly speaking redundant with ref above; having the field makes it structurally impossible for later users to fail.
+	namedTaggedRef reference.XNamedTagged // Strictly speaking redundant with ref above; having the field makes it structurally impossible for later users to fail.
 	// For talking to imageLoadGoroutine
 	goroutineCancel context.CancelFunc
 	statusChannel   <-chan error
@@ -38,7 +38,7 @@ func newImageDestination(systemCtx *types.SystemContext, ref daemonReference) (t
 	if ref.ref == nil {
 		return nil, errors.Errorf("Invalid destination docker-daemon:%s: a destination must be a name:tag", ref.StringWithinTransport())
 	}
-	namedTaggedRef, ok := ref.ref.(reference.NamedTagged)
+	namedTaggedRef, ok := ref.ref.(reference.XNamedTagged)
 	if !ok {
 		return nil, errors.Errorf("Invalid destination docker-daemon:%s: a destination must be a name:tag", ref.StringWithinTransport())
 	}
@@ -230,7 +230,7 @@ func (d *daemonImageDestination) PutManifest(m []byte) error {
 	// a hostname-qualified reference.
 	// See https://github.com/containers/image/issues/72 for a more detailed
 	// analysis and explanation.
-	refString := fmt.Sprintf("%s:%s", d.namedTaggedRef.FullName(), d.namedTaggedRef.Tag())
+	refString := fmt.Sprintf("%s:%s", d.namedTaggedRef.XFullName(), d.namedTaggedRef.XTag())
 
 	items := []manifestItem{{
 		Config:       man.Config.Digest.String(),

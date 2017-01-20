@@ -284,7 +284,7 @@ func TestManifestSchema2UpdatedImageNeedsLayerDiffIDs(t *testing.T) {
 // schema2ImageSource is plausible enough for schema conversions in manifestSchema2.UpdatedImage() to work.
 type schema2ImageSource struct {
 	configBlobImageSource
-	ref reference.Named
+	ref reference.XNamed
 }
 
 func (s2is *schema2ImageSource) Reference() types.ImageReference {
@@ -292,7 +292,7 @@ func (s2is *schema2ImageSource) Reference() types.ImageReference {
 }
 
 // refImageReferenceMock is a mock of types.ImageReference which returns itself in DockerReference.
-type refImageReferenceMock struct{ reference.Named }
+type refImageReferenceMock struct{ reference.XNamed }
 
 func (ref refImageReferenceMock) Transport() types.ImageTransport {
 	panic("unexpected call to a mock function")
@@ -300,8 +300,8 @@ func (ref refImageReferenceMock) Transport() types.ImageTransport {
 func (ref refImageReferenceMock) StringWithinTransport() string {
 	panic("unexpected call to a mock function")
 }
-func (ref refImageReferenceMock) DockerReference() reference.Named {
-	return ref.Named
+func (ref refImageReferenceMock) DockerReference() reference.XNamed {
+	return ref.XNamed
 }
 func (ref refImageReferenceMock) PolicyConfigurationIdentity() string {
 	panic("unexpected call to a mock function")
@@ -326,7 +326,7 @@ func newSchema2ImageSource(t *testing.T, dockerRef string) *schema2ImageSource {
 	realConfigJSON, err := ioutil.ReadFile("fixtures/schema2-config.json")
 	require.NoError(t, err)
 
-	ref, err := reference.ParseNamed(dockerRef)
+	ref, err := reference.XParseNamed(dockerRef)
 	require.NoError(t, err)
 
 	return &schema2ImageSource{
@@ -340,7 +340,7 @@ func newSchema2ImageSource(t *testing.T, dockerRef string) *schema2ImageSource {
 }
 
 type memoryImageDest struct {
-	ref         reference.Named
+	ref         reference.XNamed
 	storedBlobs map[digest.Digest][]byte
 }
 

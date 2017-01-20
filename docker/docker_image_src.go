@@ -91,7 +91,7 @@ func (s *dockerImageSource) GetManifest() ([]byte, string, error) {
 }
 
 func (s *dockerImageSource) fetchManifest(tagOrDigest string) ([]byte, string, error) {
-	url := fmt.Sprintf(manifestURL, s.ref.ref.RemoteName(), tagOrDigest)
+	url := fmt.Sprintf(manifestURL, s.ref.ref.XRemoteName(), tagOrDigest)
 	headers := make(map[string][]string)
 	headers["Accept"] = s.requestedManifestMIMETypes
 	res, err := s.c.makeRequest("GET", url, headers, nil)
@@ -177,7 +177,7 @@ func (s *dockerImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, 
 		return s.getExternalBlob(info.URLs)
 	}
 
-	url := fmt.Sprintf(blobsURL, s.ref.ref.RemoteName(), info.Digest.String())
+	url := fmt.Sprintf(blobsURL, s.ref.ref.XRemoteName(), info.Digest.String())
 	logrus.Debugf("Downloading %s", url)
 	res, err := s.c.makeRequest("GET", url, nil, nil)
 	if err != nil {
@@ -275,7 +275,7 @@ func deleteImage(ctx *types.SystemContext, ref dockerReference) error {
 	if err != nil {
 		return err
 	}
-	getURL := fmt.Sprintf(manifestURL, ref.ref.RemoteName(), reference)
+	getURL := fmt.Sprintf(manifestURL, ref.ref.XRemoteName(), reference)
 	get, err := c.makeRequest("GET", getURL, headers, nil)
 	if err != nil {
 		return err
@@ -294,7 +294,7 @@ func deleteImage(ctx *types.SystemContext, ref dockerReference) error {
 	}
 
 	digest := get.Header.Get("Docker-Content-Digest")
-	deleteURL := fmt.Sprintf(manifestURL, ref.ref.RemoteName(), digest)
+	deleteURL := fmt.Sprintf(manifestURL, ref.ref.XRemoteName(), digest)
 
 	// When retrieving the digest from a registry >= 2.3 use the following header:
 	//   "Accept": "application/vnd.docker.distribution.manifest.v2+json"

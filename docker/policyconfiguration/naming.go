@@ -10,20 +10,20 @@ import (
 
 // DockerReferenceIdentity returns a string representation of the reference, suitable for policy lookup,
 // as a backend for ImageReference.PolicyConfigurationIdentity.
-// The reference must satisfy !reference.IsNameOnly().
-func DockerReferenceIdentity(ref reference.Named) (string, error) {
-	res := ref.FullName()
-	tagged, isTagged := ref.(reference.NamedTagged)
-	digested, isDigested := ref.(reference.Canonical)
+// The reference must satisfy !reference.XIsNameOnly().
+func DockerReferenceIdentity(ref reference.XNamed) (string, error) {
+	res := ref.XFullName()
+	tagged, isTagged := ref.(reference.XNamedTagged)
+	digested, isDigested := ref.(reference.XCanonical)
 	switch {
-	case isTagged && isDigested: // This should not happen, docker/reference.ParseNamed drops the tag.
-		return "", errors.Errorf("Unexpected Docker reference %s with both a name and a digest", ref.String())
-	case !isTagged && !isDigested: // This should not happen, the caller is expected to ensure !reference.IsNameOnly()
-		return "", errors.Errorf("Internal inconsistency: Docker reference %s with neither a tag nor a digest", ref.String())
+	case isTagged && isDigested: // This should not happen, docker/reference.XParseNamed drops the tag.
+		return "", errors.Errorf("Unexpected Docker reference %s with both a name and a digest", ref.XString())
+	case !isTagged && !isDigested: // This should not happen, the caller is expected to ensure !reference.XIsNameOnly()
+		return "", errors.Errorf("Internal inconsistency: Docker reference %s with neither a tag nor a digest", ref.XString())
 	case isTagged:
-		res = res + ":" + tagged.Tag()
+		res = res + ":" + tagged.XTag()
 	case isDigested:
-		res = res + "@" + digested.Digest().String()
+		res = res + "@" + digested.XDigest().String()
 	default: // Coverage: The above was supposed to be exhaustive.
 		return "", errors.New("Internal inconsistency, unexpected default branch")
 	}
@@ -32,8 +32,8 @@ func DockerReferenceIdentity(ref reference.Named) (string, error) {
 
 // DockerReferenceNamespaces returns a list of other policy configuration namespaces to search,
 // as a backend for ImageReference.PolicyConfigurationIdentity.
-// The reference must satisfy !reference.IsNameOnly().
-func DockerReferenceNamespaces(ref reference.Named) []string {
+// The reference must satisfy !reference.XIsNameOnly().
+func DockerReferenceNamespaces(ref reference.XNamed) []string {
 	// Look for a match of the repository, and then of the possible parent
 	// namespaces. Note that this only happens on the expanded host names
 	// and repository names, i.e. "busybox" is looked up as "docker.io/library/busybox",
@@ -43,7 +43,7 @@ func DockerReferenceNamespaces(ref reference.Named) []string {
 	// ref.FullName() == ref.Hostname() + "/" + ref.RemoteName(), so the last
 	// iteration matches the host name (for any namespace).
 	res := []string{}
-	name := ref.FullName()
+	name := ref.XFullName()
 	for {
 		res = append(res, name)
 

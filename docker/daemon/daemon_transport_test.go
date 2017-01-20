@@ -67,8 +67,8 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 			require.NoError(t, err, c.input)
 			daemonRef, ok := ref.(daemonReference)
 			require.True(t, ok, c.input)
-			// If we don't reject the input, the interpretation must be consistent for reference.ParseIDOrReference
-			dockerID, dockerRef, err := reference.ParseIDOrReference(c.input)
+			// If we don't reject the input, the interpretation must be consistent for reference.XParseIDOrReference
+			dockerID, dockerRef, err := reference.XParseIDOrReference(c.input)
 			require.NoError(t, err, c.input)
 
 			if c.expectedRef == "" {
@@ -80,20 +80,20 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 			} else {
 				assert.Equal(t, "", daemonRef.id.String(), c.input)
 				require.NotNil(t, daemonRef.ref, c.input)
-				assert.Equal(t, c.expectedRef, daemonRef.ref.String(), c.input)
+				assert.Equal(t, c.expectedRef, daemonRef.ref.XString(), c.input)
 
 				assert.Equal(t, "", dockerID.String(), c.input)
 				require.NotNil(t, dockerRef, c.input)
-				assert.Equal(t, c.expectedRef, dockerRef.String(), c.input)
+				assert.Equal(t, c.expectedRef, dockerRef.XString(), c.input)
 			}
 		}
 	}
 }
 
-// refWithTagAndDigest is a reference.NamedTagged and reference.Canonical at the same time.
-type refWithTagAndDigest struct{ reference.Canonical }
+// refWithTagAndDigest is a reference.XNamedTagged and reference.XCanonical at the same time.
+type refWithTagAndDigest struct{ reference.XCanonical }
 
-func (ref refWithTagAndDigest) Tag() string {
+func (ref refWithTagAndDigest) XTag() string {
 	return "notLatest"
 }
 
@@ -119,7 +119,7 @@ func TestNewReference(t *testing.T) {
 
 	// Named references
 	for _, c := range validNamedReferenceTestCases {
-		parsed, err := reference.ParseNamed(c.input)
+		parsed, err := reference.XParseNamed(c.input)
 		require.NoError(t, err)
 		ref, err := NewReference("", parsed)
 		require.NoError(t, err, c.input)
@@ -127,25 +127,25 @@ func TestNewReference(t *testing.T) {
 		require.True(t, ok, c.input)
 		assert.Equal(t, "", daemonRef.id.String())
 		require.NotNil(t, daemonRef.ref)
-		assert.Equal(t, c.dockerRef, daemonRef.ref.String(), c.input)
+		assert.Equal(t, c.dockerRef, daemonRef.ref.XString(), c.input)
 	}
 
 	// Both an ID and a named reference provided
-	parsed, err := reference.ParseNamed("busybox:latest")
+	parsed, err := reference.XParseNamed("busybox:latest")
 	require.NoError(t, err)
 	_, err = NewReference(id, parsed)
 	assert.Error(t, err)
 
 	// A reference with neither a tag nor digest
-	parsed, err = reference.ParseNamed("busybox")
+	parsed, err = reference.XParseNamed("busybox")
 	require.NoError(t, err)
 	_, err = NewReference("", parsed)
 	assert.Error(t, err)
 
 	// A github.com/distribution/reference value can have a tag and a digest at the same time!
-	parsed, err = reference.ParseNamed("busybox@" + sha256digest)
+	parsed, err = reference.XParseNamed("busybox@" + sha256digest)
 	require.NoError(t, err)
-	refDigested, ok := parsed.(reference.Canonical)
+	refDigested, ok := parsed.(reference.XCanonical)
 	require.True(t, ok)
 	tagDigestRef := refWithTagAndDigest{refDigested}
 	_, err = NewReference("", tagDigestRef)
@@ -190,7 +190,7 @@ func TestReferenceDockerReference(t *testing.T) {
 		require.NoError(t, err, c.input)
 		dockerRef := ref.DockerReference()
 		require.NotNil(t, dockerRef, c.input)
-		assert.Equal(t, c.dockerRef, dockerRef.String(), c.input)
+		assert.Equal(t, c.dockerRef, dockerRef.XString(), c.input)
 	}
 }
 

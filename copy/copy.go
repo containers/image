@@ -210,7 +210,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		}
 
 		writeReport("Signing manifest\n")
-		newSig, err := signature.SignDockerManifest(manifest, dockerReference.String(), mech, options.SignBy)
+		newSig, err := signature.SignDockerManifest(manifest, dockerReference.XString(), mech, options.SignBy)
 		if err != nil {
 			return errors.Wrap(err, "Error creating signature")
 		}

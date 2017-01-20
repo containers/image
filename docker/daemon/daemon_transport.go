@@ -41,16 +41,16 @@ func (t daemonTransport) ValidatePolicyConfigurationScope(scope string) error {
 //  Using the config digest requires the caller to parse the manifest themselves, which is very cumbersome; so, for now, we don’t bother.)
 type daemonReference struct {
 	id  digest.Digest
-	ref reference.Named // !reference.IsNameOnly
+	ref reference.XNamed // !reference.XIsNameOnly
 }
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an ImageReference.
 func ParseReference(refString string) (types.ImageReference, error) {
-	// This is intended to be compatible with reference.ParseIDOrReference, but more strict about refusing some of the ambiguous cases.
+	// This is intended to be compatible with reference.XParseIDOrReference, but more strict about refusing some of the ambiguous cases.
 	// In particular, this rejects unprefixed digest values (64 hex chars), and sha256 digest prefixes (sha256:fewer-than-64-hex-chars).
 
 	// digest:hexstring is structurally the same as a reponame:tag (meaning docker.io/library/reponame:tag).
-	// reference.ParseIDOrReference interprets such strings as digests.
+	// reference.XParseIDOrReference interprets such strings as digests.
 	if dgst, err := digest.Parse(refString); err == nil {
 		// The daemon explicitly refuses to tag images with a reponame equal to digest.Canonical - but _only_ this digest name.
 		// Other digest references are ambiguous, so refuse them.
@@ -60,29 +60,29 @@ func ParseReference(refString string) (types.ImageReference, error) {
 		return NewReference(dgst, nil)
 	}
 
-	ref, err := reference.ParseNamed(refString) // This also rejects unprefixed digest values
+	ref, err := reference.XParseNamed(refString) // This also rejects unprefixed digest values
 	if err != nil {
 		return nil, err
 	}
-	if ref.Name() == digest.Canonical.String() {
+	if ref.XName() == digest.Canonical.String() {
 		return nil, errors.Errorf("Invalid docker-daemon: reference %s: The %s repository name is reserved for (non-shortened) digest references", refString, digest.Canonical)
 	}
 	return NewReference("", ref)
 }
 
-// NewReference returns a docker-daemon reference for either the supplied image ID (config digest) or the supplied reference (which must satisfy !reference.IsNameOnly)
-func NewReference(id digest.Digest, ref reference.Named) (types.ImageReference, error) {
+// NewReference returns a docker-daemon reference for either the supplied image ID (config digest) or the supplied reference (which must satisfy !reference.XIsNameOnly)
+func NewReference(id digest.Digest, ref reference.XNamed) (types.ImageReference, error) {
 	if id != "" && ref != nil {
 		return nil, errors.New("docker-daemon: reference must not have an image ID and a reference string specified at the same time")
 	}
 	if ref != nil {
-		if reference.IsNameOnly(ref) {
-			return nil, errors.Errorf("docker-daemon: reference %s has neither a tag nor a digest", ref.String())
+		if reference.XIsNameOnly(ref) {
+			return nil, errors.Errorf("docker-daemon: reference %s has neither a tag nor a digest", ref.XString())
 		}
 		// A github.com/distribution/reference value can have a tag and a digest at the same time!
 		// docker/reference does not handle that, so fail.
-		_, isTagged := ref.(reference.NamedTagged)
-		_, isDigested := ref.(reference.Canonical)
+		_, isTagged := ref.(reference.XNamedTagged)
+		_, isDigested := ref.(reference.XCanonical)
 		if isTagged && isDigested {
 			return nil, errors.Errorf("docker-daemon: references with both a tag and digest are currently not supported")
 		}
@@ -108,16 +108,16 @@ func (ref daemonReference) StringWithinTransport() string {
 	case ref.id != "":
 		return ref.id.String()
 	case ref.ref != nil:
-		return ref.ref.String()
+		return ref.ref.XString()
 	default: // Coverage: Should never happen, NewReference above should refuse such values.
 		panic("Internal inconsistency: daemonReference has empty id and nil ref")
 	}
 }
 
 // DockerReference returns a Docker reference associated with this reference
-// (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
+// (fully explicit, i.e. !reference.XIsNameOnly, but reflecting user intent,
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
-func (ref daemonReference) DockerReference() reference.Named {
+func (ref daemonReference) DockerReference() reference.XNamed {
 	return ref.ref // May be nil
 }
 

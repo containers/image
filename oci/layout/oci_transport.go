@@ -128,9 +128,9 @@ func (ref ociReference) StringWithinTransport() string {
 }
 
 // DockerReference returns a Docker reference associated with this reference
-// (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
+// (fully explicit, i.e. !reference.XIsNameOnly, but reflecting user intent,
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
-func (ref ociReference) DockerReference() reference.Named {
+func (ref ociReference) DockerReference() reference.XNamed {
 	return nil
 }
 

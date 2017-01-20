@@ -37,7 +37,7 @@ func (t dockerTransport) ValidatePolicyConfigurationScope(scope string) error {
 
 // dockerReference is an ImageReference for Docker images.
 type dockerReference struct {
-	ref reference.Named // By construction we know that !reference.IsNameOnly(ref)
+	ref reference.XNamed // By construction we know that !reference.XIsNameOnly(ref)
 }
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an Docker ImageReference.
@@ -45,25 +45,25 @@ func ParseReference(refString string) (types.ImageReference, error) {
 	if !strings.HasPrefix(refString, "//") {
 		return nil, errors.Errorf("docker: image reference %s does not start with //", refString)
 	}
-	ref, err := reference.ParseNamed(strings.TrimPrefix(refString, "//"))
+	ref, err := reference.XParseNamed(strings.TrimPrefix(refString, "//"))
 	if err != nil {
 		return nil, err
 	}
-	ref = reference.WithDefaultTag(ref)
+	ref = reference.XWithDefaultTag(ref)
 	return NewReference(ref)
 }
 
-// NewReference returns a Docker reference for a named reference. The reference must satisfy !reference.IsNameOnly().
-func NewReference(ref reference.Named) (types.ImageReference, error) {
-	if reference.IsNameOnly(ref) {
-		return nil, errors.Errorf("Docker reference %s has neither a tag nor a digest", ref.String())
+// NewReference returns a Docker reference for a named reference. The reference must satisfy !reference.XIsNameOnly().
+func NewReference(ref reference.XNamed) (types.ImageReference, error) {
+	if reference.XIsNameOnly(ref) {
+		return nil, errors.Errorf("Docker reference %s has neither a tag nor a digest", ref.XString())
 	}
 	// A github.com/distribution/reference value can have a tag and a digest at the same time!
 	// docker/reference does not handle that, so fail.
 	// (Even if it were supported, the semantics of policy namespaces are unclear - should we drop
 	// the tag or the digest first?)
-	_, isTagged := ref.(reference.NamedTagged)
-	_, isDigested := ref.(reference.Canonical)
+	_, isTagged := ref.(reference.XNamedTagged)
+	_, isDigested := ref.(reference.XCanonical)
 	if isTagged && isDigested {
 		return nil, errors.Errorf("Docker references with both a tag and digest are currently not supported")
 	}
@@ -82,13 +82,13 @@ func (ref dockerReference) Transport() types.ImageTransport {
 // e.g. default attribute values omitted by the user may be filled in in the return value, or vice versa.
 // WARNING: Do not use the return value in the UI to describe an image, it does not contain the Transport().Name() prefix.
 func (ref dockerReference) StringWithinTransport() string {
-	return "//" + ref.ref.String()
+	return "//" + ref.ref.XString()
 }
 
 // DockerReference returns a Docker reference associated with this reference
-// (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
+// (fully explicit, i.e. !reference.XIsNameOnly, but reflecting user intent,
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
-func (ref dockerReference) DockerReference() reference.Named {
+func (ref dockerReference) DockerReference() reference.XNamed {
 	return ref.ref
 }
 
@@ -145,12 +145,12 @@ func (ref dockerReference) DeleteImage(ctx *types.SystemContext) error {
 
 // tagOrDigest returns a tag or digest from the reference.
 func (ref dockerReference) tagOrDigest() (string, error) {
-	if ref, ok := ref.ref.(reference.Canonical); ok {
-		return ref.Digest().String(), nil
+	if ref, ok := ref.ref.(reference.XCanonical); ok {
+		return ref.XDigest().String(), nil
 	}
-	if ref, ok := ref.ref.(reference.NamedTagged); ok {
-		return ref.Tag(), nil
+	if ref, ok := ref.ref.(reference.XNamedTagged); ok {
+		return ref.XTag(), nil
 	}
-	// This should not happen, NewReference above refuses reference.IsNameOnly values.
-	return "", errors.Errorf("Internal inconsistency: Reference %s unexpectedly has neither a digest nor a tag", ref.ref.String())
+	// This should not happen, NewReference above refuses reference.XIsNameOnly values.
+	return "", errors.Errorf("Internal inconsistency: Reference %s unexpectedly has neither a digest nor a tag", ref.ref.XString())
 }

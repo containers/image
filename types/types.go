@@ -55,7 +55,7 @@ type ImageReference interface {
 	// DockerReference returns a Docker reference associated with this reference
 	// (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
 	// not e.g. after redirect or alias processing), or nil if unknown/not applicable.
-	DockerReference() reference.Named
+	DockerReference() reference.XNamed
 
 	// PolicyConfigurationIdentity returns a string representation of the reference, suitable for policy lookup.
 	// This MUST reflect user intent, not e.g. after processing of third-party redirects or aliases;

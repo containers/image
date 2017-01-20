@@ -249,7 +249,7 @@ func TestManifestOCI1UpdatedImageNeedsLayerDiffIDs(t *testing.T) {
 // oci1ImageSource is plausible enough for schema conversions in manifestOCI1.UpdatedImage() to work.
 type oci1ImageSource struct {
 	configBlobImageSource
-	ref reference.Named
+	ref reference.XNamed
 }
 
 func (OCIis *oci1ImageSource) Reference() types.ImageReference {
@@ -260,7 +260,7 @@ func newOCI1ImageSource(t *testing.T, dockerRef string) *oci1ImageSource {
 	realConfigJSON, err := ioutil.ReadFile("fixtures/oci1-config.json")
 	require.NoError(t, err)
 
-	ref, err := reference.ParseNamed(dockerRef)
+	ref, err := reference.XParseNamed(dockerRef)
 	require.NoError(t, err)
 
 	return &oci1ImageSource{

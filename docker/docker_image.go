@@ -34,12 +34,12 @@ func newImage(ctx *types.SystemContext, ref dockerReference) (types.Image, error
 
 // SourceRefFullName returns a fully expanded name for the repository this image is in.
 func (i *Image) SourceRefFullName() string {
-	return i.src.ref.ref.FullName()
+	return i.src.ref.ref.XFullName()
 }
 
 // GetRepositoryTags list all tags available in the repository. Note that this has no connection with the tag(s) used for this specific image, if any.
 func (i *Image) GetRepositoryTags() ([]string, error) {
-	url := fmt.Sprintf(tagsURL, i.src.ref.ref.RemoteName())
+	url := fmt.Sprintf(tagsURL, i.src.ref.ref.XRemoteName())
 	res, err := i.src.c.makeRequest("GET", url, nil, nil)
 	if err != nil {
 		return nil, err

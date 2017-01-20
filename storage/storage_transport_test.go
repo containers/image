@@ -54,10 +54,10 @@ func TestTransportParseStoreReference(t *testing.T) {
 			if c.expectedRef == "" {
 				assert.Nil(t, storageRef.name, c.input)
 			} else {
-				dockerRef, err := reference.ParseNamed(c.expectedRef)
+				dockerRef, err := reference.XParseNamed(c.expectedRef)
 				require.NoError(t, err)
 				require.NotNil(t, storageRef.name, c.input)
-				assert.Equal(t, dockerRef.String(), storageRef.name.String())
+				assert.Equal(t, dockerRef.XString(), storageRef.name.XString())
 			}
 		}
 	}

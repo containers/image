@@ -62,15 +62,15 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 			require.NoError(t, err, c.input)
 			dockerRef, ok := ref.(dockerReference)
 			require.True(t, ok, c.input)
-			assert.Equal(t, c.expected, dockerRef.ref.String(), c.input)
+			assert.Equal(t, c.expected, dockerRef.ref.XString(), c.input)
 		}
 	}
 }
 
-// refWithTagAndDigest is a reference.NamedTagged and reference.Canonical at the same time.
-type refWithTagAndDigest struct{ reference.Canonical }
+// refWithTagAndDigest is a reference.XNamedTagged and reference.XCanonical at the same time.
+type refWithTagAndDigest struct{ reference.XCanonical }
 
-func (ref refWithTagAndDigest) Tag() string {
+func (ref refWithTagAndDigest) XTag() string {
 	return "notLatest"
 }
 
@@ -84,25 +84,25 @@ var validReferenceTestCases = []struct{ input, dockerRef, stringWithinTransport 
 
 func TestNewReference(t *testing.T) {
 	for _, c := range validReferenceTestCases {
-		parsed, err := reference.ParseNamed(c.input)
+		parsed, err := reference.XParseNamed(c.input)
 		require.NoError(t, err)
 		ref, err := NewReference(parsed)
 		require.NoError(t, err, c.input)
 		dockerRef, ok := ref.(dockerReference)
 		require.True(t, ok, c.input)
-		assert.Equal(t, c.dockerRef, dockerRef.ref.String(), c.input)
+		assert.Equal(t, c.dockerRef, dockerRef.ref.XString(), c.input)
 	}
 
 	// Neither a tag nor digest
-	parsed, err := reference.ParseNamed("busybox")
+	parsed, err := reference.XParseNamed("busybox")
 	require.NoError(t, err)
 	_, err = NewReference(parsed)
 	assert.Error(t, err)
 
 	// A github.com/distribution/reference value can have a tag and a digest at the same time!
-	parsed, err = reference.ParseNamed("busybox" + sha256digest)
+	parsed, err = reference.XParseNamed("busybox" + sha256digest)
 	require.NoError(t, err)
-	refDigested, ok := parsed.(reference.Canonical)
+	refDigested, ok := parsed.(reference.XCanonical)
 	require.True(t, ok)
 	tagDigestRef := refWithTagAndDigest{refDigested}
 	_, err = NewReference(tagDigestRef)
@@ -135,7 +135,7 @@ func TestReferenceDockerReference(t *testing.T) {
 		require.NoError(t, err, c.input)
 		dockerRef := ref.DockerReference()
 		require.NotNil(t, dockerRef, c.input)
-		assert.Equal(t, c.dockerRef, dockerRef.String(), c.input)
+		assert.Equal(t, c.dockerRef, dockerRef.XString(), c.input)
 	}
 }
 
@@ -196,7 +196,7 @@ func TestReferenceTagOrDigest(t *testing.T) {
 	}
 
 	// Invalid input
-	ref, err := reference.ParseNamed("busybox")
+	ref, err := reference.XParseNamed("busybox")
 	require.NoError(t, err)
 	dockerRef := dockerReference{ref: ref}
 	_, err = dockerRef.tagOrDigest()

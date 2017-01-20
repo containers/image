@@ -66,7 +66,7 @@ func (s *storageTransport) SetStore(store storage.Store) {
 // ParseStoreReference takes a name or an ID, tries to figure out which it is
 // relative to the given store, and returns it in a reference object.
 func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (*storageReference, error) {
-	var name reference.Named
+	var name reference.XNamed
 	var sum digest.Digest
 	var err error
 	if ref == "" {
@@ -83,14 +83,14 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	refInfo := strings.SplitN(ref, "@", 2)
 	if len(refInfo) == 1 {
 		// A name.
-		name, err = reference.ParseNamed(refInfo[0])
+		name, err = reference.XParseNamed(refInfo[0])
 		if err != nil {
 			return nil, err
 		}
 	} else if len(refInfo) == 2 {
 		// An ID, possibly preceded by a name.
 		if refInfo[0] != "" {
-			name, err = reference.ParseNamed(refInfo[0])
+			name, err = reference.XParseNamed(refInfo[0])
 			if err != nil {
 				return nil, err
 			}
@@ -111,7 +111,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	}
 	refname := ""
 	if name != nil {
-		name = reference.WithDefaultTag(name)
+		name = reference.XWithDefaultTag(name)
 		refname = verboseName(name)
 	}
 	if refname == "" {
@@ -257,12 +257,12 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 	// that are just bare IDs.
 	scopeInfo := strings.SplitN(scope, "@", 2)
 	if len(scopeInfo) == 1 && scopeInfo[0] != "" {
-		_, err := reference.ParseNamed(scopeInfo[0])
+		_, err := reference.XParseNamed(scopeInfo[0])
 		if err != nil {
 			return err
 		}
 	} else if len(scopeInfo) == 2 && scopeInfo[0] != "" && scopeInfo[1] != "" {
-		_, err := reference.ParseNamed(scopeInfo[0])
+		_, err := reference.XParseNamed(scopeInfo[0])
 		if err != nil {
 			return err
 		}
@@ -276,11 +276,11 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 	return nil
 }
 
-func verboseName(name reference.Named) string {
-	name = reference.WithDefaultTag(name)
+func verboseName(name reference.XNamed) string {
+	name = reference.XWithDefaultTag(name)
 	tag := ""
-	if tagged, ok := name.(reference.NamedTagged); ok {
-		tag = tagged.Tag()
+	if tagged, ok := name.(reference.XNamedTagged); ok {
+		tag = tagged.XTag()
 	}
-	return name.FullName() + ":" + tag
+	return name.XFullName() + ":" + tag
 }
