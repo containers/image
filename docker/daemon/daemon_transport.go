@@ -46,11 +46,11 @@ type daemonReference struct {
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an ImageReference.
 func ParseReference(refString string) (types.ImageReference, error) {
-	// This is intended to be compatible with reference.XParseIDOrReference, but more strict about refusing some of the ambiguous cases.
+	// This is intended to be compatible with reference.ParseAnyReference, but more strict about refusing some of the ambiguous cases.
 	// In particular, this rejects unprefixed digest values (64 hex chars), and sha256 digest prefixes (sha256:fewer-than-64-hex-chars).
 
 	// digest:hexstring is structurally the same as a reponame:tag (meaning docker.io/library/reponame:tag).
-	// reference.XParseIDOrReference interprets such strings as digests.
+	// reference.ParseAnyReference interprets such strings as digests.
 	if dgst, err := digest.Parse(refString); err == nil {
 		// The daemon explicitly refuses to tag images with a reponame equal to digest.Canonical - but _only_ this digest name.
 		// Other digest references are ambiguous, so refuse them.

@@ -3,9 +3,8 @@ package daemon
 import (
 	"testing"
 
-	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
-	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -65,23 +64,24 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 			require.NoError(t, err, c.input)
 			daemonRef, ok := ref.(daemonReference)
 			require.True(t, ok, c.input)
-			// If we don't reject the input, the interpretation must be consistent for reference.XParseIDOrReference
-			dockerID, dockerRef, err := reference.XParseIDOrReference(c.input)
+			// If we don't reject the input, the interpretation must be consistent with reference.ParseAnyReference
+			dockerRef, err := reference.ParseAnyReference(c.input)
 			require.NoError(t, err, c.input)
 
 			if c.expectedRef == "" {
 				assert.Equal(t, c.expectedID, daemonRef.id.String(), c.input)
 				assert.Nil(t, daemonRef.ref, c.input)
 
-				assert.Equal(t, c.expectedID, dockerID.String(), c.input)
-				assert.Nil(t, dockerRef, c.input)
+				_, ok := dockerRef.(reference.Digested)
+				require.True(t, ok, c.input)
+				assert.Equal(t, c.expectedID, dockerRef.String(), c.input)
 			} else {
 				assert.Equal(t, "", daemonRef.id.String(), c.input)
 				require.NotNil(t, daemonRef.ref, c.input)
 				assert.Equal(t, c.expectedRef, daemonRef.ref.String(), c.input)
 
-				assert.Equal(t, "", dockerID.String(), c.input)
-				require.NotNil(t, dockerRef, c.input)
+				_, ok := dockerRef.(reference.Named)
+				require.True(t, ok, c.input)
 				assert.Equal(t, c.expectedRef, dockerRef.String(), c.input)
 			}
 		}
@@ -110,7 +110,7 @@ func TestNewReference(t *testing.T) {
 
 	// Named references
 	for _, c := range validNamedReferenceTestCases {
-		parsed, err := distreference.ParseNormalizedNamed(c.input)
+		parsed, err := reference.ParseNormalizedNamed(c.input)
 		require.NoError(t, err)
 		ref, err := NewReference("", parsed)
 		require.NoError(t, err, c.input)
@@ -122,23 +122,23 @@ func TestNewReference(t *testing.T) {
 	}
 
 	// Both an ID and a named reference provided
-	parsed, err := distreference.ParseNormalizedNamed("busybox:latest")
+	parsed, err := reference.ParseNormalizedNamed("busybox:latest")
 	require.NoError(t, err)
 	_, err = NewReference(id, parsed)
 	assert.Error(t, err)
 
 	// A reference with neither a tag nor digest
-	parsed, err = distreference.ParseNormalizedNamed("busybox")
+	parsed, err = reference.ParseNormalizedNamed("busybox")
 	require.NoError(t, err)
 	_, err = NewReference("", parsed)
 	assert.Error(t, err)
 
 	// A github.com/distribution/reference value can have a tag and a digest at the same time!
-	parsed, err = distreference.ParseNormalizedNamed("busybox:notlatest@" + sha256digest)
+	parsed, err = reference.ParseNormalizedNamed("busybox:notlatest@" + sha256digest)
 	require.NoError(t, err)
-	_, ok = parsed.(distreference.Canonical)
+	_, ok = parsed.(reference.Canonical)
 	require.True(t, ok)
-	_, ok = parsed.(distreference.NamedTagged)
+	_, ok = parsed.(reference.NamedTagged)
 	require.True(t, ok)
 	_, err = NewReference("", parsed)
 	assert.Error(t, err)
