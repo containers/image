@@ -354,7 +354,7 @@ func NewPRSignedByKeyData(keyType sbKeyType, keyData []byte, signedIdentity Poli
 // Compile-time check that prSignedBy implements json.Unmarshaler.
 var _ json.Unmarshaler = (*prSignedBy)(nil)
 
-func (pr *prSignedBy) getPR(tmp prSignedBy) error {
+func (pr *prSignedBy) getPR(tmp prSignedBy, gotKeyPath, gotKeyData bool) error {
 	var res *prSignedBy
 	var err error
 	switch {
@@ -418,7 +418,7 @@ func (pr *prSignedBy) UnmarshalJSON(data []byte) error {
 		tmp.SignedIdentity = si
 	}
 
-	return getPR(tmp)
+	return pr.getPR(tmp, gotKeyPath, gotKeyData)
 }
 
 // IsValid returns true iff kt is a recognized value
