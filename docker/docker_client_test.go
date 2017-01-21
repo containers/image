@@ -185,6 +185,52 @@ func TestGetAuth(t *testing.T) {
 	}
 }
 
+func testAuth(tc authTestCase, configPath string, t *testing.T) bool {
+	contents, err := json.MarshalIndent(&tc.authConfig.Auths, "", "  ")
+	if err != nil {
+		t.Errorf("[%s] failed to marshal authConfig: %v", tc.name, err)
+		return true
+	}
+	if err := ioutil.WriteFile(configPath, contents, 0640); err != nil {
+		t.Errorf("[%s] failed to write file %q: %v", tc.name, configPath, err)
+		return true
+	}
+
+	username, password, err := getAuth(nil, tc.hostname)
+	if err == nil && tc.expectedError != nil {
+		t.Errorf("[%s] got unexpected non error and username=%q, password=%q", tc.name, username, password)
+		return true
+	}
+	if err != nil && tc.expectedError == nil {
+		t.Errorf("[%s] got unexpected error: %#+v", tc.name, err)
+		return true
+	}
+	if !reflect.DeepEqual(err, tc.expectedError) {
+		t.Errorf("[%s] got unexpected error: %#+v != %#+v", tc.name, err, tc.expectedError)
+		return true
+	}
+
+	if username != tc.expectedUsername {
+		t.Errorf("[%s] got unexpected user name: %q != %q", tc.name, username, tc.expectedUsername)
+		return true
+	}
+	if password != tc.expectedPassword {
+		t.Errorf("[%s] got unexpected user name: %q != %q", tc.name, password, tc.expectedPassword)
+		return true
+	}
+
+	return false
+}
+
+type authTestCase struct {
+	name             string
+	hostname         string
+	authConfig       testAuthConfig
+	expectedUsername string
+	expectedPassword string
+	expectedError    error
+}
+
 func TestGetAuthFromLegacyFile(t *testing.T) {
 	origHomeDir := homedir.Get()
 	tmpDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
@@ -204,14 +250,7 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 
 	configPath := filepath.Join(tmpDir, ".dockercfg")
 
-	for _, tc := range []struct {
-		name             string
-		hostname         string
-		authConfig       testAuthConfig
-		expectedUsername string
-		expectedPassword string
-		expectedError    error
-	}{
+	for _, tc := range []authTestCase{
 		{
 			name:     "normalize registry",
 			hostname: "https://docker.io/v1",
@@ -233,36 +272,7 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 			expectedPassword: "pw",
 		},
 	} {
-		contents, err := json.MarshalIndent(&tc.authConfig.Auths, "", "  ")
-		if err != nil {
-			t.Errorf("[%s] failed to marshal authConfig: %v", tc.name, err)
-			continue
-		}
-		if err := ioutil.WriteFile(configPath, contents, 0640); err != nil {
-			t.Errorf("[%s] failed to write file %q: %v", tc.name, configPath, err)
-			continue
-		}
-
-		username, password, err := getAuth(nil, tc.hostname)
-		if err == nil && tc.expectedError != nil {
-			t.Errorf("[%s] got unexpected non error and username=%q, password=%q", tc.name, username, password)
-			continue
-		}
-		if err != nil && tc.expectedError == nil {
-			t.Errorf("[%s] got unexpected error: %#+v", tc.name, err)
-			continue
-		}
-		if !reflect.DeepEqual(err, tc.expectedError) {
-			t.Errorf("[%s] got unexpected error: %#+v != %#+v", tc.name, err, tc.expectedError)
-			continue
-		}
-
-		if username != tc.expectedUsername {
-			t.Errorf("[%s] got unexpected user name: %q != %q", tc.name, username, tc.expectedUsername)
-		}
-		if password != tc.expectedPassword {
-			t.Errorf("[%s] got unexpected user name: %q != %q", tc.name, password, tc.expectedPassword)
-		}
+		testAuth(tc, configPath, t)
 	}
 }
 
@@ -327,6 +337,28 @@ func TestGetAuthPreferNewConfig(t *testing.T) {
 	}
 }
 
+func testConfigFileMissing(configPath string, t *testing.T) {
+	// no config file present
+	username, password, err := getAuth(nil, "index.docker.io")
+	if err != nil {
+		t.Fatalf("got unexpected error: %#+v", err)
+	}
+	if len(username) > 0 || len(password) > 0 {
+		t.Fatalf("got unexpected not empty username/password: %q/%q", username, password)
+	}
+
+	if err := ioutil.WriteFile(configPath, []byte("Json rocks! Unless it doesn't."), 0640); err != nil {
+		t.Fatalf("failed to write file %q: %v", configPath, err)
+	}
+	username, password, err = getAuth(nil, "index.docker.io")
+	if err == nil {
+		t.Fatalf("got unexpected non-error: username=%q, password=%q", username, password)
+	}
+	if _, ok := err.(*json.SyntaxError); !ok {
+		t.Fatalf("expected os.PathError, not: %#+v", err)
+	}
+}
+
 func TestGetAuthFailsOnBadInput(t *testing.T) {
 	origHomeDir := homedir.Get()
 	tmpDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
@@ -350,30 +382,12 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	}
 	configPath := filepath.Join(configDir, "config.json")
 
-	// no config file present
-	username, password, err := getAuth(nil, "index.docker.io")
-	if err != nil {
-		t.Fatalf("got unexpected error: %#+v", err)
-	}
-	if len(username) > 0 || len(password) > 0 {
-		t.Fatalf("got unexpected not empty username/password: %q/%q", username, password)
-	}
-
-	if err := ioutil.WriteFile(configPath, []byte("Json rocks! Unless it doesn't."), 0640); err != nil {
-		t.Fatalf("failed to write file %q: %v", configPath, err)
-	}
-	username, password, err = getAuth(nil, "index.docker.io")
-	if err == nil {
-		t.Fatalf("got unexpected non-error: username=%q, password=%q", username, password)
-	}
-	if _, ok := err.(*json.SyntaxError); !ok {
-		t.Fatalf("expected os.PathError, not: %#+v", err)
-	}
+	testConfigFileMissing(configPath, t)
 
 	// remove the invalid config file
 	os.RemoveAll(configPath)
 	// no config file present
-	username, password, err = getAuth(nil, "index.docker.io")
+	username, password, err := getAuth(nil, "index.docker.io")
 	if err != nil {
 		t.Fatalf("got unexpected error: %#+v", err)
 	}
