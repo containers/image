@@ -15,6 +15,14 @@ deps:
 	go get -u $(BUILDFLAGS) github.com/golang/lint/golint
 	go get $(BUILDFLAGS) github.com/vbatts/git-validation
 
+gocyclo:
+	go get github.com/fzipp/gocyclo
+	@out=$$(gocyclo -over 15 . | grep -v vendor); \
+	if [ -n "$$(gocyclo -over 15 . | grep -v vendor)" ]; then \
+		echo "$$out"; \
+		exit 1; \
+	fi
+
 test:
 	@go test $(BUILDFLAGS) -cover ./...
 
@@ -35,7 +43,7 @@ test-skopeo:
 		$(SUDO) make check && \
 		rm -rf $${skopeo_path}
 
-validate: lint
+validate: lint gocyclo
 	@go vet ./...
 	@test -z "$$(gofmt -s -l . | tee /dev/stderr)"
 
