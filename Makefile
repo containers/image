@@ -27,6 +27,9 @@ gocyclo:
 test:
 	@go test $(BUILDFLAGS) -cover ./...
 
+test-root-storage:
+	@sudo -E `which go` test -v ./storage
+
 # This is not run as part of (make all), but Travis CI does run this.
 # Demonstarting a working version of skopeo (possibly with modified SKOPEO_REPO/SKOPEO_BRANCH, e.g.
 #    make test-skopeo SKOPEO_REPO=runcom/skopeo-1 SKOPEO_BRANCH=oci-3 SUDO=sudo

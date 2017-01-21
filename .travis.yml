@@ -6,7 +6,7 @@
   go:
     - 1.7
   install: make deps
-  script: make .gitvalidation && make validate && make test && make test-skopeo
+  script: make .gitvalidation && make validate && make test && make test-root-storage && make test-skopeo 
   dist: trusty
   os:
     - linux
