@@ -368,19 +368,8 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdCluster) []err
 	return validationErrors
 }
 
-// validateAuthInfo is a modified copy of k8s.io/kubernetes/pkg/client/unversioned/clientcmd.DirectClientConfig.validateAuthInfo.
-// validateAuthInfo looks for conflicts and errors in the auth info
-func validateAuthInfo(authInfoName string, authInfo clientcmdAuthInfo) []error {
+func (authInfo clientcmdAuthInfo) validateClientCertificate(authInfoName string) []error {
 	var validationErrors []error
-
-	usingAuthPath := false
-	methods := make([]string, 0, 3)
-	if len(authInfo.Token) != 0 {
-		methods = append(methods, "token")
-	}
-	if len(authInfo.Username) != 0 || len(authInfo.Password) != 0 {
-		methods = append(methods, "basicAuth")
-	}
 
 	if len(authInfo.ClientCertificate) != 0 || len(authInfo.ClientCertificateData) != 0 {
 		// Make sure cert data and file aren't both specified
@@ -412,8 +401,24 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdAuthInfo) []error {
 		}
 	}
 
+	return validationErrors
+}
+
+// validateAuthInfo is a modified copy of k8s.io/kubernetes/pkg/client/unversioned/clientcmd.DirectClientConfig.validateAuthInfo.
+// validateAuthInfo looks for conflicts and errors in the auth info
+func validateAuthInfo(authInfoName string, authInfo clientcmdAuthInfo) []error {
+	methods := make([]string, 0, 3)
+	if len(authInfo.Token) != 0 {
+		methods = append(methods, "token")
+	}
+	if len(authInfo.Username) != 0 || len(authInfo.Password) != 0 {
+		methods = append(methods, "basicAuth")
+	}
+
+	validationErrors := authInfo.validateClientCertificate(authInfoName)
+
 	// authPath also provides information for the client to identify the server, so allow multiple auth methods in that case
-	if (len(methods) > 1) && (!usingAuthPath) {
+	if len(methods) > 1 {
 		validationErrors = append(validationErrors, errors.Errorf("more than one authentication method found for %v; found %v, only one is allowed", authInfoName, methods))
 	}
 
