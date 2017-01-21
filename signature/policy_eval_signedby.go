@@ -15,30 +15,50 @@ import (
 	"github.com/opencontainers/go-digest"
 )
 
-func (pr *prSignedBy) isSignatureAuthorAccepted(image types.UnparsedImage, sig []byte) (signatureAcceptanceResult, *Signature, error) {
+func (pr *prSignedBy) validateKeyType() error {
+	// use a pointer here so we can get nil
 	switch pr.KeyType {
 	case SBKeyTypeGPGKeys:
 	case SBKeyTypeSignedByGPGKeys, SBKeyTypeX509Certificates, SBKeyTypeSignedByX509CAs:
 		// FIXME? Reject this at policy parsing time already?
-		return sarRejected, nil, errors.Errorf(`"Unimplemented "keyType" value "%s"`, string(pr.KeyType))
+		return errors.Errorf(`"Unimplemented "keyType" value "%s"`, string(pr.KeyType))
 	default:
 		// This should never happen, newPRSignedBy ensures KeyType.IsValid()
-		return sarRejected, nil, errors.Errorf(`"Unknown "keyType" value "%s"`, string(pr.KeyType))
+		return errors.Errorf(`"Unknown "keyType" value "%s"`, string(pr.KeyType))
 	}
 
 	if pr.KeyPath != "" && pr.KeyData != nil {
-		return sarRejected, nil, errors.New(`Internal inconsistency: both "keyPath" and "keyData" specified`)
+		return errors.New(`Internal inconsistency: both "keyPath" and "keyData" specified`)
 	}
+
+	return nil
+}
+
+func (pr *prSignedBy) readKey() ([]byte, error) {
 	// FIXME: move this to per-context initialization
 	var data []byte
+	var err error
+
 	if pr.KeyData != nil {
 		data = pr.KeyData
 	} else {
-		d, err := ioutil.ReadFile(pr.KeyPath)
+		data, err = ioutil.ReadFile(pr.KeyPath)
 		if err != nil {
-			return sarRejected, nil, err
+			return nil, err
 		}
-		data = d
+	}
+
+	return data, nil
+}
+
+func (pr *prSignedBy) isSignatureAuthorAccepted(image types.UnparsedImage, sig []byte) (signatureAcceptanceResult, *Signature, error) {
+	if err := pr.validateKeyType(); err != nil {
+		return sarRejected, nil, err
+	}
+
+	data, err := pr.readKey()
+	if err != nil {
+		return sarRejected, nil, err
 	}
 
 	// FIXME: move this to per-context initialization
