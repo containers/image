@@ -160,6 +160,60 @@ func (pc *PolicyContext) requirementsForImageRef(ref types.ImageReference) Polic
 	return pc.Policy.Default
 }
 
+func (pc *PolicyContext) acceptSignatures(res []*Signature, reqs []PolicyRequirement, image types.UnparsedImage, sigNumber int, sig []byte) []*Signature {
+	var acceptedSig *Signature // non-nil if accepted
+	rejected := false
+	// FIXME? Say more about the contents of the signature, i.e. parse it even before verification?!
+	logrus.Debugf("Evaluating signature %d:", sigNumber)
+interpretingReqs:
+	for reqNumber, req := range reqs {
+		// FIXME: Log the requirement itself? For now, we use just the number.
+		// FIXME: supply state
+		switch res, as, err := req.isSignatureAuthorAccepted(image, sig); res {
+		case sarAccepted:
+			if as == nil { // Coverage: this should never happen
+				logrus.Debugf(" Requirement %d: internal inconsistency: sarAccepted but no parsed contents", reqNumber)
+				rejected = true
+				break interpretingReqs
+			}
+			logrus.Debugf(" Requirement %d: signature accepted", reqNumber)
+			if acceptedSig == nil {
+				acceptedSig = as
+			} else if *as != *acceptedSig { // Coverage: this should never happen
+				// Huh?! Two ways of verifying the same signature blob resulted in two different parses of its already accepted contents?
+				logrus.Debugf(" Requirement %d: internal inconsistency: sarAccepted but different parsed contents", reqNumber)
+				rejected = true
+				acceptedSig = nil
+				break interpretingReqs
+			}
+		case sarRejected:
+			logrus.Debugf(" Requirement %d: signature rejected: %s", reqNumber, err.Error())
+			rejected = true
+			break interpretingReqs
+		case sarUnknown:
+			if err != nil { // Coverage: this should never happen
+				logrus.Debugf(" Requirement %d: internal inconsistency: sarUnknown but an error message %s", reqNumber, err.Error())
+				rejected = true
+				break interpretingReqs
+			}
+			logrus.Debugf(" Requirement %d: signature state unknown, continuing", reqNumber)
+		default: // Coverage: this should never happen
+			logrus.Debugf(" Requirement %d: internal inconsistency: unknown result %#v", reqNumber, string(res))
+			rejected = true
+			break interpretingReqs
+		}
+	}
+	// This also handles the (invalid) case of empty reqs, by rejecting the signature.
+	if acceptedSig != nil && !rejected {
+		logrus.Debugf(" Overall: OK, signature accepted")
+		res = append(res, acceptedSig)
+	} else {
+		logrus.Debugf(" Overall: Signature not accepted")
+	}
+
+	return res
+}
+
 // GetSignaturesWithAcceptedAuthor returns those signatures from an image
 // for which the policy accepts the author (and which have been successfully
 // verified).
@@ -195,56 +249,9 @@ func (pc *PolicyContext) GetSignaturesWithAcceptedAuthor(image types.UnparsedIma
 
 	res := make([]*Signature, 0, len(unverifiedSignatures))
 	for sigNumber, sig := range unverifiedSignatures {
-		var acceptedSig *Signature // non-nil if accepted
-		rejected := false
-		// FIXME? Say more about the contents of the signature, i.e. parse it even before verification?!
-		logrus.Debugf("Evaluating signature %d:", sigNumber)
-	interpretingReqs:
-		for reqNumber, req := range reqs {
-			// FIXME: Log the requirement itself? For now, we use just the number.
-			// FIXME: supply state
-			switch res, as, err := req.isSignatureAuthorAccepted(image, sig); res {
-			case sarAccepted:
-				if as == nil { // Coverage: this should never happen
-					logrus.Debugf(" Requirement %d: internal inconsistency: sarAccepted but no parsed contents", reqNumber)
-					rejected = true
-					break interpretingReqs
-				}
-				logrus.Debugf(" Requirement %d: signature accepted", reqNumber)
-				if acceptedSig == nil {
-					acceptedSig = as
-				} else if *as != *acceptedSig { // Coverage: this should never happen
-					// Huh?! Two ways of verifying the same signature blob resulted in two different parses of its already accepted contents?
-					logrus.Debugf(" Requirement %d: internal inconsistency: sarAccepted but different parsed contents", reqNumber)
-					rejected = true
-					acceptedSig = nil
-					break interpretingReqs
-				}
-			case sarRejected:
-				logrus.Debugf(" Requirement %d: signature rejected: %s", reqNumber, err.Error())
-				rejected = true
-				break interpretingReqs
-			case sarUnknown:
-				if err != nil { // Coverage: this should never happen
-					logrus.Debugf(" Requirement %d: internal inconsistency: sarUnknown but an error message %s", reqNumber, err.Error())
-					rejected = true
-					break interpretingReqs
-				}
-				logrus.Debugf(" Requirement %d: signature state unknown, continuing", reqNumber)
-			default: // Coverage: this should never happen
-				logrus.Debugf(" Requirement %d: internal inconsistency: unknown result %#v", reqNumber, string(res))
-				rejected = true
-				break interpretingReqs
-			}
-		}
-		// This also handles the (invalid) case of empty reqs, by rejecting the signature.
-		if acceptedSig != nil && !rejected {
-			logrus.Debugf(" Overall: OK, signature accepted")
-			res = append(res, acceptedSig)
-		} else {
-			logrus.Debugf(" Overall: Signature not accepted")
-		}
+		res = pc.acceptSignatures(res, reqs, image, sigNumber, sig)
 	}
+
 	return res, nil
 }
 
