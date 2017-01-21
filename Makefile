@@ -16,7 +16,8 @@ deps:
 	go get $(BUILDFLAGS) github.com/vbatts/git-validation
 
 gocyclo:
-	go get github.com/fzipp/gocyclo
+	@echo Fetching/Running github.com/fzipp/gocyclo...
+	@go get github.com/fzipp/gocyclo
 	@out=$$(gocyclo -over 15 . | grep -v vendor); \
 	if [ -n "$$(gocyclo -over 15 . | grep -v vendor)" ]; then \
 		echo "$$out"; \
@@ -44,10 +45,12 @@ test-skopeo:
 		rm -rf $${skopeo_path}
 
 validate: lint gocyclo
+	@echo Running go vet...
 	@go vet ./...
 	@test -z "$$(gofmt -s -l . | tee /dev/stderr)"
 
 lint:
+	@echo Running golint...
 	@out="$$(golint ./...)"; \
 	if [ -n "$$(golint ./...)" ]; then \
 		echo "$$out"; \
