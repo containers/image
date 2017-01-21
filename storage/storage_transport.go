@@ -217,22 +217,26 @@ func (s *storageTransport) GetImage(ref types.ImageReference) (*storage.Image, e
 	return s.GetStoreImage(store, ref)
 }
 
-func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
+func getStoreInfo(scope string) ([]string, string, error) {
 	// Check that there's a store location prefix.  Values we're passed are
 	// expected to come from PolicyConfigurationIdentity or
 	// PolicyConfigurationNamespaces, so if there's no store location,
 	// something's wrong.
 	if scope[0] != '[' {
-		return ErrInvalidReference
+		return nil, scope, ErrInvalidReference
 	}
 	// Parse the store location prefix.
 	closeIndex := strings.IndexRune(scope, ']')
 	if closeIndex < 1 {
-		return ErrInvalidReference
+		return nil, scope, ErrInvalidReference
 	}
 	storeSpec := scope[1:closeIndex]
 	scope = scope[closeIndex+1:]
 	storeInfo := strings.SplitN(storeSpec, "@", 2)
+	return storeInfo, scope, nil
+}
+
+func checkStoreInfo(storeInfo []string) error {
 	if len(storeInfo) == 1 && storeInfo[0] != "" {
 		// One component: the graph root.
 		if !filepath.IsAbs(storeInfo[0]) {
@@ -248,6 +252,25 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 		// recognize.
 		return ErrInvalidReference
 	}
+
+	return nil
+}
+
+func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
+	var (
+		err       error
+		storeInfo []string
+	)
+
+	storeInfo, scope, err = getStoreInfo(scope)
+	if err != nil {
+		return err
+	}
+
+	if err := checkStoreInfo(storeInfo); err != nil {
+		return err
+	}
+
 	// That might be all of it, and that's okay.
 	if scope == "" {
 		return nil

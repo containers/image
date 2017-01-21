@@ -354,6 +354,30 @@ func NewPRSignedByKeyData(keyType sbKeyType, keyData []byte, signedIdentity Poli
 // Compile-time check that prSignedBy implements json.Unmarshaler.
 var _ json.Unmarshaler = (*prSignedBy)(nil)
 
+func (pr *prSignedBy) getPR(tmp prSignedBy) error {
+	var res *prSignedBy
+	var err error
+	switch {
+	case gotKeyPath && gotKeyData:
+		return InvalidPolicyFormatError("keyPath and keyData cannot be used simultaneously")
+	case gotKeyPath && !gotKeyData:
+		res, err = newPRSignedByKeyPath(tmp.KeyType, tmp.KeyPath, tmp.SignedIdentity)
+	case !gotKeyPath && gotKeyData:
+		res, err = newPRSignedByKeyData(tmp.KeyType, tmp.KeyData, tmp.SignedIdentity)
+	case !gotKeyPath && !gotKeyData:
+		return InvalidPolicyFormatError("At least one of keyPath and keyData mus be specified")
+	default: // Coverage: This should never happen
+		return errors.Errorf("Impossible keyPath/keyData presence combination!?")
+	}
+	if err != nil {
+		return err
+	}
+
+	*pr = *res
+
+	return nil
+}
+
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (pr *prSignedBy) UnmarshalJSON(data []byte) error {
 	*pr = prSignedBy{}
@@ -394,26 +418,7 @@ func (pr *prSignedBy) UnmarshalJSON(data []byte) error {
 		tmp.SignedIdentity = si
 	}
 
-	var res *prSignedBy
-	var err error
-	switch {
-	case gotKeyPath && gotKeyData:
-		return InvalidPolicyFormatError("keyPath and keyData cannot be used simultaneously")
-	case gotKeyPath && !gotKeyData:
-		res, err = newPRSignedByKeyPath(tmp.KeyType, tmp.KeyPath, tmp.SignedIdentity)
-	case !gotKeyPath && gotKeyData:
-		res, err = newPRSignedByKeyData(tmp.KeyType, tmp.KeyData, tmp.SignedIdentity)
-	case !gotKeyPath && !gotKeyData:
-		return InvalidPolicyFormatError("At least one of keyPath and keyData mus be specified")
-	default: // Coverage: This should never happen
-		return errors.Errorf("Impossible keyPath/keyData presence combination!?")
-	}
-	if err != nil {
-		return err
-	}
-	*pr = *res
-
-	return nil
+	return getPR(tmp)
 }
 
 // IsValid returns true iff kt is a recognized value

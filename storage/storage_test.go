@@ -95,15 +95,9 @@ func newStore(t *testing.T) storage.Store {
 
 func TestParse(t *testing.T) {
 	store := newStore(t)
+	ref := getRef("test", t)
 
-	ref, err := Transport.ParseReference("test")
-	if err != nil {
-		t.Fatalf("ParseReference(%q) returned error %v", "test", err)
-	}
-	if ref == nil {
-		t.Fatalf("ParseReference returned nil reference")
-	}
-
+	var err error
 	ref, err = Transport.ParseStoreReference(store, "test")
 	if err != nil {
 		t.Fatalf("ParseStoreReference(%q) returned error %v", "test", err)
@@ -113,13 +107,7 @@ func TestParse(t *testing.T) {
 	}
 
 	strRef := ref.StringWithinTransport()
-	ref, err = Transport.ParseReference(strRef)
-	if err != nil {
-		t.Fatalf("ParseReference(%q) returned error: %v", strRef, err)
-	}
-	if ref == nil {
-		t.Fatalf("ParseReference(%q) returned nil reference", strRef)
-	}
+	ref = getRef(strRef, t)
 
 	transport := storageTransport{
 		store: store,
@@ -227,10 +215,217 @@ func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, i
 	return sum, uncompressed.Count, int64(tbuffer.Len()), tbuffer.Bytes()
 }
 
-func TestWriteRead(t *testing.T) {
+func requireRoot(t *testing.T) {
 	if os.Geteuid() != 0 {
-		t.Skip("TestWriteRead requires root privileges")
+		t.Skip("This test requires root privileges")
 	}
+}
+
+type imageDestinationParameters struct {
+	ref        types.ImageReference
+	manifest   string
+	configInfo types.BlobInfo
+	digest     ddigest.Digest
+	size       int64
+	sum        ddigest.Digest
+	dest       types.ImageDestination
+	config     string
+	signatures [][]byte
+	layerInfos []types.BlobInfo
+	src        types.ImageSource
+}
+
+func buildManifest(params *imageDestinationParameters) string {
+	manifest := strings.Replace(params.manifest, "%lh", params.digest.String(), -1)
+	manifest = strings.Replace(manifest, "%ch", params.configInfo.Digest.String(), -1)
+	manifest = strings.Replace(manifest, "%ls", fmt.Sprintf("%d", params.size), -1)
+	manifest = strings.Replace(manifest, "%cs", fmt.Sprintf("%d", params.configInfo.Size), -1)
+	li := params.digest.Hex()
+	manifest = strings.Replace(manifest, "%li", li, -1)
+	manifest = strings.Replace(manifest, "%ci", params.sum.Hex(), -1)
+
+	return manifest
+}
+
+func testDestinationConstructor(params *imageDestinationParameters, t *testing.T) {
+	if params.dest == nil {
+		t.Fatalf("NewImageDestination(%q) returned no destination", params.ref.StringWithinTransport())
+	}
+	if params.dest.Reference().StringWithinTransport() != params.ref.StringWithinTransport() {
+		t.Fatalf("NewImageDestination(%q) changed the reference to %q", params.ref.StringWithinTransport(), params.dest.Reference().StringWithinTransport())
+	}
+	t.Logf("supported manifest MIME types: %v", params.dest.SupportedManifestMIMETypes())
+	if err := params.dest.SupportsSignatures(); err != nil {
+		t.Fatalf("Destination image doesn't support signatures: %v", err)
+	}
+}
+
+func testImageDestination(params *imageDestinationParameters, t *testing.T) {
+	dest, err := params.ref.NewImageDestination(systemContext())
+	if err != nil {
+		t.Fatalf("NewImageDestination(%q) returned error %v", params.ref.StringWithinTransport(), err)
+	}
+
+	params.dest = dest
+
+	testDestinationConstructor(params, t)
+
+	t.Logf("compress layers: %v", dest.ShouldCompressLayers())
+	compression := archive.Uncompressed
+	if dest.ShouldCompressLayers() {
+		compression = archive.Gzip
+	}
+	digest, decompressedSize, size, blob := makeLayer(t, compression)
+	if _, err := dest.PutBlob(bytes.NewBuffer(blob), types.BlobInfo{
+		Size:   size,
+		Digest: digest,
+	}); err != nil {
+		t.Fatalf("Error saving randomly-generated layer to destination: %v", err)
+	}
+	t.Logf("Wrote randomly-generated layer %q (%d/%d bytes) to destination", digest, size, decompressedSize)
+	if _, err := dest.PutBlob(bytes.NewBufferString(params.config), params.configInfo); err != nil {
+		t.Fatalf("Error saving config to destination: %v", err)
+	}
+
+	params.size = size
+	params.digest = digest
+
+	manifest := buildManifest(params)
+
+	if err := dest.PutManifest([]byte(manifest)); err != nil {
+		t.Fatalf("Error saving manifest to destination: %v", err)
+	}
+	if err := dest.PutSignatures(params.signatures); err != nil {
+		t.Fatalf("Error saving signatures to destination: %v", err)
+	}
+	if err := dest.Commit(); err != nil {
+		t.Fatalf("Error committing changes to destination: %v", err)
+	}
+	dest.Close()
+}
+
+func testNewImage(params *imageDestinationParameters, t *testing.T) {
+	img, err := params.ref.NewImage(systemContext())
+	defer img.Close()
+	if err != nil {
+		t.Fatalf("NewImage(%q) returned error %v", params.ref.StringWithinTransport(), err)
+	}
+	imageConfigInfo := img.ConfigInfo()
+	if imageConfigInfo.Digest != "" {
+		blob, err := img.ConfigBlob()
+		if err != nil {
+			t.Fatalf("image %q claimed there was a config blob, but couldn't produce it: %v", params.ref.StringWithinTransport(), err)
+		}
+		sum := ddigest.SHA256.FromBytes(blob)
+		if sum != params.configInfo.Digest {
+			t.Fatalf("image config blob digest for %q doesn't match", params.ref.StringWithinTransport())
+		}
+		if int64(len(blob)) != params.configInfo.Size {
+			t.Fatalf("image config size for %q changed from %d to %d", params.ref.StringWithinTransport(), params.configInfo.Size, len(blob))
+		}
+	}
+	params.layerInfos = img.LayerInfos()
+	if params.layerInfos == nil {
+		t.Fatalf("image for %q returned empty layer list", params.ref.StringWithinTransport())
+	}
+	imageInfo, err := img.Inspect()
+	if err != nil {
+		t.Fatalf("Inspect(%q) returned error %v", params.ref.StringWithinTransport(), err)
+	}
+	if imageInfo.Created.IsZero() {
+		t.Fatalf("Image %q claims to have been created at time 0", params.ref.StringWithinTransport())
+	}
+}
+
+func testImageSource(params *imageDestinationParameters, t *testing.T) {
+	src, err := params.ref.NewImageSource(systemContext(), []string{})
+	if err != nil {
+		t.Fatalf("NewImageSource(%q) returned error %v", params.ref.StringWithinTransport(), err)
+	}
+
+	if src == nil {
+		t.Fatalf("NewImageSource(%q) returned no source", params.ref.StringWithinTransport())
+	}
+
+	params.src = src
+
+	if src.Reference().StringWithinTransport() != params.ref.StringWithinTransport() {
+		// As long as it's only the addition of an ID suffix, that's okay.
+		if !strings.HasPrefix(src.Reference().StringWithinTransport(), params.ref.StringWithinTransport()+"@") {
+			t.Fatalf("NewImageSource(%q) changed the reference to %q", params.ref.StringWithinTransport(), src.Reference().StringWithinTransport())
+		}
+	}
+	retrievedManifest, manifestType, err := src.GetManifest()
+	if err != nil {
+		t.Fatalf("GetManifest(%q) returned error %v", params.ref.StringWithinTransport(), err)
+	}
+	t.Logf("this manifest's type appears to be %q", manifestType)
+
+	manifest := buildManifest(params)
+	if string(retrievedManifest) != manifest {
+		t.Fatalf("NewImageSource(%q) changed the manifest: %q was %q", params.ref.StringWithinTransport(), string(retrievedManifest), manifest)
+	}
+	params.sum = ddigest.SHA256.FromBytes([]byte(manifest))
+	_, _, err = src.GetTargetManifest(params.sum)
+	if err == nil {
+		t.Fatalf("GetTargetManifest(%q) is supposed to fail", params.ref.StringWithinTransport())
+	}
+	sigs, err := src.GetSignatures()
+	if err != nil {
+		t.Fatalf("GetSignatures(%q) returned error %v", params.ref.StringWithinTransport(), err)
+	}
+	if len(sigs) < len(params.signatures) {
+		t.Fatalf("Lost %d signatures", len(params.signatures)-len(sigs))
+	}
+	if len(sigs) > len(params.signatures) {
+		t.Fatalf("Gained %d signatures", len(sigs)-len(params.signatures))
+	}
+	for i := range sigs {
+		if bytes.Compare(sigs[i], params.signatures[i]) != 0 {
+			t.Fatalf("Signature %d was corrupted", i)
+		}
+	}
+
+	testLayerInfos(params, t)
+
+	src.Close()
+	err = params.ref.DeleteImage(systemContext())
+	if err != nil {
+		t.Fatalf("DeleteImage(%q) returned error %v", params.ref.StringWithinTransport(), err)
+	}
+}
+
+func testLayerInfos(params *imageDestinationParameters, t *testing.T) {
+	for _, layerInfo := range params.layerInfos {
+		buf := bytes.Buffer{}
+		layer, size, err := params.src.GetBlob(layerInfo)
+		if err != nil {
+			t.Fatalf("Error reading layer %q from %q", layerInfo.Digest, params.ref.StringWithinTransport())
+		}
+		t.Logf("Decompressing blob %q, blob size = %d, layerInfo.Size = %d bytes", layerInfo.Digest, size, layerInfo.Size)
+		hasher := sha256.New()
+		compressed := ioutils.NewWriteCounter(hasher)
+		countedLayer := io.TeeReader(layer, compressed)
+		decompressed, err := archive.DecompressStream(countedLayer)
+		if err != nil {
+			t.Fatalf("Error decompressing layer %q from %q", layerInfo.Digest, params.ref.StringWithinTransport())
+		}
+		n, err := io.Copy(&buf, decompressed)
+		if layerInfo.Size >= 0 && compressed.Count != layerInfo.Size {
+			t.Fatalf("Blob size is different than expected: %d != %d, read %d", compressed.Count, layerInfo.Size, n)
+		}
+		if size >= 0 && compressed.Count != size {
+			t.Fatalf("Blob size mismatch: %d != %d, read %d", compressed.Count, size, n)
+		}
+		sum := hasher.Sum(nil)
+		if ddigest.NewDigestFromBytes(ddigest.SHA256, sum) != layerInfo.Digest {
+			t.Fatalf("Layer blob digest for %q doesn't match", params.ref.StringWithinTransport())
+		}
+	}
+}
+
+func TestWriteRead(t *testing.T) {
+	requireRoot(t)
 
 	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
 	sum := ddigest.SHA256.FromBytes([]byte(config))
@@ -292,176 +487,28 @@ func TestWriteRead(t *testing.T) {
 		[]byte("Signature A"),
 		[]byte("Signature B"),
 	}
+
 	newStore(t)
-	ref, err := Transport.ParseReference("test")
-	if err != nil {
-		t.Fatalf("ParseReference(%q) returned error %v", "test", err)
-	}
-	if ref == nil {
-		t.Fatalf("ParseReference returned nil reference")
-	}
+	ref := getRef("test", t)
 
 	for _, manifestFmt := range manifests {
-		dest, err := ref.NewImageDestination(systemContext())
-		if err != nil {
-			t.Fatalf("NewImageDestination(%q) returned error %v", ref.StringWithinTransport(), err)
-		}
-		if dest == nil {
-			t.Fatalf("NewImageDestination(%q) returned no destination", ref.StringWithinTransport())
-		}
-		if dest.Reference().StringWithinTransport() != ref.StringWithinTransport() {
-			t.Fatalf("NewImageDestination(%q) changed the reference to %q", ref.StringWithinTransport(), dest.Reference().StringWithinTransport())
-		}
-		t.Logf("supported manifest MIME types: %v", dest.SupportedManifestMIMETypes())
-		if err := dest.SupportsSignatures(); err != nil {
-			t.Fatalf("Destination image doesn't support signatures: %v", err)
-		}
-		t.Logf("compress layers: %v", dest.ShouldCompressLayers())
-		compression := archive.Uncompressed
-		if dest.ShouldCompressLayers() {
-			compression = archive.Gzip
-		}
-		digest, decompressedSize, size, blob := makeLayer(t, compression)
-		if _, err := dest.PutBlob(bytes.NewBuffer(blob), types.BlobInfo{
-			Size:   size,
-			Digest: digest,
-		}); err != nil {
-			t.Fatalf("Error saving randomly-generated layer to destination: %v", err)
-		}
-		t.Logf("Wrote randomly-generated layer %q (%d/%d bytes) to destination", digest, size, decompressedSize)
-		if _, err := dest.PutBlob(bytes.NewBufferString(config), configInfo); err != nil {
-			t.Fatalf("Error saving config to destination: %v", err)
-		}
-		manifest := strings.Replace(manifestFmt, "%lh", digest.String(), -1)
-		manifest = strings.Replace(manifest, "%ch", configInfo.Digest.String(), -1)
-		manifest = strings.Replace(manifest, "%ls", fmt.Sprintf("%d", size), -1)
-		manifest = strings.Replace(manifest, "%cs", fmt.Sprintf("%d", configInfo.Size), -1)
-		li := digest.Hex()
-		manifest = strings.Replace(manifest, "%li", li, -1)
-		manifest = strings.Replace(manifest, "%ci", sum.Hex(), -1)
-		t.Logf("this manifest is %q", manifest)
-		if err := dest.PutManifest([]byte(manifest)); err != nil {
-			t.Fatalf("Error saving manifest to destination: %v", err)
-		}
-		if err := dest.PutSignatures(signatures); err != nil {
-			t.Fatalf("Error saving signatures to destination: %v", err)
-		}
-		if err := dest.Commit(); err != nil {
-			t.Fatalf("Error committing changes to destination: %v", err)
-		}
-		dest.Close()
-
-		img, err := ref.NewImage(systemContext())
-		if err != nil {
-			t.Fatalf("NewImage(%q) returned error %v", ref.StringWithinTransport(), err)
-		}
-		imageConfigInfo := img.ConfigInfo()
-		if imageConfigInfo.Digest != "" {
-			blob, err := img.ConfigBlob()
-			if err != nil {
-				t.Fatalf("image %q claimed there was a config blob, but couldn't produce it: %v", ref.StringWithinTransport(), err)
-			}
-			sum := ddigest.SHA256.FromBytes(blob)
-			if sum != configInfo.Digest {
-				t.Fatalf("image config blob digest for %q doesn't match", ref.StringWithinTransport())
-			}
-			if int64(len(blob)) != configInfo.Size {
-				t.Fatalf("image config size for %q changed from %d to %d", ref.StringWithinTransport(), configInfo.Size, len(blob))
-			}
-		}
-		layerInfos := img.LayerInfos()
-		if layerInfos == nil {
-			t.Fatalf("image for %q returned empty layer list", ref.StringWithinTransport())
-		}
-		imageInfo, err := img.Inspect()
-		if err != nil {
-			t.Fatalf("Inspect(%q) returned error %v", ref.StringWithinTransport(), err)
-		}
-		if imageInfo.Created.IsZero() {
-			t.Fatalf("Image %q claims to have been created at time 0", ref.StringWithinTransport())
+		params := &imageDestinationParameters{
+			ref:        ref,
+			manifest:   manifestFmt,
+			configInfo: configInfo,
+			sum:        sum,
+			config:     config,
+			signatures: signatures,
 		}
 
-		src, err := ref.NewImageSource(systemContext(), []string{})
-		if err != nil {
-			t.Fatalf("NewImageSource(%q) returned error %v", ref.StringWithinTransport(), err)
-		}
-		if src == nil {
-			t.Fatalf("NewImageSource(%q) returned no source", ref.StringWithinTransport())
-		}
-		if src.Reference().StringWithinTransport() != ref.StringWithinTransport() {
-			// As long as it's only the addition of an ID suffix, that's okay.
-			if !strings.HasPrefix(src.Reference().StringWithinTransport(), ref.StringWithinTransport()+"@") {
-				t.Fatalf("NewImageSource(%q) changed the reference to %q", ref.StringWithinTransport(), src.Reference().StringWithinTransport())
-			}
-		}
-		retrievedManifest, manifestType, err := src.GetManifest()
-		if err != nil {
-			t.Fatalf("GetManifest(%q) returned error %v", ref.StringWithinTransport(), err)
-		}
-		t.Logf("this manifest's type appears to be %q", manifestType)
-		if string(retrievedManifest) != manifest {
-			t.Fatalf("NewImageSource(%q) changed the manifest: %q was %q", ref.StringWithinTransport(), string(retrievedManifest), manifest)
-		}
-		sum = ddigest.SHA256.FromBytes([]byte(manifest))
-		_, _, err = src.GetTargetManifest(sum)
-		if err == nil {
-			t.Fatalf("GetTargetManifest(%q) is supposed to fail", ref.StringWithinTransport())
-		}
-		sigs, err := src.GetSignatures()
-		if err != nil {
-			t.Fatalf("GetSignatures(%q) returned error %v", ref.StringWithinTransport(), err)
-		}
-		if len(sigs) < len(signatures) {
-			t.Fatalf("Lost %d signatures", len(signatures)-len(sigs))
-		}
-		if len(sigs) > len(signatures) {
-			t.Fatalf("Gained %d signatures", len(sigs)-len(signatures))
-		}
-		for i := range sigs {
-			if bytes.Compare(sigs[i], signatures[i]) != 0 {
-				t.Fatalf("Signature %d was corrupted", i)
-			}
-		}
-		for _, layerInfo := range layerInfos {
-			buf := bytes.Buffer{}
-			layer, size, err := src.GetBlob(layerInfo)
-			if err != nil {
-				t.Fatalf("Error reading layer %q from %q", layerInfo.Digest, ref.StringWithinTransport())
-			}
-			t.Logf("Decompressing blob %q, blob size = %d, layerInfo.Size = %d bytes", layerInfo.Digest, size, layerInfo.Size)
-			hasher := sha256.New()
-			compressed := ioutils.NewWriteCounter(hasher)
-			countedLayer := io.TeeReader(layer, compressed)
-			decompressed, err := archive.DecompressStream(countedLayer)
-			if err != nil {
-				t.Fatalf("Error decompressing layer %q from %q", layerInfo.Digest, ref.StringWithinTransport())
-			}
-			n, err := io.Copy(&buf, decompressed)
-			if layerInfo.Size >= 0 && compressed.Count != layerInfo.Size {
-				t.Fatalf("Blob size is different than expected: %d != %d, read %d", compressed.Count, layerInfo.Size, n)
-			}
-			if size >= 0 && compressed.Count != size {
-				t.Fatalf("Blob size mismatch: %d != %d, read %d", compressed.Count, size, n)
-			}
-			sum := hasher.Sum(nil)
-			if ddigest.NewDigestFromBytes(ddigest.SHA256, sum) != layerInfo.Digest {
-				t.Fatalf("Layer blob digest for %q doesn't match", ref.StringWithinTransport())
-			}
-		}
-		src.Close()
-		img.Close()
-		err = ref.DeleteImage(systemContext())
-		if err != nil {
-			t.Fatalf("DeleteImage(%q) returned error %v", ref.StringWithinTransport(), err)
-		}
+		testImageDestination(params, t)
+		testNewImage(params, t)
+		testImageSource(params, t)
 	}
 }
 
 func TestDuplicateName(t *testing.T) {
-	if os.Geteuid() != 0 {
-		t.Skip("TestDuplicateName requires root privileges")
-	}
-
+	requireRoot(t)
 	newStore(t)
 
 	ref, err := Transport.ParseReference("test")
@@ -511,10 +558,7 @@ func TestDuplicateName(t *testing.T) {
 }
 
 func TestDuplicateID(t *testing.T) {
-	if os.Geteuid() != 0 {
-		t.Skip("TestDuplicateID requires root privileges")
-	}
-
+	requireRoot(t)
 	newStore(t)
 
 	ref, err := Transport.ParseReference("@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -567,10 +611,7 @@ func TestDuplicateID(t *testing.T) {
 }
 
 func TestDuplicateNameID(t *testing.T) {
-	if os.Geteuid() != 0 {
-		t.Skip("TestDuplicateNameID requires root privileges")
-	}
-
+	requireRoot(t)
 	newStore(t)
 
 	ref, err := Transport.ParseReference("test@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -662,9 +703,7 @@ func TestNamespaces(t *testing.T) {
 }
 
 func TestSize(t *testing.T) {
-	if os.Geteuid() != 0 {
-		t.Skip("TestSize requires root privileges")
-	}
+	requireRoot(t)
 
 	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
 	sum := ddigest.SHA256.FromBytes([]byte(config))
@@ -749,28 +788,19 @@ func TestSize(t *testing.T) {
 	img.Close()
 }
 
-func TestDuplicateBlob(t *testing.T) {
-	if os.Geteuid() != 0 {
-		t.Skip("TestDuplicateBlob requires root privileges")
-	}
-
-	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
-	sum := ddigest.SHA256.FromBytes([]byte(config))
-	configInfo := types.BlobInfo{
-		Digest: sum,
-		Size:   int64(len(config)),
-	}
-
-	newStore(t)
-
-	ref, err := Transport.ParseReference("test")
+func getRef(name string, t *testing.T) types.ImageReference {
+	ref, err := Transport.ParseReference(name)
 	if err != nil {
-		t.Fatalf("ParseReference(%q) returned error %v", "test", err)
+		t.Fatalf("ParseReference(%q) returned error %v", name, err)
 	}
 	if ref == nil {
 		t.Fatalf("ParseReference returned nil reference")
 	}
 
+	return ref
+}
+
+func testDestinationBlob(ref types.ImageReference, configInfo types.BlobInfo, t *testing.T) {
 	dest, err := ref.NewImageDestination(systemContext())
 	if err != nil {
 		t.Fatalf("NewImageDestination(%q) returned error %v", ref.StringWithinTransport(), err)
@@ -844,6 +874,22 @@ func TestDuplicateBlob(t *testing.T) {
 		t.Fatalf("Error committing changes to destination: %v", err)
 	}
 	dest.Close()
+}
+
+func TestDuplicateBlob(t *testing.T) {
+	requireRoot(t)
+
+	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
+	sum := ddigest.SHA256.FromBytes([]byte(config))
+	configInfo := types.BlobInfo{
+		Digest: sum,
+		Size:   int64(len(config)),
+	}
+
+	ref := getRef("test", t)
+
+	newStore(t)
+	testDestinationBlob(ref, configInfo, t)
 
 	img, err := ref.NewImage(systemContext())
 	if err != nil {
