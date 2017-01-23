@@ -13,12 +13,13 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"golang.org/x/net/http2"
 	"k8s.io/kubernetes/pkg/util/homedir"
 )
 
@@ -847,6 +848,52 @@ func transportNew(config *restConfig) (http.RoundTripper, error) {
 	return rt, nil
 }
 
+// newProxierWithNoProxyCIDR is a modified copy of k8s.io/apimachinery/pkg/util/net.NewProxierWithNoProxyCIDR.
+// NewProxierWithNoProxyCIDR constructs a Proxier function that respects CIDRs in NO_PROXY and delegates if
+// no matching CIDRs are found
+func newProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error)) func(req *http.Request) (*url.URL, error) {
+	// we wrap the default method, so we only need to perform our check if the NO_PROXY envvar has a CIDR in it
+	noProxyEnv := os.Getenv("NO_PROXY")
+	noProxyRules := strings.Split(noProxyEnv, ",")
+
+	cidrs := []*net.IPNet{}
+	for _, noProxyRule := range noProxyRules {
+		_, cidr, _ := net.ParseCIDR(noProxyRule)
+		if cidr != nil {
+			cidrs = append(cidrs, cidr)
+		}
+	}
+
+	if len(cidrs) == 0 {
+		return delegate
+	}
+
+	return func(req *http.Request) (*url.URL, error) {
+		host := req.URL.Host
+		// for some urls, the Host is already the host, not the host:port
+		if net.ParseIP(host) == nil {
+			var err error
+			host, _, err = net.SplitHostPort(req.URL.Host)
+			if err != nil {
+				return delegate(req)
+			}
+		}
+
+		ip := net.ParseIP(host)
+		if ip == nil {
+			return delegate(req)
+		}
+
+		for _, cidr := range cidrs {
+			if cidr.Contains(ip) {
+				return nil, nil
+			}
+		}
+
+		return delegate(req)
+	}
+}
+
 // tlsCacheGet is a modified copy of k8s.io/kubernetes/pkg/client/transport.tlsTransportCache.get.
 func tlsCacheGet(config *restConfig) (http.RoundTripper, error) {
 	// REMOVED: any actual caching
@@ -861,15 +908,23 @@ func tlsCacheGet(config *restConfig) (http.RoundTripper, error) {
 		return http.DefaultTransport, nil
 	}
 
-	return utilnet.SetTransportDefaults(&http.Transport{ // FIXME??
-		Proxy:               http.ProxyFromEnvironment,
+	// REMOVED: Call to k8s.io/apimachinery/pkg/util/net.SetTransportDefaults; instead of the generic machinery and conditionals, hard-coded the result here.
+	t := &http.Transport{
+		// http.ProxyFromEnvironment doesn't respect CIDRs and that makes it impossible to exclude things like pod and service IPs from proxy settings
+		// ProxierWithNoProxyCIDR allows CIDR rules in NO_PROXY
+		Proxy:               newProxierWithNoProxyCIDR(http.ProxyFromEnvironment),
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
 		Dial: (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).Dial,
-	}), nil
+	}
+	// Allow clients to disable http2 if needed.
+	if s := os.Getenv("DISABLE_HTTP2"); len(s) == 0 {
+		_ = http2.ConfigureTransport(t)
+	}
+	return t, nil
 }
 
 // tlsConfigFor is a modified copy of k8s.io/kubernetes/pkg/client/transport.TLSConfigFor.
