@@ -18,7 +18,6 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/homedir"
 )
@@ -450,6 +449,55 @@ func (config *directClientConfig) getCluster() clientcmdCluster {
 	return mergedClusterInfo
 }
 
+// aggregateErr is a modified copy of k8s.io/apimachinery/pkg/util/errors.aggregate.
+// This helper implements the error and Errors interfaces.  Keeping it private
+// prevents people from making an aggregate of 0 errors, which is not
+// an error, but does satisfy the error interface.
+type aggregateErr []error
+
+// newAggregate is a modified copy of k8s.io/apimachinery/pkg/util/errors.NewAggregate.
+// NewAggregate converts a slice of errors into an Aggregate interface, which
+// is itself an implementation of the error interface.  If the slice is empty,
+// this returns nil.
+// It will check if any of the element of input error list is nil, to avoid
+// nil pointer panic when call Error().
+func newAggregate(errlist []error) error {
+	if len(errlist) == 0 {
+		return nil
+	}
+	// In case of input error list contains nil
+	var errs []error
+	for _, e := range errlist {
+		if e != nil {
+			errs = append(errs, e)
+		}
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return aggregateErr(errs)
+}
+
+// Error is a modified copy of k8s.io/apimachinery/pkg/util/errors.aggregate.Error.
+// Error is part of the error interface.
+func (agg aggregateErr) Error() string {
+	if len(agg) == 0 {
+		// This should never happen, really.
+		return ""
+	}
+	if len(agg) == 1 {
+		return agg[0].Error()
+	}
+	result := fmt.Sprintf("[%s", agg[0].Error())
+	for i := 1; i < len(agg); i++ {
+		result += fmt.Sprintf(", %s", agg[i].Error())
+	}
+	result += "]"
+	return result
+}
+
+// REMOVED: aggregateErr.Errors
+
 // errConfigurationInvalid is a modified? copy of k8s.io/kubernetes/pkg/client/unversioned/clientcmd.errConfigurationInvalid.
 // errConfigurationInvalid is a set of errors indicating the configuration is invalid.
 type errConfigurationInvalid []error
@@ -470,7 +518,7 @@ func newErrConfigurationInvalid(errs []error) error {
 
 // Error implements the error interface
 func (e errConfigurationInvalid) Error() string {
-	return fmt.Sprintf("invalid configuration: %v", utilerrors.NewAggregate(e).Error())
+	return fmt.Sprintf("invalid configuration: %v", newAggregate(e).Error())
 }
 
 // clientConfigLoadingRules is a modified copy of k8s.io/kubernetes/pkg/client/unversioned/clientcmd.ClientConfigLoadingRules
@@ -550,7 +598,7 @@ func (rules *clientConfigLoadingRules) Load() (*clientcmdConfig, error) {
 		errlist = append(errlist, err)
 	}
 
-	return config, utilerrors.NewAggregate(errlist)
+	return config, newAggregate(errlist)
 }
 
 // loadFromFile is a modified copy of k8s.io/kubernetes/pkg/client/unversioned/clientcmd.LoadFromFile
