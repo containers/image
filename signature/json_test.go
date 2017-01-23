@@ -2,6 +2,8 @@ package signature
 
 import (
 	"encoding/json"
+	"fmt"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,6 +44,37 @@ func TestValidateExactMapKeys(t *testing.T) {
 	// Unexpected key values
 	err = validateExactMapKeys(mSI{"a": 1}, "b")
 	assert.Error(t, err)
+}
+
+func TestInt64Field(t *testing.T) {
+	// Field not found
+	_, err := int64Field(mSI{"a": "x"}, "b")
+	assert.Error(t, err)
+
+	// Field has a wrong type
+	_, err = int64Field(mSI{"a": "string"}, "a")
+	assert.Error(t, err)
+
+	for _, value := range []float64{
+		0.5,         // Fractional input
+		math.Inf(1), // Infinity
+		math.NaN(),  // NaN
+	} {
+		_, err = int64Field(mSI{"a": value}, "a")
+		assert.Error(t, err, fmt.Sprintf("%f", value))
+	}
+
+	// Success
+	// The float64 type has 53 bits of effective precision, so ±1FFFFFFFFFFFFF is the
+	// range of integer values which can all be represented exactly (beyond that,
+	// some are representable if they are divisible by a high enough power of 2,
+	// but most are not).
+	for _, value := range []int64{0, 1, -1, 0x1FFFFFFFFFFFFF, -0x1FFFFFFFFFFFFF} {
+		testName := fmt.Sprintf("%d", value)
+		v, err := int64Field(mSI{"a": float64(value), "b": nil}, "a")
+		require.NoError(t, err, testName)
+		assert.Equal(t, value, v, testName)
+	}
 }
 
 func TestMapField(t *testing.T) {

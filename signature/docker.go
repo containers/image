@@ -16,12 +16,7 @@ func SignDockerManifest(m []byte, dockerReference string, mech SigningMechanism,
 	if err != nil {
 		return nil, err
 	}
-	sig := privateSignature{
-		Signature{
-			DockerManifestDigest: manifestDigest,
-			DockerReference:      dockerReference,
-		},
-	}
+	sig := newUntrustedSignature(manifestDigest, dockerReference)
 	return sig.sign(mech, keyIdentity)
 }
 
