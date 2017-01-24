@@ -52,7 +52,18 @@ func TestVerifyDockerManifestSignature(t *testing.T) {
 	assert.Equal(t, TestImageSignatureReference, sig.DockerReference)
 	assert.Equal(t, TestImageManifestDigest, sig.DockerManifestDigest)
 
+	// Verification using a different canonicalization of TestImageSignatureReference
+	sig, err = VerifyDockerManifestSignature(signature, manifest, "docker.io/"+TestImageSignatureReference, mech, TestKeyFingerprint)
+	require.NoError(t, err)
+	assert.Equal(t, TestImageSignatureReference, sig.DockerReference)
+	assert.Equal(t, TestImageManifestDigest, sig.DockerManifestDigest)
+
 	// For extra paranoia, test that we return nil data on error.
+
+	// Invalid docker reference on input
+	sig, err = VerifyDockerManifestSignature(signature, manifest, "UPPERCASEISINVALID", mech, TestKeyFingerprint)
+	assert.Error(t, err)
+	assert.Nil(t, sig)
 
 	// Error computing Docker manifest
 	invalidManifest, err := ioutil.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
@@ -69,6 +80,12 @@ func TestVerifyDockerManifestSignature(t *testing.T) {
 
 	// Key fingerprint mismatch
 	sig, err = VerifyDockerManifestSignature(signature, manifest, TestImageSignatureReference, mech, "unexpected fingerprint")
+	assert.Error(t, err)
+	assert.Nil(t, sig)
+
+	// Invalid reference in the signature
+	invalidReferenceSignature, err := ioutil.ReadFile("fixtures/invalid-reference.signature")
+	sig, err = VerifyDockerManifestSignature(invalidReferenceSignature, manifest, TestImageSignatureReference, mech, TestKeyFingerprint)
 	assert.Error(t, err)
 	assert.Nil(t, sig)
 
