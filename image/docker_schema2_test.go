@@ -15,6 +15,7 @@ import (
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	"github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -438,6 +439,28 @@ func TestManifestSchema2UpdatedImage(t *testing.T) {
 	typedM2, ok := m2.(*manifestSchema2)
 	require.True(t, ok)
 	assert.Equal(t, *typedM2, *typedOriginal)
+}
+
+func TestConvertToManifestOCI(t *testing.T) {
+	originalSrc := newSchema2ImageSource(t, "httpd-copy:latest")
+	original := manifestSchema2FromFixture(t, originalSrc, "schema2.json")
+	res, err := original.UpdatedImage(types.ManifestUpdateOptions{
+		ManifestMIMEType: imgspecv1.MediaTypeImageManifest,
+	})
+	require.NoError(t, err)
+
+	convertedJSON, mt, err := res.Manifest()
+	require.NoError(t, err)
+	assert.Equal(t, imgspecv1.MediaTypeImageManifest, mt)
+
+	byHandJSON, err := ioutil.ReadFile("fixtures/schema2-to-oci1.json")
+	require.NoError(t, err)
+	var converted, byHand map[string]interface{}
+	err = json.Unmarshal(byHandJSON, &byHand)
+	require.NoError(t, err)
+	err = json.Unmarshal(convertedJSON, &converted)
+	require.NoError(t, err)
+	assert.Equal(t, byHand, converted)
 }
 
 func TestConvertToManifestSchema1(t *testing.T) {

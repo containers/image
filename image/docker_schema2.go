@@ -12,6 +12,7 @@ import (
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	"github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
 
@@ -166,11 +167,38 @@ func (m *manifestSchema2) UpdatedImage(options types.ManifestUpdateOptions) (typ
 	case "": // No conversion, OK
 	case manifest.DockerV2Schema1SignedMediaType, manifest.DockerV2Schema1MediaType:
 		return copy.convertToManifestSchema1(options.InformationOnly.Destination)
+	case imgspecv1.MediaTypeImageManifest:
+		return copy.convertToManifestOCI1()
 	default:
 		return nil, errors.Errorf("Conversion of image manifest from %s to %s is not implemented", manifest.DockerV2Schema2MediaType, options.ManifestMIMEType)
 	}
 
 	return memoryImageFromManifest(&copy), nil
+}
+
+func (m *manifestSchema2) convertToManifestOCI1() (types.Image, error) {
+	// Create a copy of the descriptor.
+	config := m.ConfigDescriptor
+
+	// The only difference between OCI and DockerSchema2 is the mediatypes. The
+	// media type of the manifest is handled by manifestSchema2FromComponents.
+	config.MediaType = imgspecv1.MediaTypeImageConfig
+
+	layers := make([]descriptor, len(m.LayersDescriptors))
+	for idx := range layers {
+		layers[idx] = m.LayersDescriptors[idx]
+		if m.LayersDescriptors[idx].MediaType == manifest.DockerV2Schema2ForeignLayerMediaType {
+			layers[idx].MediaType = imgspecv1.MediaTypeImageLayerNonDistributable
+		} else {
+			layers[idx].MediaType = imgspecv1.MediaTypeImageLayer
+		}
+	}
+
+	// Rather than copying the ConfigBlob now, we just pass m.src to the
+	// translated manifest, since the only difference is the mediatype of
+	// descriptors there is no change to any blob stored in m.src.
+	m1 := manifestOCI1FromComponents(config, m.src, nil, layers)
+	return memoryImageFromManifest(m1), nil
 }
 
 // Based on docker/distribution/manifest/schema1/config_builder.go

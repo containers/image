@@ -39,6 +39,17 @@ func newImageSource(ctx *types.SystemContext, ref dockerReference, requestedMani
 	if requestedManifestMIMETypes == nil {
 		requestedManifestMIMETypes = manifest.DefaultRequestedManifestMIMETypes
 	}
+	supportedMIMEs := supportedManifestMIMETypesMap()
+	acceptableRequestedMIMEs := false
+	for _, mtrequested := range requestedManifestMIMETypes {
+		if supportedMIMEs[mtrequested] {
+			acceptableRequestedMIMEs = true
+			break
+		}
+	}
+	if !acceptableRequestedMIMEs {
+		requestedManifestMIMETypes = manifest.DefaultRequestedManifestMIMETypes
+	}
 	return &dockerImageSource{
 		ref: ref,
 		requestedManifestMIMETypes: requestedManifestMIMETypes,
