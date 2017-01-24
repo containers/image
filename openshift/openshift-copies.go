@@ -15,12 +15,12 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/containers/storage/pkg/homedir"
 	"github.com/ghodss/yaml"
 	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/kubernetes/pkg/util/homedir"
 )
 
 // restTLSClientConfig is a modified copy of k8s.io/kubernets/pkg/client/restclient.TLSClientConfig.
@@ -89,7 +89,7 @@ func defaultClientConfig() clientConfig {
 	return clientConfig
 }
 
-var recommendedHomeFile = path.Join(homedir.HomeDir(), ".kube/config")
+var recommendedHomeFile = path.Join(homedir.Get(), ".kube/config")
 
 // newOpenShiftClientConfigLoadingRules is a modified copy of openshift/origin/pkg/cmd/cli/config.NewOpenShiftClientConfigLoadingRules.
 // NewOpenShiftClientConfigLoadingRules returns file priority loading rules for OpenShift.
