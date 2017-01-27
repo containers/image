@@ -20,7 +20,7 @@ import (
 	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
 	"golang.org/x/net/http2"
-	"k8s.io/client-go/pkg/util/homedir"
+	"k8s.io/client-go/util/homedir"
 )
 
 // restTLSClientConfig is a modified copy of k8s.io/kubernets/pkg/client/restclient.TLSClientConfig.
