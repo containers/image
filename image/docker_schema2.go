@@ -190,7 +190,7 @@ func (m *manifestSchema2) convertToManifestOCI1() (types.Image, error) {
 		if m.LayersDescriptors[idx].MediaType == manifest.DockerV2Schema2ForeignLayerMediaType {
 			layers[idx].MediaType = imgspecv1.MediaTypeImageLayerNonDistributable
 		} else {
-			layers[idx].MediaType = imgspecv1.MediaTypeImageLayer
+			layers[idx].MediaType = imgspecv1.MediaTypeImageLayerGzip
 		}
 	}
 
