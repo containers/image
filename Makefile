@@ -15,8 +15,20 @@ deps:
 	go get -u $(BUILDFLAGS) github.com/golang/lint/golint
 	go get $(BUILDFLAGS) github.com/vbatts/git-validation
 
+gocyclo:
+	@echo Fetching/Running github.com/fzipp/gocyclo...
+	@go get github.com/fzipp/gocyclo
+	@out=$$(gocyclo -over 15 . | grep -v vendor); \
+	if [ -n "$$(gocyclo -over 15 . | grep -v vendor)" ]; then \
+		echo "$$out"; \
+		exit 1; \
+	fi
+
 test:
 	@go test $(BUILDFLAGS) -cover ./...
+
+test-root-storage:
+	@sudo -E `which go` test -v ./storage
 
 # This is not run as part of (make all), but Travis CI does run this.
 # Demonstarting a working version of skopeo (possibly with modified SKOPEO_REPO/SKOPEO_BRANCH, e.g.
@@ -35,11 +47,13 @@ test-skopeo:
 		$(SUDO) make check && \
 		rm -rf $${skopeo_path}
 
-validate: lint
+validate: lint gocyclo
+	@echo Running go vet...
 	@go vet ./...
 	@test -z "$$(gofmt -s -l . | tee /dev/stderr)"
 
 lint:
+	@echo Running golint...
 	@out="$$(golint ./...)"; \
 	if [ -n "$$(golint ./...)" ]; then \
 		echo "$$out"; \

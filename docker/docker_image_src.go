@@ -259,6 +259,33 @@ func (s *dockerImageSource) getOneSignature(url *url.URL) (signature []byte, mis
 	}
 }
 
+func getManifest(c *dockerClient, ref dockerReference, headers map[string][]string) ([]byte, string, error) {
+	reference, err := ref.tagOrDigest()
+	if err != nil {
+		return nil, "", err
+	}
+
+	getURL := fmt.Sprintf(manifestURL, ref.ref.RemoteName(), reference)
+	get, err := c.makeRequest("GET", getURL, headers, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	defer get.Body.Close()
+	manifestBody, err := ioutil.ReadAll(get.Body)
+	if err != nil {
+		return nil, "", err
+	}
+	switch get.StatusCode {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		return nil, "", errors.Errorf("Unable to delete %v. Image may not exist or is not stored with a v2 Schema in a v2 registry", ref.ref)
+	default:
+		return nil, "", errors.Errorf("Failed to delete %v: %s (%v)", ref.ref, manifestBody, get.Status)
+	}
+
+	return manifestBody, get.Header.Get("Docker-Content-Digest"), nil
+}
+
 // deleteImage deletes the named image from the registry, if supported.
 func deleteImage(ctx *types.SystemContext, ref dockerReference) error {
 	c, err := newDockerClient(ctx, ref, true)
@@ -271,31 +298,12 @@ func deleteImage(ctx *types.SystemContext, ref dockerReference) error {
 	headers := make(map[string][]string)
 	headers["Accept"] = []string{manifest.DockerV2Schema2MediaType}
 
-	reference, err := ref.tagOrDigest()
+	manifestBody, digest, err := getManifest(c, ref, headers)
 	if err != nil {
 		return err
-	}
-	getURL := fmt.Sprintf(manifestURL, ref.ref.RemoteName(), reference)
-	get, err := c.makeRequest("GET", getURL, headers, nil)
-	if err != nil {
-		return err
-	}
-	defer get.Body.Close()
-	manifestBody, err := ioutil.ReadAll(get.Body)
-	if err != nil {
-		return err
-	}
-	switch get.StatusCode {
-	case http.StatusOK:
-	case http.StatusNotFound:
-		return errors.Errorf("Unable to delete %v. Image may not exist or is not stored with a v2 Schema in a v2 registry", ref.ref)
-	default:
-		return errors.Errorf("Failed to delete %v: %s (%v)", ref.ref, manifestBody, get.Status)
 	}
 
-	digest := get.Header.Get("Docker-Content-Digest")
 	deleteURL := fmt.Sprintf(manifestURL, ref.ref.RemoteName(), digest)
-
 	// When retrieving the digest from a registry >= 2.3 use the following header:
 	//   "Accept": "application/vnd.docker.distribution.manifest.v2+json"
 	delete, err := c.makeRequest("DELETE", deleteURL, headers, nil)

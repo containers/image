@@ -68,19 +68,45 @@ func newOpenshiftClient(ref openshiftReference) (*openshiftClient, error) {
 	}, nil
 }
 
-// doRequest performs a correctly authenticated request to a specified path, and returns response body or an error object.
-func (c *openshiftClient) doRequest(method, path string, requestBody []byte) ([]byte, error) {
-	url := *c.baseURL
-	url.Path = path
+func (c *openshiftClient) prepRequest(method, path string, requestBody []byte) (*http.Request, error) {
+	myURL := *c.baseURL
+	myURL.Path = path
 	var requestBodyReader io.Reader
 	if requestBody != nil {
 		logrus.Debugf("Will send body: %s", requestBody)
 		requestBodyReader = bytes.NewReader(requestBody)
 	}
-	req, err := http.NewRequest(method, url.String(), requestBodyReader)
+	req, err := http.NewRequest(method, myURL.String(), requestBodyReader)
 	if err != nil {
 		return nil, err
 	}
+
+	logrus.Debugf("%s %s", method, myURL)
+
+	return req, nil
+}
+
+func (c *openshiftClient) checkStatus(res *http.Response, status status, statusValid bool) error {
+	switch {
+	case res.StatusCode == http.StatusSwitchingProtocols: // FIXME?! No idea why this weird case exists in k8s.io/kubernetes/pkg/client/restclient.
+		if statusValid && status.Status != "Success" {
+			return errors.New(status.Message)
+		}
+	case res.StatusCode >= http.StatusOK && res.StatusCode <= http.StatusPartialContent:
+		// OK.
+	default:
+		if statusValid {
+			return errors.New(status.Message)
+		}
+		return errors.Errorf("HTTP error: status code: %d", res.StatusCode)
+	}
+
+	return nil
+}
+
+// doRequest performs a correctly authenticated request to a specified path, and returns response body or an error object.
+func (c *openshiftClient) doRequest(method, path string, requestBody []byte) ([]byte, error) {
+	req, err := c.prepRequest(method, path, requestBody)
 
 	if len(c.bearerToken) != 0 {
 		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
@@ -93,7 +119,6 @@ func (c *openshiftClient) doRequest(method, path string, requestBody []byte) ([]
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	logrus.Debugf("%s %s", method, url)
 	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -113,21 +138,7 @@ func (c *openshiftClient) doRequest(method, path string, requestBody []byte) ([]
 		statusValid = true
 	}
 
-	switch {
-	case res.StatusCode == http.StatusSwitchingProtocols: // FIXME?! No idea why this weird case exists in k8s.io/kubernetes/pkg/client/restclient.
-		if statusValid && status.Status != "Success" {
-			return nil, errors.New(status.Message)
-		}
-	case res.StatusCode >= http.StatusOK && res.StatusCode <= http.StatusPartialContent:
-		// OK.
-	default:
-		if statusValid {
-			return nil, errors.New(status.Message)
-		}
-		return nil, errors.Errorf("HTTP error: status code: %d, body: %s", res.StatusCode, string(body))
-	}
-
-	return body, nil
+	return body, c.checkStatus(res, status, statusValid)
 }
 
 // getImage loads the specified image object.
