@@ -16,7 +16,7 @@ deps:
 	go get $(BUILDFLAGS) github.com/vbatts/git-validation
 
 test:
-	@go test $(BUILDFLAGS) -cover ./...
+	@go test $(BUILDFLAGS) -cover $$(go list ./... | grep -v vendor)
 
 # This is not run as part of (make all), but Travis CI does run this.
 # Demonstarting a working version of skopeo (possibly with modified SKOPEO_REPO/SKOPEO_BRANCH, e.g.
