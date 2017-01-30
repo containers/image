@@ -13,6 +13,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/image"
 	"github.com/containers/image/manifest"
+	"github.com/containers/image/pkg/compression"
 	"github.com/containers/image/signature"
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
@@ -370,7 +371,7 @@ func (ic *imageCopier) copyLayer(srcInfo types.BlobInfo) (types.BlobInfo, digest
 // and returns a complete blobInfo of the copied blob and perhaps a <-chan diffIDResult if diffIDIsNeeded, to be read by the caller.
 func (ic *imageCopier) copyLayerFromStream(srcStream io.Reader, srcInfo types.BlobInfo,
 	diffIDIsNeeded bool) (types.BlobInfo, <-chan diffIDResult, error) {
-	var getDiffIDRecorder func(decompressorFunc) io.Writer // = nil
+	var getDiffIDRecorder func(compression.DecompressorFunc) io.Writer // = nil
 	var diffIDChan chan diffIDResult
 
 	err := errors.New("Internal error: unexpected panic in copyLayer") // For pipeWriter.CloseWithError below
@@ -381,7 +382,7 @@ func (ic *imageCopier) copyLayerFromStream(srcStream io.Reader, srcInfo types.Bl
 			pipeWriter.CloseWithError(err) // CloseWithError(nil) is equivalent to Close()
 		}()
 
-		getDiffIDRecorder = func(decompressor decompressorFunc) io.Writer {
+		getDiffIDRecorder = func(decompressor compression.DecompressorFunc) io.Writer {
 			// If this fails, e.g. because we have exited and due to pipeWriter.CloseWithError() above further
 			// reading from the pipe has failed, we don’t really care.
 			// We only read from diffIDChan if the rest of the flow has succeeded, and when we do read from it,
@@ -399,7 +400,7 @@ func (ic *imageCopier) copyLayerFromStream(srcStream io.Reader, srcInfo types.Bl
 }
 
 // diffIDComputationGoroutine reads all input from layerStream, uncompresses using decompressor if necessary, and sends its digest, and status, if any, to dest.
-func diffIDComputationGoroutine(dest chan<- diffIDResult, layerStream io.ReadCloser, decompressor decompressorFunc) {
+func diffIDComputationGoroutine(dest chan<- diffIDResult, layerStream io.ReadCloser, decompressor compression.DecompressorFunc) {
 	result := diffIDResult{
 		digest: "",
 		err:    errors.New("Internal error: unexpected panic in diffIDComputationGoroutine"),
@@ -411,7 +412,7 @@ func diffIDComputationGoroutine(dest chan<- diffIDResult, layerStream io.ReadClo
 }
 
 // computeDiffID reads all input from layerStream, uncompresses it using decompressor if necessary, and returns its digest.
-func computeDiffID(stream io.Reader, decompressor decompressorFunc) (digest.Digest, error) {
+func computeDiffID(stream io.Reader, decompressor compression.DecompressorFunc) (digest.Digest, error) {
 	if decompressor != nil {
 		s, err := decompressor(stream)
 		if err != nil {
@@ -428,7 +429,7 @@ func computeDiffID(stream io.Reader, decompressor decompressorFunc) (digest.Dige
 // perhaps compressing it if canCompress,
 // and returns a complete blobInfo of the copied blob.
 func (ic *imageCopier) copyBlobFromStream(srcStream io.Reader, srcInfo types.BlobInfo,
-	getOriginalLayerCopyWriter func(decompressor decompressorFunc) io.Writer,
+	getOriginalLayerCopyWriter func(decompressor compression.DecompressorFunc) io.Writer,
 	canCompress bool) (types.BlobInfo, error) {
 	// The copying happens through a pipeline of connected io.Readers.
 	// === Input: srcStream
@@ -446,8 +447,8 @@ func (ic *imageCopier) copyBlobFromStream(srcStream io.Reader, srcInfo types.Blo
 	var destStream io.Reader = digestingReader
 
 	// === Detect compression of the input stream.
-	// This requires us to “peek ahead” into the stream to read the initial part, which requires us to chain through another io.Reader returned by detectCompression.
-	decompressor, destStream, err := detectCompression(destStream) // We could skip this in some cases, but let's keep the code path uniform
+	// This requires us to “peek ahead” into the stream to read the initial part, which requires us to chain through another io.Reader returned by DetectCompression.
+	decompressor, destStream, err := compression.DetectCompression(destStream) // We could skip this in some cases, but let's keep the code path uniform
 	if err != nil {
 		return types.BlobInfo{}, errors.Wrapf(err, "Error reading blob %s", srcInfo.Digest)
 	}
