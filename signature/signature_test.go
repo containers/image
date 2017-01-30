@@ -191,6 +191,10 @@ func TestSign(t *testing.T) {
 	require.NoError(t, err)
 	defer mech.Close()
 
+	if err := mech.SupportsSigning(); err != nil {
+		t.Skipf("Signing not supported: %v", err)
+	}
+
 	sig := newUntrustedSignature("digest!@#", "reference#@!")
 
 	// Successful signing

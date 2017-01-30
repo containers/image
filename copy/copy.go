@@ -236,6 +236,10 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 			return errors.Wrap(err, "Error initializing GPG")
 		}
 		defer mech.Close()
+		if err := mech.SupportsSigning(); err != nil {
+			return errors.Wrap(err, "Signing not supported")
+		}
+
 		dockerReference := dest.Reference().DockerReference()
 		if dockerReference == nil {
 			return errors.Errorf("Cannot determine canonical Docker reference for destination %s", transports.ImageName(dest.Reference()))
