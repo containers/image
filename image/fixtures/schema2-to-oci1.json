@@ -2,8 +2,8 @@
 	"schemaVersion": 2,
 	"config": {
 		"mediaType": "application/vnd.oci.image.config.v1+json",
-		"size": 5940,
-		"digest": "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f"
+		"size": 4651,
+		"digest": "sha256:a13a0762ab7bed51a1b49adec0a702b1cd99294fd460a025b465bcfb7b152745"
 	},
 	"layers": [{
 		"mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
