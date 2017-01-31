@@ -177,12 +177,27 @@ func (m *manifestSchema2) UpdatedImage(options types.ManifestUpdateOptions) (typ
 }
 
 func (m *manifestSchema2) convertToManifestOCI1() (types.Image, error) {
-	// Create a copy of the descriptor.
-	config := m.ConfigDescriptor
+	configBlob, err := m.ConfigBlob()
+	if err != nil {
+		return nil, err
+	}
+	// docker v2s2 and OCI v1 are mostly compatible but v2s2 contains more fields
+	// than OCI v1. This unmarshal, then re-marshal makes sure we drop docker v2s2
+	// fields that aren't needed in OCI v1.
+	configOCI := &imgspecv1.Image{}
+	if err := json.Unmarshal(configBlob, configOCI); err != nil {
+		return nil, err
+	}
+	configOCIBytes, err := json.Marshal(configOCI)
+	if err != nil {
+		return nil, err
+	}
 
-	// The only difference between OCI and DockerSchema2 is the mediatypes. The
-	// media type of the manifest is handled by manifestSchema2FromComponents.
-	config.MediaType = imgspecv1.MediaTypeImageConfig
+	config := descriptor{
+		MediaType: imgspecv1.MediaTypeImageConfig,
+		Size:      int64(len(configOCIBytes)),
+		Digest:    digest.FromBytes(configOCIBytes),
+	}
 
 	layers := make([]descriptor, len(m.LayersDescriptors))
 	for idx := range layers {
@@ -190,14 +205,13 @@ func (m *manifestSchema2) convertToManifestOCI1() (types.Image, error) {
 		if m.LayersDescriptors[idx].MediaType == manifest.DockerV2Schema2ForeignLayerMediaType {
 			layers[idx].MediaType = imgspecv1.MediaTypeImageLayerNonDistributable
 		} else {
+			// we assume layers are gzip'ed because docker v2s2 only deals with
+			// gzip'ed layers. However, OCI has non-gzip'ed layers as well.
 			layers[idx].MediaType = imgspecv1.MediaTypeImageLayerGzip
 		}
 	}
 
-	// Rather than copying the ConfigBlob now, we just pass m.src to the
-	// translated manifest, since the only difference is the mediatype of
-	// descriptors there is no change to any blob stored in m.src.
-	m1 := manifestOCI1FromComponents(config, m.src, nil, layers)
+	m1 := manifestOCI1FromComponents(config, m.src, configOCIBytes, layers)
 	return memoryImageFromManifest(m1), nil
 }
 
