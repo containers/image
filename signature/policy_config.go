@@ -19,9 +19,9 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
+	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
-	"github.com/docker/distribution/reference"
 	"github.com/pkg/errors"
 )
 

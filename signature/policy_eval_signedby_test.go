@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/containers/image/directory"
+	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/image"
 	"github.com/containers/image/types"
-	"github.com/docker/distribution/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -3,8 +3,8 @@ package signature
 import (
 	"testing"
 
+	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
-	"github.com/docker/distribution/reference"
 )
 
 // nameOnlyImageMock is a mock of types.UnparsedImage which only allows transports.ImageName to work

@@ -8,9 +8,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
 	"github.com/containers/storage/storage"
-	"github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	ddigest "github.com/opencontainers/go-digest"
 )

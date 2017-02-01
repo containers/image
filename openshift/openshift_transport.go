@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/containers/image/docker/policyconfiguration"
+	"github.com/containers/image/docker/reference"
 	genericImage "github.com/containers/image/image"
 	"github.com/containers/image/types"
-	"github.com/docker/distribution/reference"
 	"github.com/pkg/errors"
 )
 

@@ -3,8 +3,8 @@ package daemon
 import (
 	"testing"
 
+	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
-	"github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

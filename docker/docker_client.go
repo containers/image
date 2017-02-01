@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
 	"github.com/containers/storage/pkg/homedir"
-	"github.com/docker/distribution/reference"
 	"github.com/docker/go-connections/sockets"
 	"github.com/docker/go-connections/tlsconfig"
 	"github.com/pkg/errors"

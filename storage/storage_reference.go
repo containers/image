@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
-	"github.com/docker/distribution/reference"
 )
 
 // A storageReference holds an arbitrary name and/or an ID, which is a 32-byte
