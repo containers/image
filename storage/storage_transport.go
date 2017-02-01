@@ -112,7 +112,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	}
 	refname := ""
 	if name != nil {
-		name = reference.XWithDefaultTag(name)
+		name = distreference.TagNameOnly(name)
 		refname = verboseName(name)
 	}
 	if refname == "" {
@@ -278,7 +278,7 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 }
 
 func verboseName(name distreference.Named) string {
-	name = reference.XWithDefaultTag(name)
+	name = distreference.TagNameOnly(name)
 	tag := ""
 	if tagged, ok := name.(distreference.NamedTagged); ok {
 		tag = tagged.Tag()

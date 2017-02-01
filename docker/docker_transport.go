@@ -50,7 +50,7 @@ func ParseReference(refString string) (types.ImageReference, error) {
 	if err != nil {
 		return nil, err
 	}
-	ref = reference.XWithDefaultTag(ref)
+	ref = distreference.TagNameOnly(ref)
 	return NewReference(ref)
 }
 
