@@ -59,7 +59,8 @@ func (d *dockerImageDestination) Reference() types.ImageReference {
 }
 
 // Close removes resources associated with an initialized ImageDestination, if any.
-func (d *dockerImageDestination) Close() {
+func (d *dockerImageDestination) Close() error {
+	return nil
 }
 
 func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {

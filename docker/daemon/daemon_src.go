@@ -92,8 +92,8 @@ func (s *daemonImageSource) Reference() types.ImageReference {
 }
 
 // Close removes resources associated with an initialized ImageSource, if any.
-func (s *daemonImageSource) Close() {
-	_ = os.Remove(s.tarCopyPath)
+func (s *daemonImageSource) Close() error {
+	return os.Remove(s.tarCopyPath)
 }
 
 // tarReadCloser is a way to close the backing file of a tar.Reader when the user no longer needs the tar component.
