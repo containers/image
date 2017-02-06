@@ -147,3 +147,59 @@ func TestGPGSigningMechanismVerify(t *testing.T) {
 
 	// The various GPG/GPGME failures cases are not obviously easy to reach.
 }
+
+func TestGPGSigningMechanismUntrustedSignatureContents(t *testing.T) {
+	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
+	require.NoError(t, err)
+
+	// A valid signature
+	signature, err := ioutil.ReadFile("./fixtures/invalid-blob.signature")
+	require.NoError(t, err)
+	content, shortKeyID, err := mech.UntrustedSignatureContents(signature)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("This is not JSON\n"), content)
+	assert.Equal(t, TestKeyShortID, shortKeyID)
+
+	// Completely invalid signature.
+	_, _, err = mech.UntrustedSignatureContents([]byte{})
+	assert.Error(t, err)
+
+	_, _, err = mech.UntrustedSignatureContents([]byte("invalid signature"))
+	assert.Error(t, err)
+
+	// Literal packet, not a signature
+	signature, err = ioutil.ReadFile("./fixtures/unsigned-literal.signature")
+	require.NoError(t, err)
+	content, shortKeyID, err = mech.UntrustedSignatureContents(signature)
+	assert.Error(t, err)
+
+	// Encrypted data, not a signature.
+	signature, err = ioutil.ReadFile("./fixtures/unsigned-encrypted.signature")
+	require.NoError(t, err)
+	content, shortKeyID, err = mech.UntrustedSignatureContents(signature)
+	assert.Error(t, err)
+
+	// Expired signature
+	signature, err = ioutil.ReadFile("./fixtures/expired.signature")
+	require.NoError(t, err)
+	content, shortKeyID, err = mech.UntrustedSignatureContents(signature)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("This signature is expired.\n"), content)
+	assert.Equal(t, TestKeyShortID, shortKeyID)
+
+	// Corrupt signature
+	signature, err = ioutil.ReadFile("./fixtures/corrupt.signature")
+	require.NoError(t, err)
+	content, shortKeyID, err = mech.UntrustedSignatureContents(signature)
+	require.NoError(t, err)
+	assert.Equal(t, []byte(`{"critical":{"identity":{"docker-reference":"testing/manifest"},"image":{"docker-manifest-digest":"sha256:20bf21ed457b390829cdbeec8795a7bea1626991fda603e0d01b4e7f60427e55"},"type":"atomic container signature"},"optional":{"creator":"atomic ","timestamp":1458239713}}`), content)
+	assert.Equal(t, TestKeyShortID, shortKeyID)
+
+	// Valid signature with an unknown key
+	signature, err = ioutil.ReadFile("./fixtures/unknown-key.signature")
+	require.NoError(t, err)
+	content, shortKeyID, err = mech.UntrustedSignatureContents(signature)
+	require.NoError(t, err)
+	assert.Equal(t, []byte(`{"critical":{"identity":{"docker-reference":"testing/manifest"},"image":{"docker-manifest-digest":"sha256:20bf21ed457b390829cdbeec8795a7bea1626991fda603e0d01b4e7f60427e55"},"type":"atomic container signature"},"optional":{"creator":"atomic 0.1.13-dev","timestamp":1464633474}}`), content)
+	assert.Equal(t, "E5476D1110D07803", shortKeyID)
+}

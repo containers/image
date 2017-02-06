@@ -83,8 +83,8 @@ func newStore(t *testing.T) storage.Store {
 		GraphRoot:          root,
 		GraphDriverName:    "vfs",
 		GraphDriverOptions: []string{},
-		UidMap:             uidmap,
-		GidMap:             gidmap,
+		UIDMap:             uidmap,
+		GIDMap:             gidmap,
 	})
 	if err != nil {
 		t.Fatal(err)
