@@ -49,6 +49,7 @@ type imageCopier struct {
 	reportWriter      io.Writer
 	progressInterval  time.Duration
 	progress          chan types.ProgressProperties
+	layerEditor       func([]types.BlobInfo) []types.BlobInfo
 }
 
 // newDigestingReader returns an io.Reader implementation with contents of source, which will eventually return a non-EOF error
@@ -98,6 +99,7 @@ type Options struct {
 	DestinationCtx   *types.SystemContext
 	ProgressInterval time.Duration                 // time to wait between reports to signal the progress channel
 	Progress         chan types.ProgressProperties // Reported to when ProgressInterval has arrived for a single artifact+offset.
+	LayerEditor      func([]types.BlobInfo) []types.BlobInfo
 }
 
 // Image copies image from srcRef to destRef, using policyContext to validate source image admissibility.
@@ -187,6 +189,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		reportWriter:      reportWriter,
 		progressInterval:  options.ProgressInterval,
 		progress:          options.Progress,
+		layerEditor:       options.LayerEditor,
 	}
 
 	if err := ic.copyLayers(); err != nil {
@@ -194,7 +197,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	}
 
 	pendingImage := src
-	if !reflect.DeepEqual(manifestUpdates, types.ManifestUpdateOptions{InformationOnly: manifestUpdates.InformationOnly}) {
+	if !reflect.DeepEqual(ic.manifestUpdates, types.ManifestUpdateOptions{InformationOnly: ic.manifestUpdates.InformationOnly}) {
 		if !canModifyManifest {
 			return errors.Errorf("Internal error: copy needs an updated manifest but that was known to be forbidden")
 		}
@@ -236,11 +239,14 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		return errors.Wrap(err, "Error writing manifest")
 	}
 
-	writeReport("Storing signatures\n")
-	if err := dest.PutSignatures(sigs); err != nil {
-		return errors.Wrap(err, "Error writing signatures")
-	}
+	/*
+		writeReport("Storing signatures\n")
+		if err := dest.PutSignatures(sigs); err != nil {
+			return errors.Wrap(err, "Error writing signatures")
+		}
+	*/
 
+	writeReport(fmt.Sprintf("Committing image %q\n", destRef.DockerReference()))
 	if err := dest.Commit(); err != nil {
 		return errors.Wrap(err, "Error committing the finished image")
 	}
@@ -250,8 +256,15 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 
 // copyLayers copies layers from src/rawSource to dest, using and updating ic.manifestUpdates if necessary and ic.canModifyManifest.
 func (ic *imageCopier) copyLayers() error {
+	origSrcInfos := ic.src.LayerInfos()
 	srcInfos := ic.src.LayerInfos()
+
+	if ic.layerEditor != nil {
+		srcInfos = ic.layerEditor(ic.src.LayerInfos())
+	}
+
 	destInfos := []types.BlobInfo{}
+
 	diffIDs := []digest.Digest{}
 	for _, srcLayer := range srcInfos {
 		var (
@@ -259,6 +272,7 @@ func (ic *imageCopier) copyLayers() error {
 			diffID   digest.Digest
 			err      error
 		)
+
 		if ic.dest.AcceptsForeignLayerURLs() && len(srcLayer.URLs) != 0 {
 			// DiffIDs are, currently, needed only when converting from schema1.
 			// In which case src.LayerInfos will not have URLs because schema1
@@ -277,11 +291,12 @@ func (ic *imageCopier) copyLayers() error {
 		destInfos = append(destInfos, destInfo)
 		diffIDs = append(diffIDs, diffID)
 	}
+
 	ic.manifestUpdates.InformationOnly.LayerInfos = destInfos
 	if ic.diffIDsAreNeeded {
 		ic.manifestUpdates.InformationOnly.LayerDiffIDs = diffIDs
 	}
-	if layerDigestsDiffer(srcInfos, destInfos) {
+	if layerDigestsDiffer(origSrcInfos, destInfos) {
 		ic.manifestUpdates.LayerInfos = destInfos
 	}
 	return nil
@@ -303,16 +318,19 @@ func layerDigestsDiffer(a, b []types.BlobInfo) bool {
 // copyConfig copies config.json, if any, from src to dest.
 func (ic *imageCopier) copyConfig(src types.Image) error {
 	srcInfo := src.ConfigInfo()
+
 	if srcInfo.Digest != "" {
 		fmt.Fprintf(ic.reportWriter, "Copying config %s\n", srcInfo.Digest)
 		configBlob, err := src.ConfigBlob()
 		if err != nil {
 			return errors.Wrapf(err, "Error reading config blob %s", srcInfo.Digest)
 		}
+
 		destInfo, err := ic.copyBlobFromStream(bytes.NewReader(configBlob), srcInfo, nil, false)
 		if err != nil {
 			return err
 		}
+
 		if destInfo.Digest != srcInfo.Digest {
 			return errors.Errorf("Internal error: copying uncompressed config blob %s changed digest to %s", srcInfo.Digest, destInfo.Digest)
 		}
