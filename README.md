@@ -23,6 +23,15 @@ them as necessary, and to sign and verify images.
 The [skopeo](https://github.com/projectatomic/skopeo) tool uses the
 containers/image library and takes advantage of its many features.
 
+## Dependencies
+
+Dependencies that this library prefers will not be found in the `vendor`
+directory. This is so you can make well-informed decisions about which
+libraries you should use with this package in your own projects.
+
+What this project tests against dependencies-wise is located
+[here](https://github.com/containers/image/blob/master/vendor.conf).
+
 ## License
 
 ASL 2.0
