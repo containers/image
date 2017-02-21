@@ -8,15 +8,20 @@ SUDO =
 BUILDTAGS   = btrfs_noversion libdm_no_deferred_remove
 BUILDFLAGS := -tags "$(BUILDTAGS)"
 
+PACKAGES := $(shell go list ./... | grep -v vendor)
+
 all: deps .gitvalidation test validate
 
-deps:
-	go get -t $(BUILDFLAGS) ./...
+deps: vndr
 	go get -u $(BUILDFLAGS) github.com/golang/lint/golint
 	go get $(BUILDFLAGS) github.com/vbatts/git-validation
 
-test:
-	@go test $(BUILDFLAGS) -cover ./...
+vndr:
+	go get -u github.com/LK4D4/vndr
+	vndr
+
+test: deps
+	 @go test $(BUILDFLAGS) -cover $(PACKAGES)
 
 # This is not run as part of (make all), but Travis CI does run this.
 # Demonstarting a working version of skopeo (possibly with modified SKOPEO_REPO/SKOPEO_BRANCH, e.g.
@@ -36,12 +41,12 @@ test-skopeo:
 		rm -rf $${skopeo_path}
 
 validate: lint
-	@go vet ./...
-	@test -z "$$(gofmt -s -l . | tee /dev/stderr)"
+	@go vet $(PACKAGES)
+	@test -z "$$(gofmt -s -l . | grep -ve '^vendor' | tee /dev/stderr)"
 
 lint:
-	@out="$$(golint ./...)"; \
-	if [ -n "$$(golint ./...)" ]; then \
+	@out="$$(golint $(PACKAGES))"; \
+	if [ -n "$$(golint $(PACKAGES))" ]; then \
 		echo "$$out"; \
 		exit 1; \
 	fi
