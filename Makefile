@@ -16,12 +16,14 @@ deps: vndr
 	go get -u $(BUILDFLAGS) github.com/golang/lint/golint
 	go get $(BUILDFLAGS) github.com/vbatts/git-validation
 
-vndr:
-	go get -u github.com/LK4D4/vndr
-	vndr
+vndr: vendor.conf
+	@go get -u github.com/LK4D4/vndr && vndr
+
+clean:
+	rm -rf vendor
 
 test: deps
-	 @go test $(BUILDFLAGS) -cover $(PACKAGES)
+	@go test $(BUILDFLAGS) -cover $(PACKAGES)
 
 # This is not run as part of (make all), but Travis CI does run this.
 # Demonstarting a working version of skopeo (possibly with modified SKOPEO_REPO/SKOPEO_BRANCH, e.g.
@@ -34,7 +36,7 @@ test-skopeo:
 		skopeo_path=$${GOPATH}/src/github.com/projectatomic/skopeo && \
 		vendor_path=$${skopeo_path}/vendor/github.com/containers/image && \
 		git clone -b $(SKOPEO_BRANCH) https://github.com/$(SKOPEO_REPO) $${skopeo_path} && \
-		rm -rf $${vendor_path} && cp -r . $${vendor_path} && \
+		rm -rf $${vendor_path} && cp -r . $${vendor_path} && rm -rf $${vendor_path}/vendor && \
 		cd $${skopeo_path} && \
 		make BUILDTAGS="$(BUILDTAGS)" binary-local test-all-local && \
 		$(SUDO) make check && \
@@ -51,7 +53,7 @@ lint:
 		exit 1; \
 	fi
 
-.PHONY: .gitvalidation
+.PHONY: .gitvalidation vndr
 
 EPOCH_TEST_COMMIT ?= e68e0e1110e64f906f9b482e548f17d73e02e6b1
 
