@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"strings"
 
@@ -98,6 +99,8 @@ func (m *manifestSchema2) ConfigBlob() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		fmt.Println(string(blob))
 
 		computedDigest := digest.FromBytes(blob)
 		if computedDigest != m.ConfigDescriptor.Digest {
