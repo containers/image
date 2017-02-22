@@ -46,7 +46,7 @@ validate: lint
 
 lint:
 	@out="$$(golint $(PACKAGES))"; \
-	if [ -n "$$(golint $(PACKAGES))" ]; then \
+	if [ -n "$$out" ]; then \
 		echo "$$out"; \
 		exit 1; \
 	fi
