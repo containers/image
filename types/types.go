@@ -294,6 +294,13 @@ type SystemContext struct {
 	DockerDisableV1Ping bool
 }
 
+// ProgressProperties is used to pass information from the copy code to a monitor which
+// can use the real-time information to produce output or react to changes.
+type ProgressProperties struct {
+	Artifact BlobInfo
+	Offset   uint64
+}
+
 var (
 	// ErrBlobNotFound can be returned by an ImageDestination's HasBlob() method
 	ErrBlobNotFound = errors.New("no such blob present")
