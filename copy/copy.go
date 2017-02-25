@@ -100,8 +100,14 @@ type Options struct {
 	Progress         chan types.ProgressProperties // Reported to when ProgressInterval has arrived for a single artifact+offset.
 }
 
-// Image copies image from srcRef to destRef, using policyContext to validate source image admissibility.
-func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageReference, options *Options) error {
+// Image copies image from srcRef to destRef, using policyContext to validate
+// source image admissibility.
+func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageReference, options *Options) (retErr error) {
+	// NOTE this function uses an output parameter for the error return value.
+	// Setting this and returning is the ideal way to return an error.
+	//
+	// the defers in this routine will wrap the error return with its own errors
+	// which can be valuable context in the middle of a multi-streamed copy.
 	if options == nil {
 		options = &Options{}
 	}
@@ -120,7 +126,12 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	if err != nil {
 		return errors.Wrapf(err, "Error initializing destination %s", transports.ImageName(destRef))
 	}
-	defer dest.Close()
+	defer func() {
+		if err := dest.Close(); err != nil {
+			retErr = errors.Wrapf(retErr, " (dest: %v)", err)
+		}
+	}()
+
 	destSupportedManifestMIMETypes := dest.SupportedManifestMIMETypes()
 
 	rawSource, err := srcRef.NewImageSource(options.SourceCtx, destSupportedManifestMIMETypes)
@@ -130,7 +141,9 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	unparsedImage := image.UnparsedFromSource(rawSource)
 	defer func() {
 		if unparsedImage != nil {
-			unparsedImage.Close()
+			if err := unparsedImage.Close(); err != nil {
+				retErr = errors.Wrapf(retErr, " (unparsed: %v)", err)
+			}
 		}
 	}()
 
@@ -140,10 +153,14 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	}
 	src, err := image.FromUnparsedImage(unparsedImage)
 	if err != nil {
-		return errors.Wrapf(err, "Error initializing image from source %s", transports.ImageName(srcRef))
+		retErr = errors.Wrapf(err, "Error initializing image from source %s", transports.ImageName(srcRef))
 	}
 	unparsedImage = nil
-	defer src.Close()
+	defer func() {
+		if err := src.Close(); err != nil {
+			retErr = errors.Wrapf(retErr, " (source: %v)", err)
+		}
+	}()
 
 	if src.IsMultiImage() {
 		return errors.Errorf("can not copy %s: manifest contains multiple images", transports.ImageName(srcRef))

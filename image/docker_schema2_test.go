@@ -25,7 +25,7 @@ type unusedImageSource struct{}
 func (f unusedImageSource) Reference() types.ImageReference {
 	panic("Unexpected call to a mock function")
 }
-func (f unusedImageSource) Close() {
+func (f unusedImageSource) Close() error {
 	panic("Unexpected call to a mock function")
 }
 func (f unusedImageSource) GetManifest() ([]byte, string, error) {
@@ -346,7 +346,7 @@ type memoryImageDest struct {
 func (d *memoryImageDest) Reference() types.ImageReference {
 	return refImageReferenceMock{d.ref}
 }
-func (d *memoryImageDest) Close() {
+func (d *memoryImageDest) Close() error {
 	panic("Unexpected call to a mock function")
 }
 func (d *memoryImageDest) SupportedManifestMIMETypes() []string {

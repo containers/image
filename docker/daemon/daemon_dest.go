@@ -91,7 +91,7 @@ func imageLoadGoroutine(ctx context.Context, c *client.Client, reader *io.PipeRe
 }
 
 // Close removes resources associated with an initialized ImageDestination, if any.
-func (d *daemonImageDestination) Close() {
+func (d *daemonImageDestination) Close() error {
 	if !d.committed {
 		logrus.Debugf("docker-daemon: Closing tar stream to abort loading")
 		// In principle, goroutineCancel() should abort the HTTP request and stop the process from continuing.
@@ -107,6 +107,8 @@ func (d *daemonImageDestination) Close() {
 		d.writer.CloseWithError(errors.New("Aborting upload, daemonImageDestination closed without a previous .Commit()"))
 	}
 	d.goroutineCancel()
+
+	return nil
 }
 
 func (d *daemonImageDestination) Reference() types.ImageReference {
