@@ -8,15 +8,22 @@ SUDO =
 BUILDTAGS   = btrfs_noversion libdm_no_deferred_remove
 BUILDFLAGS := -tags "$(BUILDTAGS)"
 
+PACKAGES := $(shell go list ./... | grep -v vendor)
+
 all: deps .gitvalidation test validate
 
-deps:
-	go get -t $(BUILDFLAGS) ./...
+deps: vndr
 	go get -u $(BUILDFLAGS) github.com/golang/lint/golint
 	go get $(BUILDFLAGS) github.com/vbatts/git-validation
 
-test:
-	@go test $(BUILDFLAGS) -cover ./...
+vndr: vendor.conf
+	@go get -u github.com/LK4D4/vndr && vndr
+
+clean:
+	rm -rf vendor
+
+test: deps
+	@go test $(BUILDFLAGS) -cover $(PACKAGES)
 
 # This is not run as part of (make all), but Travis CI does run this.
 # Demonstarting a working version of skopeo (possibly with modified SKOPEO_REPO/SKOPEO_BRANCH, e.g.
@@ -29,24 +36,24 @@ test-skopeo:
 		skopeo_path=$${GOPATH}/src/github.com/projectatomic/skopeo && \
 		vendor_path=$${skopeo_path}/vendor/github.com/containers/image && \
 		git clone -b $(SKOPEO_BRANCH) https://github.com/$(SKOPEO_REPO) $${skopeo_path} && \
-		rm -rf $${vendor_path} && cp -r . $${vendor_path} && \
+		rm -rf $${vendor_path} && cp -r . $${vendor_path} && rm -rf $${vendor_path}/vendor && \
 		cd $${skopeo_path} && \
 		make BUILDTAGS="$(BUILDTAGS)" binary-local test-all-local && \
 		$(SUDO) make check && \
 		rm -rf $${skopeo_path}
 
 validate: lint
-	@go vet ./...
-	@test -z "$$(gofmt -s -l . | tee /dev/stderr)"
+	@go vet $(PACKAGES)
+	@test -z "$$(gofmt -s -l . | grep -ve '^vendor' | tee /dev/stderr)"
 
 lint:
-	@out="$$(golint ./...)"; \
-	if [ -n "$$(golint ./...)" ]; then \
+	@out="$$(golint $(PACKAGES))"; \
+	if [ -n "$$out" ]; then \
 		echo "$$out"; \
 		exit 1; \
 	fi
 
-.PHONY: .gitvalidation
+.PHONY: .gitvalidation vndr
 
 EPOCH_TEST_COMMIT ?= e68e0e1110e64f906f9b482e548f17d73e02e6b1
 
