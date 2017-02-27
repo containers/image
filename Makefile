@@ -1,4 +1,4 @@
-.PHONY: all deps test validate lint
+.PHONY: all tools test validate lint
 
 # Which github repostiory and branch to use for testing with skopeo
 SKOPEO_REPO = projectatomic/skopeo
@@ -10,19 +10,24 @@ BUILDFLAGS := -tags "$(BUILDTAGS)"
 
 PACKAGES := $(shell go list ./... | grep -v github.com/containers/image/vendor)
 
-all: deps .gitvalidation test validate
+all: tools .gitvalidation test validate
 
-deps: vndr
-	go get -u $(BUILDFLAGS) github.com/golang/lint/golint
-	go get $(BUILDFLAGS) github.com/vbatts/git-validation
+tools: tools.timestamp
 
-vndr: vendor.conf
-	@go get -u github.com/LK4D4/vndr && vndr
+tools.timestamp:
+	@go get -u $(BUILDFLAGS) github.com/golang/lint/golint
+	@go get $(BUILDFLAGS) github.com/vbatts/git-validation
+	@go get -u github.com/LK4D4/vndr
+	@touch tools.timestamp
+
+vendor: tools.timestamp vendor.conf
+	@vndr
+	@touch vendor
 
 clean:
-	rm -rf vendor
+	rm -rf vendor tools.timestamp
 
-test: deps
+test: vendor
 	@go test $(BUILDFLAGS) -cover $(PACKAGES)
 
 # This is not run as part of (make all), but Travis CI does run this.
@@ -53,13 +58,13 @@ lint:
 		exit 1; \
 	fi
 
-.PHONY: .gitvalidation vndr
+.PHONY: .gitvalidation
 
 EPOCH_TEST_COMMIT ?= e68e0e1110e64f906f9b482e548f17d73e02e6b1
 
 # When this is running in travis, it will only check the travis commit range
 .gitvalidation:
-	@which git-validation > /dev/null 2>/dev/null || (echo "ERROR: git-validation not found. Consider 'make deps' target" && false)
+	@which git-validation > /dev/null 2>/dev/null || (echo "ERROR: git-validation not found. Consider 'make clean && make tools'" && false)
 ifeq ($(TRAVIS),true)
 	@git-validation -q -run DCO,short-subject,dangling-whitespace
 else
