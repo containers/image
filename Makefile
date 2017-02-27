@@ -8,7 +8,7 @@ SUDO =
 BUILDTAGS   = btrfs_noversion libdm_no_deferred_remove
 BUILDFLAGS := -tags "$(BUILDTAGS)"
 
-PACKAGES := $(shell go list ./... | grep -v vendor)
+PACKAGES := $(shell go list ./... | grep -v github.com/containers/image/vendor)
 
 all: deps .gitvalidation test validate
 
