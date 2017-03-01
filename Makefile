@@ -14,14 +14,14 @@ all: tools .gitvalidation test validate
 
 tools: tools.timestamp
 
-tools.timestamp:
+tools.timestamp: Makefile
 	@go get -u $(BUILDFLAGS) github.com/golang/lint/golint
 	@go get $(BUILDFLAGS) github.com/vbatts/git-validation
-	@go get -u github.com/LK4D4/vndr
+	@go get -u github.com/rancher/trash
 	@touch tools.timestamp
 
 vendor: tools.timestamp vendor.conf
-	@vndr
+	@trash
 	@touch vendor
 
 clean:
