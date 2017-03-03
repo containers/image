@@ -153,7 +153,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	}
 	src, err := image.FromUnparsedImage(unparsedImage)
 	if err != nil {
-		retErr = errors.Wrapf(err, "Error initializing image from source %s", transports.ImageName(srcRef))
+		return errors.Wrapf(err, "Error initializing image from source %s", transports.ImageName(srcRef))
 	}
 	unparsedImage = nil
 	defer func() {
