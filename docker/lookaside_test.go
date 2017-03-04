@@ -46,7 +46,7 @@ func TestConfiguredSignatureStorageBase(t *testing.T) {
 		dockerRefFromString(t, "//example.com/my/project"), false)
 	assert.NoError(t, err)
 	require.NotNil(t, base)
-	assert.Equal(t, "https://sigstore.example.com/example.com/my/project", (*url.URL)(base).String())
+	assert.Equal(t, "https://sigstore.example.com/my/project", (*url.URL)(base).String())
 }
 
 func TestRegistriesDirPath(t *testing.T) {
