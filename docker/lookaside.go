@@ -195,6 +195,6 @@ func signatureStorageURL(base signatureStorageBase, manifestDigest digest.Digest
 		return nil
 	}
 	url := *base
-	url.Path = fmt.Sprintf("%s@%s/signature-%d", url.Path, manifestDigest.String(), index+1)
+	url.Path = fmt.Sprintf("%s@%s=%s/signature-%d", url.Path, manifestDigest.Algorithm(), manifestDigest.Hex(), index+1)
 	return &url
 }
