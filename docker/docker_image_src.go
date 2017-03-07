@@ -217,6 +217,7 @@ func (s *dockerImageSource) getSignaturesFromLookaside() ([][]byte, error) {
 		return nil, err
 	}
 
+	// NOTE: Keep this in sync with docs/signature-protocols.md!
 	signatures := [][]byte{}
 	for i := 0; ; i++ {
 		url := signatureStorageURL(s.c.signatureBase, manifestDigest, i)
@@ -237,6 +238,7 @@ func (s *dockerImageSource) getSignaturesFromLookaside() ([][]byte, error) {
 
 // getOneSignature downloads one signature from url.
 // If it successfully determines that the signature does not exist, returns with missing set to true and error set to nil.
+// NOTE: Keep this in sync with docs/signature-protocols.md!
 func (s *dockerImageSource) getOneSignature(url *url.URL) (signature []byte, missing bool, err error) {
 	switch url.Scheme {
 	case "file":

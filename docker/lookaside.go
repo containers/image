@@ -63,6 +63,7 @@ func configuredSignatureStorageBase(ctx *types.SystemContext, ref dockerReferenc
 	if err != nil {
 		return nil, errors.Wrapf(err, "Invalid signature storage URL %s", topLevel)
 	}
+	// NOTE: Keep this in sync with docs/signature-protocols.md!
 	// FIXME? Restrict to explicitly supported schemes?
 	repo := reference.Path(ref.ref) // Note that this is without a tag or digest.
 	if path.Clean(repo) != repo {   // Coverage: This should not be reachable because /./ and /../ components are not valid in docker references
@@ -190,6 +191,7 @@ func (ns registryNamespace) signatureTopLevel(write bool) string {
 
 // signatureStorageURL returns an URL usable for acessing signature index in base with known manifestDigest, or nil if not applicable.
 // Returns nil iff base == nil.
+// NOTE: Keep this in sync with docs/signature-protocols.md!
 func signatureStorageURL(base signatureStorageBase, manifestDigest digest.Digest, index int) *url.URL {
 	if base == nil {
 		return nil
