@@ -122,3 +122,25 @@ func paranoidUnmarshalJSONObject(data []byte, fieldResolver func(string) interfa
 	}
 	return nil
 }
+
+// paranoidUnmarshalJSONObject unmarshals data as a JSON object, but failing on the slightest unexpected aspect
+// (including duplicated keys, unrecognized keys, and non-matching types). Each of the fields in exactFields
+// must be present exactly once, and none other fields are accepted.
+func paranoidUnmarshalJSONObjectExactFields(data []byte, exactFields map[string]interface{}) error {
+	seenKeys := map[string]struct{}{}
+	if err := paranoidUnmarshalJSONObject(data, func(key string) interface{} {
+		if valuePtr, ok := exactFields[key]; ok {
+			seenKeys[key] = struct{}{}
+			return valuePtr
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	for key := range exactFields {
+		if _, ok := seenKeys[key]; !ok {
+			return jsonFormatError(fmt.Sprintf(`Key "%s" missing in a JSON object`, key))
+		}
+	}
+	return nil
+}

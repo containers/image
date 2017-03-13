@@ -180,3 +180,45 @@ func TestParanoidUnmarshalJSONObject(t *testing.T) {
 		assert.Error(t, err, input)
 	}
 }
+
+func TestParanoidUnmarshalJSONObjectExactFields(t *testing.T) {
+	var stringValue string
+	var float64Value float64
+	var rawValue json.RawMessage
+	var unmarshallCalled implementsUnmarshalJSON
+	exactFields := map[string]interface{}{
+		"string":       &stringValue,
+		"float64":      &float64Value,
+		"raw":          &rawValue,
+		"unmarshaller": &unmarshallCalled,
+	}
+
+	// Empty object
+	err := paranoidUnmarshalJSONObjectExactFields([]byte(`{}`), map[string]interface{}{})
+	require.NoError(t, err)
+
+	// Success
+	err = paranoidUnmarshalJSONObjectExactFields([]byte(`{"string": "a", "float64": 3.5, "raw": {"a":"b"}, "unmarshaller": true}`), exactFields)
+	require.NoError(t, err)
+	assert.Equal(t, "a", stringValue)
+	assert.Equal(t, 3.5, float64Value)
+	assert.Equal(t, json.RawMessage(`{"a":"b"}`), rawValue)
+	assert.Equal(t, implementsUnmarshalJSON(true), unmarshallCalled)
+
+	// Various kinds of invalid input
+	for _, input := range []string{
+		``,      // Empty input
+		`&`,     // Entirely invalid JSON
+		`1`,     // Not an object
+		`{&}`,   // Invalid key JSON
+		`{1:1}`, // Key not a string
+		`{"string": "a", "string": "a", "float64": 3.5, "raw": {"a":"b"}, "unmarshaller": true}`,      // Duplicate key
+		`{"string": "a", "float64": 3.5, "raw": {"a":"b"}, "unmarshaller": true, "thisisunknown", 1}`, // Unknown key
+		`{"string": &, "float64": 3.5, "raw": {"a":"b"}, "unmarshaller": true}`,                       // Invalid value JSON
+		`{"string": 1, "float64": 3.5, "raw": {"a":"b"}, "unmarshaller": true}`,                       // Type mismatch
+		`{"string": "a", "float64": 3.5, "raw": {"a":"b"}, "unmarshaller": true}{}`,                   // Extra data after object
+	} {
+		err := paranoidUnmarshalJSONObjectExactFields([]byte(input), exactFields)
+		assert.Error(t, err, input)
+	}
+}
