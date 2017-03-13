@@ -153,6 +153,7 @@ func TestUnmarshalJSON(t *testing.T) {
 		func(v mSI) { x(v, "optional")["creator"] = 1 },
 		// Invalid "timestamp"
 		func(v mSI) { x(v, "optional")["timestamp"] = "unexpected" },
+		func(v mSI) { x(v, "optional")["timestamp"] = 0.5 }, // Fractional input
 	}
 	for _, fn := range breakFns {
 		err = tryUnmarshalModifiedSignature(t, &s, validJSON, fn)
