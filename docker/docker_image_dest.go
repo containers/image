@@ -70,7 +70,10 @@ func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 // SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
 // Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
 func (d *dockerImageDestination) SupportsSignatures() error {
-	return errors.Errorf("Pushing signatures to a Docker Registry is not supported")
+	if d.c.signatureBase == nil {
+		return errors.Errorf("Pushing signatures to a Docker Registry is not supported, and there is no applicable signature storage configured")
+	}
+	return nil
 }
 
 // ShouldCompressLayers returns true iff it is desirable to compress layer blobs written to this destination.
