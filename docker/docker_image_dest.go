@@ -114,16 +114,16 @@ func (d *dockerImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 	}
 
 	// FIXME? Chunked upload, progress reporting, etc.
-	uploadURL := fmt.Sprintf(blobUploadURL, reference.Path(d.ref.ref))
-	logrus.Debugf("Uploading %s", uploadURL)
-	res, err := d.c.makeRequest("POST", uploadURL, nil, nil)
+	uploadPath := fmt.Sprintf(blobUploadPath, reference.Path(d.ref.ref))
+	logrus.Debugf("Uploading %s", uploadPath)
+	res, err := d.c.makeRequest("POST", uploadPath, nil, nil)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusAccepted {
 		logrus.Debugf("Error initiating layer upload, response %#v", *res)
-		return types.BlobInfo{}, errors.Errorf("Error initiating layer upload to %s, status %d", uploadURL, res.StatusCode)
+		return types.BlobInfo{}, errors.Errorf("Error initiating layer upload to %s, status %d", uploadPath, res.StatusCode)
 	}
 	uploadLocation, err := res.Location()
 	if err != nil {
@@ -170,10 +170,10 @@ func (d *dockerImageDestination) HasBlob(info types.BlobInfo) (bool, int64, erro
 	if info.Digest == "" {
 		return false, -1, errors.Errorf(`"Can not check for a blob with unknown digest`)
 	}
-	checkURL := fmt.Sprintf(blobsURL, reference.Path(d.ref.ref), info.Digest.String())
+	checkPath := fmt.Sprintf(blobsPath, reference.Path(d.ref.ref), info.Digest.String())
 
-	logrus.Debugf("Checking %s", checkURL)
-	res, err := d.c.makeRequest("HEAD", checkURL, nil, nil)
+	logrus.Debugf("Checking %s", checkPath)
+	res, err := d.c.makeRequest("HEAD", checkPath, nil, nil)
 	if err != nil {
 		return false, -1, err
 	}
@@ -208,14 +208,14 @@ func (d *dockerImageDestination) PutManifest(m []byte) error {
 	if err != nil {
 		return err
 	}
-	url := fmt.Sprintf(manifestURL, reference.Path(d.ref.ref), refTail)
+	path := fmt.Sprintf(manifestPath, reference.Path(d.ref.ref), refTail)
 
 	headers := map[string][]string{}
 	mimeType := manifest.GuessMIMEType(m)
 	if mimeType != "" {
 		headers["Content-Type"] = []string{mimeType}
 	}
-	res, err := d.c.makeRequest("PUT", url, headers, bytes.NewReader(m))
+	res, err := d.c.makeRequest("PUT", path, headers, bytes.NewReader(m))
 	if err != nil {
 		return err
 	}
@@ -226,7 +226,7 @@ func (d *dockerImageDestination) PutManifest(m []byte) error {
 			logrus.Debugf("Error body %s", string(body))
 		}
 		logrus.Debugf("Error uploading manifest, status %d, %#v", res.StatusCode, res)
-		return errors.Errorf("Error uploading manifest to %s, status %d", url, res.StatusCode)
+		return errors.Errorf("Error uploading manifest to %s, status %d", path, res.StatusCode)
 	}
 	return nil
 }

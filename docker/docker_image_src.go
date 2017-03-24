@@ -93,10 +93,10 @@ func (s *dockerImageSource) GetManifest() ([]byte, string, error) {
 }
 
 func (s *dockerImageSource) fetchManifest(tagOrDigest string) ([]byte, string, error) {
-	url := fmt.Sprintf(manifestURL, reference.Path(s.ref.ref), tagOrDigest)
+	path := fmt.Sprintf(manifestPath, reference.Path(s.ref.ref), tagOrDigest)
 	headers := make(map[string][]string)
 	headers["Accept"] = s.requestedManifestMIMETypes
-	res, err := s.c.makeRequest("GET", url, headers, nil)
+	res, err := s.c.makeRequest("GET", path, headers, nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -179,9 +179,9 @@ func (s *dockerImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, 
 		return s.getExternalBlob(info.URLs)
 	}
 
-	url := fmt.Sprintf(blobsURL, reference.Path(s.ref.ref), info.Digest.String())
-	logrus.Debugf("Downloading %s", url)
-	res, err := s.c.makeRequest("GET", url, nil, nil)
+	path := fmt.Sprintf(blobsPath, reference.Path(s.ref.ref), info.Digest.String())
+	logrus.Debugf("Downloading %s", path)
+	res, err := s.c.makeRequest("GET", path, nil, nil)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -277,8 +277,8 @@ func deleteImage(ctx *types.SystemContext, ref dockerReference) error {
 	if err != nil {
 		return err
 	}
-	getURL := fmt.Sprintf(manifestURL, reference.Path(ref.ref), refTail)
-	get, err := c.makeRequest("GET", getURL, headers, nil)
+	getPath := fmt.Sprintf(manifestPath, reference.Path(ref.ref), refTail)
+	get, err := c.makeRequest("GET", getPath, headers, nil)
 	if err != nil {
 		return err
 	}
@@ -296,11 +296,11 @@ func deleteImage(ctx *types.SystemContext, ref dockerReference) error {
 	}
 
 	digest := get.Header.Get("Docker-Content-Digest")
-	deleteURL := fmt.Sprintf(manifestURL, reference.Path(ref.ref), digest)
+	deletePath := fmt.Sprintf(manifestPath, reference.Path(ref.ref), digest)
 
 	// When retrieving the digest from a registry >= 2.3 use the following header:
 	//   "Accept": "application/vnd.docker.distribution.manifest.v2+json"
-	delete, err := c.makeRequest("DELETE", deleteURL, headers, nil)
+	delete, err := c.makeRequest("DELETE", deletePath, headers, nil)
 	if err != nil {
 		return err
 	}
@@ -311,7 +311,7 @@ func deleteImage(ctx *types.SystemContext, ref dockerReference) error {
 		return err
 	}
 	if delete.StatusCode != http.StatusAccepted {
-		return errors.Errorf("Failed to delete %v: %s (%v)", deleteURL, string(body), delete.Status)
+		return errors.Errorf("Failed to delete %v: %s (%v)", deletePath, string(body), delete.Status)
 	}
 
 	if c.signatureBase != nil {

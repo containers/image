@@ -32,12 +32,12 @@ const (
 	dockerCfgFileName = "config.json"
 	dockerCfgObsolete = ".dockercfg"
 
-	baseURL       = "%s://%s/v2/"
-	baseURLV1     = "%s://%s/v1/_ping"
-	tagsURL       = "%s/tags/list"
-	manifestURL   = "%s/manifests/%s"
-	blobsURL      = "%s/blobs/%s"
-	blobUploadURL = "%s/blobs/uploads/"
+	resolvedPingV2URL = "%s://%s/v2/"
+	resolvedPingV1URL = "%s://%s/v1/_ping"
+	tagsPath          = "/v2/%s/tags/list"
+	manifestPath      = "/v2/%s/manifests/%s"
+	blobsPath         = "/v2/%s/blobs/%s"
+	blobUploadPath    = "/v2/%s/blobs/uploads/"
 
 	minimumTokenLifetimeSeconds = 60
 )
@@ -209,15 +209,15 @@ func newDockerClient(ctx *types.SystemContext, ref dockerReference, write bool, 
 }
 
 // makeRequest creates and executes a http.Request with the specified parameters, adding authentication and TLS options for the Docker client.
-// url is NOT an absolute URL, but a path relative to the /v2/ top-level API path.  The host name and schema is taken from the client or autodetected.
-func (c *dockerClient) makeRequest(method, url string, headers map[string][]string, stream io.Reader) (*http.Response, error) {
+// The host name and schema is taken from the client or autodetected, and the path is relative to it, i.e. the path usually starts with /v2/.
+func (c *dockerClient) makeRequest(method, path string, headers map[string][]string, stream io.Reader) (*http.Response, error) {
 	if c.scheme == "" {
 		if err := c.ping(); err != nil {
 			return nil, err
 		}
 	}
 
-	url = fmt.Sprintf(baseURL, c.scheme, c.registry) + url
+	url := fmt.Sprintf("%s://%s%s", c.scheme, c.registry, path)
 	return c.makeRequestToResolvedURL(method, url, headers, stream, -1, true)
 }
 
@@ -400,14 +400,14 @@ func getAuth(ctx *types.SystemContext, registry string) (string, string, error) 
 
 func (c *dockerClient) ping() error {
 	ping := func(scheme string) error {
-		url := fmt.Sprintf(baseURL, scheme, c.registry)
+		url := fmt.Sprintf(resolvedPingV2URL, scheme, c.registry)
 		resp, err := c.makeRequestToResolvedURL("GET", url, nil, nil, -1, true)
 		logrus.Debugf("Ping %s err %#v", url, err)
 		if err != nil {
 			return err
 		}
 		defer resp.Body.Close()
-		logrus.Debugf("Ping %s status %d", scheme+"://"+c.registry+"/v2/", resp.StatusCode)
+		logrus.Debugf("Ping %s status %d", url, resp.StatusCode)
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
 			return errors.Errorf("error pinging repository, response code %d", resp.StatusCode)
 		}
@@ -426,14 +426,14 @@ func (c *dockerClient) ping() error {
 		}
 		// best effort to understand if we're talking to a V1 registry
 		pingV1 := func(scheme string) bool {
-			url := fmt.Sprintf(baseURLV1, scheme, c.registry)
+			url := fmt.Sprintf(resolvedPingV1URL, scheme, c.registry)
 			resp, err := c.makeRequestToResolvedURL("GET", url, nil, nil, -1, true)
 			logrus.Debugf("Ping %s err %#v", url, err)
 			if err != nil {
 				return false
 			}
 			defer resp.Body.Close()
-			logrus.Debugf("Ping %s status %d", scheme+"://"+c.registry+"/v1/_ping", resp.StatusCode)
+			logrus.Debugf("Ping %s status %d", url, resp.StatusCode)
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
 				return false
 			}
