@@ -193,10 +193,22 @@ func (s *dockerImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, 
 }
 
 func (s *dockerImageSource) GetSignatures() ([][]byte, error) {
-	if s.c.signatureBase == nil { // Skip dealing with the manifest digest if not necessary.
+	if err := s.c.detectProperties(); err != nil {
+		return nil, err
+	}
+	switch {
+	case s.c.signatureBase != nil:
+		return s.getSignaturesFromLookaside()
+	case s.c.supportsSignatures:
+		return s.getSignaturesFromAPIExtension()
+	default:
 		return [][]byte{}, nil
 	}
+}
 
+// getSignaturesFromLookaside implements GetSignatures() from the lookaside location configured in s.c.signatureBase,
+// which is not nil.
+func (s *dockerImageSource) getSignaturesFromLookaside() ([][]byte, error) {
 	if err := s.ensureManifestIsLoaded(); err != nil {
 		return nil, err
 	}
@@ -259,6 +271,30 @@ func (s *dockerImageSource) getOneSignature(url *url.URL) (signature []byte, mis
 	default:
 		return nil, false, errors.Errorf("Unsupported scheme when reading signature from %s", url.String())
 	}
+}
+
+// getSignaturesFromAPIExtension implements GetSignatures() using the X-Registry-Supports-Signatures API extension.
+func (s *dockerImageSource) getSignaturesFromAPIExtension() ([][]byte, error) {
+	if err := s.ensureManifestIsLoaded(); err != nil {
+		return nil, err
+	}
+	manifestDigest, err := manifest.Digest(s.cachedManifest)
+	if err != nil {
+		return nil, err
+	}
+
+	parsedBody, err := s.c.getExtensionsSignatures(s.ref, manifestDigest)
+	if err != nil {
+		return nil, err
+	}
+
+	var sigs [][]byte
+	for _, sig := range parsedBody.Signatures {
+		if sig.Version == extensionSignatureSchemaVersion && sig.Type == extensionSignatureTypeAtomic {
+			sigs = append(sigs, sig.Content)
+		}
+	}
+	return sigs, nil
 }
 
 // deleteImage deletes the named image from the registry, if supported.

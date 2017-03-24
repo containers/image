@@ -2,6 +2,8 @@ package docker
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -70,10 +72,17 @@ func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 // SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
 // Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
 func (d *dockerImageDestination) SupportsSignatures() error {
-	if d.c.signatureBase == nil {
-		return errors.Errorf("Pushing signatures to a Docker Registry is not supported, and there is no applicable signature storage configured")
+	if err := d.c.detectProperties(); err != nil {
+		return err
 	}
-	return nil
+	switch {
+	case d.c.signatureBase != nil:
+		return nil
+	case d.c.supportsSignatures:
+		return nil
+	default:
+		return errors.Errorf("X-Registry-Supports-Signatures extension not supported, and lookaside is not configured")
+	}
 }
 
 // ShouldCompressLayers returns true iff it is desirable to compress layer blobs written to this destination.
@@ -232,15 +241,32 @@ func (d *dockerImageDestination) PutManifest(m []byte) error {
 }
 
 func (d *dockerImageDestination) PutSignatures(signatures [][]byte) error {
+	// Do not fail if we don’t really need to support signatures.
+	if len(signatures) == 0 {
+		return nil
+	}
+	if err := d.c.detectProperties(); err != nil {
+		return err
+	}
+	switch {
+	case d.c.signatureBase != nil:
+		return d.putSignaturesToLookaside(signatures)
+	case d.c.supportsSignatures:
+		return d.putSignaturesToAPIExtension(signatures)
+	default:
+		return errors.Errorf("X-Registry-Supports-Signatures extension not supported, and lookaside is not configured")
+	}
+}
+
+// putSignaturesToLookaside implements PutSignatures() from the lookaside location configured in s.c.signatureBase,
+// which is not nil.
+func (d *dockerImageDestination) putSignaturesToLookaside(signatures [][]byte) error {
 	// FIXME? This overwrites files one at a time, definitely not atomic.
 	// A failure when updating signatures with a reordered copy could lose some of them.
 
 	// Skip dealing with the manifest digest if not necessary.
 	if len(signatures) == 0 {
 		return nil
-	}
-	if d.c.signatureBase == nil {
-		return errors.Errorf("Pushing signatures to a Docker Registry is not supported, and there is no applicable signature storage configured")
 	}
 
 	if d.manifestDigest.String() == "" {
@@ -319,6 +345,82 @@ func (c *dockerClient) deleteOneSignature(url *url.URL) (missing bool, err error
 	default:
 		return false, errors.Errorf("Unsupported scheme when deleting signature from %s", url.String())
 	}
+}
+
+// putSignaturesToAPIExtension implements PutSignatures() using the X-Registry-Supports-Signatures API extension.
+func (d *dockerImageDestination) putSignaturesToAPIExtension(signatures [][]byte) error {
+	// Skip dealing with the manifest digest, or reading the old state, if not necessary.
+	if len(signatures) == 0 {
+		return nil
+	}
+
+	if d.manifestDigest.String() == "" {
+		// This shouldn’t happen, ImageDestination users are required to call PutManifest before PutSignatures
+		return errors.Errorf("Unknown manifest digest, can't add signatures")
+	}
+
+	// Because image signatures are a shared resource in Atomic Registry, the default upload
+	// always adds signatures.  Eventually we should also allow removing signatures,
+	// but the X-Registry-Supports-Signatures API extension does not support that yet.
+
+	existingSignatures, err := d.c.getExtensionsSignatures(d.ref, d.manifestDigest)
+	if err != nil {
+		return err
+	}
+	existingSigNames := map[string]struct{}{}
+	for _, sig := range existingSignatures.Signatures {
+		existingSigNames[sig.Name] = struct{}{}
+	}
+
+sigExists:
+	for _, newSig := range signatures {
+		for _, existingSig := range existingSignatures.Signatures {
+			if existingSig.Version == extensionSignatureSchemaVersion && existingSig.Type == extensionSignatureTypeAtomic && bytes.Equal(existingSig.Content, newSig) {
+				continue sigExists
+			}
+		}
+
+		// The API expect us to invent a new unique name. This is racy, but hopefully good enough.
+		var signatureName string
+		for {
+			randBytes := make([]byte, 16)
+			n, err := rand.Read(randBytes)
+			if err != nil || n != 16 {
+				return errors.Wrapf(err, "Error generating random signature len %d", n)
+			}
+			signatureName = fmt.Sprintf("%s@%032x", d.manifestDigest.String(), randBytes)
+			if _, ok := existingSigNames[signatureName]; !ok {
+				break
+			}
+		}
+		sig := extensionSignature{
+			Version: extensionSignatureSchemaVersion,
+			Name:    signatureName,
+			Type:    extensionSignatureTypeAtomic,
+			Content: newSig,
+		}
+		body, err := json.Marshal(sig)
+		if err != nil {
+			return err
+		}
+
+		path := fmt.Sprintf(extensionsSignaturePath, reference.Path(d.ref.ref), d.manifestDigest.String())
+		res, err := d.c.makeRequest("PUT", path, nil, bytes.NewReader(body))
+		if err != nil {
+			return err
+		}
+		defer res.Body.Close()
+		if res.StatusCode != http.StatusCreated {
+			body, err := ioutil.ReadAll(res.Body)
+			if err == nil {
+				logrus.Debugf("Error body %s", string(body))
+			}
+			logrus.Debugf("Error uploading signature, status %d, %#v", res.StatusCode, res)
+			return errors.Errorf("Error uploading signature to %s, status %d", path, res.StatusCode)
+		}
+	}
+
+	return nil
 }
 
 // Commit marks the process of storing the image as successful and asks for the image to be persisted.
