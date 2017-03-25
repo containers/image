@@ -37,8 +37,8 @@ type dockerImageDestination struct {
 }
 
 // newImageDestination creates a new ImageDestination for the specified image reference.
-func newImageDestination(sys *types.SystemContext, ref dockerReference) (types.ImageDestination, error) {
-	c, err := newDockerClientFromRef(sys, ref, true, "pull,push", nil)
+func newImageDestination(sys *types.SystemContext, ref dockerReference, httpWrapper httpWrapper) (*dockerImageDestination, error) {
+	c, err := newDockerClientFromRef(sys, ref, true, "pull,push", httpWrapper)
 	if err != nil {
 		return nil, err
 	}
