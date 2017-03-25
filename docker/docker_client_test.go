@@ -229,6 +229,40 @@ func vcrDockerClient(t *testing.T, ctx *types.SystemContext, recordingBaseName s
 	return client, cleanup, dockerRef
 }
 
+func TestDockerClientDetectProperties(t *testing.T) {
+	// Success, against the Docker Hub
+	client, cleanup, _ := vcrDockerClient(t, nil, "detectProperties-docker.io", recorder.ModeReplaying,
+		"//busybox:latest", false, "pull")
+	defer cleanup()
+	err := client.detectProperties(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "https", client.scheme)
+	assert.Equal(t, []challenge{{
+		Scheme:     "bearer",
+		Parameters: map[string]string{"realm": "https://auth.docker.io/token", "service": "registry.docker.io"},
+	}}, client.challenges)
+	assert.False(t, client.supportsSignatures)
+
+	// Success, against Atomic Registry.
+	// See the comment above TestDockerClientGetExtensionsSignatures for instructions on setting up the recording.
+	openshiftCtx := &types.SystemContext{
+		DockerInsecureSkipTLSVerify: types.OptionalBoolTrue,
+	}
+	client, cleanup, _ = vcrDockerClient(t, openshiftCtx, "detectProperties-openshift", recorder.ModeReplaying,
+		"//localhost:5000/myns/personal:personal", false, "pull")
+	defer cleanup()
+	err = client.detectProperties(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "http", client.scheme)
+	assert.Equal(t, []challenge{{
+		Scheme:     "bearer",
+		Parameters: map[string]string{"realm": "http://localhost:5000/openshift/token"},
+	}}, client.challenges)
+	assert.True(t, client.supportsSignatures)
+
+	// TODO? Test the various other cases, e.g. a schema1 registry
+}
+
 // To record the the X-Registry-Supports-Signatures tests,
 // use skopeo's integration tests to set up an Atomic Registry per https://github.com/projectatomic/skopeo/pull/320
 // except running the container with -p 5000:5000, e.g.

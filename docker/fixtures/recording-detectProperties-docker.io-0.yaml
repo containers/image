@@ -1,0 +1,30 @@
+---
+version: 1
+rwmutex: {}
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Docker-Distribution-Api-Version:
+      - registry/2.0
+    url: https://registry-1.docker.io/v2/
+    method: GET
+  response:
+    body: |
+      {"errors":[{"code":"UNAUTHORIZED","message":"authentication required","detail":null}]}
+    headers:
+      Content-Length:
+      - "87"
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Sat, 25 Mar 2017 06:50:52 GMT
+      Docker-Distribution-Api-Version:
+      - registry/2.0
+      Strict-Transport-Security:
+      - max-age=31536000
+      Www-Authenticate:
+      - Bearer realm="https://auth.docker.io/token",service="registry.docker.io"
+    status: 401 Unauthorized
+    code: 401

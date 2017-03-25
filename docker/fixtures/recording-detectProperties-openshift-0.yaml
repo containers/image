@@ -1,0 +1,30 @@
+---
+version: 1
+rwmutex: {}
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Docker-Distribution-Api-Version:
+      - registry/2.0
+    url: http://localhost:5000/v2/
+    method: GET
+  response:
+    body: |
+      {"errors":[{"code":"UNAUTHORIZED","message":"authentication required","detail":null}]}
+    headers:
+      Content-Length:
+      - "87"
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Sat, 25 Mar 2017 06:55:11 GMT
+      Docker-Distribution-Api-Version:
+      - registry/2.0
+      Www-Authenticate:
+      - Bearer realm="http://localhost:5000/openshift/token"
+      X-Registry-Supports-Signatures:
+      - "1"
+    status: 401 Unauthorized
+    code: 401
