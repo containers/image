@@ -135,3 +135,32 @@ func TestDockerImageSourceGetManifest(t *testing.T) {
 	defer cleanup()
 	assert.Error(t, err)
 }
+
+// TODO: Tests for quite a few methods.
+
+// See the comment above TestDockerClientGetExtensionsSignatures for instructions on setting up the recording.
+func TestDockerImageSourceGetSignaturesFromAPIExtension(t *testing.T) {
+	ctx := &types.SystemContext{
+		DockerAuthConfig: &types.DockerAuthConfig{
+			Username: "unused",
+			Password: "dh2juhu6LbGYGSHKMUa5BFEpyoPMYDVA59hxd3FCfbU",
+		},
+		DockerInsecureSkipTLSVerify: types.OptionalBoolTrue,
+	}
+
+	// Success
+	// This only tests getting a single signature; the multiple-signature case
+	// is tested within TestDockerImageDestinationPutSignaturesToAPIExtension.
+	src, cleanup, err := vcrImageSource(t, ctx, "getSignaturesFromAPIExtension-success", recorder.ModeReplaying,
+		"//localhost:5000/myns/personal:personal")
+	defer cleanup()
+	require.NoError(t, err)
+	sigs, err := src.getSignaturesFromAPIExtension(context.Background(), nil)
+	require.NoError(t, err)
+	expectedSignature, err := ioutil.ReadFile("fixtures/extension-personal-personal.signature")
+	require.NoError(t, err)
+	assert.Equal(t, [][]byte{expectedSignature}, sigs)
+
+	// TODO? Test that unknown signature kinds are silently ignored.
+	// TODO? Test the various failure modes.
+}

@@ -1,0 +1,77 @@
+---
+version: 1
+rwmutex: {}
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Docker-Distribution-Api-Version:
+      - registry/2.0
+    url: http://localhost:5000/v2/
+    method: GET
+  response:
+    body: |
+      {"errors":[{"code":"UNAUTHORIZED","message":"authentication required","detail":null}]}
+    headers:
+      Content-Length:
+      - "87"
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Tue, 28 Mar 2017 17:36:28 GMT
+      Docker-Distribution-Api-Version:
+      - registry/2.0
+      Www-Authenticate:
+      - Bearer realm="http://localhost:5000/openshift/token"
+      X-Registry-Supports-Signatures:
+      - "1"
+    status: 401 Unauthorized
+    code: 401
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - Basic dW51c2VkOmRoMmp1aHU2TGJHWUdTSEtNVWE1QkZFcHlvUE1ZRFZBNTloeGQzRkNmYlU=
+    url: http://localhost:5000/openshift/token?account=unused&scope=repository%3Amyns%2Fpersonal%3Apull
+    method: GET
+  response:
+    body: |
+      {"access_token":"dh2juhu6LbGYGSHKMUa5BFEpyoPMYDVA59hxd3FCfbU","token":"dh2juhu6LbGYGSHKMUa5BFEpyoPMYDVA59hxd3FCfbU"}
+    headers:
+      Content-Length:
+      - "117"
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 28 Mar 2017 17:36:28 GMT
+      Docker-Distribution-Api-Version:
+      - registry/2.0
+    status: 200 OK
+    code: 200
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - Bearer dh2juhu6LbGYGSHKMUa5BFEpyoPMYDVA59hxd3FCfbU
+      Docker-Distribution-Api-Version:
+      - registry/2.0
+    url: http://localhost:5000/extensions/v2/myns/personal/signatures/sha256:8d7fe3e157e56648ab790794970fbdfe82c84af79e807443b98df92c822a9b9b
+    method: GET
+  response:
+    body: '{"signatures":[{"schemaVersion":2,"name":"sha256:8d7fe3e157e56648ab790794970fbdfe82c84af79e807443b98df92c822a9b9b@809439d23da88df57186b0f2fce91e9a","type":"atomic","content":"owGbwMvMwMFY+D11/6GF988ynj6Ql8QQcWvenGql5KLMkszkxBwlq2qlzJTUvJLMkkoQOyU/OTu1SLcoNS21KDUvOVXJSiknH6guI7+4xMrUwMBAP7cyr1i/ILWoOD8vMccKxlCq1VHKzE1MT0UyJDcxLzMttbhENyUzHUgBjSrOSDQyNbOySDFPSzVONTQ1TzU1MzOxSEwytzQwtzSxNDdIS0pJS7UwSrYwSUwzt0y1MDA3MTFOsrRISbMEChoZJVomWSaBLCupLAA5LrEkPzczWSE5P68kMTMvtUihODM9L7GktCgVpCi/oCQT7DorkI9TgYqLEHoM9Az1DHRTUsuUgKZl5gJdmJhboGRlaAJ0i5GRial5bW0nowwLAyMHAxsrEyjYGLg4BWCB+WQx+/+Se5fLX926JXvhxIUzd4pnzZARCmzy8T6+xSHpN8fimU33Q/b4VAg6l8/1ZNN3DVX9m9Q292TttwyJ0wenR5yL4f79asHchhuVM4y55hw10xfNm3b2fZdoo4Ia74eWFYrnuOfr7dYwdl6kfnODiOqSO0IblZzUA0/fib7/yFh2Bqd5Uvb1+bLcR24c0Rd4LeW89mvNNtayRWs7mabKLXR10Zot1hOccOj+e0Mnn7mmjg4q+XyX3+69smBxXz6L2vuMx/Esp64k6i2oZPc/7NV3eTart3kVo945a757f0oCeQyiLvIdWujs0Hv7V8bKrduW3+YLjX5q1/zpse3yZNZTs4VnMUgZJmWtd9xp6gsA"}]}'
+    headers:
+      Content-Length:
+      - "947"
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Tue, 28 Mar 2017 17:36:28 GMT
+      Docker-Distribution-Api-Version:
+      - registry/2.0
+      X-Registry-Supports-Signatures:
+      - "1"
+    status: 200 OK
+    code: 200

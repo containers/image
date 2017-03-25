@@ -9,7 +9,9 @@ package docker
 // Don’t forget to revert to recorder.ModeReplaying!
 
 import (
+	"context"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,6 +20,7 @@ import (
 
 	"github.com/containers/image/v5/types"
 	"github.com/dnaeon/go-vcr/recorder"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -211,4 +214,55 @@ func prepareVCR(t *testing.T, ctx *types.SystemContext, recordingBaseName string
 	}
 
 	return &ourCtx, httpWrapper, closeRecorders, dockerRef
+}
+
+// vcrDockerClient creates a dockerClient using a series of HTTP request/response recordings
+// using recordingBaseName.
+// It returns a dockerClient and a cleanup callback, and the parsed version of ref.
+func vcrDockerClient(t *testing.T, ctx *types.SystemContext, recordingBaseName string, mode recorder.Mode,
+	ref string, write bool, actions string) (*dockerClient, func(), dockerReference) {
+	ctx, httpWrapper, cleanup, dockerRef := prepareVCR(t, ctx, recordingBaseName, mode,
+		ref)
+
+	client, err := newDockerClientFromRef(ctx, dockerRef, write, actions, httpWrapper)
+	require.NoError(t, err)
+	return client, cleanup, dockerRef
+}
+
+// To record the the X-Registry-Supports-Signatures tests,
+// use skopeo's integration tests to set up an Atomic Registry per https://github.com/projectatomic/skopeo/pull/320
+// except running the container with -p 5000:5000, e.g.
+// (sudo docker run --rm -i  -t -p 5000:5000 "skopeo-dev:openshift-shell" bash)
+// Then set:
+// - the username:password values obtained by decoding "auth" from the in-container  ~/.docker/config.json
+// - the manifest digest reference e.g. from (oc get istag personal:personal) value image.dockerImageReference in-container.
+// - the signature name from the same (oc get istag personal:personal)
+func TestDockerClientGetExtensionsSignatures(t *testing.T) {
+	ctx := &types.SystemContext{
+		DockerAuthConfig: &types.DockerAuthConfig{
+			Username: "unused",
+			Password: "dh2juhu6LbGYGSHKMUa5BFEpyoPMYDVA59hxd3FCfbU",
+		},
+		DockerInsecureSkipTLSVerify: types.OptionalBoolTrue,
+	}
+
+	// Success
+	manifestDigest := digest.Digest("sha256:8d7fe3e157e56648ab790794970fbdfe82c84af79e807443b98df92c822a9b9b")
+	client, cleanup, dockerRef := vcrDockerClient(t, ctx, "getExtensionsSignatures-success", recorder.ModeReplaying,
+		"//localhost:5000/myns/personal:personal", false, "pull")
+	defer cleanup()
+	esl, err := client.getExtensionsSignatures(context.Background(), dockerRef, manifestDigest)
+	require.NoError(t, err)
+	expectedSignature, err := ioutil.ReadFile("fixtures/extension-personal-personal.signature")
+	require.NoError(t, err)
+	assert.Equal(t, &extensionSignatureList{
+		Signatures: []extensionSignature{{
+			Version: extensionSignatureSchemaVersion,
+			Name:    manifestDigest.String() + "@809439d23da88df57186b0f2fce91e9a",
+			Type:    extensionSignatureTypeAtomic,
+			Content: expectedSignature,
+		}},
+	}, esl)
+
+	// TODO? Test the various failure modes.
 }
