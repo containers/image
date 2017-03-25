@@ -1,5 +1,8 @@
 package docker
 
+// Many of these tests are made using github.com/dnaeon/go-vcr/recorder.
+// See docker_client_test.go for more instructions.
+
 import (
 	"context"
 	"io/ioutil"
@@ -12,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/containers/image/v5/types"
+	"github.com/dnaeon/go-vcr/recorder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -79,6 +83,10 @@ location = "@REGISTRY@/with-mirror"
 	}
 }
 
+// TODO: TestNewImageSource
+// TODO: TestDockerImageSourceReference
+// TODO: TestDockerImageSourceClose
+
 func TestSimplifyContentType(t *testing.T) {
 	for _, c := range []struct{ input, expected string }{
 		{"", ""},
@@ -94,4 +102,36 @@ func TestSimplifyContentType(t *testing.T) {
 		out := simplifyContentType(c.input)
 		assert.Equal(t, c.expected, out, c.input)
 	}
+}
+
+// vcrImageSource creates a dockerImageSource using a series of HTTP request/response recordings
+// using recordingBaseName.
+// It returns the imageSource or an error, and a cleanup callback
+func vcrImageSource(t *testing.T, ctx *types.SystemContext, recordingBaseName string, mode recorder.Mode,
+	ref string) (*dockerImageSource, func(), error) {
+	ctx, httpWrapper, cleanup, dockerRef := prepareVCR(t, ctx, recordingBaseName, mode,
+		ref)
+
+	src, err := newImageSource(context.Background(), ctx, dockerRef, httpWrapper)
+	return src, cleanup, err
+}
+
+func TestDockerImageSourceGetManifest(t *testing.T) {
+	// Success
+	src, cleanup, err := vcrImageSource(t, nil, "GetManifest-success", recorder.ModeReplaying,
+		"//busybox:latest")
+	defer cleanup()
+	require.NoError(t, err)
+	manifest, mimeType, err := src.GetManifest(context.Background(), nil)
+	require.NoError(t, err)
+	// Whatever was returned is now cached
+	assert.Equal(t, src.cachedManifest, manifest)
+	assert.Equal(t, src.cachedManifestMIMEType, mimeType)
+	// TODO: Somehow test caching (i.e. that we don’t redo the request when doing it the second time)
+
+	// Test failure fetching the manifest
+	_, cleanup, err = vcrImageSource(t, nil, "GetManifest-not-found", recorder.ModeReplaying,
+		"//busybox:this-does-not-exist")
+	defer cleanup()
+	assert.Error(t, err)
 }

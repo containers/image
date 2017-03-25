@@ -67,6 +67,9 @@ var (
 	}
 )
 
+// httpWrapper allows replacing the used http.RoundTripper.  This is internal-only, used for github.com/dnaeon/go-vcr/recorder -based tests.
+type httpWrapper func(http.RoundTripper) http.RoundTripper
+
 // extensionSignature and extensionSignatureList come from github.com/openshift/origin/pkg/dockerregistry/server/signaturedispatcher.go:
 // signature represents a Docker image signature.
 type extensionSignature struct {
@@ -92,8 +95,9 @@ type bearerToken struct {
 // dockerClient is configuration for dealing with a single Docker registry.
 type dockerClient struct {
 	// The following members are set by newDockerClient and do not change afterwards.
-	sys      *types.SystemContext
-	registry string
+	sys         *types.SystemContext
+	httpWrapper httpWrapper // nil unless running tests
+	registry    string
 
 	// tlsClientConfig is setup by newDockerClient and will be used and updated
 	// by detectProperties(). Callers can edit tlsClientConfig.InsecureSkipVerify in the meantime.
@@ -210,7 +214,7 @@ func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
 // newDockerClientFromRef returns a new dockerClient instance for refHostname (a host a specified in the Docker image reference, not canonicalized to dockerRegistry)
 // “write” specifies whether the client will be used for "write" access (in particular passed to lookaside.go:toplevelFromSection)
 // signatureBase is always set in the return value
-func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write bool, actions string) (*dockerClient, error) {
+func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write bool, actions string, httpWrapper httpWrapper) (*dockerClient, error) {
 	registry := reference.Domain(ref.ref)
 	auth, err := config.GetCredentials(sys, registry)
 	if err != nil {
@@ -222,7 +226,7 @@ func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write
 		return nil, err
 	}
 
-	client, err := newDockerClient(sys, registry, ref.ref.Name())
+	client, err := newDockerClient(sys, registry, ref.ref.Name(), httpWrapper)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +246,7 @@ func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write
 // (e.g., "registry.com[:5000][/some/namespace]/repo").
 // Please note that newDockerClient does not set all members of dockerClient
 // (e.g., username and password); those must be set by callers if necessary.
-func newDockerClient(sys *types.SystemContext, registry, reference string) (*dockerClient, error) {
+func newDockerClient(sys *types.SystemContext, registry, reference string, httpWrapper httpWrapper) (*dockerClient, error) {
 	hostName := registry
 	if registry == dockerHostname {
 		registry = dockerRegistry
@@ -279,6 +283,7 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 
 	return &dockerClient{
 		sys:             sys,
+		httpWrapper:     httpWrapper,
 		registry:        registry,
 		tlsClientConfig: tlsClientConfig,
 	}, nil
@@ -287,7 +292,7 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 // CheckAuth validates the credentials by attempting to log into the registry
 // returns an error if an error occurred while making the http request or the status code received was 401
 func CheckAuth(ctx context.Context, sys *types.SystemContext, username, password, registry string) error {
-	client, err := newDockerClient(sys, registry, registry)
+	client, err := newDockerClient(sys, registry, registry, nil)
 	if err != nil {
 		return errors.Wrapf(err, "error creating new docker client")
 	}
@@ -349,7 +354,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 		hostname = dockerV1Hostname
 	}
 
-	client, err := newDockerClient(sys, hostname, registry)
+	client, err := newDockerClient(sys, hostname, registry, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating new docker client")
 	}
@@ -723,7 +728,11 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 	}
 	tr := tlsclientconfig.NewTransport()
 	tr.TLSClientConfig = c.tlsClientConfig
-	c.client = &http.Client{Transport: tr}
+	rt := http.RoundTripper(tr)
+	if c.httpWrapper != nil {
+		rt = c.httpWrapper(rt)
+	}
+	c.client = &http.Client{Transport: rt}
 
 	ping := func(scheme string) error {
 		url := fmt.Sprintf(resolvedPingV2URL, scheme, c.registry)
