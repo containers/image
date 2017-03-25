@@ -54,15 +54,19 @@ type bearerToken struct {
 
 // dockerClient is configuration for dealing with a single Docker registry.
 type dockerClient struct {
-	ctx             *types.SystemContext
-	registry        string
-	username        string
-	password        string
-	scheme          string // Cache of a value returned by a successful ping() if not empty
-	client          *http.Client
-	signatureBase   signatureStorageBase
-	challenges      []challenge
-	scope           authScope
+	// The following members are set by newDockerClient and do not change afterwards.
+	ctx           *types.SystemContext
+	registry      string
+	username      string
+	password      string
+	client        *http.Client
+	signatureBase signatureStorageBase
+	scope         authScope
+	// The following members are detected registry properties:
+	// They are set after a successful detectProperties(), and never change afterwards.
+	scheme     string // Empty value also used to indicate detectProperties() has not yet succeeded.
+	challenges []challenge
+	// The following members are private state for setupRequestAuth, both are valid if token != nil.
 	token           *bearerToken
 	tokenExpiration time.Time
 }
@@ -211,10 +215,8 @@ func newDockerClient(ctx *types.SystemContext, ref dockerReference, write bool, 
 // makeRequest creates and executes a http.Request with the specified parameters, adding authentication and TLS options for the Docker client.
 // The host name and schema is taken from the client or autodetected, and the path is relative to it, i.e. the path usually starts with /v2/.
 func (c *dockerClient) makeRequest(method, path string, headers map[string][]string, stream io.Reader) (*http.Response, error) {
-	if c.scheme == "" {
-		if err := c.ping(); err != nil {
-			return nil, err
-		}
+	if err := c.detectProperties(); err != nil {
+		return nil, err
 	}
 
 	url := fmt.Sprintf("%s://%s%s", c.scheme, c.registry, path)
@@ -398,7 +400,13 @@ func getAuth(ctx *types.SystemContext, registry string) (string, string, error) 
 	return "", "", nil
 }
 
-func (c *dockerClient) ping() error {
+// detectProperties detects various properties of the registry.
+// See the dockerClient documentation for members which are affected by this.
+func (c *dockerClient) detectProperties() error {
+	if c.scheme != "" {
+		return nil
+	}
+
 	ping := func(scheme string) error {
 		url := fmt.Sprintf(resolvedPingV2URL, scheme, c.registry)
 		resp, err := c.makeRequestToResolvedURL("GET", url, nil, nil, -1, true)
