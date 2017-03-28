@@ -132,7 +132,7 @@ func (d *dockerImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 	tee := io.TeeReader(stream, io.MultiWriter(digester.Hash(), sizeCounter))
 	res, err = d.c.makeRequestToResolvedURL("PATCH", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, tee, inputInfo.Size, true)
 	if err != nil {
-		logrus.Debugf("Error uploading layer chunked, response %#v", *res)
+		logrus.Debugf("Error uploading layer chunked, response %#v", res)
 		return types.BlobInfo{}, err
 	}
 	defer res.Body.Close()
