@@ -13,7 +13,7 @@ import (
 	"github.com/containers/image/pkg/compression"
 	"github.com/containers/image/types"
 	"github.com/docker/docker/client"
-	"github.com/opencontainers/go-digest"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
