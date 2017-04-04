@@ -402,10 +402,6 @@ func TestManifestSchema2UpdatedImage(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, layerInfos, res.LayerInfos())
-	_, err = original.UpdatedImage(types.ManifestUpdateOptions{
-		LayerInfos: append(layerInfos, layerInfos[0]),
-	})
-	assert.Error(t, err)
 
 	// ManifestMIMEType:
 	// Only smoke-test the valid conversions, detailed tests are below. (This also verifies that “original” is not affected.)

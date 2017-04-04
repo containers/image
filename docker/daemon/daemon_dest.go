@@ -82,6 +82,8 @@ func imageLoadGoroutine(ctx context.Context, c *client.Client, reader *io.PipeRe
 		}
 	}()
 
+	// the err below will overwrite the error above; there by preventing the
+	// panic error message when the function can no longer panic.
 	resp, err := c.ImageLoad(ctx, reader, true)
 	if err != nil {
 		err = errors.Wrap(err, "Error saving image to docker engine")
@@ -186,8 +188,11 @@ func (d *daemonImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 	if err := d.sendFile(inputInfo.Digest.String(), inputInfo.Size, tee); err != nil {
 		return types.BlobInfo{}, err
 	}
-	d.blobs[inputInfo.Digest] = types.BlobInfo{Digest: digester.Digest(), Size: inputInfo.Size}
-	return types.BlobInfo{Digest: digester.Digest(), Size: inputInfo.Size}, nil
+
+	retval := types.BlobInfo{Digest: digester.Digest(), Size: inputInfo.Size}
+
+	d.blobs[inputInfo.Digest] = retval
+	return retval, nil
 }
 
 // HasBlob returns true iff the image destination already contains a blob with the matching digest which can be reapplied using ReapplyBlob.
@@ -286,6 +291,7 @@ func (d *daemonImageDestination) sendFile(path string, expectedSize int64, strea
 	if err != nil {
 		return nil
 	}
+
 	logrus.Debugf("Sending as tar file %s", path)
 	if err := d.tar.WriteHeader(hdr); err != nil {
 		return err
@@ -322,6 +328,5 @@ func (d *daemonImageDestination) Commit() error {
 	d.committed = true // We may still fail, but we are done sending to imageLoadGoroutine.
 
 	logrus.Debugf("docker-daemon: Waiting for status")
-	err := <-d.statusChannel
-	return err
+	return <-d.statusChannel
 }
