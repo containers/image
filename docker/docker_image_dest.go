@@ -274,6 +274,7 @@ func (d *dockerImageDestination) putSignaturesToLookaside(signatures [][]byte) e
 		return errors.Errorf("Unknown manifest digest, can't add signatures")
 	}
 
+	// NOTE: Keep this in sync with docs/signature-protocols.md!
 	for i, signature := range signatures {
 		url := signatureStorageURL(d.c.signatureBase, d.manifestDigest, i)
 		if url == nil {
@@ -307,6 +308,7 @@ func (d *dockerImageDestination) putSignaturesToLookaside(signatures [][]byte) e
 }
 
 // putOneSignature stores one signature to url.
+// NOTE: Keep this in sync with docs/signature-protocols.md!
 func (d *dockerImageDestination) putOneSignature(url *url.URL, signature []byte) error {
 	switch url.Scheme {
 	case "file":
@@ -330,6 +332,7 @@ func (d *dockerImageDestination) putOneSignature(url *url.URL, signature []byte)
 
 // deleteOneSignature deletes a signature from url, if it exists.
 // If it successfully determines that the signature does not exist, returns (true, nil)
+// NOTE: Keep this in sync with docs/signature-protocols.md!
 func (c *dockerClient) deleteOneSignature(url *url.URL) (missing bool, err error) {
 	switch url.Scheme {
 	case "file":
