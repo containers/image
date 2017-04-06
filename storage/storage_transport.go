@@ -286,7 +286,7 @@ func verboseName(name reference.Named) string {
 	name = reference.TagNameOnly(name)
 	tag := ""
 	if tagged, ok := name.(reference.NamedTagged); ok {
-		tag = tagged.Tag()
+		tag = ":" + tagged.Tag()
 	}
-	return name.Name() + ":" + tag
+	return name.Name() + tag
 }

@@ -71,14 +71,9 @@ type storageImage struct {
 
 // newImageSource sets us up to read out an image, which needs to already exist.
 func newImageSource(imageRef storageReference) (*storageImageSource, error) {
-	id := imageRef.resolveID()
-	if id == "" {
-		logrus.Errorf("no image matching reference %q found", imageRef.StringWithinTransport())
-		return nil, ErrNoSuchImage
-	}
-	img, err := imageRef.transport.store.GetImage(id)
+	img, err := imageRef.resolveImage()
 	if err != nil {
-		return nil, errors.Wrapf(err, "error reading image %q", id)
+		return nil, err
 	}
 	image := &storageImageSource{
 		imageRef:       imageRef,
@@ -341,16 +336,20 @@ func (s *storageImageDestination) Commit() error {
 	}
 	logrus.Debugf("created new image ID %q", img.ID)
 	s.ID = img.ID
+	names := img.Names
 	if s.Tag != "" {
-		// We have a name to set, so move the name to this image.
-		if err := s.imageRef.transport.store.SetNames(img.ID, []string{s.Tag}); err != nil {
+		names = append(names, s.Tag)
+	}
+	// We have names to set, so move those names to this image.
+	if len(names) > 0 {
+		if err := s.imageRef.transport.store.SetNames(img.ID, names); err != nil {
 			if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
 				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
 			}
 			logrus.Debugf("error setting names on image %q: %v", img.ID, err)
 			return err
 		}
-		logrus.Debugf("set name of image %q to %q", img.ID, s.Tag)
+		logrus.Debugf("set names of image %q to %v", img.ID, names)
 	}
 	// Save the data blobs to disk, and drop their contents from memory.
 	keys := []ddigest.Digest{}
