@@ -106,24 +106,28 @@ func TestDetermineManifestConversion(t *testing.T) {
 	for _, c := range cases {
 		src := fakeImageSource(c.sourceType)
 		mu := types.ManifestUpdateOptions{}
-		err := determineManifestConversion(&mu, src, c.destTypes, true)
+		preferredMIMEType, err := determineManifestConversion(&mu, src, c.destTypes, true)
 		require.NoError(t, err, c.description)
 		assert.Equal(t, c.expectedUpdate, mu.ManifestMIMEType, c.description)
+		if c.expectedUpdate == "" {
+			assert.Equal(t, c.sourceType, preferredMIMEType, c.description)
+		} else {
+			assert.Equal(t, c.expectedUpdate, preferredMIMEType, c.description)
+		}
 	}
 
 	// Whatever the input is, with !canModifyManifest we return "keep the original as is"
 	for _, c := range cases {
 		src := fakeImageSource(c.sourceType)
 		mu := types.ManifestUpdateOptions{}
-		err := determineManifestConversion(&mu, src, c.destTypes, false)
+		preferredMIMEType, err := determineManifestConversion(&mu, src, c.destTypes, false)
 		require.NoError(t, err, c.description)
 		assert.Equal(t, "", mu.ManifestMIMEType, c.description)
+		assert.Equal(t, c.sourceType, preferredMIMEType, c.description)
 	}
 
 	// Error reading the manifest — smoke test only.
-	// (This error is not currently encountered if the destination accepts anything;
-	// that is not an API promise, though.)
 	mu := types.ManifestUpdateOptions{}
-	err := determineManifestConversion(&mu, fakeImageSource(""), supportS1S2, true)
+	_, err := determineManifestConversion(&mu, fakeImageSource(""), supportS1S2, true)
 	assert.Error(t, err)
 }

@@ -14,28 +14,30 @@ var preferredManifestMIMETypes = []string{manifest.DockerV2Schema2MediaType, man
 
 // determineManifestConversion updates manifestUpdates to convert manifest to a supported MIME type, if necessary and canModifyManifest.
 // Note that the conversion will only happen later, through src.UpdatedImage
-func determineManifestConversion(manifestUpdates *types.ManifestUpdateOptions, src types.Image, destSupportedManifestMIMETypes []string, canModifyManifest bool) error {
+// Returns the preferred manifest MIME type (whether we are converting to it or using it unmodified).
+func determineManifestConversion(manifestUpdates *types.ManifestUpdateOptions, src types.Image, destSupportedManifestMIMETypes []string, canModifyManifest bool) (string, error) {
+	_, srcType, err := src.Manifest()
+	if err != nil { // This should have been cached?!
+		return "", errors.Wrap(err, "Error reading manifest")
+	}
+
 	if len(destSupportedManifestMIMETypes) == 0 {
-		return nil // Anything goes
+		return srcType, nil // Anything goes
 	}
 	supportedByDest := map[string]struct{}{}
 	for _, t := range destSupportedManifestMIMETypes {
 		supportedByDest[t] = struct{}{}
 	}
 
-	_, srcType, err := src.Manifest()
-	if err != nil { // This should have been cached?!
-		return errors.Wrap(err, "Error reading manifest")
-	}
 	if _, ok := supportedByDest[srcType]; ok {
 		logrus.Debugf("Manifest MIME type %s is declared supported by the destination", srcType)
-		return nil
+		return srcType, nil
 	}
 
 	// OK, we should convert the manifest.
 	if !canModifyManifest {
 		logrus.Debugf("Manifest MIME type %s is not supported by the destination, but we can't modify the manifest, hoping for the best...")
-		return nil // Take our chances - FIXME? Or should we fail without trying?
+		return srcType, nil // Take our chances - FIXME? Or should we fail without trying?
 	}
 
 	var chosenType = destSupportedManifestMIMETypes[0] // This one is known to be supported.
@@ -47,5 +49,5 @@ func determineManifestConversion(manifestUpdates *types.ManifestUpdateOptions, s
 	}
 	logrus.Debugf("Will convert manifest from MIME type %s to %s", srcType, chosenType)
 	manifestUpdates.ManifestMIMEType = chosenType
-	return nil
+	return chosenType, nil
 }

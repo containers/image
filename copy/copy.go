@@ -182,7 +182,8 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	manifestUpdates := types.ManifestUpdateOptions{}
 	manifestUpdates.InformationOnly.Destination = dest
 
-	if err := determineManifestConversion(&manifestUpdates, src, destSupportedManifestMIMETypes, canModifyManifest); err != nil {
+	_, err = determineManifestConversion(&manifestUpdates, src, destSupportedManifestMIMETypes, canModifyManifest)
+	if err != nil {
 		return err
 	}
 
