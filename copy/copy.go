@@ -211,28 +211,9 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		return err
 	}
 
-	pendingImage := src
-	if !reflect.DeepEqual(manifestUpdates, types.ManifestUpdateOptions{InformationOnly: manifestUpdates.InformationOnly}) {
-		if !canModifyManifest {
-			return errors.Errorf("Internal error: copy needs an updated manifest but that was known to be forbidden")
-		}
-		pendingImage, err = src.UpdatedImage(manifestUpdates)
-		if err != nil {
-			return errors.Wrap(err, "Error creating an updated image manifest")
-		}
-	}
-	manifest, _, err := pendingImage.Manifest()
+	manifest, err := ic.copyUpdatedConfigAndManifest()
 	if err != nil {
-		return errors.Wrap(err, "Error reading manifest")
-	}
-
-	if err := ic.copyConfig(pendingImage); err != nil {
 		return err
-	}
-
-	writeReport("Writing manifest to image destination\n")
-	if err := dest.PutManifest(manifest); err != nil {
-		return errors.Wrap(err, "Error writing manifest")
 	}
 
 	if options.SignBy != "" {
@@ -305,6 +286,36 @@ func layerDigestsDiffer(a, b []types.BlobInfo) bool {
 		}
 	}
 	return false
+}
+
+// copyUpdatedConfigAndManifest updates the image per ic.manifestUpdates, if necessary,
+// stores the resulting config and manifest ot the destination, and returns the stored manifest.
+func (ic *imageCopier) copyUpdatedConfigAndManifest() ([]byte, error) {
+	pendingImage := ic.src
+	if !reflect.DeepEqual(*ic.manifestUpdates, types.ManifestUpdateOptions{InformationOnly: ic.manifestUpdates.InformationOnly}) {
+		if !ic.canModifyManifest {
+			return nil, errors.Errorf("Internal error: copy needs an updated manifest but that was known to be forbidden")
+		}
+		pi, err := ic.src.UpdatedImage(*ic.manifestUpdates)
+		if err != nil {
+			return nil, errors.Wrap(err, "Error creating an updated image manifest")
+		}
+		pendingImage = pi
+	}
+	manifest, _, err := pendingImage.Manifest()
+	if err != nil {
+		return nil, errors.Wrap(err, "Error reading manifest")
+	}
+
+	if err := ic.copyConfig(pendingImage); err != nil {
+		return nil, err
+	}
+
+	fmt.Fprintf(ic.reportWriter, "Writing manifest to image destination\n")
+	if err := ic.dest.PutManifest(manifest); err != nil {
+		return nil, errors.Wrap(err, "Error writing manifest")
+	}
+	return manifest, nil
 }
 
 // copyConfig copies config.json, if any, from src to dest.
