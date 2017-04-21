@@ -230,6 +230,11 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		return err
 	}
 
+	writeReport("Writing manifest to image destination\n")
+	if err := dest.PutManifest(manifest); err != nil {
+		return errors.Wrap(err, "Error writing manifest")
+	}
+
 	if options.SignBy != "" {
 		mech, err := signature.NewGPGSigningMechanism()
 		if err != nil {
@@ -251,11 +256,6 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 			return errors.Wrap(err, "Error creating signature")
 		}
 		sigs = append(sigs, newSig)
-	}
-
-	writeReport("Writing manifest to image destination\n")
-	if err := dest.PutManifest(manifest); err != nil {
-		return errors.Wrap(err, "Error writing manifest")
 	}
 
 	writeReport("Storing signatures\n")
