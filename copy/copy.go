@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"reflect"
+	"strings"
 	"time"
 
 	pb "gopkg.in/cheggaaa/pb.v1"
@@ -182,7 +183,9 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	manifestUpdates := types.ManifestUpdateOptions{}
 	manifestUpdates.InformationOnly.Destination = dest
 
-	_, _, err = determineManifestConversion(&manifestUpdates, src, destSupportedManifestMIMETypes, canModifyManifest)
+	// We compute preferredManifestMIMEType only to show it in error messages.
+	// Without having to add this context in an error message, we would be happy enough to know only that no conversion is needed.
+	preferredManifestMIMEType, otherManifestMIMETypeCandidates, err := determineManifestConversion(&manifestUpdates, src, destSupportedManifestMIMETypes, canModifyManifest)
 	if err != nil {
 		return err
 	}
@@ -206,9 +209,44 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		return err
 	}
 
+	// With docker/distribution registries we do not know whether the registry accepts schema2 or schema1 only;
+	// and at least with the OpenShift registry "acceptschema2" option, there is no way to detect the support
+	// without actually trying to upload something.  So, try the preferred manifest MIME type.
+	// If the process succeeds, fine; if it fails, try the other options.
 	manifest, err := ic.copyUpdatedConfigAndManifest()
 	if err != nil {
-		return err
+		logrus.Debugf("Writing manifest using preferred type %s failed: %v", preferredManifestMIMEType, err)
+		if len(otherManifestMIMETypeCandidates) == 0 {
+			return err // If we have other options, the error message is fairly ugly. Don't bother the user with MIME types if we have no choice.
+		}
+		// If the original MIME type is acceptable, determineManifestConversion always uses it as preferredManifestMIMEType.
+		// So if we are here, we will definitely be trying to convert the manifest.
+		// With !canModifyManifest, that would just be a string of repeated failures for the same reason,
+		// so let’s bail out early and with a better error message.
+		if !canModifyManifest {
+			return errors.Wrap(err, "Writing manifest failed (and converting it is not possible)")
+		}
+
+		// errs is a list of errors when trying various manifest types. Also serves as an "upload succeeded" flag when set to nil.
+		errs := []string{fmt.Sprintf("%s(%v)", preferredManifestMIMEType, err)}
+		for _, manifestMIMEType := range otherManifestMIMETypeCandidates {
+			logrus.Debugf("Trying to use manifest type %s…", manifestMIMEType)
+			manifestUpdates.ManifestMIMEType = manifestMIMEType
+			attemptedManifest, err := ic.copyUpdatedConfigAndManifest()
+			if err != nil {
+				logrus.Debugf("Upload of manifest type %s failed: %v", manifestMIMEType, err)
+				errs = append(errs, fmt.Sprintf("%s(%v)", manifestMIMEType, err))
+				continue
+			}
+
+			// We have successfully uploaded a manifest.
+			manifest = attemptedManifest
+			errs = nil // Mark this as a success so that we don't abort below.
+			break
+		}
+		if errs != nil {
+			return fmt.Errorf("Uploading manifest failed, attempted the following formats: %s", strings.Join(errs, ", "))
+		}
 	}
 
 	if options.SignBy != "" {
@@ -290,6 +328,15 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest() ([]byte, error) {
 	if !reflect.DeepEqual(*ic.manifestUpdates, types.ManifestUpdateOptions{InformationOnly: ic.manifestUpdates.InformationOnly}) {
 		if !ic.canModifyManifest {
 			return nil, errors.Errorf("Internal error: copy needs an updated manifest but that was known to be forbidden")
+		}
+		if !ic.diffIDsAreNeeded && ic.src.UpdatedImageNeedsLayerDiffIDs(*ic.manifestUpdates) {
+			// We have set ic.diffIDsAreNeeded based on the preferred MIME type returned by determineManifestConversion.
+			// So, this can only happen if we are trying to upload using one of the other MIME type candidates.
+			// Because UpdatedImageNeedsLayerDiffIDs only when converting from s1 to s2, this case should only arise
+			// when ic.dest.SupportedManifestMIMETypes() includes both s1 and s2, the upload using s1 failed, and we are now trying s2.
+			// Supposedly s2-only registries do not exist or are extremely rare, so failing with this error message is good enough for now.
+			// If handling such registries turned out to be necessary, we could compute ic.diffIDsAreNeeded based on the full list of manifest MIME type candidates.
+			return nil, errors.Errorf("Can not convert image to %s, preparing DiffIDs for this case is not supported", ic.manifestUpdates.ManifestMIMEType)
 		}
 		pi, err := ic.src.UpdatedImage(*ic.manifestUpdates)
 		if err != nil {
