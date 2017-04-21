@@ -186,6 +186,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 
 	canModifyManifest := len(sigs) == 0
 	manifestUpdates := types.ManifestUpdateOptions{}
+	manifestUpdates.InformationOnly.Destination = dest
 
 	if err := determineManifestConversion(&manifestUpdates, src, destSupportedManifestMIMETypes, canModifyManifest); err != nil {
 		return err
@@ -215,7 +216,6 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		if !canModifyManifest {
 			return errors.Errorf("Internal error: copy needs an updated manifest but that was known to be forbidden")
 		}
-		manifestUpdates.InformationOnly.Destination = dest
 		pendingImage, err = src.UpdatedImage(manifestUpdates)
 		if err != nil {
 			return errors.Wrap(err, "Error creating an updated image manifest")
