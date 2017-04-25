@@ -2,6 +2,7 @@ package layout
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -104,6 +105,11 @@ func ParseReference(reference string) (types.ImageReference, error) {
 // We do not expose an API supplying the resolvedDir; we could, but recomputing it
 // is generally cheap enough that we prefer being confident about the properties of resolvedDir.
 func NewReference(dir, tag string) (types.ImageReference, error) {
+	if _, err := os.Lstat(filepath.Dir(dir)); err != nil && os.IsNotExist(err) {
+		if err := os.MkdirAll(filepath.Dir(dir), os.FileMode(0755)); err != nil {
+			return nil, err
+		}
+	}
 	resolved, err := explicitfilepath.ResolvePathToFullyExplicit(dir)
 	if err != nil {
 		return nil, err
