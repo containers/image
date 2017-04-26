@@ -331,10 +331,22 @@ func (s *storageImageDestination) Commit() error {
 	}
 	img, err := s.imageRef.transport.store.CreateImage(s.ID, nil, lastLayer, "", nil)
 	if err != nil {
-		logrus.Debugf("error creating image: %q", err)
-		return err
+		if err != storage.ErrDuplicateID {
+			logrus.Debugf("error creating image: %q", err)
+			return errors.Wrapf(err, "error creating image %q", s.ID)
+		}
+		img, err = s.imageRef.transport.store.GetImage(s.ID)
+		if err != nil {
+			return errors.Wrapf(err, "error reading image %q", s.ID)
+		}
+		if img.TopLayer != lastLayer {
+			logrus.Debugf("error creating image: image with ID %q exists, but uses different layers", err)
+			return errors.Wrapf(err, "image with ID %q already exists, but uses a different top layer", s.ID)
+		}
+		logrus.Debugf("reusing image ID %q", img.ID)
+	} else {
+		logrus.Debugf("created new image ID %q", img.ID)
 	}
-	logrus.Debugf("created new image ID %q", img.ID)
 	s.ID = img.ID
 	names := img.Names
 	if s.Tag != "" {
