@@ -119,6 +119,32 @@ func (d *ostreeImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 	return types.BlobInfo{Digest: computedDigest, Size: size}, nil
 }
 
+func fixUsermodeFiles(dir string) error {
+	entries, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+
+	for _, info := range entries {
+		fullpath := filepath.Join(dir, info.Name())
+		if info.IsDir() {
+			if err := os.Chmod(dir, info.Mode()|0700); err != nil {
+				return err
+			}
+			err = fixUsermodeFiles(fullpath)
+			if err != nil {
+				return err
+			}
+		} else if info.Mode().IsRegular() {
+			if err := os.Chmod(fullpath, info.Mode()|0600); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 func (d *ostreeImageDestination) importBlob(blob *blobToImport) error {
 	ostreeBranch := fmt.Sprintf("ociimage/%s", blob.Digest.Hex())
 	destinationPath := filepath.Join(d.tmpDirPath, blob.Digest.Hex(), "root")
@@ -130,9 +156,19 @@ func (d *ostreeImageDestination) importBlob(blob *blobToImport) error {
 		os.RemoveAll(destinationPath)
 	}()
 
-	err := archive.UntarPath(blob.BlobPath, destinationPath)
-	if err != nil {
-		return err
+	if os.Getuid() == 0 {
+		if err := archive.UntarPath(blob.BlobPath, destinationPath); err != nil {
+			return err
+		}
+	} else {
+		os.MkdirAll(destinationPath, 0755)
+		if err := exec.Command("tar", "-C", destinationPath, "--no-same-owner", "--no-same-permissions", "--delay-directory-restore", "-xf", blob.BlobPath).Run(); err != nil {
+			return err
+		}
+
+		if err := fixUsermodeFiles(destinationPath); err != nil {
+			return err
+		}
 	}
 	return exec.Command("ostree", "commit",
 		"--repo", d.ref.repo,
