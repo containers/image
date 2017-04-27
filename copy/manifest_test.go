@@ -2,6 +2,7 @@ package copy
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/containers/image/manifest"
@@ -10,6 +11,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestOrderedSet(t *testing.T) {
+	for _, c := range []struct{ input, expected []string }{
+		{[]string{}, []string{}},
+		{[]string{"a", "b", "c"}, []string{"a", "b", "c"}},
+		{[]string{"a", "b", "a", "c"}, []string{"a", "b", "c"}},
+	} {
+		os := newOrderedSet()
+		for _, s := range c.input {
+			os.append(s)
+		}
+		assert.Equal(t, c.expected, os.list, fmt.Sprintf("%#v", c.input))
+	}
+}
 
 // fakeImageSource is an implementation of types.Image which only returns itself as a MIME type in Manifest
 // except that "" means “reading the manifest should fail”
@@ -81,32 +96,42 @@ func TestDetermineManifestConversion(t *testing.T) {
 	}
 
 	cases := []struct {
-		description    string
-		sourceType     string
-		destTypes      []string
-		expectedUpdate string
+		description             string
+		sourceType              string
+		destTypes               []string
+		expectedUpdate          string
+		expectedOtherCandidates []string
 	}{
 		// Destination accepts anything — no conversion necessary
-		{"s1→anything", manifest.DockerV2Schema1SignedMediaType, nil, ""},
-		{"s2→anything", manifest.DockerV2Schema2MediaType, nil, ""},
+		{"s1→anything", manifest.DockerV2Schema1SignedMediaType, nil, "", []string{}},
+		{"s2→anything", manifest.DockerV2Schema2MediaType, nil, "", []string{}},
 		// Destination accepts the unmodified original
-		{"s1→s1s2", manifest.DockerV2Schema1SignedMediaType, supportS1S2, ""},
-		{"s2→s1s2", manifest.DockerV2Schema2MediaType, supportS1S2, ""},
-		{"s1→s1", manifest.DockerV2Schema1SignedMediaType, supportOnlyS1, ""},
+		{"s1→s1s2", manifest.DockerV2Schema1SignedMediaType, supportS1S2, "", []string{manifest.DockerV2Schema2MediaType, manifest.DockerV2Schema1MediaType}},
+		{"s2→s1s2", manifest.DockerV2Schema2MediaType, supportS1S2, "", supportOnlyS1},
+		{"s1→s1", manifest.DockerV2Schema1SignedMediaType, supportOnlyS1, "", []string{manifest.DockerV2Schema1MediaType}},
 		// Conversion necessary, a preferred format is acceptable
-		{"s2→s1", manifest.DockerV2Schema2MediaType, supportOnlyS1, manifest.DockerV2Schema1SignedMediaType},
+		{"s2→s1", manifest.DockerV2Schema2MediaType, supportOnlyS1, manifest.DockerV2Schema1SignedMediaType, []string{manifest.DockerV2Schema1MediaType}},
 		// Conversion necessary, a preferred format is not acceptable
-		{"s2→OCI", manifest.DockerV2Schema2MediaType, []string{v1.MediaTypeImageManifest}, v1.MediaTypeImageManifest},
+		{"s2→OCI", manifest.DockerV2Schema2MediaType, []string{v1.MediaTypeImageManifest}, v1.MediaTypeImageManifest, []string{}},
 		// Conversion necessary, try the preferred formats in order.
-		{"special→s2", "this needs conversion", supportS1S2OCI, manifest.DockerV2Schema2MediaType},
-		{"special→s1", "this needs conversion", supportS1OCI, manifest.DockerV2Schema1SignedMediaType},
-		{"special→OCI", "this needs conversion", []string{v1.MediaTypeImageManifest, "other options", "with lower priority"}, v1.MediaTypeImageManifest},
+		{
+			"special→s2", "this needs conversion", supportS1S2OCI, manifest.DockerV2Schema2MediaType,
+			[]string{manifest.DockerV2Schema1SignedMediaType, v1.MediaTypeImageManifest, manifest.DockerV2Schema1MediaType},
+		},
+		{
+			"special→s1", "this needs conversion", supportS1OCI, manifest.DockerV2Schema1SignedMediaType,
+			[]string{v1.MediaTypeImageManifest, manifest.DockerV2Schema1MediaType},
+		},
+		{
+			"special→OCI", "this needs conversion", []string{v1.MediaTypeImageManifest, "other options", "with lower priority"}, v1.MediaTypeImageManifest,
+			[]string{"other options", "with lower priority"},
+		},
 	}
 
 	for _, c := range cases {
 		src := fakeImageSource(c.sourceType)
 		mu := types.ManifestUpdateOptions{}
-		preferredMIMEType, err := determineManifestConversion(&mu, src, c.destTypes, true)
+		preferredMIMEType, otherCandidates, err := determineManifestConversion(&mu, src, c.destTypes, true)
 		require.NoError(t, err, c.description)
 		assert.Equal(t, c.expectedUpdate, mu.ManifestMIMEType, c.description)
 		if c.expectedUpdate == "" {
@@ -114,20 +139,22 @@ func TestDetermineManifestConversion(t *testing.T) {
 		} else {
 			assert.Equal(t, c.expectedUpdate, preferredMIMEType, c.description)
 		}
+		assert.Equal(t, c.expectedOtherCandidates, otherCandidates, c.description)
 	}
 
 	// Whatever the input is, with !canModifyManifest we return "keep the original as is"
 	for _, c := range cases {
 		src := fakeImageSource(c.sourceType)
 		mu := types.ManifestUpdateOptions{}
-		preferredMIMEType, err := determineManifestConversion(&mu, src, c.destTypes, false)
+		preferredMIMEType, otherCandidates, err := determineManifestConversion(&mu, src, c.destTypes, false)
 		require.NoError(t, err, c.description)
 		assert.Equal(t, "", mu.ManifestMIMEType, c.description)
 		assert.Equal(t, c.sourceType, preferredMIMEType, c.description)
+		assert.Equal(t, []string{}, otherCandidates, c.description)
 	}
 
 	// Error reading the manifest — smoke test only.
 	mu := types.ManifestUpdateOptions{}
-	_, err := determineManifestConversion(&mu, fakeImageSource(""), supportS1S2, true)
+	_, _, err := determineManifestConversion(&mu, fakeImageSource(""), supportS1S2, true)
 	assert.Error(t, err)
 }
