@@ -211,13 +211,17 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 
 	// With docker/distribution registries we do not know whether the registry accepts schema2 or schema1 only;
 	// and at least with the OpenShift registry "acceptschema2" option, there is no way to detect the support
-	// without actually trying to upload something.  So, try the preferred manifest MIME type.
-	// If the process succeeds, fine; if it fails, try the other options.
+	// without actually trying to upload something and getting a types.ManifestTypeRejectedError.
+	// So, try the preferred manifest MIME type. If the process succeeds, fine…
 	manifest, err := ic.copyUpdatedConfigAndManifest()
 	if err != nil {
 		logrus.Debugf("Writing manifest using preferred type %s failed: %v", preferredManifestMIMEType, err)
-		if len(otherManifestMIMETypeCandidates) == 0 {
-			return err // If we have other options, the error message is fairly ugly. Don't bother the user with MIME types if we have no choice.
+		// … if it fails, _and_ the failure is because the manifest is rejected, we may have other options.
+		if _, isManifestRejected := errors.Cause(err).(types.ManifestTypeRejectedError); !isManifestRejected || len(otherManifestMIMETypeCandidates) == 0 {
+			// We don’t have other options.
+			// In principle the code below would handle this as well, but the resulting  error message is fairly ugly. Do
+			// Don’t bother the user with MIME types if we have no choice.
+			return err
 		}
 		// If the original MIME type is acceptable, determineManifestConversion always uses it as preferredManifestMIMEType.
 		// So if we are here, we will definitely be trying to convert the manifest.
