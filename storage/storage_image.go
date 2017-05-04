@@ -138,9 +138,9 @@ func (s *storageImageDestination) putBlob(stream io.Reader, blobinfo types.BlobI
 		Size:   -1,
 	}
 	// Try to read an initial snippet of the blob.
-	header := make([]byte, 10240)
-	n, err := stream.Read(header)
-	if err != nil && err != io.EOF {
+	buf := [archive.HeaderSize]byte{}
+	n, err := io.ReadAtLeast(stream, buf[:], len(buf))
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 		return errorBlobInfo, err
 	}
 	// Set up to read the whole blob (the initial snippet, plus the rest)
@@ -154,9 +154,9 @@ func (s *storageImageDestination) putBlob(stream io.Reader, blobinfo types.BlobI
 	}
 	hash := ""
 	counter := ioutils.NewWriteCounter(hasher.Hash())
-	defragmented := io.MultiReader(bytes.NewBuffer(header[:n]), stream)
+	defragmented := io.MultiReader(bytes.NewBuffer(buf[:n]), stream)
 	multi := io.TeeReader(defragmented, counter)
-	if (n > 0) && archive.IsArchive(header[:n]) {
+	if (n > 0) && archive.IsArchive(buf[:n]) {
 		// It's a filesystem layer.  If it's not the first one in the
 		// image, we assume that the most recently added layer is its
 		// parent.
