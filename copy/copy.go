@@ -219,7 +219,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		// … if it fails, _and_ the failure is because the manifest is rejected, we may have other options.
 		if _, isManifestRejected := errors.Cause(err).(types.ManifestTypeRejectedError); !isManifestRejected || len(otherManifestMIMETypeCandidates) == 0 {
 			// We don’t have other options.
-			// In principle the code below would handle this as well, but the resulting  error message is fairly ugly. Do
+			// In principle the code below would handle this as well, but the resulting  error message is fairly ugly.
 			// Don’t bother the user with MIME types if we have no choice.
 			return err
 		}
@@ -326,7 +326,7 @@ func layerDigestsDiffer(a, b []types.BlobInfo) bool {
 }
 
 // copyUpdatedConfigAndManifest updates the image per ic.manifestUpdates, if necessary,
-// stores the resulting config and manifest ot the destination, and returns the stored manifest.
+// stores the resulting config and manifest to the destination, and returns the stored manifest.
 func (ic *imageCopier) copyUpdatedConfigAndManifest() ([]byte, error) {
 	pendingImage := ic.src
 	if !reflect.DeepEqual(*ic.manifestUpdates, types.ManifestUpdateOptions{InformationOnly: ic.manifestUpdates.InformationOnly}) {
@@ -336,10 +336,10 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest() ([]byte, error) {
 		if !ic.diffIDsAreNeeded && ic.src.UpdatedImageNeedsLayerDiffIDs(*ic.manifestUpdates) {
 			// We have set ic.diffIDsAreNeeded based on the preferred MIME type returned by determineManifestConversion.
 			// So, this can only happen if we are trying to upload using one of the other MIME type candidates.
-			// Because UpdatedImageNeedsLayerDiffIDs only when converting from s1 to s2, this case should only arise
+			// Because UpdatedImageNeedsLayerDiffIDs is true only when converting from s1 to s2, this case should only arise
 			// when ic.dest.SupportedManifestMIMETypes() includes both s1 and s2, the upload using s1 failed, and we are now trying s2.
 			// Supposedly s2-only registries do not exist or are extremely rare, so failing with this error message is good enough for now.
-			// If handling such registries turned out to be necessary, we could compute ic.diffIDsAreNeeded based on the full list of manifest MIME type candidates.
+			// If handling such registries turns out to be necessary, we could compute ic.diffIDsAreNeeded based on the full list of manifest MIME type candidates.
 			return nil, errors.Errorf("Can not convert image to %s, preparing DiffIDs for this case is not supported", ic.manifestUpdates.ManifestMIMEType)
 		}
 		pi, err := ic.src.UpdatedImage(*ic.manifestUpdates)
