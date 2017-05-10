@@ -260,7 +260,7 @@ func isManifestInvalidError(err error) bool {
 		return false
 	}
 	// ErrorCodeManifestInvalid is returned by OpenShift with acceptschema2=false.
-	// ErrorCodeTagInvalid is returned by docker/distribution (at least as of ec87e9b6971d831f0eff752ddb54fb64693e51cd)
+	// ErrorCodeTagInvalid is returned by docker/distribution (at least as of commit ec87e9b6971d831f0eff752ddb54fb64693e51cd)
 	// when uploading to a tag (because it can’t find a matching tag inside the manifest)
 	return ec.ErrorCode() == v2.ErrorCodeManifestInvalid || ec.ErrorCode() == v2.ErrorCodeTagInvalid
 }
