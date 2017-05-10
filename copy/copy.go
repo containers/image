@@ -183,6 +183,10 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	manifestUpdates := types.ManifestUpdateOptions{}
 	manifestUpdates.InformationOnly.Destination = dest
 
+	if err := updateEmbeddedDockerReference(&manifestUpdates, dest, src, canModifyManifest); err != nil {
+		return err
+	}
+
 	// We compute preferredManifestMIMEType only to show it in error messages.
 	// Without having to add this context in an error message, we would be happy enough to know only that no conversion is needed.
 	preferredManifestMIMEType, otherManifestMIMETypeCandidates, err := determineManifestConversion(&manifestUpdates, src, destSupportedManifestMIMETypes, canModifyManifest)
@@ -270,6 +274,24 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		return errors.Wrap(err, "Error committing the finished image")
 	}
 
+	return nil
+}
+
+// updateEmbeddedDockerReference handles the Docker reference embedded in Docker schema1 manifests.
+func updateEmbeddedDockerReference(manifestUpdates *types.ManifestUpdateOptions, dest types.ImageDestination, src types.Image, canModifyManifest bool) error {
+	destRef := dest.Reference().DockerReference()
+	if destRef == nil {
+		return nil // Destination does not care about Docker references
+	}
+	if !src.EmbeddedDockerReferenceConflicts(destRef) {
+		return nil // No reference embedded in the manifest, or it matches destRef already.
+	}
+
+	if !canModifyManifest {
+		return errors.Errorf("Copying a schema1 image with an embedded Docker reference to %s (Docker reference %s) would invalidate existing signatures. Explicitly enable signature removal to proceed anyway",
+			transports.ImageName(dest.Reference()), destRef.String())
+	}
+	manifestUpdates.EmbeddedDockerReference = destRef
 	return nil
 }
 
