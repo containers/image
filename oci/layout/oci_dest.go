@@ -171,10 +171,6 @@ func (d *ociImageDestination) PutManifest(m []byte) error {
 	if err := ioutil.WriteFile(blobPath, m, 0644); err != nil {
 		return err
 	}
-	// TODO(runcom): ugly here?
-	if err := ioutil.WriteFile(d.ref.ociLayoutPath(), []byte(`{"imageLayoutVersion": "1.0.0"}`), 0644); err != nil {
-		return err
-	}
 
 	annotations := make(map[string]string)
 	annotations["org.opencontainers.ref.name"] = d.ref.tag
@@ -216,6 +212,9 @@ func (d *ociImageDestination) PutSignatures(signatures [][]byte) error {
 // - Uploaded data MAY be visible to others before Commit() is called
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 func (d *ociImageDestination) Commit() error {
+	if err := ioutil.WriteFile(d.ref.ociLayoutPath(), []byte(`{"imageLayoutVersion": "1.0.0"}`), 0644); err != nil {
+		return err
+	}
 	indexJSON, err := json.Marshal(d.index)
 	if err != nil {
 		return err
