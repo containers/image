@@ -51,13 +51,18 @@ Ensure that the dependencies documented [in vendor.conf](https://github.com/cont
 are also available
 (using those exact versions or different versions of your choosing).
 
-Optionally, you can use the `containers_image_openpgp` build tag (using `go build -tags …`, or `make … BUILDTAGS=…`).
+This library, by default, also depends on the GpgME C library. Either install it:
+```sh
+Fedora$ dnf install gpgme-devel libassuan-devel
+macOS$ brew install gpgme
+```
+or use the `containers_image_openpgp` build tag (e.g. using `go build -tags …`)
 This will use a Golang-only OpenPGP implementation for signature verification instead of the default cgo/gpgme-based implementation;
 the primary downside is that creating new signatures with the Golang-only implementation is not supported.
 
 ## Contributing
 
-When developing this library, please use `make` to take advantage of the tests and validation.
+When developing this library, please use `make` (or `make … BUILDTAGS=…`) to take advantage of the tests and validation.
 
 ## License
 
