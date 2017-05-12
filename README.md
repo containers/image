@@ -45,8 +45,11 @@ If you want to see what the library can do, or an example of how it is called,
 consider starting with the [skopeo](https://github.com/projectatomic/skopeo) tool
 instead.
 
-For ordinary use, `go build ./...` is sufficient.
-
+To integrate this library into your project, put it into `$GOPATH` or use
+your preferred vendoring tool to include a copy in your project.
+Ensure that the dependencies documented [in vendor.conf](https://github.com/containers/image/blob/master/vendor.conf)
+are also available
+(using those exact versions or different versions of your choosing).
 
 Optionally, you can use the `containers_image_openpgp` build tag (using `go build -tags …`, or `make … BUILDTAGS=…`).
 This will use a Golang-only OpenPGP implementation for signature verification instead of the default cgo/gpgme-based implementation;
