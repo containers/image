@@ -20,8 +20,14 @@ to another, for example docker container images to OCI images. It also allows
 you to copy container images between various registries, possibly converting
 them as necessary, and to sign and verify images.
 
+## Command-line usage
+
+The containers/image project is only a library with no user interface;
+you can either incorporate it into your Go programs, or use the `skopeo` tool:
+
 The [skopeo](https://github.com/projectatomic/skopeo) tool uses the
-containers/image library and takes advantage of its many features.
+containers/image library and takes advantage of many of its features,
+e.g. `skopeo copy` exposes the `containers/image/copy.Image` functionality.
 
 ## Dependencies
 
