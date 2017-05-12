@@ -31,12 +31,13 @@ e.g. `skopeo copy` exposes the `containers/image/copy.Image` functionality.
 
 ## Dependencies
 
-Dependencies that this library prefers will not be found in the `vendor`
-directory. This is so you can make well-informed decisions about which
-libraries you should use with this package in your own projects.
+This library does not ship a committed version of its dependencies in a `vendor`
+subdirectory.  This is so you can make well-informed decisions about which
+libraries you should use with this package in your own projects, and because
+types defined in the `vendor` directory would be impossible to use from your projects.
 
 What this project tests against dependencies-wise is located
-[here](https://github.com/containers/image/blob/master/vendor.conf).
+[in vendor.conf](https://github.com/containers/image/blob/master/vendor.conf).
 
 ## Building
 
