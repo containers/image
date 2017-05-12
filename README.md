@@ -41,6 +41,10 @@ What this project tests against dependencies-wise is located
 
 ## Building
 
+If you want to see what the library can do, or an example of how it is called,
+consider starting with the [skopeo](https://github.com/projectatomic/skopeo) tool
+instead.
+
 For ordinary use, `go build ./...` is sufficient.
 
 
