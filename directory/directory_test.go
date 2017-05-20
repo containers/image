@@ -47,11 +47,17 @@ func TestGetPutManifest(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, man, m)
 	assert.Equal(t, "", mt)
+	m, mt, err = src.GetOriginalManifest(context.Background(), nil)
+	assert.NoError(t, err)
+	assert.Equal(t, man, m)
+	assert.Equal(t, "", mt)
 
 	// Non-default instances are not supported
 	md, err := manifest.Digest(man)
 	require.NoError(t, err)
 	_, _, err = src.GetManifest(context.Background(), &md)
+	assert.Error(t, err)
+	_, _, err = src.GetOriginalManifest(context.Background(), &md)
 	assert.Error(t, err)
 }
 

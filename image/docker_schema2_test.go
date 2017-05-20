@@ -13,7 +13,7 @@ import (
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
-	"github.com/opencontainers/go-digest"
+	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -30,6 +30,9 @@ func (f unusedImageSource) Close() error {
 	panic("Unexpected call to a mock function")
 }
 func (f unusedImageSource) GetManifest(context.Context, *digest.Digest) ([]byte, string, error) {
+	panic("Unexpected call to a mock function")
+}
+func (f unusedImageSource) GetOriginalManifest(context.Context, *digest.Digest) ([]byte, string, error) {
 	panic("Unexpected call to a mock function")
 }
 func (f unusedImageSource) HasThreadSafeGetBlob() bool {
