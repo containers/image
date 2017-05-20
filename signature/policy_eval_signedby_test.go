@@ -201,6 +201,69 @@ func createInvalidSigDir(t *testing.T) string {
 	return dir
 }
 
+func TestPRSignedByIsImageAuthenticated(t *testing.T) {
+	ktGPG := SBKeyTypeGPGKeys
+	prm := NewPRMMatchExact()
+
+	// A simple success case: single valid signature.
+	image, closer := dirImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
+	defer closer()
+	pr, err := NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
+	require.NoError(t, err)
+	authenticated, err := pr.isImageAuthenticated(context.Background(), image)
+	assertImageAuthenticated(t, authenticated, err)
+
+	// Error reading signatures
+	invalidSigDir := createInvalidSigDir(t)
+	defer os.RemoveAll(invalidSigDir)
+	image, closer = dirImageMock(t, invalidSigDir, "testing/manifest:latest")
+	defer closer()
+	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
+	require.NoError(t, err)
+	authenticated, err = pr.isImageAuthenticated(context.Background(), image)
+	assertImageAuthenticationRejected(t, authenticated, err)
+
+	// No signatures
+	image, closer = dirImageMock(t, "fixtures/dir-img-unsigned", "testing/manifest:latest")
+	defer closer()
+	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
+	require.NoError(t, err)
+	authenticated, err = pr.isImageAuthenticated(context.Background(), image)
+	assertImageAuthenticationRejectedPolicyRequirement(t, authenticated, err)
+
+	// 1 invalid signature: use dir-img-valid, but a non-matching Docker reference
+	image, closer = dirImageMock(t, "fixtures/dir-img-valid", "testing/manifest:notlatest")
+	defer closer()
+	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
+	require.NoError(t, err)
+	authenticated, err = pr.isImageAuthenticated(context.Background(), image)
+	assertImageAuthenticationRejectedPolicyRequirement(t, authenticated, err)
+
+	// 2 valid signatures
+	image, closer = dirImageMock(t, "fixtures/dir-img-valid-2", "testing/manifest:latest")
+	defer closer()
+	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
+	require.NoError(t, err)
+	authenticated, err = pr.isImageAuthenticated(context.Background(), image)
+	assertImageAuthenticated(t, authenticated, err)
+
+	// One invalid, one valid signature (in this order)
+	image, closer = dirImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:latest")
+	defer closer()
+	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
+	require.NoError(t, err)
+	authenticated, err = pr.isImageAuthenticated(context.Background(), image)
+	assertImageAuthenticated(t, authenticated, err)
+
+	// 2 invalid signatures: use dir-img-valid-2, but a non-matching Docker reference
+	image, closer = dirImageMock(t, "fixtures/dir-img-valid-2", "testing/manifest:notlatest")
+	defer closer()
+	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
+	require.NoError(t, err)
+	authenticated, err = pr.isImageAuthenticated(context.Background(), image)
+	assertImageAuthenticationRejectedPolicyRequirement(t, authenticated, err)
+}
+
 func TestPRSignedByIsRunningImageAllowed(t *testing.T) {
 	ktGPG := SBKeyTypeGPGKeys
 	prm := NewPRMMatchExact()

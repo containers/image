@@ -56,6 +56,13 @@ func TestPRInsecureAcceptAnythingIsSignatureAuthorAccepted(t *testing.T) {
 	assertSARUnknown(t, sar, parsedSig, err)
 }
 
+func TestPRInsecureAcceptAnythingIsImageAuthenticated(t *testing.T) {
+	pr := NewPRInsecureAcceptAnything()
+	// Pass nil pointers to, kind of, test that the return value does not depend on the parameters.
+	authenticated, err := pr.isImageAuthenticated(context.Background(), nil)
+	assertImageNotAuthenticated(t, authenticated, err)
+}
+
 func TestPRInsecureAcceptAnythingIsRunningImageAllowed(t *testing.T) {
 	pr := NewPRInsecureAcceptAnything()
 	res, err := pr.isRunningImageAllowed(context.Background(), nameOnlyImageMock{})
@@ -67,6 +74,12 @@ func TestPRRejectIsSignatureAuthorAccepted(t *testing.T) {
 	// Pass nil signature to, kind of, test that the return value does not depend on it.
 	sar, parsedSig, err := pr.isSignatureAuthorAccepted(context.Background(), nameOnlyImageMock{}, nil)
 	assertSARRejectedPolicyRequirement(t, sar, parsedSig, err)
+}
+
+func TestPRRejectIsImageAuthenticated(t *testing.T) {
+	pr := NewPRReject()
+	authenticated, err := pr.isImageAuthenticated(context.Background(), nameOnlyImageMock{})
+	assertImageAuthenticationRejectedPolicyRequirement(t, authenticated, err)
 }
 
 func TestPRRejectIsRunningImageAllowed(t *testing.T) {

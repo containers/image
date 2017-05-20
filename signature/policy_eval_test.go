@@ -366,6 +366,110 @@ func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
 	assert.Nil(t, sigs)
 }
 
+func TestPolicyContextIsImageAuthenticated(t *testing.T) {
+	pc, err := NewPolicyContext(&Policy{
+		Default: PolicyRequirements{NewPRReject()},
+		Transports: map[string]PolicyTransportScopes{
+			"docker": {
+				"docker.io/testing/manifest:latest": {
+					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchExact()),
+				},
+				"docker.io/testing/manifest:twoAllows": {
+					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
+					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
+				},
+				"docker.io/testing/manifest:allowDeny": {
+					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
+					NewPRReject(),
+				},
+				"docker.io/testing/manifest:reject": {
+					NewPRReject(),
+				},
+				"docker.io/testing/manifest:acceptAnything": {
+					NewPRInsecureAcceptAnything(),
+				},
+				"docker.io/testing/manifest:invalidEmptyRequirements": {},
+			},
+		},
+	})
+	require.NoError(t, err)
+	defer pc.Destroy()
+
+	// Success
+	img, closer := pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
+	defer closer()
+	res, err := pc.IsImageAuthenticated(context.Background(), img)
+	assertImageAuthenticated(t, res, err)
+
+	// Two signatures
+	// FIXME? Use really different signatures for this?
+	img, closer = pcImageMock(t, "fixtures/dir-img-valid-2", "testing/manifest:latest")
+	defer closer()
+	res, err = pc.IsImageAuthenticated(context.Background(), img)
+	assertImageAuthenticated(t, res, err)
+
+	// No signatures
+	img, closer = pcImageMock(t, "fixtures/dir-img-unsigned", "testing/manifest:latest")
+	defer closer()
+	res, err = pc.IsImageAuthenticated(context.Background(), img)
+	assertImageAuthenticationRejectedPolicyRequirement(t, res, err)
+
+	// Only invalid signatures
+	img, closer = pcImageMock(t, "fixtures/dir-img-modified-manifest", "testing/manifest:latest")
+	defer closer()
+	res, err = pc.IsImageAuthenticated(context.Background(), img)
+	assertImageAuthenticationRejectedPolicyRequirement(t, res, err)
+
+	// 1 invalid, 1 valid signature (in this order)
+	img, closer = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:latest")
+	defer closer()
+	res, err = pc.IsImageAuthenticated(context.Background(), img)
+	assertImageAuthenticated(t, res, err)
+
+	// Two allowed results
+	img, closer = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:twoAllows")
+	defer closer()
+	res, err = pc.IsImageAuthenticated(context.Background(), img)
+	assertImageAuthenticated(t, res, err)
+
+	// Allow + deny results
+	img, closer = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:allowDeny")
+	defer closer()
+	res, err = pc.IsImageAuthenticated(context.Background(), img)
+	assertImageAuthenticationRejectedPolicyRequirement(t, res, err)
+
+	// prReject works
+	img, closer = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:reject")
+	defer closer()
+	res, err = pc.IsImageAuthenticated(context.Background(), img)
+	assertImageAuthenticationRejectedPolicyRequirement(t, res, err)
+
+	// prInsecureAcceptAnything works
+	img, closer = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:acceptAnything")
+	defer closer()
+	res, err = pc.IsImageAuthenticated(context.Background(), img)
+	assertImageNotAuthenticated(t, res, err)
+
+	// Empty list of requirements (invalid)
+	img, closer = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:invalidEmptyRequirements")
+	defer closer()
+	res, err = pc.IsImageAuthenticated(context.Background(), img)
+	assertImageAuthenticationRejectedPolicyRequirement(t, res, err)
+
+	// Unexpected state (context already destroyed)
+	destroyedPC, err := NewPolicyContext(pc.Policy)
+	require.NoError(t, err)
+	err = destroyedPC.Destroy()
+	require.NoError(t, err)
+	img, closer = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
+	defer closer()
+	res, err = destroyedPC.IsImageAuthenticated(context.Background(), img)
+	assertImageAuthenticationRejected(t, res, err)
+	// Not testing the pcInUse->pcReady transition, that would require custom PolicyRequirement
+	// implementations meddling with the state, or threads. This is for catching trivial programmer
+	// mistakes only, anyway.
+}
+
 func TestPolicyContextIsRunningImageAllowed(t *testing.T) {
 	pc, err := NewPolicyContext(&Policy{
 		Default: PolicyRequirements{NewPRReject()},
@@ -498,6 +602,33 @@ func assertSARRejectedPolicyRequirement(t *testing.T, sar signatureAcceptanceRes
 func assertSARUnknown(t *testing.T, sar signatureAcceptanceResult, parsedSig *Signature, err error) {
 	assert.Equal(t, sarUnknown, sar)
 	assert.Nil(t, parsedSig)
+	assert.NoError(t, err)
+}
+
+// Helpers for validating PolicyRequirement.isImageAuthenticated results:
+
+// assertImageAuthenticated verifies that isImageAuthenticated returns a consistent true result.
+func assertImageAuthenticated(t *testing.T, authenticated bool, err error) {
+	assert.True(t, authenticated)
+	assert.NoError(t, err)
+}
+
+// assertImageAuthenticationRejected verifies that isImageAuthenticated returns a consistent rejection result,
+func assertImageAuthenticationRejected(t *testing.T, authenticated bool, err error) {
+	assert.False(t, authenticated)
+	assert.Error(t, err)
+}
+
+// assertImageAuthenticationRejectedPolicyRequirement verifies that isImageAuthenticated returns a consistent rejection result,
+// and that the returned error is a PolicyRequirementError.
+func assertImageAuthenticationRejectedPolicyRequirement(t *testing.T, authenticated bool, err error) {
+	assertImageAuthenticationRejected(t, authenticated, err)
+	assert.IsType(t, PolicyRequirementError(""), err)
+}
+
+// assertImageNotAuthenticated verifies that isImageAuthenticated returns a consistent “no error, not authenticated” result.
+func assertImageNotAuthenticated(t *testing.T, authenticated bool, err error) {
+	assert.False(t, authenticated)
 	assert.NoError(t, err)
 }
 

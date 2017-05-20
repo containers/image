@@ -14,6 +14,13 @@ func TestPRSignedBaseLayerIsSignatureAuthorAccepted(t *testing.T) {
 	sar, parsedSig, err := pr.isSignatureAuthorAccepted(context.Background(), nil, nil)
 	assertSARUnknown(t, sar, parsedSig, err)
 }
+func TestPRSignedBaseLayerIsImageAuthenticated(t *testing.T) {
+	pr, err := NewPRSignedBaseLayer(NewPRMMatchRepository())
+	require.NoError(t, err)
+	// Pass nil pointers to, kind of, test that the return value does not depend on the parameters.
+	authenticated, err := pr.isImageAuthenticated(context.Background(), nil)
+	assertImageNotAuthenticated(t, authenticated, err)
+}
 
 func TestPRSignedBaseLayerIsRunningImageAllowed(t *testing.T) {
 	// This will obviously need to change after signedBaseLayer is implemented.
