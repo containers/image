@@ -122,6 +122,24 @@ func (m *manifestSchema2) LayerInfos() []types.BlobInfo {
 	return manifestLayerInfosToBlobInfos(m.m.LayerInfos())
 }
 
+// LayerDiffIDs returns a list of DiffIDs (= digests of the UNCOMPRESSED versions, whether or not the downloadable blobs are compressed) of layers referenced by this image,
+// in order (the root layer first, and then successive layered layers), if available, or nil if not.
+// WARNING: The list may contain duplicates, and they are semantically relevant.
+func (m *manifestSchema2) LayerDiffIDs(ctx context.Context) ([]digest.Digest, error) {
+	configBytes, err := m.ConfigBlob(ctx)
+	if err != nil {
+		return nil, err
+	}
+	imageConfig := &manifest.Schema2Image{}
+	if err := json.Unmarshal(configBytes, imageConfig); err != nil {
+		return nil, err
+	}
+	if imageConfig.RootFS == nil {
+		return nil, errors.New("rootfs subobject missing from image config")
+	}
+	return imageConfig.RootFS.DiffIDs, nil
+}
+
 // EmbeddedDockerReferenceConflicts whether a Docker reference embedded in the manifest, if any, conflicts with destination ref.
 // It returns false if the manifest does not embed a Docker reference.
 // (This embedding unfortunately happens for Docker schema1, please do not add support for this in any new formats.)

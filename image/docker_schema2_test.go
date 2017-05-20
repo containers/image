@@ -256,6 +256,35 @@ func TestManifestSchema2LayerInfo(t *testing.T) {
 	}
 }
 
+func TestManifestSchema2LayerDiffIDs(t *testing.T) {
+	configJSON, err := ioutil.ReadFile("fixtures/schema2-config.json")
+	require.NoError(t, err)
+
+	m := manifestSchema2FromComponentsLikeFixture(configJSON)
+	diffIDs, err := m.LayerDiffIDs(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, []digest.Digest{
+		"sha256:142a601d97936307e75220c35dde0348971a9584c21e7cb42e1f7004005432ab",
+		"sha256:90fcc66ad3be9f1757f954b750deb37032f208428aa12599fcb02182b9065a9c",
+		"sha256:5a8624bb7e76d1e6829f9c64c43185e02bc07f97a2189eb048609a8914e72c56",
+		"sha256:d349ff6b3afc6a2800054768c82bfbf4289c9aa5da55c1290f802943dcd4d1e9",
+		"sha256:8c064bb1f60e84fa8cc6079b6d2e76e0423389fd6aeb7e497dfdae5e05b2b25b",
+	}, diffIDs)
+
+	// nil configBlob will trigger an error in m.ConfigBlob()
+	m = manifestSchema2FromComponentsLikeFixture(nil)
+	_, err = m.LayerDiffIDs(context.Background())
+	assert.Error(t, err)
+
+	m = manifestSchema2FromComponentsLikeFixture([]byte("invalid JSON"))
+	_, err = m.LayerDiffIDs(context.Background())
+	assert.Error(t, err)
+
+	m = manifestSchema2FromComponentsLikeFixture([]byte(`{"no-rootfs":1}`))
+	_, err = m.LayerDiffIDs(context.Background())
+	assert.Error(t, err)
+}
+
 func TestManifestSchema2EmbeddedDockerReferenceConflicts(t *testing.T) {
 	for _, m := range []genericManifest{
 		manifestSchema2FromFixture(t, unusedImageSource{}, "schema2.json", false),

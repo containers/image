@@ -7,7 +7,7 @@ import (
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/pkg/compression"
-	"github.com/opencontainers/go-digest"
+	digest "github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -104,7 +104,7 @@ const (
 	Compress
 )
 
-// BlobInfo collects known information about a blob (layer/config).
+// BlobInfo collects known information about a downloadable blob (layer/config).
 // In some situations, some fields may be unknown, in others they may be mandatory; documenting an “unknown” value here does not override that.
 type BlobInfo struct {
 	Digest      digest.Digest // "" if unknown.
@@ -351,6 +351,10 @@ type Image interface {
 	// The Digest field is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
 	// WARNING: The list may contain duplicates, and they are semantically relevant.
 	LayerInfosForCopy(context.Context) ([]BlobInfo, error)
+	// LayerDiffIDs returns a list of DiffIDs (= digests of the UNCOMPRESSED versions, whether or not the downloadable blobs are compressed) of layers referenced by this image,
+	// in order (the root layer first, and then successive layered layers), if available, or nil if not.
+	// WARNING: The list may contain duplicates, and they are semantically relevant.
+	LayerDiffIDs(context.Context) ([]digest.Digest, error)
 	// EmbeddedDockerReferenceConflicts whether a Docker reference embedded in the manifest, if any, conflicts with destination ref.
 	// It returns false if the manifest does not embed a Docker reference.
 	// (This embedding unfortunately happens for Docker schema1, please do not add support for this in any new formats.)

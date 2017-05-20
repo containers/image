@@ -9,6 +9,7 @@ import (
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,6 +45,9 @@ func (f fakeImageSource) Manifest(ctx context.Context) ([]byte, string, error) {
 func (f fakeImageSource) Signatures(context.Context) ([][]byte, error) {
 	panic("Unexpected call to a mock function")
 }
+func (f fakeImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+	panic("Unexpected call to a mock function")
+}
 func (f fakeImageSource) ConfigInfo() types.BlobInfo {
 	panic("Unexpected call to a mock function")
 }
@@ -56,7 +60,7 @@ func (f fakeImageSource) OCIConfig(context.Context) (*v1.Image, error) {
 func (f fakeImageSource) LayerInfos() []types.BlobInfo {
 	panic("Unexpected call to a mock function")
 }
-func (f fakeImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+func (f fakeImageSource) LayerDiffIDs(context.Context) ([]digest.Digest, error) {
 	panic("Unexpected call to a mock function")
 }
 func (f fakeImageSource) EmbeddedDockerReferenceConflicts(ref reference.Named) bool {

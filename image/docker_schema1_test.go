@@ -208,6 +208,17 @@ func TestManifestSchema1LayerInfo(t *testing.T) {
 	}
 }
 
+func TestManifestSchema1LayerDiffIDs(t *testing.T) {
+	for _, m := range []genericManifest{
+		manifestSchema1FromFixture(t, "schema1.json"),
+		manifestSchema1FromComponentsLikeFixture(t),
+	} {
+		diffIDs, err := m.LayerDiffIDs(context.Background())
+		require.NoError(t, err)
+		assert.Nil(t, diffIDs)
+	}
+}
+
 func TestManifestSchema1EmbeddedDockerReferenceConflicts(t *testing.T) {
 	for _, m := range []genericManifest{
 		manifestSchema1FromFixture(t, "schema1.json"),
