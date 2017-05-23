@@ -518,6 +518,10 @@ type SystemContext struct {
 	// in order to not break any existing docker's integration tests.
 	DockerDisableV1Ping bool
 
+	// === docker/daemon.Transport and docker/daemon/signatures.Store overrides ===
+	// If not "", overrides the system's default path for the docker signature storage, used for recording metadata allowing to authenticate docker images.
+	DockerSignatureDBPath string
+
 	// === ostree.Transport overrides ===
 	// Directory to use for OSTree temporary files
 	OSTreeTmpDirPath string

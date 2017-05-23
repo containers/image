@@ -1,0 +1,8 @@
+["config+manifest->bucket"]
+  ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\x00sha256:426c390db1e8405a6aa1de0d5abf0ad29146740bc5319fd3b323a0681789e47b"]
+    "manifest" = "{\"mediaType\":\"application/vnd.docker.distribution.manifest.v2+json\",\"config\":{\"digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}}"
+    "sig0" = "signature 1"
+    "sig1" = "signature 2"
+    "sig2" = "signature 3"
+["config+name+tag->manifest"]
+  "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\x00docker.io/library/busybox:latest" = "sha256:426c390db1e8405a6aa1de0d5abf0ad29146740bc5319fd3b323a0681789e47b"
