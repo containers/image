@@ -488,3 +488,12 @@ func (s *Source) GetSignatures(ctx context.Context, instanceDigest *digest.Diges
 	}
 	return [][]byte{}, nil
 }
+
+// TarfileConfigDigest returns the config digest (“image ID”) of the image.
+// (TarfileConfigDigest is not a part of types.ImageSource.)
+func (s *Source) TarfileConfigDigest() (digest.Digest, error) {
+	if err := s.ensureCachedDataIsPresent(); err != nil {
+		return "", err
+	}
+	return s.configDigest, nil
+}
