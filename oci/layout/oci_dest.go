@@ -173,7 +173,7 @@ func (d *ociImageDestination) PutManifest(m []byte) error {
 	}
 
 	annotations := make(map[string]string)
-	annotations["org.opencontainers.ref.name"] = d.ref.tag
+	annotations["org.opencontainers.image.ref.name"] = d.ref.tag
 	desc.Annotations = annotations
 	desc.Platform = &imgspecv1.Platform{
 		Architecture: runtime.GOARCH,
