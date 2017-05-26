@@ -134,7 +134,10 @@ func setupCertificates(dir string, tlsc *tls.Config) error {
 		return nil
 	}
 	fs, err := ioutil.ReadDir(dir)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return err
 	}
 
