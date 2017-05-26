@@ -129,10 +129,15 @@ func newTransport() *http.Transport {
 	return tr
 }
 
-func setupCertificates(dir string, tlsc *tls.Config) error {
-	if dir == "" {
-		return nil
+// dockerCertDir returns a path to a directory to be consumed by setupCertificates() depending on ctx, or "" if no directory should be used.
+func dockerCertDir(ctx *types.SystemContext) string {
+	if ctx != nil {
+		return ctx.DockerCertPath
 	}
+	return ""
+}
+
+func setupCertificates(dir string, tlsc *tls.Config) error {
 	fs, err := ioutil.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -203,12 +208,14 @@ func newDockerClient(ctx *types.SystemContext, ref dockerReference, write bool, 
 	}
 	tr := newTransport()
 	tr.TLSClientConfig = serverDefault()
-	if ctx != nil && (ctx.DockerCertPath != "" || ctx.DockerInsecureSkipTLSVerify) {
-		if err := setupCertificates(ctx.DockerCertPath, tr.TLSClientConfig); err != nil {
+	certDir := dockerCertDir(ctx)
+	if certDir != "" {
+		if err := setupCertificates(certDir, tr.TLSClientConfig); err != nil {
 			return nil, err
 		}
-
-		tr.TLSClientConfig.InsecureSkipVerify = ctx.DockerInsecureSkipTLSVerify
+	}
+	if ctx != nil && ctx.DockerInsecureSkipTLSVerify {
+		tr.TLSClientConfig.InsecureSkipVerify = true
 	}
 	client := &http.Client{Transport: tr}
 
