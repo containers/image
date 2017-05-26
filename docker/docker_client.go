@@ -202,18 +202,13 @@ func newDockerClient(ctx *types.SystemContext, ref dockerReference, write bool, 
 		return nil, err
 	}
 	tr := newTransport()
+	tr.TLSClientConfig = serverDefault()
 	if ctx != nil && (ctx.DockerCertPath != "" || ctx.DockerInsecureSkipTLSVerify) {
-		tlsc := &tls.Config{}
-
-		if err := setupCertificates(ctx.DockerCertPath, tlsc); err != nil {
+		if err := setupCertificates(ctx.DockerCertPath, tr.TLSClientConfig); err != nil {
 			return nil, err
 		}
 
-		tlsc.InsecureSkipVerify = ctx.DockerInsecureSkipTLSVerify
-		tr.TLSClientConfig = tlsc
-	}
-	if tr.TLSClientConfig == nil {
-		tr.TLSClientConfig = serverDefault()
+		tr.TLSClientConfig.InsecureSkipVerify = ctx.DockerInsecureSkipTLSVerify
 	}
 	client := &http.Client{Transport: tr}
 
