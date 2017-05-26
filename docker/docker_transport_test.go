@@ -153,7 +153,7 @@ func TestReferenceNewImage(t *testing.T) {
 	ref, err := ParseReference("//busybox")
 	require.NoError(t, err)
 	img, err := ref.NewImage(&types.SystemContext{RegistriesDirPath: "/this/doesnt/exist"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer img.Close()
 }
 
@@ -169,7 +169,7 @@ func TestReferenceNewImageDestination(t *testing.T) {
 	ref, err := ParseReference("//busybox")
 	require.NoError(t, err)
 	dest, err := ref.NewImageDestination(&types.SystemContext{RegistriesDirPath: "/this/doesnt/exist"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer dest.Close()
 }
 

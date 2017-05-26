@@ -52,7 +52,7 @@ func TestCreateSignature(t *testing.T) {
 	dockerRef, err := docker.ParseReference("//busybox")
 	require.NoError(t, err)
 	dockerDest, err := dockerRef.NewImageDestination(&types.SystemContext{RegistriesDirPath: "/this/doesnt/exist"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer dockerDest.Close()
 
 	// Signing with an unknown key fails
