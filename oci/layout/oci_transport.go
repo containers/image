@@ -201,7 +201,7 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 		if md.MediaType != imgspecv1.MediaTypeImageManifest {
 			continue
 		}
-		refName, ok := md.Annotations["org.opencontainers.ref.name"]
+		refName, ok := md.Annotations["org.opencontainers.image.ref.name"]
 		if !ok {
 			continue
 		}
