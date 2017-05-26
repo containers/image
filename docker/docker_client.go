@@ -34,6 +34,8 @@ const (
 	dockerCfgFileName = "config.json"
 	dockerCfgObsolete = ".dockercfg"
 
+	systemPerHostCertDirPath = "/etc/docker/certs.d"
+
 	resolvedPingV2URL       = "%s://%s/v2/"
 	resolvedPingV1URL       = "%s://%s/v1/_ping"
 	tagsPath                = "/v2/%s/tags/list"
@@ -129,12 +131,20 @@ func newTransport() *http.Transport {
 	return tr
 }
 
-// dockerCertDir returns a path to a directory to be consumed by setupCertificates() depending on ctx, or "" if no directory should be used.
-func dockerCertDir(ctx *types.SystemContext) string {
-	if ctx != nil {
+// dockerCertDir returns a path to a directory to be consumed by setupCertificates() depending on ctx and hostPort.
+func dockerCertDir(ctx *types.SystemContext, hostPort string) string {
+	if ctx != nil && ctx.DockerCertPath != "" {
 		return ctx.DockerCertPath
 	}
-	return ""
+	var hostCertDir string
+	if ctx != nil && ctx.DockerPerHostCertDirPath != "" {
+		hostCertDir = ctx.DockerPerHostCertDirPath
+	} else if ctx != nil && ctx.RootForImplicitAbsolutePaths != "" {
+		hostCertDir = filepath.Join(ctx.RootForImplicitAbsolutePaths, systemPerHostCertDirPath)
+	} else {
+		hostCertDir = systemPerHostCertDirPath
+	}
+	return filepath.Join(hostCertDir, hostPort)
 }
 
 func setupCertificates(dir string, tlsc *tls.Config) error {
@@ -208,11 +218,14 @@ func newDockerClient(ctx *types.SystemContext, ref dockerReference, write bool, 
 	}
 	tr := newTransport()
 	tr.TLSClientConfig = serverDefault()
-	certDir := dockerCertDir(ctx)
-	if certDir != "" {
-		if err := setupCertificates(certDir, tr.TLSClientConfig); err != nil {
-			return nil, err
-		}
+	// It is undefined whether the host[:port] string for dockerHostname should be dockerHostname or dockerRegistry,
+	// because docker/docker does not read the certs.d subdirectory at all in that case.  We use the user-visible
+	// dockerHostname here, because it is more symmetrical to read the configuration in that case as well, and because
+	// generally the UI hides the existence of the different dockerRegistry.  But note that this behavior is
+	// undocumented and may change if docker/docker changes.
+	certDir := dockerCertDir(ctx, reference.Domain(ref.ref))
+	if err := setupCertificates(certDir, tr.TLSClientConfig); err != nil {
+		return nil, err
 	}
 	if ctx != nil && ctx.DockerInsecureSkipTLSVerify {
 		tr.TLSClientConfig.InsecureSkipVerify = true
