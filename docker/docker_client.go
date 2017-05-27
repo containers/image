@@ -148,6 +148,7 @@ func dockerCertDir(ctx *types.SystemContext, hostPort string) string {
 }
 
 func setupCertificates(dir string, tlsc *tls.Config) error {
+	logrus.Debugf("Looking for TLS certificates and private keys in %s", dir)
 	fs, err := ioutil.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -164,7 +165,7 @@ func setupCertificates(dir string, tlsc *tls.Config) error {
 				return errors.Wrap(err, "unable to get system cert pool")
 			}
 			tlsc.RootCAs = systemPool
-			logrus.Debugf("crt: %s", fullPath)
+			logrus.Debugf(" crt: %s", fullPath)
 			data, err := ioutil.ReadFile(fullPath)
 			if err != nil {
 				return err
@@ -174,7 +175,7 @@ func setupCertificates(dir string, tlsc *tls.Config) error {
 		if strings.HasSuffix(f.Name(), ".cert") {
 			certName := f.Name()
 			keyName := certName[:len(certName)-5] + ".key"
-			logrus.Debugf("cert: %s", fullPath)
+			logrus.Debugf(" cert: %s", fullPath)
 			if !hasFile(fs, keyName) {
 				return errors.Errorf("missing key %s for client certificate %s. Note that CA certificates should use the extension .crt", keyName, certName)
 			}
@@ -187,7 +188,7 @@ func setupCertificates(dir string, tlsc *tls.Config) error {
 		if strings.HasSuffix(f.Name(), ".key") {
 			keyName := f.Name()
 			certName := keyName[:len(keyName)-4] + ".cert"
-			logrus.Debugf("key: %s", fullPath)
+			logrus.Debugf(" key: %s", fullPath)
 			if !hasFile(fs, certName) {
 				return errors.Errorf("missing client certificate %s for key %s", certName, keyName)
 			}
