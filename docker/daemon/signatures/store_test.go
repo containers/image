@@ -1,6 +1,8 @@
 package signatures
 
 import (
+	"context"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -8,6 +10,8 @@ import (
 	"time"
 
 	"github.com/containers/image/docker/reference"
+	"github.com/containers/image/image"
+	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	bolt "github.com/etcd-io/bbolt"
 	digest "github.com/opencontainers/go-digest"
@@ -297,4 +301,83 @@ func TestWriteToTx(t *testing.T) {
 	// Writing to a read-only transaction fails already on the first CreateBucketIfNotExists,
 	// which detects a read-only transaction and fails. So, we can’t use a read-only transaction
 	// to test write failures.
+}
+
+// fixtureReference emulates the reference recorded for the image in testdata/signatures.db
+type fixtureReference struct{ ref reference.Named }
+
+func (fr fixtureReference) Transport() types.ImageTransport {
+	panic("not implemented")
+}
+func (fr fixtureReference) StringWithinTransport() string {
+	panic("not implemented")
+}
+func (fr fixtureReference) DockerReference() reference.Named {
+	return fr.ref
+}
+func (fr fixtureReference) PolicyConfigurationIdentity() string {
+	panic("not implemented")
+}
+func (fr fixtureReference) PolicyConfigurationNamespaces() []string {
+	panic("not implemented")
+}
+func (fr fixtureReference) NewImage(context.Context, *types.SystemContext) (types.ImageCloser, error) {
+	panic("not implemented")
+}
+func (fr fixtureReference) NewImageSource(context.Context, *types.SystemContext) (types.ImageSource, error) {
+	panic("not implemented")
+}
+func (fr fixtureReference) NewImageDestination(context.Context, *types.SystemContext) (types.ImageDestination, error) {
+	panic("not implemented")
+}
+func (fr fixtureReference) DeleteImage(context.Context, *types.SystemContext) error {
+	panic("not implemented")
+}
+
+// fixtureImageSource emulates the image recorded in testdata/signatures.db.
+type fixtureImageSource struct{ ref reference.Named }
+
+func (fis fixtureImageSource) Reference() types.ImageReference {
+	return fixtureReference{ref: fis.ref}
+}
+func (fis fixtureImageSource) Close() error {
+	return nil
+}
+func (fis fixtureImageSource) GetManifest(_ context.Context, instanceDigest *digest.Digest) ([]byte, string, error) {
+	if instanceDigest != nil {
+		panic("not implemented")
+	}
+	return fxManifestContents, manifest.DockerV2Schema2MediaType, nil
+}
+func (fis fixtureImageSource) GetOriginalManifest(context.Context, *digest.Digest) ([]byte, string, error) {
+	panic("not implemented")
+}
+func (fis fixtureImageSource) HasThreadSafeGetBlob() bool {
+	panic("not implemented")
+}
+func (fis fixtureImageSource) GetBlob(context.Context, types.BlobInfo, types.BlobInfoCache) (io.ReadCloser, int64, error) {
+	panic("not implemented")
+}
+func (fis fixtureImageSource) GetSignatures(_ context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
+	if instanceDigest != nil {
+		panic("not implemented")
+	}
+	return fxSignatures, nil
+}
+func (fis fixtureImageSource) LayerInfosForCopy(context.Context) ([]types.BlobInfo, error) {
+	panic("not implemented")
+}
+
+func TestStoreRecordImage(t *testing.T) {
+	tmpFile, err := ioutil.TempFile("", "signatures-test-store.RecordImage")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+	s := NewStore(&types.SystemContext{DockerSignatureDBPath: tmpFile.Name()})
+
+	fis := fixtureImageSource{ref: referenceNamed(t, fxNamedTaggedReference.String())}
+	img, err := image.FromSource(context.Background(), nil, fis)
+	require.NoError(t, err)
+	err = s.RecordImage(context.Background(), img)
+	assert.NoError(t, err)
+	assertBoltDBMatchesFxDBDump(t, tmpFile.Name())
 }

@@ -8,6 +8,7 @@ package signatures
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -181,4 +182,30 @@ func writeToTx(tx *bolt.Tx, configDigest digest.Digest, ref reference.NamedTagge
 		return err
 	}
 	return updateTagMapping(tx, configDigest, ref, manifestDigest)
+}
+
+// RecordImage stores the manifest and signatures of img, which may then be discarded by the caller.
+func (s *Store) RecordImage(ctx context.Context, img types.Image) error {
+	configDigest := img.ConfigInfo().Digest
+	if configDigest == "" {
+		return nil // FIXME?! We do not record anything for v2s1?!
+	}
+	manifest, _, err := img.Manifest(ctx)
+	if err != nil {
+		return err
+	}
+	sigs, err := img.Signatures(ctx)
+	if err != nil {
+		return err
+	}
+
+	var namedTaggedRef reference.NamedTagged
+	if dockerReference := img.Reference().DockerReference(); dockerReference != nil {
+		// dockerReference could in theory also be reference.Canonical (name@digest), which we can ignore:
+		// s.Prepare() computes the digest from manifest directly, and the name alone is not useful.
+		if nt, ok := dockerReference.(reference.NamedTagged); ok {
+			namedTaggedRef = nt
+		}
+	}
+	return s.Write(configDigest, namedTaggedRef, manifest, sigs)
 }
