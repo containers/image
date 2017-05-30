@@ -12,7 +12,80 @@ import (
 
 	"github.com/containers/image/types"
 	"github.com/containers/storage/pkg/homedir"
+	"github.com/stretchr/testify/assert"
 )
+
+func TestDockerCertDir(t *testing.T) {
+	const nondefaultFullPath = "/this/is/not/the/default/full/path"
+	const nondefaultPerHostDir = "/this/is/not/the/default/certs.d"
+	const variableReference = "$HOME"
+	const rootPrefix = "/root/prefix"
+	const registryHostPort = "localhost:5000"
+
+	systemPerHostResult := filepath.Join(systemPerHostCertDirPath, registryHostPort)
+	for _, c := range []struct {
+		ctx      *types.SystemContext
+		expected string
+	}{
+		// The common case
+		{nil, systemPerHostResult},
+		// There is a context, but it does not override the path.
+		{&types.SystemContext{}, systemPerHostResult},
+		// Full path overridden
+		{&types.SystemContext{DockerCertPath: nondefaultFullPath}, nondefaultFullPath},
+		// Per-host path overridden
+		{
+			&types.SystemContext{DockerPerHostCertDirPath: nondefaultPerHostDir},
+			filepath.Join(nondefaultPerHostDir, registryHostPort),
+		},
+		// Both overridden
+		{
+			&types.SystemContext{
+				DockerCertPath:           nondefaultFullPath,
+				DockerPerHostCertDirPath: nondefaultPerHostDir,
+			},
+			nondefaultFullPath,
+		},
+		// Root overridden
+		{
+			&types.SystemContext{RootForImplicitAbsolutePaths: rootPrefix},
+			filepath.Join(rootPrefix, systemPerHostResult),
+		},
+		// Root and path overrides present simultaneously,
+		{
+			&types.SystemContext{
+				DockerCertPath:               nondefaultFullPath,
+				RootForImplicitAbsolutePaths: rootPrefix,
+			},
+			nondefaultFullPath,
+		},
+		{
+			&types.SystemContext{
+				DockerPerHostCertDirPath:     nondefaultPerHostDir,
+				RootForImplicitAbsolutePaths: rootPrefix,
+			},
+			filepath.Join(nondefaultPerHostDir, registryHostPort),
+		},
+		// … and everything at once
+		{
+			&types.SystemContext{
+				DockerCertPath:               nondefaultFullPath,
+				DockerPerHostCertDirPath:     nondefaultPerHostDir,
+				RootForImplicitAbsolutePaths: rootPrefix,
+			},
+			nondefaultFullPath,
+		},
+		// No environment expansion happens in the overridden paths
+		{&types.SystemContext{DockerCertPath: variableReference}, variableReference},
+		{
+			&types.SystemContext{DockerPerHostCertDirPath: variableReference},
+			filepath.Join(variableReference, registryHostPort),
+		},
+	} {
+		path := dockerCertDir(c.ctx, registryHostPort)
+		assert.Equal(t, c.expected, path)
+	}
+}
 
 func TestGetAuth(t *testing.T) {
 	origHomeDir := homedir.Get()
