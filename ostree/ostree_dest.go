@@ -86,6 +86,11 @@ func (d *ostreeImageDestination) AcceptsForeignLayerURLs() bool {
 	return false
 }
 
+// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime OS. False otherwise.
+func (d *ostreeImageDestination) MustMatchRuntimeOS() bool {
+	return true
+}
+
 func (d *ostreeImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobInfo) (types.BlobInfo, error) {
 	tmpDir, err := ioutil.TempDir(d.tmpDirPath, "blob")
 	if err != nil {

@@ -375,6 +375,9 @@ func (d *memoryImageDest) ShouldCompressLayers() bool {
 func (d *memoryImageDest) AcceptsForeignLayerURLs() bool {
 	panic("Unexpected call to a mock function")
 }
+func (d *memoryImageDest) MustMatchRuntimeOS() bool {
+	panic("Unexpected call to a mock function")
+}
 func (d *memoryImageDest) PutBlob(stream io.Reader, inputInfo types.BlobInfo) (types.BlobInfo, error) {
 	if d.storedBlobs == nil {
 		d.storedBlobs = make(map[digest.Digest][]byte)
