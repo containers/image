@@ -69,3 +69,16 @@ func Register(t types.ImageTransport) {
 func ImageName(ref types.ImageReference) string {
 	return ref.Transport().Name() + ":" + ref.StringWithinTransport()
 }
+
+// List returns a comma separate list of transports
+func ListNames() string {
+	list := ""
+	for _, transport := range kt.transports {
+		if list == "" {
+			list = transport.Name()
+		} else {
+			list = list + ", " + transport.Name()
+		}
+	}
+	return list
+}
