@@ -2,6 +2,7 @@ package transports
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/containers/image/types"
@@ -68,4 +69,14 @@ func Register(t types.ImageTransport) {
 // e.g. default attribute values omitted by the user may be filled in in the return value, or vice versa.
 func ImageName(ref types.ImageReference) string {
 	return ref.Transport().Name() + ":" + ref.StringWithinTransport()
+}
+
+// List returns a comma separate list of transports
+func ListNames() []string {
+	var names []string
+	for _, transport := range kt.transports {
+	       names = append(names, transport.Name())
+	}
+	sort.Strings(names)
+	return names
 }
