@@ -24,6 +24,7 @@ func TestParseImageName(t *testing.T) {
 
 // A table-driven test summarizing the various transports' behavior.
 func TestImageNameHandling(t *testing.T) {
+	// Always registered transports
 	for _, c := range []struct{ transport, input, roundtrip string }{
 		{"dir", "/etc", "/etc"},
 		{"docker", "//busybox", "//busybox:latest"},
@@ -41,5 +42,11 @@ func TestImageNameHandling(t *testing.T) {
 		require.NoError(t, err, fullInput)
 		s := transports.ImageName(ref)
 		assert.Equal(t, c.transport+":"+c.roundtrip, s, fullInput)
+	}
+
+	// Possibly stubbed-out transports: Only verify that something is registered.
+	for _, c := range []string{"ostree"} {
+		transport := transports.Get(c)
+		assert.NotNil(t, transport, c)
 	}
 }
