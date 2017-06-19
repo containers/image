@@ -188,9 +188,10 @@ func setupCertificates(dir string, tlsc *tls.Config) error {
 		if strings.HasSuffix(f.Name(), ".key") {
 			keyName := f.Name()
 			certName := keyName[:len(keyName)-4] + ".cert"
+			crtName := keyName[:len(keyName)-4] + ".crt"
 			logrus.Debugf(" key: %s", fullPath)
-			if !hasFile(fs, certName) {
-				return errors.Errorf("missing client certificate %s for key %s", certName, keyName)
+			if !hasFile(fs, certName) && !hasFile(fs, crtName) {
+				return errors.Errorf("missing client certificate %s|%s for key %s", certName, crtName, keyName)
 			}
 		}
 	}
