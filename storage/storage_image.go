@@ -521,7 +521,7 @@ func diffLayer(store storage.Store, layerID string) (rc io.ReadCloser, n int64, 
 	} else {
 		n = layerMeta.CompressedSize
 	}
-	diff, err := store.Diff("", layer.ID)
+	diff, err := store.Diff("", layer.ID, nil)
 	if err != nil {
 		return nil, -1, err
 	}
