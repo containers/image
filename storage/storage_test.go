@@ -23,6 +23,7 @@ import (
 	"github.com/containers/storage/pkg/ioutils"
 	"github.com/containers/storage/pkg/reexec"
 	ddigest "github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -498,6 +499,7 @@ func TestDuplicateName(t *testing.T) {
 	if dest == nil {
 		t.Fatalf("NewImageDestination(%q, second pass) returned no destination", ref.StringWithinTransport())
 	}
+	digest, _, size, blob = makeLayer(t, archive.Gzip)
 	if _, err := dest.PutBlob(bytes.NewBuffer(blob), types.BlobInfo{
 		Size:   int64(size),
 		Digest: digest,
@@ -551,17 +553,18 @@ func TestDuplicateID(t *testing.T) {
 	if dest == nil {
 		t.Fatalf("NewImageDestination(%q, second pass) returned no destination", ref.StringWithinTransport())
 	}
+	digest, _, size, blob = makeLayer(t, archive.Gzip)
 	if _, err := dest.PutBlob(bytes.NewBuffer(blob), types.BlobInfo{
 		Size:   int64(size),
 		Digest: digest,
 	}); err != nil {
 		t.Fatalf("Error saving randomly-generated layer to destination, second pass: %v", err)
 	}
-	if err := dest.Commit(); err != storage.ErrDuplicateID {
+	if err := dest.Commit(); errors.Cause(err) != storage.ErrDuplicateID {
 		if err != nil {
 			t.Fatalf("Wrong error committing changes to destination, second pass: %v", err)
 		}
-		t.Fatalf("Incorrectly succeeded committing changes to destination, second pass: %v", err)
+		t.Fatal("Incorrectly succeeded committing changes to destination, second pass: no error")
 	}
 	dest.Close()
 }
@@ -607,17 +610,18 @@ func TestDuplicateNameID(t *testing.T) {
 	if dest == nil {
 		t.Fatalf("NewImageDestination(%q, second pass) returned no destination", ref.StringWithinTransport())
 	}
+	digest, _, size, blob = makeLayer(t, archive.Gzip)
 	if _, err := dest.PutBlob(bytes.NewBuffer(blob), types.BlobInfo{
 		Size:   int64(size),
 		Digest: digest,
 	}); err != nil {
 		t.Fatalf("Error saving randomly-generated layer to destination, second pass: %v", err)
 	}
-	if err := dest.Commit(); err != storage.ErrDuplicateID {
+	if err := dest.Commit(); errors.Cause(err) != storage.ErrDuplicateID {
 		if err != nil {
 			t.Fatalf("Wrong error committing changes to destination, second pass: %v", err)
 		}
-		t.Fatalf("Incorrectly succeeded committing changes to destination, second pass: %v", err)
+		t.Fatal("Incorrectly succeeded committing changes to destination, second pass: no error")
 	}
 	dest.Close()
 }
