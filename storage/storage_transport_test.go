@@ -68,24 +68,24 @@ func TestTransportParseReference(t *testing.T) {
 	driver := store.GraphDriverName()
 	root := store.GraphRoot()
 
-	for _, c := range []struct{ prefix, expectedDriver, expectedRoot string }{
-		{"", driver, root},                              // Implicit store location prefix
-		{"[unterminated", "", ""},                       // Unterminated store specifier
-		{"[]", "", ""},                                  // Empty store specifier
-		{"[relative/path]", "", ""},                     // Non-absolute graph root path
-		{"[" + driver + "@relative/path]", "", ""},      // Non-absolute graph root path
-		{"[thisisunknown@" + root + "suffix2]", "", ""}, // Unknown graph driver
-
-		// The next two could be valid, but aren't enough to allow GetStore() to locate a matching
-		// store, since the reference can't specify a RunRoot.  Without one, GetStore() tries to
-		// match the GraphRoot (possibly combined with the driver name) against a Store that was
-		// previously opened using GetStore(), and we haven't done that.
-		// Future versions of the storage library will probably make this easier for locations that
-		// are shared, by caching the rest of the information inside the graph root so that it can
-		// be looked up later, but since this is a per-test temporary location, that won't help here.
-		//{"[" + root + "suffix1]", driver, root + "suffix1"},                // A valid root path
-		//{"[" + driver + "@" + root + "suffix3]", driver, root + "suffix3"}, // A valid root@graph pair
+	for _, c := range []struct{ prefix, expectedDriver, expectedRoot, expectedRunRoot string }{
+		{"", driver, root, ""},                              // Implicit store location prefix
+		{"[unterminated", "", "", ""},                       // Unterminated store specifier
+		{"[]", "", "", ""},                                  // Empty store specifier
+		{"[relative/path]", "", "", ""},                     // Non-absolute graph root path
+		{"[" + driver + "@relative/path]", "", "", ""},      // Non-absolute graph root path
+		{"[thisisunknown@" + root + "suffix2]", "", "", ""}, // Unknown graph driver
+		{"[" + root + "suffix1]", "", root + "suffix1", ""}, // A valid root path, but no run dir
+		{"[" + driver + "@" + root + "suffix3+" + root + "suffix4]",
+			driver,
+			root + "suffix3",
+			root + "suffix4"}, // A valid root@graph+run set
+		{"[" + driver + "@" + root + "suffix3+" + root + "suffix4:options,options,options]",
+			driver,
+			root + "suffix3",
+			root + "suffix4"}, // A valid root@graph+run+options set
 	} {
+		t.Logf("parsing %q", c.prefix+"busybox")
 		ref, err := Transport.ParseReference(c.prefix + "busybox")
 		if c.expectedDriver == "" {
 			assert.Error(t, err, c.prefix)
@@ -95,6 +95,9 @@ func TestTransportParseReference(t *testing.T) {
 			require.True(t, ok, c.prefix)
 			assert.Equal(t, c.expectedDriver, storageRef.transport.store.GraphDriverName(), c.prefix)
 			assert.Equal(t, c.expectedRoot, storageRef.transport.store.GraphRoot(), c.prefix)
+			if c.expectedRunRoot != "" {
+				assert.Equal(t, c.expectedRunRoot, storageRef.transport.store.RunRoot(), c.prefix)
+			}
 		}
 	}
 }

@@ -58,7 +58,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func newStore(t *testing.T) storage.Store {
+func newStoreWithGraphDriverOptions(t *testing.T, options []string) storage.Store {
 	wd, err := ioutil.TempDir(topwd, "test.")
 	if err != nil {
 		t.Fatal(err)
@@ -83,7 +83,7 @@ func newStore(t *testing.T) storage.Store {
 		RunRoot:            run,
 		GraphRoot:          root,
 		GraphDriverName:    "vfs",
-		GraphDriverOptions: []string{},
+		GraphDriverOptions: options,
 		UIDMap:             uidmap,
 		GIDMap:             gidmap,
 	})
@@ -92,6 +92,10 @@ func newStore(t *testing.T) storage.Store {
 	}
 	Transport.SetStore(store)
 	return store
+}
+
+func newStore(t *testing.T) storage.Store {
+	return newStoreWithGraphDriverOptions(t, []string{})
 }
 
 func TestParse(t *testing.T) {
@@ -158,6 +162,46 @@ func TestParse(t *testing.T) {
 		}
 		if ref.reference != reference.reference {
 			t.Fatalf("ParseReference(%q) failed to extract reference (%q!=%q)", s, ref.reference, reference.reference)
+		}
+	}
+}
+
+func TestParseWithGraphDriverOptions(t *testing.T) {
+	optionLists := [][]string{
+		{},
+		{"unused1"},
+		{"unused1", "unused2"},
+		{"unused1", "unused2", "unused3"},
+	}
+	for _, optionList := range optionLists {
+		store := newStoreWithGraphDriverOptions(t, optionList)
+		ref, err := Transport.ParseStoreReference(store, "test")
+		if err != nil {
+			t.Fatalf("ParseStoreReference(%q, graph driver options %v) returned error %v", "test", optionList, err)
+		}
+		if ref == nil {
+			t.Fatalf("ParseStoreReference returned nil reference")
+		}
+		spec := ref.StringWithinTransport()
+		ref2, err := Transport.ParseReference(spec)
+		if err != nil {
+			t.Fatalf("ParseReference(%q) returned error %v", "test", err)
+		}
+		if ref == nil {
+			t.Fatalf("ParseReference returned nil reference")
+		}
+		sref, ok := ref2.(*storageReference)
+		if !ok {
+			t.Fatalf("ParseReference returned a reference from transport %s, not one of ours", ref2.Transport().Name())
+		}
+		parsedOptions := sref.transport.store.GraphOptions()
+		if len(parsedOptions) != len(optionList) {
+			t.Fatalf("Lost options between %v and %v", optionList, parsedOptions)
+		}
+		for i := range optionList {
+			if parsedOptions[i] != optionList[i] {
+				t.Fatalf("Mismatched option %d: %v and %v", i, optionList[i], parsedOptions[i])
+			}
 		}
 	}
 }
