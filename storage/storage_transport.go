@@ -11,6 +11,7 @@ import (
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
 	"github.com/containers/storage"
+	"github.com/containers/storage/pkg/idtools"
 	"github.com/opencontainers/go-digest"
 	ddigest "github.com/opencontainers/go-digest"
 )
@@ -46,10 +47,20 @@ type StoreTransport interface {
 	// ParseStoreReference parses a reference, overriding any store
 	// specification that it may contain.
 	ParseStoreReference(store storage.Store, reference string) (*storageReference, error)
+	// SetDefaultUIDMap sets the default UID map to use when opening stores.
+	SetDefaultUIDMap(idmap []idtools.IDMap)
+	// SetDefaultGIDMap sets the default GID map to use when opening stores.
+	SetDefaultGIDMap(idmap []idtools.IDMap)
+	// DefaultUIDMap returns the default UID map used when opening stores.
+	DefaultUIDMap() []idtools.IDMap
+	// DefaultGIDMap returns the default GID map used when opening stores.
+	DefaultGIDMap() []idtools.IDMap
 }
 
 type storageTransport struct {
-	store storage.Store
+	store         storage.Store
+	defaultUIDMap []idtools.IDMap
+	defaultGIDMap []idtools.IDMap
 }
 
 func (s *storageTransport) Name() string {
@@ -64,6 +75,26 @@ func (s *storageTransport) Name() string {
 // SetStore does not affect previously parsed references.
 func (s *storageTransport) SetStore(store storage.Store) {
 	s.store = store
+}
+
+// SetDefaultUIDMap sets the default UID map to use when opening stores.
+func (s *storageTransport) SetDefaultUIDMap(idmap []idtools.IDMap) {
+	s.defaultUIDMap = idmap
+}
+
+// SetDefaultGIDMap sets the default GID map to use when opening stores.
+func (s *storageTransport) SetDefaultGIDMap(idmap []idtools.IDMap) {
+	s.defaultGIDMap = idmap
+}
+
+// DefaultUIDMap returns the default UID map used when opening stores.
+func (s *storageTransport) DefaultUIDMap() []idtools.IDMap {
+	return s.defaultUIDMap
+}
+
+// DefaultGIDMap returns the default GID map used when opening stores.
+func (s *storageTransport) DefaultGIDMap() []idtools.IDMap {
+	return s.defaultGIDMap
 }
 
 // ParseStoreReference takes a name or an ID, tries to figure out which it is
@@ -132,14 +163,17 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	} else {
 		logrus.Debugf("parsed reference into %q", storeSpec+refname+"@"+id)
 	}
-	return newReference(storageTransport{store: store}, refname, id, name), nil
+	return newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, refname, id, name), nil
 }
 
 func (s *storageTransport) GetStore() (storage.Store, error) {
 	// Return the transport's previously-set store.  If we don't have one
 	// of those, initialize one now.
 	if s.store == nil {
-		store, err := storage.GetStore(storage.DefaultStoreOptions)
+		options := storage.DefaultStoreOptions
+		options.UIDMap = s.defaultUIDMap
+		options.GIDMap = s.defaultGIDMap
+		store, err := storage.GetStore(options)
 		if err != nil {
 			return nil, err
 		}
@@ -211,6 +245,8 @@ func (s *storageTransport) ParseReference(reference string) (types.ImageReferenc
 			GraphRoot:          rootInfo,
 			RunRoot:            runRootInfo,
 			GraphDriverOptions: options,
+			UIDMap:             s.defaultUIDMap,
+			GIDMap:             s.defaultGIDMap,
 		})
 		if err != nil {
 			return nil, err

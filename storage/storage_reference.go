@@ -70,7 +70,9 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 // to build this reference object.
 func (s storageReference) Transport() types.ImageTransport {
 	return &storageTransport{
-		store: s.transport.store,
+		store:         s.transport.store,
+		defaultUIDMap: s.transport.defaultUIDMap,
+		defaultGIDMap: s.transport.defaultGIDMap,
 	}
 }
 

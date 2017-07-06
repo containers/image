@@ -69,23 +69,23 @@ func newStoreWithGraphDriverOptions(t *testing.T, options []string) storage.Stor
 	}
 	run := filepath.Join(wd, "run")
 	root := filepath.Join(wd, "root")
-	uidmap := []idtools.IDMap{{
+	Transport.SetDefaultUIDMap([]idtools.IDMap{{
 		ContainerID: 0,
 		HostID:      os.Getuid(),
 		Size:        1,
-	}}
-	gidmap := []idtools.IDMap{{
+	}})
+	Transport.SetDefaultGIDMap([]idtools.IDMap{{
 		ContainerID: 0,
 		HostID:      os.Getgid(),
 		Size:        1,
-	}}
+	}})
 	store, err := storage.GetStore(storage.StoreOptions{
 		RunRoot:            run,
 		GraphRoot:          root,
 		GraphDriverName:    "vfs",
 		GraphDriverOptions: options,
-		UIDMap:             uidmap,
-		GIDMap:             gidmap,
+		UIDMap:             Transport.DefaultUIDMap(),
+		GIDMap:             Transport.DefaultGIDMap(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -127,7 +127,9 @@ func TestParse(t *testing.T) {
 	}
 
 	transport := storageTransport{
-		store: store,
+		store:         store,
+		defaultUIDMap: Transport.(*storageTransport).defaultUIDMap,
+		defaultGIDMap: Transport.(*storageTransport).defaultGIDMap,
 	}
 	_references := []storageReference{
 		{
