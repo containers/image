@@ -183,6 +183,7 @@ func (m *manifestSchema2) UpdatedImage(options types.ManifestUpdateOptions) (typ
 		}
 		copy.LayersDescriptors = make([]descriptor, len(options.LayerInfos))
 		for i, info := range options.LayerInfos {
+			copy.LayersDescriptors[i].MediaType = m.LayersDescriptors[i].MediaType
 			copy.LayersDescriptors[i].Digest = info.Digest
 			copy.LayersDescriptors[i].Size = info.Size
 			copy.LayersDescriptors[i].URLs = info.URLs
