@@ -438,6 +438,7 @@ func TestWriteRead(t *testing.T) {
 		if src == nil {
 			t.Fatalf("NewImageSource(%q) returned no source", ref.StringWithinTransport())
 		}
+		// Note that we would strip a digest here, but not a tag.
 		if src.Reference().StringWithinTransport() != ref.StringWithinTransport() {
 			// As long as it's only the addition of an ID suffix, that's okay.
 			if !strings.HasPrefix(src.Reference().StringWithinTransport(), ref.StringWithinTransport()+"@") {

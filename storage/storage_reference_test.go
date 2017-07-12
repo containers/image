@@ -22,6 +22,7 @@ func TestStorageReferenceTransport(t *testing.T) {
 }
 
 func TestStorageReferenceDockerReference(t *testing.T) {
+	newStore(t)
 	ref, err := Transport.ParseReference("busybox")
 	require.NoError(t, err)
 	dr := ref.DockerReference()
@@ -54,7 +55,11 @@ var validReferenceTestCases = []struct {
 	},
 	{
 		"busybox@" + sha256digestHex, "docker.io/library/busybox:latest@" + sha256digestHex,
-		[]string{"docker.io/library/busybox:latest", "docker.io/library/busybox", "docker.io/library", "docker.io"},
+		[]string{"docker.io/library/busybox", "docker.io/library", "docker.io"},
+	},
+	{
+		"busybox@sha256:" + sha256digestHex, "docker.io/library/busybox@sha256:" + sha256digestHex,
+		[]string{"docker.io/library/busybox", "docker.io/library", "docker.io"},
 	},
 }
 
