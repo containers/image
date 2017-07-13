@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,7 +58,12 @@ var validReferenceTestCases = []struct {
 
 func TestStorageReferenceStringWithinTransport(t *testing.T) {
 	store := newStore(t)
-	storeSpec := fmt.Sprintf("[%s@%s]", store.GraphDriverName(), store.GraphRoot())
+	optionsList := ""
+	options := store.GraphOptions()
+	if len(options) > 0 {
+		optionsList = ":" + strings.Join(options, ",")
+	}
+	storeSpec := fmt.Sprintf("[%s@%s+%s%s]", store.GraphDriverName(), store.GraphRoot(), store.RunRoot(), optionsList)
 
 	for _, c := range validReferenceTestCases {
 		ref, err := Transport.ParseReference(c.input)
