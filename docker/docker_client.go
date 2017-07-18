@@ -308,31 +308,33 @@ func (c *dockerClient) setupRequestAuth(req *http.Request) error {
 	if len(c.challenges) == 0 {
 		return nil
 	}
-	// assume just one...
-	challenge := c.challenges[0]
-	switch challenge.Scheme {
-	case "basic":
-		req.SetBasicAuth(c.username, c.password)
-		return nil
-	case "bearer":
-		if c.token == nil || time.Now().After(c.tokenExpiration) {
-			realm, ok := challenge.Parameters["realm"]
-			if !ok {
-				return errors.Errorf("missing realm in bearer auth challenge")
+	for _, challenge := range c.challenges {
+		switch challenge.Scheme {
+		case "basic":
+			req.SetBasicAuth(c.username, c.password)
+			return nil
+		case "bearer":
+			if c.token == nil || time.Now().After(c.tokenExpiration) {
+				realm, ok := challenge.Parameters["realm"]
+				if !ok {
+					return errors.Errorf("missing realm in bearer auth challenge")
+				}
+				service, _ := challenge.Parameters["service"] // Will be "" if not present
+				scope := fmt.Sprintf("repository:%s:%s", c.scope.remoteName, c.scope.actions)
+				token, err := c.getBearerToken(realm, service, scope)
+				if err != nil {
+					return err
+				}
+				c.token = token
+				c.tokenExpiration = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
 			}
-			service, _ := challenge.Parameters["service"] // Will be "" if not present
-			scope := fmt.Sprintf("repository:%s:%s", c.scope.remoteName, c.scope.actions)
-			token, err := c.getBearerToken(realm, service, scope)
-			if err != nil {
-				return err
-			}
-			c.token = token
-			c.tokenExpiration = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token.Token))
+			return nil
+		default:
+			logrus.Debugf("no handler for %s authentication", challenge.Scheme)
 		}
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token.Token))
-		return nil
 	}
-	return errors.Errorf("no handler for %s authentication", challenge.Scheme)
+	return nil
 }
 
 func (c *dockerClient) getBearerToken(realm, service, scope string) (*bearerToken, error) {
