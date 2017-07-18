@@ -308,7 +308,9 @@ func (c *dockerClient) setupRequestAuth(req *http.Request) error {
 	if len(c.challenges) == 0 {
 		return nil
 	}
+	schemeNames := make([]string, 0, len(c.challenges))
 	for _, challenge := range c.challenges {
+		schemeNames = append(schemeNames, challenge.Scheme)
 		switch challenge.Scheme {
 		case "basic":
 			req.SetBasicAuth(c.username, c.password)
@@ -334,6 +336,7 @@ func (c *dockerClient) setupRequestAuth(req *http.Request) error {
 			logrus.Debugf("no handler for %s authentication", challenge.Scheme)
 		}
 	}
+	logrus.Infof("None of the challenges sent by server (%s) are supported, trying an unauthenticated request anyway", strings.Join(schemeNames, ", "))
 	return nil
 }
 
