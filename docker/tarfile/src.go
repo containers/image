@@ -20,7 +20,7 @@ import (
 type Source struct {
 	tarPath string
 	// The following data is only available after ensureCachedDataIsPresent() succeeds
-	tarManifest       *manifestItem // nil if not available yet.
+	tarManifest       *ManifestItem // nil if not available yet.
 	configBytes       []byte
 	configDigest      digest.Digest
 	orderedDiffIDList []diffID
@@ -175,13 +175,13 @@ func (s *Source) ensureCachedDataIsPresent() error {
 }
 
 // loadTarManifest loads and decodes the manifest.json.
-func (s *Source) loadTarManifest() ([]manifestItem, error) {
+func (s *Source) loadTarManifest() ([]ManifestItem, error) {
 	// FIXME? Do we need to deal with the legacy format?
 	bytes, err := s.readTarComponent(manifestFileName)
 	if err != nil {
 		return nil, err
 	}
-	var items []manifestItem
+	var items []ManifestItem
 	if err := json.Unmarshal(bytes, &items); err != nil {
 		return nil, errors.Wrap(err, "Error decoding tar manifest.json")
 	}
@@ -189,11 +189,11 @@ func (s *Source) loadTarManifest() ([]manifestItem, error) {
 }
 
 // LoadTarManifest loads and decodes the manifest.json
-func (s *Source) LoadTarManifest() ([]manifestItem, error) {
+func (s *Source) LoadTarManifest() ([]ManifestItem, error) {
 	return s.loadTarManifest()
 }
 
-func (s *Source) prepareLayerData(tarManifest *manifestItem, parsedConfig *image) (map[diffID]*layerInfo, error) {
+func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *image) (map[diffID]*layerInfo, error) {
 	// Collect layer data available in manifest and config.
 	if len(tarManifest.Layers) != len(parsedConfig.RootFS.DiffIDs) {
 		return nil, errors.Errorf("Inconsistent layer count: %d in manifest, %d in config", len(tarManifest.Layers), len(parsedConfig.RootFS.DiffIDs))
