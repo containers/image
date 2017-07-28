@@ -3,6 +3,7 @@ package storage
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"flag"
@@ -454,7 +455,7 @@ func TestWriteRead(t *testing.T) {
 		if err == nil {
 			t.Fatalf("GetTargetManifest(%q) is supposed to fail", ref.StringWithinTransport())
 		}
-		sigs, err := src.GetSignatures()
+		sigs, err := src.GetSignatures(context.Background())
 		if err != nil {
 			t.Fatalf("GetSignatures(%q) returned error %v", ref.StringWithinTransport(), err)
 		}

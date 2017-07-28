@@ -3,6 +3,7 @@ package copy
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -171,7 +172,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		sigs = [][]byte{}
 	} else {
 		writeReport("Getting image source signatures\n")
-		s, err := src.Signatures()
+		s, err := src.Signatures(context.TODO())
 		if err != nil {
 			return errors.Wrap(err, "Error reading signatures")
 		}

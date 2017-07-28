@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -537,7 +538,7 @@ func (s *storageImageSource) GetTargetManifest(digest ddigest.Digest) (manifestB
 	return nil, "", ErrNoManifestLists
 }
 
-func (s *storageImageSource) GetSignatures() (signatures [][]byte, err error) {
+func (s *storageImageSource) GetSignatures(ctx context.Context) (signatures [][]byte, err error) {
 	var offset int
 	signature, err := s.imageRef.transport.store.ImageBigData(s.ID, "signatures")
 	if err != nil {

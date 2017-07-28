@@ -2,6 +2,7 @@ package openshift
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -226,7 +227,7 @@ func (s *openshiftImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int6
 	return s.docker.GetBlob(info)
 }
 
-func (s *openshiftImageSource) GetSignatures() ([][]byte, error) {
+func (s *openshiftImageSource) GetSignatures(ctx context.Context) ([][]byte, error) {
 	if err := s.ensureImageIsResolved(); err != nil {
 		return nil, err
 	}

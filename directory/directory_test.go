@@ -2,6 +2,7 @@ package directory
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -145,7 +146,7 @@ func TestGetPutSignatures(t *testing.T) {
 	src, err := ref.NewImageSource(nil, nil)
 	require.NoError(t, err)
 	defer src.Close()
-	sigs, err := src.GetSignatures()
+	sigs, err := src.GetSignatures(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, signatures, sigs)
 }
