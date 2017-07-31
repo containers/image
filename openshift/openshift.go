@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containers/image/docker"
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
@@ -20,6 +19,7 @@ import (
 	"github.com/containers/image/version"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // openshiftClient is configuration for dealing with a single image stream, for reading or writing.
