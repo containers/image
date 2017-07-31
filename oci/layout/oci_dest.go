@@ -180,6 +180,10 @@ func (d *ociImageDestination) PutManifest(m []byte) error {
 		return err
 	}
 
+	if d.ref.image == "" {
+		return errors.Errorf("cannot save image with empyt image.ref.name")
+	}
+
 	annotations := make(map[string]string)
 	annotations["org.opencontainers.image.ref.name"] = d.ref.image
 	desc.Annotations = annotations
