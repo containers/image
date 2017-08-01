@@ -206,13 +206,24 @@ func (s *dockerImageSource) GetSignatures() ([][]byte, error) {
 	}
 }
 
+// manifestDigest returns a digest of the manifest, either from the supplied reference or from a fetched manifest.
+func (s *dockerImageSource) manifestDigest() (digest.Digest, error) {
+	if digested, ok := s.ref.ref.(reference.Digested); ok {
+		d := digested.Digest()
+		if d.Algorithm() == digest.Canonical {
+			return d, nil
+		}
+	}
+	if err := s.ensureManifestIsLoaded(); err != nil {
+		return "", err
+	}
+	return manifest.Digest(s.cachedManifest)
+}
+
 // getSignaturesFromLookaside implements GetSignatures() from the lookaside location configured in s.c.signatureBase,
 // which is not nil.
 func (s *dockerImageSource) getSignaturesFromLookaside() ([][]byte, error) {
-	if err := s.ensureManifestIsLoaded(); err != nil {
-		return nil, err
-	}
-	manifestDigest, err := manifest.Digest(s.cachedManifest)
+	manifestDigest, err := s.manifestDigest()
 	if err != nil {
 		return nil, err
 	}
@@ -277,10 +288,7 @@ func (s *dockerImageSource) getOneSignature(url *url.URL) (signature []byte, mis
 
 // getSignaturesFromAPIExtension implements GetSignatures() using the X-Registry-Supports-Signatures API extension.
 func (s *dockerImageSource) getSignaturesFromAPIExtension() ([][]byte, error) {
-	if err := s.ensureManifestIsLoaded(); err != nil {
-		return nil, err
-	}
-	manifestDigest, err := manifest.Digest(s.cachedManifest)
+	manifestDigest, err := s.manifestDigest()
 	if err != nil {
 		return nil, err
 	}
