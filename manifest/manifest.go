@@ -3,6 +3,7 @@ package manifest
 import (
 	"encoding/json"
 
+	"github.com/containers/image/types"
 	"github.com/docker/libtrust"
 	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -36,6 +37,28 @@ var DefaultRequestedManifestMIMETypes = []string{
 	DockerV2Schema1SignedMediaType,
 	DockerV2Schema1MediaType,
 	DockerV2ListMediaType,
+}
+
+// Manifest is an interface for parsing, modifying image manifests in isolation.
+// Callers can either use this abstract interface without understanding the details of the formats,
+// or instantiate a specific implementation (e.g. manifest.OCI1) and access the public members
+// directly.
+//
+// See types.Image for functionality not limited to manifests, including format conversions and config parsing.
+// This interface is similar to, but not strictly equivalent to, the equivalent methods in types.Image.
+type Manifest interface {
+	// ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
+	ConfigInfo() types.BlobInfo
+	// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
+	// The Digest field is guaranteed to be provided; Size may be -1.
+	// WARNING: The list may contain duplicates, and they are semantically relevant.
+	LayerInfos() []types.BlobInfo
+	// UpdateLayerInfos replaces the original layers with the specified BlobInfos (size+digest+urls), in order (the root layer first, and then successive layered layers)
+	UpdateLayerInfos(layerInfos []types.BlobInfo) error
+
+	// Serialize returns the manifest in a blob format.
+	// NOTE: Serialize() does not in general reproduce the original blob if this object was loaded from one, even if no modifications were made!
+	Serialize() ([]byte, error)
 }
 
 // GuessMIMEType guesses MIME type of a manifest and returns it _if it is recognized_, or "" if unknown or unrecognized.

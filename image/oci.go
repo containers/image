@@ -8,23 +8,25 @@ import (
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	"github.com/opencontainers/go-digest"
-	"github.com/opencontainers/image-spec/specs-go"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
 
 type manifestOCI1 struct {
 	src        types.ImageSource // May be nil if configBlob is not nil
-	configBlob []byte            // If set, corresponds to contents of Config.
-	imgspecv1.Manifest
+	configBlob []byte            // If set, corresponds to contents of m.Config.
+	m          *manifest.OCI1
 }
 
-func manifestOCI1FromManifest(src types.ImageSource, manifest []byte) (genericManifest, error) {
-	oci := manifestOCI1{src: src}
-	if err := json.Unmarshal(manifest, &oci.Manifest); err != nil {
+func manifestOCI1FromManifest(src types.ImageSource, manifestBlob []byte) (genericManifest, error) {
+	m, err := manifest.OCI1FromManifest(manifestBlob)
+	if err != nil {
 		return nil, err
 	}
-	return &oci, nil
+	return &manifestOCI1{
+		src: src,
+		m:   m,
+	}, nil
 }
 
 // manifestOCI1FromComponents builds a new manifestOCI1 from the supplied data:
@@ -32,16 +34,12 @@ func manifestOCI1FromComponents(config imgspecv1.Descriptor, src types.ImageSour
 	return &manifestOCI1{
 		src:        src,
 		configBlob: configBlob,
-		Manifest: imgspecv1.Manifest{
-			Versioned: specs.Versioned{SchemaVersion: 2},
-			Config:    config,
-			Layers:    layers,
-		},
+		m:          manifest.OCI1FromComponents(config, layers),
 	}
 }
 
 func (m *manifestOCI1) serialize() ([]byte, error) {
-	return json.Marshal((*m).Manifest)
+	return m.m.Serialize()
 }
 
 func (m *manifestOCI1) manifestMIMEType() string {
@@ -51,7 +49,7 @@ func (m *manifestOCI1) manifestMIMEType() string {
 // ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
 // Note that the config object may not exist in the underlying storage in the return value of UpdatedImage! Use ConfigBlob() below.
 func (m *manifestOCI1) ConfigInfo() types.BlobInfo {
-	return types.BlobInfo{Digest: m.Config.Digest, Size: m.Config.Size, Annotations: m.Config.Annotations}
+	return m.m.ConfigInfo()
 }
 
 // ConfigBlob returns the blob described by ConfigInfo, iff ConfigInfo().Digest != ""; nil otherwise.
@@ -62,9 +60,9 @@ func (m *manifestOCI1) ConfigBlob() ([]byte, error) {
 			return nil, errors.Errorf("Internal error: neither src nor configBlob set in manifestOCI1")
 		}
 		stream, _, err := m.src.GetBlob(types.BlobInfo{
-			Digest: m.Config.Digest,
-			Size:   m.Config.Size,
-			URLs:   m.Config.URLs,
+			Digest: m.m.Config.Digest,
+			Size:   m.m.Config.Size,
+			URLs:   m.m.Config.URLs,
 		})
 		if err != nil {
 			return nil, err
@@ -75,8 +73,8 @@ func (m *manifestOCI1) ConfigBlob() ([]byte, error) {
 			return nil, err
 		}
 		computedDigest := digest.FromBytes(blob)
-		if computedDigest != m.Config.Digest {
-			return nil, errors.Errorf("Download config.json digest %s does not match expected %s", computedDigest, m.Config.Digest)
+		if computedDigest != m.m.Config.Digest {
+			return nil, errors.Errorf("Download config.json digest %s does not match expected %s", computedDigest, m.m.Config.Digest)
 		}
 		m.configBlob = blob
 	}
@@ -102,11 +100,7 @@ func (m *manifestOCI1) OCIConfig() (*imgspecv1.Image, error) {
 // The Digest field is guaranteed to be provided; Size may be -1.
 // WARNING: The list may contain duplicates, and they are semantically relevant.
 func (m *manifestOCI1) LayerInfos() []types.BlobInfo {
-	blobs := []types.BlobInfo{}
-	for _, layer := range m.Layers {
-		blobs = append(blobs, types.BlobInfo{Digest: layer.Digest, Size: layer.Size, Annotations: layer.Annotations, URLs: layer.URLs, MediaType: layer.MediaType})
-	}
-	return blobs
+	return m.m.LayerInfos()
 }
 
 // EmbeddedDockerReferenceConflicts whether a Docker reference embedded in the manifest, if any, conflicts with destination ref.
@@ -147,18 +141,14 @@ func (m *manifestOCI1) UpdatedImageNeedsLayerDiffIDs(options types.ManifestUpdat
 // UpdatedImage returns a types.Image modified according to options.
 // This does not change the state of the original Image object.
 func (m *manifestOCI1) UpdatedImage(options types.ManifestUpdateOptions) (types.Image, error) {
-	copy := *m // NOTE: This is not a deep copy, it still shares slices etc.
+	copy := manifestOCI1{ // NOTE: This is not a deep copy, it still shares slices etc.
+		src:        m.src,
+		configBlob: m.configBlob,
+		m:          manifest.OCI1Clone(m.m),
+	}
 	if options.LayerInfos != nil {
-		if len(copy.Layers) != len(options.LayerInfos) {
-			return nil, errors.Errorf("Error preparing updated manifest: layer count changed from %d to %d", len(copy.Layers), len(options.LayerInfos))
-		}
-		copy.Layers = make([]imgspecv1.Descriptor, len(options.LayerInfos))
-		for i, info := range options.LayerInfos {
-			copy.Layers[i].MediaType = m.Layers[i].MediaType
-			copy.Layers[i].Digest = info.Digest
-			copy.Layers[i].Size = info.Size
-			copy.Layers[i].Annotations = info.Annotations
-			copy.Layers[i].URLs = info.URLs
+		if err := copy.m.UpdateLayerInfos(options.LayerInfos); err != nil {
+			return nil, err
 		}
 	}
 	// Ignore options.EmbeddedDockerReference: it may be set when converting from schema1, but we really don't care.
@@ -185,15 +175,15 @@ func schema2DescriptorFromOCI1Descriptor(d imgspecv1.Descriptor) descriptor {
 
 func (m *manifestOCI1) convertToManifestSchema2() (types.Image, error) {
 	// Create a copy of the descriptor.
-	config := schema2DescriptorFromOCI1Descriptor(m.Config)
+	config := schema2DescriptorFromOCI1Descriptor(m.m.Config)
 
 	// The only difference between OCI and DockerSchema2 is the mediatypes. The
 	// media type of the manifest is handled by manifestSchema2FromComponents.
 	config.MediaType = manifest.DockerV2Schema2ConfigMediaType
 
-	layers := make([]descriptor, len(m.Layers))
+	layers := make([]descriptor, len(m.m.Layers))
 	for idx := range layers {
-		layers[idx] = schema2DescriptorFromOCI1Descriptor(m.Layers[idx])
+		layers[idx] = schema2DescriptorFromOCI1Descriptor(m.m.Layers[idx])
 		layers[idx].MediaType = manifest.DockerV2Schema2LayerMediaType
 	}
 
