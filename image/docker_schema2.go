@@ -207,6 +207,15 @@ func (m *manifestSchema2) UpdatedImage(options types.ManifestUpdateOptions) (typ
 	return memoryImageFromManifest(&copy), nil
 }
 
+func oci1DescriptorFromSchema2Descriptor(d descriptor) imgspecv1.Descriptor {
+	return imgspecv1.Descriptor{
+		MediaType: d.MediaType,
+		Size:      d.Size,
+		Digest:    d.Digest,
+		URLs:      d.URLs,
+	}
+}
+
 func (m *manifestSchema2) convertToManifestOCI1() (types.Image, error) {
 	configOCI, err := m.OCIConfig()
 	if err != nil {
@@ -217,17 +226,15 @@ func (m *manifestSchema2) convertToManifestOCI1() (types.Image, error) {
 		return nil, err
 	}
 
-	config := descriptorOCI1{
-		descriptor: descriptor{
-			MediaType: imgspecv1.MediaTypeImageConfig,
-			Size:      int64(len(configOCIBytes)),
-			Digest:    digest.FromBytes(configOCIBytes),
-		},
+	config := imgspecv1.Descriptor{
+		MediaType: imgspecv1.MediaTypeImageConfig,
+		Size:      int64(len(configOCIBytes)),
+		Digest:    digest.FromBytes(configOCIBytes),
 	}
 
-	layers := make([]descriptorOCI1, len(m.LayersDescriptors))
+	layers := make([]imgspecv1.Descriptor, len(m.LayersDescriptors))
 	for idx := range layers {
-		layers[idx] = descriptorOCI1{descriptor: m.LayersDescriptors[idx]}
+		layers[idx] = oci1DescriptorFromSchema2Descriptor(m.LayersDescriptors[idx])
 		if m.LayersDescriptors[idx].MediaType == manifest.DockerV2Schema2ForeignLayerMediaType {
 			layers[idx].MediaType = imgspecv1.MediaTypeImageLayerNonDistributable
 		} else {
