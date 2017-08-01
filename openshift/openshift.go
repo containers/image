@@ -71,7 +71,7 @@ func newOpenshiftClient(ref openshiftReference) (*openshiftClient, error) {
 }
 
 // doRequest performs a correctly authenticated request to a specified path, and returns response body or an error object.
-func (c *openshiftClient) doRequest(method, path string, requestBody []byte) ([]byte, error) {
+func (c *openshiftClient) doRequest(ctx context.Context, method, path string, requestBody []byte) ([]byte, error) {
 	url := *c.baseURL
 	url.Path = path
 	var requestBodyReader io.Reader
@@ -83,6 +83,7 @@ func (c *openshiftClient) doRequest(method, path string, requestBody []byte) ([]
 	if err != nil {
 		return nil, err
 	}
+	req = req.WithContext(ctx)
 
 	if len(c.bearerToken) != 0 {
 		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
@@ -133,10 +134,10 @@ func (c *openshiftClient) doRequest(method, path string, requestBody []byte) ([]
 }
 
 // getImage loads the specified image object.
-func (c *openshiftClient) getImage(imageStreamImageName string) (*image, error) {
+func (c *openshiftClient) getImage(ctx context.Context, imageStreamImageName string) (*image, error) {
 	// FIXME: validate components per validation.IsValidPathSegmentName?
 	path := fmt.Sprintf("/oapi/v1/namespaces/%s/imagestreamimages/%s@%s", c.ref.namespace, c.ref.stream, imageStreamImageName)
-	body, err := c.doRequest("GET", path, nil)
+	body, err := c.doRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +205,7 @@ func (s *openshiftImageSource) Close() error {
 }
 
 func (s *openshiftImageSource) GetTargetManifest(digest digest.Digest) ([]byte, string, error) {
-	if err := s.ensureImageIsResolved(); err != nil {
+	if err := s.ensureImageIsResolved(context.TODO()); err != nil {
 		return nil, "", err
 	}
 	return s.docker.GetTargetManifest(digest)
@@ -213,7 +214,7 @@ func (s *openshiftImageSource) GetTargetManifest(digest digest.Digest) ([]byte, 
 // GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).
 // It may use a remote (= slow) service.
 func (s *openshiftImageSource) GetManifest() ([]byte, string, error) {
-	if err := s.ensureImageIsResolved(); err != nil {
+	if err := s.ensureImageIsResolved(context.TODO()); err != nil {
 		return nil, "", err
 	}
 	return s.docker.GetManifest()
@@ -221,18 +222,18 @@ func (s *openshiftImageSource) GetManifest() ([]byte, string, error) {
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 func (s *openshiftImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, error) {
-	if err := s.ensureImageIsResolved(); err != nil {
+	if err := s.ensureImageIsResolved(context.TODO()); err != nil {
 		return nil, 0, err
 	}
 	return s.docker.GetBlob(info)
 }
 
 func (s *openshiftImageSource) GetSignatures(ctx context.Context) ([][]byte, error) {
-	if err := s.ensureImageIsResolved(); err != nil {
+	if err := s.ensureImageIsResolved(ctx); err != nil {
 		return nil, err
 	}
 
-	image, err := s.client.getImage(s.imageStreamImageName)
+	image, err := s.client.getImage(ctx, s.imageStreamImageName)
 	if err != nil {
 		return nil, err
 	}
@@ -246,14 +247,14 @@ func (s *openshiftImageSource) GetSignatures(ctx context.Context) ([][]byte, err
 }
 
 // ensureImageIsResolved sets up s.docker and s.imageStreamImageName
-func (s *openshiftImageSource) ensureImageIsResolved() error {
+func (s *openshiftImageSource) ensureImageIsResolved(ctx context.Context) error {
 	if s.docker != nil {
 		return nil
 	}
 
 	// FIXME: validate components per validation.IsValidPathSegmentName?
 	path := fmt.Sprintf("/oapi/v1/namespaces/%s/imagestreams/%s", s.client.ref.namespace, s.client.ref.stream)
-	body, err := s.client.doRequest("GET", path, nil)
+	body, err := s.client.doRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return err
 	}
@@ -411,7 +412,7 @@ func (d *openshiftImageDestination) PutSignatures(signatures [][]byte) error {
 		return nil // No need to even read the old state.
 	}
 
-	image, err := d.client.getImage(d.imageStreamImageName)
+	image, err := d.client.getImage(context.TODO(), d.imageStreamImageName)
 	if err != nil {
 		return err
 	}
@@ -452,7 +453,7 @@ sigExists:
 			Content:    newSig,
 		}
 		body, err := json.Marshal(sig)
-		_, err = d.client.doRequest("POST", "/oapi/v1/imagesignatures", body)
+		_, err = d.client.doRequest(context.TODO(), "POST", "/oapi/v1/imagesignatures", body)
 		if err != nil {
 			return err
 		}
