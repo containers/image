@@ -164,8 +164,8 @@ func (m *manifestOCI1) UpdatedImage(options types.ManifestUpdateOptions) (types.
 	return memoryImageFromManifest(&copy), nil
 }
 
-func schema2DescriptorFromOCI1Descriptor(d imgspecv1.Descriptor) descriptor {
-	return descriptor{
+func schema2DescriptorFromOCI1Descriptor(d imgspecv1.Descriptor) manifest.Schema2Descriptor {
+	return manifest.Schema2Descriptor{
 		MediaType: d.MediaType,
 		Size:      d.Size,
 		Digest:    d.Digest,
@@ -181,7 +181,7 @@ func (m *manifestOCI1) convertToManifestSchema2() (types.Image, error) {
 	// media type of the manifest is handled by manifestSchema2FromComponents.
 	config.MediaType = manifest.DockerV2Schema2ConfigMediaType
 
-	layers := make([]descriptor, len(m.m.Layers))
+	layers := make([]manifest.Schema2Descriptor, len(m.m.Layers))
 	for idx := range layers {
 		layers[idx] = schema2DescriptorFromOCI1Descriptor(m.m.Layers[idx])
 		layers[idx].MediaType = manifest.DockerV2Schema2LayerMediaType

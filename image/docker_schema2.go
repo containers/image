@@ -29,44 +29,36 @@ var gzippedEmptyLayer = []byte{
 // gzippedEmptyLayerDigest is a digest of gzippedEmptyLayer
 const gzippedEmptyLayerDigest = digest.Digest("sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4")
 
-type descriptor struct {
-	MediaType string        `json:"mediaType"`
-	Size      int64         `json:"size"`
-	Digest    digest.Digest `json:"digest"`
-	URLs      []string      `json:"urls,omitempty"`
-}
-
 type manifestSchema2 struct {
-	src               types.ImageSource // May be nil if configBlob is not nil
-	configBlob        []byte            // If set, corresponds to contents of ConfigDescriptor.
-	SchemaVersion     int               `json:"schemaVersion"`
-	MediaType         string            `json:"mediaType"`
-	ConfigDescriptor  descriptor        `json:"config"`
-	LayersDescriptors []descriptor      `json:"layers"`
+	src        types.ImageSource // May be nil if configBlob is not nil
+	configBlob []byte            // If set, corresponds to contents of ConfigDescriptor.
+	manifest.Schema2
 }
 
 func manifestSchema2FromManifest(src types.ImageSource, manifest []byte) (genericManifest, error) {
 	v2s2 := manifestSchema2{src: src}
-	if err := json.Unmarshal(manifest, &v2s2); err != nil {
+	if err := json.Unmarshal(manifest, &v2s2.Schema2); err != nil {
 		return nil, err
 	}
 	return &v2s2, nil
 }
 
 // manifestSchema2FromComponents builds a new manifestSchema2 from the supplied data:
-func manifestSchema2FromComponents(config descriptor, src types.ImageSource, configBlob []byte, layers []descriptor) genericManifest {
+func manifestSchema2FromComponents(config manifest.Schema2Descriptor, src types.ImageSource, configBlob []byte, layers []manifest.Schema2Descriptor) genericManifest {
 	return &manifestSchema2{
-		src:               src,
-		configBlob:        configBlob,
-		SchemaVersion:     2,
-		MediaType:         manifest.DockerV2Schema2MediaType,
-		ConfigDescriptor:  config,
-		LayersDescriptors: layers,
+		src:        src,
+		configBlob: configBlob,
+		Schema2: manifest.Schema2{
+			SchemaVersion:     2,
+			MediaType:         manifest.DockerV2Schema2MediaType,
+			ConfigDescriptor:  config,
+			LayersDescriptors: layers,
+		},
 	}
 }
 
 func (m *manifestSchema2) serialize() ([]byte, error) {
-	return json.Marshal(*m)
+	return json.Marshal(m.Schema2)
 }
 
 func (m *manifestSchema2) manifestMIMEType() string {
@@ -184,7 +176,7 @@ func (m *manifestSchema2) UpdatedImage(options types.ManifestUpdateOptions) (typ
 		if len(copy.LayersDescriptors) != len(options.LayerInfos) {
 			return nil, errors.Errorf("Error preparing updated manifest: layer count changed from %d to %d", len(copy.LayersDescriptors), len(options.LayerInfos))
 		}
-		copy.LayersDescriptors = make([]descriptor, len(options.LayerInfos))
+		copy.LayersDescriptors = make([]manifest.Schema2Descriptor, len(options.LayerInfos))
 		for i, info := range options.LayerInfos {
 			copy.LayersDescriptors[i].MediaType = m.LayersDescriptors[i].MediaType
 			copy.LayersDescriptors[i].Digest = info.Digest
@@ -207,7 +199,7 @@ func (m *manifestSchema2) UpdatedImage(options types.ManifestUpdateOptions) (typ
 	return memoryImageFromManifest(&copy), nil
 }
 
-func oci1DescriptorFromSchema2Descriptor(d descriptor) imgspecv1.Descriptor {
+func oci1DescriptorFromSchema2Descriptor(d manifest.Schema2Descriptor) imgspecv1.Descriptor {
 	return imgspecv1.Descriptor{
 		MediaType: d.MediaType,
 		Size:      d.Size,

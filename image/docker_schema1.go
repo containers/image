@@ -313,7 +313,7 @@ func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.Bl
 		DiffIDs:   []digest.Digest{},
 		BaseLayer: "",
 	}
-	var layers []descriptor
+	var layers []manifest.Schema2Descriptor
 	history := make([]imageHistory, len(m.History))
 	for v1Index := len(m.History) - 1; v1Index >= 0; v1Index-- {
 		v2Index := (len(m.History) - 1) - v1Index
@@ -339,7 +339,7 @@ func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.Bl
 			if layerDiffIDs != nil {
 				d = layerDiffIDs[v2Index]
 			}
-			layers = append(layers, descriptor{
+			layers = append(layers, manifest.Schema2Descriptor{
 				MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 				Size:      size,
 				Digest:    m.FSLayers[v1Index].BlobSum,
@@ -351,7 +351,7 @@ func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.Bl
 	if err != nil {
 		return nil, err
 	}
-	configDescriptor := descriptor{
+	configDescriptor := manifest.Schema2Descriptor{
 		MediaType: "application/vnd.docker.container.image.v1+json",
 		Size:      int64(len(configJSON)),
 		Digest:    digest.FromBytes(configJSON),

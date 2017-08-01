@@ -49,11 +49,11 @@ func manifestSchema2FromFixture(t *testing.T, src types.ImageSource, fixture str
 }
 
 func manifestSchema2FromComponentsLikeFixture(configBlob []byte) genericManifest {
-	return manifestSchema2FromComponents(descriptor{
+	return manifestSchema2FromComponents(manifest.Schema2Descriptor{
 		MediaType: "application/octet-stream",
 		Size:      5940,
 		Digest:    "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f",
-	}, nil, configBlob, []descriptor{
+	}, nil, configBlob, []manifest.Schema2Descriptor{
 		{
 			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 			Digest:    "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
