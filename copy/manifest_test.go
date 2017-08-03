@@ -1,6 +1,7 @@
 package copy
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -43,7 +44,7 @@ func (f fakeImageSource) Manifest() ([]byte, string, error) {
 	}
 	return nil, string(f), nil
 }
-func (f fakeImageSource) Signatures() ([][]byte, error) {
+func (f fakeImageSource) Signatures(context.Context) ([][]byte, error) {
 	panic("Unexpected call to a mock function")
 }
 func (f fakeImageSource) ConfigInfo() types.BlobInfo {

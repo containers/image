@@ -2,6 +2,7 @@ package image
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -37,7 +38,7 @@ func (f unusedImageSource) GetTargetManifest(digest digest.Digest) ([]byte, stri
 func (f unusedImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, error) {
 	panic("Unexpected call to a mock function")
 }
-func (f unusedImageSource) GetSignatures() ([][]byte, error) {
+func (f unusedImageSource) GetSignatures(context.Context) ([][]byte, error) {
 	panic("Unexpected call to a mock function")
 }
 
