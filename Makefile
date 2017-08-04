@@ -5,10 +5,14 @@ SKOPEO_REPO = projectatomic/skopeo
 SKOPEO_BRANCH = master
 # Set SUDO=sudo to run container integration tests using sudo.
 SUDO =
-BUILDTAGS   = btrfs_noversion libdm_no_deferred_remove
+
+ifeq ($(shell uname),Darwin)
+DARWIN_BUILD_TAG = containers_image_ostree_stub
+endif
+BUILDTAGS = btrfs_noversion libdm_no_deferred_remove $(DARWIN_BUILD_TAG)
 BUILDFLAGS := -tags "$(BUILDTAGS)"
 
-PACKAGES := $(shell go list ./... | grep -v github.com/containers/image/vendor)
+PACKAGES := $(shell go list $(BUILDFLAGS) ./... | grep -v github.com/containers/image/vendor)
 
 all: tools .gitvalidation test validate
 
