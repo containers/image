@@ -110,12 +110,12 @@ in that case some requirements may apply only to some signatures, but each signa
 
 The following requirement objects are supported:
 
-### `insecureAcceptAnything`
+### `accept`
 
 A simple requirement with the following syntax
 
 ```json
-{"type":"insecureAcceptAnything"}
+{"type":"accept"}
 ```
 
 This requirement accepts any image (but note that other requirements in the array still apply).
@@ -217,14 +217,14 @@ selectively allow individual transports and scopes as desired.
         "docker": {
             /* Allow installing images from a specific repository namespace, without cryptographic verification.
                This namespace includes images like openshift/hello-openshift and openshift/origin. */
-            "docker.io/openshift": [{"type": "insecureAcceptAnything"}],
+            "docker.io/openshift": [{"type": "accept"}],
             /* Similarly, allow installing the “official” busybox images.  Note how the fully expanded
                form, with the explicit /library/, must be used. */
-            "docker.io/library/busybox": [{"type": "insecureAcceptAnything"}]
+            "docker.io/library/busybox": [{"type": "accept"}]
             /* Other docker: images use the global default policy and are rejected */
         },
         "dir": {
-            "": [{"type": "insecureAcceptAnything"}] /* Allow any images originating in local directories */
+            "": [{"type": "accept"}] /* Allow any images originating in local directories */
         },
         "atomic": {
             /* The common case: using a known key for a repository or set of repositories */
@@ -262,6 +262,6 @@ selectively allow individual transports and scopes as desired.
 
 ```json
 {
-    "default": [{"type": "insecureAcceptAnything"}]
+    "default": [{"type": "accept"}]
 }
 ```

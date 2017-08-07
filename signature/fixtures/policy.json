@@ -8,14 +8,14 @@
         "dir": {
             "": [
                 {
-                    "type": "insecureAcceptAnything"
+                    "type": "accept"
                 }
             ]
         },
         "docker": {
             "example.com/playground": [
                 {
-                    "type": "insecureAcceptAnything"
+                    "type": "accept"
                 }
             ],
             "example.com/production": [
