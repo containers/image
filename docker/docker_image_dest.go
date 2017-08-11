@@ -20,6 +20,7 @@ import (
 	"github.com/docker/distribution/registry/api/v2"
 	"github.com/docker/distribution/registry/client"
 	"github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -56,7 +57,7 @@ func (d *dockerImageDestination) Close() error {
 
 func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 	return []string{
-		// TODO(runcom): we'll add OCI as part of another PR here
+		imgspecv1.MediaTypeImageManifest,
 		manifest.DockerV2Schema2MediaType,
 		manifest.DockerV2Schema1SignedMediaType,
 		manifest.DockerV2Schema1MediaType,
