@@ -25,6 +25,8 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 		"/etc:notlatest",
 		"/this/does/not/exist",
 		"/this/does/not/exist:notlatest",
+		"/this/does/not/exist:a-b.c_d:e@f+g--h",
+		"/this/does/not/exist:ABZabz019",
 		"/:strangecornercase",
 	} {
 		err := Transport.ValidatePolicyConfigurationScope(scope)
@@ -38,9 +40,10 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 		"/has/./dot",
 		"/has/dot/../dot",
 		"/trailing/slash/",
-		"/etc:invalid'tag!value@",
-		"/path:with/colons",
-		"/path:with/colons/and:tag",
+		"/etc:invalid!character!in!tag",
+		"/etc:_leading_separator",
+		"/etc:trailing_separator_",
+		"/etc:double__separator",
 	} {
 		err := Transport.ValidatePolicyConfigurationScope(scope)
 		assert.Error(t, err, scope)
@@ -66,6 +69,7 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 	} {
 		for _, tag := range []struct{ suffix, tag string }{
 			{":notlatest", "notlatest"},
+			{":notlatest:with:colons", "notlatest:with:colons"},
 			{"", "latest"},
 		} {
 			input := path + tag.suffix
@@ -77,9 +81,6 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 			assert.Equal(t, tag.tag, ociRef.tag, input)
 		}
 	}
-
-	_, err = fn(tmpDir + "/with:multiple:colons:and:tag")
-	assert.Error(t, err)
 
 	_, err = fn(tmpDir + ":invalid'tag!value@")
 	assert.Error(t, err)

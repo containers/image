@@ -36,7 +36,12 @@ func (t ociTransport) ParseReference(reference string) (types.ImageReference, er
 	return ParseReference(reference)
 }
 
-var refRegexp = regexp.MustCompile(`^([A-Za-z0-9._-]+)+$`)
+// See https://github.com/opencontainers/image-spec/blob/master/annotations.md
+const separator = `(?:[-._:@+]|--)`
+const alphanum = `(?:[A-Za-z0-9]+)`
+const component = `(?:` + alphanum + `(?:` + separator + alphanum + `)*)`
+
+var refRegexp = regexp.MustCompile(`^` + component + `(?:/` + component + `)*$`)
 
 // ValidatePolicyConfigurationScope checks that scope is a valid name for a signature.PolicyTransportScopes keys
 // (i.e. a valid PolicyConfigurationIdentity() or PolicyConfigurationNamespaces() return value).
@@ -44,7 +49,7 @@ var refRegexp = regexp.MustCompile(`^([A-Za-z0-9._-]+)+$`)
 // scope passed to this function will not be "", that value is always allowed.
 func (t ociTransport) ValidatePolicyConfigurationScope(scope string) error {
 	var dir string
-	sep := strings.LastIndex(scope, ":")
+	sep := strings.Index(scope, ":")
 	if sep == -1 {
 		dir = scope
 	} else {
@@ -53,10 +58,6 @@ func (t ociTransport) ValidatePolicyConfigurationScope(scope string) error {
 		if !refRegexp.MatchString(tag) {
 			return errors.Errorf("Invalid tag %s", tag)
 		}
-	}
-
-	if strings.Contains(dir, ":") {
-		return errors.Errorf("Invalid OCI reference %s: path contains a colon", scope)
 	}
 
 	if !strings.HasPrefix(dir, "/") {
@@ -91,7 +92,7 @@ type ociReference struct {
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an OCI ImageReference.
 func ParseReference(reference string) (types.ImageReference, error) {
 	var dir, tag string
-	sep := strings.LastIndex(reference, ":")
+	sep := strings.Index(reference, ":")
 	if sep == -1 {
 		dir = reference
 		tag = "latest"
