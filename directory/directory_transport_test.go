@@ -131,14 +131,14 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 	// It would be nice to test a deeper hierarchy, but it is not obvious what
 	// deeper path is always available in the various distros, AND is not likely
 	// to contains a symbolic link.
-	for _, path := range []string{"/etc/skel", "/etc/skel/./."} {
+	for _, path := range []string{"/usr/share", "/usr/share/./."} {
 		_, err := os.Lstat(path)
 		require.NoError(t, err)
 		ref, err := NewReference(path)
 		require.NoError(t, err)
 		ns := ref.PolicyConfigurationNamespaces()
 		require.NotNil(t, ns)
-		assert.Equal(t, []string{"/etc"}, ns)
+		assert.Equal(t, []string{"/usr"}, ns)
 	}
 
 	// "/" as a corner case.
