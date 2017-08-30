@@ -52,11 +52,13 @@ validate: lint
 	@test -z "$$(gofmt -s -l . | grep -ve '^vendor' | tee /dev/stderr)"
 
 lint:
-	@out="$$(golint $(PACKAGES))"; \
-	if [ -n "$$out" ]; then \
-		echo "$$out"; \
-		exit 1; \
-	fi
+	@for package in $(PACKAGES); do \
+		out="$$(golint $$package)"; \
+		if [ -n "$$out" ]; then \
+			echo "$$out"; \
+			exit 1; \
+		fi \
+	done
 
 .PHONY: .gitvalidation
 

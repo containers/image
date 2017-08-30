@@ -51,7 +51,7 @@ func loadRegistryConf() (*tomlConfig, error) {
 	return config, err
 }
 
-// Returns an array of strings that contain the names
+// GetRegistries returns an array of strings that contain the names
 // of the registries as defined in the system-wide
 // registries file.  it returns an empty array if none are
 // defined
@@ -63,7 +63,7 @@ func GetRegistries() ([]string, error) {
 	return config.Registries.Search.Registries, nil
 }
 
-// Returns an array of strings that contain the names
+// GetInsecureRegistries returns an array of strings that contain the names
 // of the insecure registries as defined in the system-wide
 // registries file.  it returns an empty array if none are
 // defined
