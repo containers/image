@@ -13,6 +13,13 @@ BUILDTAGS = btrfs_noversion libdm_no_deferred_remove $(DARWIN_BUILD_TAG)
 BUILDFLAGS := -tags "$(BUILDTAGS)"
 
 PACKAGES := $(shell go list $(BUILDFLAGS) ./... | grep -v github.com/containers/image/vendor)
+# On macOS, (brew install gpgme) installs it within /usr/local, but /usr/local/include is not in the default search path.
+# Rather than hard-code this directory, use gpgme-config. Sadly that must be done at the top-level user
+# instead of locally in the gpgme subpackage, because cgo supports only pkg-config, not general shell scripts,
+# and gpgme does not install a pkg-config file.
+# If gpgme is not installed or gpgme-config can’t be found for other reasons, the error is silently ignored
+# (and the user will probably find out because the cgo compilation will fail).
+GPGME_ENV = CGO_CFLAGS="$(shell gpgme-config --cflags 2>/dev/null)" CGO_LDFLAGS="$(shell gpgme-config --libs 2>/dev/null)"
 
 all: tools .gitvalidation test validate
 
@@ -32,7 +39,7 @@ clean:
 	rm -rf vendor tools.timestamp
 
 test: vendor
-	@go test $(BUILDFLAGS) -cover $(PACKAGES)
+	@$(GPGME_ENV) go test $(BUILDFLAGS) -cover $(PACKAGES)
 
 # This is not run as part of (make all), but Travis CI does run this.
 # Demonstarting a working version of skopeo (possibly with modified SKOPEO_REPO/SKOPEO_BRANCH, e.g.
