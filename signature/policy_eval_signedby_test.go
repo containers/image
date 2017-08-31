@@ -27,7 +27,7 @@ func dirImageMock(t *testing.T, dir, dockerReference string) types.UnparsedImage
 func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) types.UnparsedImage {
 	srcRef, err := directory.NewReference(dir)
 	require.NoError(t, err)
-	src, err := srcRef.NewImageSource(nil, nil)
+	src, err := srcRef.NewImageSource(nil)
 	require.NoError(t, err)
 	return image.UnparsedFromSource(&dirImageSourceMock{
 		ImageSource: src,

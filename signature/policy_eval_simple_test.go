@@ -37,7 +37,7 @@ func (ref nameOnlyImageReferenceMock) PolicyConfigurationNamespaces() []string {
 func (ref nameOnlyImageReferenceMock) NewImage(ctx *types.SystemContext) (types.Image, error) {
 	panic("unexpected call to a mock function")
 }
-func (ref nameOnlyImageReferenceMock) NewImageSource(ctx *types.SystemContext, requestedManifestMIMETypes []string) (types.ImageSource, error) {
+func (ref nameOnlyImageReferenceMock) NewImageSource(ctx *types.SystemContext) (types.ImageSource, error) {
 	panic("unexpected call to a mock function")
 }
 func (ref nameOnlyImageReferenceMock) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {

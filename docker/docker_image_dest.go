@@ -24,21 +24,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var manifestMIMETypes = []string{
-	// TODO(runcom): we'll add OCI as part of another PR here
-	manifest.DockerV2Schema2MediaType,
-	manifest.DockerV2Schema1SignedMediaType,
-	manifest.DockerV2Schema1MediaType,
-}
-
-func supportedManifestMIMETypesMap() map[string]bool {
-	m := make(map[string]bool, len(manifestMIMETypes))
-	for _, mt := range manifestMIMETypes {
-		m[mt] = true
-	}
-	return m
-}
-
 type dockerImageDestination struct {
 	ref dockerReference
 	c   *dockerClient
@@ -70,7 +55,12 @@ func (d *dockerImageDestination) Close() error {
 }
 
 func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
-	return manifestMIMETypes
+	return []string{
+		// TODO(runcom): we'll add OCI as part of another PR here
+		manifest.DockerV2Schema2MediaType,
+		manifest.DockerV2Schema1SignedMediaType,
+		manifest.DockerV2Schema1MediaType,
+	}
 }
 
 // SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.

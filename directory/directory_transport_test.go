@@ -185,7 +185,7 @@ func TestReferenceNewImageNoValidManifest(t *testing.T) {
 func TestReferenceNewImageSource(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)
-	src, err := ref.NewImageSource(nil, nil)
+	src, err := ref.NewImageSource(nil)
 	assert.NoError(t, err)
 	defer src.Close()
 }

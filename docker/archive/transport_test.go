@@ -154,7 +154,7 @@ func TestReferenceNewImageSource(t *testing.T) {
 	for _, suffix := range []string{"", ":thisisignoredbutaccepted"} {
 		ref, err := ParseReference(tarFixture + suffix)
 		require.NoError(t, err, suffix)
-		src, err := ref.NewImageSource(nil, nil)
+		src, err := ref.NewImageSource(nil)
 		assert.NoError(t, err, suffix)
 		defer src.Close()
 	}
