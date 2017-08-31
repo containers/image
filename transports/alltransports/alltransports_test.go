@@ -33,7 +33,7 @@ func TestImageNameHandling(t *testing.T) {
 		{"docker-daemon", "busybox:latest", "busybox:latest"},
 		{"docker-archive", "/var/lib/oci/busybox.tar:busybox:latest", "/var/lib/oci/busybox.tar:docker.io/library/busybox:latest"},
 		{"docker-archive", "busybox.tar:busybox:latest", "busybox.tar:docker.io/library/busybox:latest"},
-		{"oci", "/etc:sometag", "/etc:sometag"},
+		{"oci", "/etc:someimage:latest", "/etc:someimage:latest"},
 		// "atomic" not tested here because it depends on per-user configuration for the default cluster.
 		// "containers-storage" not tested here because it needs to initialize various directories on the fs.
 	} {
