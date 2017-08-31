@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	_ "github.com/containers/image/internal/testing/explicitfilepath-tmpdir"
 	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -214,14 +215,14 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 	// It would be nice to test a deeper hierarchy, but it is not obvious what
 	// deeper path is always available in the various distros, AND is not likely
 	// to contains a symbolic link.
-	for _, path := range []string{"/etc/skel", "/etc/skel/./."} {
+	for _, path := range []string{"/usr/share", "/usr/share/./."} {
 		_, err := os.Lstat(path)
 		require.NoError(t, err)
 		ref, err := NewReference(path, "someimage")
 		require.NoError(t, err)
 		ns := ref.PolicyConfigurationNamespaces()
 		require.NotNil(t, ns)
-		assert.Equal(t, []string{"/etc/skel", "/etc"}, ns)
+		assert.Equal(t, []string{"/usr/share", "/usr"}, ns)
 	}
 
 	// "/" as a corner case.
