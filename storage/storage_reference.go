@@ -177,7 +177,7 @@ func (s storageReference) DeleteImage(ctx *types.SystemContext) error {
 }
 
 func (s storageReference) NewImageSource(ctx *types.SystemContext) (types.ImageSource, error) {
-	return newImageSource(ctx, s)
+	return newImageSource(s)
 }
 
 func (s storageReference) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {

@@ -44,7 +44,11 @@ var (
 )
 
 type storageImageSource struct {
-	image *storageImageCloser
+	imageRef        storageReference
+	ID              string
+	layerPosition   map[digest.Digest]int // Where we are in reading a blob's layers
+	updatedManifest []byte                // The edited version of the manifest, if already known, or nil
+	SignatureSizes  []int                 `json:"signature-sizes"` // List of sizes of each signature slice
 }
 
 type storageImageDestination struct {
@@ -62,32 +66,32 @@ type storageImageDestination struct {
 }
 
 type storageImageCloser struct {
-	types.Image
-	io.Closer
-	imageRef storageReference
-	reader   *storageUnnamedImageReader
-	size     int64
+	types.ImageCloser
+	size int64
 }
 
-type storageUnnamedImageReader struct {
-	ID             string
-	transport      storageTransport
-	layerPosition  map[digest.Digest]int // Where we are in reading a blob's layers
-	SignatureSizes []int                 `json:"signature-sizes"` // List of sizes of each signature slice
-}
-
-// newUnnamedImageReader sets us up to read out an image without making any changes to what we read before
-// handing it back to the caller, without caring about the image's name.
-func newUnnamedImageReader(imageRef storageReference) (*storageUnnamedImageReader, error) {
+// newImageSource reads an image, modifying the manifest to refer to uncompressed layers.
+func newImageSource(imageRef storageReference) (*storageImageSource, error) {
 	// First, locate the image using the original reference.
 	img, err := imageRef.resolveImage()
 	if err != nil {
 		return nil, err
 	}
+
+	// FIXME FIXME we need to preserve the ORIGINAL reference.
+	// Build the updated information that we want for the manifest.
+	// Discard a digest in the image reference, if there is one, since the updated image manifest
+	// won't match it.
+	newName := imageRef.name
+	if imageRef.digest != "" {
+		newName = reference.TrimNamed(newName)
+	}
+	newRef := newReference(imageRef.transport, verboseName(newName), img.ID, newName, "", "")
+
 	// Build the reader object, reading the image referred to by a possibly-updated reference.
-	image := &storageUnnamedImageReader{
+	image := &storageImageSource{
+		imageRef:       *newRef,
 		ID:             img.ID,
-		transport:      imageRef.transport,
 		layerPosition:  make(map[digest.Digest]int),
 		SignatureSizes: []int{},
 	}
@@ -98,25 +102,23 @@ func newUnnamedImageReader(imageRef storageReference) (*storageUnnamedImageReade
 }
 
 // Reference returns the image reference that we used to find this image.
-// Since our goal here is to remain unnamed, return a reference with no naming
-// information.
-func (s storageUnnamedImageReader) Reference() types.ImageReference {
-	return newReference(s.transport, "", s.ID, nil, "", "")
+func (s storageImageSource) Reference() types.ImageReference {
+	return s.imageRef
 }
 
 // Close cleans up any resources we tied up while reading the image.
-func (s storageUnnamedImageReader) Close() error {
+func (s storageImageSource) Close() error {
 	return nil
 }
 
 // GetBlob reads the data blob or filesystem layer which matches the digest and size, if given.
-func (s *storageUnnamedImageReader) GetBlob(info types.BlobInfo) (rc io.ReadCloser, n int64, err error) {
+func (s *storageImageSource) GetBlob(info types.BlobInfo) (rc io.ReadCloser, n int64, err error) {
 	rc, n, _, err = s.getBlobAndLayerID(info)
 	return rc, n, err
 }
 
 // getBlobAndLayer reads the data blob or filesystem layer which matches the digest and size, if given.
-func (s *storageUnnamedImageReader) getBlobAndLayerID(info types.BlobInfo) (rc io.ReadCloser, n int64, layerID string, err error) {
+func (s *storageImageSource) getBlobAndLayerID(info types.BlobInfo) (rc io.ReadCloser, n int64, layerID string, err error) {
 	var layer storage.Layer
 	var diffOptions *storage.DiffOptions
 	// We need a valid digest value.
@@ -127,10 +129,10 @@ func (s *storageUnnamedImageReader) getBlobAndLayerID(info types.BlobInfo) (rc i
 	// Check if the blob corresponds to a diff that was used to initialize any layers.  Our
 	// callers should only ask about layers using their uncompressed digests, so no need to
 	// check if they're using one of the compressed digests, which we can't reproduce anyway.
-	layers, err := s.transport.store.LayersByUncompressedDigest(info.Digest)
+	layers, err := s.imageRef.transport.store.LayersByUncompressedDigest(info.Digest)
 	// If it's not a layer, then it must be a data item.
 	if len(layers) == 0 {
-		b, err := s.transport.store.ImageBigData(s.ID, info.Digest.String())
+		b, err := s.imageRef.transport.store.ImageBigData(s.ID, info.Digest.String())
 		if err != nil {
 			return nil, -1, "", err
 		}
@@ -158,7 +160,7 @@ func (s *storageUnnamedImageReader) getBlobAndLayerID(info types.BlobInfo) (rc i
 		n = layer.UncompressedSize
 	}
 	logrus.Debugf("exporting filesystem layer %q without compression for blob %q", layer.ID, info.Digest)
-	rc, err = s.transport.store.Diff("", layer.ID, diffOptions)
+	rc, err = s.imageRef.transport.store.Diff("", layer.ID, diffOptions)
 	if err != nil {
 		return nil, -1, "", err
 	}
@@ -166,16 +168,61 @@ func (s *storageUnnamedImageReader) getBlobAndLayerID(info types.BlobInfo) (rc i
 }
 
 // GetManifest() reads the image's manifest.
-func (s *storageUnnamedImageReader) GetManifest(instanceDigest *digest.Digest) (manifestBlob []byte, MIMEType string, err error) {
+func (s *storageImageSource) GetManifest(instanceDigest *digest.Digest) (manifestBlob []byte, MIMEType string, err error) {
 	if instanceDigest != nil {
 		return nil, "", ErrNoManifestLists
 	}
-	manifestBlob, err = s.transport.store.ImageBigData(s.ID, "manifest")
-	return manifestBlob, manifest.GuessMIMEType(manifestBlob), err
+	if s.updatedManifest == nil {
+		originalBlob, err := s.imageRef.transport.store.ImageBigData(s.ID, "manifest")
+		if err != nil {
+			return nil, "", err
+		}
+		man, err := manifest.FromBlob(originalBlob, manifest.GuessMIMEType(originalBlob))
+		if err != nil {
+			return nil, "", err
+		}
+
+		simg, err := s.imageRef.transport.store.Image(s.ID)
+		if err != nil {
+			return nil, "", err
+		}
+		updatedBlobInfos := []types.BlobInfo{}
+		layerID := simg.TopLayer
+		for layerID != "" {
+			layer, err := s.imageRef.transport.store.Layer(layerID)
+			if err != nil {
+				return nil, "", err
+			}
+			if layer.UncompressedDigest == "" {
+				return nil, "", errors.Errorf("uncompressed digest for layer %q is unknown", layerID)
+			}
+			if layer.UncompressedSize < 0 {
+				return nil, "", errors.Errorf("uncompressed size for layer %q is unknown", layerID)
+			}
+			blobInfo := types.BlobInfo{
+				Digest: layer.UncompressedDigest,
+				Size:   layer.UncompressedSize,
+			}
+			updatedBlobInfos = append([]types.BlobInfo{blobInfo}, updatedBlobInfos...)
+			if layer.Parent == "" {
+				break
+			}
+			layerID = layer.Parent
+		}
+		if err := man.UpdateLayerInfos(updatedBlobInfos); err != nil {
+			return nil, "", err
+		}
+		updatedBlob, err := man.Serialize()
+		if err != nil {
+			return nil, "", err
+		}
+		s.updatedManifest = updatedBlob
+	}
+	return s.updatedManifest, manifest.GuessMIMEType(s.updatedManifest), err
 }
 
 // GetSignatures() parses the image's signatures blob into a slice of byte slices.
-func (s *storageUnnamedImageReader) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) (signatures [][]byte, err error) {
+func (s *storageImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) (signatures [][]byte, err error) {
 	if instanceDigest != nil {
 		return nil, ErrNoManifestLists
 	}
@@ -183,7 +230,7 @@ func (s *storageUnnamedImageReader) GetSignatures(ctx context.Context, instanceD
 	sigslice := [][]byte{}
 	signature := []byte{}
 	if len(s.SignatureSizes) > 0 {
-		signatureBlob, err := s.transport.store.ImageBigData(s.ID, "signatures")
+		signatureBlob, err := s.imageRef.transport.store.ImageBigData(s.ID, "signatures")
 		if err != nil {
 			return nil, errors.Wrapf(err, "error looking up signatures data for image %q", s.ID)
 		}
@@ -197,167 +244,6 @@ func (s *storageUnnamedImageReader) GetSignatures(ctx context.Context, instanceD
 		return nil, errors.Errorf("signatures data contained %d extra bytes", len(signatures)-offset)
 	}
 	return sigslice, nil
-}
-
-// getSize() adds up the sizes of the image's data blobs (which includes the configuration blob), the
-// signatures, and the uncompressed sizes of all of the image's layers.
-func (s *storageUnnamedImageReader) getSize() (int64, error) {
-	var sum int64
-	// Size up the data blobs.
-	dataNames, err := s.transport.store.ListImageBigData(s.ID)
-	if err != nil {
-		return -1, errors.Wrapf(err, "error reading image %q", s.ID)
-	}
-	for _, dataName := range dataNames {
-		bigSize, err := s.transport.store.ImageBigDataSize(s.ID, dataName)
-		if err != nil {
-			return -1, errors.Wrapf(err, "error reading data blob size %q for %q", dataName, s.ID)
-		}
-		sum += bigSize
-	}
-	// Add the signature sizes.
-	for _, sigSize := range s.SignatureSizes {
-		sum += int64(sigSize)
-	}
-	// Prepare to walk the layer list.
-	img, err := s.transport.store.Image(s.ID)
-	if err != nil {
-		return -1, errors.Wrapf(err, "error reading image info %q", s.ID)
-	}
-	// Walk the layer list.
-	layerID := img.TopLayer
-	for layerID != "" {
-		layer, err := s.transport.store.Layer(layerID)
-		if err != nil {
-			return -1, err
-		}
-		if layer.UncompressedDigest == "" || layer.UncompressedSize < 0 {
-			return -1, errors.Errorf("size for layer %q is unknown, failing getSize()", layerID)
-		}
-		sum += layer.UncompressedSize
-		if layer.Parent == "" {
-			break
-		}
-		layerID = layer.Parent
-	}
-	return sum, nil
-}
-
-// newImage creates an image that knows its size and always refers to its layer blobs using
-// uncompressed digests and sizes
-func newImage(ctx *types.SystemContext, s storageReference) (*storageImageCloser, error) {
-	reader, err := newUnnamedImageReader(s)
-	if err != nil {
-		return nil, err
-	}
-	// Compute the image's size.
-	size, err := reader.getSize()
-	if err != nil {
-		return nil, err
-	}
-	// Build the updated information that we want for the manifest.
-	simg, err := reader.transport.store.Image(reader.ID)
-	if err != nil {
-		return nil, err
-	}
-	updatedBlobInfos := []types.BlobInfo{}
-	diffIDs := []digest.Digest{}
-	layerID := simg.TopLayer
-	for layerID != "" {
-		layer, err := reader.transport.store.Layer(layerID)
-		if err != nil {
-			return nil, err
-		}
-		if layer.UncompressedDigest == "" {
-			return nil, errors.Errorf("uncompressed digest for layer %q is unknown", layerID)
-		}
-		if layer.UncompressedSize < 0 {
-			return nil, errors.Errorf("uncompressed size for layer %q is unknown", layerID)
-		}
-		blobInfo := types.BlobInfo{
-			Digest: layer.UncompressedDigest,
-			Size:   layer.UncompressedSize,
-		}
-		updatedBlobInfos = append([]types.BlobInfo{blobInfo}, updatedBlobInfos...)
-		diffIDs = append([]digest.Digest{layer.UncompressedDigest}, diffIDs...)
-		if layer.Parent == "" {
-			break
-		}
-		layerID = layer.Parent
-	}
-	info := types.ManifestUpdateInformation{
-		Destination:  nil,
-		LayerInfos:   updatedBlobInfos,
-		LayerDiffIDs: diffIDs,
-	}
-	options := types.ManifestUpdateOptions{
-		LayerInfos:      updatedBlobInfos,
-		InformationOnly: info,
-	}
-	// Return a version of the image that uses the updated manifest.
-	img, err := image.FromSource(ctx, reader)
-	if err != nil {
-		return nil, err
-	}
-	updated, err := img.UpdatedImage(options)
-	if err != nil {
-		return nil, err
-	}
-	// Discard a digest in the image reference, if there is one, since the updated image manifest
-	// won't match it.
-	newName := s.name
-	if s.digest != "" {
-		newName = reference.TrimNamed(newName)
-	}
-	newRef := newReference(reader.transport, verboseName(newName), reader.ID, newName, "", "")
-	return &storageImageCloser{Image: updated, Closer: img, imageRef: *newRef, reader: reader, size: size}, nil
-}
-
-// Size returns the image's previously-computed size.
-func (s *storageImageCloser) Size() (int64, error) {
-	return s.size, nil
-}
-
-// newImageSource reads an image that has been updated to not compress layers.
-func newImageSource(ctx *types.SystemContext, s storageReference) (*storageImageSource, error) {
-	image, err := newImage(ctx, s)
-	if err != nil {
-		return nil, err
-	}
-	return &storageImageSource{image: image}, nil
-}
-
-// GetBlob returns either a data blob or an uncompressed layer blob.  In practice this avoids attempting
-// to recompress any layers that were originally delivered in compressed form, since we know that we
-// updated the manifest to refer to the blob using the digest of the uncompressed version.
-func (s *storageImageSource) GetBlob(info types.BlobInfo) (rc io.ReadCloser, n int64, err error) {
-	return s.image.reader.GetBlob(info)
-}
-
-// GetManifest returns the updated manifest.
-func (s *storageImageSource) GetManifest(instanceDigest *digest.Digest) ([]byte, string, error) {
-	if instanceDigest != nil {
-		return nil, "", ErrNoManifestLists
-	}
-	return s.image.Manifest()
-}
-
-// GetSignatures returns the original signatures.
-func (s *storageImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
-	if instanceDigest != nil {
-		return nil, ErrNoManifestLists
-	}
-	return s.image.reader.GetSignatures(ctx, instanceDigest)
-}
-
-// Reference returns a trimmed copy of the image reference that we used to find this image.
-func (s storageImageSource) Reference() types.ImageReference {
-	return s.image.imageRef
-}
-
-// Close cleans up any resources we tied up while reading the image.
-func (s *storageImageSource) Close() error {
-	return s.image.Close()
 }
 
 // newImageDestination sets us up to write a new image, caching blobs in a temporary directory until
@@ -765,4 +651,75 @@ func (s *storageImageDestination) PutSignatures(signatures [][]byte) error {
 	s.signatures = sigblob
 	s.SignatureSizes = sizes
 	return nil
+}
+
+// getSize() adds up the sizes of the image's data blobs (which includes the configuration blob), the
+// signatures, and the uncompressed sizes of all of the image's layers.
+func (s *storageImageSource) getSize() (int64, error) {
+	var sum int64
+	// Size up the data blobs.
+	dataNames, err := s.imageRef.transport.store.ListImageBigData(s.ID)
+	if err != nil {
+		return -1, errors.Wrapf(err, "error reading image %q", s.ID)
+	}
+	for _, dataName := range dataNames {
+		bigSize, err := s.imageRef.transport.store.ImageBigDataSize(s.ID, dataName)
+		if err != nil {
+			return -1, errors.Wrapf(err, "error reading data blob size %q for %q", dataName, s.ID)
+		}
+		sum += bigSize
+	}
+	// Add the signature sizes.
+	for _, sigSize := range s.SignatureSizes {
+		sum += int64(sigSize)
+	}
+	// Prepare to walk the layer list.
+	img, err := s.imageRef.transport.store.Image(s.ID)
+	if err != nil {
+		return -1, errors.Wrapf(err, "error reading image info %q", s.ID)
+	}
+	// Walk the layer list.
+	layerID := img.TopLayer
+	for layerID != "" {
+		layer, err := s.imageRef.transport.store.Layer(layerID)
+		if err != nil {
+			return -1, err
+		}
+		if layer.UncompressedDigest == "" || layer.UncompressedSize < 0 {
+			return -1, errors.Errorf("size for layer %q is unknown, failing getSize()", layerID)
+		}
+		sum += layer.UncompressedSize
+		if layer.Parent == "" {
+			break
+		}
+		layerID = layer.Parent
+	}
+	return sum, nil
+}
+
+// Size returns the image's previously-computed size.
+func (s *storageImageCloser) Size() (int64, error) {
+	return s.size, nil
+}
+
+// newImage creates an image that also knows its size
+func newImage(ctx *types.SystemContext, s storageReference) (types.ImageCloser, error) {
+	src, err := newImageSource(s)
+	if err != nil {
+		return nil, err
+	}
+	img, err := image.FromSource(ctx, src)
+	if err != nil {
+		return nil, err
+	}
+	size, err := src.getSize()
+	if err != nil {
+		return nil, err
+	}
+	return &storageImageCloser{ImageCloser: img, size: size}, nil
+}
+
+// Size() returns the previously-computed size of the image, with no error.
+func (s storageImage) Size() (int64, error) {
+	return s.size, nil
 }
