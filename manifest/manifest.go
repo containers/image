@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/containers/image/types"
 	"github.com/docker/libtrust"
@@ -196,5 +197,21 @@ func NormalizedMIMEType(input string) string {
 		// redirected to a content distribution
 		// network which is configured that way. See https://bugzilla.redhat.com/show_bug.cgi?id=1389442
 		return DockerV2Schema1SignedMediaType
+	}
+}
+
+// FromBlob returns a Manifest instance for the specified manifest blob and the corresponding MIME type
+func FromBlob(manblob []byte, mt string) (Manifest, error) {
+	switch NormalizedMIMEType(mt) {
+	case DockerV2Schema1MediaType, DockerV2Schema1SignedMediaType:
+		return Schema1FromManifest(manblob)
+	case imgspecv1.MediaTypeImageManifest:
+		return OCI1FromManifest(manblob)
+	case DockerV2Schema2MediaType:
+		return Schema2FromManifest(manblob)
+	case DockerV2ListMediaType:
+		return nil, fmt.Errorf("Treating manifest lists as individual manifests is not implemented")
+	default: // Note that this may not be reachable, NormalizedMIMEType has a default for unknown values.
+		return nil, fmt.Errorf("Unimplemented manifest MIME type %s", mt)
 	}
 }
