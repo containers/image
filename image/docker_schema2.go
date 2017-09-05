@@ -239,8 +239,8 @@ func (m *manifestSchema2) convertToManifestSchema1(dest types.ImageDestination) 
 	}
 
 	// Build fsLayers and History, discarding all configs. We will patch the top-level config in later.
-	fsLayers := make([]fsLayersSchema1, len(imageConfig.History))
-	history := make([]historySchema1, len(imageConfig.History))
+	fsLayers := make([]manifest.Schema1FSLayers, len(imageConfig.History))
+	history := make([]manifest.Schema1History, len(imageConfig.History))
 	nonemptyLayerIndex := 0
 	var parentV1ID string // Set in the loop
 	v1ID := ""
@@ -296,8 +296,8 @@ func (m *manifestSchema2) convertToManifestSchema1(dest types.ImageDestination) 
 			return nil, errors.Errorf("Internal error: Error creating v1compatibility for %#v", fakeImage)
 		}
 
-		fsLayers[v1Index] = fsLayersSchema1{BlobSum: blobDigest}
-		history[v1Index] = historySchema1{V1Compatibility: string(v1CompatibilityBytes)}
+		fsLayers[v1Index] = manifest.Schema1FSLayers{BlobSum: blobDigest}
+		history[v1Index] = manifest.Schema1History{V1Compatibility: string(v1CompatibilityBytes)}
 		// Note that parentV1ID of the top layer is preserved when exiting this loop
 	}
 
