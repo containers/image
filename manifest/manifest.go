@@ -170,3 +170,31 @@ func AddDummyV2S1Signature(manifest []byte) ([]byte, error) {
 func MIMETypeIsMultiImage(mimeType string) bool {
 	return mimeType == DockerV2ListMediaType
 }
+
+// NormalizedMIMEType returns the effective MIME type of a manifest MIME type returned by a server,
+// centralizing various workarounds.
+func NormalizedMIMEType(input string) string {
+	switch input {
+	// "application/json" is a valid v2s1 value per https://github.com/docker/distribution/blob/master/docs/spec/manifest-v2-1.md .
+	// This works for now, when nothing else seems to return "application/json"; if that were not true, the mapping/detection might
+	// need to happen within the ImageSource.
+	case "application/json":
+		return DockerV2Schema1SignedMediaType
+	case DockerV2Schema1MediaType, DockerV2Schema1SignedMediaType,
+		imgspecv1.MediaTypeImageManifest,
+		DockerV2Schema2MediaType,
+		DockerV2ListMediaType:
+		return input
+	default:
+		// If it's not a recognized manifest media type, or we have failed determining the type, we'll try one last time
+		// to deserialize using v2s1 as per https://github.com/docker/distribution/blob/master/manifests.go#L108
+		// and https://github.com/docker/distribution/blob/master/manifest/schema1/manifest.go#L50
+		//
+		// Crane registries can also return "text/plain", or pretty much anything else depending on a file extension “recognized” in the tag.
+		// This makes no real sense, but it happens
+		// because requests for manifests are
+		// redirected to a content distribution
+		// network which is configured that way. See https://bugzilla.redhat.com/show_bug.cgi?id=1389442
+		return DockerV2Schema1SignedMediaType
+	}
+}
