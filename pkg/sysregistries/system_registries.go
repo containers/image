@@ -2,7 +2,9 @@ package sysregistries
 
 import (
 	"github.com/BurntSushi/toml"
+	"github.com/containers/image/types"
 	"io/ioutil"
+	"path/filepath"
 )
 
 // systemRegistriesConfPath is the path to the system-wide registry configuration file
@@ -29,8 +31,16 @@ type tomlConfig struct {
 
 // Reads the global registry file from the filesystem. Returns
 // a byte array
-func readRegistryConf() ([]byte, error) {
-	configBytes, err := ioutil.ReadFile(systemRegistriesConfPath)
+func readRegistryConf(ctx *types.SystemContext) ([]byte, error) {
+	dirPath := systemRegistriesConfPath
+	if ctx != nil {
+		if ctx.SystemRegistriesConfPath != "" {
+			dirPath = ctx.SystemRegistriesConfPath
+		} else if ctx.RootForImplicitAbsolutePaths != "" {
+			dirPath = filepath.Join(ctx.RootForImplicitAbsolutePaths, systemRegistriesConfPath)
+		}
+	}
+	configBytes, err := ioutil.ReadFile(dirPath)
 	return configBytes, err
 }
 
@@ -39,10 +49,10 @@ var readConf = readRegistryConf
 
 // Loads the registry configuration file from the filesystem and
 // then unmarshals it.  Returns the unmarshalled object.
-func loadRegistryConf() (*tomlConfig, error) {
+func loadRegistryConf(ctx *types.SystemContext) (*tomlConfig, error) {
 	config := &tomlConfig{}
 
-	configBytes, err := readConf()
+	configBytes, err := readConf(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -55,8 +65,8 @@ func loadRegistryConf() (*tomlConfig, error) {
 // of the registries as defined in the system-wide
 // registries file.  it returns an empty array if none are
 // defined
-func GetRegistries() ([]string, error) {
-	config, err := loadRegistryConf()
+func GetRegistries(ctx *types.SystemContext) ([]string, error) {
+	config, err := loadRegistryConf(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -67,8 +77,8 @@ func GetRegistries() ([]string, error) {
 // of the insecure registries as defined in the system-wide
 // registries file.  it returns an empty array if none are
 // defined
-func GetInsecureRegistries() ([]string, error) {
-	config, err := loadRegistryConf()
+func GetInsecureRegistries(ctx *types.SystemContext) ([]string, error) {
+	config, err := loadRegistryConf(ctx)
 	if err != nil {
 		return nil, err
 	}
