@@ -185,11 +185,9 @@ func (ref ostreeReference) NewImage(ctx *types.SystemContext) (types.Image, erro
 	return nil, errors.New("Reading ostree: images is currently not supported")
 }
 
-// NewImageSource returns a types.ImageSource for this reference,
-// asking the backend to use a manifest from requestedManifestMIMETypes if possible.
-// nil requestedManifestMIMETypes means manifest.DefaultRequestedManifestMIMETypes.
+// NewImageSource returns a types.ImageSource for this reference.
 // The caller must call .Close() on the returned ImageSource.
-func (ref ostreeReference) NewImageSource(ctx *types.SystemContext, requestedManifestMIMETypes []string) (types.ImageSource, error) {
+func (ref ostreeReference) NewImageSource(ctx *types.SystemContext) (types.ImageSource, error) {
 	return nil, errors.New("Reading ostree: images is currently not supported")
 }
 

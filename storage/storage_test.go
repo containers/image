@@ -429,7 +429,7 @@ func TestWriteRead(t *testing.T) {
 			t.Fatalf("Image %q claims to have been created at time 0", ref.StringWithinTransport())
 		}
 
-		src, err := ref.NewImageSource(systemContext(), []string{})
+		src, err := ref.NewImageSource(systemContext())
 		if err != nil {
 			t.Fatalf("NewImageSource(%q) returned error %v", ref.StringWithinTransport(), err)
 		}
@@ -900,7 +900,7 @@ func TestDuplicateBlob(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewImage(%q) returned error %v", ref.StringWithinTransport(), err)
 	}
-	src, err := ref.NewImageSource(systemContext(), nil)
+	src, err := ref.NewImageSource(systemContext())
 	if err != nil {
 		t.Fatalf("NewImageSource(%q) returned error %v", ref.StringWithinTransport(), err)
 	}

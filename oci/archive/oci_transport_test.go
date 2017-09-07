@@ -273,7 +273,7 @@ func TestReferenceNewImage(t *testing.T) {
 func TestReferenceNewImageSource(t *testing.T) {
 	ref, tmpTarFile := refToTempOCIArchive(t)
 	defer os.RemoveAll(tmpTarFile)
-	_, err := ref.NewImageSource(nil, nil)
+	_, err := ref.NewImageSource(nil)
 	assert.NoError(t, err)
 }
 
