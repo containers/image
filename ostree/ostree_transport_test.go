@@ -44,6 +44,7 @@ var imageNameTestcases = []struct{ input, normalized, branchName string }{
 	{"busybox:notlatest", "busybox:notlatest", "busybox_3Anotlatest"},                                                  // Explicit tag
 	{"busybox", "busybox:latest", "busybox_3Alatest"},                                                                  // Default tag
 	{"docker.io/library/busybox:latest", "docker.io/library/busybox:latest", "docker.io_2Flibrary_2Fbusybox_3Alatest"}, // A hierarchical name
+	{"127.0.0.1:5000/busybox:latest", "127.0.0.1:5000/busybox:latest", "127.0.0.1_3A5000_2Fbusybox_3Alatest"},          // Port usage
 	{"UPPERCASEISINVALID", "", ""},                                                                                     // Invalid input
 	{"busybox" + sha256digest, "", ""},                                                                                 // Digested references are not supported (parsed as invalid repository name)
 	{"busybox:invalid+tag", "", ""},                                                                                    // Invalid tag value
