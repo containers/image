@@ -44,11 +44,12 @@ var imageNameTestcases = []struct{ input, normalized, branchName string }{
 	{"busybox:notlatest", "busybox:notlatest", "busybox_3Anotlatest"},                                                  // Explicit tag
 	{"busybox", "busybox:latest", "busybox_3Alatest"},                                                                  // Default tag
 	{"docker.io/library/busybox:latest", "docker.io/library/busybox:latest", "docker.io_2Flibrary_2Fbusybox_3Alatest"}, // A hierarchical name
-	{"UPPERCASEISINVALID", "", ""},                                                                                     // Invalid input
-	{"busybox" + sha256digest, "", ""},                                                                                 // Digested references are not supported (parsed as invalid repository name)
-	{"busybox:invalid+tag", "", ""},                                                                                    // Invalid tag value
-	{"busybox:tag:with:colons", "", ""},                                                                                // Multiple colons - treated as a tag which contains a colon, which is invalid
-	{"", "", ""},                                                                                                       // Empty input is rejected (invalid repository.Named)
+	{"127.0.0.1:5000/busybox:latest", "127.0.0.1:5000/busybox:latest", "127.0.0.1_3A5000_2Fbusybox_3Alatest"},          // Port usage
+	{"busybox" + sha256digest, "busybox" + sha256digest, "busybox_40sha256_3A0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+	{"UPPERCASEISINVALID", "", ""},      // Invalid input
+	{"busybox:invalid+tag", "", ""},     // Invalid tag value
+	{"busybox:tag:with:colons", "", ""}, // Multiple colons - treated as a tag which contains a colon, which is invalid
+	{"", "", ""},                        // Empty input is rejected (invalid repository.Named)
 }
 
 func TestTransportParseReference(t *testing.T) {
