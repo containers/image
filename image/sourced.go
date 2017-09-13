@@ -86,5 +86,5 @@ func (i *sourcedImage) Inspect() (*types.ImageInspectInfo, error) {
 }
 
 func (i *sourcedImage) IsMultiImage() bool {
-	return i.manifestMIMEType == manifest.DockerV2ListMediaType
+	return manifest.MIMETypeIsMultiImage(i.manifestMIMEType)
 }

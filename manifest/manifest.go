@@ -142,3 +142,8 @@ func AddDummyV2S1Signature(manifest []byte) ([]byte, error) {
 	}
 	return js.PrettySignature("signatures")
 }
+
+// MIMETypeIsMultiImage returns true if mimeType is a list of images
+func MIMETypeIsMultiImage(mimeType string) bool {
+	return mimeType == DockerV2ListMediaType
+}
