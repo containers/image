@@ -4,7 +4,6 @@
 package image
 
 import (
-	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 )
 
@@ -83,8 +82,4 @@ func (i *sourcedImage) Manifest() ([]byte, string, error) {
 
 func (i *sourcedImage) Inspect() (*types.ImageInspectInfo, error) {
 	return inspectManifest(i.genericManifest)
-}
-
-func (i *sourcedImage) IsMultiImage() bool {
-	return manifest.MIMETypeIsMultiImage(i.manifestMIMEType)
 }

@@ -104,3 +104,12 @@ func determineManifestConversion(manifestUpdates *types.ManifestUpdateOptions, s
 	}
 	return preferredType, prioritizedTypes.list[1:], nil
 }
+
+// isMultiImage returns true if img is a list of images
+func isMultiImage(img types.UnparsedImage) (bool, error) {
+	_, mt, err := img.Manifest()
+	if err != nil {
+		return false, err
+	}
+	return manifest.MIMETypeIsMultiImage(mt), nil
+}

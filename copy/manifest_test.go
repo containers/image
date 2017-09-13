@@ -71,9 +71,6 @@ func (f fakeImageSource) UpdatedImageNeedsLayerDiffIDs(options types.ManifestUpd
 func (f fakeImageSource) UpdatedImage(options types.ManifestUpdateOptions) (types.Image, error) {
 	panic("Unexpected call to a mock function")
 }
-func (f fakeImageSource) IsMultiImage() bool {
-	panic("Unexpected call to a mock function")
-}
 func (f fakeImageSource) Size() (int64, error) {
 	panic("Unexpected call to a mock function")
 }
@@ -172,5 +169,26 @@ func TestDetermineManifestConversion(t *testing.T) {
 	// Error reading the manifest — smoke test only.
 	mu := types.ManifestUpdateOptions{}
 	_, _, err := determineManifestConversion(&mu, fakeImageSource(""), supportS1S2, true, "")
+	assert.Error(t, err)
+}
+
+func TestIsMultiImage(t *testing.T) {
+	// MIME type is available; more or less a smoke test, other cases are handled in manifest.MIMETypeIsMultiImage
+	for _, c := range []struct {
+		mt       string
+		expected bool
+	}{
+		{manifest.DockerV2ListMediaType, true},
+		{manifest.DockerV2Schema2MediaType, false},
+	} {
+		src := fakeImageSource(c.mt)
+		res, err := isMultiImage(src)
+		require.NoError(t, err)
+		assert.Equal(t, c.expected, res, c.mt)
+	}
+
+	// Error getting manifest MIME type
+	src := fakeImageSource("")
+	_, err := isMultiImage(src)
 	assert.Error(t, err)
 }

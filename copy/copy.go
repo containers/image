@@ -162,7 +162,11 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		return err
 	}
 
-	if src.IsMultiImage() {
+	multiImage, err := isMultiImage(src)
+	if err != nil {
+		return errors.Wrapf(err, "Error determining manifest MIME type for %s", transports.ImageName(srcRef))
+	}
+	if multiImage {
 		return errors.Errorf("can not copy %s: manifest contains multiple images", transports.ImageName(srcRef))
 	}
 

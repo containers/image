@@ -66,8 +66,3 @@ func (i *memoryImage) Signatures(ctx context.Context) ([][]byte, error) {
 func (i *memoryImage) Inspect() (*types.ImageInspectInfo, error) {
 	return inspectManifest(i.genericManifest)
 }
-
-// IsMultiImage returns true if the image's manifest is a list of images, false otherwise.
-func (i *memoryImage) IsMultiImage() bool {
-	return false
-}
