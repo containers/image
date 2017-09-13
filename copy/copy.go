@@ -142,8 +142,17 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 			}
 		}
 	}()
+	multiImage, err := isMultiImage(unparsedImage)
+	if err != nil {
+		return errors.Wrapf(err, "Error determining manifest MIME type for %s", transports.ImageName(srcRef))
+	}
+	if multiImage {
+		return errors.Errorf("can not copy %s: manifest contains multiple images", transports.ImageName(srcRef))
+	}
 
 	// Please keep this policy check BEFORE reading any other information about the image.
+	// (the multiImage check above only matches the MIME type, which we have received anyway.
+	// Actual parsing of anything should be deferred.)
 	if allowed, err := policyContext.IsRunningImageAllowed(unparsedImage); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
 		return errors.Wrap(err, "Source image rejected")
 	}
@@ -160,14 +169,6 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 
 	if err := checkImageDestinationForCurrentRuntimeOS(src, dest); err != nil {
 		return err
-	}
-
-	multiImage, err := isMultiImage(src)
-	if err != nil {
-		return errors.Wrapf(err, "Error determining manifest MIME type for %s", transports.ImageName(srcRef))
-	}
-	if multiImage {
-		return errors.Errorf("can not copy %s: manifest contains multiple images", transports.ImageName(srcRef))
 	}
 
 	var sigs [][]byte
