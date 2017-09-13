@@ -30,23 +30,6 @@ type digestingReader struct {
 	validationFailed bool
 }
 
-// imageCopier allows us to keep track of diffID values for blobs, and other
-// data, that we're copying between images, and cache other information that
-// might allow us to take some shortcuts
-type imageCopier struct {
-	copiedBlobs       map[digest.Digest]digest.Digest
-	cachedDiffIDs     map[digest.Digest]digest.Digest
-	manifestUpdates   *types.ManifestUpdateOptions
-	dest              types.ImageDestination
-	src               types.Image
-	rawSource         types.ImageSource
-	diffIDsAreNeeded  bool
-	canModifyManifest bool
-	reportWriter      io.Writer
-	progressInterval  time.Duration
-	progress          chan types.ProgressProperties
-}
-
 // newDigestingReader returns an io.Reader implementation with contents of source, which will eventually return a non-EOF error
 // and set validationFailed to true if the source stream does not match expectedDigest.
 func newDigestingReader(source io.Reader, expectedDigest digest.Digest) (*digestingReader, error) {
@@ -83,6 +66,23 @@ func (d *digestingReader) Read(p []byte) (int, error) {
 		}
 	}
 	return n, err
+}
+
+// copier allows us to keep track of diffID values for blobs, and other
+// data, that we're copying between images, and cache other information that
+// might allow us to take some shortcuts
+type copier struct {
+	copiedBlobs       map[digest.Digest]digest.Digest
+	cachedDiffIDs     map[digest.Digest]digest.Digest
+	manifestUpdates   *types.ManifestUpdateOptions
+	dest              types.ImageDestination
+	src               types.Image
+	rawSource         types.ImageSource
+	diffIDsAreNeeded  bool
+	canModifyManifest bool
+	reportWriter      io.Writer
+	progressInterval  time.Duration
+	progress          chan types.ProgressProperties
 }
 
 // Options allows supplying non-default configuration modifying the behavior of CopyImage.
@@ -205,7 +205,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	}
 
 	// If src.UpdatedImageNeedsLayerDiffIDs(manifestUpdates) will be true, it needs to be true by the time we get here.
-	ic := imageCopier{
+	c := copier{
 		copiedBlobs:       make(map[digest.Digest]digest.Digest),
 		cachedDiffIDs:     make(map[digest.Digest]digest.Digest),
 		manifestUpdates:   &manifestUpdates,
@@ -219,7 +219,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		progress:          options.Progress,
 	}
 
-	if err := ic.copyLayers(); err != nil {
+	if err := c.copyLayers(); err != nil {
 		return err
 	}
 
@@ -227,7 +227,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	// and at least with the OpenShift registry "acceptschema2" option, there is no way to detect the support
 	// without actually trying to upload something and getting a types.ManifestTypeRejectedError.
 	// So, try the preferred manifest MIME type. If the process succeeds, fine…
-	manifest, err := ic.copyUpdatedConfigAndManifest()
+	manifest, err := c.copyUpdatedConfigAndManifest()
 	if err != nil {
 		logrus.Debugf("Writing manifest using preferred type %s failed: %v", preferredManifestMIMEType, err)
 		// … if it fails, _and_ the failure is because the manifest is rejected, we may have other options.
@@ -250,7 +250,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		for _, manifestMIMEType := range otherManifestMIMETypeCandidates {
 			logrus.Debugf("Trying to use manifest type %s…", manifestMIMEType)
 			manifestUpdates.ManifestMIMEType = manifestMIMEType
-			attemptedManifest, err := ic.copyUpdatedConfigAndManifest()
+			attemptedManifest, err := c.copyUpdatedConfigAndManifest()
 			if err != nil {
 				logrus.Debugf("Upload of manifest type %s failed: %v", manifestMIMEType, err)
 				errs = append(errs, fmt.Sprintf("%s(%v)", manifestMIMEType, err))
@@ -321,9 +321,9 @@ func updateEmbeddedDockerReference(manifestUpdates *types.ManifestUpdateOptions,
 	return nil
 }
 
-// copyLayers copies layers from src/rawSource to dest, using and updating ic.manifestUpdates if necessary and ic.canModifyManifest.
-func (ic *imageCopier) copyLayers() error {
-	srcInfos := ic.src.LayerInfos()
+// copyLayers copies layers from src/rawSource to dest, using and updating c.manifestUpdates if necessary and c.canModifyManifest.
+func (c *copier) copyLayers() error {
+	srcInfos := c.src.LayerInfos()
 	destInfos := []types.BlobInfo{}
 	diffIDs := []digest.Digest{}
 	for _, srcLayer := range srcInfos {
@@ -332,17 +332,17 @@ func (ic *imageCopier) copyLayers() error {
 			diffID   digest.Digest
 			err      error
 		)
-		if ic.dest.AcceptsForeignLayerURLs() && len(srcLayer.URLs) != 0 {
+		if c.dest.AcceptsForeignLayerURLs() && len(srcLayer.URLs) != 0 {
 			// DiffIDs are, currently, needed only when converting from schema1.
 			// In which case src.LayerInfos will not have URLs because schema1
 			// does not support them.
-			if ic.diffIDsAreNeeded {
+			if c.diffIDsAreNeeded {
 				return errors.New("getting DiffID for foreign layers is unimplemented")
 			}
 			destInfo = srcLayer
-			fmt.Fprintf(ic.reportWriter, "Skipping foreign layer %q copy to %s\n", destInfo.Digest, ic.dest.Reference().Transport().Name())
+			fmt.Fprintf(c.reportWriter, "Skipping foreign layer %q copy to %s\n", destInfo.Digest, c.dest.Reference().Transport().Name())
 		} else {
-			destInfo, diffID, err = ic.copyLayer(srcLayer)
+			destInfo, diffID, err = c.copyLayer(srcLayer)
 			if err != nil {
 				return err
 			}
@@ -350,12 +350,12 @@ func (ic *imageCopier) copyLayers() error {
 		destInfos = append(destInfos, destInfo)
 		diffIDs = append(diffIDs, diffID)
 	}
-	ic.manifestUpdates.InformationOnly.LayerInfos = destInfos
-	if ic.diffIDsAreNeeded {
-		ic.manifestUpdates.InformationOnly.LayerDiffIDs = diffIDs
+	c.manifestUpdates.InformationOnly.LayerInfos = destInfos
+	if c.diffIDsAreNeeded {
+		c.manifestUpdates.InformationOnly.LayerDiffIDs = diffIDs
 	}
 	if layerDigestsDiffer(srcInfos, destInfos) {
-		ic.manifestUpdates.LayerInfos = destInfos
+		c.manifestUpdates.LayerInfos = destInfos
 	}
 	return nil
 }
@@ -373,24 +373,24 @@ func layerDigestsDiffer(a, b []types.BlobInfo) bool {
 	return false
 }
 
-// copyUpdatedConfigAndManifest updates the image per ic.manifestUpdates, if necessary,
+// copyUpdatedConfigAndManifest updates the image per c.manifestUpdates, if necessary,
 // stores the resulting config and manifest to the destination, and returns the stored manifest.
-func (ic *imageCopier) copyUpdatedConfigAndManifest() ([]byte, error) {
-	pendingImage := ic.src
-	if !reflect.DeepEqual(*ic.manifestUpdates, types.ManifestUpdateOptions{InformationOnly: ic.manifestUpdates.InformationOnly}) {
-		if !ic.canModifyManifest {
+func (c *copier) copyUpdatedConfigAndManifest() ([]byte, error) {
+	pendingImage := c.src
+	if !reflect.DeepEqual(*c.manifestUpdates, types.ManifestUpdateOptions{InformationOnly: c.manifestUpdates.InformationOnly}) {
+		if !c.canModifyManifest {
 			return nil, errors.Errorf("Internal error: copy needs an updated manifest but that was known to be forbidden")
 		}
-		if !ic.diffIDsAreNeeded && ic.src.UpdatedImageNeedsLayerDiffIDs(*ic.manifestUpdates) {
-			// We have set ic.diffIDsAreNeeded based on the preferred MIME type returned by determineManifestConversion.
+		if !c.diffIDsAreNeeded && c.src.UpdatedImageNeedsLayerDiffIDs(*c.manifestUpdates) {
+			// We have set c.diffIDsAreNeeded based on the preferred MIME type returned by determineManifestConversion.
 			// So, this can only happen if we are trying to upload using one of the other MIME type candidates.
 			// Because UpdatedImageNeedsLayerDiffIDs is true only when converting from s1 to s2, this case should only arise
-			// when ic.dest.SupportedManifestMIMETypes() includes both s1 and s2, the upload using s1 failed, and we are now trying s2.
+			// when c.dest.SupportedManifestMIMETypes() includes both s1 and s2, the upload using s1 failed, and we are now trying s2.
 			// Supposedly s2-only registries do not exist or are extremely rare, so failing with this error message is good enough for now.
-			// If handling such registries turns out to be necessary, we could compute ic.diffIDsAreNeeded based on the full list of manifest MIME type candidates.
-			return nil, errors.Errorf("Can not convert image to %s, preparing DiffIDs for this case is not supported", ic.manifestUpdates.ManifestMIMEType)
+			// If handling such registries turns out to be necessary, we could compute c.diffIDsAreNeeded based on the full list of manifest MIME type candidates.
+			return nil, errors.Errorf("Can not convert image to %s, preparing DiffIDs for this case is not supported", c.manifestUpdates.ManifestMIMEType)
 		}
-		pi, err := ic.src.UpdatedImage(*ic.manifestUpdates)
+		pi, err := c.src.UpdatedImage(*c.manifestUpdates)
 		if err != nil {
 			return nil, errors.Wrap(err, "Error creating an updated image manifest")
 		}
@@ -401,27 +401,27 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest() ([]byte, error) {
 		return nil, errors.Wrap(err, "Error reading manifest")
 	}
 
-	if err := ic.copyConfig(pendingImage); err != nil {
+	if err := c.copyConfig(pendingImage); err != nil {
 		return nil, err
 	}
 
-	fmt.Fprintf(ic.reportWriter, "Writing manifest to image destination\n")
-	if err := ic.dest.PutManifest(manifest); err != nil {
+	fmt.Fprintf(c.reportWriter, "Writing manifest to image destination\n")
+	if err := c.dest.PutManifest(manifest); err != nil {
 		return nil, errors.Wrap(err, "Error writing manifest")
 	}
 	return manifest, nil
 }
 
 // copyConfig copies config.json, if any, from src to dest.
-func (ic *imageCopier) copyConfig(src types.Image) error {
+func (c *copier) copyConfig(src types.Image) error {
 	srcInfo := src.ConfigInfo()
 	if srcInfo.Digest != "" {
-		fmt.Fprintf(ic.reportWriter, "Copying config %s\n", srcInfo.Digest)
+		fmt.Fprintf(c.reportWriter, "Copying config %s\n", srcInfo.Digest)
 		configBlob, err := src.ConfigBlob()
 		if err != nil {
 			return errors.Wrapf(err, "Error reading config blob %s", srcInfo.Digest)
 		}
-		destInfo, err := ic.copyBlobFromStream(bytes.NewReader(configBlob), srcInfo, nil, false)
+		destInfo, err := c.copyBlobFromStream(bytes.NewReader(configBlob), srcInfo, nil, false)
 		if err != nil {
 			return err
 		}
@@ -441,14 +441,14 @@ type diffIDResult struct {
 
 // copyLayer copies a layer with srcInfo (with known Digest and possibly known Size) in src to dest, perhaps compressing it if canCompress,
 // and returns a complete blobInfo of the copied layer, and a value for LayerDiffIDs if diffIDIsNeeded
-func (ic *imageCopier) copyLayer(srcInfo types.BlobInfo) (types.BlobInfo, digest.Digest, error) {
+func (c *copier) copyLayer(srcInfo types.BlobInfo) (types.BlobInfo, digest.Digest, error) {
 	// Check if we already have a blob with this digest
-	haveBlob, extantBlobSize, err := ic.dest.HasBlob(srcInfo)
+	haveBlob, extantBlobSize, err := c.dest.HasBlob(srcInfo)
 	if err != nil {
 		return types.BlobInfo{}, "", errors.Wrapf(err, "Error checking for blob %s at destination", srcInfo.Digest)
 	}
 	// If we already have a cached diffID for this blob, we don't need to compute it
-	diffIDIsNeeded := ic.diffIDsAreNeeded && (ic.cachedDiffIDs[srcInfo.Digest] == "")
+	diffIDIsNeeded := c.diffIDsAreNeeded && (c.cachedDiffIDs[srcInfo.Digest] == "")
 	// If we already have the blob, and we don't need to recompute the diffID, then we might be able to avoid reading it again
 	if haveBlob && !diffIDIsNeeded {
 		// Check the blob sizes match, if we were given a size this time
@@ -457,23 +457,23 @@ func (ic *imageCopier) copyLayer(srcInfo types.BlobInfo) (types.BlobInfo, digest
 		}
 		srcInfo.Size = extantBlobSize
 		// Tell the image destination that this blob's delta is being applied again.  For some image destinations, this can be faster than using GetBlob/PutBlob
-		blobinfo, err := ic.dest.ReapplyBlob(srcInfo)
+		blobinfo, err := c.dest.ReapplyBlob(srcInfo)
 		if err != nil {
 			return types.BlobInfo{}, "", errors.Wrapf(err, "Error reapplying blob %s at destination", srcInfo.Digest)
 		}
-		fmt.Fprintf(ic.reportWriter, "Skipping fetch of repeat blob %s\n", srcInfo.Digest)
-		return blobinfo, ic.cachedDiffIDs[srcInfo.Digest], err
+		fmt.Fprintf(c.reportWriter, "Skipping fetch of repeat blob %s\n", srcInfo.Digest)
+		return blobinfo, c.cachedDiffIDs[srcInfo.Digest], err
 	}
 
 	// Fallback: copy the layer, computing the diffID if we need to do so
-	fmt.Fprintf(ic.reportWriter, "Copying blob %s\n", srcInfo.Digest)
-	srcStream, srcBlobSize, err := ic.rawSource.GetBlob(srcInfo)
+	fmt.Fprintf(c.reportWriter, "Copying blob %s\n", srcInfo.Digest)
+	srcStream, srcBlobSize, err := c.rawSource.GetBlob(srcInfo)
 	if err != nil {
 		return types.BlobInfo{}, "", errors.Wrapf(err, "Error reading blob %s", srcInfo.Digest)
 	}
 	defer srcStream.Close()
 
-	blobInfo, diffIDChan, err := ic.copyLayerFromStream(srcStream, types.BlobInfo{Digest: srcInfo.Digest, Size: srcBlobSize},
+	blobInfo, diffIDChan, err := c.copyLayerFromStream(srcStream, types.BlobInfo{Digest: srcInfo.Digest, Size: srcBlobSize},
 		diffIDIsNeeded)
 	if err != nil {
 		return types.BlobInfo{}, "", err
@@ -485,7 +485,7 @@ func (ic *imageCopier) copyLayer(srcInfo types.BlobInfo) (types.BlobInfo, digest
 			return types.BlobInfo{}, "", errors.Wrap(diffIDResult.err, "Error computing layer DiffID")
 		}
 		logrus.Debugf("Computed DiffID %s for layer %s", diffIDResult.digest, srcInfo.Digest)
-		ic.cachedDiffIDs[srcInfo.Digest] = diffIDResult.digest
+		c.cachedDiffIDs[srcInfo.Digest] = diffIDResult.digest
 	}
 	return blobInfo, diffIDResult.digest, nil
 }
@@ -494,7 +494,7 @@ func (ic *imageCopier) copyLayer(srcInfo types.BlobInfo) (types.BlobInfo, digest
 // it copies a blob with srcInfo (with known Digest and possibly known Size) from srcStream to dest,
 // perhaps compressing the stream if canCompress,
 // and returns a complete blobInfo of the copied blob and perhaps a <-chan diffIDResult if diffIDIsNeeded, to be read by the caller.
-func (ic *imageCopier) copyLayerFromStream(srcStream io.Reader, srcInfo types.BlobInfo,
+func (c *copier) copyLayerFromStream(srcStream io.Reader, srcInfo types.BlobInfo,
 	diffIDIsNeeded bool) (types.BlobInfo, <-chan diffIDResult, error) {
 	var getDiffIDRecorder func(compression.DecompressorFunc) io.Writer // = nil
 	var diffIDChan chan diffIDResult
@@ -519,7 +519,7 @@ func (ic *imageCopier) copyLayerFromStream(srcStream io.Reader, srcInfo types.Bl
 			return pipeWriter
 		}
 	}
-	blobInfo, err := ic.copyBlobFromStream(srcStream, srcInfo, getDiffIDRecorder, ic.canModifyManifest) // Sets err to nil on success
+	blobInfo, err := c.copyBlobFromStream(srcStream, srcInfo, getDiffIDRecorder, c.canModifyManifest) // Sets err to nil on success
 	return blobInfo, diffIDChan, err
 	// We need the defer … pipeWriter.CloseWithError() to happen HERE so that the caller can block on reading from diffIDChan
 }
@@ -553,7 +553,7 @@ func computeDiffID(stream io.Reader, decompressor compression.DecompressorFunc) 
 // perhaps sending a copy to an io.Writer if getOriginalLayerCopyWriter != nil,
 // perhaps compressing it if canCompress,
 // and returns a complete blobInfo of the copied blob.
-func (ic *imageCopier) copyBlobFromStream(srcStream io.Reader, srcInfo types.BlobInfo,
+func (c *copier) copyBlobFromStream(srcStream io.Reader, srcInfo types.BlobInfo,
 	getOriginalLayerCopyWriter func(decompressor compression.DecompressorFunc) io.Writer,
 	canCompress bool) (types.BlobInfo, error) {
 	// The copying happens through a pipeline of connected io.Readers.
@@ -581,7 +581,7 @@ func (ic *imageCopier) copyBlobFromStream(srcStream io.Reader, srcInfo types.Blo
 
 	// === Report progress using a pb.Reader.
 	bar := pb.New(int(srcInfo.Size)).SetUnits(pb.U_BYTES)
-	bar.Output = ic.reportWriter
+	bar.Output = c.reportWriter
 	bar.SetMaxWidth(80)
 	bar.ShowTimeLeft = false
 	bar.ShowPercent = false
@@ -598,7 +598,7 @@ func (ic *imageCopier) copyBlobFromStream(srcStream io.Reader, srcInfo types.Blo
 
 	// === Compress the layer if it is uncompressed and compression is desired
 	var inputInfo types.BlobInfo
-	if !canCompress || isCompressed || !ic.dest.ShouldCompressLayers() {
+	if !canCompress || isCompressed || !c.dest.ShouldCompressLayers() {
 		logrus.Debugf("Using original blob without modification")
 		inputInfo = srcInfo
 	} else {
@@ -615,19 +615,19 @@ func (ic *imageCopier) copyBlobFromStream(srcStream io.Reader, srcInfo types.Blo
 		inputInfo.Size = -1
 	}
 
-	// === Report progress using the ic.progress channel, if required.
-	if ic.progress != nil && ic.progressInterval > 0 {
+	// === Report progress using the c.progress channel, if required.
+	if c.progress != nil && c.progressInterval > 0 {
 		destStream = &progressReader{
 			source:   destStream,
-			channel:  ic.progress,
-			interval: ic.progressInterval,
+			channel:  c.progress,
+			interval: c.progressInterval,
 			artifact: srcInfo,
 			lastTime: time.Now(),
 		}
 	}
 
 	// === Finally, send the layer stream to dest.
-	uploadedInfo, err := ic.dest.PutBlob(destStream, inputInfo)
+	uploadedInfo, err := c.dest.PutBlob(destStream, inputInfo)
 	if err != nil {
 		return types.BlobInfo{}, errors.Wrap(err, "Error writing blob")
 	}
