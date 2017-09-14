@@ -193,21 +193,6 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		}
 	}
 
-	canModifyManifest := len(sigs) == 0
-	manifestUpdates := types.ManifestUpdateOptions{}
-	manifestUpdates.InformationOnly.Destination = dest
-
-	if err := updateEmbeddedDockerReference(&manifestUpdates, dest, src, canModifyManifest); err != nil {
-		return err
-	}
-
-	// We compute preferredManifestMIMEType only to show it in error messages.
-	// Without having to add this context in an error message, we would be happy enough to know only that no conversion is needed.
-	preferredManifestMIMEType, otherManifestMIMETypeCandidates, err := determineManifestConversion(&manifestUpdates, src, dest.SupportedManifestMIMETypes(), canModifyManifest, options.ForceManifestMIMEType)
-	if err != nil {
-		return err
-	}
-
 	c := &copier{
 		copiedBlobs:      make(map[digest.Digest]digest.Digest),
 		cachedDiffIDs:    make(map[digest.Digest]digest.Digest),
@@ -217,14 +202,27 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		progressInterval: options.ProgressInterval,
 		progress:         options.Progress,
 	}
-	// If src.UpdatedImageNeedsLayerDiffIDs(manifestUpdates) will be true, it needs to be true by the time we get here.
 	ic := imageCopier{
-		c:                 c,
-		manifestUpdates:   &manifestUpdates,
-		src:               src,
-		diffIDsAreNeeded:  src.UpdatedImageNeedsLayerDiffIDs(manifestUpdates),
-		canModifyManifest: canModifyManifest,
+		c:               c,
+		manifestUpdates: &types.ManifestUpdateOptions{InformationOnly: types.ManifestUpdateInformation{Destination: dest}},
+		src:             src,
+		// diffIDsAreNeeded is computed later
+		canModifyManifest: len(sigs) == 0,
 	}
+
+	if err := ic.updateEmbeddedDockerReference(); err != nil {
+		return err
+	}
+
+	// We compute preferredManifestMIMEType only to show it in error messages.
+	// Without having to add this context in an error message, we would be happy enough to know only that no conversion is needed.
+	preferredManifestMIMEType, otherManifestMIMETypeCandidates, err := ic.determineManifestConversion(dest.SupportedManifestMIMETypes(), options.ForceManifestMIMEType)
+	if err != nil {
+		return err
+	}
+
+	// If src.UpdatedImageNeedsLayerDiffIDs(ic.manifestUpdates) will be true, it needs to be true by the time we get here.
+	ic.diffIDsAreNeeded = src.UpdatedImageNeedsLayerDiffIDs(*ic.manifestUpdates)
 
 	if err := ic.copyLayers(); err != nil {
 		return err
@@ -246,9 +244,9 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		}
 		// If the original MIME type is acceptable, determineManifestConversion always uses it as preferredManifestMIMEType.
 		// So if we are here, we will definitely be trying to convert the manifest.
-		// With !canModifyManifest, that would just be a string of repeated failures for the same reason,
+		// With !ic.canModifyManifest, that would just be a string of repeated failures for the same reason,
 		// so let’s bail out early and with a better error message.
-		if !canModifyManifest {
+		if !ic.canModifyManifest {
 			return errors.Wrap(err, "Writing manifest failed (and converting it is not possible)")
 		}
 
@@ -256,7 +254,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		errs := []string{fmt.Sprintf("%s(%v)", preferredManifestMIMEType, err)}
 		for _, manifestMIMEType := range otherManifestMIMETypeCandidates {
 			logrus.Debugf("Trying to use manifest type %s…", manifestMIMEType)
-			manifestUpdates.ManifestMIMEType = manifestMIMEType
+			ic.manifestUpdates.ManifestMIMEType = manifestMIMEType
 			attemptedManifest, err := ic.copyUpdatedConfigAndManifest()
 			if err != nil {
 				logrus.Debugf("Upload of manifest type %s failed: %v", manifestMIMEType, err)
@@ -275,7 +273,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	}
 
 	if options.SignBy != "" {
-		newSig, err := createSignature(dest, manifest, options.SignBy, reportWriter)
+		newSig, err := c.createSignature(manifest, options.SignBy)
 		if err != nil {
 			return err
 		}
@@ -311,20 +309,20 @@ func checkImageDestinationForCurrentRuntimeOS(src types.Image, dest types.ImageD
 }
 
 // updateEmbeddedDockerReference handles the Docker reference embedded in Docker schema1 manifests.
-func updateEmbeddedDockerReference(manifestUpdates *types.ManifestUpdateOptions, dest types.ImageDestination, src types.Image, canModifyManifest bool) error {
-	destRef := dest.Reference().DockerReference()
+func (ic *imageCopier) updateEmbeddedDockerReference() error {
+	destRef := ic.c.dest.Reference().DockerReference()
 	if destRef == nil {
 		return nil // Destination does not care about Docker references
 	}
-	if !src.EmbeddedDockerReferenceConflicts(destRef) {
+	if !ic.src.EmbeddedDockerReferenceConflicts(destRef) {
 		return nil // No reference embedded in the manifest, or it matches destRef already.
 	}
 
-	if !canModifyManifest {
+	if !ic.canModifyManifest {
 		return errors.Errorf("Copying a schema1 image with an embedded Docker reference to %s (Docker reference %s) would invalidate existing signatures. Explicitly enable signature removal to proceed anyway",
-			transports.ImageName(dest.Reference()), destRef.String())
+			transports.ImageName(ic.c.dest.Reference()), destRef.String())
 	}
-	manifestUpdates.EmbeddedDockerReference = destRef
+	ic.manifestUpdates.EmbeddedDockerReference = destRef
 	return nil
 }
 
