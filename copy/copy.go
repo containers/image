@@ -159,6 +159,20 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		return errors.Errorf("can not copy %s: manifest contains multiple images", transports.ImageName(srcRef))
 	}
 
+	if err := c.copyOneImage(policyContext, options, unparsedImage); err != nil {
+		return err
+	}
+
+	if err := c.dest.Commit(); err != nil {
+		return errors.Wrap(err, "Error committing the finished image")
+	}
+
+	return nil
+}
+
+// Image copies a single (on-manifest-list) image unparsedImage, using policyContext to validate
+// source image admissibility.
+func (c *copier) copyOneImage(policyContext *signature.PolicyContext, options *Options, unparsedImage *image.UnparsedImage) (retErr error) {
 	// Please keep this policy check BEFORE reading any other information about the image.
 	// (the multiImage check above only matches the MIME type, which we have received anyway.
 	// Actual parsing of anything should be deferred.)
@@ -167,10 +181,10 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	}
 	src, err := image.FromUnparsedImage(unparsedImage)
 	if err != nil {
-		return errors.Wrapf(err, "Error initializing image from source %s", transports.ImageName(srcRef))
+		return errors.Wrapf(err, "Error initializing image from source %s", transports.ImageName(c.rawSource.Reference()))
 	}
 
-	if err := checkImageDestinationForCurrentRuntimeOS(src, dest); err != nil {
+	if err := checkImageDestinationForCurrentRuntimeOS(src, c.dest); err != nil {
 		return err
 	}
 
@@ -187,14 +201,14 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	}
 	if len(sigs) != 0 {
 		c.Printf("Checking if image destination supports signatures\n")
-		if err := dest.SupportsSignatures(); err != nil {
+		if err := c.dest.SupportsSignatures(); err != nil {
 			return errors.Wrap(err, "Can not copy signatures")
 		}
 	}
 
 	ic := imageCopier{
 		c:               c,
-		manifestUpdates: &types.ManifestUpdateOptions{InformationOnly: types.ManifestUpdateInformation{Destination: dest}},
+		manifestUpdates: &types.ManifestUpdateOptions{InformationOnly: types.ManifestUpdateInformation{Destination: c.dest}},
 		src:             src,
 		// diffIDsAreNeeded is computed later
 		canModifyManifest: len(sigs) == 0,
@@ -206,7 +220,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 
 	// We compute preferredManifestMIMEType only to show it in error messages.
 	// Without having to add this context in an error message, we would be happy enough to know only that no conversion is needed.
-	preferredManifestMIMEType, otherManifestMIMETypeCandidates, err := ic.determineManifestConversion(dest.SupportedManifestMIMETypes(), options.ForceManifestMIMEType)
+	preferredManifestMIMEType, otherManifestMIMETypeCandidates, err := ic.determineManifestConversion(c.dest.SupportedManifestMIMETypes(), options.ForceManifestMIMEType)
 	if err != nil {
 		return err
 	}
@@ -271,12 +285,8 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	}
 
 	c.Printf("Storing signatures\n")
-	if err := dest.PutSignatures(sigs); err != nil {
+	if err := c.dest.PutSignatures(sigs); err != nil {
 		return errors.Wrap(err, "Error writing signatures")
-	}
-
-	if err := dest.Commit(); err != nil {
-		return errors.Wrap(err, "Error committing the finished image")
 	}
 
 	return nil
