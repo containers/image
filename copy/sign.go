@@ -1,8 +1,6 @@
 package copy
 
 import (
-	"fmt"
-
 	"github.com/containers/image/signature"
 	"github.com/containers/image/transports"
 	"github.com/pkg/errors"
@@ -24,7 +22,7 @@ func (c *copier) createSignature(manifest []byte, keyIdentity string) ([]byte, e
 		return nil, errors.Errorf("Cannot determine canonical Docker reference for destination %s", transports.ImageName(c.dest.Reference()))
 	}
 
-	fmt.Fprintf(c.reportWriter, "Signing manifest\n")
+	c.Printf("Signing manifest\n")
 	newSig, err := signature.SignDockerManifest(manifest, dockerReference.String(), mech, keyIdentity)
 	if err != nil {
 		return nil, errors.Wrap(err, "Error creating signature")

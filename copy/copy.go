@@ -120,10 +120,6 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		reportWriter = options.ReportWriter
 	}
 
-	writeReport := func(f string, a ...interface{}) {
-		fmt.Fprintf(reportWriter, f, a...)
-	}
-
 	dest, err := destRef.NewImageDestination(options.DestinationCtx)
 	if err != nil {
 		return errors.Wrapf(err, "Error initializing destination %s", transports.ImageName(destRef))
@@ -138,6 +134,17 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	if err != nil {
 		return errors.Wrapf(err, "Error initializing source %s", transports.ImageName(srcRef))
 	}
+
+	c := &copier{
+		copiedBlobs:      make(map[digest.Digest]digest.Digest),
+		cachedDiffIDs:    make(map[digest.Digest]digest.Digest),
+		dest:             dest,
+		rawSource:        rawSource,
+		reportWriter:     reportWriter,
+		progressInterval: options.ProgressInterval,
+		progress:         options.Progress,
+	}
+
 	unparsedImage := image.UnparsedFromSource(rawSource)
 	defer func() {
 		if unparsedImage != nil {
@@ -179,7 +186,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	if options.RemoveSignatures {
 		sigs = [][]byte{}
 	} else {
-		writeReport("Getting image source signatures\n")
+		c.Printf("Getting image source signatures\n")
 		s, err := src.Signatures(context.TODO())
 		if err != nil {
 			return errors.Wrap(err, "Error reading signatures")
@@ -187,21 +194,12 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		sigs = s
 	}
 	if len(sigs) != 0 {
-		writeReport("Checking if image destination supports signatures\n")
+		c.Printf("Checking if image destination supports signatures\n")
 		if err := dest.SupportsSignatures(); err != nil {
 			return errors.Wrap(err, "Can not copy signatures")
 		}
 	}
 
-	c := &copier{
-		copiedBlobs:      make(map[digest.Digest]digest.Digest),
-		cachedDiffIDs:    make(map[digest.Digest]digest.Digest),
-		dest:             dest,
-		rawSource:        rawSource,
-		reportWriter:     reportWriter,
-		progressInterval: options.ProgressInterval,
-		progress:         options.Progress,
-	}
 	ic := imageCopier{
 		c:               c,
 		manifestUpdates: &types.ManifestUpdateOptions{InformationOnly: types.ManifestUpdateInformation{Destination: dest}},
@@ -280,7 +278,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		sigs = append(sigs, newSig)
 	}
 
-	writeReport("Storing signatures\n")
+	c.Printf("Storing signatures\n")
 	if err := dest.PutSignatures(sigs); err != nil {
 		return errors.Wrap(err, "Error writing signatures")
 	}
@@ -290,6 +288,15 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	}
 
 	return nil
+}
+
+// Printf writes a formatted string to c.reportWriter.
+// Note that the method name Printf is not entirely arbitrary: (go tool vet)
+// has a built-in list of functions/methods (whatever object they are for)
+// which have their format strings checked; for other names we would have
+// to pass a parameter to every (go tool vet) invocation.
+func (c *copier) Printf(format string, a ...interface{}) {
+	fmt.Fprintf(c.reportWriter, format, a...)
 }
 
 func checkImageDestinationForCurrentRuntimeOS(src types.Image, dest types.ImageDestination) error {
@@ -345,7 +352,7 @@ func (ic *imageCopier) copyLayers() error {
 				return errors.New("getting DiffID for foreign layers is unimplemented")
 			}
 			destInfo = srcLayer
-			fmt.Fprintf(ic.c.reportWriter, "Skipping foreign layer %q copy to %s\n", destInfo.Digest, ic.c.dest.Reference().Transport().Name())
+			ic.c.Printf("Skipping foreign layer %q copy to %s\n", destInfo.Digest, ic.c.dest.Reference().Transport().Name())
 		} else {
 			destInfo, diffID, err = ic.copyLayer(srcLayer)
 			if err != nil {
@@ -410,7 +417,7 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest() ([]byte, error) {
 		return nil, err
 	}
 
-	fmt.Fprintf(ic.c.reportWriter, "Writing manifest to image destination\n")
+	ic.c.Printf("Writing manifest to image destination\n")
 	if err := ic.c.dest.PutManifest(manifest); err != nil {
 		return nil, errors.Wrap(err, "Error writing manifest")
 	}
@@ -421,7 +428,7 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest() ([]byte, error) {
 func (c *copier) copyConfig(src types.Image) error {
 	srcInfo := src.ConfigInfo()
 	if srcInfo.Digest != "" {
-		fmt.Fprintf(c.reportWriter, "Copying config %s\n", srcInfo.Digest)
+		c.Printf("Copying config %s\n", srcInfo.Digest)
 		configBlob, err := src.ConfigBlob()
 		if err != nil {
 			return errors.Wrapf(err, "Error reading config blob %s", srcInfo.Digest)
@@ -466,12 +473,12 @@ func (ic *imageCopier) copyLayer(srcInfo types.BlobInfo) (types.BlobInfo, digest
 		if err != nil {
 			return types.BlobInfo{}, "", errors.Wrapf(err, "Error reapplying blob %s at destination", srcInfo.Digest)
 		}
-		fmt.Fprintf(ic.c.reportWriter, "Skipping fetch of repeat blob %s\n", srcInfo.Digest)
+		ic.c.Printf("Skipping fetch of repeat blob %s\n", srcInfo.Digest)
 		return blobinfo, ic.c.cachedDiffIDs[srcInfo.Digest], err
 	}
 
 	// Fallback: copy the layer, computing the diffID if we need to do so
-	fmt.Fprintf(ic.c.reportWriter, "Copying blob %s\n", srcInfo.Digest)
+	ic.c.Printf("Copying blob %s\n", srcInfo.Digest)
 	srcStream, srcBlobSize, err := ic.c.rawSource.GetBlob(srcInfo)
 	if err != nil {
 		return types.BlobInfo{}, "", errors.Wrapf(err, "Error reading blob %s", srcInfo.Digest)
