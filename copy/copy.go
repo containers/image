@@ -145,7 +145,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		progress:         options.Progress,
 	}
 
-	unparsedImage := image.UnparsedFromSource(rawSource)
+	unparsedImage := image.UnparsedInstance(rawSource, nil)
 	defer func() {
 		if unparsedImage != nil {
 			if err := unparsedImage.Close(); err != nil {

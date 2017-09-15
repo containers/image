@@ -29,10 +29,10 @@ func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) typ
 	require.NoError(t, err)
 	src, err := srcRef.NewImageSource(nil)
 	require.NoError(t, err)
-	return image.UnparsedFromSource(&dirImageSourceMock{
+	return image.UnparsedInstance(&dirImageSourceMock{
 		ImageSource: src,
 		ref:         ref,
-	})
+	}, nil)
 }
 
 // dirImageSourceMock inherits dirImageSource, but overrides its Reference method.

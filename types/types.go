@@ -198,6 +198,9 @@ func (e ManifestTypeRejectedError) Error() string {
 // Thus, an UnparsedImage can be created from an ImageSource simply by fetching blobs without interpreting them,
 // allowing cryptographic signature verification to happen first, before even fetching the manifest, or parsing anything else.
 // This also makes the UnparsedImage→Image conversion an explicitly visible step.
+//
+// An UnparsedImage is a pair of (ImageSource, instance digest); it can represent either a manifest list or a single image instance.
+//
 // Each UnparsedImage should eventually be closed by calling Close().
 type UnparsedImage interface {
 	// Reference returns the reference used to set up this source, _as specified by the user_
@@ -212,6 +215,7 @@ type UnparsedImage interface {
 }
 
 // Image is the primary API for inspecting properties of images.
+// An Image is based on a pair of (ImageSource, instance digest); it can represent either a manifest list or a single image instance.
 // Each Image should eventually be closed by calling Close().
 type Image interface {
 	// Note that Reference may return nil in the return value of UpdatedImage!

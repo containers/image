@@ -7,7 +7,10 @@ import (
 	"github.com/containers/image/types"
 )
 
-// FromSource returns a types.Image implementation for source.
+// FromSource returns a types.Image implementation for the default instance of source.
+// If source is a manifest list, .Manifest() still returns the manifest list,
+// but other methods transparently return data from an appropriate image instance.
+//
 // The caller must call .Close() on the returned Image.
 //
 // FromSource “takes ownership” of the input ImageSource and will call src.Close()
@@ -18,7 +21,7 @@ import (
 // NOTE: If any kind of signature verification should happen, build an UnparsedImage from the value returned by NewImageSource,
 // verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage instead of calling this function.
 func FromSource(src types.ImageSource) (types.Image, error) {
-	return FromUnparsedImage(UnparsedFromSource(src))
+	return FromUnparsedImage(UnparsedInstance(src, nil))
 }
 
 // sourcedImage is a general set of utilities for working with container images,
