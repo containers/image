@@ -552,7 +552,7 @@ func (s *storageImageSource) GetSignatures(ctx context.Context) (signatures [][]
 		offset += length
 	}
 	if offset != len(signature) {
-		return nil, errors.Errorf("signatures data contained %d extra bytes", len(signatures)-offset)
+		return nil, errors.Errorf("signatures data contained %d extra bytes", len(signature)-offset)
 	}
 	return sigslice, nil
 }
