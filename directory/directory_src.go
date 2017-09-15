@@ -35,16 +35,17 @@ func (s *dirImageSource) Close() error {
 
 // GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).
 // It may use a remote (= slow) service.
-func (s *dirImageSource) GetManifest() ([]byte, string, error) {
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve (when the primary manifest is a manifest list);
+// this never happens if the primary manifest is not a manifest list (e.g. if the source never returns manifest lists).
+func (s *dirImageSource) GetManifest(instanceDigest *digest.Digest) ([]byte, string, error) {
+	if instanceDigest != nil {
+		return nil, "", errors.Errorf(`Getting target manifest not supported by "dir:"`)
+	}
 	m, err := ioutil.ReadFile(s.ref.manifestPath())
 	if err != nil {
 		return nil, "", err
 	}
 	return m, manifest.GuessMIMEType(m), err
-}
-
-func (s *dirImageSource) GetTargetManifest(digest digest.Digest) ([]byte, string, error) {
-	return nil, "", errors.Errorf(`Getting target manifest not supported by "dir:"`)
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).

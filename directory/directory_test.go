@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -41,10 +42,16 @@ func TestGetPutManifest(t *testing.T) {
 	src, err := ref.NewImageSource(nil)
 	require.NoError(t, err)
 	defer src.Close()
-	m, mt, err := src.GetManifest()
+	m, mt, err := src.GetManifest(nil)
 	assert.NoError(t, err)
 	assert.Equal(t, man, m)
 	assert.Equal(t, "", mt)
+
+	// Non-default instances are not supported
+	md, err := manifest.Digest(man)
+	require.NoError(t, err)
+	_, _, err = src.GetManifest(&md)
+	assert.Error(t, err)
 }
 
 func TestGetPutBlob(t *testing.T) {

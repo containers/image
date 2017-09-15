@@ -46,7 +46,7 @@ func manifestSchema2FromManifestList(src types.ImageSource, manblob []byte) (gen
 	if targetManifestDigest == "" {
 		return nil, errors.New("no supported platform found in manifest list")
 	}
-	manblob, mt, err := src.GetTargetManifest(targetManifestDigest)
+	manblob, mt, err := src.GetManifest(&targetManifestDigest)
 	if err != nil {
 		return nil, err
 	}

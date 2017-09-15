@@ -67,7 +67,12 @@ func simplifyContentType(contentType string) string {
 
 // GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).
 // It may use a remote (= slow) service.
-func (s *dockerImageSource) GetManifest() ([]byte, string, error) {
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve (when the primary manifest is a manifest list);
+// this never happens if the primary manifest is not a manifest list (e.g. if the source never returns manifest lists).
+func (s *dockerImageSource) GetManifest(instanceDigest *digest.Digest) ([]byte, string, error) {
+	if instanceDigest != nil {
+		return s.fetchManifest(context.TODO(), instanceDigest.String())
+	}
 	err := s.ensureManifestIsLoaded(context.TODO())
 	if err != nil {
 		return nil, "", err
@@ -94,17 +99,11 @@ func (s *dockerImageSource) fetchManifest(ctx context.Context, tagOrDigest strin
 	return manblob, simplifyContentType(res.Header.Get("Content-Type")), nil
 }
 
-// GetTargetManifest returns an image's manifest given a digest.
-// This is mainly used to retrieve a single image's manifest out of a manifest list.
-func (s *dockerImageSource) GetTargetManifest(digest digest.Digest) ([]byte, string, error) {
-	return s.fetchManifest(context.TODO(), digest.String())
-}
-
 // ensureManifestIsLoaded sets s.cachedManifest and s.cachedManifestMIMEType
 //
 // ImageSource implementations are not required or expected to do any caching,
 // but because our signatures are “attached” to the manifest digest,
-// we need to ensure that the digest of the manifest returned by GetManifest
+// we need to ensure that the digest of the manifest returned by GetManifest(nil)
 // and used by GetSignatures are consistent, otherwise we would get spurious
 // signature verification failures when pulling while a tag is being updated.
 func (s *dockerImageSource) ensureManifestIsLoaded(ctx context.Context) error {

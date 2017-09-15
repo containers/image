@@ -114,10 +114,9 @@ type ImageSource interface {
 	Close() error
 	// GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).
 	// It may use a remote (= slow) service.
-	GetManifest() ([]byte, string, error)
-	// GetTargetManifest returns an image's manifest given a digest. This is mainly used to retrieve a single image's manifest
-	// out of a manifest list.
-	GetTargetManifest(digest digest.Digest) ([]byte, string, error)
+	// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve (when the primary manifest is a manifest list);
+	// this never happens if the primary manifest is not a manifest list (e.g. if the source never returns manifest lists).
+	GetManifest(instanceDigest *digest.Digest) ([]byte, string, error)
 	// GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 	// The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
 	GetBlob(BlobInfo) (io.ReadCloser, int64, error)

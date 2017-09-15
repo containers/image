@@ -61,8 +61,26 @@ func (s *ociImageSource) Close() error {
 
 // GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).
 // It may use a remote (= slow) service.
-func (s *ociImageSource) GetManifest() ([]byte, string, error) {
-	manifestPath, err := s.ref.blobPath(digest.Digest(s.descriptor.Digest), s.sharedBlobDir)
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve (when the primary manifest is a manifest list);
+// this never happens if the primary manifest is not a manifest list (e.g. if the source never returns manifest lists).
+func (s *ociImageSource) GetManifest(instanceDigest *digest.Digest) ([]byte, string, error) {
+	var dig digest.Digest
+	var mimeType string
+	if instanceDigest == nil {
+		dig = digest.Digest(s.descriptor.Digest)
+		mimeType = s.descriptor.MediaType
+	} else {
+		dig = *instanceDigest
+		// XXX: instanceDigest means that we don't immediately have the context of what
+		//      mediaType the manifest has. In OCI this means that we don't know
+		//      what reference it came from, so we just *assume* that its
+		//      MediaTypeImageManifest.
+		// FIXME: We should actually be able to look up the manifest in the index,
+		// and see the MIME type there.
+		mimeType = imgspecv1.MediaTypeImageManifest
+	}
+
+	manifestPath, err := s.ref.blobPath(dig, s.sharedBlobDir)
 	if err != nil {
 		return nil, "", err
 	}
@@ -71,25 +89,7 @@ func (s *ociImageSource) GetManifest() ([]byte, string, error) {
 		return nil, "", err
 	}
 
-	return m, s.descriptor.MediaType, nil
-}
-
-func (s *ociImageSource) GetTargetManifest(digest digest.Digest) ([]byte, string, error) {
-	manifestPath, err := s.ref.blobPath(digest, s.sharedBlobDir)
-	if err != nil {
-		return nil, "", err
-	}
-
-	m, err := ioutil.ReadFile(manifestPath)
-	if err != nil {
-		return nil, "", err
-	}
-
-	// XXX: GetTargetManifest means that we don't have the context of what
-	//      mediaType the manifest has. In OCI this means that we don't know
-	//      what reference it came from, so we just *assume* that its
-	//      MediaTypeImageManifest.
-	return m, imgspecv1.MediaTypeImageManifest, nil
+	return m, mimeType, nil
 }
 
 // GetBlob returns a stream for the specified blob, and the blob's size.

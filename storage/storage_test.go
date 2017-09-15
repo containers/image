@@ -444,7 +444,7 @@ func TestWriteRead(t *testing.T) {
 				t.Fatalf("NewImageSource(%q) changed the reference to %q", ref.StringWithinTransport(), src.Reference().StringWithinTransport())
 			}
 		}
-		retrievedManifest, manifestType, err := src.GetManifest()
+		retrievedManifest, manifestType, err := src.GetManifest(nil)
 		if err != nil {
 			t.Fatalf("GetManifest(%q) returned error %v", ref.StringWithinTransport(), err)
 		}
@@ -453,9 +453,9 @@ func TestWriteRead(t *testing.T) {
 			t.Fatalf("NewImageSource(%q) changed the manifest: %q was %q", ref.StringWithinTransport(), string(retrievedManifest), manifest)
 		}
 		sum = ddigest.SHA256.FromBytes([]byte(manifest))
-		_, _, err = src.GetTargetManifest(sum)
+		_, _, err = src.GetManifest(&sum)
 		if err == nil {
-			t.Fatalf("GetTargetManifest(%q) is supposed to fail", ref.StringWithinTransport())
+			t.Fatalf("GetManifest(%q) with an instanceDigest is supposed to fail", ref.StringWithinTransport())
 		}
 		sigs, err := src.GetSignatures(context.Background())
 		if err != nil {

@@ -45,7 +45,7 @@ func (i *UnparsedImage) Close() error {
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
 func (i *UnparsedImage) Manifest() ([]byte, string, error) {
 	if i.cachedManifest == nil {
-		m, mt, err := i.src.GetManifest()
+		m, mt, err := i.src.GetManifest(nil)
 		if err != nil {
 			return nil, "", err
 		}

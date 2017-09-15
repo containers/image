@@ -29,8 +29,8 @@ var (
 	// ErrBlobSizeMismatch is returned when PutBlob() is given a blob
 	// with an expected size that doesn't match the reader.
 	ErrBlobSizeMismatch = errors.New("blob size mismatch")
-	// ErrNoManifestLists is returned when GetTargetManifest() is
-	// called.
+	// ErrNoManifestLists is returned when GetManifest() is called.
+	// with a non-nil instanceDigest.
 	ErrNoManifestLists = errors.New("manifest lists are not supported by this transport")
 	// ErrNoSuchImage is returned when we attempt to access an image which
 	// doesn't exist in the storage area.
@@ -531,13 +531,16 @@ func diffLayer(store storage.Store, layerID string) (rc io.ReadCloser, n int64, 
 	return diff, n, nil
 }
 
-func (s *storageImageSource) GetManifest() (manifestBlob []byte, MIMEType string, err error) {
+// GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).
+// It may use a remote (= slow) service.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve (when the primary manifest is a manifest list);
+// this never happens if the primary manifest is not a manifest list (e.g. if the source never returns manifest lists).
+func (s *storageImageSource) GetManifest(instanceDigest *ddigest.Digest) (manifestBlob []byte, MIMEType string, err error) {
+	if instanceDigest != nil {
+		return nil, "", ErrNoManifestLists
+	}
 	manifestBlob, err = s.imageRef.transport.store.ImageBigData(s.ID, "manifest")
 	return manifestBlob, manifest.GuessMIMEType(manifestBlob), err
-}
-
-func (s *storageImageSource) GetTargetManifest(digest ddigest.Digest) (manifestBlob []byte, MIMEType string, err error) {
-	return nil, "", ErrNoManifestLists
 }
 
 func (s *storageImageSource) GetSignatures(ctx context.Context) (signatures [][]byte, err error) {
