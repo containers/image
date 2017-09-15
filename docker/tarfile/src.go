@@ -354,6 +354,13 @@ func (s *Source) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, error) {
 }
 
 // GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
-func (s *Source) GetSignatures(ctx context.Context) ([][]byte, error) {
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
+// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
+// (e.g. if the source never returns manifest lists).
+func (s *Source) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
+	if instanceDigest != nil {
+		// How did we even get here? GetManifest(nil) has returned a manifest.DockerV2Schema2MediaType.
+		return nil, errors.Errorf(`Manifest lists are not supported by "docker-daemon:"`)
+	}
 	return [][]byte{}, nil
 }

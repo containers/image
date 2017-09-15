@@ -457,7 +457,7 @@ func TestWriteRead(t *testing.T) {
 		if err == nil {
 			t.Fatalf("GetManifest(%q) with an instanceDigest is supposed to fail", ref.StringWithinTransport())
 		}
-		sigs, err := src.GetSignatures(context.Background())
+		sigs, err := src.GetSignatures(context.Background(), nil)
 		if err != nil {
 			t.Fatalf("GetSignatures(%q) returned error %v", ref.StringWithinTransport(), err)
 		}
@@ -471,6 +471,10 @@ func TestWriteRead(t *testing.T) {
 			if bytes.Compare(sigs[i], signatures[i]) != 0 {
 				t.Fatalf("Signature %d was corrupted", i)
 			}
+		}
+		_, err = src.GetSignatures(context.Background(), &sum)
+		if err == nil {
+			t.Fatalf("GetSignatures(%q) with instanceDigest is supposed to fail", ref.StringWithinTransport())
 		}
 		for _, layerInfo := range layerInfos {
 			buf := bytes.Buffer{}

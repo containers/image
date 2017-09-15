@@ -219,12 +219,21 @@ func (s *openshiftImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int6
 	return s.docker.GetBlob(info)
 }
 
-func (s *openshiftImageSource) GetSignatures(ctx context.Context) ([][]byte, error) {
-	if err := s.ensureImageIsResolved(ctx); err != nil {
-		return nil, err
+// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
+// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
+// (e.g. if the source never returns manifest lists).
+func (s *openshiftImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
+	var imageName string
+	if instanceDigest == nil {
+		if err := s.ensureImageIsResolved(ctx); err != nil {
+			return nil, err
+		}
+		imageName = s.imageStreamImageName
+	} else {
+		imageName = instanceDigest.String()
 	}
-
-	image, err := s.client.getImage(ctx, s.imageStreamImageName)
+	image, err := s.client.getImage(ctx, imageName)
 	if err != nil {
 		return nil, err
 	}

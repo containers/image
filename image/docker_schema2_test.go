@@ -35,7 +35,7 @@ func (f unusedImageSource) GetManifest(*digest.Digest) ([]byte, string, error) {
 func (f unusedImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, error) {
 	panic("Unexpected call to a mock function")
 }
-func (f unusedImageSource) GetSignatures(context.Context) ([][]byte, error) {
+func (f unusedImageSource) GetSignatures(context.Context, *digest.Digest) ([][]byte, error) {
 	panic("Unexpected call to a mock function")
 }
 

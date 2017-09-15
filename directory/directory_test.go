@@ -139,12 +139,16 @@ func TestGetPutSignatures(t *testing.T) {
 	dest, err := ref.NewImageDestination(nil)
 	require.NoError(t, err)
 	defer dest.Close()
+	man := []byte("test-manifest")
 	signatures := [][]byte{
 		[]byte("sig1"),
 		[]byte("sig2"),
 	}
 	err = dest.SupportsSignatures()
 	assert.NoError(t, err)
+	err = dest.PutManifest(man)
+	require.NoError(t, err)
+
 	err = dest.PutSignatures(signatures)
 	assert.NoError(t, err)
 	err = dest.Commit()
@@ -153,9 +157,15 @@ func TestGetPutSignatures(t *testing.T) {
 	src, err := ref.NewImageSource(nil)
 	require.NoError(t, err)
 	defer src.Close()
-	sigs, err := src.GetSignatures(context.Background())
+	sigs, err := src.GetSignatures(context.Background(), nil)
 	assert.NoError(t, err)
 	assert.Equal(t, signatures, sigs)
+
+	// Non-default instances are not supported
+	md, err := manifest.Digest(man)
+	require.NoError(t, err)
+	_, err = src.GetSignatures(context.Background(), &md)
+	assert.Error(t, err)
 }
 
 func TestSourceReference(t *testing.T) {

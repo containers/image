@@ -75,7 +75,7 @@ func (i *UnparsedImage) Manifest() ([]byte, string, error) {
 // Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 func (i *UnparsedImage) Signatures(ctx context.Context) ([][]byte, error) {
 	if i.cachedSignatures == nil {
-		sigs, err := i.src.GetSignatures(ctx)
+		sigs, err := i.src.GetSignatures(ctx, nil)
 		if err != nil {
 			return nil, err
 		}

@@ -99,7 +99,7 @@ type BlobInfo struct {
 	MediaType   string
 }
 
-// ImageSource is a service, possibly remote (= slow), to download components of a single image.
+// ImageSource is a service, possibly remote (= slow), to download components of a single image or a named image set (manifest list).
 // This is primarily useful for copying images around; for examining their properties, Image (below)
 // is usually more useful.
 // Each ImageSource should eventually be closed by calling Close().
@@ -121,7 +121,10 @@ type ImageSource interface {
 	// The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
 	GetBlob(BlobInfo) (io.ReadCloser, int64, error)
 	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
-	GetSignatures(context.Context) ([][]byte, error)
+	// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
+	// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
+	// (e.g. if the source never returns manifest lists).
+	GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error)
 }
 
 // ImageDestination is a service, possibly remote (= slow), to store components of a single image.

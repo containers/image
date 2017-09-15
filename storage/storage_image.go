@@ -543,7 +543,14 @@ func (s *storageImageSource) GetManifest(instanceDigest *ddigest.Digest) (manife
 	return manifestBlob, manifest.GuessMIMEType(manifestBlob), err
 }
 
-func (s *storageImageSource) GetSignatures(ctx context.Context) (signatures [][]byte, err error) {
+// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
+// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
+// (e.g. if the source never returns manifest lists).
+func (s *storageImageSource) GetSignatures(ctx context.Context, instanceDigest *ddigest.Digest) ([][]byte, error) {
+	if instanceDigest != nil {
+		return nil, ErrNoManifestLists
+	}
 	var offset int
 	signature, err := s.imageRef.transport.store.ImageBigData(s.ID, "signatures")
 	if err != nil {

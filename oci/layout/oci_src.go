@@ -114,7 +114,11 @@ func (s *ociImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, err
 	return r, fi.Size(), nil
 }
 
-func (s *ociImageSource) GetSignatures(context.Context) ([][]byte, error) {
+// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
+// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
+// (e.g. if the source never returns manifest lists).
+func (s *ociImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
 	return [][]byte{}, nil
 }
 
