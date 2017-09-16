@@ -150,17 +150,30 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		progress:         options.Progress,
 	}
 
-	unparsedImage := image.UnparsedInstance(rawSource, nil)
-	multiImage, err := isMultiImage(unparsedImage)
+	unparsedToplevel := image.UnparsedInstance(rawSource, nil)
+	multiImage, err := isMultiImage(unparsedToplevel)
 	if err != nil {
 		return errors.Wrapf(err, "Error determining manifest MIME type for %s", transports.ImageName(srcRef))
 	}
-	if multiImage {
-		return errors.Errorf("can not copy %s: manifest contains multiple images", transports.ImageName(srcRef))
-	}
 
-	if err := c.copyOneImage(policyContext, options, unparsedImage); err != nil {
-		return err
+	if !multiImage {
+		// The simple case: Just copy a single image.
+		if err := c.copyOneImage(policyContext, options, unparsedToplevel); err != nil {
+			return err
+		}
+	} else {
+		// This is a manifest list. Choose a single image and copy it.
+		// FIXME: Copy to destinations which support manifest lists, one image at a time.
+		instanceDigest, err := image.ChooseManifestInstanceFromManifestList(unparsedToplevel)
+		if err != nil {
+			return errors.Wrapf(err, "Error choosing an image from manifest list %s", transports.ImageName(srcRef))
+		}
+		logrus.Debugf("Source is a manifest list; copying (only) instance %s", instanceDigest)
+		unparsedInstance := image.UnparsedInstance(rawSource, &instanceDigest)
+
+		if err := c.copyOneImage(policyContext, options, unparsedInstance); err != nil {
+			return err
+		}
 	}
 
 	if err := c.dest.Commit(); err != nil {
@@ -173,6 +186,17 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 // Image copies a single (on-manifest-list) image unparsedImage, using policyContext to validate
 // source image admissibility.
 func (c *copier) copyOneImage(policyContext *signature.PolicyContext, options *Options, unparsedImage *image.UnparsedImage) (retErr error) {
+	// The caller is handling manifest lists; this could happen only if a manifest list contains a manifest list.
+	// Make sure we fail cleanly in such cases.
+	multiImage, err := isMultiImage(unparsedImage)
+	if err != nil {
+		// FIXME FIXME: How to name a reference for the sub-image?
+		return errors.Wrapf(err, "Error determining manifest MIME type for %s", transports.ImageName(unparsedImage.Reference()))
+	}
+	if multiImage {
+		return fmt.Errorf("Unexpectedly received a manifest list instead of a manifest for a single image")
+	}
+
 	// Please keep this policy check BEFORE reading any other information about the image.
 	// (the multiImage check above only matches the MIME type, which we have received anyway.
 	// Actual parsing of anything should be deferred.)

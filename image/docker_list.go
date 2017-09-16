@@ -2,6 +2,7 @@ package image
 
 import (
 	"encoding/json"
+	"fmt"
 	"runtime"
 
 	"github.com/containers/image/manifest"
@@ -31,20 +32,25 @@ type manifestList struct {
 	Manifests     []manifestDescriptor `json:"manifests"`
 }
 
-func manifestSchema2FromManifestList(src types.ImageSource, manblob []byte) (genericManifest, error) {
+// chooseDigestFromManifestList parses blob as a schema2 manifest list,
+// and returns the digest of the image appropriate for the current environment.
+func chooseDigestFromManifestList(blob []byte) (digest.Digest, error) {
 	list := manifestList{}
-	if err := json.Unmarshal(manblob, &list); err != nil {
-		return nil, err
+	if err := json.Unmarshal(blob, &list); err != nil {
+		return "", err
 	}
-	var targetManifestDigest digest.Digest
 	for _, d := range list.Manifests {
 		if d.Platform.Architecture == runtime.GOARCH && d.Platform.OS == runtime.GOOS {
-			targetManifestDigest = d.Digest
-			break
+			return d.Digest, nil
 		}
 	}
-	if targetManifestDigest == "" {
-		return nil, errors.New("no supported platform found in manifest list")
+	return "", errors.New("no supported platform found in manifest list")
+}
+
+func manifestSchema2FromManifestList(src types.ImageSource, manblob []byte) (genericManifest, error) {
+	targetManifestDigest, err := chooseDigestFromManifestList(manblob)
+	if err != nil {
+		return nil, err
 	}
 	manblob, mt, err := src.GetManifest(&targetManifestDigest)
 	if err != nil {
@@ -60,4 +66,19 @@ func manifestSchema2FromManifestList(src types.ImageSource, manblob []byte) (gen
 	}
 
 	return manifestInstanceFromBlob(src, manblob, mt)
+}
+
+// ChooseManifestInstanceFromManifestList returns a digest of a manifest appropriate
+// for the current system from the manifest available from src.
+func ChooseManifestInstanceFromManifestList(src types.UnparsedImage) (digest.Digest, error) {
+	// For now this only handles manifest.DockerV2ListMediaType; we can generalize it later,
+	// probably along with manifest list editing.
+	blob, mt, err := src.Manifest()
+	if err != nil {
+		return "", err
+	}
+	if mt != manifest.DockerV2ListMediaType {
+		return "", fmt.Errorf("Internal error: Trying to select an image from a non-manifest-list manifest type %s", mt)
+	}
+	return chooseDigestFromManifestList(blob)
 }

@@ -87,6 +87,8 @@ type genericManifest interface {
 	UpdatedImage(options types.ManifestUpdateOptions) (types.Image, error)
 }
 
+// manifestInstanceFromBlob returns a genericManifest implementation for (manblob, mt) in src.
+// If manblob is a manifest list, it implicitly chooses an appropriate image from the list.
 func manifestInstanceFromBlob(src types.ImageSource, manblob []byte, mt string) (genericManifest, error) {
 	switch mt {
 	// "application/json" is a valid v2s1 value per https://github.com/docker/distribution/blob/master/docs/spec/manifest-v2-1.md .
