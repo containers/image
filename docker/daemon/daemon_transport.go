@@ -161,7 +161,7 @@ func (ref daemonReference) NewImage(ctx *types.SystemContext) (types.ImageCloser
 	if err != nil {
 		return nil, err
 	}
-	return image.FromSource(src)
+	return image.FromSource(ctx, src)
 }
 
 // NewImageSource returns a types.ImageSource for this reference.

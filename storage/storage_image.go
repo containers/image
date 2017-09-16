@@ -611,12 +611,12 @@ func (s *storageImageCloser) Size() (int64, error) {
 }
 
 // newImage creates an ImageCloser that also knows its size
-func newImage(s storageReference) (types.ImageCloser, error) {
+func newImage(ctx *types.SystemContext, s storageReference) (types.ImageCloser, error) {
 	src, err := newImageSource(s)
 	if err != nil {
 		return nil, err
 	}
-	img, err := image.FromSource(src)
+	img, err := image.FromSource(ctx, src)
 	if err != nil {
 		return nil, err
 	}

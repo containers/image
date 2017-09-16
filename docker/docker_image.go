@@ -27,7 +27,7 @@ func newImage(ctx *types.SystemContext, ref dockerReference) (types.ImageCloser,
 	if err != nil {
 		return nil, err
 	}
-	img, err := image.FromSource(s)
+	img, err := image.FromSource(ctx, s)
 	if err != nil {
 		return nil, err
 	}

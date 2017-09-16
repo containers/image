@@ -71,7 +71,7 @@ func (r *tarballReference) NewImage(ctx *types.SystemContext) (types.ImageCloser
 	if err != nil {
 		return nil, err
 	}
-	img, err := image.FromSource(src)
+	img, err := image.FromSource(ctx, src)
 	if err != nil {
 		src.Close()
 		return nil, err

@@ -141,7 +141,7 @@ func (ref dirReference) PolicyConfigurationNamespaces() []string {
 // WARNING: This may not do the right thing for a manifest list, see image.FromSource for details.
 func (ref dirReference) NewImage(ctx *types.SystemContext) (types.ImageCloser, error) {
 	src := newImageSource(ref)
-	return image.FromSource(src)
+	return image.FromSource(ctx, src)
 }
 
 // NewImageSource returns a types.ImageSource for this reference.

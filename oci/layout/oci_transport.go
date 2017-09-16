@@ -187,7 +187,7 @@ func (ref ociReference) NewImage(ctx *types.SystemContext) (types.ImageCloser, e
 	if err != nil {
 		return nil, err
 	}
-	return image.FromSource(src)
+	return image.FromSource(ctx, src)
 }
 
 // getIndex returns a pointer to the index references by this ociReference. If an error occurs opening an index nil is returned together

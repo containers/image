@@ -34,21 +34,30 @@ type manifestList struct {
 
 // chooseDigestFromManifestList parses blob as a schema2 manifest list,
 // and returns the digest of the image appropriate for the current environment.
-func chooseDigestFromManifestList(blob []byte) (digest.Digest, error) {
+func chooseDigestFromManifestList(ctx *types.SystemContext, blob []byte) (digest.Digest, error) {
+	wantedArch := runtime.GOARCH
+	if ctx != nil && ctx.ArchitectureChoice != "" {
+		wantedArch = ctx.ArchitectureChoice
+	}
+	wantedOS := runtime.GOOS
+	if ctx != nil && ctx.OSChoice != "" {
+		wantedOS = ctx.OSChoice
+	}
+
 	list := manifestList{}
 	if err := json.Unmarshal(blob, &list); err != nil {
 		return "", err
 	}
 	for _, d := range list.Manifests {
-		if d.Platform.Architecture == runtime.GOARCH && d.Platform.OS == runtime.GOOS {
+		if d.Platform.Architecture == wantedArch && d.Platform.OS == wantedOS {
 			return d.Digest, nil
 		}
 	}
-	return "", errors.New("no supported platform found in manifest list")
+	return "", fmt.Errorf("no image found in manifest list for architecture %s, OS %s", wantedArch, wantedOS)
 }
 
-func manifestSchema2FromManifestList(src types.ImageSource, manblob []byte) (genericManifest, error) {
-	targetManifestDigest, err := chooseDigestFromManifestList(manblob)
+func manifestSchema2FromManifestList(ctx *types.SystemContext, src types.ImageSource, manblob []byte) (genericManifest, error) {
+	targetManifestDigest, err := chooseDigestFromManifestList(ctx, manblob)
 	if err != nil {
 		return nil, err
 	}
@@ -65,12 +74,12 @@ func manifestSchema2FromManifestList(src types.ImageSource, manblob []byte) (gen
 		return nil, errors.Errorf("Manifest image does not match selected manifest digest %s", targetManifestDigest)
 	}
 
-	return manifestInstanceFromBlob(src, manblob, mt)
+	return manifestInstanceFromBlob(ctx, src, manblob, mt)
 }
 
 // ChooseManifestInstanceFromManifestList returns a digest of a manifest appropriate
 // for the current system from the manifest available from src.
-func ChooseManifestInstanceFromManifestList(src types.UnparsedImage) (digest.Digest, error) {
+func ChooseManifestInstanceFromManifestList(ctx *types.SystemContext, src types.UnparsedImage) (digest.Digest, error) {
 	// For now this only handles manifest.DockerV2ListMediaType; we can generalize it later,
 	// probably along with manifest list editing.
 	blob, mt, err := src.Manifest()
@@ -80,5 +89,5 @@ func ChooseManifestInstanceFromManifestList(src types.UnparsedImage) (digest.Dig
 	if mt != manifest.DockerV2ListMediaType {
 		return "", fmt.Errorf("Internal error: Trying to select an image from a non-manifest-list manifest type %s", mt)
 	}
-	return chooseDigestFromManifestList(blob)
+	return chooseDigestFromManifestList(ctx, blob)
 }

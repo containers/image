@@ -164,7 +164,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	} else {
 		// This is a manifest list. Choose a single image and copy it.
 		// FIXME: Copy to destinations which support manifest lists, one image at a time.
-		instanceDigest, err := image.ChooseManifestInstanceFromManifestList(unparsedToplevel)
+		instanceDigest, err := image.ChooseManifestInstanceFromManifestList(options.SourceCtx, unparsedToplevel)
 		if err != nil {
 			return errors.Wrapf(err, "Error choosing an image from manifest list %s", transports.ImageName(srcRef))
 		}
@@ -203,12 +203,12 @@ func (c *copier) copyOneImage(policyContext *signature.PolicyContext, options *O
 	if allowed, err := policyContext.IsRunningImageAllowed(unparsedImage); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
 		return errors.Wrap(err, "Source image rejected")
 	}
-	src, err := image.FromUnparsedImage(unparsedImage)
+	src, err := image.FromUnparsedImage(options.SourceCtx, unparsedImage)
 	if err != nil {
 		return errors.Wrapf(err, "Error initializing image from source %s", transports.ImageName(c.rawSource.Reference()))
 	}
 
-	if err := checkImageDestinationForCurrentRuntimeOS(src, c.dest); err != nil {
+	if err := checkImageDestinationForCurrentRuntimeOS(options.DestinationCtx, src, c.dest); err != nil {
 		return err
 	}
 
@@ -325,16 +325,20 @@ func (c *copier) Printf(format string, a ...interface{}) {
 	fmt.Fprintf(c.reportWriter, format, a...)
 }
 
-func checkImageDestinationForCurrentRuntimeOS(src types.Image, dest types.ImageDestination) error {
+func checkImageDestinationForCurrentRuntimeOS(ctx *types.SystemContext, src types.Image, dest types.ImageDestination) error {
 	if dest.MustMatchRuntimeOS() {
+		wantedOS := runtime.GOOS
+		if ctx != nil && ctx.OSChoice != "" {
+			wantedOS = ctx.OSChoice
+		}
 		c, err := src.OCIConfig()
 		if err != nil {
 			return errors.Wrapf(err, "Error parsing image configuration")
 		}
-		osErr := fmt.Errorf("image operating system %q cannot be used on %q", c.OS, runtime.GOOS)
-		if runtime.GOOS == "windows" && c.OS == "linux" {
+		osErr := fmt.Errorf("image operating system %q cannot be used on %q", c.OS, wantedOS)
+		if wantedOS == "windows" && c.OS == "linux" {
 			return osErr
-		} else if runtime.GOOS != "windows" && c.OS == "windows" {
+		} else if wantedOS != "windows" && c.OS == "windows" {
 			return osErr
 		}
 	}

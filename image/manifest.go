@@ -89,7 +89,7 @@ type genericManifest interface {
 
 // manifestInstanceFromBlob returns a genericManifest implementation for (manblob, mt) in src.
 // If manblob is a manifest list, it implicitly chooses an appropriate image from the list.
-func manifestInstanceFromBlob(src types.ImageSource, manblob []byte, mt string) (genericManifest, error) {
+func manifestInstanceFromBlob(ctx *types.SystemContext, src types.ImageSource, manblob []byte, mt string) (genericManifest, error) {
 	switch mt {
 	// "application/json" is a valid v2s1 value per https://github.com/docker/distribution/blob/master/docs/spec/manifest-v2-1.md .
 	// This works for now, when nothing else seems to return "application/json"; if that were not true, the mapping/detection might
@@ -101,7 +101,7 @@ func manifestInstanceFromBlob(src types.ImageSource, manblob []byte, mt string) 
 	case manifest.DockerV2Schema2MediaType:
 		return manifestSchema2FromManifest(src, manblob)
 	case manifest.DockerV2ListMediaType:
-		return manifestSchema2FromManifestList(src, manblob)
+		return manifestSchema2FromManifestList(ctx, src, manblob)
 	default:
 		// If it's not a recognized manifest media type, or we have failed determining the type, we'll try one last time
 		// to deserialize using v2s1 as per https://github.com/docker/distribution/blob/master/manifests.go#L108

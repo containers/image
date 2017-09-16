@@ -164,7 +164,7 @@ func (ref ociArchiveReference) NewImage(ctx *types.SystemContext) (types.ImageCl
 	if err != nil {
 		return nil, err
 	}
-	return image.FromSource(src)
+	return image.FromSource(ctx, src)
 }
 
 // NewImageSource returns a types.ImageSource for this reference.

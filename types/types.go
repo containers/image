@@ -321,6 +321,10 @@ type SystemContext struct {
 	SystemRegistriesConfPath string
 	// If not "", overrides the default path for the authentication file
 	AuthFilePath string
+	// If not "", overrides the use of platform.GOARCH when choosing an image or verifying architecture match.
+	ArchitectureChoice string
+	// If not "", overrides the use of platform.GOOS when choosing an image or verifying OS match.
+	OSChoice string
 
 	// === OCI.Transport overrides ===
 	// If not "", a directory containing a CA certificate (ending with ".crt"),

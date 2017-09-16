@@ -28,8 +28,8 @@ type imageCloser struct {
 //
 // NOTE: If any kind of signature verification should happen, build an UnparsedImage from the value returned by NewImageSource,
 // verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage instead of calling this function.
-func FromSource(src types.ImageSource) (types.ImageCloser, error) {
-	img, err := FromUnparsedImage(UnparsedInstance(src, nil))
+func FromSource(ctx *types.SystemContext, src types.ImageSource) (types.ImageCloser, error) {
+	img, err := FromUnparsedImage(ctx, UnparsedInstance(src, nil))
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ type sourcedImage struct {
 // but other methods transparently return data from an appropriate single image.
 //
 // The Image must not be used after the underlying ImageSource is Close()d.
-func FromUnparsedImage(unparsed *UnparsedImage) (types.Image, error) {
+func FromUnparsedImage(ctx *types.SystemContext, unparsed *UnparsedImage) (types.Image, error) {
 	// Note that the input parameter above is specifically *image.UnparsedImage, not types.UnparsedImage:
 	// we want to be able to use unparsed.src.  We could make that an explicit interface, but, well,
 	// this is the only UnparsedImage implementation around, anyway.
@@ -74,7 +74,7 @@ func FromUnparsedImage(unparsed *UnparsedImage) (types.Image, error) {
 		return nil, err
 	}
 
-	parsedManifest, err := manifestInstanceFromBlob(unparsed.src, manifestBlob, manifestMIMEType)
+	parsedManifest, err := manifestInstanceFromBlob(ctx, unparsed.src, manifestBlob, manifestMIMEType)
 	if err != nil {
 		return nil, err
 	}

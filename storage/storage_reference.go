@@ -143,7 +143,7 @@ func (s storageReference) PolicyConfigurationNamespaces() []string {
 // verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage.
 // WARNING: This may not do the right thing for a manifest list, see image.FromSource for details.
 func (s storageReference) NewImage(ctx *types.SystemContext) (types.ImageCloser, error) {
-	return newImage(s)
+	return newImage(ctx, s)
 }
 
 func (s storageReference) DeleteImage(ctx *types.SystemContext) error {
