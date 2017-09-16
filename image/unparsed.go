@@ -23,13 +23,9 @@ type UnparsedImage struct {
 }
 
 // UnparsedInstance returns a types.UnparsedImage implementation for (source, instanceDigest).
-// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve (when the primary manifest is a manifest list);
-// The caller must call .Close() on the returned UnparsedImage.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve (when the primary manifest is a manifest list).
 //
-// UnparsedInstance “takes ownership” of the input ImageSource and will call src.Close()
-// when the image is closed.  (This does not prevent callers from using both the
-// UnparsedImage and ImageSource objects simultaneously, but it means that they only need to
-// keep a reference to the UnparsedImage.)
+// The UnparsedImage must not be used after the underlying ImageSource is Close()d.
 func UnparsedInstance(src types.ImageSource, instanceDigest *digest.Digest) *UnparsedImage {
 	return &UnparsedImage{
 		src:            src,
@@ -42,11 +38,6 @@ func UnparsedInstance(src types.ImageSource, instanceDigest *digest.Digest) *Unp
 func (i *UnparsedImage) Reference() types.ImageReference {
 	// Note that this does not depend on instanceDigest; e.g. all instances within a manifest list need to be signed with the manifest list identity.
 	return i.src.Reference()
-}
-
-// Close removes resources associated with an initialized UnparsedImage, if any.
-func (i *UnparsedImage) Close() error {
-	return i.src.Close()
 }
 
 // Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.

@@ -35,9 +35,6 @@ type fakeImageSource string
 func (f fakeImageSource) Reference() types.ImageReference {
 	panic("Unexpected call to a mock function")
 }
-func (f fakeImageSource) Close() error {
-	panic("Unexpected call to a mock function")
-}
 func (f fakeImageSource) Manifest() ([]byte, string, error) {
 	if string(f) == "" {
 		return nil, "", errors.New("Manifest() directed to fail")

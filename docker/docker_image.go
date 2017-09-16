@@ -12,17 +12,17 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Image is a Docker-specific implementation of types.Image with a few extra methods
+// Image is a Docker-specific implementation of types.ImageCloser with a few extra methods
 // which are specific to Docker.
 type Image struct {
-	types.Image
+	types.ImageCloser
 	src *dockerImageSource
 }
 
 // newImage returns a new Image interface type after setting up
 // a client to the registry hosting the given image.
 // The caller must call .Close() on the returned Image.
-func newImage(ctx *types.SystemContext, ref dockerReference) (types.Image, error) {
+func newImage(ctx *types.SystemContext, ref dockerReference) (types.ImageCloser, error) {
 	s, err := newImageSource(ctx, ref)
 	if err != nil {
 		return nil, err
@@ -31,7 +31,7 @@ func newImage(ctx *types.SystemContext, ref dockerReference) (types.Image, error
 	if err != nil {
 		return nil, err
 	}
-	return &Image{Image: img, src: s}, nil
+	return &Image{ImageCloser: img, src: s}, nil
 }
 
 // SourceRefFullName returns a fully expanded name for the repository this image is in.

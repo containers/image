@@ -73,11 +73,12 @@ type ImageReference interface {
 	// and each following element to be a prefix of the element preceding it.
 	PolicyConfigurationNamespaces() []string
 
-	// NewImage returns a types.Image for this reference, possibly specialized for this ImageTransport.
-	// The caller must call .Close() on the returned Image.
+	// NewImage returns a types.ImageCloser for this reference, possibly specialized for this ImageTransport.
+	// The caller must call .Close() on the returned ImageCloser.
 	// NOTE: If any kind of signature verification should happen, build an UnparsedImage from the value returned by NewImageSource,
 	// verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage.
-	NewImage(ctx *SystemContext) (Image, error)
+	// WARNING: This may not do the right thing for a manifest list, see image.FromSource for details.
+	NewImage(ctx *SystemContext) (ImageCloser, error)
 	// NewImageSource returns a types.ImageSource for this reference.
 	// The caller must call .Close() on the returned ImageSource.
 	NewImageSource(ctx *SystemContext) (ImageSource, error)
@@ -201,13 +202,11 @@ func (e ManifestTypeRejectedError) Error() string {
 //
 // An UnparsedImage is a pair of (ImageSource, instance digest); it can represent either a manifest list or a single image instance.
 //
-// Each UnparsedImage should eventually be closed by calling Close().
+// The UnparsedImage must not be used after the underlying ImageSource is Close()d.
 type UnparsedImage interface {
 	// Reference returns the reference used to set up this source, _as specified by the user_
 	// (not as the image itself, or its underlying storage, claims).  This can be used e.g. to determine which public keys are trusted for this image.
 	Reference() ImageReference
-	// Close removes resources associated with an initialized UnparsedImage, if any.
-	Close() error
 	// Manifest is like ImageSource.GetManifest, but the result is cached; it is OK to call this however often you need.
 	Manifest() ([]byte, string, error)
 	// Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
@@ -216,7 +215,8 @@ type UnparsedImage interface {
 
 // Image is the primary API for inspecting properties of images.
 // An Image is based on a pair of (ImageSource, instance digest); it can represent either a manifest list or a single image instance.
-// Each Image should eventually be closed by calling Close().
+//
+// The Image must not be used after the underlying ImageSource is Close()d.
 type Image interface {
 	// Note that Reference may return nil in the return value of UpdatedImage!
 	UnparsedImage
@@ -251,6 +251,15 @@ type Image interface {
 	// Size returns an approximation of the amount of disk space which is consumed by the image in its current
 	// location.  If the size is not known, -1 will be returned.
 	Size() (int64, error)
+}
+
+// ImageCloser is an Image with a Close() method which must be called by the user.
+// This is returned by ImageReference.NewImage, which transparently instantiates a types.ImageSource,
+// to ensure that the ImageSource is closed.
+type ImageCloser interface {
+	Image
+	// Close removes resources associated with an initialized ImageCloser.
+	Close() error
 }
 
 // ManifestUpdateOptions is a way to pass named optional arguments to Image.UpdatedManifest

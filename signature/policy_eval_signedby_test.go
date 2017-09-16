@@ -15,16 +15,16 @@ import (
 )
 
 // dirImageMock returns a types.UnparsedImage for a directory, claiming a specified dockerReference.
-// The caller must call .Close() on the returned UnparsedImage.
-func dirImageMock(t *testing.T, dir, dockerReference string) types.UnparsedImage {
+// The caller must call the returned close callback when done.
+func dirImageMock(t *testing.T, dir, dockerReference string) (types.UnparsedImage, func() error) {
 	ref, err := reference.ParseNormalizedNamed(dockerReference)
 	require.NoError(t, err)
 	return dirImageMockWithRef(t, dir, refImageReferenceMock{ref})
 }
 
 // dirImageMockWithRef returns a types.UnparsedImage for a directory, claiming a specified ref.
-// The caller must call .Close() on the returned UnparsedImage.
-func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) types.UnparsedImage {
+// The caller must call the returned close callback when done.
+func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) (types.UnparsedImage, func() error) {
 	srcRef, err := directory.NewReference(dir)
 	require.NoError(t, err)
 	src, err := srcRef.NewImageSource(nil)
@@ -32,7 +32,7 @@ func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) typ
 	return image.UnparsedInstance(&dirImageSourceMock{
 		ImageSource: src,
 		ref:         ref,
-	}, nil)
+	}, nil), src.Close
 }
 
 // dirImageSourceMock inherits dirImageSource, but overrides its Reference method.
@@ -48,8 +48,8 @@ func (d *dirImageSourceMock) Reference() types.ImageReference {
 func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	ktGPG := SBKeyTypeGPGKeys
 	prm := NewPRMMatchExact()
-	testImage := dirImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
-	defer testImage.Close()
+	testImage, closer := dirImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
+	defer closer()
 	testImageSig, err := ioutil.ReadFile("fixtures/dir-img-valid/signature-1")
 	require.NoError(t, err)
 
@@ -153,8 +153,8 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	assertSARRejectedPolicyRequirement(t, sar, parsedSig, err)
 
 	// Error reading image manifest
-	image := dirImageMock(t, "fixtures/dir-img-no-manifest", "testing/manifest:latest")
-	defer image.Close()
+	image, closer := dirImageMock(t, "fixtures/dir-img-no-manifest", "testing/manifest:latest")
+	defer closer()
 	sig, err = ioutil.ReadFile("fixtures/dir-img-no-manifest/signature-1")
 	require.NoError(t, err)
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
@@ -163,8 +163,8 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	assertSARRejected(t, sar, parsedSig, err)
 
 	// Error computing manifest digest
-	image = dirImageMock(t, "fixtures/dir-img-manifest-digest-error", "testing/manifest:latest")
-	defer image.Close()
+	image, closer = dirImageMock(t, "fixtures/dir-img-manifest-digest-error", "testing/manifest:latest")
+	defer closer()
 	sig, err = ioutil.ReadFile("fixtures/dir-img-manifest-digest-error/signature-1")
 	require.NoError(t, err)
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
@@ -173,8 +173,8 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	assertSARRejected(t, sar, parsedSig, err)
 
 	// A valid signature with a non-matching manifest
-	image = dirImageMock(t, "fixtures/dir-img-modified-manifest", "testing/manifest:latest")
-	defer image.Close()
+	image, closer = dirImageMock(t, "fixtures/dir-img-modified-manifest", "testing/manifest:latest")
+	defer closer()
 	sig, err = ioutil.ReadFile("fixtures/dir-img-modified-manifest/signature-1")
 	require.NoError(t, err)
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
@@ -205,8 +205,8 @@ func TestPRSignedByIsRunningImageAllowed(t *testing.T) {
 	prm := NewPRMMatchExact()
 
 	// A simple success case: single valid signature.
-	image := dirImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
-	defer image.Close()
+	image, closer := dirImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
+	defer closer()
 	pr, err := NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
 	allowed, err := pr.isRunningImageAllowed(image)
@@ -215,48 +215,48 @@ func TestPRSignedByIsRunningImageAllowed(t *testing.T) {
 	// Error reading signatures
 	invalidSigDir := createInvalidSigDir(t)
 	defer os.RemoveAll(invalidSigDir)
-	image = dirImageMock(t, invalidSigDir, "testing/manifest:latest")
-	defer image.Close()
+	image, closer = dirImageMock(t, invalidSigDir, "testing/manifest:latest")
+	defer closer()
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
 	allowed, err = pr.isRunningImageAllowed(image)
 	assertRunningRejected(t, allowed, err)
 
 	// No signatures
-	image = dirImageMock(t, "fixtures/dir-img-unsigned", "testing/manifest:latest")
-	defer image.Close()
+	image, closer = dirImageMock(t, "fixtures/dir-img-unsigned", "testing/manifest:latest")
+	defer closer()
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
 	allowed, err = pr.isRunningImageAllowed(image)
 	assertRunningRejectedPolicyRequirement(t, allowed, err)
 
 	// 1 invalid signature: use dir-img-valid, but a non-matching Docker reference
-	image = dirImageMock(t, "fixtures/dir-img-valid", "testing/manifest:notlatest")
-	defer image.Close()
+	image, closer = dirImageMock(t, "fixtures/dir-img-valid", "testing/manifest:notlatest")
+	defer closer()
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
 	allowed, err = pr.isRunningImageAllowed(image)
 	assertRunningRejectedPolicyRequirement(t, allowed, err)
 
 	// 2 valid signatures
-	image = dirImageMock(t, "fixtures/dir-img-valid-2", "testing/manifest:latest")
-	defer image.Close()
+	image, closer = dirImageMock(t, "fixtures/dir-img-valid-2", "testing/manifest:latest")
+	defer closer()
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
 	allowed, err = pr.isRunningImageAllowed(image)
 	assertRunningAllowed(t, allowed, err)
 
 	// One invalid, one valid signature (in this order)
-	image = dirImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:latest")
-	defer image.Close()
+	image, closer = dirImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:latest")
+	defer closer()
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
 	allowed, err = pr.isRunningImageAllowed(image)
 	assertRunningAllowed(t, allowed, err)
 
 	// 2 invalid signatures: use dir-img-valid-2, but a non-matching Docker reference
-	image = dirImageMock(t, "fixtures/dir-img-valid-2", "testing/manifest:notlatest")
-	defer image.Close()
+	image, closer = dirImageMock(t, "fixtures/dir-img-valid-2", "testing/manifest:notlatest")
+	defer closer()
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
 	allowed, err = pr.isRunningImageAllowed(image)

@@ -67,8 +67,8 @@ type storageLayerMetadata struct {
 	CompressedSize int64  `json:"compressed-size,omitempty"`
 }
 
-type storageImage struct {
-	types.Image
+type storageImageCloser struct {
+	types.ImageCloser
 	size int64
 }
 
@@ -606,12 +606,12 @@ func (s *storageImageSource) getSize() (int64, error) {
 	return sum, nil
 }
 
-func (s *storageImage) Size() (int64, error) {
+func (s *storageImageCloser) Size() (int64, error) {
 	return s.size, nil
 }
 
-// newImage creates an image that also knows its size
-func newImage(s storageReference) (types.Image, error) {
+// newImage creates an ImageCloser that also knows its size
+func newImage(s storageReference) (types.ImageCloser, error) {
 	src, err := newImageSource(s)
 	if err != nil {
 		return nil, err
@@ -624,5 +624,5 @@ func newImage(s storageReference) (types.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &storageImage{Image: img, size: size}, nil
+	return &storageImageCloser{ImageCloser: img, size: size}, nil
 }

@@ -134,6 +134,11 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	if err != nil {
 		return errors.Wrapf(err, "Error initializing source %s", transports.ImageName(srcRef))
 	}
+	defer func() {
+		if err := rawSource.Close(); err != nil {
+			retErr = errors.Wrapf(retErr, " (src: %v)", err)
+		}
+	}()
 
 	c := &copier{
 		copiedBlobs:      make(map[digest.Digest]digest.Digest),
@@ -146,13 +151,6 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	}
 
 	unparsedImage := image.UnparsedInstance(rawSource, nil)
-	defer func() {
-		if unparsedImage != nil {
-			if err := unparsedImage.Close(); err != nil {
-				retErr = errors.Wrapf(retErr, " (unparsed: %v)", err)
-			}
-		}
-	}()
 	multiImage, err := isMultiImage(unparsedImage)
 	if err != nil {
 		return errors.Wrapf(err, "Error determining manifest MIME type for %s", transports.ImageName(srcRef))
@@ -171,12 +169,6 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	if err != nil {
 		return errors.Wrapf(err, "Error initializing image from source %s", transports.ImageName(srcRef))
 	}
-	unparsedImage = nil
-	defer func() {
-		if err := src.Close(); err != nil {
-			retErr = errors.Wrapf(retErr, " (source: %v)", err)
-		}
-	}()
 
 	if err := checkImageDestinationForCurrentRuntimeOS(src, dest); err != nil {
 		return err
