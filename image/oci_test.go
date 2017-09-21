@@ -53,6 +53,9 @@ func manifestOCI1FromComponentsLikeFixture(configBlob []byte) genericManifest {
 			MediaType: imgspecv1.MediaTypeImageLayerGzip,
 			Digest:    "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
 			Size:      11739507,
+			URLs: []string{
+				"https://layer.url",
+			},
 		}},
 		{
 			descriptor: descriptor{
@@ -207,6 +210,9 @@ func TestManifestOCI1LayerInfo(t *testing.T) {
 			{
 				Digest: "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
 				Size:   11739507,
+				URLs: []string{
+					"https://layer.url",
+				},
 			},
 			{
 				Digest: "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
