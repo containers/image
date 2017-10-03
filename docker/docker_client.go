@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,11 +15,11 @@ import (
 	"time"
 
 	"github.com/containers/image/docker/reference"
+	"github.com/containers/image/pkg/tlsclientconfig"
 	"github.com/containers/image/types"
 	"github.com/containers/storage/pkg/homedir"
 	"github.com/docker/distribution/registry/client"
 	helperclient "github.com/docker/docker-credential-helpers/client"
-	"github.com/docker/go-connections/sockets"
 	"github.com/docker/go-connections/tlsconfig"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -113,27 +112,7 @@ func serverDefault() *tls.Config {
 	}
 }
 
-func newTransport() *http.Transport {
-	direct := &net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-		DualStack: true,
-	}
-	tr := &http.Transport{
-		Proxy:               http.ProxyFromEnvironment,
-		Dial:                direct.Dial,
-		TLSHandshakeTimeout: 10 * time.Second,
-		// TODO(dmcgowan): Call close idle connections when complete and use keep alive
-		DisableKeepAlives: true,
-	}
-	proxyDialer, err := sockets.DialerFromEnvironment(direct)
-	if err == nil {
-		tr.Dial = proxyDialer.Dial
-	}
-	return tr
-}
-
-// dockerCertDir returns a path to a directory to be consumed by setupCertificates() depending on ctx and hostPort.
+// dockerCertDir returns a path to a directory to be consumed by tlsclientconfig.SetupCertificates() depending on ctx and hostPort.
 func dockerCertDir(ctx *types.SystemContext, hostPort string) string {
 	if ctx != nil && ctx.DockerCertPath != "" {
 		return ctx.DockerCertPath
@@ -149,69 +128,6 @@ func dockerCertDir(ctx *types.SystemContext, hostPort string) string {
 	return filepath.Join(hostCertDir, hostPort)
 }
 
-func setupCertificates(dir string, tlsc *tls.Config) error {
-	logrus.Debugf("Looking for TLS certificates and private keys in %s", dir)
-	fs, err := ioutil.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		if os.IsPermission(err) {
-			logrus.Debugf("Skipping scan of %s due to permission error: %v", dir, err)
-			return nil
-		}
-		return err
-	}
-
-	for _, f := range fs {
-		fullPath := filepath.Join(dir, f.Name())
-		if strings.HasSuffix(f.Name(), ".crt") {
-			systemPool, err := tlsconfig.SystemCertPool()
-			if err != nil {
-				return errors.Wrap(err, "unable to get system cert pool")
-			}
-			tlsc.RootCAs = systemPool
-			logrus.Debugf(" crt: %s", fullPath)
-			data, err := ioutil.ReadFile(fullPath)
-			if err != nil {
-				return err
-			}
-			tlsc.RootCAs.AppendCertsFromPEM(data)
-		}
-		if strings.HasSuffix(f.Name(), ".cert") {
-			certName := f.Name()
-			keyName := certName[:len(certName)-5] + ".key"
-			logrus.Debugf(" cert: %s", fullPath)
-			if !hasFile(fs, keyName) {
-				return errors.Errorf("missing key %s for client certificate %s. Note that CA certificates should use the extension .crt", keyName, certName)
-			}
-			cert, err := tls.LoadX509KeyPair(filepath.Join(dir, certName), filepath.Join(dir, keyName))
-			if err != nil {
-				return err
-			}
-			tlsc.Certificates = append(tlsc.Certificates, cert)
-		}
-		if strings.HasSuffix(f.Name(), ".key") {
-			keyName := f.Name()
-			certName := keyName[:len(keyName)-4] + ".cert"
-			logrus.Debugf(" key: %s", fullPath)
-			if !hasFile(fs, certName) {
-				return errors.Errorf("missing client certificate %s for key %s", certName, keyName)
-			}
-		}
-	}
-	return nil
-}
-
-func hasFile(files []os.FileInfo, name string) bool {
-	for _, f := range files {
-		if f.Name() == name {
-			return true
-		}
-	}
-	return false
-}
-
 // newDockerClient returns a new dockerClient instance for refHostname (a host a specified in the Docker image reference, not canonicalized to dockerRegistry)
 // “write” specifies whether the client will be used for "write" access (in particular passed to lookaside.go:toplevelFromSection)
 func newDockerClient(ctx *types.SystemContext, ref dockerReference, write bool, actions string) (*dockerClient, error) {
@@ -223,7 +139,7 @@ func newDockerClient(ctx *types.SystemContext, ref dockerReference, write bool, 
 	if err != nil {
 		return nil, err
 	}
-	tr := newTransport()
+	tr := tlsclientconfig.NewTransport()
 	tr.TLSClientConfig = serverDefault()
 	// It is undefined whether the host[:port] string for dockerHostname should be dockerHostname or dockerRegistry,
 	// because docker/docker does not read the certs.d subdirectory at all in that case.  We use the user-visible
@@ -231,7 +147,7 @@ func newDockerClient(ctx *types.SystemContext, ref dockerReference, write bool, 
 	// generally the UI hides the existence of the different dockerRegistry.  But note that this behavior is
 	// undocumented and may change if docker/docker changes.
 	certDir := dockerCertDir(ctx, reference.Domain(ref.ref))
-	if err := setupCertificates(certDir, tr.TLSClientConfig); err != nil {
+	if err := tlsclientconfig.SetupCertificates(certDir, tr.TLSClientConfig); err != nil {
 		return nil, err
 	}
 	if ctx != nil && ctx.DockerInsecureSkipTLSVerify {
@@ -364,7 +280,7 @@ func (c *dockerClient) getBearerToken(ctx context.Context, realm, service, scope
 	if c.username != "" && c.password != "" {
 		authReq.SetBasicAuth(c.username, c.password)
 	}
-	tr := newTransport()
+	tr := tlsclientconfig.NewTransport()
 	// TODO(runcom): insecure for now to contact the external token service
 	tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	client := &http.Client{Transport: tr}
