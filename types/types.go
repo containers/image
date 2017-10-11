@@ -96,6 +96,7 @@ type BlobInfo struct {
 	Size        int64         // -1 if unknown
 	URLs        []string
 	Annotations map[string]string
+	MediaType   string
 }
 
 // ImageSource is a service, possibly remote (= slow), to download components of a single image.

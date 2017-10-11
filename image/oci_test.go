@@ -200,12 +200,14 @@ func TestManifestOCI1LayerInfo(t *testing.T) {
 	} {
 		assert.Equal(t, []types.BlobInfo{
 			{
-				Digest: "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
-				Size:   51354364,
+				Digest:    "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+				Size:      51354364,
+				MediaType: imgspecv1.MediaTypeImageLayerGzip,
 			},
 			{
-				Digest: "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
-				Size:   150,
+				Digest:    "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+				Size:      150,
+				MediaType: imgspecv1.MediaTypeImageLayerGzip,
 			},
 			{
 				Digest: "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
@@ -213,6 +215,7 @@ func TestManifestOCI1LayerInfo(t *testing.T) {
 				URLs: []string{
 					"https://layer.url",
 				},
+				MediaType: imgspecv1.MediaTypeImageLayerGzip,
 			},
 			{
 				Digest: "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
@@ -220,10 +223,12 @@ func TestManifestOCI1LayerInfo(t *testing.T) {
 				Annotations: map[string]string{
 					"test-annotation-2": "two",
 				},
+				MediaType: imgspecv1.MediaTypeImageLayerGzip,
 			},
 			{
-				Digest: "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
-				Size:   291,
+				Digest:    "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
+				Size:      291,
+				MediaType: imgspecv1.MediaTypeImageLayerGzip,
 			},
 		}, m.LayerInfos())
 	}
