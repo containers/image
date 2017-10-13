@@ -248,7 +248,7 @@ func (d *ostreeImageDestination) importBlob(repo *otbuiltin.Repo, blob *blobToIm
 
 func (d *ostreeImageDestination) importConfig(repo *otbuiltin.Repo, blob *blobToImport) error {
 	ostreeBranch := fmt.Sprintf("ociimage/%s", blob.Digest.Hex())
-	destinationPath:= filepath.Dir(blob.BlobPath)
+	destinationPath := filepath.Dir(blob.BlobPath)
 
 	return d.ostreeCommit(repo, ostreeBranch, destinationPath, []string{fmt.Sprintf("docker.size=%d", blob.Size)})
 }
