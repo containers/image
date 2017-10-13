@@ -22,6 +22,11 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/ostreedev/ostree-go/pkg/otbuiltin"
+
+	"compress/gzip"
+	"encoding/base64"
+	"github.com/vbatts/tar-split/tar/asm"
+	"github.com/vbatts/tar-split/tar/storage"
 )
 
 type blobToImport struct {
@@ -174,6 +179,35 @@ func (d *ostreeImageDestination) ostreeCommit(repo *otbuiltin.Repo, branch strin
 	return err
 }
 
+func generateTarSplitMetadata(output *bytes.Buffer, file string) error {
+	mfz := gzip.NewWriter(output)
+	defer mfz.Close()
+	metaPacker := storage.NewJSONPacker(mfz)
+
+	stream, err := os.OpenFile(file, os.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer stream.Close()
+
+	gzReader, err := gzip.NewReader(stream)
+	if err != nil {
+		return err
+	}
+	defer gzReader.Close()
+
+	its, err := asm.NewInputTarStream(gzReader, metaPacker, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(ioutil.Discard, its)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (d *ostreeImageDestination) importBlob(repo *otbuiltin.Repo, blob *blobToImport) error {
 	ostreeBranch := fmt.Sprintf("ociimage/%s", blob.Digest.Hex())
 	destinationPath := filepath.Join(d.tmpDirPath, blob.Digest.Hex(), "root")
@@ -184,6 +218,11 @@ func (d *ostreeImageDestination) importBlob(repo *otbuiltin.Repo, blob *blobToIm
 		os.Remove(blob.BlobPath)
 		os.RemoveAll(destinationPath)
 	}()
+
+	var tarSplitOutput bytes.Buffer
+	if err := generateTarSplitMetadata(&tarSplitOutput, blob.BlobPath); err != nil {
+		return err
+	}
 
 	if os.Getuid() == 0 {
 		if err := archive.UntarPath(blob.BlobPath, destinationPath); err != nil {
@@ -202,7 +241,9 @@ func (d *ostreeImageDestination) importBlob(repo *otbuiltin.Repo, blob *blobToIm
 			return err
 		}
 	}
-	return d.ostreeCommit(repo, ostreeBranch, destinationPath, []string{fmt.Sprintf("docker.size=%d", blob.Size)})
+	return d.ostreeCommit(repo, ostreeBranch, destinationPath, []string{fmt.Sprintf("docker.size=%d", blob.Size),
+		fmt.Sprintf("tarsplit.output=%s", base64.StdEncoding.EncodeToString(tarSplitOutput.Bytes()))})
+
 }
 
 func (d *ostreeImageDestination) importConfig(repo *otbuiltin.Repo, blob *blobToImport) error {
