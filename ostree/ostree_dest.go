@@ -205,13 +205,11 @@ func (d *ostreeImageDestination) importBlob(repo *otbuiltin.Repo, blob *blobToIm
 	return d.ostreeCommit(repo, ostreeBranch, destinationPath, []string{fmt.Sprintf("docker.size=%d", blob.Size)})
 }
 
-func (d *ostreeImageDestination) importConfig(blob *blobToImport) error {
+func (d *ostreeImageDestination) importConfig(repo *otbuiltin.Repo, blob *blobToImport) error {
 	ostreeBranch := fmt.Sprintf("ociimage/%s", blob.Digest.Hex())
+	destinationPath:= filepath.Dir(blob.BlobPath)
 
-	return exec.Command("ostree", "commit",
-		"--repo", d.ref.repo,
-		fmt.Sprintf("--add-metadata-string=docker.size=%d", blob.Size),
-		"--branch", ostreeBranch, filepath.Dir(blob.BlobPath)).Run()
+	return d.ostreeCommit(repo, ostreeBranch, destinationPath, []string{fmt.Sprintf("docker.size=%d", blob.Size)})
 }
 
 func (d *ostreeImageDestination) HasBlob(info types.BlobInfo) (bool, int64, error) {
@@ -303,7 +301,7 @@ func (d *ostreeImageDestination) Commit() error {
 	hash := d.schema.ConfigDescriptor.Digest.Hex()
 	blob := d.blobs[hash]
 	if blob != nil {
-		err := d.importConfig(blob)
+		err := d.importConfig(repo, blob)
 		if err != nil {
 			return err
 		}
