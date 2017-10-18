@@ -52,8 +52,7 @@ func TestTransportParseStoreReference(t *testing.T) {
 			assert.Error(t, err, c.input)
 		} else {
 			require.NoError(t, err, c.input)
-			// FIXME HOW is it supposed to be eual after Transport.SetStore(nil) vs. store := newStore()?
-			// assert.Equal(t, *(Transport.(*storageTransport)), storageRef.transport, c.input)
+			assert.Equal(t, store, storageRef.transport.store, c.input)
 			assert.Equal(t, c.expectedRef, storageRef.reference, c.input)
 			assert.Equal(t, c.expectedID, storageRef.id, c.input)
 			if c.expectedRef == "" {
