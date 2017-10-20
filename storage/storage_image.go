@@ -322,12 +322,58 @@ func (s *storageImageDestination) ReapplyBlob(blobinfo types.BlobInfo) (types.Bl
 	return s.putBlob(rc, blobinfo, false)
 }
 
+// GetBlob is only here so that it can be used to read the image's configuration blob, if there is one,
+// so it does not know how to read layers.
+func (s *storageImageDestination) GetBlob(blobinfo types.BlobInfo) (io.ReadCloser, int64, error) {
+	if blobinfo.Digest == "" {
+		return nil, -1, errors.Errorf(`Can not read a blob with unknown digest`)
+	}
+	if blob, ok := s.BlobData[blobinfo.Digest]; ok {
+		return ioutils.NewReadCloserWrapper(bytes.NewReader(blob), func() error { return nil }), int64(len(blob)), nil
+	}
+	return nil, -1, nil
+}
+
+func (s *storageImageDestination) GetManifest() ([]byte, string, error) {
+	if len(s.Manifest) > 0 {
+		return s.Manifest, manifest.GuessMIMEType(s.Manifest), nil
+	}
+	return nil, "", errors.Errorf("manifest can not be read: manifest has not previously been written")
+}
+
+func (s *storageImageDestination) GetTargetManifest(_ ddigest.Digest) ([]byte, string, error) {
+	return nil, "", ErrNoManifestLists
+}
+
+func (s *storageImageDestination) GetSignatures(_ context.Context) ([][]byte, error) {
+	sigslice := [][]byte{}
+	offset := 0
+	for _, length := range s.SignatureSizes {
+		sigslice = append(sigslice, s.Signatures[offset:offset+length])
+		offset += length
+	}
+	if offset != len(s.Signatures) {
+		return nil, errors.Errorf("signatures data contained %d extra bytes", len(s.Signatures)-offset)
+	}
+	return sigslice, nil
+}
+
 func (s *storageImageDestination) Commit() error {
 	// Create the image record.
 	lastLayer := ""
 	for _, blob := range s.BlobList {
 		if layerList, ok := s.Layers[blob.Digest]; ok {
 			lastLayer = layerList[len(layerList)-1]
+		}
+	}
+	if s.ID == "" {
+		if image, err := image.FromSource(s); err == nil {
+			configInfo := image.ConfigInfo()
+			if configInfo.Digest.Validate() == nil {
+				logrus.Debugf("guessing a default image ID of %q", configInfo.Digest.Hex())
+				s.ID = configInfo.Digest.Hex()
+			}
+			image.Close()
 		}
 	}
 	img, err := s.imageRef.transport.store.CreateImage(s.ID, nil, lastLayer, "", nil)
