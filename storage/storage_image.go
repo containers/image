@@ -49,7 +49,7 @@ type storageImageSource struct {
 	ID             string
 	layerPosition  map[digest.Digest]int // Where we are in reading a blob's layers
 	cachedManifest []byte                // A cached copy of the manifest, if already known, or nil
-	SignatureSizes []int                 `json:"signature-sizes"` // List of sizes of each signature slice
+	SignatureSizes []int                 `json:"signature-sizes,omitempty"` // List of sizes of each signature slice
 }
 
 type storageImageDestination struct {
@@ -63,7 +63,7 @@ type storageImageDestination struct {
 	blobDiffIDs    map[digest.Digest]digest.Digest // Mapping from layer blobsums to their corresponding DiffIDs
 	fileSizes      map[digest.Digest]int64         // Mapping from layer blobsums to their sizes
 	filenames      map[digest.Digest]string        // Mapping from layer blobsums to names of files we used to hold them
-	SignatureSizes []int                           `json:"signature-sizes"` // List of sizes of each signature slice
+	SignatureSizes []int                           `json:"signature-sizes,omitempty"` // List of sizes of each signature slice
 }
 
 type storageImageCloser struct {
