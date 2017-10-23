@@ -528,6 +528,27 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 	return ""
 }
 
+// getConfigBlob exists only to let us retrieve the configuration blob so that the manifest package can dig
+// information out of it for Inspect().
+func (s *storageImageDestination) getConfigBlob(info types.BlobInfo) ([]byte, error) {
+	if info.Digest == "" {
+		return nil, errors.Errorf(`no digest supplied when reading blob`)
+	}
+	if err := info.Digest.Validate(); err != nil {
+		return nil, errors.Wrapf(err, `invalid digest supplied when reading blob`)
+	}
+	// Assume it's a file, since we're only calling this from a place that expects to read files.
+	if filename, ok := s.filenames[info.Digest]; ok {
+		contents, err2 := ioutil.ReadFile(filename)
+		if err2 != nil {
+			return nil, errors.Wrapf(err2, `error reading blob from file %q`, filename)
+		}
+		return contents, nil
+	}
+	// If it's not a file, it's a bug, because we're not expecting to be asked for a layer.
+	return nil, errors.New("blob not found")
+}
+
 func (s *storageImageDestination) Commit() error {
 	// Find the list of layer blobs.
 	if len(s.manifest) == 0 {
@@ -623,13 +644,12 @@ func (s *storageImageDestination) Commit() error {
 	// If one of those blobs was a configuration blob, then we can try to dig out the date when the image
 	// was originally created, in case we're just copying it.  If not, no harm done.
 	var options *storage.ImageOptions
-	// FIXME FIXME FIXME
-	// if inspect, err := s.image.Inspect(); err == nil {
-	// 	logrus.Debugf("setting image creation date to %s", inspect.Created)
-	// 	options = &storage.ImageOptions{
-	// 		CreationDate: inspect.Created,
-	// 	}
-	// }
+	if inspect, err := man.Inspect(s.getConfigBlob); err == nil {
+		logrus.Debugf("setting image creation date to %s", inspect.Created)
+		options = &storage.ImageOptions{
+			CreationDate: inspect.Created,
+		}
+	}
 	// Create the image record, pointing to the most-recently added layer.
 	intendedID := s.imageRef.id
 	if intendedID == "" {
