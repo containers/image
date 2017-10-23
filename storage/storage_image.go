@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 
 	"github.com/containers/image/docker/reference"
@@ -20,6 +21,7 @@ import (
 	"github.com/containers/storage"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/containers/storage/pkg/ioutils"
+	"github.com/docker/docker/api/types/versions"
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -172,7 +174,7 @@ func (s *storageImageSource) GetManifest(instanceDigest *digest.Digest) (manifes
 	if instanceDigest != nil {
 		return nil, "", ErrNoManifestLists
 	}
-	if s.updatedManifest == nil {
+	if len(s.updatedManifest) == 0 {
 		originalBlob, err := s.imageRef.transport.store.ImageBigData(s.ID, "manifest")
 		if err != nil {
 			return nil, "", err
@@ -204,9 +206,6 @@ func (s *storageImageSource) GetManifest(instanceDigest *digest.Digest) (manifes
 				Size:   layer.UncompressedSize,
 			}
 			updatedBlobInfos = append([]types.BlobInfo{blobInfo}, updatedBlobInfos...)
-			if layer.Parent == "" {
-				break
-			}
 			layerID = layer.Parent
 		}
 		if err := man.UpdateLayerInfos(updatedBlobInfos); err != nil {
@@ -382,7 +381,8 @@ func (s *storageImageDestination) HasBlob(blobinfo types.BlobInfo) (bool, int64,
 	return false, -1, nil
 }
 
-// ReapplyBlob is now a no-op, assuming PutBlob() says we already have it.
+// ReapplyBlob is now a no-op, assuming HasBlob() says we already have it, since Commit() can just apply the
+// same one when it walks the list in the manifest.
 func (s *storageImageDestination) ReapplyBlob(blobinfo types.BlobInfo) (types.BlobInfo, error) {
 	present, size, err := s.HasBlob(blobinfo)
 	if !present {
@@ -393,6 +393,139 @@ func (s *storageImageDestination) ReapplyBlob(blobinfo types.BlobInfo) (types.Bl
 	}
 	blobinfo.Size = size
 	return blobinfo, nil
+}
+
+// computeID computes a recommended image ID based on information we have so far.
+func (s *storageImageDestination) computeID(m manifest.Manifest) string {
+	mb, err := m.Serialize()
+	if err != nil {
+		return ""
+	}
+	switch manifest.GuessMIMEType(mb) {
+	case manifest.DockerV2Schema2MediaType, imgspecv1.MediaTypeImageManifest:
+		// For Schema2 and OCI1(?), the ID is just the hex part of the digest of the config blob.
+		logrus.Debugf("trivial image ID for configured blob")
+		configInfo := m.ConfigInfo()
+		if configInfo.Digest.Validate() == nil {
+			return configInfo.Digest.Hex()
+		}
+		return ""
+	case manifest.DockerV2Schema1MediaType, manifest.DockerV2Schema1SignedMediaType:
+		// Convert the schema 1 compat info into a schema 2 config, constructing some of the fields
+		// that aren't directly comparable using info from the manifest.
+		logrus.Debugf("computing image ID using compat data")
+		s1, ok := m.(*manifest.Schema1)
+		if !ok {
+			logrus.Debugf("schema type was guessed wrong?")
+			return ""
+		}
+		if len(s1.History) == 0 {
+			logrus.Debugf("image has no layers")
+			return ""
+		}
+		s2 := struct {
+			manifest.Schema2Image
+			ID        string `json:"id,omitempty"`
+			Parent    string `json:"parent,omitempty"`
+			ParentID  string `json:"parent_id,omitempty"`
+			LayerID   string `json:"layer_id,omitempty"`
+			ThrowAway bool   `json:"throwaway,omitempty"`
+			Size      int64  `json:",omitempty"`
+		}{}
+		config := []byte(s1.History[0].V1Compatibility)
+		if json.Unmarshal(config, &s2) != nil {
+			logrus.Debugf("error decoding configuration")
+			return ""
+		}
+		// Images created with versions prior to 1.8.3 require us to rebuild the object.
+		if s2.DockerVersion != "" && versions.LessThan(s2.DockerVersion, "1.8.3") {
+			err = json.Unmarshal(config, &s2)
+			if err != nil {
+				logrus.Infof("error decoding compat image config %s: %v", string(config), err)
+				return ""
+			}
+			config, err = json.Marshal(&s2)
+			if err != nil {
+				logrus.Infof("error re-encoding compat image config %#v: %v", s2, err)
+				return ""
+			}
+		}
+		// Build the history.
+		for _, h := range s1.History {
+			compat := manifest.Schema1V1Compatibility{}
+			if json.Unmarshal([]byte(h.V1Compatibility), &compat) != nil {
+				logrus.Debugf("error decoding history information")
+				return ""
+			}
+			hitem := manifest.Schema2History{
+				Created:    compat.Created,
+				CreatedBy:  strings.Join(compat.ContainerConfig.Cmd, " "),
+				Comment:    compat.Comment,
+				EmptyLayer: compat.ThrowAway,
+			}
+			s2.History = append([]manifest.Schema2History{hitem}, s2.History...)
+		}
+		// Build the rootfs information.  We need the decompressed sums that we've been
+		// calculating to fill in the DiffIDs.
+		s2.RootFS = &manifest.Schema2RootFS{
+			Type: "layers",
+		}
+		for _, fslayer := range s1.FSLayers {
+			blobSum := fslayer.BlobSum
+			diffID, ok := s.blobDiffIDs[blobSum]
+			if !ok {
+				logrus.Infof("error looking up diffID for blob %q", string(blobSum))
+				return ""
+			}
+			s2.RootFS.DiffIDs = append([]digest.Digest{diffID}, s2.RootFS.DiffIDs...)
+		}
+		// And now for some raw manipulation.
+		raw := make(map[string]*json.RawMessage)
+		err = json.Unmarshal(config, &raw)
+		if err != nil {
+			logrus.Infof("error re-decoding compat image config %#v: %v", s2, err)
+			return ""
+		}
+		// Drop some fields.
+		delete(raw, "id")
+		delete(raw, "parent")
+		delete(raw, "parent_id")
+		delete(raw, "layer_id")
+		delete(raw, "throwaway")
+		delete(raw, "Size")
+		// Add the history and rootfs information.
+		rootfs, err := json.Marshal(s2.RootFS)
+		if err != nil {
+			logrus.Infof("error encoding rootfs information %#v: %v", s2.RootFS, err)
+			return ""
+		}
+		rawRootfs := json.RawMessage(rootfs)
+		raw["rootfs"] = &rawRootfs
+		history, err := json.Marshal(s2.History)
+		if err != nil {
+			logrus.Infof("error encoding history information %#v: %v", s2.History, err)
+			return ""
+		}
+		rawHistory := json.RawMessage(history)
+		raw["history"] = &rawHistory
+		// Encode the result, and take the digest of that result.
+		config, err = json.Marshal(raw)
+		if err != nil {
+			logrus.Infof("error re-encoding compat image config %#v: %v", s2, err)
+			return ""
+		}
+		return digest.FromBytes(config).Hex()
+	case manifest.DockerV2ListMediaType:
+		logrus.Debugf("no image ID for manifest list")
+		// FIXME
+	case imgspecv1.MediaTypeImageIndex:
+		logrus.Debugf("no image ID for manifest index")
+		// FIXME
+	default:
+		logrus.Debugf("no image ID for unrecognized manifest type %q", manifest.GuessMIMEType(mb))
+		// FIXME
+	}
+	return ""
 }
 
 func (s *storageImageDestination) Commit() error {
@@ -499,8 +632,8 @@ func (s *storageImageDestination) Commit() error {
 	// }
 	// Create the image record, pointing to the most-recently added layer.
 	intendedID := s.imageRef.id
-	if configInfo := man.ConfigInfo(); intendedID == "" && configInfo.Digest.Validate() == nil {
-		intendedID = configInfo.Digest.Hex()
+	if intendedID == "" {
+		intendedID = s.computeID(man)
 	}
 	oldNames := []string{}
 	img, err := s.imageRef.transport.store.CreateImage(intendedID, nil, lastLayer, "", options)
