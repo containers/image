@@ -3,6 +3,7 @@ package manifest
 import (
 	"encoding/json"
 	"regexp"
+	"time"
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
@@ -28,6 +29,19 @@ type Schema1 struct {
 	FSLayers      []Schema1FSLayers `json:"fsLayers"`
 	History       []Schema1History  `json:"history"`
 	SchemaVersion int               `json:"schemaVersion"`
+}
+
+// Schema1V1Compatibility is a v1Compatibility in docker/distribution schema 1.
+type Schema1V1Compatibility struct {
+	ID              string    `json:"id"`
+	Parent          string    `json:"parent,omitempty"`
+	Comment         string    `json:"comment,omitempty"`
+	Created         time.Time `json:"created"`
+	ContainerConfig struct {
+		Cmd []string
+	} `json:"container_config,omitempty"`
+	Author    string `json:"author,omitempty"`
+	ThrowAway bool   `json:"throwaway,omitempty"`
 }
 
 // Schema1FromManifest creates a Schema1 manifest instance from a manifest blob.

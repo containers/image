@@ -3,7 +3,6 @@ package image
 import (
 	"encoding/json"
 	"strings"
-	"time"
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
@@ -12,19 +11,6 @@ import (
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
-
-// manifest.Schema1History.V1Compatibility is a string containing this.  It is similar to v1Image but not the same, in particular note the ThrowAway field.
-type v1Compatibility struct {
-	ID              string    `json:"id"`
-	Parent          string    `json:"parent,omitempty"`
-	Comment         string    `json:"comment,omitempty"`
-	Created         time.Time `json:"created"`
-	ContainerConfig struct {
-		Cmd []string
-	} `json:"container_config,omitempty"`
-	Author    string `json:"author,omitempty"`
-	ThrowAway bool   `json:"throwaway,omitempty"`
-}
 
 type manifestSchema1 struct {
 	m *manifest.Schema1
@@ -199,7 +185,7 @@ func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.Bl
 	for v1Index := len(m.m.History) - 1; v1Index >= 0; v1Index-- {
 		v2Index := (len(m.m.History) - 1) - v1Index
 
-		var v1compat v1Compatibility
+		var v1compat manifest.Schema1V1Compatibility
 		if err := json.Unmarshal([]byte(m.m.History[v1Index].V1Compatibility), &v1compat); err != nil {
 			return nil, errors.Wrapf(err, "Error decoding history entry %d", v1Index)
 		}

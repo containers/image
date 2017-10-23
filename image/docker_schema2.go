@@ -282,7 +282,7 @@ func (m *manifestSchema2) convertToManifestSchema1(dest types.ImageDestination) 
 		}
 		v1ID = v
 
-		fakeImage := v1Compatibility{
+		fakeImage := manifest.Schema1V1Compatibility{
 			ID:        v1ID,
 			Parent:    parentV1ID,
 			Comment:   historyEntry.Comment,

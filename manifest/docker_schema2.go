@@ -2,7 +2,9 @@ package manifest
 
 import (
 	"encoding/json"
+	"time"
 
+	"github.com/containers/image/pkg/strslice"
 	"github.com/containers/image/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -22,6 +24,131 @@ type Schema2 struct {
 	MediaType         string              `json:"mediaType"`
 	ConfigDescriptor  Schema2Descriptor   `json:"config"`
 	LayersDescriptors []Schema2Descriptor `json:"layers"`
+}
+
+// Schema2Port is a Port, a string containing port number and protocol in the
+// format "80/tcp", from docker/go-connections/nat.
+type Schema2Port string
+
+// Schema2PortSet is a PortSet, a collection of structs indexed by Port, from
+// docker/go-connections/nat.
+type Schema2PortSet map[Schema2Port]struct{}
+
+// Schema2HealthConfig is a HealthConfig, which holds configuration settings
+// for the HEALTHCHECK feature, from docker/docker/api/types/container.
+type Schema2HealthConfig struct {
+	// Test is the test to perform to check that the container is healthy.
+	// An empty slice means to inherit the default.
+	// The options are:
+	// {} : inherit healthcheck
+	// {"NONE"} : disable healthcheck
+	// {"CMD", args...} : exec arguments directly
+	// {"CMD-SHELL", command} : run command with system's default shell
+	Test []string `json:",omitempty"`
+
+	// Zero means to inherit. Durations are expressed as integer nanoseconds.
+	Interval time.Duration `json:",omitempty"` // Interval is the time to wait between checks.
+	Timeout  time.Duration `json:",omitempty"` // Timeout is the time to wait before considering the check to have hung.
+
+	// Retries is the number of consecutive failures needed to consider a container as unhealthy.
+	// Zero means inherit.
+	Retries int `json:",omitempty"`
+}
+
+// Schema2Config is a Config in docker/docker/api/types/container.
+type Schema2Config struct {
+	Hostname        string               // Hostname
+	Domainname      string               // Domainname
+	User            string               // User that will run the command(s) inside the container, also support user:group
+	AttachStdin     bool                 // Attach the standard input, makes possible user interaction
+	AttachStdout    bool                 // Attach the standard output
+	AttachStderr    bool                 // Attach the standard error
+	ExposedPorts    Schema2PortSet       `json:",omitempty"` // List of exposed ports
+	Tty             bool                 // Attach standard streams to a tty, including stdin if it is not closed.
+	OpenStdin       bool                 // Open stdin
+	StdinOnce       bool                 // If true, close stdin after the 1 attached client disconnects.
+	Env             []string             // List of environment variable to set in the container
+	Cmd             strslice.StrSlice    // Command to run when starting the container
+	Healthcheck     *Schema2HealthConfig `json:",omitempty"` // Healthcheck describes how to check the container is healthy
+	ArgsEscaped     bool                 `json:",omitempty"` // True if command is already escaped (Windows specific)
+	Image           string               // Name of the image as it was passed by the operator (e.g. could be symbolic)
+	Volumes         map[string]struct{}  // List of volumes (mounts) used for the container
+	WorkingDir      string               // Current directory (PWD) in the command will be launched
+	Entrypoint      strslice.StrSlice    // Entrypoint to run when starting the container
+	NetworkDisabled bool                 `json:",omitempty"` // Is network disabled
+	MacAddress      string               `json:",omitempty"` // Mac Address of the container
+	OnBuild         []string             // ONBUILD metadata that were defined on the image Dockerfile
+	Labels          map[string]string    // List of labels set to this container
+	StopSignal      string               `json:",omitempty"` // Signal to stop a container
+	StopTimeout     *int                 `json:",omitempty"` // Timeout (in seconds) to stop a container
+	Shell           strslice.StrSlice    `json:",omitempty"` // Shell for shell-form of RUN, CMD, ENTRYPOINT
+}
+
+// Schema2V1Image is a V1Image in docker/docker/image.
+type Schema2V1Image struct {
+	// ID is a unique 64 character identifier of the image
+	ID string `json:"id,omitempty"`
+	// Parent is the ID of the parent image
+	Parent string `json:"parent,omitempty"`
+	// Comment is the commit message that was set when committing the image
+	Comment string `json:"comment,omitempty"`
+	// Created is the timestamp at which the image was created
+	Created time.Time `json:"created"`
+	// Container is the id of the container used to commit
+	Container string `json:"container,omitempty"`
+	// ContainerConfig is the configuration of the container that is committed into the image
+	ContainerConfig Schema2Config `json:"container_config,omitempty"`
+	// DockerVersion specifies the version of Docker that was used to build the image
+	DockerVersion string `json:"docker_version,omitempty"`
+	// Author is the name of the author that was specified when committing the image
+	Author string `json:"author,omitempty"`
+	// Config is the configuration of the container received from the client
+	Config *Schema2Config `json:"config,omitempty"`
+	// Architecture is the hardware that the image is build and runs on
+	Architecture string `json:"architecture,omitempty"`
+	// OS is the operating system used to build and run the image
+	OS string `json:"os,omitempty"`
+	// Size is the total size of the image including all layers it is composed of
+	Size int64 `json:",omitempty"`
+}
+
+// Schema2RootFS is a description of how to build up an image's root filesystem, from docker/docker/image.
+type Schema2RootFS struct {
+	Type    string          `json:"type"`
+	DiffIDs []digest.Digest `json:"diff_ids,omitempty"`
+}
+
+// Schema2History stores build commands that were used to create an image, from docker/docker/image.
+type Schema2History struct {
+	// Created is the timestamp at which the image was created
+	Created time.Time `json:"created"`
+	// Author is the name of the author that was specified when committing the image
+	Author string `json:"author,omitempty"`
+	// CreatedBy keeps the Dockerfile command used while building the image
+	CreatedBy string `json:"created_by,omitempty"`
+	// Comment is the commit message that was set when committing the image
+	Comment string `json:"comment,omitempty"`
+	// EmptyLayer is set to true if this history item did not generate a
+	// layer. Otherwise, the history item is associated with the next
+	// layer in the RootFS section.
+	EmptyLayer bool `json:"empty_layer,omitempty"`
+}
+
+// Schema2Image is an Image in docker/docker/image.
+type Schema2Image struct {
+	Schema2V1Image
+	Parent     digest.Digest    `json:"parent,omitempty"`
+	RootFS     *Schema2RootFS   `json:"rootfs,omitempty"`
+	History    []Schema2History `json:"history,omitempty"`
+	OSVersion  string           `json:"os.version,omitempty"`
+	OSFeatures []string         `json:"os.features,omitempty"`
+
+	// rawJSON caches the immutable JSON associated with this image.
+	rawJSON []byte
+
+	// computedID is the ID computed from the hash of the image config.
+	// Not to be confused with the legacy V1 ID in V1Image.
+	computedID digest.Digest
 }
 
 // Schema2FromManifest creates a Schema2 manifest instance from a manifest blob.
