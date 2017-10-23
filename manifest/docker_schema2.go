@@ -217,3 +217,24 @@ func (m *Schema2) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 func (m *Schema2) Serialize() ([]byte, error) {
 	return json.Marshal(*m)
 }
+
+// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
+func (m *Schema2) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*types.ImageInspectInfo, error) {
+	config, err := configGetter(m.ConfigInfo())
+	if err != nil {
+		return nil, err
+	}
+	s2 := &Schema2Image{}
+	if err := json.Unmarshal(config, s2); err != nil {
+		return nil, err
+	}
+	return &types.ImageInspectInfo{
+		Tag:           "",
+		Created:       s2.Created,
+		DockerVersion: s2.DockerVersion,
+		Labels:        s2.Config.Labels,
+		Architecture:  s2.Architecture,
+		Os:            s2.OS,
+		Layers:        []string{},
+	}, nil
+}

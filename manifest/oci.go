@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/containers/image/types"
 	"github.com/opencontainers/image-spec/specs-go"
@@ -79,4 +80,29 @@ func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 // NOTE: Serialize() does not in general reproduce the original blob if this object was loaded from one, even if no modifications were made!
 func (m *OCI1) Serialize() ([]byte, error) {
 	return json.Marshal(*m)
+}
+
+// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
+func (m *OCI1) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*types.ImageInspectInfo, error) {
+	config, err := configGetter(m.ConfigInfo())
+	if err != nil {
+		return nil, err
+	}
+	v1 := &imgspecv1.Image{}
+	if err := json.Unmarshal(config, v1); err != nil {
+		return nil, err
+	}
+	created := time.Time{}
+	if v1.Created != nil {
+		created = *v1.Created
+	}
+	return &types.ImageInspectInfo{
+		Tag:           "",
+		Created:       created,
+		DockerVersion: "",
+		Labels:        v1.Config.Labels,
+		Architecture:  v1.Architecture,
+		Os:            v1.OS,
+		Layers:        []string{},
+	}, nil
 }

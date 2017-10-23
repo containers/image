@@ -57,6 +57,11 @@ type Manifest interface {
 	// UpdateLayerInfos replaces the original layers with the specified BlobInfos (size+digest+urls), in order (the root layer first, and then successive layered layers)
 	UpdateLayerInfos(layerInfos []types.BlobInfo) error
 
+	// Inspect returns various information for (skopeo inspect) parsed from the manifest,
+	// incorporating information from a configuration blob returned by configGetter, if
+	// the underlying image format is expected to include a configuration blob.
+	Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*types.ImageInspectInfo, error)
+
 	// Serialize returns the manifest in a blob format.
 	// NOTE: Serialize() does not in general reproduce the original blob if this object was loaded from one, even if no modifications were made!
 	Serialize() ([]byte, error)
