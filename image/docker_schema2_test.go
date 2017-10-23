@@ -38,6 +38,9 @@ func (f unusedImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, e
 func (f unusedImageSource) GetSignatures(context.Context, *digest.Digest) ([][]byte, error) {
 	panic("Unexpected call to a mock function")
 }
+func (f unusedImageSource) LayerInfosForCopy() []types.BlobInfo {
+	panic("Unexpected call to a mock function")
+}
 
 func manifestSchema2FromFixture(t *testing.T, src types.ImageSource, fixture string) genericManifest {
 	manifest, err := ioutil.ReadFile(filepath.Join("fixtures", fixture))

@@ -14,7 +14,6 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/image"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
@@ -46,11 +45,11 @@ var (
 )
 
 type storageImageSource struct {
-	imageRef        storageReference
-	ID              string
-	layerPosition   map[digest.Digest]int // Where we are in reading a blob's layers
-	updatedManifest []byte                // The edited version of the manifest, if already known, or nil
-	SignatureSizes  []int                 `json:"signature-sizes"` // List of sizes of each signature slice
+	imageRef       storageReference
+	ID             string
+	layerPosition  map[digest.Digest]int // Where we are in reading a blob's layers
+	cachedManifest []byte                // A cached copy of the manifest, if already known, or nil
+	SignatureSizes []int                 `json:"signature-sizes"` // List of sizes of each signature slice
 }
 
 type storageImageDestination struct {
@@ -72,27 +71,17 @@ type storageImageCloser struct {
 	size int64
 }
 
-// newImageSource reads an image, modifying the manifest to refer to uncompressed layers.
+// newImageSource sets up an image for reading.
 func newImageSource(imageRef storageReference) (*storageImageSource, error) {
-	// First, locate the image using the original reference.
+	// First, locate the image.
 	img, err := imageRef.resolveImage()
 	if err != nil {
 		return nil, err
 	}
 
-	// FIXME FIXME we need to preserve the ORIGINAL reference.
-	// Build the updated information that we want for the manifest.
-	// Discard a digest in the image reference, if there is one, since the updated image manifest
-	// won't match it.
-	newName := imageRef.name
-	if imageRef.digest != "" {
-		newName = reference.TrimNamed(newName)
-	}
-	newRef := newReference(imageRef.transport, verboseName(newName), img.ID, newName, "", "")
-
-	// Build the reader object, reading the image referred to by a possibly-updated reference.
+	// Build the reader object.
 	image := &storageImageSource{
-		imageRef:       *newRef,
+		imageRef:       imageRef,
 		ID:             img.ID,
 		layerPosition:  make(map[digest.Digest]int),
 		SignatureSizes: []int{},
@@ -129,7 +118,7 @@ func (s *storageImageSource) getBlobAndLayerID(info types.BlobInfo) (rc io.ReadC
 		return nil, -1, "", err
 	}
 	// Check if the blob corresponds to a diff that was used to initialize any layers.  Our
-	// callers should only ask about layers using their uncompressed digests, so no need to
+	// callers should try to retrieve layers using their uncompressed digests, so no need to
 	// check if they're using one of the compressed digests, which we can't reproduce anyway.
 	layers, err := s.imageRef.transport.store.LayersByUncompressedDigest(info.Digest)
 	// If it's not a layer, then it must be a data item.
@@ -174,50 +163,62 @@ func (s *storageImageSource) GetManifest(instanceDigest *digest.Digest) (manifes
 	if instanceDigest != nil {
 		return nil, "", ErrNoManifestLists
 	}
-	if len(s.updatedManifest) == 0 {
-		originalBlob, err := s.imageRef.transport.store.ImageBigData(s.ID, "manifest")
+	if len(s.cachedManifest) == 0 {
+		cachedBlob, err := s.imageRef.transport.store.ImageBigData(s.ID, "manifest")
 		if err != nil {
 			return nil, "", err
 		}
-		man, err := manifest.FromBlob(originalBlob, manifest.GuessMIMEType(originalBlob))
-		if err != nil {
-			return nil, "", err
-		}
-
-		simg, err := s.imageRef.transport.store.Image(s.ID)
-		if err != nil {
-			return nil, "", err
-		}
-		updatedBlobInfos := []types.BlobInfo{}
-		layerID := simg.TopLayer
-		for layerID != "" {
-			layer, err := s.imageRef.transport.store.Layer(layerID)
-			if err != nil {
-				return nil, "", err
-			}
-			if layer.UncompressedDigest == "" {
-				return nil, "", errors.Errorf("uncompressed digest for layer %q is unknown", layerID)
-			}
-			if layer.UncompressedSize < 0 {
-				return nil, "", errors.Errorf("uncompressed size for layer %q is unknown", layerID)
-			}
-			blobInfo := types.BlobInfo{
-				Digest: layer.UncompressedDigest,
-				Size:   layer.UncompressedSize,
-			}
-			updatedBlobInfos = append([]types.BlobInfo{blobInfo}, updatedBlobInfos...)
-			layerID = layer.Parent
-		}
-		if err := man.UpdateLayerInfos(updatedBlobInfos); err != nil {
-			return nil, "", err
-		}
-		updatedBlob, err := man.Serialize()
-		if err != nil {
-			return nil, "", err
-		}
-		s.updatedManifest = updatedBlob
+		s.cachedManifest = cachedBlob
 	}
-	return s.updatedManifest, manifest.GuessMIMEType(s.updatedManifest), err
+	return s.cachedManifest, manifest.GuessMIMEType(s.cachedManifest), err
+}
+
+// LayerInfosForCopy() returns the list of layer blobs that make up the root filesystem of
+// the image, after they've been decompressed.
+func (s *storageImageSource) LayerInfosForCopy() []types.BlobInfo {
+	simg, err := s.imageRef.transport.store.Image(s.ID)
+	if err != nil {
+		logrus.Errorf("error reading image %q: %v", s.ID, err)
+		return nil
+	}
+	updatedBlobInfos := []types.BlobInfo{}
+	layerID := simg.TopLayer
+	_, manifestType, err := s.GetManifest(nil)
+	if err != nil {
+		logrus.Errorf("error reading image manifest for %q: %v", s.ID, err)
+		return nil
+	}
+	uncompressedLayerType := ""
+	switch manifestType {
+	case imgspecv1.MediaTypeImageManifest:
+		uncompressedLayerType = imgspecv1.MediaTypeImageLayer
+	case manifest.DockerV2Schema1MediaType, manifest.DockerV2Schema1SignedMediaType, manifest.DockerV2Schema2MediaType:
+		// This is actually a compressed type, but there's no uncompressed type defined
+		uncompressedLayerType = manifest.DockerV2Schema2LayerMediaType
+	}
+	for layerID != "" {
+		layer, err := s.imageRef.transport.store.Layer(layerID)
+		if err != nil {
+			logrus.Errorf("error reading layer %q in image %q: %v", layerID, s.ID, err)
+			return nil
+		}
+		if layer.UncompressedDigest == "" {
+			logrus.Errorf("uncompressed digest for layer %q is unknown", layerID)
+			return nil
+		}
+		if layer.UncompressedSize < 0 {
+			logrus.Errorf("uncompressed size for layer %q is unknown", layerID)
+			return nil
+		}
+		blobInfo := types.BlobInfo{
+			Digest:    layer.UncompressedDigest,
+			Size:      layer.UncompressedSize,
+			MediaType: uncompressedLayerType,
+		}
+		updatedBlobInfos = append([]types.BlobInfo{blobInfo}, updatedBlobInfos...)
+		layerID = layer.Parent
+	}
+	return updatedBlobInfos
 }
 
 // GetSignatures() parses the image's signatures blob into a slice of byte slices.
@@ -335,8 +336,9 @@ func (s *storageImageDestination) PutBlob(stream io.Reader, blobinfo types.BlobI
 		blobSize = counter.Count
 	}
 	return types.BlobInfo{
-		Digest: blobDigest,
-		Size:   blobSize,
+		Digest:    blobDigest,
+		Size:      blobSize,
+		MediaType: blobinfo.MediaType,
 	}, nil
 }
 
@@ -850,7 +852,7 @@ func (s *storageImageSource) getSize() (int64, error) {
 	return sum, nil
 }
 
-// Size returns the image's previously-computed size.
+// Size() returns the previously-computed size of the image, with no error.
 func (s *storageImageCloser) Size() (int64, error) {
 	return s.size, nil
 }
@@ -870,9 +872,4 @@ func newImage(ctx *types.SystemContext, s storageReference) (types.ImageCloser, 
 		return nil, err
 	}
 	return &storageImageCloser{ImageCloser: img, size: size}, nil
-}
-
-// Size() returns the previously-computed size of the image, with no error.
-func (s storageImage) Size() (int64, error) {
-	return s.size, nil
 }

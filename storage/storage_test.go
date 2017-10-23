@@ -1012,7 +1012,7 @@ func TestDuplicateBlob(t *testing.T) {
 		t.Fatalf("ImageSource is not a storage image")
 	}
 	layers := []string{}
-	for _, layerInfo := range img.LayerInfos() {
+	for _, layerInfo := range img.LayerInfosForCopy() {
 		rc, _, layerID, err := source.getBlobAndLayerID(layerInfo)
 		if err != nil {
 			t.Fatalf("getBlobAndLayerID(%q) returned error %v", layerInfo.Digest, err)
