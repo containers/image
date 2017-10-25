@@ -218,7 +218,7 @@ func (d *ociImageDestination) PutManifest(m []byte) error {
 	}
 
 	if d.ref.image == "" {
-		return errors.Errorf("cannot save image with empyt image.ref.name")
+		return errors.Errorf("cannot save image with empty image.ref.name")
 	}
 
 	annotations := make(map[string]string)
