@@ -4,11 +4,12 @@ import (
 	"os"
 	"testing"
 
+	"path/filepath"
+
 	"github.com/containers/image/types"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"path/filepath"
 )
 
 // readerFromFunc allows implementing Reader by any function, e.g. a closure.
@@ -27,7 +28,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	dirRef, ok := ref.(ociReference)
 	require.True(t, ok)
-	blobPath, err := dirRef.blobPath(blobDigest)
+	blobPath, err := dirRef.blobPath(blobDigest, "")
 	assert.NoError(t, err)
 
 	firstRead := true
@@ -102,7 +103,7 @@ func TestPutManifestTwice(t *testing.T) {
 }
 
 func putTestManifest(t *testing.T, ociRef ociReference, tmpDir string) {
-	imageDest, err := newImageDestination(ociRef)
+	imageDest, err := newImageDestination(nil, ociRef)
 	assert.NoError(t, err)
 
 	data := []byte("abc")
