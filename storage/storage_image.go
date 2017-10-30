@@ -371,7 +371,7 @@ func (s *storageImageDestination) HasBlob(blobinfo types.BlobInfo) (bool, int64,
 	}
 	// Check if we have a wasn't-compressed layer in storage that's based on that blob.
 	layers, err := s.imageRef.transport.store.LayersByUncompressedDigest(blobinfo.Digest)
-	if err != nil {
+	if err != nil && errors.Cause(err) != storage.ErrLayerUnknown {
 		return false, -1, errors.Wrapf(err, `Error looking for layers with digest %q`, blobinfo.Digest)
 	}
 	if len(layers) > 0 {
@@ -381,7 +381,7 @@ func (s *storageImageDestination) HasBlob(blobinfo types.BlobInfo) (bool, int64,
 	}
 	// Check if we have a was-compressed layer in storage that's based on that blob.
 	layers, err = s.imageRef.transport.store.LayersByCompressedDigest(blobinfo.Digest)
-	if err != nil {
+	if err != nil && errors.Cause(err) != storage.ErrLayerUnknown {
 		return false, -1, errors.Wrapf(err, `Error looking for compressed layers with digest %q`, blobinfo.Digest)
 	}
 	if len(layers) > 0 {
