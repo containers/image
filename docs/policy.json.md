@@ -99,6 +99,12 @@ a directory containing one or more tags, or any of the parent directories.
 
 *Note:* See `dir:` above for semantics and restrictions on the directory paths, they apply to `oci:` equivalently.
 
+### `tarball:`
+
+The `tarball:` transport refers to tarred up container root filesystems.
+
+Scopes are ignored.
+
 ## Policy Requirements
 
 Using the mechanisms above, a set of policy requirements is looked up.  The policy requirements
