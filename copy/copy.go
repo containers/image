@@ -43,7 +43,9 @@ type imageCopier struct {
 	rawSource         types.ImageSource
 	diffIDsAreNeeded  bool
 	canModifyManifest bool
-	reportWriter      io.Writer
+	writer            io.Writer
+	reportWriter      func(f string, a ...interface{})
+	hasReportWriter   bool
 	progressInterval  time.Duration
 	progress          chan types.ProgressProperties
 }
@@ -109,14 +111,20 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		options = &Options{}
 	}
 
-	reportWriter := ioutil.Discard
+	var (
+		hasReportWriter bool
+		writer          io.Writer
+	)
 
 	if options.ReportWriter != nil {
-		reportWriter = options.ReportWriter
+		writer = options.ReportWriter
+		hasReportWriter = true
 	}
-
 	writeReport := func(f string, a ...interface{}) {
-		fmt.Fprintf(reportWriter, f, a...)
+		if !hasReportWriter {
+			return
+		}
+		fmt.Fprintf(writer, f, a...)
 	}
 
 	dest, err := destRef.NewImageDestination(options.DestinationCtx)
@@ -208,7 +216,9 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 		rawSource:         rawSource,
 		diffIDsAreNeeded:  src.UpdatedImageNeedsLayerDiffIDs(manifestUpdates),
 		canModifyManifest: canModifyManifest,
-		reportWriter:      reportWriter,
+		writer:            writer,
+		reportWriter:      writeReport,
+		hasReportWriter:   hasReportWriter,
 		progressInterval:  options.ProgressInterval,
 		progress:          options.Progress,
 	}
@@ -262,7 +272,7 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	}
 
 	if options.SignBy != "" {
-		newSig, err := createSignature(dest, manifest, options.SignBy, reportWriter)
+		newSig, err := createSignature(dest, manifest, options.SignBy, writeReport)
 		if err != nil {
 			return err
 		}
@@ -334,7 +344,7 @@ func (ic *imageCopier) copyLayers() error {
 				return errors.New("getting DiffID for foreign layers is unimplemented")
 			}
 			destInfo = srcLayer
-			fmt.Fprintf(ic.reportWriter, "Skipping foreign layer %q copy to %s\n", destInfo.Digest, ic.dest.Reference().Transport().Name())
+			ic.reportWriter("Skipping foreign layer %q copy to %s\n", destInfo.Digest, ic.dest.Reference().Transport().Name())
 		} else {
 			destInfo, diffID, err = ic.copyLayer(srcLayer)
 			if err != nil {
@@ -399,7 +409,7 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest() ([]byte, error) {
 		return nil, err
 	}
 
-	fmt.Fprintf(ic.reportWriter, "Writing manifest to image destination\n")
+	ic.reportWriter("Writing manifest to image destination\n")
 	if err := ic.dest.PutManifest(manifest); err != nil {
 		return nil, errors.Wrap(err, "Error writing manifest")
 	}
@@ -410,7 +420,7 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest() ([]byte, error) {
 func (ic *imageCopier) copyConfig(src types.Image) error {
 	srcInfo := src.ConfigInfo()
 	if srcInfo.Digest != "" {
-		fmt.Fprintf(ic.reportWriter, "Copying config %s\n", srcInfo.Digest)
+		ic.reportWriter("Copying config %s\n", srcInfo.Digest)
 		configBlob, err := src.ConfigBlob()
 		if err != nil {
 			return errors.Wrapf(err, "Error reading config blob %s", srcInfo.Digest)
@@ -455,12 +465,12 @@ func (ic *imageCopier) copyLayer(srcInfo types.BlobInfo) (types.BlobInfo, digest
 		if err != nil {
 			return types.BlobInfo{}, "", errors.Wrapf(err, "Error reapplying blob %s at destination", srcInfo.Digest)
 		}
-		fmt.Fprintf(ic.reportWriter, "Skipping fetch of repeat blob %s\n", srcInfo.Digest)
+		ic.reportWriter("Skipping fetch of repeat blob %s\n", srcInfo.Digest)
 		return blobinfo, ic.cachedDiffIDs[srcInfo.Digest], err
 	}
 
 	// Fallback: copy the layer, computing the diffID if we need to do so
-	fmt.Fprintf(ic.reportWriter, "Copying blob %s\n", srcInfo.Digest)
+	ic.reportWriter("Copying blob %s\n", srcInfo.Digest)
 	srcStream, srcBlobSize, err := ic.rawSource.GetBlob(srcInfo)
 	if err != nil {
 		return types.BlobInfo{}, "", errors.Wrapf(err, "Error reading blob %s", srcInfo.Digest)
@@ -574,14 +584,16 @@ func (ic *imageCopier) copyBlobFromStream(srcStream io.Reader, srcInfo types.Blo
 	isCompressed := decompressor != nil
 
 	// === Report progress using a pb.Reader.
-	bar := pb.New(int(srcInfo.Size)).SetUnits(pb.U_BYTES)
-	bar.Output = ic.reportWriter
-	bar.SetMaxWidth(80)
-	bar.ShowTimeLeft = false
-	bar.ShowPercent = false
-	bar.Start()
-	destStream = bar.NewProxyReader(destStream)
-	defer bar.Finish()
+	if ic.hasReportWriter {
+		bar := pb.New(int(srcInfo.Size)).SetUnits(pb.U_BYTES)
+		bar.Output = ic.writer
+		bar.SetMaxWidth(80)
+		bar.ShowTimeLeft = false
+		bar.ShowPercent = false
+		bar.Start()
+		destStream = bar.NewProxyReader(destStream)
+		defer bar.Finish()
+	}
 
 	// === Send a copy of the original, uncompressed, stream, to a separate path if necessary.
 	var originalLayerReader io.Reader // DO NOT USE this other than to drain the input if no other consumer in the pipeline has done so.

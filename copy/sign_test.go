@@ -21,6 +21,10 @@ const (
 	testKeyFingerprint = "1D8230F6CDB6A06716E414C1DB72F2188BB46CC8"
 )
 
+func writerMock(s string, a ...interface{}) {
+	return
+}
+
 func TestCreateSignature(t *testing.T) {
 	manifestBlob := []byte("Something")
 	manifestDigest, err := manifest.Digest(manifestBlob)
@@ -45,7 +49,7 @@ func TestCreateSignature(t *testing.T) {
 	dirDest, err := dirRef.NewImageDestination(nil)
 	require.NoError(t, err)
 	defer dirDest.Close()
-	_, err = createSignature(dirDest, manifestBlob, testKeyFingerprint, ioutil.Discard)
+	_, err = createSignature(dirDest, manifestBlob, testKeyFingerprint, writerMock)
 	assert.Error(t, err)
 
 	// Set up a docker: reference
@@ -56,14 +60,14 @@ func TestCreateSignature(t *testing.T) {
 	defer dockerDest.Close()
 
 	// Signing with an unknown key fails
-	_, err = createSignature(dockerDest, manifestBlob, "this key does not exist", ioutil.Discard)
+	_, err = createSignature(dockerDest, manifestBlob, "this key does not exist", writerMock)
 	assert.Error(t, err)
 
 	// Success
 	mech, err = signature.NewGPGSigningMechanism()
 	require.NoError(t, err)
 	defer mech.Close()
-	sig, err := createSignature(dockerDest, manifestBlob, testKeyFingerprint, ioutil.Discard)
+	sig, err := createSignature(dockerDest, manifestBlob, testKeyFingerprint, writerMock)
 	require.NoError(t, err)
 	verified, err := signature.VerifyDockerManifestSignature(sig, manifestBlob, "docker.io/library/busybox:latest", mech, testKeyFingerprint)
 	require.NoError(t, err)
