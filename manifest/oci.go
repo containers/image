@@ -92,6 +92,8 @@ func (m *OCI1) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*type
 	if err := json.Unmarshal(config, v1); err != nil {
 		return nil, err
 	}
+	d1 := &Schema2V1Image{}
+	json.Unmarshal(config, d1)
 	created := time.Time{}
 	if v1.Created != nil {
 		created = *v1.Created
@@ -99,7 +101,7 @@ func (m *OCI1) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*type
 	i := &types.ImageInspectInfo{
 		Tag:           "",
 		Created:       created,
-		DockerVersion: "",
+		DockerVersion: d1.DockerVersion,
 		Labels:        v1.Config.Labels,
 		Architecture:  v1.Architecture,
 		Os:            v1.OS,
