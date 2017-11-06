@@ -196,17 +196,17 @@ func validateV1ID(id string) error {
 
 // Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
 func (m *Schema1) Inspect(_ func(types.BlobInfo) ([]byte, error)) (*types.ImageInspectInfo, error) {
-	s1 := &Schema1V1Compatibility{}
+	s1 := &Schema2V1Image{}
 	if err := json.Unmarshal([]byte(m.History[0].V1Compatibility), s1); err != nil {
 		return nil, err
 	}
 	return &types.ImageInspectInfo{
 		Tag:           m.Tag,
 		Created:       s1.Created,
-		DockerVersion: "",
+		DockerVersion: s1.DockerVersion,
 		Labels:        make(map[string]string),
-		Architecture:  "",
-		Os:            "",
+		Architecture:  s1.Architecture,
+		Os:            s1.OS,
 		Layers:        []string{},
 	}, nil
 }
