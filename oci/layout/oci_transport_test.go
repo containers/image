@@ -283,9 +283,21 @@ func TestReferenceBlobPath(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	ociRef, ok := ref.(ociReference)
 	require.True(t, ok)
-	bp, err := ociRef.blobPath("sha256:" + hex)
+	bp, err := ociRef.blobPath("sha256:"+hex, "")
 	assert.NoError(t, err)
 	assert.Equal(t, tmpDir+"/blobs/sha256/"+hex, bp)
+}
+
+func TestReferenceSharedBlobPathShared(t *testing.T) {
+	const hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+	ref, tmpDir := refToTempOCI(t)
+	defer os.RemoveAll(tmpDir)
+	ociRef, ok := ref.(ociReference)
+	require.True(t, ok)
+	bp, err := ociRef.blobPath("sha256:"+hex, "/external/path")
+	assert.NoError(t, err)
+	assert.Equal(t, "/external/path/sha256/"+hex, bp)
 }
 
 func TestReferenceBlobPathInvalid(t *testing.T) {
@@ -295,7 +307,7 @@ func TestReferenceBlobPathInvalid(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	ociRef, ok := ref.(ociReference)
 	require.True(t, ok)
-	_, err := ociRef.blobPath(hex)
+	_, err := ociRef.blobPath(hex, "")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unexpected digest reference "+hex)
 }

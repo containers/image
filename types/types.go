@@ -316,6 +316,8 @@ type SystemContext struct {
 	OCICertPath string
 	// Allow downloading OCI image layers over HTTP, or HTTPS with failed TLS verification. Note that this does not affect other TLS connections.
 	OCIInsecureSkipTLSVerify bool
+	// If not "", use a shared directory for storing blobs rather than within OCI layouts
+	OCISharedBlobDirPath string
 
 	// === docker.Transport overrides ===
 	// If not "", a directory containing a CA certificate (ending with ".crt"),
