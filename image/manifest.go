@@ -63,14 +63,5 @@ func manifestInstanceFromBlob(ctx *types.SystemContext, src types.ImageSource, m
 
 // inspectManifest is an implementation of types.Image.Inspect
 func inspectManifest(m genericManifest) (*types.ImageInspectInfo, error) {
-	info, err := m.imageInspectInfo()
-	if err != nil {
-		return nil, err
-	}
-	layers := m.LayerInfos()
-	info.Layers = make([]string, len(layers))
-	for i, layer := range layers {
-		info.Layers[i] = layer.Digest.String()
-	}
-	return info, nil
+	return m.imageInspectInfo()
 }

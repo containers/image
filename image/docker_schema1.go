@@ -89,21 +89,7 @@ func (m *manifestSchema1) EmbeddedDockerReferenceConflicts(ref reference.Named) 
 }
 
 func (m *manifestSchema1) imageInspectInfo() (*types.ImageInspectInfo, error) {
-	v1 := &manifest.Schema2V1Image{}
-	if err := json.Unmarshal([]byte(m.m.History[0].V1Compatibility), v1); err != nil {
-		return nil, err
-	}
-	i := &types.ImageInspectInfo{
-		Tag:           m.m.Tag,
-		DockerVersion: v1.DockerVersion,
-		Created:       v1.Created,
-		Architecture:  v1.Architecture,
-		Os:            v1.OS,
-	}
-	if v1.Config != nil {
-		i.Labels = v1.Config.Labels
-	}
-	return i, nil
+	return m.m.Inspect(nil)
 }
 
 // UpdatedImageNeedsLayerDiffIDs returns true iff UpdatedImage(options) needs InformationOnly.LayerDiffIDs.
