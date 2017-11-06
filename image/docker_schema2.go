@@ -135,7 +135,7 @@ func (m *manifestSchema2) imageInspectInfo() (*types.ImageInspectInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	v1 := &v1Image{}
+	v1 := &manifest.Schema2V1Image{}
 	if err := json.Unmarshal(config, v1); err != nil {
 		return nil, err
 	}
@@ -233,7 +233,7 @@ func (m *manifestSchema2) convertToManifestSchema1(dest types.ImageDestination) 
 	if err != nil {
 		return nil, err
 	}
-	imageConfig := &image{}
+	imageConfig := &manifest.Schema2Image{}
 	if err := json.Unmarshal(configBytes, imageConfig); err != nil {
 		return nil, err
 	}

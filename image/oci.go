@@ -115,7 +115,7 @@ func (m *manifestOCI1) imageInspectInfo() (*types.ImageInspectInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	v1 := &v1Image{}
+	v1 := &manifest.Schema2V1Image{}
 	if err := json.Unmarshal(config, v1); err != nil {
 		return nil, err
 	}
