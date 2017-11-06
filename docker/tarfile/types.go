@@ -21,20 +21,8 @@ type ManifestItem struct {
 	Config       string
 	RepoTags     []string
 	Layers       []string
-	Parent       imageID                               `json:",omitempty"`
-	LayerSources map[diffID]manifest.Schema2Descriptor `json:",omitempty"`
+	Parent       imageID                                      `json:",omitempty"`
+	LayerSources map[digest.Digest]manifest.Schema2Descriptor `json:",omitempty"`
 }
 
 type imageID string
-type diffID digest.Digest
-
-// Based on github.com/docker/docker/image/image.go
-// MOST CONTENT OMITTED AS UNNECESSARY
-type image struct {
-	RootFS *rootFS `json:"rootfs,omitempty"`
-}
-
-type rootFS struct {
-	Type    string   `json:"type"`
-	DiffIDs []diffID `json:"diff_ids,omitempty"`
-}
