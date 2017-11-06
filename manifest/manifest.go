@@ -57,6 +57,12 @@ type Manifest interface {
 	// UpdateLayerInfos replaces the original layers with the specified BlobInfos (size+digest+urls), in order (the root layer first, and then successive layered layers)
 	UpdateLayerInfos(layerInfos []types.BlobInfo) error
 
+	// ImageID computes an ID which can uniquely identify this image by its contents, irrespective
+	// of which (of possibly more than one simultaneously valid) reference was used to locate the
+	// image, and unchanged by whether or how the layers are compressed.  The result takes the form
+	// of the hexadecimal portion of a digest.Digest.
+	ImageID(diffIDs []digest.Digest) (string, error)
+
 	// Inspect returns various information for (skopeo inspect) parsed from the manifest,
 	// incorporating information from a configuration blob returned by configGetter, if
 	// the underlying image format is expected to include a configuration blob.

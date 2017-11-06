@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/containers/image/types"
+	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -108,4 +109,12 @@ func (m *OCI1) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*type
 		Layers:        LayerInfosToStrings(m.LayerInfos()),
 	}
 	return i, nil
+}
+
+// ImageID computes an ID which can uniquely identify this image by its contents.
+func (m *OCI1) ImageID([]digest.Digest) (string, error) {
+	if err := m.Config.Digest.Validate(); err != nil {
+		return "", err
+	}
+	return m.Config.Digest.Hex(), nil
 }

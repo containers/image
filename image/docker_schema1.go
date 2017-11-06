@@ -2,7 +2,6 @@ package image
 
 import (
 	"encoding/json"
-	"strings"
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
@@ -161,12 +160,9 @@ func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.Bl
 		return nil, errors.Errorf("Internal error: collected %d DiffID values, but schema1 manifest has %d fsLayers", len(layerDiffIDs), len(m.m.FSLayers))
 	}
 
-	rootFS := manifest.Schema2RootFS{
-		Type:    "layers",
-		DiffIDs: []digest.Digest{},
-	}
+	// Build a list of the diffIDs for the non-empty layers.
+	diffIDs := []digest.Digest{}
 	var layers []manifest.Schema2Descriptor
-	history := make([]manifest.Schema2History, len(m.m.History))
 	for v1Index := len(m.m.History) - 1; v1Index >= 0; v1Index-- {
 		v2Index := (len(m.m.History) - 1) - v1Index
 
@@ -174,14 +170,6 @@ func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.Bl
 		if err := json.Unmarshal([]byte(m.m.History[v1Index].V1Compatibility), &v1compat); err != nil {
 			return nil, errors.Wrapf(err, "Error decoding history entry %d", v1Index)
 		}
-		history[v2Index] = manifest.Schema2History{
-			Created:    v1compat.Created,
-			Author:     v1compat.Author,
-			CreatedBy:  strings.Join(v1compat.ContainerConfig.Cmd, " "),
-			Comment:    v1compat.Comment,
-			EmptyLayer: v1compat.ThrowAway,
-		}
-
 		if !v1compat.ThrowAway {
 			var size int64
 			if uploadedLayerInfos != nil {
@@ -196,10 +184,10 @@ func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.Bl
 				Size:      size,
 				Digest:    m.m.FSLayers[v1Index].BlobSum,
 			})
-			rootFS.DiffIDs = append(rootFS.DiffIDs, d)
+			diffIDs = append(diffIDs, d)
 		}
 	}
-	configJSON, err := configJSONFromV1Config([]byte(m.m.History[0].V1Compatibility), rootFS, history)
+	configJSON, err := m.m.ToSchema2(diffIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -210,34 +198,4 @@ func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.Bl
 	}
 
 	return manifestSchema2FromComponents(configDescriptor, nil, configJSON, layers), nil
-}
-
-func configJSONFromV1Config(v1ConfigJSON []byte, rootFS manifest.Schema2RootFS, history []manifest.Schema2History) ([]byte, error) {
-	// github.com/docker/docker/image/v1/imagev1.go:MakeConfigFromV1Config unmarshals and re-marshals the input if docker_version is < 1.8.3 to remove blank fields;
-	// we don't do that here. FIXME? Should we? AFAICT it would only affect the digest value of the schema2 manifest, and we don't particularly need that to be
-	// a consistently reproducible value.
-
-	// Preserve everything we don't specifically know about.
-	// (This must be a *json.RawMessage, even though *[]byte is fairly redundant, because only *RawMessage implements json.Marshaler.)
-	rawContents := map[string]*json.RawMessage{}
-	if err := json.Unmarshal(v1ConfigJSON, &rawContents); err != nil { // We have already unmarshaled it before, using a more detailed schema?!
-		return nil, err
-	}
-
-	delete(rawContents, "id")
-	delete(rawContents, "parent")
-	delete(rawContents, "Size")
-	delete(rawContents, "parent_id")
-	delete(rawContents, "layer_id")
-	delete(rawContents, "throwaway")
-
-	updates := map[string]interface{}{"rootfs": rootFS, "history": history}
-	for field, value := range updates {
-		encoded, err := json.Marshal(value)
-		if err != nil {
-			return nil, err
-		}
-		rawContents[field] = (*json.RawMessage)(&encoded)
-	}
-	return json.Marshal(rawContents)
 }

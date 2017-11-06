@@ -3,10 +3,12 @@ package manifest
 import (
 	"encoding/json"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
+	"github.com/docker/docker/api/types/versions"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
@@ -209,4 +211,100 @@ func (m *Schema1) Inspect(_ func(types.BlobInfo) ([]byte, error)) (*types.ImageI
 		Os:            s1.OS,
 		Layers:        LayerInfosToStrings(m.LayerInfos()),
 	}, nil
+}
+
+// ToSchema2 builds a schema2-style configuration blob using the supplied diffIDs.
+func (m *Schema1) ToSchema2(diffIDs []digest.Digest) ([]byte, error) {
+	// Convert the schema 1 compat info into a schema 2 config, constructing some of the fields
+	// that aren't directly comparable using info from the manifest.
+	if len(m.History) == 0 {
+		return nil, errors.New("image has no layers")
+	}
+	s2 := struct {
+		Schema2Image
+		ID        string `json:"id,omitempty"`
+		Parent    string `json:"parent,omitempty"`
+		ParentID  string `json:"parent_id,omitempty"`
+		LayerID   string `json:"layer_id,omitempty"`
+		ThrowAway bool   `json:"throwaway,omitempty"`
+		Size      int64  `json:",omitempty"`
+	}{}
+	config := []byte(m.History[0].V1Compatibility)
+	err := json.Unmarshal(config, &s2)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error decoding configuration")
+	}
+	// Images created with versions prior to 1.8.3 require us to re-encode the encoded object,
+	// adding some fields that aren't "omitempty".
+	if s2.DockerVersion != "" && versions.LessThan(s2.DockerVersion, "1.8.3") {
+		config, err = json.Marshal(&s2)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error re-encoding compat image config %#v", s2)
+		}
+	}
+	// Build the history.
+	convertedHistory := []Schema2History{}
+	for _, h := range m.History {
+		compat := Schema1V1Compatibility{}
+		if err := json.Unmarshal([]byte(h.V1Compatibility), &compat); err != nil {
+			return nil, errors.Wrapf(err, "error decoding history information")
+		}
+		hitem := Schema2History{
+			Created:    compat.Created,
+			CreatedBy:  strings.Join(compat.ContainerConfig.Cmd, " "),
+			Author:     compat.Author,
+			Comment:    compat.Comment,
+			EmptyLayer: compat.ThrowAway,
+		}
+		convertedHistory = append([]Schema2History{hitem}, convertedHistory...)
+	}
+	// Build the rootfs information.  We need the decompressed sums that we've been
+	// calculating to fill in the DiffIDs.  It's expected (but not enforced by us)
+	// that the number of diffIDs corresponds to the number of non-EmptyLayer
+	// entries in the history.
+	rootFS := &Schema2RootFS{
+		Type:    "layers",
+		DiffIDs: diffIDs,
+	}
+	// And now for some raw manipulation.
+	raw := make(map[string]*json.RawMessage)
+	err = json.Unmarshal(config, &raw)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error re-decoding compat image config %#v: %v", s2)
+	}
+	// Drop some fields.
+	delete(raw, "id")
+	delete(raw, "parent")
+	delete(raw, "parent_id")
+	delete(raw, "layer_id")
+	delete(raw, "throwaway")
+	delete(raw, "Size")
+	// Add the history and rootfs information.
+	rootfs, err := json.Marshal(rootFS)
+	if err != nil {
+		return nil, errors.Errorf("error encoding rootfs information %#v: %v", rootFS, err)
+	}
+	rawRootfs := json.RawMessage(rootfs)
+	raw["rootfs"] = &rawRootfs
+	history, err := json.Marshal(convertedHistory)
+	if err != nil {
+		return nil, errors.Errorf("error encoding history information %#v: %v", convertedHistory, err)
+	}
+	rawHistory := json.RawMessage(history)
+	raw["history"] = &rawHistory
+	// Encode the result.
+	config, err = json.Marshal(raw)
+	if err != nil {
+		return nil, errors.Errorf("error re-encoding compat image config %#v: %v", s2, err)
+	}
+	return config, nil
+}
+
+// ImageID computes an ID which can uniquely identify this image by its contents.
+func (m *Schema1) ImageID(diffIDs []digest.Digest) (string, error) {
+	image, err := m.ToSchema2(diffIDs)
+	if err != nil {
+		return "", err
+	}
+	return digest.FromBytes(image).Hex(), nil
 }

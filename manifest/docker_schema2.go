@@ -241,3 +241,11 @@ func (m *Schema2) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*t
 	}
 	return i, nil
 }
+
+// ImageID computes an ID which can uniquely identify this image by its contents.
+func (m *Schema2) ImageID([]digest.Digest) (string, error) {
+	if err := m.ConfigDescriptor.Digest.Validate(); err != nil {
+		return "", err
+	}
+	return m.ConfigDescriptor.Digest.Hex(), nil
+}
