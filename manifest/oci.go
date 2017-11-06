@@ -105,7 +105,7 @@ func (m *OCI1) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*type
 		Labels:        v1.Config.Labels,
 		Architecture:  v1.Architecture,
 		Os:            v1.OS,
-		Layers:        []string{},
+		Layers:        LayerInfosToStrings(m.LayerInfos()),
 	}
 	return i, nil
 }

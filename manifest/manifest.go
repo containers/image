@@ -220,3 +220,13 @@ func FromBlob(manblob []byte, mt string) (Manifest, error) {
 		return nil, fmt.Errorf("Unimplemented manifest MIME type %s", mt)
 	}
 }
+
+// LayerInfosToStrings converts a list of layer infos, presumably obtained from a Manifest.LayerInfos()
+// method call, into a format suitable for inclusion in a types.ImageInspectInfo structure.
+func LayerInfosToStrings(infos []types.BlobInfo) []string {
+	layers := make([]string, len(infos))
+	for i, info := range infos {
+		layers[i] = info.Digest.String()
+	}
+	return layers
+}

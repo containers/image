@@ -234,7 +234,7 @@ func (m *Schema2) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*t
 		DockerVersion: s2.DockerVersion,
 		Architecture:  s2.Architecture,
 		Os:            s2.OS,
-		Layers:        []string{},
+		Layers:        LayerInfosToStrings(m.LayerInfos()),
 	}
 	if s2.Config != nil {
 		i.Labels = s2.Config.Labels

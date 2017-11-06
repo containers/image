@@ -207,6 +207,6 @@ func (m *Schema1) Inspect(_ func(types.BlobInfo) ([]byte, error)) (*types.ImageI
 		Labels:        make(map[string]string),
 		Architecture:  s1.Architecture,
 		Os:            s1.OS,
-		Layers:        []string{},
+		Layers:        LayerInfosToStrings(m.LayerInfos()),
 	}, nil
 }
