@@ -49,9 +49,9 @@ Regardless of the type of PR, all PRs should include:
 * documentation changes
 
 Squash your commits into logical pieces of work that might want to be reviewed
-separate from the rest of the PRs. But, squashing down to just one commit is ok
-too since in the end the entire PR will be reviewed anyway. When in doubt,
-squash.
+separate from the rest of the PRs. Ideally, each commit should implement a single
+idea, and the PR branch should pass the tests at every commit.  GitHub makes it easy
+to review the cumulative effect of many commits; so, when in doubt, use smaller commits.
 
 PRs that fix issues should include a reference like `Closes #XXXX` in the
 commit message so that github will automatically close the referenced issue
