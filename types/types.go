@@ -285,7 +285,7 @@ type DockerAuthConfig struct {
 	Password string
 }
 
-// SystemContext allows parametrizing access to implicitly-accessed resources,
+// SystemContext allows parameterizing access to implicitly-accessed resources,
 // like configuration files in /etc and users' login state in their home directory.
 // Various components can share the same field only if their semantics is exactly
 // the same; if in doubt, add a new field.
@@ -324,8 +324,9 @@ type SystemContext struct {
 	DockerCertPath string
 	// If not "", overrides the system’s default path for a directory containing host[:port] subdirectories with the same structure as DockerCertPath above.
 	// Ignored if DockerCertPath is non-empty.
-	DockerPerHostCertDirPath    string
-	DockerInsecureSkipTLSVerify bool // Allow contacting docker registries over HTTP, or HTTPS with failed TLS verification. Note that this does not affect other TLS connections.
+	DockerPerHostCertDirPath string
+	// Allow contacting docker registries over HTTP, or HTTPS with failed TLS verification. Note that this does not affect other TLS connections.
+	DockerInsecureSkipTLSVerify bool
 	// if nil, the library tries to parse ~/.docker/config.json to retrieve credentials
 	DockerAuthConfig *DockerAuthConfig
 	// if not "", an User-Agent header is added to each request when contacting a registry.
@@ -336,6 +337,16 @@ type SystemContext struct {
 	DockerDisableV1Ping bool
 	// Directory to use for OSTree temporary files
 	OSTreeTmpDirPath string
+
+	// === docker/daemon.Transport overrides ===
+	// A directory containing a CA certificate (ending with ".crt"),
+	// a client certificate (ending with ".cert") and a client certificate key
+	// (ending with ".key") used when talking to a Docker daemon.
+	DockerDaemonCertPath string
+	// The hostname or IP to the Docker daemon. If not set (aka ""), client.DefaultDockerHost is assumed.
+	DockerDaemonHost string
+	// Used to skip TLS verification, off by default. To take effect DockerDaemonCertPath needs to be specified as well.
+	DockerDaemonInsecureSkipTLSVerify bool
 }
 
 // ProgressProperties is used to pass information from the copy code to a monitor which
