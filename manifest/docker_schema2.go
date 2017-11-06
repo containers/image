@@ -228,13 +228,16 @@ func (m *Schema2) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*t
 	if err := json.Unmarshal(config, s2); err != nil {
 		return nil, err
 	}
-	return &types.ImageInspectInfo{
+	i := &types.ImageInspectInfo{
 		Tag:           "",
 		Created:       s2.Created,
 		DockerVersion: s2.DockerVersion,
-		Labels:        s2.Config.Labels,
 		Architecture:  s2.Architecture,
 		Os:            s2.OS,
 		Layers:        []string{},
-	}, nil
+	}
+	if s2.Config != nil {
+		i.Labels = s2.Config.Labels
+	}
+	return i, nil
 }

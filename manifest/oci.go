@@ -96,7 +96,7 @@ func (m *OCI1) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*type
 	if v1.Created != nil {
 		created = *v1.Created
 	}
-	return &types.ImageInspectInfo{
+	i := &types.ImageInspectInfo{
 		Tag:           "",
 		Created:       created,
 		DockerVersion: "",
@@ -104,5 +104,6 @@ func (m *OCI1) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*type
 		Architecture:  v1.Architecture,
 		Os:            v1.OS,
 		Layers:        []string{},
-	}, nil
+	}
+	return i, nil
 }
