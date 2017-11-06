@@ -231,3 +231,11 @@ func TestReferenceSignaturePath(t *testing.T) {
 	assert.Equal(t, tmpDir+"/signature-1", dirRef.signaturePath(0))
 	assert.Equal(t, tmpDir+"/signature-10", dirRef.signaturePath(9))
 }
+
+func TestReferenceVersionPath(t *testing.T) {
+	ref, tmpDir := refToTempDir(t)
+	defer os.RemoveAll(tmpDir)
+	dirRef, ok := ref.(dirReference)
+	require.True(t, ok)
+	assert.Equal(t, tmpDir+"/version", dirRef.versionPath())
+}

@@ -136,7 +136,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 	for _, c := range cases {
 		src := fakeImageSource(c.sourceType)
 		mu := types.ManifestUpdateOptions{}
-		preferredMIMEType, otherCandidates, err := determineManifestConversion(&mu, src, c.destTypes, true)
+		preferredMIMEType, otherCandidates, err := determineManifestConversion(&mu, src, c.destTypes, true, "")
 		require.NoError(t, err, c.description)
 		assert.Equal(t, c.expectedUpdate, mu.ManifestMIMEType, c.description)
 		if c.expectedUpdate == "" {
@@ -151,15 +151,26 @@ func TestDetermineManifestConversion(t *testing.T) {
 	for _, c := range cases {
 		src := fakeImageSource(c.sourceType)
 		mu := types.ManifestUpdateOptions{}
-		preferredMIMEType, otherCandidates, err := determineManifestConversion(&mu, src, c.destTypes, false)
+		preferredMIMEType, otherCandidates, err := determineManifestConversion(&mu, src, c.destTypes, false, "")
 		require.NoError(t, err, c.description)
 		assert.Equal(t, "", mu.ManifestMIMEType, c.description)
 		assert.Equal(t, c.sourceType, preferredMIMEType, c.description)
 		assert.Equal(t, []string{}, otherCandidates, c.description)
 	}
 
+	// With forceManifestMIMEType, the output is always the forced manifest type (in this case oci manifest)
+	for _, c := range cases {
+		src := fakeImageSource(c.sourceType)
+		mu := types.ManifestUpdateOptions{}
+		preferredMIMEType, otherCandidates, err := determineManifestConversion(&mu, src, c.destTypes, true, v1.MediaTypeImageManifest)
+		require.NoError(t, err, c.description)
+		assert.Equal(t, v1.MediaTypeImageManifest, mu.ManifestMIMEType, c.description)
+		assert.Equal(t, v1.MediaTypeImageManifest, preferredMIMEType, c.description)
+		assert.Equal(t, []string{}, otherCandidates, c.description)
+	}
+
 	// Error reading the manifest — smoke test only.
 	mu := types.ManifestUpdateOptions{}
-	_, _, err := determineManifestConversion(&mu, fakeImageSource(""), supportS1S2, true)
+	_, _, err := determineManifestConversion(&mu, fakeImageSource(""), supportS1S2, true, "")
 	assert.Error(t, err)
 }
