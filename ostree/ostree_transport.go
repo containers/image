@@ -116,7 +116,7 @@ func NewReference(image string, repo string) (types.ImageReference, error) {
 	// This is necessary to prevent directory paths returned by PolicyConfigurationNamespaces
 	// from being ambiguous with values of PolicyConfigurationIdentity.
 	if strings.Contains(resolved, ":") {
-		return nil, errors.Errorf("Invalid OSTreeCI reference %s@%s: path %s contains a colon", image, repo, resolved)
+		return nil, errors.Errorf("Invalid OSTree reference %s@%s: path %s contains a colon", image, repo, resolved)
 	}
 
 	return ostreeReference{
