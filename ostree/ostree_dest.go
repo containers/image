@@ -46,12 +46,13 @@ type manifestSchema struct {
 }
 
 type ostreeImageDestination struct {
-	ref        ostreeReference
-	manifest   string
-	schema     manifestSchema
-	tmpDirPath string
-	blobs      map[string]*blobToImport
-	digest     digest.Digest
+	ref           ostreeReference
+	manifest      string
+	schema        manifestSchema
+	tmpDirPath    string
+	blobs         map[string]*blobToImport
+	digest        digest.Digest
+	signaturesLen int
 }
 
 // newImageDestination returns an ImageDestination for writing to an existing ostree.
@@ -60,7 +61,7 @@ func newImageDestination(ref ostreeReference, tmpDirPath string) (types.ImageDes
 	if err := ensureDirectoryExists(tmpDirPath); err != nil {
 		return nil, err
 	}
-	return &ostreeImageDestination{ref, "", manifestSchema{}, tmpDirPath, map[string]*blobToImport{}, ""}, nil
+	return &ostreeImageDestination{ref, "", manifestSchema{}, tmpDirPath, map[string]*blobToImport{}, "", 0}, nil
 }
 
 // Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
@@ -311,6 +312,7 @@ func (d *ostreeImageDestination) PutSignatures(signatures [][]byte) error {
 			return err
 		}
 	}
+	d.signaturesLen = len(signatures)
 	return nil
 }
 
@@ -350,7 +352,9 @@ func (d *ostreeImageDestination) Commit() error {
 
 	manifestPath := filepath.Join(d.tmpDirPath, "manifest")
 
-	metadata := []string{fmt.Sprintf("docker.manifest=%s", string(d.manifest)), fmt.Sprintf("docker.digest=%s", string(d.digest))}
+	metadata := []string{fmt.Sprintf("docker.manifest=%s", string(d.manifest)),
+		fmt.Sprintf("signatures=%d", d.signaturesLen),
+		fmt.Sprintf("docker.digest=%s", string(d.digest))}
 	err = d.ostreeCommit(repo, fmt.Sprintf("ociimage/%s", d.ref.branchName), manifestPath, metadata)
 
 	_, err = repo.CommitTransaction()

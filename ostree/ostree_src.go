@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -75,6 +76,22 @@ func (s *ostreeImageSource) getLayerSize(blob string) (int64, error) {
 	out, err := exec.Command("ostree", "show", "--repo", s.ref.repo, "--print-metadata-key=docker.size", b).CombinedOutput()
 	if err != nil {
 		return 0, err
+	}
+
+	data := parseGVariantString(string(out))
+	size, err := strconv.ParseInt(data, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return size, nil
+}
+
+func (s *ostreeImageSource) getLenSignatures() (int64, error) {
+	b := fmt.Sprintf("ociimage/%s", s.ref.branchName)
+	out, err := exec.Command("ostree", "show", "--repo", s.ref.repo, "--print-metadata-key=signatures", b).CombinedOutput()
+	if err != nil {
+		// if 'signatures' is not present, just return 0 signatures.
+		return 0, nil
 	}
 
 	data := parseGVariantString(string(out))
@@ -278,5 +295,36 @@ func (s *ostreeImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, 
 }
 
 func (s *ostreeImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
-	return [][]byte{}, nil
+	if instanceDigest != nil {
+		return nil, errors.New("manifest lists are not supported by this transport")
+	}
+	lenSignatures, err := s.getLenSignatures()
+	if err != nil {
+		return nil, err
+	}
+	branch := fmt.Sprintf("ociimage/%s", s.ref.branchName)
+
+	if s.repo == nil {
+		repo, err := openRepo(s.ref.repo)
+		if err != nil {
+			return nil, err
+		}
+		s.repo = repo
+	}
+
+	signatures := [][]byte{}
+	for i := int64(1); i <= lenSignatures; i++ {
+		sigReader, err := s.readSingleFile(branch, fmt.Sprintf("/signature-%d", i))
+		if err != nil {
+			return nil, err
+		}
+		defer sigReader.Close()
+
+		sig, err := ioutil.ReadAll(sigReader)
+		if err != nil {
+			return nil, err
+		}
+		signatures = append(signatures, sig)
+	}
+	return signatures, nil
 }
