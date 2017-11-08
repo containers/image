@@ -339,11 +339,12 @@ func (d *ostreeImageDestination) Commit() error {
 		if err != nil {
 			return err
 		}
+
+		delete(d.blobs, hash)
 	}
 
-	hash := d.schema.ConfigDescriptor.Digest.Hex()
-	blob := d.blobs[hash]
-	if blob != nil {
+	// Import the other blobs that are not layers
+	for _, blob := range d.blobs {
 		err := d.importConfig(repo, blob)
 		if err != nil {
 			return err
