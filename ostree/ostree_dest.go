@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/containers/image/manifest"
@@ -28,6 +27,15 @@ import (
 	"github.com/vbatts/tar-split/tar/asm"
 	"github.com/vbatts/tar-split/tar/storage"
 )
+
+// #cgo pkg-config: glib-2.0 gobject-2.0 ostree-1
+// #include <glib.h>
+// #include <glib-object.h>
+// #include <gio/gio.h>
+// #include <stdlib.h>
+// #include <ostree.h>
+// #include <gio/ginputstream.h>
+import "C"
 
 type blobToImport struct {
 	Size     int64
@@ -53,6 +61,7 @@ type ostreeImageDestination struct {
 	blobs         map[string]*blobToImport
 	digest        digest.Digest
 	signaturesLen int
+	repo          *C.struct_OstreeRepo
 }
 
 // newImageDestination returns an ImageDestination for writing to an existing ostree.
@@ -61,7 +70,7 @@ func newImageDestination(ref ostreeReference, tmpDirPath string) (types.ImageDes
 	if err := ensureDirectoryExists(tmpDirPath); err != nil {
 		return nil, err
 	}
-	return &ostreeImageDestination{ref, "", manifestSchema{}, tmpDirPath, map[string]*blobToImport{}, "", 0}, nil
+	return &ostreeImageDestination{ref, "", manifestSchema{}, tmpDirPath, map[string]*blobToImport{}, "", 0, nil}, nil
 }
 
 // Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
@@ -72,6 +81,9 @@ func (d *ostreeImageDestination) Reference() types.ImageReference {
 
 // Close removes resources associated with an initialized ImageDestination, if any.
 func (d *ostreeImageDestination) Close() error {
+	if d.repo != nil {
+		C.g_object_unref(C.gpointer(d.repo))
+	}
 	return os.RemoveAll(d.tmpDirPath)
 }
 
@@ -255,15 +267,22 @@ func (d *ostreeImageDestination) importConfig(repo *otbuiltin.Repo, blob *blobTo
 }
 
 func (d *ostreeImageDestination) HasBlob(info types.BlobInfo) (bool, int64, error) {
-	branch := fmt.Sprintf("ociimage/%s", info.Digest.Hex())
-	output, err := exec.Command("ostree", "show", "--repo", d.ref.repo, "--print-metadata-key=docker.size", branch).CombinedOutput()
-	if err != nil {
-		if bytes.Index(output, []byte("not found")) >= 0 || bytes.Index(output, []byte("No such")) >= 0 {
-			return false, -1, nil
+
+	if d.repo == nil {
+		repo, err := openRepo(d.ref.repo)
+		if err != nil {
+			return false, 0, err
 		}
-		return false, -1, err
+		d.repo = repo
 	}
-	size, err := strconv.ParseInt(strings.Trim(string(output), "'\n"), 10, 64)
+	branch := fmt.Sprintf("ociimage/%s", info.Digest.Hex())
+
+	found, data, err := readMetadata(d.repo, branch, "docker.size")
+	if err != nil || !found {
+		return found, -1, err
+	}
+
+	size, err := strconv.ParseInt(data, 10, 64)
 	if err != nil {
 		return false, -1, err
 	}

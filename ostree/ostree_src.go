@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os/exec"
 	"strconv"
 	"strings"
 	"unsafe"
@@ -33,18 +32,6 @@ import (
 // #include <ostree.h>
 // #include <gio/ginputstream.h>
 import "C"
-
-func parseGVariantString(in string) string {
-	cstring := C.CString(in)
-	defer C.free(unsafe.Pointer(cstring))
-
-	variant := C.g_variant_parse(nil, (*C.gchar)(cstring), nil, nil, nil)
-	defer C.g_variant_unref(variant)
-
-	ptr := (*C.char)(C.g_variant_get_string(variant, nil))
-
-	return C.GoString(ptr)
-}
 
 type ostreeImageSource struct {
 	ref    ostreeReference
@@ -72,48 +59,33 @@ func (s *ostreeImageSource) Close() error {
 
 func (s *ostreeImageSource) getLayerSize(blob string) (int64, error) {
 	b := fmt.Sprintf("ociimage/%s", blob)
-	// Use golang bindings once they support to read metadata
-	out, err := exec.Command("ostree", "show", "--repo", s.ref.repo, "--print-metadata-key=docker.size", b).CombinedOutput()
-	if err != nil {
+	found, data, err := readMetadata(s.repo, b, "docker.size")
+	if err != nil || !found {
 		return 0, err
 	}
-
-	data := parseGVariantString(string(out))
-	size, err := strconv.ParseInt(data, 10, 64)
-	if err != nil {
-		return 0, err
-	}
-	return size, nil
+	return strconv.ParseInt(data, 10, 64)
 }
 
 func (s *ostreeImageSource) getLenSignatures() (int64, error) {
 	b := fmt.Sprintf("ociimage/%s", s.ref.branchName)
-	out, err := exec.Command("ostree", "show", "--repo", s.ref.repo, "--print-metadata-key=signatures", b).CombinedOutput()
+	found, data, err := readMetadata(s.repo, b, "signatures")
 	if err != nil {
+		return -1, err
+	}
+	if !found {
 		// if 'signatures' is not present, just return 0 signatures.
 		return 0, nil
 	}
-
-	data := parseGVariantString(string(out))
-	size, err := strconv.ParseInt(data, 10, 64)
-	if err != nil {
-		return 0, err
-	}
-	return size, nil
+	return strconv.ParseInt(data, 10, 64)
 }
 
 func (s *ostreeImageSource) getTarSplitData(blob string) ([]byte, error) {
 	b := fmt.Sprintf("ociimage/%s", blob)
-	// Use golang bindings once they support to read metadata
-	out, err := exec.Command("ostree", "show", "--repo", s.ref.repo, "--print-metadata-key=tarsplit.output", b).CombinedOutput()
-	if err != nil {
-		if strings.Index(string(out), "No such metadata key") >= 0 {
-			return nil, nil
-		}
+	found, out, err := readMetadata(s.repo, b, "tarsplit.output")
+	if err != nil || !found {
 		return nil, err
 	}
-	data := parseGVariantString(string(out))
-	return base64.StdEncoding.DecodeString(data)
+	return base64.StdEncoding.DecodeString(out)
 }
 
 // GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).
@@ -122,13 +94,23 @@ func (s *ostreeImageSource) GetManifest(instanceDigest *digest.Digest) ([]byte, 
 	if instanceDigest != nil {
 		return nil, "", errors.Errorf(`Manifest lists are not supported by "ostree:"`)
 	}
+	if s.repo == nil {
+		repo, err := openRepo(s.ref.repo)
+		if err != nil {
+			return nil, "", err
+		}
+		s.repo = repo
+	}
+
 	b := fmt.Sprintf("ociimage/%s", s.ref.branchName)
-	// Use golang bindings once they support to read metadata
-	out, err := exec.Command("ostree", "show", "--repo", s.ref.repo, "--print-metadata-key=docker.manifest", b).Output()
+	found, out, err := readMetadata(s.repo, b, "docker.manifest")
 	if err != nil {
 		return nil, "", err
 	}
-	m := []byte(parseGVariantString(string(out)))
+	if !found {
+		return nil, "", errors.New("manifest not found")
+	}
+	m := []byte(out)
 	return m, manifest.GuessMIMEType(m), nil
 }
 
@@ -184,6 +166,45 @@ func (o ostreeReader) Read(p []byte) (int, error) {
 	return count, nil
 }
 
+func readMetadata(repo *C.struct_OstreeRepo, commit, key string) (bool, string, error) {
+	var cerr *C.GError
+	var ref *C.char
+	defer C.free(unsafe.Pointer(ref))
+
+	cCommit := C.CString(commit)
+	defer C.free(unsafe.Pointer(cCommit))
+
+	if !glib.GoBool(glib.GBoolean(C.ostree_repo_resolve_rev(repo, cCommit, C.gboolean(1), &ref, &cerr))) {
+		return false, "", glib.ConvertGError(glib.ToGError(unsafe.Pointer(cerr)))
+	}
+
+	if ref == nil {
+		return false, "", nil
+	}
+
+	var variant *C.GVariant
+	if !glib.GoBool(glib.GBoolean(C.ostree_repo_load_variant(repo, C.OSTREE_OBJECT_TYPE_COMMIT, ref, &variant, &cerr))) {
+		return false, "", glib.ConvertGError(glib.ToGError(unsafe.Pointer(cerr)))
+	}
+	defer C.g_variant_unref(variant)
+	if variant != nil {
+		cKey := C.CString(key)
+		defer C.free(unsafe.Pointer(cKey))
+
+		metadata := C.g_variant_get_child_value(variant, 0)
+		defer C.g_variant_unref(metadata)
+
+		data := C.g_variant_lookup_value(metadata, (*C.gchar)(cKey), nil)
+		if data != nil {
+			defer C.g_variant_unref(data)
+			ptr := (*C.char)(C.g_variant_get_string(data, nil))
+			val := C.GoString(ptr)
+			return true, val, nil
+		}
+	}
+	return false, "", nil
+}
+
 func newOSTreePathFileGetter(repo *C.struct_OstreeRepo, commit string) (*ostreePathFileGetter, error) {
 	var cerr *C.GError
 	var parentRoot *C.GFile
@@ -218,7 +239,7 @@ func (o ostreePathFileGetter) Get(filename string) (io.ReadCloser, error) {
 }
 
 func (o ostreePathFileGetter) Close() {
-	C.g_object_ref(C.gpointer(o.repo))
+	C.g_object_unref(C.gpointer(o.repo))
 	C.g_object_unref(C.gpointer(o.parentRoot))
 }
 
