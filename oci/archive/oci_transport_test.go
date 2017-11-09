@@ -23,10 +23,7 @@ func TestTransportParseReference(t *testing.T) {
 func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 	for _, scope := range []string{
 		"/etc",
-		"/etc:notlatest",
 		"/this/does/not/exist",
-		"/this/does/not/exist:notlatest",
-		"/:strangecornercase",
 	} {
 		err := Transport.ValidatePolicyConfigurationScope(scope)
 		assert.NoError(t, err, scope)
@@ -39,9 +36,6 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 		"/has/./dot",
 		"/has/dot/../dot",
 		"/trailing/slash/",
-		"/etc:invalid'image!value@",
-		"/etc_no_image:",
-		"/etc:multiple_:separators",
 	} {
 		err := Transport.ValidatePolicyConfigurationScope(scope)
 		assert.Error(t, err, scope)
