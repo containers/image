@@ -48,9 +48,13 @@ type descriptor struct {
 	Digest digest.Digest `json:"digest"`
 }
 
+type fsLayersSchema1 struct {
+	BlobSum digest.Digest `json:"blobSum"`
+}
+
 type manifestSchema struct {
-	ConfigDescriptor  descriptor   `json:"config"`
-	LayersDescriptors []descriptor `json:"layers"`
+	LayersDescriptors []descriptor      `json:"layers"`
+	FSLayers          []fsLayersSchema1 `json:"fsLayers"`
 }
 
 type ostreeImageDestination struct {
@@ -346,13 +350,12 @@ func (d *ostreeImageDestination) Commit() error {
 		return err
 	}
 
-	for _, layer := range d.schema.LayersDescriptors {
-		hash := layer.Digest.Hex()
+	checkLayer := func(hash string) error {
 		blob := d.blobs[hash]
 		// if the blob is not present in d.blobs then it is already stored in OSTree,
 		// and we don't need to import it.
 		if blob == nil {
-			continue
+			return nil
 		}
 		err := d.importBlob(repo, blob)
 		if err != nil {
@@ -360,6 +363,19 @@ func (d *ostreeImageDestination) Commit() error {
 		}
 
 		delete(d.blobs, hash)
+		return nil
+	}
+	for _, layer := range d.schema.LayersDescriptors {
+		hash := layer.Digest.Hex()
+		if err = checkLayer(hash); err != nil {
+			return err
+		}
+	}
+	for _, layer := range d.schema.FSLayers {
+		hash := layer.BlobSum.Hex()
+		if err = checkLayer(hash); err != nil {
+			return err
+		}
 	}
 
 	// Import the other blobs that are not layers
