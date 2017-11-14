@@ -349,6 +349,10 @@ type SystemContext struct {
 	DockerDaemonHost string
 	// Used to skip TLS verification, off by default. To take effect DockerDaemonCertPath needs to be specified as well.
 	DockerDaemonInsecureSkipTLSVerify bool
+
+	// === dir.Transport overrides ===
+	// DirForceCompress compresses the image layers if set to true
+	DirForceCompress bool
 }
 
 // ProgressProperties is used to pass information from the copy code to a monitor which
