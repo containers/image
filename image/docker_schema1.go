@@ -223,7 +223,10 @@ func (m *manifestSchema1) UpdatedImage(options types.ManifestUpdateOptions) (typ
 		if err != nil {
 			return nil, err
 		}
-		return m2.UpdatedImage(options)
+		return m2.UpdatedImage(types.ManifestUpdateOptions{
+			ManifestMIMEType: imgspecv1.MediaTypeImageManifest,
+			InformationOnly:  options.InformationOnly,
+		})
 	default:
 		return nil, errors.Errorf("Conversion of image manifest from %s to %s is not implemented", manifest.DockerV2Schema1SignedMediaType, options.ManifestMIMEType)
 	}
