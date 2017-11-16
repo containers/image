@@ -44,9 +44,30 @@ func newReference(transport storageTransport, reference, id string, name referen
 // one present with the same name or ID, and return the image.
 func (s *storageReference) resolveImage() (*storage.Image, error) {
 	if s.id == "" {
+		// Look for an image that has the expanded reference name as an explicit Name value.
 		image, err := s.transport.store.Image(s.reference)
 		if image != nil && err == nil {
 			s.id = image.ID
+		}
+	}
+	if s.id == "" && s.name != nil && s.digest != "" {
+		// Look for an image with the specified digest that has the same name,
+		// though possibly with a different tag or digest, as a Name value, so
+		// that the canonical reference can be implicitly resolved to the image.
+		images, err := s.transport.store.ImagesByDigest(s.digest)
+		if images != nil && err == nil {
+			repo := reference.FamiliarName(reference.TrimNamed(s.name))
+		search:
+			for _, image := range images {
+				for _, name := range image.Names {
+					if named, err := reference.ParseNormalizedNamed(name); err == nil {
+						if reference.FamiliarName(reference.TrimNamed(named)) == repo {
+							s.id = image.ID
+							break search
+						}
+					}
+				}
+			}
 		}
 	}
 	if s.id == "" {
@@ -57,12 +78,15 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading image %q", s.id)
 	}
-	if s.reference != "" {
+	if s.name != nil {
+		repo := reference.FamiliarName(reference.TrimNamed(s.name))
 		nameMatch := false
 		for _, name := range img.Names {
-			if name == s.reference {
-				nameMatch = true
-				break
+			if named, err := reference.ParseNormalizedNamed(name); err == nil {
+				if reference.FamiliarName(reference.TrimNamed(named)) == repo {
+					nameMatch = true
+					break
+				}
 			}
 		}
 		if !nameMatch {

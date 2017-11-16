@@ -337,17 +337,23 @@ func (s *storageTransport) ParseReference(reference string) (types.ImageReferenc
 
 func (s storageTransport) GetStoreImage(store storage.Store, ref types.ImageReference) (*storage.Image, error) {
 	dref := ref.DockerReference()
-	if dref == nil {
-		if sref, ok := ref.(*storageReference); ok {
-			if sref.id != "" {
-				if img, err := store.Image(sref.id); err == nil {
-					return img, nil
-				}
+	if dref != nil {
+		if img, err := store.Image(verboseName(dref)); err == nil {
+			return img, nil
+		}
+	}
+	if sref, ok := ref.(*storageReference); ok {
+		if sref.id != "" {
+			if img, err := store.Image(sref.id); err == nil {
+				return img, nil
 			}
 		}
-		return nil, ErrInvalidReference
+		tmpRef := *sref
+		if img, err := tmpRef.resolveImage(); err == nil {
+			return img, nil
+		}
 	}
-	return store.Image(verboseName(dref))
+	return nil, storage.ErrImageUnknown
 }
 
 func (s *storageTransport) GetImage(ref types.ImageReference) (*storage.Image, error) {

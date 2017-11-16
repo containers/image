@@ -163,7 +163,8 @@ func (s *storageImageSource) GetManifest(instanceDigest *digest.Digest) (manifes
 		return nil, "", ErrNoManifestLists
 	}
 	if len(s.cachedManifest) == 0 {
-		cachedBlob, err := s.imageRef.transport.store.ImageBigData(s.ID, "manifest")
+		// We stored the manifest as an item named after storage.ImageDigestBigDataKey.
+		cachedBlob, err := s.imageRef.transport.store.ImageBigData(s.ID, storage.ImageDigestBigDataKey)
 		if err != nil {
 			return nil, "", err
 		}
@@ -639,8 +640,9 @@ func (s *storageImageDestination) Commit() error {
 		}
 		logrus.Debugf("set names of image %q to %v", img.ID, names)
 	}
-	// Save the manifest.
-	if err := s.imageRef.transport.store.SetImageBigData(img.ID, "manifest", s.manifest); err != nil {
+	// Save the manifest.  Use storage.ImageDigestBigDataKey as the item's
+	// name, so that its digest can be used to locate the image in the Store.
+	if err := s.imageRef.transport.store.SetImageBigData(img.ID, storage.ImageDigestBigDataKey, s.manifest); err != nil {
 		if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
 			logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
 		}
