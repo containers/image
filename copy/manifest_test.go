@@ -35,9 +35,6 @@ type fakeImageSource string
 func (f fakeImageSource) Reference() types.ImageReference {
 	panic("Unexpected call to a mock function")
 }
-func (f fakeImageSource) Close() error {
-	panic("Unexpected call to a mock function")
-}
 func (f fakeImageSource) Manifest() ([]byte, string, error) {
 	if string(f) == "" {
 		return nil, "", errors.New("Manifest() directed to fail")
@@ -69,9 +66,6 @@ func (f fakeImageSource) UpdatedImageNeedsLayerDiffIDs(options types.ManifestUpd
 	panic("Unexpected call to a mock function")
 }
 func (f fakeImageSource) UpdatedImage(options types.ManifestUpdateOptions) (types.Image, error) {
-	panic("Unexpected call to a mock function")
-}
-func (f fakeImageSource) IsMultiImage() bool {
 	panic("Unexpected call to a mock function")
 }
 func (f fakeImageSource) Size() (int64, error) {
@@ -135,10 +129,14 @@ func TestDetermineManifestConversion(t *testing.T) {
 
 	for _, c := range cases {
 		src := fakeImageSource(c.sourceType)
-		mu := types.ManifestUpdateOptions{}
-		preferredMIMEType, otherCandidates, err := determineManifestConversion(&mu, src, c.destTypes, true, "")
+		ic := &imageCopier{
+			manifestUpdates:   &types.ManifestUpdateOptions{},
+			src:               src,
+			canModifyManifest: true,
+		}
+		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(c.destTypes, "")
 		require.NoError(t, err, c.description)
-		assert.Equal(t, c.expectedUpdate, mu.ManifestMIMEType, c.description)
+		assert.Equal(t, c.expectedUpdate, ic.manifestUpdates.ManifestMIMEType, c.description)
 		if c.expectedUpdate == "" {
 			assert.Equal(t, c.sourceType, preferredMIMEType, c.description)
 		} else {
@@ -150,10 +148,14 @@ func TestDetermineManifestConversion(t *testing.T) {
 	// Whatever the input is, with !canModifyManifest we return "keep the original as is"
 	for _, c := range cases {
 		src := fakeImageSource(c.sourceType)
-		mu := types.ManifestUpdateOptions{}
-		preferredMIMEType, otherCandidates, err := determineManifestConversion(&mu, src, c.destTypes, false, "")
+		ic := &imageCopier{
+			manifestUpdates:   &types.ManifestUpdateOptions{},
+			src:               src,
+			canModifyManifest: false,
+		}
+		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(c.destTypes, "")
 		require.NoError(t, err, c.description)
-		assert.Equal(t, "", mu.ManifestMIMEType, c.description)
+		assert.Equal(t, "", ic.manifestUpdates.ManifestMIMEType, c.description)
 		assert.Equal(t, c.sourceType, preferredMIMEType, c.description)
 		assert.Equal(t, []string{}, otherCandidates, c.description)
 	}
@@ -161,16 +163,45 @@ func TestDetermineManifestConversion(t *testing.T) {
 	// With forceManifestMIMEType, the output is always the forced manifest type (in this case oci manifest)
 	for _, c := range cases {
 		src := fakeImageSource(c.sourceType)
-		mu := types.ManifestUpdateOptions{}
-		preferredMIMEType, otherCandidates, err := determineManifestConversion(&mu, src, c.destTypes, true, v1.MediaTypeImageManifest)
+		ic := &imageCopier{
+			manifestUpdates:   &types.ManifestUpdateOptions{},
+			src:               src,
+			canModifyManifest: true,
+		}
+		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(c.destTypes, v1.MediaTypeImageManifest)
 		require.NoError(t, err, c.description)
-		assert.Equal(t, v1.MediaTypeImageManifest, mu.ManifestMIMEType, c.description)
+		assert.Equal(t, v1.MediaTypeImageManifest, ic.manifestUpdates.ManifestMIMEType, c.description)
 		assert.Equal(t, v1.MediaTypeImageManifest, preferredMIMEType, c.description)
 		assert.Equal(t, []string{}, otherCandidates, c.description)
 	}
 
 	// Error reading the manifest — smoke test only.
-	mu := types.ManifestUpdateOptions{}
-	_, _, err := determineManifestConversion(&mu, fakeImageSource(""), supportS1S2, true, "")
+	ic := imageCopier{
+		manifestUpdates:   &types.ManifestUpdateOptions{},
+		src:               fakeImageSource(""),
+		canModifyManifest: true,
+	}
+	_, _, err := ic.determineManifestConversion(supportS1S2, "")
+	assert.Error(t, err)
+}
+
+func TestIsMultiImage(t *testing.T) {
+	// MIME type is available; more or less a smoke test, other cases are handled in manifest.MIMETypeIsMultiImage
+	for _, c := range []struct {
+		mt       string
+		expected bool
+	}{
+		{manifest.DockerV2ListMediaType, true},
+		{manifest.DockerV2Schema2MediaType, false},
+	} {
+		src := fakeImageSource(c.mt)
+		res, err := isMultiImage(src)
+		require.NoError(t, err)
+		assert.Equal(t, c.expected, res, c.mt)
+	}
+
+	// Error getting manifest MIME type
+	src := fakeImageSource("")
+	_, err := isMultiImage(src)
 	assert.Error(t, err)
 }

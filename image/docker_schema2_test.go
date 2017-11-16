@@ -29,16 +29,13 @@ func (f unusedImageSource) Reference() types.ImageReference {
 func (f unusedImageSource) Close() error {
 	panic("Unexpected call to a mock function")
 }
-func (f unusedImageSource) GetManifest() ([]byte, string, error) {
-	panic("Unexpected call to a mock function")
-}
-func (f unusedImageSource) GetTargetManifest(digest digest.Digest) ([]byte, string, error) {
+func (f unusedImageSource) GetManifest(*digest.Digest) ([]byte, string, error) {
 	panic("Unexpected call to a mock function")
 }
 func (f unusedImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, error) {
 	panic("Unexpected call to a mock function")
 }
-func (f unusedImageSource) GetSignatures(context.Context) ([][]byte, error) {
+func (f unusedImageSource) GetSignatures(context.Context, *digest.Digest) ([][]byte, error) {
 	panic("Unexpected call to a mock function")
 }
 
@@ -323,7 +320,7 @@ func (ref refImageReferenceMock) PolicyConfigurationIdentity() string {
 func (ref refImageReferenceMock) PolicyConfigurationNamespaces() []string {
 	panic("unexpected call to a mock function")
 }
-func (ref refImageReferenceMock) NewImage(ctx *types.SystemContext) (types.Image, error) {
+func (ref refImageReferenceMock) NewImage(ctx *types.SystemContext) (types.ImageCloser, error) {
 	panic("unexpected call to a mock function")
 }
 func (ref refImageReferenceMock) NewImageSource(ctx *types.SystemContext) (types.ImageSource, error) {

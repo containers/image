@@ -34,7 +34,7 @@ func (ref nameOnlyImageReferenceMock) PolicyConfigurationIdentity() string {
 func (ref nameOnlyImageReferenceMock) PolicyConfigurationNamespaces() []string {
 	panic("unexpected call to a mock function")
 }
-func (ref nameOnlyImageReferenceMock) NewImage(ctx *types.SystemContext) (types.Image, error) {
+func (ref nameOnlyImageReferenceMock) NewImage(ctx *types.SystemContext) (types.ImageCloser, error) {
 	panic("unexpected call to a mock function")
 }
 func (ref nameOnlyImageReferenceMock) NewImageSource(ctx *types.SystemContext) (types.ImageSource, error) {
