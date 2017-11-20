@@ -15,7 +15,6 @@ import (
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	"github.com/docker/distribution/registry/client"
-	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -181,7 +180,10 @@ func (s *dockerImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, 
 // (e.g. if the source never returns manifest lists).
 func (s *dockerImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
 	if err := s.c.detectProperties(ctx); err != nil {
-		return nil, err
+		// Do not error here to allow the signatureBase switch to run even when the
+		// registry ping failed. In that case the supportsSignatures should be
+		// false.
+		logrus.Debugf("Detecting properties for %s failed: %v", instanceDigest, err)
 	}
 	switch {
 	case s.c.signatureBase != nil:
