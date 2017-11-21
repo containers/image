@@ -4,6 +4,8 @@ package ostree
 
 import (
 	"bytes"
+	"compress/gzip"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,12 +20,8 @@ import (
 	"github.com/containers/image/types"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
-
 	"github.com/ostreedev/ostree-go/pkg/otbuiltin"
-
-	"compress/gzip"
-	"encoding/base64"
+	"github.com/pkg/errors"
 	"github.com/vbatts/tar-split/tar/asm"
 	"github.com/vbatts/tar-split/tar/storage"
 )
