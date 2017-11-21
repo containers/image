@@ -301,10 +301,8 @@ func (s *ostreeImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, 
 	ots := asm.NewOutputTarStream(getter, metaUnpacker)
 
 	pipeReader, pipeWriter := io.Pipe()
-	gzipWriter := gzip.NewWriter(pipeWriter)
 	go func() {
-		io.Copy(gzipWriter, ots)
-		gzipWriter.Close()
+		io.Copy(pipeWriter, ots)
 		pipeWriter.Close()
 	}()
 
