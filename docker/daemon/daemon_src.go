@@ -6,12 +6,11 @@ import (
 	"os"
 
 	"github.com/containers/image/docker/tarfile"
+	"github.com/containers/image/internal/tmpdir"
 	"github.com/containers/image/types"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
-
-const temporaryDirectoryForBigFiles = "/var/tmp" // Do not use the system default of os.TempDir(), usually /tmp, because with systemd it could be a tmpfs.
 
 type daemonImageSource struct {
 	ref             daemonReference
@@ -47,7 +46,7 @@ func newImageSource(ctx *types.SystemContext, ref daemonReference) (types.ImageS
 	defer inputStream.Close()
 
 	// FIXME: use SystemContext here.
-	tarCopyFile, err := ioutil.TempFile(temporaryDirectoryForBigFiles, "docker-daemon-tar")
+	tarCopyFile, err := ioutil.TempFile(tmpdir.TemporaryDirectoryForBigFiles(), "docker-daemon-tar")
 	if err != nil {
 		return nil, err
 	}
