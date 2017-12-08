@@ -776,6 +776,12 @@ func (s *storageImageSource) getSize() (int64, error) {
 	return sum, nil
 }
 
+// Size() adds up the sizes of the image's data blobs (which includes the configuration blob), the
+// signatures, and the uncompressed sizes of all of the image's layers.
+func (s *storageImageSource) Size() (int64, error) {
+	return s.getSize()
+}
+
 // Size() returns the previously-computed size of the image, with no error.
 func (s *storageImageCloser) Size() (int64, error) {
 	return s.size, nil
