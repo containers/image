@@ -568,12 +568,13 @@ func (s *storageImageDestination) Commit() error {
 	}
 	// If one of those blobs was a configuration blob, then we can try to dig out the date when the image
 	// was originally created, in case we're just copying it.  If not, no harm done.
-	var options *storage.ImageOptions
+	options := &storage.ImageOptions{}
 	if inspect, err := man.Inspect(s.getConfigBlob); err == nil {
 		logrus.Debugf("setting image creation date to %s", inspect.Created)
-		options = &storage.ImageOptions{
-			CreationDate: inspect.Created,
-		}
+		options.CreationDate = inspect.Created
+	}
+	if manifestDigest, err := manifest.Digest(s.manifest); err == nil {
+		options.Digest = manifestDigest
 	}
 	// Create the image record, pointing to the most-recently added layer.
 	intendedID := s.imageRef.id
