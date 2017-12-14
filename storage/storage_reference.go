@@ -71,7 +71,7 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 		}
 	}
 	if s.id == "" {
-		logrus.Errorf("reference %q does not resolve to an image ID", s.StringWithinTransport())
+		logrus.Warnf("reference %q does not resolve to an image ID", s.StringWithinTransport())
 		return nil, ErrNoSuchImage
 	}
 	img, err := s.transport.store.Image(s.id)
@@ -90,7 +90,7 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 			}
 		}
 		if !nameMatch {
-			logrus.Errorf("no image matching reference %q found", s.StringWithinTransport())
+			logrus.Warnf("no image matching reference %q found", s.StringWithinTransport())
 			return nil, ErrNoSuchImage
 		}
 	}
