@@ -85,8 +85,10 @@ func newImageSource(imageRef storageReference) (*storageImageSource, error) {
 		layerPosition:  make(map[digest.Digest]int),
 		SignatureSizes: []int{},
 	}
-	if err := json.Unmarshal([]byte(img.Metadata), image); err != nil {
-		return nil, errors.Wrap(err, "error decoding metadata for source image")
+	if img.Metadata != "" {
+		if err := json.Unmarshal([]byte(img.Metadata), image); err != nil {
+			return nil, errors.Wrap(err, "error decoding metadata for source image")
+		}
 	}
 	return image, nil
 }
