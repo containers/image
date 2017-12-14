@@ -20,6 +20,9 @@ func TestTransportName(t *testing.T) {
 }
 
 func TestTransportParseStoreReference(t *testing.T) {
+	store := newStore(t)
+
+	Transport.SetStore(nil)
 	for _, c := range []struct{ input, expectedRef, expectedID string }{
 		{"", "", ""}, // Empty input
 		// Handling of the store prefix
@@ -28,7 +31,7 @@ func TestTransportParseStoreReference(t *testing.T) {
 		{"[garbage]busybox", "docker.io/library/busybox:latest", ""}, // Store specifier is overridden by the store we pass to ParseStoreReference
 
 		{"UPPERCASEISINVALID", "", ""},                                                     // Invalid single-component name
-		{"sha256:" + sha256digestHex, "docker.io/library/sha256:" + sha256digestHex, ""},   // Valid single-component name; the hex part is not an ID unless it has a "@" prefix
+		{"sha256:" + sha256digestHex, "docker.io/library/sha256:" + sha256digestHex, ""},   // Valid single-component name; the hex part is not an ID unless it has a "@" prefix, so it looks like a tag
 		{sha256digestHex, "", ""},                                                          // Invalid single-component ID; not an ID without a "@" prefix, so it's parsed as a name, but names aren't allowed to look like IDs
 		{"@" + sha256digestHex, "", sha256digestHex},                                       // Valid single-component ID
 		{"sha256:ab", "docker.io/library/sha256:ab", ""},                                   // Valid single-component name, explicit tag
@@ -39,18 +42,17 @@ func TestTransportParseStoreReference(t *testing.T) {
 		{"UPPERCASEISINVALID@" + sha256digestHex, "", ""}, // Invalid name in name@ID
 		{"busybox@ab", "", ""},                            // Invalid ID in name@ID
 		{"busybox@", "", ""},                              // Empty ID in name@ID
-		{"busybox@sha256:" + sha256digestHex, "docker.io/library/busybox:latest", sha256digestHex},                         // Valid two-component name, with ID using "sha256:" prefix
-		{"@" + sha256digestHex, "", sha256digestHex},                                                                       // Valid two-component name, with ID only
+		{"busybox@sha256:" + sha256digestHex, "docker.io/library/busybox@sha256:" + sha256digestHex, ""},                   // Valid two-component name, with a digest and no tag
 		{"busybox@" + sha256digestHex, "docker.io/library/busybox:latest", sha256digestHex},                                // Valid two-component name, implicit tag
 		{"busybox:notlatest@" + sha256digestHex, "docker.io/library/busybox:notlatest", sha256digestHex},                   // Valid two-component name, explicit tag
 		{"docker.io/library/busybox:notlatest@" + sha256digestHex, "docker.io/library/busybox:notlatest", sha256digestHex}, // Valid two-component name, everything explicit
 	} {
-		storageRef, err := Transport.ParseStoreReference(Transport.(*storageTransport).store, c.input)
+		storageRef, err := Transport.ParseStoreReference(store, c.input)
 		if c.expectedRef == "" && c.expectedID == "" {
 			assert.Error(t, err, c.input)
 		} else {
 			require.NoError(t, err, c.input)
-			assert.Equal(t, *(Transport.(*storageTransport)), storageRef.transport, c.input)
+			assert.Equal(t, store, storageRef.transport.store, c.input)
 			assert.Equal(t, c.expectedRef, storageRef.reference, c.input)
 			assert.Equal(t, c.expectedID, storageRef.id, c.input)
 			if c.expectedRef == "" {
@@ -59,7 +61,8 @@ func TestTransportParseStoreReference(t *testing.T) {
 				dockerRef, err := reference.ParseNormalizedNamed(c.expectedRef)
 				require.NoError(t, err)
 				require.NotNil(t, storageRef.name, c.input)
-				assert.Equal(t, dockerRef.String(), storageRef.name.String())
+				assert.Equal(t, dockerRef.String(), storageRef.reference)
+				assert.Equal(t, dockerRef.String(), storageRef.DockerReference().String())
 			}
 		}
 	}

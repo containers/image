@@ -67,6 +67,9 @@ func (ref refImageMock) Manifest() ([]byte, string, error) {
 func (ref refImageMock) Signatures(context.Context) ([][]byte, error) {
 	panic("unexpected call to a mock function")
 }
+func (ref refImageMock) LayerInfosForCopy() []types.BlobInfo {
+	panic("unexpected call to a mock function")
+}
 
 // refImageReferenceMock is a mock of types.ImageReference which returns itself in DockerReference.
 type refImageReferenceMock struct{ reference.Named }
@@ -330,6 +333,9 @@ func (ref forbiddenImageMock) Manifest() ([]byte, string, error) {
 	panic("unexpected call to a mock function")
 }
 func (ref forbiddenImageMock) Signatures(context.Context) ([][]byte, error) {
+	panic("unexpected call to a mock function")
+}
+func (ref forbiddenImageMock) LayerInfosForCopy() []types.BlobInfo {
 	panic("unexpected call to a mock function")
 }
 
