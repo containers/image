@@ -195,10 +195,15 @@ func (d *Destination) createRepositoriesFile(rootLayerID string) error {
 }
 
 // PutManifest writes manifest to the destination.
+// The instanceDigest value is expected to always be nil, because this transport does not support manifest lists, so
+// there can be no secondary manifests.
 // FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 // If the destination is in principle available, refuses this manifest type (e.g. it does not recognize the schema),
 // but may accept a different manifest type, the returned error must be an ManifestTypeRejectedError.
-func (d *Destination) PutManifest(ctx context.Context, m []byte) error {
+func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest *digest.Digest) error {
+	if instanceDigest != nil {
+		return errors.New(`Manifest lists are not supported for docker tar files`)
+	}
 	// We do not bother with types.ManifestTypeRejectedError; our .SupportedManifestMIMETypes() above is already providing only one alternative,
 	// so the caller trying a different manifest kind would be pointless.
 	var man manifest.Schema2
@@ -390,10 +395,13 @@ func (d *Destination) sendFile(path string, expectedSize int64, stream io.Reader
 	return nil
 }
 
-// PutSignatures adds the given signatures to the docker tarfile (currently not
-// supported). MUST be called after PutManifest (signatures reference manifest
-// contents)
-func (d *Destination) PutSignatures(ctx context.Context, signatures [][]byte) error {
+// PutSignatures would add the given signatures to the docker tarfile (currently not supported).
+// The instanceDigest value is expected to always be nil, because this transport does not support manifest lists, so
+// there can be no secondary manifests.  MUST be called after PutManifest (signatures reference manifest contents).
+func (d *Destination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
+	if instanceDigest != nil {
+		return errors.Errorf(`Manifest lists are not supported for docker tar files`)
+	}
 	if len(signatures) != 0 {
 		return errors.Errorf("Storing signatures for docker tar files is not supported")
 	}

@@ -134,6 +134,8 @@ func TestMIMETypeIsMultiImage(t *testing.T) {
 		{DockerV2Schema1MediaType, false},
 		{DockerV2Schema1SignedMediaType, false},
 		{DockerV2Schema2MediaType, false},
+		{imgspecv1.MediaTypeImageIndex, true},
+		{imgspecv1.MediaTypeImageManifest, false},
 	} {
 		res := MIMETypeIsMultiImage(c.mt)
 		assert.Equal(t, c.expected, res, c.mt)

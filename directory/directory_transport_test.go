@@ -9,6 +9,7 @@ import (
 
 	_ "github.com/containers/image/v4/internal/testing/explicitfilepath-tmpdir"
 	"github.com/containers/image/v4/types"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -157,9 +158,9 @@ func TestReferenceNewImage(t *testing.T) {
 	defer dest.Close()
 	mFixture, err := ioutil.ReadFile("../manifest/fixtures/v2s1.manifest.json")
 	require.NoError(t, err)
-	err = dest.PutManifest(context.Background(), mFixture)
+	err = dest.PutManifest(context.Background(), mFixture, nil)
 	assert.NoError(t, err)
-	err = dest.Commit(context.Background())
+	err = dest.Commit(context.Background(), nil)
 	assert.NoError(t, err)
 
 	img, err := ref.NewImage(context.Background(), nil)
@@ -174,9 +175,9 @@ func TestReferenceNewImageNoValidManifest(t *testing.T) {
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	require.NoError(t, err)
 	defer dest.Close()
-	err = dest.PutManifest(context.Background(), []byte(`{"schemaVersion":1}`))
+	err = dest.PutManifest(context.Background(), []byte(`{"schemaVersion":1}`), nil)
 	assert.NoError(t, err)
-	err = dest.Commit(context.Background())
+	err = dest.Commit(context.Background(), nil)
 	assert.NoError(t, err)
 
 	_, err = ref.NewImage(context.Background(), nil)
@@ -207,11 +208,14 @@ func TestReferenceDeleteImage(t *testing.T) {
 }
 
 func TestReferenceManifestPath(t *testing.T) {
+	dhex := digest.Digest("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)
 	dirRef, ok := ref.(dirReference)
 	require.True(t, ok)
-	assert.Equal(t, tmpDir+"/manifest.json", dirRef.manifestPath())
+	assert.Equal(t, tmpDir+"/manifest.json", dirRef.manifestPath(nil))
+	assert.Equal(t, tmpDir+"/"+dhex.Encoded()+".manifest.json", dirRef.manifestPath(&dhex))
 }
 
 func TestReferenceLayerPath(t *testing.T) {
@@ -225,12 +229,16 @@ func TestReferenceLayerPath(t *testing.T) {
 }
 
 func TestReferenceSignaturePath(t *testing.T) {
+	dhex := digest.Digest("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)
 	dirRef, ok := ref.(dirReference)
 	require.True(t, ok)
-	assert.Equal(t, tmpDir+"/signature-1", dirRef.signaturePath(0))
-	assert.Equal(t, tmpDir+"/signature-10", dirRef.signaturePath(9))
+	assert.Equal(t, tmpDir+"/signature-1", dirRef.signaturePath(0, nil))
+	assert.Equal(t, tmpDir+"/signature-10", dirRef.signaturePath(9, nil))
+	assert.Equal(t, tmpDir+"/"+dhex.Encoded()+".signature-1", dirRef.signaturePath(0, &dhex))
+	assert.Equal(t, tmpDir+"/"+dhex.Encoded()+".signature-10", dirRef.signaturePath(9, &dhex))
 }
 
 func TestReferenceVersionPath(t *testing.T) {

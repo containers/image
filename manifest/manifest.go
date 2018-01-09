@@ -52,6 +52,7 @@ var DefaultRequestedManifestMIMETypes = []string{
 	DockerV2Schema1SignedMediaType,
 	DockerV2Schema1MediaType,
 	DockerV2ListMediaType,
+	imgspecv1.MediaTypeImageIndex,
 }
 
 // Manifest is an interface for parsing, modifying image manifests in isolation.
@@ -140,8 +141,11 @@ func GuessMIMEType(manifest []byte) string {
 		if err := json.Unmarshal(manifest, &ociIndex); err != nil {
 			return ""
 		}
-		if len(ociIndex.Manifests) != 0 && ociIndex.Manifests[0].MediaType == imgspecv1.MediaTypeImageManifest {
-			return imgspecv1.MediaTypeImageIndex
+		if len(ociIndex.Manifests) != 0 {
+			if ociMan.Config.MediaType == "" {
+				return imgspecv1.MediaTypeImageIndex
+			}
+			return ociMan.Config.MediaType
 		}
 		return DockerV2Schema2MediaType
 	}
@@ -199,7 +203,7 @@ func AddDummyV2S1Signature(manifest []byte) ([]byte, error) {
 
 // MIMETypeIsMultiImage returns true if mimeType is a list of images
 func MIMETypeIsMultiImage(mimeType string) bool {
-	return mimeType == DockerV2ListMediaType
+	return mimeType == DockerV2ListMediaType || mimeType == imgspecv1.MediaTypeImageIndex
 }
 
 // NormalizedMIMEType returns the effective MIME type of a manifest MIME type returned by a server,
@@ -213,6 +217,7 @@ func NormalizedMIMEType(input string) string {
 		return DockerV2Schema1SignedMediaType
 	case DockerV2Schema1MediaType, DockerV2Schema1SignedMediaType,
 		imgspecv1.MediaTypeImageManifest,
+		imgspecv1.MediaTypeImageIndex,
 		DockerV2Schema2MediaType,
 		DockerV2ListMediaType:
 		return input
@@ -232,18 +237,19 @@ func NormalizedMIMEType(input string) string {
 
 // FromBlob returns a Manifest instance for the specified manifest blob and the corresponding MIME type
 func FromBlob(manblob []byte, mt string) (Manifest, error) {
-	switch NormalizedMIMEType(mt) {
+	nmt := NormalizedMIMEType(mt)
+	switch nmt {
 	case DockerV2Schema1MediaType, DockerV2Schema1SignedMediaType:
 		return Schema1FromManifest(manblob)
 	case imgspecv1.MediaTypeImageManifest:
 		return OCI1FromManifest(manblob)
 	case DockerV2Schema2MediaType:
 		return Schema2FromManifest(manblob)
-	case DockerV2ListMediaType:
+	case DockerV2ListMediaType, imgspecv1.MediaTypeImageIndex:
 		return nil, fmt.Errorf("Treating manifest lists as individual manifests is not implemented")
-	default: // Note that this may not be reachable, NormalizedMIMEType has a default for unknown values.
-		return nil, fmt.Errorf("Unimplemented manifest MIME type %s", mt)
 	}
+	// Note that this may not be reachable, NormalizedMIMEType has a default for unknown values.
+	return nil, fmt.Errorf("Unimplemented manifest MIME type %s (normalized as %s)", mt, nmt)
 }
 
 // layerInfosToStrings converts a list of layer infos, presumably obtained from a Manifest.LayerInfos()

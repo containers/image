@@ -98,9 +98,11 @@ func (s *ostreeImageSource) getTarSplitData(blob string) ([]byte, error) {
 
 // GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).
 // It may use a remote (= slow) service.
+// This source implementation does not support manifest lists, so the passed-in instanceDigest should always be nil,
+// as the primary manifest can not be a list, so there can be non-default instances.
 func (s *ostreeImageSource) GetManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error) {
 	if instanceDigest != nil {
-		return nil, "", errors.Errorf(`Manifest lists are not supported by "ostree:"`)
+		return nil, "", errors.New(`Manifest lists are not supported by "ostree:"`)
 	}
 	if s.repo == nil {
 		repo, err := openRepo(s.ref.repo)
@@ -275,7 +277,7 @@ func (s *ostreeImageSource) GetBlob(ctx context.Context, info types.BlobInfo, ca
 
 	// Ensure s.compressed is initialized.  It is build by LayerInfosForCopy.
 	if s.compressed == nil {
-		_, err := s.LayerInfosForCopy(ctx)
+		_, err := s.LayerInfosForCopy(ctx, nil)
 		if err != nil {
 			return nil, -1, err
 		}
@@ -337,9 +339,12 @@ func (s *ostreeImageSource) GetBlob(ctx context.Context, info types.BlobInfo, ca
 	return rc, layerSize, nil
 }
 
+// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
+// This source implementation does not support manifest lists, so the passed-in instanceDigest should always be nil,
+// as there can be no secondary manifests.
 func (s *ostreeImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
 	if instanceDigest != nil {
-		return nil, errors.New("manifest lists are not supported by this transport")
+		return nil, errors.New(`Manifest lists are not supported by "ostree:"`)
 	}
 	lenSignatures, err := s.getLenSignatures()
 	if err != nil {
@@ -372,9 +377,18 @@ func (s *ostreeImageSource) GetSignatures(ctx context.Context, instanceDigest *d
 	return signatures, nil
 }
 
-// LayerInfosForCopy() returns the list of layer blobs that make up the root filesystem of
-// the image, after they've been decompressed.
-func (s *ostreeImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+// LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer
+// blobsums that are listed in the image's manifest.  If values are returned, they should be used when using GetBlob()
+// to read the image's layers.
+// This source implementation does not support manifest lists, so the passed-in instanceDigest should always be nil,
+// as the primary manifest can not be a list, so there can be secondary manifests.
+// The Digest field is guaranteed to be provided; Size may be -1.
+// WARNING: The list may contain duplicates, and they are semantically relevant.
+func (s *ostreeImageSource) LayerInfosForCopy(ctx context.Context, instanceDigest *digest.Digest) ([]types.BlobInfo, error) {
+	if instanceDigest != nil {
+		return nil, errors.New(`Manifest lists are not supported by "ostree:"`)
+	}
+
 	updatedBlobInfos := []types.BlobInfo{}
 	manifestBlob, manifestType, err := s.GetManifest(ctx, nil)
 	if err != nil {

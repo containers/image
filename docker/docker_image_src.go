@@ -103,8 +103,15 @@ func (s *dockerImageSource) Close() error {
 	return nil
 }
 
-// LayerInfosForCopy() returns updated layer info that should be used when reading, in preference to values in the manifest, if specified.
-func (s *dockerImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+// LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer
+// blobsums that are listed in the image's manifest.  If values are returned, they should be used when using GetBlob()
+// to read the image's layers.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve BlobInfos for
+// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
+// (e.g. if the source never returns manifest lists).
+// The Digest field is guaranteed to be provided; Size may be -1.
+// WARNING: The list may contain duplicates, and they are semantically relevant.
+func (s *dockerImageSource) LayerInfosForCopy(context.Context, *digest.Digest) ([]types.BlobInfo, error) {
 	return nil, nil
 }
 

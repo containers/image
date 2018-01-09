@@ -231,16 +231,16 @@ func (s *openshiftImageSource) GetBlob(ctx context.Context, info types.BlobInfo,
 // (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
 // (e.g. if the source never returns manifest lists).
 func (s *openshiftImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
-	var imageName string
+	var imageStreamImageName string
 	if instanceDigest == nil {
 		if err := s.ensureImageIsResolved(ctx); err != nil {
 			return nil, err
 		}
-		imageName = s.imageStreamImageName
+		imageStreamImageName = s.imageStreamImageName
 	} else {
-		imageName = instanceDigest.String()
+		imageStreamImageName = instanceDigest.String()
 	}
-	image, err := s.client.getImage(ctx, imageName)
+	image, err := s.client.getImage(ctx, imageStreamImageName)
 	if err != nil {
 		return nil, err
 	}
@@ -253,8 +253,15 @@ func (s *openshiftImageSource) GetSignatures(ctx context.Context, instanceDigest
 	return sigs, nil
 }
 
-// LayerInfosForCopy() returns updated layer info that should be used when reading, in preference to values in the manifest, if specified.
-func (s *openshiftImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+// LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer
+// blobsums that are listed in the image's manifest.  If values are returned, they should be used when using GetBlob()
+// to read the image's layers.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve BlobInfos for
+// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
+// (e.g. if the source never returns manifest lists).
+// The Digest field is guaranteed to be provided; Size may be -1.
+// WARNING: The list may contain duplicates, and they are semantically relevant.
+func (s *openshiftImageSource) LayerInfosForCopy(ctx context.Context, instanceDigest *digest.Digest) ([]types.BlobInfo, error) {
 	return nil, nil
 }
 
@@ -414,20 +421,28 @@ func (d *openshiftImageDestination) TryReusingBlob(ctx context.Context, info typ
 // FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 // If the destination is in principle available, refuses this manifest type (e.g. it does not recognize the schema),
 // but may accept a different manifest type, the returned error must be an ManifestTypeRejectedError.
-func (d *openshiftImageDestination) PutManifest(ctx context.Context, m []byte) error {
-	manifestDigest, err := manifest.Digest(m)
-	if err != nil {
-		return err
+func (d *openshiftImageDestination) PutManifest(ctx context.Context, m []byte, instanceDigest *digest.Digest) error {
+	if instanceDigest == nil {
+		manifestDigest, err := manifest.Digest(m)
+		if err != nil {
+			return err
+		}
+		d.imageStreamImageName = manifestDigest.String()
 	}
-	d.imageStreamImageName = manifestDigest.String()
-
-	return d.docker.PutManifest(ctx, m)
+	return d.docker.PutManifest(ctx, m, instanceDigest)
 }
 
-func (d *openshiftImageDestination) PutSignatures(ctx context.Context, signatures [][]byte) error {
-	if d.imageStreamImageName == "" {
-		return errors.Errorf("Internal error: Unknown manifest digest, can't add signatures")
+func (d *openshiftImageDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
+	var imageStreamName string
+	if instanceDigest == nil {
+		if d.imageStreamImageName == "" {
+			return errors.Errorf("Internal error: Unknown manifest digest, can't add signatures")
+		}
+		imageStreamName = d.imageStreamImageName
+	} else {
+		imageStreamName = instanceDigest.String()
 	}
+
 	// Because image signatures are a shared resource in Atomic Registry, the default upload
 	// always adds signatures.  Eventually we should also allow removing signatures.
 
@@ -435,7 +450,7 @@ func (d *openshiftImageDestination) PutSignatures(ctx context.Context, signature
 		return nil // No need to even read the old state.
 	}
 
-	image, err := d.client.getImage(ctx, d.imageStreamImageName)
+	image, err := d.client.getImage(ctx, imageStreamName)
 	if err != nil {
 		return err
 	}
@@ -460,7 +475,7 @@ sigExists:
 			if err != nil || n != 16 {
 				return errors.Wrapf(err, "Error generating random signature len %d", n)
 			}
-			signatureName = fmt.Sprintf("%s@%032x", d.imageStreamImageName, randBytes)
+			signatureName = fmt.Sprintf("%s@%032x", imageStreamName, randBytes)
 			if _, ok := existingSigNames[signatureName]; !ok {
 				break
 			}
@@ -489,8 +504,8 @@ sigExists:
 // WARNING: This does not have any transactional semantics:
 // - Uploaded data MAY be visible to others before Commit() is called
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
-func (d *openshiftImageDestination) Commit(ctx context.Context) error {
-	return d.docker.Commit(ctx)
+func (d *openshiftImageDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {
+	return d.docker.Commit(ctx, unparsedToplevel)
 }
 
 // These structs are subsets of github.com/openshift/origin/pkg/image/api/v1 and its dependencies.

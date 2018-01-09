@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/containers/image/v4/manifest"
 	"github.com/containers/image/v4/pkg/tlsclientconfig"
 	"github.com/containers/image/v4/types"
 	"github.com/docker/go-connections/tlsconfig"
@@ -18,6 +19,7 @@ import (
 
 type ociImageSource struct {
 	ref           ociReference
+	index         *imgspecv1.Index
 	descriptor    imgspecv1.Descriptor
 	client        *http.Client
 	sharedBlobDir string
@@ -41,7 +43,11 @@ func newImageSource(sys *types.SystemContext, ref ociReference) (types.ImageSour
 	if err != nil {
 		return nil, err
 	}
-	d := &ociImageSource{ref: ref, descriptor: descriptor, client: client}
+	index, err := ref.getIndex()
+	if err != nil {
+		return nil, err
+	}
+	d := &ociImageSource{ref: ref, index: index, descriptor: descriptor, client: client}
 	if sys != nil {
 		// TODO(jonboulle): check dir existence?
 		d.sharedBlobDir = sys.OCISharedBlobDirPath
@@ -66,27 +72,32 @@ func (s *ociImageSource) Close() error {
 func (s *ociImageSource) GetManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error) {
 	var dig digest.Digest
 	var mimeType string
+	var err error
+
 	if instanceDigest == nil {
 		dig = digest.Digest(s.descriptor.Digest)
 		mimeType = s.descriptor.MediaType
 	} else {
 		dig = *instanceDigest
-		// XXX: instanceDigest means that we don't immediately have the context of what
-		//      mediaType the manifest has. In OCI this means that we don't know
-		//      what reference it came from, so we just *assume* that its
-		//      MediaTypeImageManifest.
-		// FIXME: We should actually be able to look up the manifest in the index,
-		// and see the MIME type there.
-		mimeType = imgspecv1.MediaTypeImageManifest
+		for _, md := range s.index.Manifests {
+			if md.Digest == dig {
+				mimeType = md.MediaType
+				break
+			}
+		}
 	}
 
 	manifestPath, err := s.ref.blobPath(dig, s.sharedBlobDir)
 	if err != nil {
 		return nil, "", err
 	}
+
 	m, err := ioutil.ReadFile(manifestPath)
 	if err != nil {
 		return nil, "", err
+	}
+	if mimeType == "" {
+		mimeType = manifest.GuessMIMEType(m)
 	}
 
 	return m, mimeType, nil
@@ -157,8 +168,15 @@ func (s *ociImageSource) getExternalBlob(ctx context.Context, urls []string) (io
 	return nil, 0, errWrap
 }
 
-// LayerInfosForCopy() returns updated layer info that should be used when reading, in preference to values in the manifest, if specified.
-func (s *ociImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+// LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer
+// blobsums that are listed in the image's manifest.  If values are returned, they should be used when using GetBlob()
+// to read the image's layers.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve BlobInfos for
+// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
+// (e.g. if the source never returns manifest lists).
+// The Digest field is guaranteed to be provided; Size may be -1.
+// WARNING: The list may contain duplicates, and they are semantically relevant.
+func (s *ociImageSource) LayerInfosForCopy(context.Context, *digest.Digest) ([]types.BlobInfo, error) {
 	return nil, nil
 }
 

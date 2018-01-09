@@ -100,5 +100,5 @@ func (i *sourcedImage) Manifest(ctx context.Context) ([]byte, string, error) {
 }
 
 func (i *sourcedImage) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
-	return i.UnparsedImage.src.LayerInfosForCopy(ctx)
+	return i.UnparsedImage.src.LayerInfosForCopy(ctx, i.UnparsedImage.instanceDigest)
 }

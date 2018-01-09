@@ -119,3 +119,36 @@ func isMultiImage(ctx context.Context, img types.UnparsedImage) (bool, error) {
 	}
 	return manifest.MIMETypeIsMultiImage(mt), nil
 }
+
+// determineListConversion takes the current MIME type of a list of manifests,
+// the list of MIME types supported for a given destination, and a possible
+// forced value, and returns the MIME type to which we should convert the list
+// of manifests, whether we are converting to it or using it unmodified.
+func (c *copier) determineListConversion(currentListMIMEType string, destSupportedMIMETypes []string, forcedListMIMEType string) (string, error) {
+	// If we're forcing it, we prefer the forced value over everything else.
+	if forcedListMIMEType != "" {
+		return forcedListMIMEType, nil
+	}
+	// If there's no list of supported types, then anything we support is expected to be supported.
+	if len(destSupportedMIMETypes) == 0 {
+		destSupportedMIMETypes = manifest.SupportedListMIMETypes
+	}
+	var selectedType string
+	for i := range destSupportedMIMETypes {
+		// The second priority is the first member of the list of acceptable types that is a list,
+		// but keep going in case current type occurs later in the list.
+		if selectedType == "" && manifest.MIMETypeIsMultiImage(destSupportedMIMETypes[i]) {
+			selectedType = destSupportedMIMETypes[i]
+		}
+		// The first priority is the current type, if it's in the list, since that lets us avoid a
+		// conversion that isn't strictly necessary.
+		if destSupportedMIMETypes[i] == currentListMIMEType {
+			selectedType = destSupportedMIMETypes[i]
+		}
+	}
+	if selectedType == "" {
+		return "", errors.Errorf("destination does not support any supported manifest list types (%v)", manifest.SupportedListMIMETypes)
+	}
+	// Done.
+	return selectedType, nil
+}

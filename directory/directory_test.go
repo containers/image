@@ -32,12 +32,17 @@ func TestGetPutManifest(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	man := []byte("test-manifest")
+	list := []byte("test-manifest-list")
+	md, err := manifest.Digest(man)
+	require.NoError(t, err)
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	require.NoError(t, err)
 	defer dest.Close()
-	err = dest.PutManifest(context.Background(), man)
+	err = dest.PutManifest(context.Background(), man, &md)
 	assert.NoError(t, err)
-	err = dest.Commit(context.Background())
+	err = dest.PutManifest(context.Background(), list, nil)
+	assert.NoError(t, err)
+	err = dest.Commit(context.Background(), nil)
 	assert.NoError(t, err)
 
 	src, err := ref.NewImageSource(context.Background(), nil)
@@ -45,14 +50,13 @@ func TestGetPutManifest(t *testing.T) {
 	defer src.Close()
 	m, mt, err := src.GetManifest(context.Background(), nil)
 	assert.NoError(t, err)
-	assert.Equal(t, man, m)
+	assert.Equal(t, list, m)
 	assert.Equal(t, "", mt)
 
-	// Non-default instances are not supported
-	md, err := manifest.Digest(man)
-	require.NoError(t, err)
-	_, _, err = src.GetManifest(context.Background(), &md)
-	assert.Error(t, err)
+	m, mt, err = src.GetManifest(context.Background(), &md)
+	assert.NoError(t, err)
+	assert.Equal(t, man, m)
+	assert.Equal(t, "", mt)
 }
 
 func TestGetPutBlob(t *testing.T) {
@@ -67,7 +71,7 @@ func TestGetPutBlob(t *testing.T) {
 	assert.Equal(t, types.PreserveOriginal, dest.DesiredLayerCompression())
 	info, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{Digest: digest.Digest("sha256:digest-test"), Size: int64(9)}, cache, false)
 	assert.NoError(t, err)
-	err = dest.Commit(context.Background())
+	err = dest.Commit(context.Background(), nil)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(9), info.Size)
 	assert.Equal(t, digest.FromBytes(blob), info.Digest)
@@ -126,7 +130,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	_, err = dest.PutBlob(context.Background(), reader, types.BlobInfo{Digest: blobDigest, Size: -1}, cache, false)
 	assert.Error(t, err)
 	assert.Contains(t, digestErrorString, err.Error())
-	err = dest.Commit(context.Background())
+	err = dest.Commit(context.Background(), nil)
 	assert.NoError(t, err)
 
 	_, err = os.Lstat(blobPath)
@@ -148,12 +152,29 @@ func TestGetPutSignatures(t *testing.T) {
 	}
 	err = dest.SupportsSignatures(context.Background())
 	assert.NoError(t, err)
-	err = dest.PutManifest(context.Background(), man)
+	err = dest.PutManifest(context.Background(), man, nil)
 	require.NoError(t, err)
 
-	err = dest.PutSignatures(context.Background(), signatures)
+	err = dest.PutSignatures(context.Background(), signatures, nil)
+	listSignatures := [][]byte{
+		[]byte("sig3"),
+		[]byte("sig4"),
+	}
+	md, err := manifest.Digest(man)
+	require.NoError(t, err)
+
+	err = dest.SupportsSignatures(context.Background())
 	assert.NoError(t, err)
-	err = dest.Commit(context.Background())
+	err = dest.PutManifest(context.Background(), man, nil)
+	require.NoError(t, err)
+	err = dest.PutManifest(context.Background(), man, &md)
+	require.NoError(t, err)
+
+	err = dest.PutSignatures(context.Background(), listSignatures, nil)
+	assert.NoError(t, err)
+	err = dest.PutSignatures(context.Background(), signatures, &md)
+	assert.NoError(t, err)
+	err = dest.Commit(context.Background(), nil)
 	assert.NoError(t, err)
 
 	src, err := ref.NewImageSource(context.Background(), nil)
@@ -161,13 +182,11 @@ func TestGetPutSignatures(t *testing.T) {
 	defer src.Close()
 	sigs, err := src.GetSignatures(context.Background(), nil)
 	assert.NoError(t, err)
-	assert.Equal(t, signatures, sigs)
+	assert.Equal(t, listSignatures, sigs)
 
-	// Non-default instances are not supported
-	md, err := manifest.Digest(man)
-	require.NoError(t, err)
-	_, err = src.GetSignatures(context.Background(), &md)
-	assert.Error(t, err)
+	sigs, err = src.GetSignatures(context.Background(), &md)
+	assert.NoError(t, err)
+	assert.Equal(t, signatures, sigs)
 }
 
 func TestSourceReference(t *testing.T) {
