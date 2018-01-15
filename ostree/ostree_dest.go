@@ -383,7 +383,7 @@ func (d *ostreeImageDestination) Commit() error {
 	var selinuxHnd *C.struct_selabel_handle
 
 	if os.Getuid() == 0 && selinux.GetEnabled() {
-		selinuxHnd, err := C.selabel_open(C.SELABEL_CTX_FILE, nil, 0)
+		selinuxHnd, err = C.selabel_open(C.SELABEL_CTX_FILE, nil, 0)
 		if selinuxHnd == nil {
 			return errors.Wrapf(err, "cannot open the SELinux DB")
 		}
