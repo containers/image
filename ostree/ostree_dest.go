@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -175,7 +176,10 @@ func fixFiles(selinuxHnd *C.struct_selabel_handle, root string, dir string, user
 			if err != nil {
 				return err
 			}
-			relPath = fmt.Sprintf("/%s", relPath)
+			// Handle /exports/hostfs as a special case.  Files under this directory are copied to the host,
+			// thus we benefit from maintaining the same SELinux label they would have on the host as we could
+			// use hard links instead of copying the files.
+			relPath = fmt.Sprintf("/%s", strings.TrimPrefix(relPath, "exports/hostfs/"))
 
 			relPathC := C.CString(relPath)
 			defer C.free(unsafe.Pointer(relPathC))
