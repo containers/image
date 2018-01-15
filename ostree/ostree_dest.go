@@ -237,7 +237,7 @@ func generateTarSplitMetadata(output *bytes.Buffer, file string) error {
 	}
 	defer stream.Close()
 
-	gzReader, err := gzip.NewReader(stream)
+	gzReader, err := archive.DecompressStream(stream)
 	if err != nil {
 		return err
 	}
