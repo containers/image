@@ -66,9 +66,10 @@ type extensionSignatureList struct {
 }
 
 type bearerToken struct {
-	Token     string    `json:"token"`
-	ExpiresIn int       `json:"expires_in"`
-	IssuedAt  time.Time `json:"issued_at"`
+	Token       string    `json:"token"`
+	AccessToken string    `json:"access_token"`
+	ExpiresIn   int       `json:"expires_in"`
+	IssuedAt    time.Time `json:"issued_at"`
 }
 
 // dockerClient is configuration for dealing with a single Docker registry.
@@ -94,6 +95,24 @@ type dockerClient struct {
 type authScope struct {
 	remoteName string
 	actions    string
+}
+
+func newBearerTokenFromJSONBlob(blob []byte) (*bearerToken, error) {
+	token := new(bearerToken)
+	if err := json.Unmarshal(blob, &token); err != nil {
+		return nil, err
+	}
+	if token.Token == "" {
+		token.Token = token.AccessToken
+	}
+	if token.ExpiresIn < minimumTokenLifetimeSeconds {
+		token.ExpiresIn = minimumTokenLifetimeSeconds
+		logrus.Debugf("Increasing token expiration to: %d seconds", token.ExpiresIn)
+	}
+	if token.IssuedAt.IsZero() {
+		token.IssuedAt = time.Now().UTC()
+	}
+	return token, nil
 }
 
 // this is cloned from docker/go-connections because upstream docker has changed
@@ -332,18 +351,8 @@ func (c *dockerClient) getBearerToken(ctx context.Context, realm, service, scope
 	if err != nil {
 		return nil, err
 	}
-	var token bearerToken
-	if err := json.Unmarshal(tokenBlob, &token); err != nil {
-		return nil, err
-	}
-	if token.ExpiresIn < minimumTokenLifetimeSeconds {
-		token.ExpiresIn = minimumTokenLifetimeSeconds
-		logrus.Debugf("Increasing token expiration to: %d seconds", token.ExpiresIn)
-	}
-	if token.IssuedAt.IsZero() {
-		token.IssuedAt = time.Now().UTC()
-	}
-	return &token, nil
+
+	return newBearerTokenFromJSONBlob(tokenBlob)
 }
 
 // detectProperties detects various properties of the registry.
