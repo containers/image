@@ -67,7 +67,7 @@ func (ref refImageMock) Manifest() ([]byte, string, error) {
 func (ref refImageMock) Signatures(context.Context) ([][]byte, error) {
 	panic("unexpected call to a mock function")
 }
-func (ref refImageMock) LayerInfosForCopy() []types.BlobInfo {
+func (ref refImageMock) LayerInfosForCopy() ([]types.BlobInfo, error) {
 	panic("unexpected call to a mock function")
 }
 
@@ -335,7 +335,7 @@ func (ref forbiddenImageMock) Manifest() ([]byte, string, error) {
 func (ref forbiddenImageMock) Signatures(context.Context) ([][]byte, error) {
 	panic("unexpected call to a mock function")
 }
-func (ref forbiddenImageMock) LayerInfosForCopy() []types.BlobInfo {
+func (ref forbiddenImageMock) LayerInfosForCopy() ([]types.BlobInfo, error) {
 	panic("unexpected call to a mock function")
 }
 

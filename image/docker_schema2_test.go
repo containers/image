@@ -38,7 +38,7 @@ func (f unusedImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, e
 func (f unusedImageSource) GetSignatures(context.Context, *digest.Digest) ([][]byte, error) {
 	panic("Unexpected call to a mock function")
 }
-func (f unusedImageSource) LayerInfosForCopy() []types.BlobInfo {
+func (f unusedImageSource) LayerInfosForCopy() ([]types.BlobInfo, error) {
 	panic("Unexpected call to a mock function")
 }
 
