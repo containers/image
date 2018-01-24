@@ -87,7 +87,8 @@ func (m *manifestSchema1) EmbeddedDockerReferenceConflicts(ref reference.Named) 
 	return m.m.Name != name || m.m.Tag != tag
 }
 
-func (m *manifestSchema1) imageInspectInfo() (*types.ImageInspectInfo, error) {
+// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
+func (m *manifestSchema1) Inspect() (*types.ImageInspectInfo, error) {
 	return m.m.Inspect(nil)
 }
 

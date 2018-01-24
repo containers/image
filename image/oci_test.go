@@ -244,12 +244,12 @@ func TestManifestOCI1EmbeddedDockerReferenceConflicts(t *testing.T) {
 	}
 }
 
-func TestManifestOCI1ImageInspectInfo(t *testing.T) {
+func TestManifestOCI1Inspect(t *testing.T) {
 	configJSON, err := ioutil.ReadFile("fixtures/oci1-config.json")
 	require.NoError(t, err)
 
 	m := manifestOCI1FromComponentsLikeFixture(configJSON)
-	ii, err := m.imageInspectInfo()
+	ii, err := m.Inspect()
 	require.NoError(t, err)
 	assert.Equal(t, types.ImageInspectInfo{
 		Tag:           "",
@@ -269,11 +269,11 @@ func TestManifestOCI1ImageInspectInfo(t *testing.T) {
 
 	// nil configBlob will trigger an error in m.ConfigBlob()
 	m = manifestOCI1FromComponentsLikeFixture(nil)
-	_, err = m.imageInspectInfo()
+	_, err = m.Inspect()
 	assert.Error(t, err)
 
 	m = manifestOCI1FromComponentsLikeFixture([]byte("invalid JSON"))
-	_, err = m.imageInspectInfo()
+	_, err = m.Inspect()
 	assert.Error(t, err)
 }
 
