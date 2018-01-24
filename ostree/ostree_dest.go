@@ -321,7 +321,17 @@ func (d *ostreeImageDestination) HasBlob(info types.BlobInfo) (bool, int64, erro
 	}
 	branch := fmt.Sprintf("ociimage/%s", info.Digest.Hex())
 
-	found, data, err := readMetadata(d.repo, branch, "docker.size")
+	found, data, err := readMetadata(d.repo, branch, "docker.uncompressed_digest")
+	if err != nil || !found {
+		return found, -1, err
+	}
+
+	found, data, err = readMetadata(d.repo, branch, "docker.uncompressed_size")
+	if err != nil || !found {
+		return found, -1, err
+	}
+
+	found, data, err = readMetadata(d.repo, branch, "docker.size")
 	if err != nil || !found {
 		return found, -1, err
 	}
