@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -27,7 +28,7 @@ const (
 	dockerHostname = "docker.io"
 	dockerRegistry = "registry-1.docker.io"
 
-	systemPerHostCertDirPath = "/etc/docker/certs.d"
+	systemPerHostCertDirPath = "/etc/containers/certs.d"
 
 	resolvedPingV2URL       = "%s://%s/v2/"
 	resolvedPingV1URL       = "%s://%s/v1/_ping"
@@ -132,15 +133,38 @@ func dockerCertDir(ctx *types.SystemContext, hostPort string) string {
 	if ctx != nil && ctx.DockerCertPath != "" {
 		return ctx.DockerCertPath
 	}
-	var hostCertDir string
 	if ctx != nil && ctx.DockerPerHostCertDirPath != "" {
-		hostCertDir = ctx.DockerPerHostCertDirPath
-	} else if ctx != nil && ctx.RootForImplicitAbsolutePaths != "" {
-		hostCertDir = filepath.Join(ctx.RootForImplicitAbsolutePaths, systemPerHostCertDirPath)
-	} else {
-		hostCertDir = systemPerHostCertDirPath
+		return filepath.Join(ctx.DockerPerHostCertDirPath, hostPort)
+	}
+
+	var hostCertDir string
+	systemPerHostCertDirPaths := []string{"/etc/containers/certs.d", "/etc/docker/certs.d"}
+
+	for _, p := range systemPerHostCertDirPaths {
+		if ctx != nil && ctx.RootForImplicitAbsolutePaths != "" {
+			hostCertDir = filepath.Join(ctx.RootForImplicitAbsolutePaths, p)
+		} else {
+			hostCertDir = p
+		}
+
+		// check if the path exists
+		if exists(hostCertDir) {
+			break
+		}
 	}
 	return filepath.Join(hostCertDir, hostPort)
+}
+
+// exists returns whether the given file or directory exists or not
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	return true
 }
 
 // newDockerClientFromRef returns a new dockerClient instance for refHostname (a host a specified in the Docker image reference, not canonicalized to dockerRegistry)
