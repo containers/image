@@ -180,15 +180,13 @@ func (s *storageImageSource) GetManifest(instanceDigest *digest.Digest) (manifes
 func (s *storageImageSource) LayerInfosForCopy() ([]types.BlobInfo, error) {
 	simg, err := s.imageRef.transport.store.Image(s.ID)
 	if err != nil {
-		logrus.Errorf("error reading image %q: %v", s.ID, err)
-		return nil, nil
+		return nil, errors.Wrapf(err, "error reading image %q", s.ID)
 	}
 	updatedBlobInfos := []types.BlobInfo{}
 	layerID := simg.TopLayer
 	_, manifestType, err := s.GetManifest(nil)
 	if err != nil {
-		logrus.Errorf("error reading image manifest for %q: %v", s.ID, err)
-		return nil, nil
+		return nil, errors.Wrapf(err, "error reading image manifest for %q", s.ID)
 	}
 	uncompressedLayerType := ""
 	switch manifestType {
@@ -201,16 +199,13 @@ func (s *storageImageSource) LayerInfosForCopy() ([]types.BlobInfo, error) {
 	for layerID != "" {
 		layer, err := s.imageRef.transport.store.Layer(layerID)
 		if err != nil {
-			logrus.Errorf("error reading layer %q in image %q: %v", layerID, s.ID, err)
-			return nil, nil
+			return nil, errors.Wrapf(err, "error reading layer %q in image %q", layerID, s.ID)
 		}
 		if layer.UncompressedDigest == "" {
-			logrus.Errorf("uncompressed digest for layer %q is unknown", layerID)
-			return nil, nil
+			return nil, errors.Errorf("uncompressed digest for layer %q is unknown", layerID)
 		}
 		if layer.UncompressedSize < 0 {
-			logrus.Errorf("uncompressed size for layer %q is unknown", layerID)
-			return nil, nil
+			return nil, errors.Errorf("uncompressed size for layer %q is unknown", layerID)
 		}
 		blobInfo := types.BlobInfo{
 			Digest:    layer.UncompressedDigest,
