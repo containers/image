@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/containers/image/pkg/docker/config"
 	"github.com/containers/image/types"
 	"github.com/containers/storage/pkg/homedir"
@@ -23,9 +25,9 @@ func TestDockerCertDir(t *testing.T) {
 	const nondefaultPerHostDir = "/this/is/not/the/default/certs.d"
 	const variableReference = "$HOME"
 	const rootPrefix = "/root/prefix"
-	const registryHostPort = "localhost:5000"
+	const registryHostPort = "thishostdefinitelydoesnotexist:5000"
 
-	systemPerHostResult := filepath.Join(systemPerHostCertDirPath, registryHostPort)
+	systemPerHostResult := filepath.Join(systemPerHostCertDirPaths[len(systemPerHostCertDirPaths)-1], registryHostPort)
 	for _, c := range []struct {
 		ctx      *types.SystemContext
 		expected string
@@ -85,7 +87,8 @@ func TestDockerCertDir(t *testing.T) {
 			filepath.Join(variableReference, registryHostPort),
 		},
 	} {
-		path := dockerCertDir(c.ctx, registryHostPort)
+		path, err := dockerCertDir(c.ctx, registryHostPort)
+		require.Equal(t, nil, err)
 		assert.Equal(t, c.expected, path)
 	}
 }
