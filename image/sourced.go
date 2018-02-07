@@ -98,5 +98,5 @@ func (i *sourcedImage) Manifest() ([]byte, string, error) {
 }
 
 func (i *sourcedImage) LayerInfosForCopy() ([]types.BlobInfo, error) {
-	return i.UnparsedImage.LayerInfosForCopy()
+	return i.UnparsedImage.src.LayerInfosForCopy()
 }
