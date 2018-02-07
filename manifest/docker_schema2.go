@@ -142,13 +142,6 @@ type Schema2Image struct {
 	History    []Schema2History `json:"history,omitempty"`
 	OSVersion  string           `json:"os.version,omitempty"`
 	OSFeatures []string         `json:"os.features,omitempty"`
-
-	// rawJSON caches the immutable JSON associated with this image.
-	rawJSON []byte
-
-	// computedID is the ID computed from the hash of the image config.
-	// Not to be confused with the legacy V1 ID in V1Image.
-	computedID digest.Digest
 }
 
 // Schema2FromManifest creates a Schema2 manifest instance from a manifest blob.

@@ -223,26 +223,18 @@ func (m *Schema1) ToSchema2(diffIDs []digest.Digest) ([]byte, error) {
 	if len(m.History) == 0 {
 		return nil, errors.New("image has no layers")
 	}
-	s2 := struct {
-		Schema2Image
-		ID        string `json:"id,omitempty"`
-		Parent    string `json:"parent,omitempty"`
-		ParentID  string `json:"parent_id,omitempty"`
-		LayerID   string `json:"layer_id,omitempty"`
-		ThrowAway bool   `json:"throwaway,omitempty"`
-		Size      int64  `json:",omitempty"`
-	}{}
+	s1 := Schema2V1Image{}
 	config := []byte(m.History[0].V1Compatibility)
-	err := json.Unmarshal(config, &s2)
+	err := json.Unmarshal(config, &s1)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error decoding configuration")
 	}
 	// Images created with versions prior to 1.8.3 require us to re-encode the encoded object,
 	// adding some fields that aren't "omitempty".
-	if s2.DockerVersion != "" && versions.LessThan(s2.DockerVersion, "1.8.3") {
-		config, err = json.Marshal(&s2)
+	if s1.DockerVersion != "" && versions.LessThan(s1.DockerVersion, "1.8.3") {
+		config, err = json.Marshal(&s1)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error re-encoding compat image config %#v", s2)
+			return nil, errors.Wrapf(err, "error re-encoding compat image config %#v", s1)
 		}
 	}
 	// Build the history.
@@ -273,7 +265,7 @@ func (m *Schema1) ToSchema2(diffIDs []digest.Digest) ([]byte, error) {
 	raw := make(map[string]*json.RawMessage)
 	err = json.Unmarshal(config, &raw)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error re-decoding compat image config %#v: %v", s2)
+		return nil, errors.Wrapf(err, "error re-decoding compat image config %#v: %v", s1)
 	}
 	// Drop some fields.
 	delete(raw, "id")
@@ -298,7 +290,7 @@ func (m *Schema1) ToSchema2(diffIDs []digest.Digest) ([]byte, error) {
 	// Encode the result.
 	config, err = json.Marshal(raw)
 	if err != nil {
-		return nil, errors.Errorf("error re-encoding compat image config %#v: %v", s2, err)
+		return nil, errors.Errorf("error re-encoding compat image config %#v: %v", s1, err)
 	}
 	return config, nil
 }
