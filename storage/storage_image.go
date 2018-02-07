@@ -442,6 +442,8 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 	case *manifest.Schema2, *manifest.OCI1:
 		// We know the ID calculation for these formats doesn't actually use the diffIDs,
 		// so we don't need to populate the diffID list.
+	default:
+		return ""
 	}
 	id, err := m.ImageID(diffIDs)
 	if err != nil {
