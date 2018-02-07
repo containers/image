@@ -216,8 +216,8 @@ func (m *Schema1) Inspect(_ func(types.BlobInfo) ([]byte, error)) (*types.ImageI
 	return i, nil
 }
 
-// ToSchema2 builds a schema2-style configuration blob using the supplied diffIDs.
-func (m *Schema1) ToSchema2(diffIDs []digest.Digest) ([]byte, error) {
+// ToSchema2Config builds a schema2-style configuration blob using the supplied diffIDs.
+func (m *Schema1) ToSchema2Config(diffIDs []digest.Digest) ([]byte, error) {
 	// Convert the schema 1 compat info into a schema 2 config, constructing some of the fields
 	// that aren't directly comparable using info from the manifest.
 	if len(m.History) == 0 {
@@ -297,7 +297,7 @@ func (m *Schema1) ToSchema2(diffIDs []digest.Digest) ([]byte, error) {
 
 // ImageID computes an ID which can uniquely identify this image by its contents.
 func (m *Schema1) ImageID(diffIDs []digest.Digest) (string, error) {
-	image, err := m.ToSchema2(diffIDs)
+	image, err := m.ToSchema2Config(diffIDs)
 	if err != nil {
 		return "", err
 	}

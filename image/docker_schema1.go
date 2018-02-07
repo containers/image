@@ -188,7 +188,7 @@ func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.Bl
 			diffIDs = append(diffIDs, d)
 		}
 	}
-	configJSON, err := m.m.ToSchema2(diffIDs)
+	configJSON, err := m.m.ToSchema2Config(diffIDs)
 	if err != nil {
 		return nil, err
 	}
