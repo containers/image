@@ -51,8 +51,6 @@ type storageImageSource struct {
 }
 
 type storageImageDestination struct {
-	image          types.ImageCloser
-	systemContext  *types.SystemContext
 	imageRef       storageReference                // The reference we'll use to name the image
 	publicRef      storageReference                // The reference we return when asked about the name we'll give to the image
 	directory      string                          // Temporary directory where we store blobs until Commit() time
@@ -253,7 +251,6 @@ func newImageDestination(ctx *types.SystemContext, imageRef storageReference) (*
 	publicRef := imageRef
 	publicRef.name = nil
 	image := &storageImageDestination{
-		systemContext:  ctx,
 		imageRef:       imageRef,
 		publicRef:      publicRef,
 		directory:      directory,
