@@ -412,17 +412,11 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 	// fill in the DiffIDs.  It's expected (but not enforced by us) that the number of
 	// diffIDs corresponds to the number of non-EmptyLayer entries in the history.
 	var diffIDs []digest.Digest
-	switch m.(type) {
+	switch m := m.(type) {
 	case *manifest.Schema1:
 		// Build a list of the diffIDs we've generated for the non-throwaway FS layers,
 		// in reverse of the order in which they were originally listed.
-		s1, ok := m.(*manifest.Schema1)
-		if !ok {
-			// Shouldn't happen
-			logrus.Debugf("internal error reading schema 1 manifest")
-			return ""
-		}
-		for i, history := range s1.History {
+		for i, history := range m.History {
 			compat := manifest.Schema1V1Compatibility{}
 			if err := json.Unmarshal([]byte(history.V1Compatibility), &compat); err != nil {
 				logrus.Debugf("internal error reading schema 1 history: %v", err)
@@ -431,7 +425,7 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 			if compat.ThrowAway {
 				continue
 			}
-			blobSum := s1.FSLayers[i].BlobSum
+			blobSum := m.FSLayers[i].BlobSum
 			diffID, ok := s.blobDiffIDs[blobSum]
 			if !ok {
 				logrus.Infof("error looking up diffID for layer %q", blobSum.String())
