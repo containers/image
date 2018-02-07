@@ -202,15 +202,18 @@ func (m *Schema1) Inspect(_ func(types.BlobInfo) ([]byte, error)) (*types.ImageI
 	if err := json.Unmarshal([]byte(m.History[0].V1Compatibility), s1); err != nil {
 		return nil, err
 	}
-	return &types.ImageInspectInfo{
+	i := &types.ImageInspectInfo{
 		Tag:           m.Tag,
 		Created:       &s1.Created,
 		DockerVersion: s1.DockerVersion,
-		Labels:        make(map[string]string),
 		Architecture:  s1.Architecture,
 		Os:            s1.OS,
 		Layers:        LayerInfosToStrings(m.LayerInfos()),
-	}, nil
+	}
+	if s1.Config != nil {
+		i.Labels = s1.Config.Labels
+	}
+	return i, nil
 }
 
 // ToSchema2 builds a schema2-style configuration blob using the supplied diffIDs.
