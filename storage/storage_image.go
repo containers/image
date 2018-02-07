@@ -44,7 +44,7 @@ var (
 
 type storageImageSource struct {
 	imageRef       storageReference
-	ID             string
+	image          *storage.Image
 	layerPosition  map[digest.Digest]int // Where we are in reading a blob's layers
 	cachedManifest []byte                // A cached copy of the manifest, if already known, or nil
 	SignatureSizes []int                 `json:"signature-sizes,omitempty"` // List of sizes of each signature slice
@@ -81,7 +81,7 @@ func newImageSource(imageRef storageReference) (*storageImageSource, error) {
 	// Build the reader object.
 	image := &storageImageSource{
 		imageRef:       imageRef,
-		ID:             img.ID,
+		image:          img,
 		layerPosition:  make(map[digest.Digest]int),
 		SignatureSizes: []int{},
 	}
@@ -124,7 +124,7 @@ func (s *storageImageSource) getBlobAndLayerID(info types.BlobInfo) (rc io.ReadC
 	layers, err := s.imageRef.transport.store.LayersByUncompressedDigest(info.Digest)
 	// If it's not a layer, then it must be a data item.
 	if len(layers) == 0 {
-		b, err := s.imageRef.transport.store.ImageBigData(s.ID, info.Digest.String())
+		b, err := s.imageRef.transport.store.ImageBigData(s.image.ID, info.Digest.String())
 		if err != nil {
 			return nil, -1, "", err
 		}
@@ -166,7 +166,7 @@ func (s *storageImageSource) GetManifest(instanceDigest *digest.Digest) (manifes
 	}
 	if len(s.cachedManifest) == 0 {
 		// We stored the manifest as an item named after storage.ImageDigestBigDataKey.
-		cachedBlob, err := s.imageRef.transport.store.ImageBigData(s.ID, storage.ImageDigestBigDataKey)
+		cachedBlob, err := s.imageRef.transport.store.ImageBigData(s.image.ID, storage.ImageDigestBigDataKey)
 		if err != nil {
 			return nil, "", err
 		}
@@ -178,15 +178,10 @@ func (s *storageImageSource) GetManifest(instanceDigest *digest.Digest) (manifes
 // LayerInfosForCopy() returns the list of layer blobs that make up the root filesystem of
 // the image, after they've been decompressed.
 func (s *storageImageSource) LayerInfosForCopy() ([]types.BlobInfo, error) {
-	simg, err := s.imageRef.transport.store.Image(s.ID)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error reading image %q", s.ID)
-	}
 	updatedBlobInfos := []types.BlobInfo{}
-	layerID := simg.TopLayer
 	_, manifestType, err := s.GetManifest(nil)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error reading image manifest for %q", s.ID)
+		return nil, errors.Wrapf(err, "error reading image manifest for %q", s.image.ID)
 	}
 	uncompressedLayerType := ""
 	switch manifestType {
@@ -196,10 +191,11 @@ func (s *storageImageSource) LayerInfosForCopy() ([]types.BlobInfo, error) {
 		// This is actually a compressed type, but there's no uncompressed type defined
 		uncompressedLayerType = manifest.DockerV2Schema2LayerMediaType
 	}
+	layerID := s.image.TopLayer
 	for layerID != "" {
 		layer, err := s.imageRef.transport.store.Layer(layerID)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error reading layer %q in image %q", layerID, s.ID)
+			return nil, errors.Wrapf(err, "error reading layer %q in image %q", layerID, s.image.ID)
 		}
 		if layer.UncompressedDigest == "" {
 			return nil, errors.Errorf("uncompressed digest for layer %q is unknown", layerID)
@@ -227,9 +223,9 @@ func (s *storageImageSource) GetSignatures(ctx context.Context, instanceDigest *
 	sigslice := [][]byte{}
 	signature := []byte{}
 	if len(s.SignatureSizes) > 0 {
-		signatureBlob, err := s.imageRef.transport.store.ImageBigData(s.ID, "signatures")
+		signatureBlob, err := s.imageRef.transport.store.ImageBigData(s.image.ID, "signatures")
 		if err != nil {
-			return nil, errors.Wrapf(err, "error looking up signatures data for image %q", s.ID)
+			return nil, errors.Wrapf(err, "error looking up signatures data for image %q", s.image.ID)
 		}
 		signature = signatureBlob
 	}
@@ -731,14 +727,14 @@ func (s *storageImageDestination) PutSignatures(signatures [][]byte) error {
 func (s *storageImageSource) getSize() (int64, error) {
 	var sum int64
 	// Size up the data blobs.
-	dataNames, err := s.imageRef.transport.store.ListImageBigData(s.ID)
+	dataNames, err := s.imageRef.transport.store.ListImageBigData(s.image.ID)
 	if err != nil {
-		return -1, errors.Wrapf(err, "error reading image %q", s.ID)
+		return -1, errors.Wrapf(err, "error reading image %q", s.image.ID)
 	}
 	for _, dataName := range dataNames {
-		bigSize, err := s.imageRef.transport.store.ImageBigDataSize(s.ID, dataName)
+		bigSize, err := s.imageRef.transport.store.ImageBigDataSize(s.image.ID, dataName)
 		if err != nil {
-			return -1, errors.Wrapf(err, "error reading data blob size %q for %q", dataName, s.ID)
+			return -1, errors.Wrapf(err, "error reading data blob size %q for %q", dataName, s.image.ID)
 		}
 		sum += bigSize
 	}
@@ -746,13 +742,8 @@ func (s *storageImageSource) getSize() (int64, error) {
 	for _, sigSize := range s.SignatureSizes {
 		sum += int64(sigSize)
 	}
-	// Prepare to walk the layer list.
-	img, err := s.imageRef.transport.store.Image(s.ID)
-	if err != nil {
-		return -1, errors.Wrapf(err, "error reading image info %q", s.ID)
-	}
 	// Walk the layer list.
-	layerID := img.TopLayer
+	layerID := s.image.TopLayer
 	for layerID != "" {
 		layer, err := s.imageRef.transport.store.Layer(layerID)
 		if err != nil {
