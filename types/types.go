@@ -292,7 +292,7 @@ type ManifestUpdateInformation struct {
 // for other manifest types.
 type ImageInspectInfo struct {
 	Tag           string
-	Created       time.Time
+	Created       *time.Time
 	DockerVersion string
 	Labels        map[string]string
 	Architecture  string

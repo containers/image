@@ -204,7 +204,7 @@ func (m *Schema1) Inspect(_ func(types.BlobInfo) ([]byte, error)) (*types.ImageI
 	}
 	return &types.ImageInspectInfo{
 		Tag:           m.Tag,
-		Created:       s1.Created,
+		Created:       &s1.Created,
 		DockerVersion: s1.DockerVersion,
 		Labels:        make(map[string]string),
 		Architecture:  s1.Architecture,

@@ -230,7 +230,7 @@ func (m *Schema2) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*t
 	}
 	i := &types.ImageInspectInfo{
 		Tag:           "",
-		Created:       s2.Created,
+		Created:       &s2.Created,
 		DockerVersion: s2.DockerVersion,
 		Architecture:  s2.Architecture,
 		Os:            s2.OS,
