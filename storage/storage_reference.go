@@ -123,6 +123,8 @@ func (s storageReference) DockerReference() reference.Named {
 			return canonical
 		}
 	}
+	// FIXME: This should never happen, ParseStoreReference sets name = reference.TagNameOnly(name) if s.digest == ""
+	// FIXME: This also violates the DockerReference contract.
 	return s.name
 }
 

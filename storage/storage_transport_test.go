@@ -13,6 +13,7 @@ import (
 
 const (
 	sha256digestHex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	sha256Digest2   = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 )
 
 func TestTransportName(t *testing.T) {
@@ -20,6 +21,8 @@ func TestTransportName(t *testing.T) {
 }
 
 func TestTransportParseStoreReference(t *testing.T) {
+	const digest3 = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
 	store := newStore(t)
 
 	Transport.SetStore(nil)
@@ -30,22 +33,40 @@ func TestTransportParseStoreReference(t *testing.T) {
 		{"[unterminated", "", ""},                                    // Unterminated store specifier
 		{"[garbage]busybox", "docker.io/library/busybox:latest", ""}, // Store specifier is overridden by the store we pass to ParseStoreReference
 
-		{"UPPERCASEISINVALID", "", ""},                                                     // Invalid single-component name
-		{"sha256:" + sha256digestHex, "docker.io/library/sha256:" + sha256digestHex, ""},   // Valid single-component name; the hex part is not an ID unless it has a "@" prefix, so it looks like a tag
-		{sha256digestHex, "", ""},                                                          // Invalid single-component ID; not an ID without a "@" prefix, so it's parsed as a name, but names aren't allowed to look like IDs
-		{"@" + sha256digestHex, "", sha256digestHex},                                       // Valid single-component ID
+		{"UPPERCASEISINVALID", "", ""},                                                   // Invalid single-component name
+		{"sha256:" + sha256digestHex, "docker.io/library/sha256:" + sha256digestHex, ""}, // Valid single-component name; the hex part is not an ID unless it has a "@" prefix, so it looks like a tag
+		// FIXME: This test is now incorrect, this should not fail _if the image ID matches_
+		{sha256digestHex, "", ""},                    // Invalid single-component ID; not an ID without a "@" prefix, so it's parsed as a name, but names aren't allowed to look like IDs
+		{"@" + sha256digestHex, "", sha256digestHex}, // Valid single-component ID
+		// FIXME: This should fail it seems, everything else uses ref.digest only if ref.name != nil
+		// {"@sha256:" + sha256digestHex, "", ""},                                      // Valid single-component digest
+		// "aaaa", either a valid image ID prefix, or a short form of docker.io/library/aaaa, untested
 		{"sha256:ab", "docker.io/library/sha256:ab", ""},                                   // Valid single-component name, explicit tag
 		{"busybox", "docker.io/library/busybox:latest", ""},                                // Valid single-component name, implicit tag
 		{"busybox:notlatest", "docker.io/library/busybox:notlatest", ""},                   // Valid single-component name, explicit tag
 		{"docker.io/library/busybox:notlatest", "docker.io/library/busybox:notlatest", ""}, // Valid single-component name, everything explicit
 
-		{"UPPERCASEISINVALID@" + sha256digestHex, "", ""}, // Invalid name in name@ID
-		{"busybox@ab", "", ""},                            // Invalid ID in name@ID
-		{"busybox@", "", ""},                              // Empty ID in name@ID
-		{"busybox@sha256:" + sha256digestHex, "docker.io/library/busybox@sha256:" + sha256digestHex, ""},                   // Valid two-component name, with a digest and no tag
-		{"busybox@" + sha256digestHex, "docker.io/library/busybox:latest", sha256digestHex},                                // Valid two-component name, implicit tag
-		{"busybox:notlatest@" + sha256digestHex, "docker.io/library/busybox:notlatest", sha256digestHex},                   // Valid two-component name, explicit tag
-		{"docker.io/library/busybox:notlatest@" + sha256digestHex, "docker.io/library/busybox:notlatest", sha256digestHex}, // Valid two-component name, everything explicit
+		{"UPPERCASEISINVALID@" + sha256digestHex, "", ""},                                                // Invalid name in name@digestOrID
+		{"busybox@ab", "", ""},                                                                           // Invalid ID in name@digestOrID
+		{"busybox@", "", ""},                                                                             // Empty ID in name@digestOrID
+		{"busybox@sha256:ab", "", ""},                                                                    // Invalid digest in name@digestOrID
+		{"busybox@sha256:" + sha256digestHex, "docker.io/library/busybox@sha256:" + sha256digestHex, ""}, // Valid name@digest, no tag
+		{"busybox@" + sha256digestHex, "docker.io/library/busybox:latest", sha256digestHex},              // Valid name@ID, implicit tag
+		// "busybox@aaaa", a valid image ID prefix, untested
+		{"busybox:notlatest@" + sha256digestHex, "docker.io/library/busybox:notlatest", sha256digestHex},                     // Valid name@ID, explicit tag
+		{"docker.io/library/busybox:notlatest@" + sha256digestHex, "docker.io/library/busybox:notlatest", sha256digestHex},   // Valid name@ID, everything explicit
+		{"docker.io/library/busybox:notlatest@" + sha256Digest2, "docker.io/library/busybox:notlatest@" + sha256Digest2, ""}, // Valid name:tag@digest, everything explicit
+
+		{"busybox@sha256:" + sha256digestHex + "@ab", "", ""},                                                                                                                       // Invalid ID in name@digest@ID
+		{"busybox@ab@" + sha256digestHex, "", ""},                                                                                                                                   // Invalid digest in name@digest@ID
+		{"busybox@@" + sha256digestHex, "", ""},                                                                                                                                     // Invalid digest in name@digest@ID
+		{"busybox@" + sha256Digest2 + "@" + sha256digestHex, "docker.io/library/busybox@" + sha256Digest2, sha256digestHex},                                                         // name@digest@ID
+		{"docker.io/library/busybox@" + sha256Digest2 + "@" + sha256digestHex, "docker.io/library/busybox@" + sha256Digest2, sha256digestHex},                                       // name@digest@ID, everything explicit
+		{"docker.io/library/busybox:notlatest@sha256:" + sha256digestHex + "@" + sha256digestHex, "docker.io/library/busybox:notlatest@sha256:" + sha256digestHex, sha256digestHex}, // name:tag@digest@ID, everything explicit
+		// FIXME: Is this supposed to work? the validation of idOrDigest seems to make this impossible.
+		// "busybox@sha256:"+sha256digestHex+"@aaaa", a valid image ID prefix, untested
+		// FIXME FIXME: two digests
+		{"busybox:notlatest@" + sha256Digest2 + "@" + digest3 + "@" + sha256digestHex, "docker.io/library/busybox:notlatest@" + digest3, sha256digestHex}, // name@digest@ID, with name containing a digest
 	} {
 		storageRef, err := Transport.ParseStoreReference(store, c.input)
 		if c.expectedRef == "" && c.expectedID == "" {
@@ -74,13 +95,16 @@ func TestTransportParseReference(t *testing.T) {
 	root := store.GraphRoot()
 
 	for _, c := range []struct{ prefix, expectedDriver, expectedRoot, expectedRunRoot string }{
-		{"", driver, root, ""},                              // Implicit store location prefix
-		{"[unterminated", "", "", ""},                       // Unterminated store specifier
-		{"[]", "", "", ""},                                  // Empty store specifier
-		{"[relative/path]", "", "", ""},                     // Non-absolute graph root path
-		{"[" + driver + "@relative/path]", "", "", ""},      // Non-absolute graph root path
-		{"[thisisunknown@" + root + "suffix2]", "", "", ""}, // Unknown graph driver
-		{"[" + root + "suffix1]", "", root + "suffix1", ""}, // A valid root path, but no run dir
+		{"", driver, root, ""},                                             // Implicit store location prefix
+		{"[unterminated", "", "", ""},                                      // Unterminated store specifier
+		{"[]", "", "", ""},                                                 // Empty store specifier
+		{"[relative/path]", "", "", ""},                                    // Non-absolute graph root path
+		{"[" + driver + "@relative/path]", "", "", ""},                     // Non-absolute graph root path
+		{"[@" + root + "suffix2]", "", "", ""},                             // Empty graph driver
+		{"[" + driver + "@]", "", "", ""},                                  // Empty root path
+		{"[thisisunknown@" + root + "suffix2]", "", "", ""},                // Unknown graph driver
+		{"[" + root + "suffix1]", "", "", ""},                              // A valid root path, but no run dir
+		{"[" + driver + "@" + root + "suffix3+relative/path]", "", "", ""}, // Non-absolute run dir
 		{"[" + driver + "@" + root + "suffix3+" + root + "suffix4]",
 			driver,
 			root + "suffix3",

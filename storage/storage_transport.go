@@ -193,7 +193,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 			return nil, errors.Wrapf(err, "error parsing named reference %q", ref)
 		}
 	}
-	if name == nil && sum == "" && id == "" {
+	if name == nil && sum == "" && id == "" { // Coverage: This could happen only on empty input, which is refused at the very top of the method.
 		return nil, errors.Errorf("error parsing reference")
 	}
 
