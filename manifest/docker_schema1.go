@@ -116,6 +116,7 @@ func (m *Schema1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 	if len(m.FSLayers) != len(layerInfos) {
 		return errors.Errorf("Error preparing updated manifest: layer count changed from %d to %d", len(m.FSLayers), len(layerInfos))
 	}
+	m.FSLayers = make([]Schema1FSLayers, len(layerInfos))
 	for i, info := range layerInfos {
 		// (docker push) sets up m.History.V1Compatibility->{Id,Parent} based on values of info.Digest,
 		// but (docker pull) ignores them in favor of computing DiffIDs from uncompressed data, except verifying the child->parent links and uniqueness.
