@@ -120,7 +120,12 @@ func (d *Destination) PutBlob(stream io.Reader, inputInfo types.BlobInfo, isConf
 			return types.BlobInfo{}, errors.Wrap(err, "Error writing Config file")
 		}
 	} else {
-		if err := d.sendFile(filepath.Join(inputInfo.Digest.Hex(), legacyLayerFileName), inputInfo.Size, stream); err != nil {
+		// Note that this can't be e.g. filepath.Join(l.Digest.Hex(), legacyLayerFileName); due to the way
+		// writeLegacyLayerMetadata constructs layer IDs differently from inputinfo.Digest values (as described
+		// inside it), most of the layers would end up in subdirectories alone without any metadata; (docker load)
+		// tries to load every subdirectory as an image and fails if the config is missing.  So, keep the layers
+		// in the root of the tarball.
+		if err := d.sendFile(inputInfo.Digest.Hex()+".tar", inputInfo.Size, stream); err != nil {
 			return types.BlobInfo{}, err
 		}
 	}
@@ -247,15 +252,13 @@ func (d *Destination) writeLegacyLayerMetadata(layerDescriptors []manifest.Schem
 		// configuration).
 		layerID := chainID.Hex()
 
-		physicalLayerPath := filepath.Join(l.Digest.Hex(), legacyLayerFileName)
+		physicalLayerPath := l.Digest.Hex() + ".tar"
 		// The layer itself has been stored into physicalLayerPath in PutManifest.
 		// So, use that path for layerPaths used in the non-legacy manifest
 		layerPaths = append(layerPaths, physicalLayerPath)
-		// ... and create a symlink to layerID/legacyLayerFilename for the legacy format;
-		if layerID != l.Digest.Hex() { // The chainID = l.Digest corner case.
-			if err := d.sendSymlink(filepath.Join(layerID, legacyLayerFileName), filepath.Join("..", physicalLayerPath)); err != nil {
-				return nil, "", errors.Wrap(err, "Error creating layer symbolic link")
-			}
+		// ... and create a symlink for the legacy format;
+		if err := d.sendSymlink(filepath.Join(layerID, legacyLayerFileName), filepath.Join("..", physicalLayerPath)); err != nil {
+			return nil, "", errors.Wrap(err, "Error creating layer symbolic link")
 		}
 
 		b := []byte("1.0")
