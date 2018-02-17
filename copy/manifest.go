@@ -46,6 +46,7 @@ func (ic *imageCopier) determineManifestConversion(destSupportedManifestMIMEType
 	if err != nil { // This should have been cached?!
 		return "", nil, errors.Wrap(err, "Error reading manifest")
 	}
+	srcType = manifest.NormalizedMIMEType(srcType)
 
 	if forceManifestMIMEType != "" {
 		destSupportedManifestMIMETypes = []string{forceManifestMIMEType}
