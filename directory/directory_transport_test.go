@@ -220,7 +220,7 @@ func TestReferenceLayerPath(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	dirRef, ok := ref.(dirReference)
 	require.True(t, ok)
-	assert.Equal(t, tmpDir+"/"+hex+".tar", dirRef.layerPath("sha256:"+hex))
+	assert.Equal(t, tmpDir+"/"+hex, dirRef.layerPath("sha256:"+hex))
 }
 
 func TestReferenceSignaturePath(t *testing.T) {
