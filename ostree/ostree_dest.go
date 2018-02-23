@@ -5,6 +5,7 @@ package ostree
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -103,7 +104,7 @@ func (d *ostreeImageDestination) SupportedManifestMIMETypes() []string {
 
 // SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
 // Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
-func (d *ostreeImageDestination) SupportsSignatures() error {
+func (d *ostreeImageDestination) SupportsSignatures(ctx context.Context) error {
 	return nil
 }
 
@@ -123,7 +124,7 @@ func (d *ostreeImageDestination) MustMatchRuntimeOS() bool {
 	return true
 }
 
-func (d *ostreeImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobInfo, isConfig bool) (types.BlobInfo, error) {
+func (d *ostreeImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, isConfig bool) (types.BlobInfo, error) {
 	tmpDir, err := ioutil.TempDir(d.tmpDirPath, "blob")
 	if err != nil {
 		return types.BlobInfo{}, err
@@ -310,7 +311,7 @@ func (d *ostreeImageDestination) importConfig(repo *otbuiltin.Repo, blob *blobTo
 	return d.ostreeCommit(repo, ostreeBranch, destinationPath, []string{fmt.Sprintf("docker.size=%d", blob.Size)})
 }
 
-func (d *ostreeImageDestination) HasBlob(info types.BlobInfo) (bool, int64, error) {
+func (d *ostreeImageDestination) HasBlob(ctx context.Context, info types.BlobInfo) (bool, int64, error) {
 
 	if d.repo == nil {
 		repo, err := openRepo(d.ref.repo)
@@ -344,7 +345,7 @@ func (d *ostreeImageDestination) HasBlob(info types.BlobInfo) (bool, int64, erro
 	return true, size, nil
 }
 
-func (d *ostreeImageDestination) ReapplyBlob(info types.BlobInfo) (types.BlobInfo, error) {
+func (d *ostreeImageDestination) ReapplyBlob(ctx context.Context, info types.BlobInfo) (types.BlobInfo, error) {
 	return info, nil
 }
 
@@ -352,7 +353,7 @@ func (d *ostreeImageDestination) ReapplyBlob(info types.BlobInfo) (types.BlobInf
 // FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 // If the destination is in principle available, refuses this manifest type (e.g. it does not recognize the schema),
 // but may accept a different manifest type, the returned error must be an ManifestTypeRejectedError.
-func (d *ostreeImageDestination) PutManifest(manifestBlob []byte) error {
+func (d *ostreeImageDestination) PutManifest(ctx context.Context, manifestBlob []byte) error {
 	d.manifest = string(manifestBlob)
 
 	if err := json.Unmarshal(manifestBlob, &d.schema); err != nil {
@@ -373,7 +374,7 @@ func (d *ostreeImageDestination) PutManifest(manifestBlob []byte) error {
 	return ioutil.WriteFile(manifestPath, manifestBlob, 0644)
 }
 
-func (d *ostreeImageDestination) PutSignatures(signatures [][]byte) error {
+func (d *ostreeImageDestination) PutSignatures(ctx context.Context, signatures [][]byte) error {
 	path := filepath.Join(d.tmpDirPath, d.ref.signaturePath(0))
 	if err := ensureParentDirectoryExists(path); err != nil {
 		return err
@@ -389,7 +390,7 @@ func (d *ostreeImageDestination) PutSignatures(signatures [][]byte) error {
 	return nil
 }
 
-func (d *ostreeImageDestination) Commit() error {
+func (d *ostreeImageDestination) Commit(ctx context.Context) error {
 	repo, err := otbuiltin.OpenRepo(d.ref.repo)
 	if err != nil {
 		return err

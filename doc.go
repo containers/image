@@ -13,12 +13,13 @@
 // 		if err != nil {
 // 			panic(err)
 // 		}
-// 		img, err := ref.NewImage(nil)
+//  	ctx := context.Background()
+// 		img, err := ref.NewImage(ctx)
 // 		if err != nil {
 // 			panic(err)
 // 		}
 // 		defer img.Close()
-// 		b, _, err := img.Manifest()
+// 		b, _, err := img.Manifest(ctx)
 // 		if err != nil {
 // 			panic(err)
 // 		}

@@ -29,16 +29,16 @@ func (f unusedImageSource) Reference() types.ImageReference {
 func (f unusedImageSource) Close() error {
 	panic("Unexpected call to a mock function")
 }
-func (f unusedImageSource) GetManifest(*digest.Digest) ([]byte, string, error) {
+func (f unusedImageSource) GetManifest(context.Context, *digest.Digest) ([]byte, string, error) {
 	panic("Unexpected call to a mock function")
 }
-func (f unusedImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, error) {
+func (f unusedImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadCloser, int64, error) {
 	panic("Unexpected call to a mock function")
 }
 func (f unusedImageSource) GetSignatures(context.Context, *digest.Digest) ([][]byte, error) {
 	panic("Unexpected call to a mock function")
 }
-func (f unusedImageSource) LayerInfosForCopy() ([]types.BlobInfo, error) {
+func (f unusedImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
 	panic("Unexpected call to a mock function")
 }
 
@@ -151,7 +151,7 @@ type configBlobImageSource struct {
 	f                 func(digest digest.Digest) (io.ReadCloser, int64, error)
 }
 
-func (f configBlobImageSource) GetBlob(info types.BlobInfo) (io.ReadCloser, int64, error) {
+func (f configBlobImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadCloser, int64, error) {
 	if info.Digest.String() != "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f" {
 		panic("Unexpected digest in GetBlob")
 	}
@@ -192,7 +192,7 @@ func TestManifestSchema2ConfigBlob(t *testing.T) {
 			src = nil
 		}
 		m := manifestSchema2FromFixture(t, src, "schema2.json")
-		blob, err := m.ConfigBlob()
+		blob, err := m.ConfigBlob(context.Background())
 		if c.blob != nil {
 			assert.NoError(t, err)
 			assert.Equal(t, c.blob, blob)
@@ -208,7 +208,7 @@ func TestManifestSchema2ConfigBlob(t *testing.T) {
 	// This just tests that the manifest can be created; we test that the parsed
 	// values are correctly returned in tests for the individual getter methods.
 	m := manifestSchema2FromComponentsLikeFixture(configBlob)
-	cb, err := m.ConfigBlob()
+	cb, err := m.ConfigBlob(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, configBlob, cb)
 }
@@ -262,7 +262,7 @@ func TestManifestSchema2Inspect(t *testing.T) {
 	require.NoError(t, err)
 
 	m := manifestSchema2FromComponentsLikeFixture(configJSON)
-	ii, err := m.Inspect()
+	ii, err := m.Inspect(context.Background())
 	require.NoError(t, err)
 	created := time.Date(2016, 9, 23, 23, 20, 45, 789764590, time.UTC)
 	assert.Equal(t, types.ImageInspectInfo{
@@ -283,11 +283,11 @@ func TestManifestSchema2Inspect(t *testing.T) {
 
 	// nil configBlob will trigger an error in m.ConfigBlob()
 	m = manifestSchema2FromComponentsLikeFixture(nil)
-	_, err = m.Inspect()
+	_, err = m.Inspect(context.Background())
 	assert.Error(t, err)
 
 	m = manifestSchema2FromComponentsLikeFixture([]byte("invalid JSON"))
-	_, err = m.Inspect()
+	_, err = m.Inspect(context.Background())
 	assert.Error(t, err)
 }
 
@@ -330,16 +330,16 @@ func (ref refImageReferenceMock) PolicyConfigurationIdentity() string {
 func (ref refImageReferenceMock) PolicyConfigurationNamespaces() []string {
 	panic("unexpected call to a mock function")
 }
-func (ref refImageReferenceMock) NewImage(ctx *types.SystemContext) (types.ImageCloser, error) {
+func (ref refImageReferenceMock) NewImage(ctx context.Context, sys *types.SystemContext) (types.ImageCloser, error) {
 	panic("unexpected call to a mock function")
 }
-func (ref refImageReferenceMock) NewImageSource(ctx *types.SystemContext) (types.ImageSource, error) {
+func (ref refImageReferenceMock) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
 	panic("unexpected call to a mock function")
 }
-func (ref refImageReferenceMock) NewImageDestination(ctx *types.SystemContext) (types.ImageDestination, error) {
+func (ref refImageReferenceMock) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
 	panic("unexpected call to a mock function")
 }
-func (ref refImageReferenceMock) DeleteImage(ctx *types.SystemContext) error {
+func (ref refImageReferenceMock) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
 	panic("unexpected call to a mock function")
 }
 
@@ -374,7 +374,7 @@ func (d *memoryImageDest) Close() error {
 func (d *memoryImageDest) SupportedManifestMIMETypes() []string {
 	panic("Unexpected call to a mock function")
 }
-func (d *memoryImageDest) SupportsSignatures() error {
+func (d *memoryImageDest) SupportsSignatures(ctx context.Context) error {
 	panic("Unexpected call to a mock function")
 }
 func (d *memoryImageDest) DesiredLayerCompression() types.LayerCompression {
@@ -386,7 +386,7 @@ func (d *memoryImageDest) AcceptsForeignLayerURLs() bool {
 func (d *memoryImageDest) MustMatchRuntimeOS() bool {
 	panic("Unexpected call to a mock function")
 }
-func (d *memoryImageDest) PutBlob(stream io.Reader, inputInfo types.BlobInfo, isConfig bool) (types.BlobInfo, error) {
+func (d *memoryImageDest) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, isConfig bool) (types.BlobInfo, error) {
 	if d.storedBlobs == nil {
 		d.storedBlobs = make(map[digest.Digest][]byte)
 	}
@@ -400,19 +400,19 @@ func (d *memoryImageDest) PutBlob(stream io.Reader, inputInfo types.BlobInfo, is
 	d.storedBlobs[inputInfo.Digest] = contents
 	return types.BlobInfo{Digest: inputInfo.Digest, Size: int64(len(contents))}, nil
 }
-func (d *memoryImageDest) HasBlob(inputInfo types.BlobInfo) (bool, int64, error) {
+func (d *memoryImageDest) HasBlob(ctx context.Context, inputInfo types.BlobInfo) (bool, int64, error) {
 	panic("Unexpected call to a mock function")
 }
-func (d *memoryImageDest) ReapplyBlob(inputInfo types.BlobInfo) (types.BlobInfo, error) {
+func (d *memoryImageDest) ReapplyBlob(ctx context.Context, inputInfo types.BlobInfo) (types.BlobInfo, error) {
 	panic("Unexpected call to a mock function")
 }
-func (d *memoryImageDest) PutManifest([]byte) error {
+func (d *memoryImageDest) PutManifest(ctx context.Context, m []byte) error {
 	panic("Unexpected call to a mock function")
 }
-func (d *memoryImageDest) PutSignatures(signatures [][]byte) error {
+func (d *memoryImageDest) PutSignatures(ctx context.Context, signatures [][]byte) error {
 	panic("Unexpected call to a mock function")
 }
-func (d *memoryImageDest) Commit() error {
+func (d *memoryImageDest) Commit(ctx context.Context) error {
 	panic("Unexpected call to a mock function")
 }
 
@@ -422,12 +422,12 @@ func TestManifestSchema2UpdatedImage(t *testing.T) {
 
 	// LayerInfos:
 	layerInfos := append(original.LayerInfos()[1:], original.LayerInfos()[0])
-	res, err := original.UpdatedImage(types.ManifestUpdateOptions{
+	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		LayerInfos: layerInfos,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, layerInfos, res.LayerInfos())
-	_, err = original.UpdatedImage(types.ManifestUpdateOptions{
+	_, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		LayerInfos: append(layerInfos, layerInfos[0]),
 	})
 	assert.Error(t, err)
@@ -436,7 +436,7 @@ func TestManifestSchema2UpdatedImage(t *testing.T) {
 	// … is ignored
 	embeddedRef, err := reference.ParseNormalizedNamed("busybox")
 	require.NoError(t, err)
-	res, err = original.UpdatedImage(types.ManifestUpdateOptions{
+	res, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		EmbeddedDockerReference: embeddedRef,
 	})
 	require.NoError(t, err)
@@ -451,7 +451,7 @@ func TestManifestSchema2UpdatedImage(t *testing.T) {
 		manifest.DockerV2Schema1MediaType,
 		manifest.DockerV2Schema1SignedMediaType,
 	} {
-		_, err = original.UpdatedImage(types.ManifestUpdateOptions{
+		_, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 			ManifestMIMEType: mime,
 			InformationOnly: types.ManifestUpdateInformation{
 				Destination: &memoryImageDest{ref: originalSrc.ref},
@@ -463,7 +463,7 @@ func TestManifestSchema2UpdatedImage(t *testing.T) {
 		manifest.DockerV2Schema2MediaType, // This indicates a confused caller, not a no-op
 		"this is invalid",
 	} {
-		_, err = original.UpdatedImage(types.ManifestUpdateOptions{
+		_, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 			ManifestMIMEType: mime,
 		})
 		assert.Error(t, err, mime)
@@ -481,12 +481,12 @@ func TestManifestSchema2UpdatedImage(t *testing.T) {
 func TestConvertToManifestOCI(t *testing.T) {
 	originalSrc := newSchema2ImageSource(t, "httpd-copy:latest")
 	original := manifestSchema2FromFixture(t, originalSrc, "schema2.json")
-	res, err := original.UpdatedImage(types.ManifestUpdateOptions{
+	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: imgspecv1.MediaTypeImageManifest,
 	})
 	require.NoError(t, err)
 
-	convertedJSON, mt, err := res.Manifest()
+	convertedJSON, mt, err := res.Manifest(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, imgspecv1.MediaTypeImageManifest, mt)
 
@@ -504,7 +504,7 @@ func TestConvertToManifestSchema1(t *testing.T) {
 	originalSrc := newSchema2ImageSource(t, "httpd-copy:latest")
 	original := manifestSchema2FromFixture(t, originalSrc, "schema2.json")
 	memoryDest := &memoryImageDest{ref: originalSrc.ref}
-	res, err := original.UpdatedImage(types.ManifestUpdateOptions{
+	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
 		InformationOnly: types.ManifestUpdateInformation{
 			Destination: memoryDest,
@@ -512,7 +512,7 @@ func TestConvertToManifestSchema1(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	convertedJSON, mt, err := res.Manifest()
+	convertedJSON, mt, err := res.Manifest(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, manifest.DockerV2Schema1SignedMediaType, mt)
 

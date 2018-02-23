@@ -1,6 +1,7 @@
 package image
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
@@ -153,7 +154,7 @@ func TestManifestSchema1ConfigBlob(t *testing.T) {
 		manifestSchema1FromFixture(t, "schema1.json"),
 		manifestSchema1FromComponentsLikeFixture(t),
 	} {
-		blob, err := m.ConfigBlob()
+		blob, err := m.ConfigBlob(context.Background())
 		require.NoError(t, err)
 		assert.Nil(t, blob)
 	}
@@ -161,7 +162,7 @@ func TestManifestSchema1ConfigBlob(t *testing.T) {
 
 func TestManifestSchema1OCIConfig(t *testing.T) {
 	m := manifestSchema1FromFixture(t, "schema1-to-oci-config.json")
-	configOCI, err := m.OCIConfig()
+	configOCI, err := m.OCIConfig(context.Background())
 	require.NoError(t, err)
 	// FIXME: A more comprehensive test?
 	assert.Equal(t, "/pause", configOCI.Config.Entrypoint[0])
@@ -230,7 +231,7 @@ func TestManifestSchema1Inspect(t *testing.T) {
 		manifestSchema1FromFixture(t, "schema1.json"),
 		manifestSchema1FromComponentsLikeFixture(t),
 	} {
-		ii, err := m.Inspect()
+		ii, err := m.Inspect(context.Background())
 		require.NoError(t, err)
 		created := time.Date(2018, 1, 25, 0, 37, 48, 268558000, time.UTC)
 		assert.Equal(t, types.ImageInspectInfo{
@@ -300,12 +301,12 @@ func TestManifestSchema1UpdatedImage(t *testing.T) {
 
 	// LayerInfos:
 	layerInfos := append(original.LayerInfos()[1:], original.LayerInfos()[0])
-	res, err := original.UpdatedImage(types.ManifestUpdateOptions{
+	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		LayerInfos: layerInfos,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, layerInfos, res.LayerInfos())
-	_, err = original.UpdatedImage(types.ManifestUpdateOptions{
+	_, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		LayerInfos: append(layerInfos, layerInfos[0]),
 	})
 	assert.Error(t, err)
@@ -318,7 +319,7 @@ func TestManifestSchema1UpdatedImage(t *testing.T) {
 	} {
 		embeddedRef, err := reference.ParseNormalizedNamed(refName)
 		require.NoError(t, err)
-		res, err = original.UpdatedImage(types.ManifestUpdateOptions{
+		res, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 			EmbeddedDockerReference: embeddedRef,
 		})
 		require.NoError(t, err)
@@ -335,7 +336,7 @@ func TestManifestSchema1UpdatedImage(t *testing.T) {
 		manifest.DockerV2Schema2MediaType,
 		imgspecv1.MediaTypeImageManifest,
 	} {
-		_, err = original.UpdatedImage(types.ManifestUpdateOptions{
+		_, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 			ManifestMIMEType: mime,
 			InformationOnly: types.ManifestUpdateInformation{
 				LayerInfos:   schema1FixtureLayerInfos,
@@ -347,7 +348,7 @@ func TestManifestSchema1UpdatedImage(t *testing.T) {
 	for _, mime := range []string{
 		"this is invalid",
 	} {
-		_, err = original.UpdatedImage(types.ManifestUpdateOptions{
+		_, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 			ManifestMIMEType: mime,
 		})
 		assert.Error(t, err, mime)
@@ -364,7 +365,7 @@ func TestManifestSchema1UpdatedImage(t *testing.T) {
 
 func TestManifestSchema1ConvertToSchema2(t *testing.T) {
 	original := manifestSchema1FromFixture(t, "schema1.json")
-	res, err := original.UpdatedImage(types.ManifestUpdateOptions{
+	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
 		InformationOnly: types.ManifestUpdateInformation{
 			LayerInfos:   schema1FixtureLayerInfos,
@@ -373,7 +374,7 @@ func TestManifestSchema1ConvertToSchema2(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	convertedJSON, mt, err := res.Manifest()
+	convertedJSON, mt, err := res.Manifest(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, manifest.DockerV2Schema2MediaType, mt)
 
@@ -388,7 +389,7 @@ func TestManifestSchema1ConvertToSchema2(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, byHand, converted)
 
-	convertedConfig, err := res.ConfigBlob()
+	convertedConfig, err := res.ConfigBlob(context.Background())
 	require.NoError(t, err)
 
 	byHandConfig, err := ioutil.ReadFile("fixtures/schema1-to-schema2-config.json")
