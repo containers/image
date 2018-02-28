@@ -378,6 +378,9 @@ type SystemContext struct {
 	// === dir.Transport overrides ===
 	// DirForceCompress compresses the image layers if set to true
 	DirForceCompress bool
+
+	// Optional cross-repository mount to use for Docker registry destionations.
+	DockerMount *reference.Named
 }
 
 // ProgressProperties is used to pass information from the copy code to a monitor which

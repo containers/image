@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
@@ -26,17 +25,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Mountable represents a destination which supports cross-repository mounting.
-type Mountable interface {
-	SetMounts(refs []reference.Named) error
-}
-
 type dockerImageDestination struct {
 	ref dockerReference
 	c   *dockerClient
 	// State
 	manifestDigest digest.Digest // or "" if not yet known.
-	mounts         []reference.Named
+	mount          *reference.Named
 }
 
 // newImageDestination creates a new ImageDestination for the specified image reference.
@@ -45,20 +39,26 @@ func newImageDestination(ctx *types.SystemContext, ref dockerReference) (types.I
 	if err != nil {
 		return nil, err
 	}
+	if ctx.DockerMount != nil {
+		if err := validateDockerMount(ref.ref, *ctx.DockerMount); err != nil {
+			return nil, err
+		}
+	}
 	return &dockerImageDestination{
-		ref: ref,
-		c:   c,
+		ref:   ref,
+		c:     c,
+		mount: ctx.DockerMount,
 	}, nil
 }
 
-// SetMounts sets the cross-repository mounts to use for the destination.
-func (d *dockerImageDestination) SetMounts(refs []reference.Named) error {
-	for _, m := range refs {
-		if !reference.IsNameOnly(m) {
-			return fmt.Errorf("Mount parameters must be named-only. Got: %s", m)
-		}
+func validateDockerMount(ref reference.Named, mount reference.Named) error {
+	// The mount must be named only, and the same host/port as the destination.
+	if !reference.IsNameOnly(mount) {
+		return fmt.Errorf("Mount parameter must be name-only, got: %s", mount)
 	}
-	d.mounts = refs
+	if reference.Domain(ref) != reference.Domain(mount) {
+		return fmt.Errorf("Mount reference %s must be in the same domain as the destination %s", ref, mount)
+	}
 	return nil
 }
 
@@ -122,15 +122,9 @@ func (c *sizeCounter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func prepareMountQuery(mounts []reference.Named, digest string) string {
-	var repositories []string
-	for _, m := range mounts {
-		// Mount only takes the path, not the hostname
-		mount := reference.Path(m)
-		repositories = append(repositories, "from="+mount)
-	}
-	if len(repositories) > 0 {
-		return fmt.Sprintf("mount=%s&%s", digest, strings.Join(repositories, "&"))
+func prepareMountQuery(mount *reference.Named, digest string) string {
+	if mount != nil {
+		return fmt.Sprintf("mount=%s&from=%s", digest, reference.Path(*mount))
 	}
 	return ""
 }
@@ -151,12 +145,12 @@ func (d *dockerImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 			return types.BlobInfo{Digest: inputInfo.Digest, Size: size}, nil
 		}
 	}
-	mountQuery := prepareMountQuery(d.mounts, inputInfo.Digest.String())
+	mountQuery := prepareMountQuery(d.mount, inputInfo.Digest.String())
 
 	// FIXME? Chunked upload, progress reporting, etc.
 	uploadPath := fmt.Sprintf(blobUploadPath, reference.Path(d.ref.ref))
 	if mountQuery != "" {
-		logrus.Debugf("Trying mounts: %s", mountQuery)
+		logrus.Debugf("Trying mount: %s", mountQuery)
 		uploadPath = fmt.Sprintf("%s?%s", uploadPath, mountQuery)
 	}
 	logrus.Debugf("Uploading %s", uploadPath)
@@ -166,8 +160,9 @@ func (d *dockerImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 	}
 	defer res.Body.Close()
 	if res.StatusCode == http.StatusCreated {
+		size := getBlobSize(res)
 		logrus.Debugf("Layer mounted: %s", inputInfo.Digest)
-		return types.BlobInfo{Digest: inputInfo.Digest}, nil
+		return types.BlobInfo{Digest: inputInfo.Digest, Size: size}, nil
 	}
 
 	if res.StatusCode != http.StatusAccepted {

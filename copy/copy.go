@@ -12,9 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containers/image/docker"
-	"github.com/containers/image/docker/reference"
-
 	"github.com/containers/image/image"
 	"github.com/containers/image/pkg/compression"
 	"github.com/containers/image/signature"
@@ -103,7 +100,6 @@ type Options struct {
 	Progress         chan types.ProgressProperties // Reported to when ProgressInterval has arrived for a single artifact+offset.
 	// manifest MIME type of image set by user. "" is default and means use the autodetection to the the manifest MIME type
 	ForceManifestMIMEType string
-	Mounts                []reference.Named // Optional cross-repository mounts to use. Only works with docker registry destinations.
 }
 
 // Image copies image from srcRef to destRef, using policyContext to validate
@@ -127,15 +123,6 @@ func Image(policyContext *signature.PolicyContext, destRef, srcRef types.ImageRe
 	dest, err := destRef.NewImageDestination(options.DestinationCtx)
 	if err != nil {
 		return errors.Wrapf(err, "Error initializing destination %s", transports.ImageName(destRef))
-	}
-	if options.Mounts != nil {
-		c, ok := dest.(docker.Mountable)
-		if !ok {
-			return errors.Wrapf(err, "Destination %s is not mountable, but mount option %s specified", dest, options.Mounts)
-		}
-		if err := c.SetMounts(options.Mounts); err != nil {
-			return errors.Wrapf(err, "Error setting mounts: %s", options.Mounts)
-		}
 	}
 	defer func() {
 		if err := dest.Close(); err != nil {

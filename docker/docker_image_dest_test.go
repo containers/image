@@ -6,20 +6,21 @@ import (
 	"github.com/containers/image/docker/reference"
 )
 
+func parseNamedOrFail(t *testing.T, name string) reference.Named {
+	n, err := reference.ParseNamed(name)
+	if err != nil {
+		t.Fatalf("Error parsing name: %s", err)
+	}
+	return n
+}
+
 func Test_prepareMountQuery(t *testing.T) {
 
-	parseNamedOrFail := func(name string) reference.Named {
-		n, err := reference.ParseNamed(name)
-		if err != nil {
-			t.Fatalf("Error parsing name: %s", err)
-		}
-		return n
-	}
-
 	type args struct {
-		mounts []reference.Named
+		mount  *reference.Named
 		digest string
 	}
+	ref := parseNamedOrFail(t, "registry.com/foo")
 	tests := []struct {
 		name string
 		args args
@@ -28,7 +29,7 @@ func Test_prepareMountQuery(t *testing.T) {
 		{
 			name: "single mount",
 			args: args{
-				mounts: []reference.Named{parseNamedOrFail("registry.com/foo")},
+				mount:  &ref,
 				digest: "somedigest",
 			},
 			want: "mount=somedigest&from=foo",
@@ -36,28 +37,61 @@ func Test_prepareMountQuery(t *testing.T) {
 		{
 			name: "no mounts",
 			args: args{
-				mounts: []reference.Named{},
+				mount:  nil,
 				digest: "somedigest",
 			},
 			want: "",
 		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := prepareMountQuery(tt.args.mount, tt.args.digest); got != tt.want {
+				t.Errorf("prepareMountQuery() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_validateDockerMount(t *testing.T) {
+	type args struct {
+		ref   reference.Named
+		mount reference.Named
+	}
+	dst := parseNamedOrFail(t, "someregistry.com/foo/bar:baz")
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
 		{
-			name: "multiple mounts",
+			name: "not name only",
 			args: args{
-				mounts: []reference.Named{
-					parseNamedOrFail("registry.com/foo"),
-					parseNamedOrFail("registry.com/bar"),
-					parseNamedOrFail("registry.com/baz/bat"),
-				},
-				digest: "somedigest",
+				ref:   dst,
+				mount: parseNamedOrFail(t, "someregistry.com/foo/baz:latest"),
 			},
-			want: "mount=somedigest&from=foo&from=bar&from=baz/bat",
+			wantErr: true,
+		},
+		{
+			name: "not same dest",
+			args: args{
+				ref:   dst,
+				mount: parseNamedOrFail(t, "someotherregistry.com/foo/baz"),
+			},
+			wantErr: true,
+		},
+		{
+			name: "no error",
+			args: args{
+				ref:   dst,
+				mount: parseNamedOrFail(t, "someregistry.com/foo/baz"),
+			},
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := prepareMountQuery(tt.args.mounts, tt.args.digest); got != tt.want {
-				t.Errorf("prepareMountQuery() = %v, want %v", got, tt.want)
+			if err := validateDockerMount(tt.args.ref, tt.args.mount); (err != nil) != tt.wantErr {
+				t.Errorf("validateDockerMount() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
