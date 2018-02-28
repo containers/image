@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
@@ -25,11 +26,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Mountable represents a destination which supports cross-repository mounting.
+type Mountable interface {
+	SetMounts(refs []reference.Named) error
+}
+
 type dockerImageDestination struct {
 	ref dockerReference
 	c   *dockerClient
 	// State
 	manifestDigest digest.Digest // or "" if not yet known.
+	mounts         []reference.Named
 }
 
 // newImageDestination creates a new ImageDestination for the specified image reference.
@@ -42,6 +49,17 @@ func newImageDestination(ctx *types.SystemContext, ref dockerReference) (types.I
 		ref: ref,
 		c:   c,
 	}, nil
+}
+
+// SetMounts sets the cross-repository mounts to use for the destination.
+func (d *dockerImageDestination) SetMounts(refs []reference.Named) error {
+	for _, m := range refs {
+		if !reference.IsNameOnly(m) {
+			return fmt.Errorf("Mount parameters must be named-only. Got: %s", m)
+		}
+	}
+	d.mounts = refs
+	return nil
 }
 
 // Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
@@ -104,6 +122,19 @@ func (c *sizeCounter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+func prepareMountQuery(mounts []reference.Named, digest string) string {
+	var repositories []string
+	for _, m := range mounts {
+		// Mount only takes the path, not the hostname
+		mount := reference.Path(m)
+		repositories = append(repositories, "from="+mount)
+	}
+	if len(repositories) > 0 {
+		return fmt.Sprintf("mount=%s&%s", digest, strings.Join(repositories, "&"))
+	}
+	return ""
+}
+
 // PutBlob writes contents of stream and returns data representing the result (with all data filled in).
 // inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
 // inputInfo.Size is the expected length of stream, if known.
@@ -120,15 +151,25 @@ func (d *dockerImageDestination) PutBlob(stream io.Reader, inputInfo types.BlobI
 			return types.BlobInfo{Digest: inputInfo.Digest, Size: size}, nil
 		}
 	}
+	mountQuery := prepareMountQuery(d.mounts, inputInfo.Digest.String())
 
 	// FIXME? Chunked upload, progress reporting, etc.
 	uploadPath := fmt.Sprintf(blobUploadPath, reference.Path(d.ref.ref))
+	if mountQuery != "" {
+		logrus.Debugf("Trying mounts: %s", mountQuery)
+		uploadPath = fmt.Sprintf("%s?%s", uploadPath, mountQuery)
+	}
 	logrus.Debugf("Uploading %s", uploadPath)
 	res, err := d.c.makeRequest(context.TODO(), "POST", uploadPath, nil, nil)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
 	defer res.Body.Close()
+	if res.StatusCode == http.StatusCreated {
+		logrus.Debugf("Layer mounted: %s", inputInfo.Digest)
+		return types.BlobInfo{Digest: inputInfo.Digest}, nil
+	}
+
 	if res.StatusCode != http.StatusAccepted {
 		logrus.Debugf("Error initiating layer upload, response %#v", *res)
 		return types.BlobInfo{}, errors.Wrapf(client.HandleErrorResponse(res), "Error initiating layer upload to %s", uploadPath)
