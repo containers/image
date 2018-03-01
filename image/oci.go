@@ -111,18 +111,24 @@ func (m *manifestOCI1) EmbeddedDockerReferenceConflicts(ref reference.Named) boo
 }
 
 func (m *manifestOCI1) imageInspectInfo() (*types.ImageInspectInfo, error) {
-	getter := func(info types.BlobInfo) ([]byte, error) {
-		if info.Digest != m.ConfigInfo().Digest {
-			// Shouldn't ever happen
-			return nil, errors.New("asked for a different config blob")
-		}
-		config, err := m.ConfigBlob()
-		if err != nil {
-			return nil, err
-		}
-		return config, nil
+	config, err := m.ConfigBlob()
+	if err != nil {
+		return nil, err
 	}
-	return m.m.Inspect(getter)
+	v1 := &manifest.Schema2V1Image{}
+	if err := json.Unmarshal(config, v1); err != nil {
+		return nil, err
+	}
+	i := &types.ImageInspectInfo{
+		DockerVersion: v1.DockerVersion,
+		Created:       v1.Created,
+		Architecture:  v1.Architecture,
+		Os:            v1.OS,
+	}
+	if v1.Config != nil {
+		i.Labels = v1.Config.Labels
+	}
+	return i, nil
 }
 
 // UpdatedImageNeedsLayerDiffIDs returns true iff UpdatedImage(options) needs InformationOnly.LayerDiffIDs.
