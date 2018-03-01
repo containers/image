@@ -142,6 +142,13 @@ func (ref ostreeReference) StringWithinTransport() string {
 // (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
 func (ref ostreeReference) DockerReference() reference.Named {
+	img, err := reference.ParseNormalizedNamed(ref.image)
+	if err != nil {
+		return nil
+	}
+	if !reference.IsNameOnly(img) {
+		return img
+	}
 	return nil
 }
 

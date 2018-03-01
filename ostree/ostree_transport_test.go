@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/containers/image/docker/reference"
 	_ "github.com/containers/image/internal/testing/explicitfilepath-tmpdir"
 	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
@@ -185,7 +186,9 @@ func TestReferenceDockerReference(t *testing.T) {
 		ref, err := Transport.ParseReference(withTmpDir(c.input, tmpDir))
 		require.NoError(t, err, c.input)
 		dockerRef := ref.DockerReference()
-		assert.Nil(t, dockerRef, c.input)
+		if dockerRef != nil {
+			assert.False(t, reference.IsNameOnly(dockerRef))
+		}
 	}
 }
 
