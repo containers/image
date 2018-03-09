@@ -41,6 +41,19 @@ func newReference(transport storageTransport, reference, id string, name referen
 	}
 }
 
+// imageMatchesRepo returns true iff image.Names contains an element with the same repo as ref
+func imageMatchesRepo(image *storage.Image, ref reference.Named) bool {
+	repo := ref.Name()
+	for _, name := range image.Names {
+		if named, err := reference.ParseNormalizedNamed(name); err == nil {
+			if named.Name() == repo {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Resolve the reference's name to an image ID in the store, if there's already
 // one present with the same name or ID, and return the image.
 func (s *storageReference) resolveImage() (*storage.Image, error) {
@@ -57,16 +70,10 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 		// that the canonical reference can be implicitly resolved to the image.
 		images, err := s.transport.store.ImagesByDigest(s.digest)
 		if images != nil && err == nil {
-			repo := s.name.Name()
-		search:
 			for _, image := range images {
-				for _, name := range image.Names {
-					if named, err := reference.ParseNormalizedNamed(name); err == nil {
-						if named.Name() == repo {
-							s.id = image.ID
-							break search
-						}
-					}
+				if imageMatchesRepo(image, s.name) {
+					s.id = image.ID
+					break
 				}
 			}
 		}
@@ -80,17 +87,7 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 		return nil, errors.Wrapf(err, "error reading image %q", s.id)
 	}
 	if s.name != nil {
-		repo := s.name.Name()
-		nameMatch := false
-		for _, name := range img.Names {
-			if named, err := reference.ParseNormalizedNamed(name); err == nil {
-				if named.Name() == repo {
-					nameMatch = true
-					break
-				}
-			}
-		}
-		if !nameMatch {
+		if !imageMatchesRepo(img, s.name) {
 			logrus.Errorf("no image matching reference %q found", s.StringWithinTransport())
 			return nil, ErrNoSuchImage
 		}
