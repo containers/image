@@ -50,8 +50,7 @@ type storageImageSource struct {
 }
 
 type storageImageDestination struct {
-	imageRef       storageReference                // The reference we'll use to name the image
-	publicRef      storageReference                // The reference we return when asked about the name we'll give to the image
+	imageRef       storageReference
 	directory      string                          // Temporary directory where we store blobs until Commit() time
 	nextTempFileID int32                           // A counter that we use for computing filenames to assign to blobs
 	manifest       []byte                          // Manifest contents, temporary
@@ -243,15 +242,8 @@ func newImageDestination(imageRef storageReference) (*storageImageDestination, e
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating a temporary directory")
 	}
-	// Break reading of the reference we're writing, so that copy.Image() won't try to rewrite
-	// schema1 image manifests to remove embedded references, since that changes the manifest's
-	// digest, and that makes the image unusable if we subsequently try to access it using a
-	// reference that mentions the no-longer-correct digest.
-	publicRef := imageRef
-	publicRef.breakDockerReference = true // FIXME: this does not change .StringWithinTransport(), but modifies DockerReference()
 	image := &storageImageDestination{
 		imageRef:       imageRef,
-		publicRef:      publicRef,
 		directory:      directory,
 		blobDiffIDs:    make(map[digest.Digest]digest.Digest),
 		fileSizes:      make(map[digest.Digest]int64),
@@ -261,11 +253,10 @@ func newImageDestination(imageRef storageReference) (*storageImageDestination, e
 	return image, nil
 }
 
-// Reference returns a mostly-usable image reference that can't return a DockerReference, to
-// avoid triggering logic in copy.Image() that rewrites schema 1 image manifests in order to
-// remove image names that they contain which don't match the value we're using.
+// Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
+// e.g. it should use the public hostname instead of the result of resolving CNAMEs or following redirects.
 func (s storageImageDestination) Reference() types.ImageReference {
-	return s.publicRef
+	return s.imageRef
 }
 
 // Close cleans up the temporary directory.

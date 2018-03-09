@@ -18,10 +18,9 @@ import (
 // where an image is, or would be, kept.
 // Either "named" or "id" must be set.
 type storageReference struct {
-	transport            storageTransport
-	named                reference.Named // may include a tag and/or a digest
-	id                   string
-	breakDockerReference bool // Possibly set by newImageDestination.  FIXME: Figure out another way.
+	transport storageTransport
+	named     reference.Named // may include a tag and/or a digest
+	id        string
 }
 
 func newReference(transport storageTransport, named reference.Named, id string) (*storageReference, error) {
@@ -113,9 +112,6 @@ func (s storageReference) Transport() types.ImageTransport {
 
 // Return a name with a tag or digest, if we have either, else return it bare.
 func (s storageReference) DockerReference() reference.Named {
-	if s.breakDockerReference {
-		return nil
-	}
 	return s.named
 }
 
