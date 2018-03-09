@@ -197,6 +197,11 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	if name == nil && sum == "" && id == "" { // Coverage: This could happen only on empty input, which is refused at the very top of the method.
 		return nil, errors.Errorf("error parsing reference")
 	}
+	if name == nil && sum != "" {
+		// "@digest" with no name: this package can't read nor write images with such names (the digest value is used only if name != nil),
+		// so refuse it.
+		return nil, errors.Errorf("invalid reference with digest @%s without a repository name", sum)
+	}
 
 	// Construct a copy of the store spec.
 	optionsList := ""

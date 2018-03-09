@@ -38,8 +38,7 @@ func TestTransportParseStoreReference(t *testing.T) {
 		// FIXME: This test is now incorrect, this should not fail _if the image ID matches_
 		{sha256digestHex, "", ""},                    // Invalid single-component ID; not an ID without a "@" prefix, so it's parsed as a name, but names aren't allowed to look like IDs
 		{"@" + sha256digestHex, "", sha256digestHex}, // Valid single-component ID
-		// FIXME: This should fail it seems, everything else uses ref.digest only if ref.name != nil
-		// {"@sha256:" + sha256digestHex, "", ""},                                      // Valid single-component digest
+		{"@sha256:" + sha256digestHex, "", ""},       // Invalid un-named @digest
 		// "aaaa", either a valid image ID prefix, or a short form of docker.io/library/aaaa, untested
 		{"sha256:ab", "docker.io/library/sha256:ab", ""},                                   // Valid single-component name, explicit tag
 		{"busybox", "docker.io/library/busybox:latest", ""},                                // Valid single-component name, implicit tag
