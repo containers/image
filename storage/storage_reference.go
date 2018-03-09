@@ -117,8 +117,8 @@ func (s storageReference) DockerReference() reference.Named {
 		return nil
 	}
 	name := s.name
-	if s.tag != "" {
-		if namedTagged, err := reference.WithTag(name, s.tag); err == nil {
+	if tagged, ok := s.completeReference.(reference.Tagged); ok {
+		if namedTagged, err := reference.WithTag(name, tagged.Tag()); err == nil {
 			name = namedTagged
 		}
 	}
