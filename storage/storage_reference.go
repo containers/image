@@ -55,7 +55,7 @@ func imageMatchesRepo(image *storage.Image, ref reference.Named) bool {
 func (s *storageReference) resolveImage() (*storage.Image, error) {
 	if s.id == "" {
 		// Look for an image that has the expanded reference name as an explicit Name value.
-		image, err := s.transport.store.Image(s.reference)
+		image, err := s.transport.store.Image(s.completeReference.String())
 		if image != nil && err == nil {
 			s.id = image.ID
 		}
@@ -121,13 +121,13 @@ func (s storageReference) StringWithinTransport() string {
 		optionsList = ":" + strings.Join(options, ",")
 	}
 	storeSpec := "[" + s.transport.store.GraphDriverName() + "@" + s.transport.store.GraphRoot() + "+" + s.transport.store.RunRoot() + optionsList + "]"
-	if s.reference == "" {
+	if s.completeReference == nil {
 		return storeSpec + "@" + s.id
 	}
 	if s.id == "" {
-		return storeSpec + s.reference
+		return storeSpec + s.completeReference.String()
 	}
-	return storeSpec + s.reference + "@" + s.id
+	return storeSpec + s.completeReference.String() + "@" + s.id
 }
 
 func (s storageReference) PolicyConfigurationIdentity() string {
@@ -136,9 +136,9 @@ func (s storageReference) PolicyConfigurationIdentity() string {
 		return storeSpec + "@" + s.id
 	}
 	if s.id == "" {
-		return storeSpec + s.reference
+		return storeSpec + s.completeReference.String()
 	}
-	return storeSpec + s.reference + "@" + s.id
+	return storeSpec + s.completeReference.String() + "@" + s.id
 }
 
 // Also accept policy that's tied to the combination of the graph root and
@@ -152,7 +152,7 @@ func (s storageReference) PolicyConfigurationNamespaces() []string {
 	if s.completeReference != nil {
 		if s.id != "" {
 			// The reference without the ID is also a valid namespace.
-			namespaces = append(namespaces, storeSpec+s.reference)
+			namespaces = append(namespaces, storeSpec+s.completeReference.String())
 		}
 		components := strings.Split(s.completeReference.Name(), "/")
 		for len(components) > 0 {
