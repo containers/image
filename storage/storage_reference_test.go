@@ -21,46 +21,47 @@ func TestStorageReferenceTransport(t *testing.T) {
 	assert.Equal(t, *(Transport.(*storageTransport)), *st)
 }
 
-func TestStorageReferenceDockerReference(t *testing.T) {
-	newStore(t)
-	ref, err := Transport.ParseReference("busybox")
-	require.NoError(t, err)
-	dr := ref.DockerReference()
-	require.NotNil(t, dr)
-	assert.Equal(t, "docker.io/library/busybox:latest", dr.String())
-
-	ref, err = Transport.ParseReference("@" + sha256digestHex)
-	require.NoError(t, err)
-
-	dr = ref.DockerReference()
-	assert.Nil(t, dr)
-}
-
 // A common list of reference formats to test for the various ImageReference methods.
 var validReferenceTestCases = []struct {
-	input, canonical string
-	namespaces       []string
+	input, dockerRef, canonical string
+	namespaces                  []string
 }{
 	{
-		"busybox", "docker.io/library/busybox:latest",
+		"busybox", "docker.io/library/busybox:latest", "docker.io/library/busybox:latest",
 		[]string{"docker.io/library/busybox", "docker.io/library", "docker.io"},
 	},
 	{
-		"example.com/myns/ns2/busybox:notlatest", "example.com/myns/ns2/busybox:notlatest",
+		"example.com/myns/ns2/busybox:notlatest", "example.com/myns/ns2/busybox:notlatest", "example.com/myns/ns2/busybox:notlatest",
 		[]string{"example.com/myns/ns2/busybox", "example.com/myns/ns2", "example.com/myns", "example.com"},
 	},
 	{
-		"@" + sha256digestHex, "@" + sha256digestHex,
+		"@" + sha256digestHex, "", "@" + sha256digestHex,
 		[]string{},
 	},
 	{
-		"busybox@" + sha256digestHex, "docker.io/library/busybox:latest@" + sha256digestHex,
+		"busybox@" + sha256digestHex, "docker.io/library/busybox:latest", "docker.io/library/busybox:latest@" + sha256digestHex,
 		[]string{"docker.io/library/busybox", "docker.io/library", "docker.io"},
 	},
 	{
-		"busybox@sha256:" + sha256digestHex, "docker.io/library/busybox@sha256:" + sha256digestHex,
+		"busybox@sha256:" + sha256digestHex, "docker.io/library/busybox@sha256:" + sha256digestHex, "docker.io/library/busybox@sha256:" + sha256digestHex,
 		[]string{"docker.io/library/busybox", "docker.io/library", "docker.io"},
 	},
+}
+
+func TestStorageReferenceDockerReference(t *testing.T) {
+	newStore(t)
+	for _, c := range validReferenceTestCases {
+		ref, err := Transport.ParseReference(c.input)
+		require.NoError(t, err, c.input)
+		if c.dockerRef != "" {
+			dr := ref.DockerReference()
+			require.NotNil(t, dr, c.input)
+			assert.Equal(t, c.dockerRef, dr.String(), c.input)
+		} else {
+			dr := ref.DockerReference()
+			assert.Nil(t, dr, c.input)
+		}
+	}
 }
 
 func TestStorageReferenceStringWithinTransport(t *testing.T) {
