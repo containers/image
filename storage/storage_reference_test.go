@@ -61,7 +61,7 @@ var validReferenceTestCases = []struct {
 	},
 	{
 		"busybox:notlatest@sha256:" + sha256digestHex, "docker.io/library/busybox:notlatest@sha256:" + sha256digestHex, "docker.io/library/busybox:notlatest@sha256:" + sha256digestHex,
-		[]string{"docker.io/library/busybox", "docker.io/library", "docker.io"},
+		[]string{"docker.io/library/busybox:notlatest", "docker.io/library/busybox", "docker.io/library", "docker.io"},
 	},
 	{
 		"busybox@" + sha256Digest2 + "@" + sha256digestHex, "docker.io/library/busybox@" + sha256Digest2, "docker.io/library/busybox@" + sha256Digest2 + "@" + sha256digestHex,
@@ -69,8 +69,7 @@ var validReferenceTestCases = []struct {
 	},
 	{
 		"busybox:notlatest@" + sha256Digest2 + "@" + sha256digestHex, "docker.io/library/busybox:notlatest@" + sha256Digest2, "docker.io/library/busybox:notlatest@" + sha256Digest2 + "@" + sha256digestHex,
-		// FIXME: After …/busybox:tag@digest, there should be a …/busybox:tag, only then a plain …/busybox
-		[]string{"docker.io/library/busybox:notlatest@" + sha256Digest2, "docker.io/library/busybox", "docker.io/library", "docker.io"},
+		[]string{"docker.io/library/busybox:notlatest@" + sha256Digest2, "docker.io/library/busybox:notlatest", "docker.io/library/busybox", "docker.io/library", "docker.io"},
 	},
 }
 

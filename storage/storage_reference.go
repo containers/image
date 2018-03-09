@@ -156,6 +156,11 @@ func (s storageReference) PolicyConfigurationNamespaces() []string {
 			// The reference without the ID is also a valid namespace.
 			namespaces = append(namespaces, storeSpec+s.named.String())
 		}
+		tagged, isTagged := s.named.(reference.Tagged)
+		_, isDigested := s.named.(reference.Digested)
+		if isTagged && isDigested { // s.named is "name:tag@digest"; add a "name:tag" parent namespace.
+			namespaces = append(namespaces, storeSpec+s.named.Name()+":"+tagged.Tag())
+		}
 		components := strings.Split(s.named.Name(), "/")
 		for len(components) > 0 {
 			namespaces = append(namespaces, storeSpec+strings.Join(components, "/"))
