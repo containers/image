@@ -236,11 +236,12 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		} else {
 			name = reference.TagNameOnly(name)
 			completeReference = reference.TagNameOnly(completeReference)
-			tagged, ok := name.(reference.Tagged)
-			if !ok {
+			if _, ok := name.(reference.Tagged); !ok { // Coverage: This should never happen; we check only to ensure that "tag" is set below.
 				return nil, errors.Errorf("error parsing possibly-tagless name %q", ref)
 			}
 			refname = name.String()
+		}
+		if tagged, ok := name.(reference.Tagged); ok {
 			tag = tagged.Tag()
 		}
 	}
@@ -271,7 +272,7 @@ func (s *storageTransport) GetStore() (storage.Store, error) {
 }
 
 // ParseReference takes a name and a tag or digest and/or ID
-// ("_name_"/"@_id_"/"_name_:_tag_"/"_name_:_tag_@_id_"/"_name_@_digest_"/"_name_@_digest_@_id_"),
+// ("_name_"/"@_id_"/"_name_:_tag_"/"_name_:_tag_@_id_"/"_name_@_digest_"/"_name_@_digest_@_id_"/"_name_:_tag_@_digest_"/"_name_:_tag_@_digest_@_id_"),
 // possibly prefixed with a store specifier in the form "[_graphroot_]" or
 // "[_driver_@_graphroot_]" or "[_driver_@_graphroot_+_runroot_]" or
 // "[_driver_@_graphroot_:_options_]" or "[_driver_@_graphroot_+_runroot_:_options_]",

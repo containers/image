@@ -116,19 +116,18 @@ func (s storageReference) DockerReference() reference.Named {
 	if s.name == nil {
 		return nil
 	}
+	name := s.name
 	if s.tag != "" {
-		if namedTagged, err := reference.WithTag(s.name, s.tag); err == nil {
-			return namedTagged
+		if namedTagged, err := reference.WithTag(name, s.tag); err == nil {
+			name = namedTagged
 		}
 	}
 	if s.digest != "" {
-		if canonical, err := reference.WithDigest(s.name, s.digest); err == nil {
-			return canonical
+		if canonical, err := reference.WithDigest(name, s.digest); err == nil {
+			name = canonical
 		}
 	}
-	// FIXME: This should never happen, ParseStoreReference sets name = reference.TagNameOnly(name) if s.digest == ""
-	// FIXME: This also violates the DockerReference contract.
-	return s.name
+	return name
 }
 
 // Return a name with a tag, prefixed with the graph root and driver name, to
