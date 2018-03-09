@@ -18,26 +18,29 @@ import (
 // value hex-encoded into a 64-character string, and a reference to a Store
 // where an image is, or would be, kept.
 type storageReference struct {
-	transport storageTransport
-	reference string
-	id        string
-	name      reference.Named
-	tag       string
-	digest    digest.Digest
+	transport            storageTransport
+	completeReference    reference.Named // may include a tag and/or a digest
+	reference            string
+	id                   string
+	name                 reference.Named
+	tag                  string
+	digest               digest.Digest
+	breakDockerReference bool // Possibly set by newImageDestination.  FIXME: Figure out another way.
 }
 
-func newReference(transport storageTransport, reference, id string, name reference.Named, tag string, digest digest.Digest) *storageReference {
+func newReference(transport storageTransport, completeReference reference.Named, reference, id string, name reference.Named, tag string, digest digest.Digest) *storageReference {
 	// We take a copy of the transport, which contains a pointer to the
 	// store that it used for resolving this reference, so that the
 	// transport that we'll return from Transport() won't be affected by
 	// further calls to the original transport's SetStore() method.
 	return &storageReference{
-		transport: transport,
-		reference: reference,
-		id:        id,
-		name:      name,
-		tag:       tag,
-		digest:    digest,
+		transport:         transport,
+		completeReference: completeReference,
+		reference:         reference,
+		id:                id,
+		name:              name,
+		tag:               tag,
+		digest:            digest,
 	}
 }
 
@@ -107,6 +110,9 @@ func (s storageReference) Transport() types.ImageTransport {
 
 // Return a name with a tag or digest, if we have either, else return it bare.
 func (s storageReference) DockerReference() reference.Named {
+	if s.breakDockerReference {
+		return nil
+	}
 	if s.name == nil {
 		return nil
 	}

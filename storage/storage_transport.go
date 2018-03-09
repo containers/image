@@ -188,6 +188,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	}
 
 	// The initial portion is probably a name, possibly with a tag.
+	var completeReference reference.Named
 	if ref != "" {
 		var err error
 		if name, err = reference.ParseNormalizedNamed(ref); err != nil {
@@ -199,6 +200,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 			// FIXME? Reorganize the code to always parse the digest in ParseNormalizedNamed, then this condition disappears.
 			return nil, errors.Errorf("invalid reference %q, with digest %q and ID %q", ref, sum, id)
 		}
+		completeReference = name
 	}
 	if name == nil && sum == "" && id == "" { // Coverage: This could happen only on empty input, which is refused at the very top of the method.
 		return nil, errors.Errorf("error parsing reference")
@@ -226,9 +228,14 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 			if err != nil {
 				return nil, errors.Wrapf(err, "error mixing name %q with digest %q", name, sum)
 			}
+			completeReference, err = reference.WithDigest(completeReference, sum)
+			if err != nil {
+				return nil, errors.Wrapf(err, "error mixing name %q with digest %q", name, sum)
+			}
 			refname = canonical.String()
 		} else {
 			name = reference.TagNameOnly(name)
+			completeReference = reference.TagNameOnly(completeReference)
 			tagged, ok := name.(reference.Tagged)
 			if !ok {
 				return nil, errors.Errorf("error parsing possibly-tagless name %q", ref)
@@ -244,7 +251,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	} else {
 		logrus.Debugf("parsed reference to refname@id into %q", storeSpec+refname+"@"+id)
 	}
-	return newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, refname, id, name, tag, sum), nil
+	return newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, completeReference, refname, id, name, tag, sum), nil
 }
 
 func (s *storageTransport) GetStore() (storage.Store, error) {
