@@ -11,6 +11,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNewReference(t *testing.T) {
+	newStore(t)
+	st, ok := Transport.(*storageTransport)
+	require.True(t, ok)
+	// Success is tested throughout; test only the failure
+	_, err := newReference(*st, nil, "")
+	assert.Error(t, err)
+}
+
 func TestStorageReferenceTransport(t *testing.T) {
 	newStore(t)
 	ref, err := Transport.ParseReference("busybox")

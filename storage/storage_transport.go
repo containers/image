@@ -216,12 +216,12 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 			// so refuse it.
 			return nil, errors.Errorf("invalid reference with digest @%s without a repository name", sum)
 		}
-		if id == "" { // Coverage: This could happen only on empty input, which is refused at the very top of the method.
-			return nil, errors.Errorf("error parsing reference")
-		}
 	}
 
-	result := newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, named, id)
+	result, err := newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, named, id)
+	if err != nil {
+		return nil, err
+	}
 	logrus.Debugf("parsed reference into %q", result.StringWithinTransport())
 	return result, nil
 }

@@ -16,6 +16,7 @@ import (
 // A storageReference holds an arbitrary name and/or an ID, which is a 32-byte
 // value hex-encoded into a 64-character string, and a reference to a Store
 // where an image is, or would be, kept.
+// Either "named" or "id" must be set.
 type storageReference struct {
 	transport            storageTransport
 	named                reference.Named // may include a tag and/or a digest
@@ -23,7 +24,10 @@ type storageReference struct {
 	breakDockerReference bool // Possibly set by newImageDestination.  FIXME: Figure out another way.
 }
 
-func newReference(transport storageTransport, named reference.Named, id string) *storageReference {
+func newReference(transport storageTransport, named reference.Named, id string) (*storageReference, error) {
+	if named == nil && id == "" {
+		return nil, ErrInvalidReference
+	}
 	// We take a copy of the transport, which contains a pointer to the
 	// store that it used for resolving this reference, so that the
 	// transport that we'll return from Transport() won't be affected by
@@ -32,7 +36,7 @@ func newReference(transport storageTransport, named reference.Named, id string) 
 		transport: transport,
 		named:     named,
 		id:        id,
-	}
+	}, nil
 }
 
 // imageMatchesRepo returns true iff image.Names contains an element with the same repo as ref
