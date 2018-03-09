@@ -209,15 +209,6 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		// so refuse it.
 		return nil, errors.Errorf("invalid reference with digest @%s without a repository name", sum)
 	}
-
-	// Construct a copy of the store spec.
-	optionsList := ""
-	options := store.GraphOptions()
-	if len(options) > 0 {
-		optionsList = ":" + strings.Join(options, ",")
-	}
-	storeSpec := "[" + store.GraphDriverName() + "@" + store.GraphRoot() + "+" + store.RunRoot() + optionsList + "]"
-
 	if completeReference != nil {
 		if sum.Validate() == nil {
 			cr2, err := reference.WithDigest(completeReference, sum)
@@ -229,14 +220,10 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 			completeReference = reference.TagNameOnly(completeReference)
 		}
 	}
-	if completeReference == nil {
-		logrus.Debugf("parsed reference to id into %q", storeSpec+"@"+id)
-	} else if id == "" {
-		logrus.Debugf("parsed reference to refname into %q", storeSpec+completeReference.String())
-	} else {
-		logrus.Debugf("parsed reference to refname@id into %q", storeSpec+completeReference.String()+"@"+id)
-	}
-	return newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, completeReference, id), nil
+
+	result := newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, completeReference, id)
+	logrus.Debugf("parsed reference into %q", result.StringWithinTransport())
+	return result, nil
 }
 
 func (s *storageTransport) GetStore() (storage.Store, error) {
