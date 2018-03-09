@@ -218,7 +218,6 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	}
 	storeSpec := "[" + store.GraphDriverName() + "@" + store.GraphRoot() + "+" + store.RunRoot() + optionsList + "]"
 
-	// Convert the name back into a reference string, if we got a name.
 	refname := ""
 	if completeReference != nil {
 		if sum.Validate() == nil {
@@ -232,12 +231,12 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		}
 		refname = completeReference.String()
 	}
-	if refname == "" {
+	if completeReference == nil {
 		logrus.Debugf("parsed reference to id into %q", storeSpec+"@"+id)
 	} else if id == "" {
-		logrus.Debugf("parsed reference to refname into %q", storeSpec+refname)
+		logrus.Debugf("parsed reference to refname into %q", storeSpec+completeReference.String())
 	} else {
-		logrus.Debugf("parsed reference to refname@id into %q", storeSpec+refname+"@"+id)
+		logrus.Debugf("parsed reference to refname@id into %q", storeSpec+completeReference.String()+"@"+id)
 	}
 	return newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, completeReference, refname, id), nil
 }
