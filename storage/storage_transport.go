@@ -432,7 +432,7 @@ func verboseName(r reference.Named) string {
 	tagged, isTagged := r.(reference.Tagged)
 	tag := ""
 	sum := ""
-	name := (reference.TrimNamed(r)).String()
+	name := r.Name()
 	if isTagged {
 		if tagged.Tag() != "" {
 			tag = ":" + tagged.Tag()

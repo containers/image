@@ -57,12 +57,12 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 		// that the canonical reference can be implicitly resolved to the image.
 		images, err := s.transport.store.ImagesByDigest(s.digest)
 		if images != nil && err == nil {
-			repo := reference.FamiliarName(reference.TrimNamed(s.name))
+			repo := reference.FamiliarName(s.name)
 		search:
 			for _, image := range images {
 				for _, name := range image.Names {
 					if named, err := reference.ParseNormalizedNamed(name); err == nil {
-						if reference.FamiliarName(reference.TrimNamed(named)) == repo {
+						if reference.FamiliarName(named) == repo {
 							s.id = image.ID
 							break search
 						}
@@ -80,11 +80,11 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 		return nil, errors.Wrapf(err, "error reading image %q", s.id)
 	}
 	if s.name != nil {
-		repo := reference.FamiliarName(reference.TrimNamed(s.name))
+		repo := reference.FamiliarName(s.name)
 		nameMatch := false
 		for _, name := range img.Names {
 			if named, err := reference.ParseNormalizedNamed(name); err == nil {
-				if reference.FamiliarName(reference.TrimNamed(named)) == repo {
+				if reference.FamiliarName(named) == repo {
 					nameMatch = true
 					break
 				}
@@ -171,8 +171,7 @@ func (s storageReference) PolicyConfigurationNamespaces() []string {
 			// The reference without the ID is also a valid namespace.
 			namespaces = append(namespaces, storeSpec+s.reference)
 		}
-		name := reference.TrimNamed(s.name)
-		components := strings.Split(name.String(), "/")
+		components := strings.Split(s.name.Name(), "/")
 		for len(components) > 0 {
 			namespaces = append(namespaces, storeSpec+strings.Join(components, "/"))
 			components = components[:len(components)-1]
