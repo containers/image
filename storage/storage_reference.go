@@ -122,25 +122,25 @@ func (s storageReference) StringWithinTransport() string {
 	if len(options) > 0 {
 		optionsList = ":" + strings.Join(options, ",")
 	}
-	storeSpec := "[" + s.transport.store.GraphDriverName() + "@" + s.transport.store.GraphRoot() + "+" + s.transport.store.RunRoot() + optionsList + "]"
-	if s.named == nil {
-		return storeSpec + "@" + s.id
+	res := "[" + s.transport.store.GraphDriverName() + "@" + s.transport.store.GraphRoot() + "+" + s.transport.store.RunRoot() + optionsList + "]"
+	if s.named != nil {
+		res = res + s.named.String()
 	}
-	if s.id == "" {
-		return storeSpec + s.named.String()
+	if s.id != "" {
+		res = res + "@" + s.id
 	}
-	return storeSpec + s.named.String() + "@" + s.id
+	return res
 }
 
 func (s storageReference) PolicyConfigurationIdentity() string {
-	storeSpec := "[" + s.transport.store.GraphDriverName() + "@" + s.transport.store.GraphRoot() + "]"
-	if s.named == nil {
-		return storeSpec + "@" + s.id
+	res := "[" + s.transport.store.GraphDriverName() + "@" + s.transport.store.GraphRoot() + "]"
+	if s.named != nil {
+		res = res + s.named.String()
 	}
-	if s.id == "" {
-		return storeSpec + s.named.String()
+	if s.id != "" {
+		res = res + "@" + s.id
 	}
-	return storeSpec + s.named.String() + "@" + s.id
+	return res
 }
 
 // Also accept policy that's tied to the combination of the graph root and
