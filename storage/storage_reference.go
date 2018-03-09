@@ -55,10 +55,12 @@ func imageMatchesRepo(image *storage.Image, ref reference.Named) bool {
 // Resolve the reference's name to an image ID in the store, if there's already
 // one present with the same name or ID, and return the image.
 func (s *storageReference) resolveImage() (*storage.Image, error) {
+	var loadedImage *storage.Image
 	if s.id == "" {
 		// Look for an image that has the expanded reference name as an explicit Name value.
 		image, err := s.transport.store.Image(s.named.String())
 		if image != nil && err == nil {
+			loadedImage = image
 			s.id = image.ID
 		}
 	}
@@ -71,6 +73,7 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 			if images != nil && err == nil {
 				for _, image := range images {
 					if imageMatchesRepo(image, s.named) {
+						loadedImage = image
 						s.id = image.ID
 						break
 					}
@@ -82,17 +85,20 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 		logrus.Debugf("reference %q does not resolve to an image ID", s.StringWithinTransport())
 		return nil, errors.Wrapf(ErrNoSuchImage, "reference %q does not resolve to an image ID", s.StringWithinTransport())
 	}
-	img, err := s.transport.store.Image(s.id)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error reading image %q", s.id)
+	if loadedImage == nil {
+		img, err := s.transport.store.Image(s.id)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error reading image %q", s.id)
+		}
+		loadedImage = img
 	}
 	if s.named != nil {
-		if !imageMatchesRepo(img, s.named) {
+		if !imageMatchesRepo(loadedImage, s.named) {
 			logrus.Errorf("no image matching reference %q found", s.StringWithinTransport())
 			return nil, ErrNoSuchImage
 		}
 	}
-	return img, nil
+	return loadedImage, nil
 }
 
 // Return a Transport object that defaults to using the same store that we used
