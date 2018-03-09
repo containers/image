@@ -189,17 +189,17 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	// The initial portion is probably a name, possibly with a tag.
 	var completeReference reference.Named
 	if ref != "" {
-		name, err := reference.ParseNormalizedNamed(ref)
+		var err error
+		completeReference, err = reference.ParseNormalizedNamed(ref)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error parsing named reference %q", ref)
 		}
-		if _, hasDigest := name.(reference.Digested); hasDigest {
+		if _, hasDigest := completeReference.(reference.Digested); hasDigest {
 			// We have already checked for up to two @… suffixes, so ID and digest, if any, must already have been parsed separately.
 			// This means that we got a name@digest@digest@ID, ambiguous and invalid.
 			// FIXME? Reorganize the code to always parse the digest in ParseNormalizedNamed, then this condition disappears.
 			return nil, errors.Errorf("invalid reference %q, with digest %q and ID %q", ref, sum, id)
 		}
-		completeReference = name
 	}
 	if completeReference == nil && sum == "" && id == "" { // Coverage: This could happen only on empty input, which is refused at the very top of the method.
 		return nil, errors.Errorf("error parsing reference")
@@ -222,20 +222,15 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	refname := ""
 	if completeReference != nil {
 		if sum.Validate() == nil {
-			canonical, err := reference.WithDigest(completeReference, sum)
-			if err != nil {
-				return nil, errors.Wrapf(err, "error mixing name %q with digest %q", completeReference, sum)
-			}
 			cr2, err := reference.WithDigest(completeReference, sum)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error mixing name %q with digest %q", completeReference, sum)
 			}
 			completeReference = cr2
-			refname = canonical.String()
+			refname = completeReference.String()
 		} else {
-			name := reference.TagNameOnly(completeReference)
 			completeReference = reference.TagNameOnly(completeReference)
-			refname = name.String()
+			refname = completeReference.String()
 		}
 	}
 	if refname == "" {
