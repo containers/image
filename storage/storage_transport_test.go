@@ -139,16 +139,18 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 
 	// Valid inputs
 	for _, scope := range []string{
-		"[" + root + "suffix1]",                                              // driverlessStoreSpec in PolicyConfigurationNamespaces
-		"[" + driver + "@" + root + "suffix3]",                               // storeSpec in PolicyConfigurationNamespaces
-		storeSpec + "sha256:ab",                                              // Valid single-component name, explicit tag
-		storeSpec + "sha256:" + sha256digestHex,                              // Valid single-component ID with a longer explicit tag
-		storeSpec + "busybox",                                                // Valid single-component name, implicit tag; NOTE that this non-canonical form would be interpreted as a scope for host busybox
-		storeSpec + "busybox:notlatest",                                      // Valid single-component name, explicit tag; NOTE that this non-canonical form would be interpreted as a scope for host busybox
-		storeSpec + "docker.io/library/busybox:notlatest",                    // Valid single-component name, everything explicit
-		storeSpec + "busybox@" + sha256digestHex,                             // Valid two-component name, implicit tag; NOTE that this non-canonical form would be interpreted as a scope for host busybox (and never match)
-		storeSpec + "busybox:notlatest@" + sha256digestHex,                   // Valid two-component name, explicit tag; NOTE that this non-canonical form would be interpreted as a scope for host busybox (and never match)
-		storeSpec + "docker.io/library/busybox:notlatest@" + sha256digestHex, // Valid two-component name, everything explicit
+		"[" + root + "suffix1]",                // driverlessStoreSpec in PolicyConfigurationNamespaces
+		"[" + driver + "@" + root + "suffix3]", // storeSpec in PolicyConfigurationNamespaces
+		// FIXME storeSpec + "@" + sha256digestHex,                                                          // ID only
+		storeSpec + "docker.io",                                              // Host name only
+		storeSpec + "docker.io/library",                                      // A repository namespace
+		storeSpec + "docker.io/library/busybox",                              // A repository name
+		storeSpec + "docker.io/library/busybox:notlatest",                    // name:tag
+		storeSpec + "docker.io/library/busybox:notlatest@" + sha256digestHex, // name@ID
+		// FIXME storeSpec + "docker.io/library/busybox@" + sha256Digest2,                                   // name@digest
+		// FIXME storeSpec + "docker.io/library/busybox@" + sha256Digest2 + "@" + sha256digestHex,           // name@digest@ID
+		// FIXME storeSpec + "docker.io/library/busybox:notlatest@" + sha256Digest2,                         // name:tag@digest
+		// FIXME storeSpec + "docker.io/library/busybox:notlatest@" + sha256Digest2 + "@" + sha256digestHex, // name:tag@digest@ID
 	} {
 		err := Transport.ValidatePolicyConfigurationScope(scope)
 		assert.NoError(t, err, scope)
@@ -162,15 +164,13 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 		"[relative/path]",                // Non-absolute graph root path
 		"[" + driver + "@relative/path]", // Non-absolute graph root path
 		// "[thisisunknown@" + root + "suffix2]", // Unknown graph driver FIXME: validate against storage.ListGraphDrivers() once that's available
-		storeSpec + sha256digestHex,       // Almost a valid single-component name, but rejected because it looks like an ID that's missing its "@" prefix
-		storeSpec + "@",                   // An incomplete two-component name
-		storeSpec + "@" + sha256digestHex, // A valid two-component name, but ID-only, so not a valid scope
+		storeSpec + sha256digestHex, // Almost a valid single-component name, but rejected because it looks like an ID that's missing its "@" prefix
+		storeSpec + "@",             // An incomplete two-component name
 
 		storeSpec + "UPPERCASEISINVALID",                    // Invalid single-component name
 		storeSpec + "UPPERCASEISINVALID@" + sha256digestHex, // Invalid name in name@ID
-		storeSpec + "busybox@ab",                            // Invalid ID in name@ID
-		storeSpec + "busybox@",                              // Empty ID in name@ID
-		storeSpec + "busybox@sha256:" + sha256digestHex,     // This (in a digested docker/docker reference format) is also invalid; this can't actually be matched by a storageReference.PolicyConfigurationIdentity, so it should be rejected
+		storeSpec + "docker.io/library/busybox@ab",          // Invalid ID in name@ID
+		storeSpec + "docker.io/library/busybox@",            // Empty ID in name@ID
 	} {
 		err := Transport.ValidatePolicyConfigurationScope(scope)
 		assert.Error(t, err, scope)
