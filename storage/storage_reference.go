@@ -21,8 +21,8 @@ type storageReference struct {
 	completeReference    reference.Named // may include a tag and/or a digest
 	reference            string
 	id                   string
-	name                 reference.Named
-	breakDockerReference bool // Possibly set by newImageDestination.  FIXME: Figure out another way.
+	name                 reference.Named // May include a tag, not a digest
+	breakDockerReference bool            // Possibly set by newImageDestination.  FIXME: Figure out another way.
 }
 
 func newReference(transport storageTransport, completeReference reference.Named, reference, id string, name reference.Named) *storageReference {
@@ -62,7 +62,7 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 			s.id = image.ID
 		}
 	}
-	if s.id == "" && s.name != nil {
+	if s.id == "" && s.completeReference != nil {
 		if digested, ok := s.completeReference.(reference.Digested); ok {
 			// Look for an image with the specified digest that has the same name,
 			// though possibly with a different tag or digest, as a Name value, so
@@ -70,7 +70,7 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 			images, err := s.transport.store.ImagesByDigest(digested.Digest())
 			if images != nil && err == nil {
 				for _, image := range images {
-					if imageMatchesRepo(image, s.name) {
+					if imageMatchesRepo(image, s.completeReference) {
 						s.id = image.ID
 						break
 					}
@@ -86,8 +86,8 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading image %q", s.id)
 	}
-	if s.name != nil {
-		if !imageMatchesRepo(img, s.name) {
+	if s.completeReference != nil {
+		if !imageMatchesRepo(img, s.completeReference) {
 			logrus.Errorf("no image matching reference %q found", s.StringWithinTransport())
 			return nil, ErrNoSuchImage
 		}
@@ -110,10 +110,10 @@ func (s storageReference) DockerReference() reference.Named {
 	if s.breakDockerReference {
 		return nil
 	}
-	if s.name == nil {
+	if s.completeReference == nil {
 		return nil
 	}
-	name := s.name
+	name := s.completeReference
 	if tagged, ok := s.completeReference.(reference.Tagged); ok {
 		if namedTagged, err := reference.WithTag(name, tagged.Tag()); err == nil {
 			name = namedTagged
@@ -148,7 +148,7 @@ func (s storageReference) StringWithinTransport() string {
 
 func (s storageReference) PolicyConfigurationIdentity() string {
 	storeSpec := "[" + s.transport.store.GraphDriverName() + "@" + s.transport.store.GraphRoot() + "]"
-	if s.name == nil {
+	if s.completeReference == nil {
 		return storeSpec + "@" + s.id
 	}
 	if s.id == "" {
@@ -165,12 +165,12 @@ func (s storageReference) PolicyConfigurationNamespaces() []string {
 	storeSpec := "[" + s.transport.store.GraphDriverName() + "@" + s.transport.store.GraphRoot() + "]"
 	driverlessStoreSpec := "[" + s.transport.store.GraphRoot() + "]"
 	namespaces := []string{}
-	if s.name != nil {
+	if s.completeReference != nil {
 		if s.id != "" {
 			// The reference without the ID is also a valid namespace.
 			namespaces = append(namespaces, storeSpec+s.reference)
 		}
-		components := strings.Split(s.name.Name(), "/")
+		components := strings.Split(s.completeReference.Name(), "/")
 		for len(components) > 0 {
 			namespaces = append(namespaces, storeSpec+strings.Join(components, "/"))
 			components = components[:len(components)-1]
