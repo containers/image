@@ -218,7 +218,6 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	}
 	storeSpec := "[" + store.GraphDriverName() + "@" + store.GraphRoot() + "+" + store.RunRoot() + optionsList + "]"
 
-	refname := ""
 	if completeReference != nil {
 		if sum.Validate() == nil {
 			cr2, err := reference.WithDigest(completeReference, sum)
@@ -229,7 +228,6 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		} else {
 			completeReference = reference.TagNameOnly(completeReference)
 		}
-		refname = completeReference.String()
 	}
 	if completeReference == nil {
 		logrus.Debugf("parsed reference to id into %q", storeSpec+"@"+id)
@@ -238,7 +236,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	} else {
 		logrus.Debugf("parsed reference to refname@id into %q", storeSpec+completeReference.String()+"@"+id)
 	}
-	return newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, completeReference, refname, id), nil
+	return newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, completeReference, id), nil
 }
 
 func (s *storageTransport) GetStore() (storage.Store, error) {

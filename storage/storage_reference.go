@@ -19,12 +19,11 @@ import (
 type storageReference struct {
 	transport            storageTransport
 	completeReference    reference.Named // may include a tag and/or a digest
-	reference            string
 	id                   string
 	breakDockerReference bool // Possibly set by newImageDestination.  FIXME: Figure out another way.
 }
 
-func newReference(transport storageTransport, completeReference reference.Named, reference, id string) *storageReference {
+func newReference(transport storageTransport, completeReference reference.Named, id string) *storageReference {
 	// We take a copy of the transport, which contains a pointer to the
 	// store that it used for resolving this reference, so that the
 	// transport that we'll return from Transport() won't be affected by
@@ -32,7 +31,6 @@ func newReference(transport storageTransport, completeReference reference.Named,
 	return &storageReference{
 		transport:         transport,
 		completeReference: completeReference,
-		reference:         reference,
 		id:                id,
 	}
 }
