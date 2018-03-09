@@ -183,10 +183,7 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 func TestVerboseName(t *testing.T) {
 	newStore(t)
 
-	assert.Equal(t, "", verboseName(nil))
-
 	for _, c := range []struct{ input, expected string }{
-		{"sha256:" + sha256digestHex, "@sha256:" + sha256digestHex},
 		{"busybox", "docker.io/library/busybox"}, // The normalization actually happens already in ParseAnyReference
 		{"docker.io/library/busybox", "docker.io/library/busybox"},
 		{"docker.io/library/busybox:latest", "docker.io/library/busybox:latest"},
@@ -194,7 +191,7 @@ func TestVerboseName(t *testing.T) {
 		{"docker.io/library/busybox@sha256:" + sha256digestHex, "docker.io/library/busybox@sha256:" + sha256digestHex},
 		{"docker.io/library/busybox:notlatest@sha256:" + sha256digestHex, "docker.io/library/busybox:notlatest@sha256:" + sha256digestHex},
 	} {
-		ref, err := reference.ParseAnyReference(c.input)
+		ref, err := reference.ParseNormalizedNamed(c.input)
 		require.NoError(t, err, c.input)
 		name := verboseName(ref)
 		assert.Equal(t, c.expected, name, c.input)

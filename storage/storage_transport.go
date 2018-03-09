@@ -427,10 +427,7 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 	return nil
 }
 
-func verboseName(r reference.Reference) string {
-	if r == nil {
-		return ""
-	}
+func verboseName(r reference.Named) string {
 	named, isNamed := r.(reference.Named)
 	digested, isDigested := r.(reference.Digested)
 	tagged, isTagged := r.(reference.Tagged)
