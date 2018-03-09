@@ -118,19 +118,33 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		ref = ref[closeIndex+1:]
 	}
 
-	// The last segment, if there's more than one, is either a digest from a reference, or an image ID.
+	// The reference may end with an image ID.  Image IDs and digests use the same "@" separator;
+	// here we only peel away an image ID, and leave digests alone.
 	split := strings.LastIndex(ref, "@")
-	idOrDigest := ""
+	id := ""
 	if split != -1 {
-		// Peel off that last bit so that we can work on the rest.
-		idOrDigest = ref[split+1:]
-		if idOrDigest == "" {
-			return nil, errors.Wrapf(ErrInvalidReference, "%q does not look like a digest or image ID", idOrDigest)
+		possibleID := ref[split+1:]
+		if possibleID == "" {
+			return nil, errors.Wrapf(ErrInvalidReference, "empty trailing digest or ID in %q", ref)
 		}
-		ref = ref[:split]
+		// If it looks like a digest, leave it alone for now.
+		if _, err := digest.Parse(possibleID); err != nil {
+			// Otherwise…
+			if idSum, err := digest.Parse("sha256:" + possibleID); err == nil && idSum.Validate() == nil {
+				id = possibleID // … it is a full ID
+			} else if img, err := store.Image(possibleID); err == nil && img != nil && len(possibleID) >= minimumTruncatedIDLength && strings.HasPrefix(img.ID, possibleID) {
+				// … it is a truncated version of the ID of an image that's present in local storage,
+				// so we might as well use the expanded value.
+				id = img.ID
+			} else {
+				return nil, errors.Wrapf(ErrInvalidReference, "%q does not look like an image ID or digest", possibleID)
+			}
+			// We have recognized an image ID; peel it off.
+			ref = ref[:split]
+		}
 	}
 
-	// The middle segment (now the last segment), if there is one, is a digest.
+	// The last segment (if there is no ID), or the middle segment (if there is an ID), is a digest.
 	split = strings.LastIndex(ref, "@")
 	sum := digest.Digest("")
 	if split != -1 {
@@ -138,40 +152,10 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		if sum == "" {
 			return nil, errors.Wrapf(ErrInvalidReference, "%q does not look like an image digest", sum)
 		}
-		ref = ref[:split]
-	}
-
-	// If we have something that unambiguously should be a digest, validate it, and then the third part,
-	// if we have one, as an ID.
-	id := ""
-	if sum != "" {
 		if err := sum.Validate(); err != nil {
-			return nil, errors.Wrapf(ErrInvalidReference, "%q does not look like an image digest", sum)
+			return nil, errors.Wrapf(err, "%q does not look like an image digest", sum)
 		}
-		if idSum, err := digest.Parse("sha256:" + idOrDigest); err == nil && idSum.Validate() == nil {
-			id = idOrDigest
-		} else if img, err := store.Image(idOrDigest); err == nil && img != nil && len(idOrDigest) >= minimumTruncatedIDLength && strings.HasPrefix(img.ID, idOrDigest) {
-			// The ID is a truncated version of the ID of an image that's present in local storage,
-			// so we might as well use the expanded value.
-			id = img.ID
-		} else {
-			return nil, errors.Wrapf(ErrInvalidReference, "%q does not look like an image ID", idOrDigest)
-		}
-	} else if idOrDigest != "" {
-		// There was no middle portion, so the final portion could be either a digest or an ID.
-		if idSum, err := digest.Parse("sha256:" + idOrDigest); err == nil && idSum.Validate() == nil {
-			// It's an ID.
-			id = idOrDigest
-		} else if idSum, err := digest.Parse(idOrDigest); err == nil && idSum.Validate() == nil {
-			// It's a digest.
-			sum = idSum
-		} else if img, err := store.Image(idOrDigest); err == nil && img != nil && len(idOrDigest) >= minimumTruncatedIDLength && strings.HasPrefix(img.ID, idOrDigest) {
-			// It's a truncated version of the ID of an image that's present in local storage,
-			// and we may need the expanded value.
-			id = img.ID
-		} else {
-			return nil, errors.Wrapf(ErrInvalidReference, "%q does not look like a digest or image ID", idOrDigest)
-		}
+		ref = ref[:split]
 	}
 
 	// If we only had one portion, then _maybe_ it's a truncated image ID.  Only check on that if it's
