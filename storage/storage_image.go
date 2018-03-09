@@ -613,7 +613,7 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 	if name := s.imageRef.DockerReference(); len(oldNames) > 0 || name != nil {
 		names := []string{}
 		if name != nil {
-			names = append(names, verboseName(name))
+			names = append(names, name.String())
 		}
 		if len(oldNames) > 0 {
 			names = append(names, oldNames...)

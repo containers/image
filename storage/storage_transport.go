@@ -215,14 +215,14 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 			if err != nil {
 				return nil, errors.Wrapf(err, "error mixing name %q with digest %q", name, sum)
 			}
-			refname = verboseName(canonical)
+			refname = canonical.String()
 		} else {
 			name = reference.TagNameOnly(name)
 			tagged, ok := name.(reference.Tagged)
 			if !ok {
 				return nil, errors.Errorf("error parsing possibly-tagless name %q", ref)
 			}
-			refname = verboseName(name)
+			refname = name.String()
 			tag = tagged.Tag()
 		}
 	}
@@ -339,7 +339,7 @@ func (s *storageTransport) ParseReference(reference string) (types.ImageReferenc
 func (s storageTransport) GetStoreImage(store storage.Store, ref types.ImageReference) (*storage.Image, error) {
 	dref := ref.DockerReference()
 	if dref != nil {
-		if img, err := store.Image(verboseName(dref)); err == nil {
+		if img, err := store.Image(dref.String()); err == nil {
 			return img, nil
 		}
 	}
@@ -425,8 +425,4 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 	// from docker/distribution/reference.regexp.go, but other than that there
 	// are few semantically invalid strings.
 	return nil
-}
-
-func verboseName(r reference.Named) string {
-	return r.String()
 }

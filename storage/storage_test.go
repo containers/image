@@ -137,13 +137,13 @@ func TestParse(t *testing.T) {
 	_references := []storageReference{
 		{
 			name:      ref.(*storageReference).name,
-			reference: verboseName(ref.(*storageReference).name),
+			reference: ref.(*storageReference).name.String(),
 			id:        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			transport: transport,
 		},
 		{
 			name:      ref.(*storageReference).name,
-			reference: verboseName(ref.(*storageReference).name),
+			reference: ref.(*storageReference).name.String(),
 			transport: transport,
 		},
 		{
@@ -152,7 +152,7 @@ func TestParse(t *testing.T) {
 		},
 		{
 			name:      ref.DockerReference(),
-			reference: verboseName(ref.DockerReference()),
+			reference: ref.DockerReference().String(),
 			transport: transport,
 		},
 	}
