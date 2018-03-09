@@ -187,14 +187,14 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	}
 
 	// The initial portion is probably a name, possibly with a tag.
-	var completeReference reference.Named
+	var named reference.Named
 	if ref != "" {
 		var err error
-		completeReference, err = reference.ParseNormalizedNamed(ref)
+		named, err = reference.ParseNormalizedNamed(ref)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error parsing named reference %q", ref)
 		}
-		if _, hasDigest := completeReference.(reference.Digested); hasDigest {
+		if _, hasDigest := named.(reference.Digested); hasDigest {
 			// We have already checked for up to two @… suffixes, so ID and digest, if any, must already have been parsed separately.
 			// This means that we got a name@digest@digest@ID, ambiguous and invalid.
 			// FIXME? Reorganize the code to always parse the digest in ParseNormalizedNamed, then this condition disappears.
@@ -202,15 +202,15 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		}
 
 		if sum.Validate() == nil {
-			cr2, err := reference.WithDigest(completeReference, sum)
+			n, err := reference.WithDigest(named, sum)
 			if err != nil {
-				return nil, errors.Wrapf(err, "error mixing name %q with digest %q", completeReference, sum)
+				return nil, errors.Wrapf(err, "error mixing name %q with digest %q", named, sum)
 			}
-			completeReference = cr2
+			named = n
 		} else {
-			completeReference = reference.TagNameOnly(completeReference)
+			named = reference.TagNameOnly(named)
 		}
-	} else { // ref == "", completeReference == nil {
+	} else { // ref == "", named == nil {
 		if sum != "" {
 			// "@digest" with no name: this package can't read nor write images with such names (the digest value is used only if name != nil),
 			// so refuse it.
@@ -221,7 +221,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		}
 	}
 
-	result := newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, completeReference, id)
+	result := newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, named, id)
 	logrus.Debugf("parsed reference into %q", result.StringWithinTransport())
 	return result, nil
 }

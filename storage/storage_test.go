@@ -136,21 +136,21 @@ func TestParse(t *testing.T) {
 	}
 	_references := []storageReference{
 		{
-			completeReference: ref.(*storageReference).completeReference,
-			id:                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			transport:         transport,
+			named:     ref.(*storageReference).named,
+			id:        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			transport: transport,
 		},
 		{
-			completeReference: ref.(*storageReference).completeReference,
-			transport:         transport,
+			named:     ref.(*storageReference).named,
+			transport: transport,
 		},
 		{
 			id:        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			transport: transport,
 		},
 		{
-			completeReference: ref.DockerReference(),
-			transport:         transport,
+			named:     ref.DockerReference(),
+			transport: transport,
 		},
 	}
 	for _, reference := range _references {
@@ -162,13 +162,13 @@ func TestParse(t *testing.T) {
 		if ref.id != reference.id {
 			t.Fatalf("ParseReference(%q) failed to extract ID", s)
 		}
-		if reference.completeReference == nil {
-			if ref.completeReference != nil {
-				t.Fatalf("ParseReference(%q) set non-nil completeReference", s)
+		if reference.named == nil {
+			if ref.named != nil {
+				t.Fatalf("ParseReference(%q) set non-nil named", s)
 			}
 		} else {
-			if ref.completeReference.String() != reference.completeReference.String() {
-				t.Fatalf("ParseReference(%q) failed to extract reference (%q!=%q)", s, ref.completeReference.String(), reference.completeReference.String())
+			if ref.named.String() != reference.named.String() {
+				t.Fatalf("ParseReference(%q) failed to extract reference (%q!=%q)", s, ref.named.String(), reference.named.String())
 			}
 		}
 	}

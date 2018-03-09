@@ -18,20 +18,20 @@ import (
 // where an image is, or would be, kept.
 type storageReference struct {
 	transport            storageTransport
-	completeReference    reference.Named // may include a tag and/or a digest
+	named                reference.Named // may include a tag and/or a digest
 	id                   string
 	breakDockerReference bool // Possibly set by newImageDestination.  FIXME: Figure out another way.
 }
 
-func newReference(transport storageTransport, completeReference reference.Named, id string) *storageReference {
+func newReference(transport storageTransport, named reference.Named, id string) *storageReference {
 	// We take a copy of the transport, which contains a pointer to the
 	// store that it used for resolving this reference, so that the
 	// transport that we'll return from Transport() won't be affected by
 	// further calls to the original transport's SetStore() method.
 	return &storageReference{
-		transport:         transport,
-		completeReference: completeReference,
-		id:                id,
+		transport: transport,
+		named:     named,
+		id:        id,
 	}
 }
 
@@ -53,20 +53,20 @@ func imageMatchesRepo(image *storage.Image, ref reference.Named) bool {
 func (s *storageReference) resolveImage() (*storage.Image, error) {
 	if s.id == "" {
 		// Look for an image that has the expanded reference name as an explicit Name value.
-		image, err := s.transport.store.Image(s.completeReference.String())
+		image, err := s.transport.store.Image(s.named.String())
 		if image != nil && err == nil {
 			s.id = image.ID
 		}
 	}
-	if s.id == "" && s.completeReference != nil {
-		if digested, ok := s.completeReference.(reference.Digested); ok {
+	if s.id == "" && s.named != nil {
+		if digested, ok := s.named.(reference.Digested); ok {
 			// Look for an image with the specified digest that has the same name,
 			// though possibly with a different tag or digest, as a Name value, so
 			// that the canonical reference can be implicitly resolved to the image.
 			images, err := s.transport.store.ImagesByDigest(digested.Digest())
 			if images != nil && err == nil {
 				for _, image := range images {
-					if imageMatchesRepo(image, s.completeReference) {
+					if imageMatchesRepo(image, s.named) {
 						s.id = image.ID
 						break
 					}
@@ -82,8 +82,8 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading image %q", s.id)
 	}
-	if s.completeReference != nil {
-		if !imageMatchesRepo(img, s.completeReference) {
+	if s.named != nil {
+		if !imageMatchesRepo(img, s.named) {
 			logrus.Errorf("no image matching reference %q found", s.StringWithinTransport())
 			return nil, ErrNoSuchImage
 		}
@@ -106,7 +106,7 @@ func (s storageReference) DockerReference() reference.Named {
 	if s.breakDockerReference {
 		return nil
 	}
-	return s.completeReference
+	return s.named
 }
 
 // Return a name with a tag, prefixed with the graph root and driver name, to
@@ -119,24 +119,24 @@ func (s storageReference) StringWithinTransport() string {
 		optionsList = ":" + strings.Join(options, ",")
 	}
 	storeSpec := "[" + s.transport.store.GraphDriverName() + "@" + s.transport.store.GraphRoot() + "+" + s.transport.store.RunRoot() + optionsList + "]"
-	if s.completeReference == nil {
+	if s.named == nil {
 		return storeSpec + "@" + s.id
 	}
 	if s.id == "" {
-		return storeSpec + s.completeReference.String()
+		return storeSpec + s.named.String()
 	}
-	return storeSpec + s.completeReference.String() + "@" + s.id
+	return storeSpec + s.named.String() + "@" + s.id
 }
 
 func (s storageReference) PolicyConfigurationIdentity() string {
 	storeSpec := "[" + s.transport.store.GraphDriverName() + "@" + s.transport.store.GraphRoot() + "]"
-	if s.completeReference == nil {
+	if s.named == nil {
 		return storeSpec + "@" + s.id
 	}
 	if s.id == "" {
-		return storeSpec + s.completeReference.String()
+		return storeSpec + s.named.String()
 	}
-	return storeSpec + s.completeReference.String() + "@" + s.id
+	return storeSpec + s.named.String() + "@" + s.id
 }
 
 // Also accept policy that's tied to the combination of the graph root and
@@ -147,12 +147,12 @@ func (s storageReference) PolicyConfigurationNamespaces() []string {
 	storeSpec := "[" + s.transport.store.GraphDriverName() + "@" + s.transport.store.GraphRoot() + "]"
 	driverlessStoreSpec := "[" + s.transport.store.GraphRoot() + "]"
 	namespaces := []string{}
-	if s.completeReference != nil {
+	if s.named != nil {
 		if s.id != "" {
 			// The reference without the ID is also a valid namespace.
-			namespaces = append(namespaces, storeSpec+s.completeReference.String())
+			namespaces = append(namespaces, storeSpec+s.named.String())
 		}
-		components := strings.Split(s.completeReference.Name(), "/")
+		components := strings.Split(s.named.Name(), "/")
 		for len(components) > 0 {
 			namespaces = append(namespaces, storeSpec+strings.Join(components, "/"))
 			components = components[:len(components)-1]
