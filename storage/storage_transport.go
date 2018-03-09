@@ -156,50 +156,16 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		}
 	}
 
-	// The last segment (if there is no ID), or the middle segment (if there is an ID), is a digest.
-	split = strings.LastIndex(ref, "@")
-	sum := digest.Digest("")
-	if split != -1 {
-		sum = digest.Digest(ref[split+1:])
-		if sum == "" {
-			return nil, errors.Wrapf(ErrInvalidReference, "%q does not look like an image digest", sum)
-		}
-		if err := sum.Validate(); err != nil {
-			return nil, errors.Wrapf(err, "%q does not look like an image digest", sum)
-		}
-		ref = ref[:split]
-	}
-
-	// The initial portion is probably a name, possibly with a tag.
 	var named reference.Named
+	// Unless we have an un-named "ID" or "@ID" reference (where ID might only have been a prefix), which has been
+	// completely parsed above, the initial portion should be a name, possibly with a tag and/or a digest..
 	if ref != "" {
 		var err error
 		named, err = reference.ParseNormalizedNamed(ref)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error parsing named reference %q", ref)
 		}
-		if _, hasDigest := named.(reference.Digested); hasDigest {
-			// We have already checked for up to two @… suffixes, so ID and digest, if any, must already have been parsed separately.
-			// This means that we got a name@digest@digest@ID, ambiguous and invalid.
-			// FIXME? Reorganize the code to always parse the digest in ParseNormalizedNamed, then this condition disappears.
-			return nil, errors.Errorf("invalid reference %q, with digest %q and ID %q", ref, sum, id)
-		}
-
-		if sum.Validate() == nil {
-			n, err := reference.WithDigest(named, sum)
-			if err != nil {
-				return nil, errors.Wrapf(err, "error mixing name %q with digest %q", named, sum)
-			}
-			named = n
-		} else {
-			named = reference.TagNameOnly(named)
-		}
-	} else { // ref == "", named == nil {
-		if sum != "" {
-			// "@digest" with no name: this package can't read nor write images with such names (the digest value is used only if name != nil),
-			// so refuse it.
-			return nil, errors.Errorf("invalid reference with digest @%s without a repository name", sum)
-		}
+		named = reference.TagNameOnly(named)
 	}
 
 	result, err := newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, named, id)
