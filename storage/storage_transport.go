@@ -245,7 +245,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	} else {
 		logrus.Debugf("parsed reference to refname@id into %q", storeSpec+refname+"@"+id)
 	}
-	return newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, completeReference, refname, id, name, sum), nil
+	return newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, completeReference, refname, id, name), nil
 }
 
 func (s *storageTransport) GetStore() (storage.Store, error) {
