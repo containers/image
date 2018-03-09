@@ -74,11 +74,11 @@ func TestTransportParseStoreReference(t *testing.T) {
 			assert.Equal(t, c.expectedRef, storageRef.reference, c.input)
 			assert.Equal(t, c.expectedID, storageRef.id, c.input)
 			if c.expectedRef == "" {
-				assert.Nil(t, storageRef.name, c.input)
+				assert.Nil(t, storageRef.completeReference, c.input)
 			} else {
 				dockerRef, err := reference.ParseNormalizedNamed(c.expectedRef)
 				require.NoError(t, err)
-				require.NotNil(t, storageRef.name, c.input)
+				require.NotNil(t, storageRef.completeReference, c.input)
 				assert.Equal(t, dockerRef.String(), storageRef.reference)
 				assert.Equal(t, dockerRef.String(), storageRef.DockerReference().String())
 			}

@@ -249,7 +249,6 @@ func newImageDestination(imageRef storageReference) (*storageImageDestination, e
 	// reference that mentions the no-longer-correct digest.
 	publicRef := imageRef
 	publicRef.breakDockerReference = true // FIXME: this does not change .StringWithinTransport(), but modifies DockerReference()
-	publicRef.name = nil
 	image := &storageImageDestination{
 		imageRef:       imageRef,
 		publicRef:      publicRef,

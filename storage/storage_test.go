@@ -136,24 +136,24 @@ func TestParse(t *testing.T) {
 	}
 	_references := []storageReference{
 		{
-			name:      ref.(*storageReference).name,
-			reference: ref.(*storageReference).name.String(),
+			completeReference: ref.(*storageReference).completeReference,
+			reference:         ref.(*storageReference).completeReference.String(),
+			id:                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			transport:         transport,
+		},
+		{
+			completeReference: ref.(*storageReference).completeReference,
+			reference:         ref.(*storageReference).completeReference.String(),
+			transport:         transport,
+		},
+		{
 			id:        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			transport: transport,
 		},
 		{
-			name:      ref.(*storageReference).name,
-			reference: ref.(*storageReference).name.String(),
-			transport: transport,
-		},
-		{
-			id:        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			transport: transport,
-		},
-		{
-			name:      ref.DockerReference(),
-			reference: ref.DockerReference().String(),
-			transport: transport,
+			completeReference: ref.DockerReference(),
+			reference:         ref.DockerReference().String(),
+			transport:         transport,
 		},
 	}
 	for _, reference := range _references {
