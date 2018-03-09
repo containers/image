@@ -65,16 +65,18 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 			s.id = image.ID
 		}
 	}
-	if s.id == "" && s.name != nil && s.digest != "" {
-		// Look for an image with the specified digest that has the same name,
-		// though possibly with a different tag or digest, as a Name value, so
-		// that the canonical reference can be implicitly resolved to the image.
-		images, err := s.transport.store.ImagesByDigest(s.digest)
-		if images != nil && err == nil {
-			for _, image := range images {
-				if imageMatchesRepo(image, s.name) {
-					s.id = image.ID
-					break
+	if s.id == "" && s.name != nil {
+		if digested, ok := s.completeReference.(reference.Digested); ok {
+			// Look for an image with the specified digest that has the same name,
+			// though possibly with a different tag or digest, as a Name value, so
+			// that the canonical reference can be implicitly resolved to the image.
+			images, err := s.transport.store.ImagesByDigest(digested.Digest())
+			if images != nil && err == nil {
+				for _, image := range images {
+					if imageMatchesRepo(image, s.name) {
+						s.id = image.ID
+						break
+					}
 				}
 			}
 		}
@@ -120,8 +122,8 @@ func (s storageReference) DockerReference() reference.Named {
 			name = namedTagged
 		}
 	}
-	if s.digest != "" {
-		if canonical, err := reference.WithDigest(name, s.digest); err == nil {
+	if digested, ok := s.completeReference.(reference.Digested); ok {
+		if canonical, err := reference.WithDigest(name, digested.Digest()); err == nil {
 			name = canonical
 		}
 	}
