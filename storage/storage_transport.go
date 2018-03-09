@@ -221,7 +221,6 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 
 	// Convert the name back into a reference string, if we got a name.
 	refname := ""
-	tag := ""
 	if name != nil {
 		if sum.Validate() == nil {
 			canonical, err := reference.WithDigest(name, sum)
@@ -236,13 +235,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		} else {
 			name = reference.TagNameOnly(name)
 			completeReference = reference.TagNameOnly(completeReference)
-			if _, ok := name.(reference.Tagged); !ok { // Coverage: This should never happen; we check only to ensure that "tag" is set below.
-				return nil, errors.Errorf("error parsing possibly-tagless name %q", ref)
-			}
 			refname = name.String()
-		}
-		if tagged, ok := name.(reference.Tagged); ok {
-			tag = tagged.Tag()
 		}
 	}
 	if refname == "" {
@@ -252,7 +245,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	} else {
 		logrus.Debugf("parsed reference to refname@id into %q", storeSpec+refname+"@"+id)
 	}
-	return newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, completeReference, refname, id, name, tag, sum), nil
+	return newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, completeReference, refname, id, name, sum), nil
 }
 
 func (s *storageTransport) GetStore() (storage.Store, error) {
