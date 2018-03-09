@@ -3,6 +3,7 @@
 package storage
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -399,27 +400,30 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 	if scope == "" {
 		return nil
 	}
-	// But if there is anything left, it has to be a name, with or without
-	// a tag, with or without an ID, since we don't return namespace values
-	// that are just bare IDs.
-	scopeInfo := strings.SplitN(scope, "@", 2)
-	if len(scopeInfo) == 1 && scopeInfo[0] != "" {
-		_, err := reference.ParseNormalizedNamed(scopeInfo[0])
-		if err != nil {
+
+	fields := strings.SplitN(scope, "@", 3)
+	switch len(fields) {
+	case 1: // name only
+	case 2: // name:tag@ID or name[:tag]@digest
+		if _, idErr := digest.Parse("sha256:" + fields[1]); idErr != nil {
+			if _, digestErr := digest.Parse(fields[1]); digestErr != nil {
+				return fmt.Errorf("%v is neither a valid digest(%s) nor a valid ID(%s)", fields[1], digestErr.Error(), idErr.Error())
+			}
+		}
+	case 3: // name[:tag]@digest@ID
+		if _, err := digest.Parse(fields[1]); err != nil {
 			return err
 		}
-	} else if len(scopeInfo) == 2 && scopeInfo[0] != "" && scopeInfo[1] != "" {
-		_, err := reference.ParseNormalizedNamed(scopeInfo[0])
-		if err != nil {
+		if _, err := digest.Parse("sha256:" + fields[2]); err != nil {
 			return err
 		}
-		_, err = digest.Parse("sha256:" + scopeInfo[1])
-		if err != nil {
-			return err
-		}
-	} else {
-		return ErrInvalidReference
+	default: // Coverage: This should never happen
+		return errors.New("Internal error: unexpected number of fields form strings.SplitN")
 	}
+	// As for field[0], if it is non-empty at all:
+	// FIXME? We could be verifying the various character set and length restrictions
+	// from docker/distribution/reference.regexp.go, but other than that there
+	// are few semantically invalid strings.
 	return nil
 }
 
