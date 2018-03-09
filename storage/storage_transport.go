@@ -146,17 +146,17 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	// if we have one, as an ID.
 	id := ""
 	if sum != "" {
-		if idSum, err := digest.Parse("sha256:" + idOrDigest); err != nil || idSum.Validate() != nil {
-			return nil, errors.Wrapf(ErrInvalidReference, "%q does not look like an image ID", idOrDigest)
-		}
 		if err := sum.Validate(); err != nil {
 			return nil, errors.Wrapf(ErrInvalidReference, "%q does not look like an image digest", sum)
 		}
-		id = idOrDigest
-		if img, err := store.Image(idOrDigest); err == nil && img != nil && len(idOrDigest) >= minimumTruncatedIDLength && strings.HasPrefix(img.ID, idOrDigest) {
+		if idSum, err := digest.Parse("sha256:" + idOrDigest); err == nil && idSum.Validate() == nil {
+			id = idOrDigest
+		} else if img, err := store.Image(idOrDigest); err == nil && img != nil && len(idOrDigest) >= minimumTruncatedIDLength && strings.HasPrefix(img.ID, idOrDigest) {
 			// The ID is a truncated version of the ID of an image that's present in local storage,
 			// so we might as well use the expanded value.
 			id = img.ID
+		} else {
+			return nil, errors.Wrapf(ErrInvalidReference, "%q does not look like an image ID", idOrDigest)
 		}
 	} else if idOrDigest != "" {
 		// There was no middle portion, so the final portion could be either a digest or an ID.
