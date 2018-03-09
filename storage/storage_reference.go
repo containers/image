@@ -110,21 +110,7 @@ func (s storageReference) DockerReference() reference.Named {
 	if s.breakDockerReference {
 		return nil
 	}
-	if s.completeReference == nil {
-		return nil
-	}
-	name := s.completeReference
-	if tagged, ok := s.completeReference.(reference.Tagged); ok {
-		if namedTagged, err := reference.WithTag(name, tagged.Tag()); err == nil {
-			name = namedTagged
-		}
-	}
-	if digested, ok := s.completeReference.(reference.Digested); ok {
-		if canonical, err := reference.WithDigest(name, digested.Digest()); err == nil {
-			name = canonical
-		}
-	}
-	return name
+	return s.completeReference
 }
 
 // Return a name with a tag, prefixed with the graph root and driver name, to
