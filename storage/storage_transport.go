@@ -106,7 +106,6 @@ func (s *storageTransport) DefaultGIDMap() []idtools.IDMap {
 // ParseStoreReference takes a name or an ID, tries to figure out which it is
 // relative to the given store, and returns it in a reference object.
 func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (*storageReference, error) {
-	var name reference.Named
 	if ref == "" {
 		return nil, errors.Wrapf(ErrInvalidReference, "%q is an empty reference")
 	}
@@ -190,8 +189,8 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	// The initial portion is probably a name, possibly with a tag.
 	var completeReference reference.Named
 	if ref != "" {
-		var err error
-		if name, err = reference.ParseNormalizedNamed(ref); err != nil {
+		name, err := reference.ParseNormalizedNamed(ref)
+		if err != nil {
 			return nil, errors.Wrapf(err, "error parsing named reference %q", ref)
 		}
 		if _, hasDigest := name.(reference.Digested); hasDigest {
@@ -202,10 +201,10 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		}
 		completeReference = name
 	}
-	if name == nil && sum == "" && id == "" { // Coverage: This could happen only on empty input, which is refused at the very top of the method.
+	if completeReference == nil && sum == "" && id == "" { // Coverage: This could happen only on empty input, which is refused at the very top of the method.
 		return nil, errors.Errorf("error parsing reference")
 	}
-	if name == nil && sum != "" {
+	if completeReference == nil && sum != "" {
 		// "@digest" with no name: this package can't read nor write images with such names (the digest value is used only if name != nil),
 		// so refuse it.
 		return nil, errors.Errorf("invalid reference with digest @%s without a repository name", sum)
@@ -221,19 +220,20 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 
 	// Convert the name back into a reference string, if we got a name.
 	refname := ""
-	if name != nil {
+	if completeReference != nil {
 		if sum.Validate() == nil {
-			canonical, err := reference.WithDigest(name, sum)
+			canonical, err := reference.WithDigest(completeReference, sum)
 			if err != nil {
-				return nil, errors.Wrapf(err, "error mixing name %q with digest %q", name, sum)
+				return nil, errors.Wrapf(err, "error mixing name %q with digest %q", completeReference, sum)
 			}
-			completeReference, err = reference.WithDigest(completeReference, sum)
+			cr2, err := reference.WithDigest(completeReference, sum)
 			if err != nil {
-				return nil, errors.Wrapf(err, "error mixing name %q with digest %q", name, sum)
+				return nil, errors.Wrapf(err, "error mixing name %q with digest %q", completeReference, sum)
 			}
+			completeReference = cr2
 			refname = canonical.String()
 		} else {
-			name = reference.TagNameOnly(name)
+			name := reference.TagNameOnly(completeReference)
 			completeReference = reference.TagNameOnly(completeReference)
 			refname = name.String()
 		}
