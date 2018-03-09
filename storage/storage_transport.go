@@ -227,11 +227,10 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 				return nil, errors.Wrapf(err, "error mixing name %q with digest %q", completeReference, sum)
 			}
 			completeReference = cr2
-			refname = completeReference.String()
 		} else {
 			completeReference = reference.TagNameOnly(completeReference)
-			refname = completeReference.String()
 		}
+		refname = completeReference.String()
 	}
 	if refname == "" {
 		logrus.Debugf("parsed reference to id into %q", storeSpec+"@"+id)
