@@ -144,6 +144,18 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		}
 	}
 
+	// If we only have one @-delimited portion, then _maybe_ it's a truncated image ID.  Only check on that if it's
+	// at least of what we guess is a reasonable minimum length, because we don't want a really short value
+	// like "a" matching an image by ID prefix when the input was actually meant to specify an image name.
+	if id == "" && len(ref) >= minimumTruncatedIDLength && !strings.ContainsAny(ref, "@:") {
+		if img, err := store.Image(ref); err == nil && img != nil && strings.HasPrefix(img.ID, ref) {
+			// It's a truncated version of the ID of an image that's present in local storage;
+			// we need to expand it.
+			id = img.ID
+			ref = ""
+		}
+	}
+
 	// The last segment (if there is no ID), or the middle segment (if there is an ID), is a digest.
 	split = strings.LastIndex(ref, "@")
 	sum := digest.Digest("")
@@ -156,18 +168,6 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 			return nil, errors.Wrapf(err, "%q does not look like an image digest", sum)
 		}
 		ref = ref[:split]
-	}
-
-	// If we only had one portion, then _maybe_ it's a truncated image ID.  Only check on that if it's
-	// at least of what we guess is a reasonable minimum length, because we don't want a really short value
-	// like "a" matching an image by ID prefix when the input was actually meant to specify an image name.
-	if len(ref) >= minimumTruncatedIDLength && sum == "" && id == "" {
-		if img, err := store.Image(ref); err == nil && img != nil && strings.HasPrefix(img.ID, ref) {
-			// It's a truncated version of the ID of an image that's present in local storage;
-			// we need to expand it.
-			id = img.ID
-			ref = ""
-		}
 	}
 
 	// The initial portion is probably a name, possibly with a tag.
