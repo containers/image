@@ -428,15 +428,11 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 }
 
 func verboseName(r reference.Named) string {
-	named, isNamed := r.(reference.Named)
 	digested, isDigested := r.(reference.Digested)
 	tagged, isTagged := r.(reference.Tagged)
-	name := ""
 	tag := ""
 	sum := ""
-	if isNamed {
-		name = (reference.TrimNamed(named)).String()
-	}
+	name := (reference.TrimNamed(r)).String()
 	if isTagged {
 		if tagged.Tag() != "" {
 			tag = ":" + tagged.Tag()
