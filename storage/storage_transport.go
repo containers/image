@@ -193,6 +193,12 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		if name, err = reference.ParseNormalizedNamed(ref); err != nil {
 			return nil, errors.Wrapf(err, "error parsing named reference %q", ref)
 		}
+		if _, hasDigest := name.(reference.Digested); hasDigest {
+			// We have already checked for up to two @… suffixes, so ID and digest, if any, must already have been parsed separately.
+			// This means that we got a name@digest@digest@ID, ambiguous and invalid.
+			// FIXME? Reorganize the code to always parse the digest in ParseNormalizedNamed, then this condition disappears.
+			return nil, errors.Errorf("invalid reference %q, with digest %q and ID %q", ref, sum, id)
+		}
 	}
 	if name == nil && sum == "" && id == "" { // Coverage: This could happen only on empty input, which is refused at the very top of the method.
 		return nil, errors.Errorf("error parsing reference")

@@ -63,8 +63,7 @@ func TestTransportParseStoreReference(t *testing.T) {
 		{"docker.io/library/busybox@" + sha256Digest2 + "@" + sha256digestHex, "docker.io/library/busybox@" + sha256Digest2, sha256digestHex},                                       // name@digest@ID, everything explicit
 		{"docker.io/library/busybox:notlatest@sha256:" + sha256digestHex + "@" + sha256digestHex, "docker.io/library/busybox:notlatest@sha256:" + sha256digestHex, sha256digestHex}, // name:tag@digest@ID, everything explicit
 		// "busybox@sha256:"+sha256digestHex+"@aaaa", a valid image ID prefix, untested
-		// FIXME FIXME: two digests
-		{"busybox:notlatest@" + sha256Digest2 + "@" + digest3 + "@" + sha256digestHex, "docker.io/library/busybox:notlatest@" + digest3, sha256digestHex}, // name@digest@ID, with name containing a digest
+		{"busybox:notlatest@" + sha256Digest2 + "@" + digest3 + "@" + sha256digestHex, "", ""}, // name@digest@ID, with name containing another digest
 	} {
 		storageRef, err := Transport.ParseStoreReference(store, c.input)
 		if c.expectedRef == "" && c.expectedID == "" {
