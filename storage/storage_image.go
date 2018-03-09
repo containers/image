@@ -703,6 +703,13 @@ func (s *storageImageDestination) MustMatchRuntimeOS() bool {
 	return true
 }
 
+// IgnoresEmbeddedDockerReference returns true iff the destination does not care about Image.EmbeddedDockerReferenceConflicts(),
+// and would prefer to receive an unmodified manifest instead of one modified for the destination.
+// Does not make a difference if Reference().DockerReference() is nil.
+func (s *storageImageDestination) IgnoresEmbeddedDockerReference() bool {
+	return true // Yes, we want the unmodified manifest
+}
+
 // PutSignatures records the image's signatures for committing as a single data blob.
 func (s *storageImageDestination) PutSignatures(ctx context.Context, signatures [][]byte) error {
 	sizes := []int{}
