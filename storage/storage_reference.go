@@ -167,6 +167,10 @@ func (s storageReference) PolicyConfigurationNamespaces() []string {
 	driverlessStoreSpec := "[" + s.transport.store.GraphRoot() + "]"
 	namespaces := []string{}
 	if s.name != nil {
+		if s.id != "" {
+			// The reference without the ID is also a valid namespace.
+			namespaces = append(namespaces, storeSpec+s.reference)
+		}
 		name := reference.TrimNamed(s.name)
 		components := strings.Split(name.String(), "/")
 		for len(components) > 0 {
