@@ -200,16 +200,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 			// FIXME? Reorganize the code to always parse the digest in ParseNormalizedNamed, then this condition disappears.
 			return nil, errors.Errorf("invalid reference %q, with digest %q and ID %q", ref, sum, id)
 		}
-	}
-	if completeReference == nil && sum == "" && id == "" { // Coverage: This could happen only on empty input, which is refused at the very top of the method.
-		return nil, errors.Errorf("error parsing reference")
-	}
-	if completeReference == nil && sum != "" {
-		// "@digest" with no name: this package can't read nor write images with such names (the digest value is used only if name != nil),
-		// so refuse it.
-		return nil, errors.Errorf("invalid reference with digest @%s without a repository name", sum)
-	}
-	if completeReference != nil {
+
 		if sum.Validate() == nil {
 			cr2, err := reference.WithDigest(completeReference, sum)
 			if err != nil {
@@ -218,6 +209,15 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 			completeReference = cr2
 		} else {
 			completeReference = reference.TagNameOnly(completeReference)
+		}
+	} else { // ref == "", completeReference == nil {
+		if sum != "" {
+			// "@digest" with no name: this package can't read nor write images with such names (the digest value is used only if name != nil),
+			// so refuse it.
+			return nil, errors.Errorf("invalid reference with digest @%s without a repository name", sum)
+		}
+		if id == "" { // Coverage: This could happen only on empty input, which is refused at the very top of the method.
+			return nil, errors.Errorf("error parsing reference")
 		}
 	}
 
