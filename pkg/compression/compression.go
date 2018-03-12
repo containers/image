@@ -6,9 +6,8 @@ import (
 	"compress/gzip"
 	"io"
 
-	"github.com/pkg/errors"
-
 	"github.com/sirupsen/logrus"
+	"github.com/ulikunitz/xz"
 )
 
 // DecompressorFunc returns the decompressed stream, given a compressed stream.
@@ -26,7 +25,7 @@ func Bzip2Decompressor(r io.Reader) (io.Reader, error) {
 
 // XzDecompressor is a DecompressorFunc for the xz compression algorithm.
 func XzDecompressor(r io.Reader) (io.Reader, error) {
-	return nil, errors.New("Decompressing xz streams is not supported")
+	return xz.NewReader(r)
 }
 
 // compressionAlgos is an internal implementation detail of DetectCompression
