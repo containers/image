@@ -305,7 +305,23 @@ func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manif
 			return nil, err
 		}
 		if li, ok := unknownLayerSizes[h.Name]; ok {
-			li.size = h.Size
+			// Since GetBlob will decompress layers that are compressed we need
+			// to do the decompression here as well, otherwise we will
+			// incorrectly report the size. Pretty critical, since tools like
+			// umoci always compress layer blobs. Obviously we only bother with
+			// the slower method of checking if it's compressed.
+			stream, isCompressed, err := compression.AutoDecompress(t)
+			if err != nil {
+				return nil, errors.Wrapf(err, "auto-decompress %s to find size", h.Name)
+			}
+			uncompressedSize := h.Size
+			if isCompressed {
+				uncompressedSize, err = io.Copy(ioutil.Discard, stream)
+				if err != nil {
+					return nil, errors.Wrapf(err, "reading %s to find size", h.Name)
+				}
+			}
+			li.size = uncompressedSize
 			delete(unknownLayerSizes, h.Name)
 		}
 	}
