@@ -3,7 +3,6 @@ package tarfile
 import (
 	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"io"
@@ -43,8 +42,7 @@ type layerInfo struct {
 //       the source of an image.
 // 	To do for both the NewSourceFromFile and NewSourceFromStream functions
 
-// NewSourceFromFile returns a tarfile.Source for the specified path
-// NewSourceFromFile supports both conpressed and uncompressed input
+// NewSourceFromFile returns a tarfile.Source for the specified path.
 func NewSourceFromFile(path string) (*Source, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -52,19 +50,23 @@ func NewSourceFromFile(path string) (*Source, error) {
 	}
 	defer file.Close()
 
-	reader, err := gzip.NewReader(file)
+	// If the file is already not compressed we can just return the file itself
+	// as a source. Otherwise we pass the stream to NewSourceFromStream.
+	stream, isCompressed, err := compression.AutoDecompress(file)
 	if err != nil {
+		return nil, errors.Wrapf(err, "detecting compression for file %q", path)
+	}
+	if !isCompressed {
 		return &Source{
 			tarPath: path,
 		}, nil
 	}
-	defer reader.Close()
-
-	return NewSourceFromStream(reader)
+	return NewSourceFromStream(stream)
 }
 
-// NewSourceFromStream returns a tarfile.Source for the specified inputStream, which must be uncompressed.
-// The caller can close the inputStream immediately after NewSourceFromFile returns.
+// NewSourceFromStream returns a tarfile.Source for the specified inputStream,
+// which can be either compressed or uncompressed. The caller can close the
+// inputStream immediately after NewSourceFromFile returns.
 func NewSourceFromStream(inputStream io.Reader) (*Source, error) {
 	// FIXME: use SystemContext here.
 	// Save inputStream to a temporary file
@@ -81,7 +83,18 @@ func NewSourceFromStream(inputStream io.Reader) (*Source, error) {
 		}
 	}()
 
-	// TODO: This can take quite some time, and should ideally be cancellable using a context.Context.
+	// In order to be compatible with docker-load, we need to support
+	// auto-decompression (it's also a nice quality-of-life thing to avoid
+	// giving users really confusing "invalid tar header" errors).
+	inputStream, _, err = compression.AutoDecompress(inputStream)
+	if err != nil {
+		return nil, errors.Wrap(err, "auto-decompress docker-archive source")
+	}
+
+	// Copy the plain archive to the temporary file.
+	//
+	// TODO: This can take quite some time, and should ideally be cancellable
+	//       using a context.Context.
 	if _, err := io.Copy(tarCopyFile, inputStream); err != nil {
 		return nil, errors.Wrapf(err, "error copying contents to temporary file %q", tarCopyFile.Name())
 	}
@@ -386,7 +399,7 @@ func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadClose
 		// be verifing a "digest" which is not the actual layer's digest (but
 		// is instead the DiffID).
 
-		reader, _, err := compression.AutoDecompress(inputStream)
+		reader, _, err := compression.AutoDecompress(stream)
 		if err != nil {
 			return nil, 0, errors.Wrapf(err, "auto-decompress blob %s", info.Digest)
 		}
