@@ -386,16 +386,9 @@ func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadClose
 		// be verifing a "digest" which is not the actual layer's digest (but
 		// is instead the DiffID).
 
-		decompressFunc, reader, err := compression.DetectCompression(stream)
+		reader, _, err := compression.AutoDecompress(inputStream)
 		if err != nil {
-			return nil, 0, errors.Wrapf(err, "Detecting compression in blob %s", info.Digest)
-		}
-
-		if decompressFunc != nil {
-			reader, err = decompressFunc(reader)
-			if err != nil {
-				return nil, 0, errors.Wrapf(err, "Decompressing blob %s stream", info.Digest)
-			}
+			return nil, 0, errors.Wrapf(err, "auto-decompress blob %s", info.Digest)
 		}
 
 		newStream := readCloseWrapper{

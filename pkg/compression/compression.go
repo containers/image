@@ -6,6 +6,8 @@ import (
 	"compress/gzip"
 	"io"
 
+	"github.com/pkg/errors"
+
 	"github.com/sirupsen/logrus"
 	"github.com/ulikunitz/xz"
 )
@@ -63,4 +65,21 @@ func DetectCompression(input io.Reader) (DecompressorFunc, io.Reader, error) {
 	}
 
 	return decompressor, io.MultiReader(bytes.NewReader(buffer[:n]), input), nil
+}
+
+// AutoDecompress takes a stream and returns an uncompressed version of the
+// same stream. It's a simple wrapper around DetectCompression that removes the
+// need to touch DecompressorFuncs.
+func AutoDecompress(stream io.Reader) (io.Reader, bool, error) {
+	decompressFunc, stream, err := DetectCompression(stream)
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "detect compression")
+	}
+	if decompressFunc != nil {
+		stream, err = decompressFunc(stream)
+		if err != nil {
+			return nil, false, errors.Wrapf(err, "auto decompression")
+		}
+	}
+	return stream, decompressFunc != nil, nil
 }
