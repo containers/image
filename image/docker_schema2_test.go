@@ -257,16 +257,17 @@ func TestManifestSchema2EmbeddedDockerReferenceConflicts(t *testing.T) {
 	}
 }
 
-func TestManifestSchema2ImageInspectInfo(t *testing.T) {
+func TestManifestSchema2Inspect(t *testing.T) {
 	configJSON, err := ioutil.ReadFile("fixtures/schema2-config.json")
 	require.NoError(t, err)
 
 	m := manifestSchema2FromComponentsLikeFixture(configJSON)
-	ii, err := m.imageInspectInfo()
+	ii, err := m.Inspect()
 	require.NoError(t, err)
+	created := time.Date(2016, 9, 23, 23, 20, 45, 789764590, time.UTC)
 	assert.Equal(t, types.ImageInspectInfo{
 		Tag:           "",
-		Created:       time.Date(2016, 9, 23, 23, 20, 45, 789764590, time.UTC),
+		Created:       &created,
 		DockerVersion: "1.12.1",
 		Labels:        map[string]string{},
 		Architecture:  "amd64",
@@ -282,11 +283,11 @@ func TestManifestSchema2ImageInspectInfo(t *testing.T) {
 
 	// nil configBlob will trigger an error in m.ConfigBlob()
 	m = manifestSchema2FromComponentsLikeFixture(nil)
-	_, err = m.imageInspectInfo()
+	_, err = m.Inspect()
 	assert.Error(t, err)
 
 	m = manifestSchema2FromComponentsLikeFixture([]byte("invalid JSON"))
-	_, err = m.imageInspectInfo()
+	_, err = m.Inspect()
 	assert.Error(t, err)
 }
 
