@@ -39,9 +39,9 @@ func TestGetRegistriesWithBadData(t *testing.T) {
 }
 
 func TestGetRegistriesWithTrailingSlash(t *testing.T) {
-	answer := []string{"no-slash.com:5000/path", "one-slash.com", "two-slashes.com/"}
+	answer := []string{"no-slash.com:5000/path", "one-slash.com", "two-slashes.com", "three-slashes.com:5000"}
 	testConfig = []byte(`[registries.search]
-	registries= ['no-slash.com:5000/path', 'one-slash.com/', 'two-slashes.com//']
+	registries= ['no-slash.com:5000/path', 'one-slash.com', 'two-slashes.com//', 'three-slashes.com:5000///']
 `)
 	// note: only one trailing gets removed
 	registriesConfig, err := GetRegistries(nil)
