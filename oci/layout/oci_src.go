@@ -24,7 +24,7 @@ type ociImageSource struct {
 }
 
 // newImageSource returns an ImageSource for reading from an existing directory.
-func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociReference) (types.ImageSource, error) {
+func newImageSource(sys *types.SystemContext, ref ociReference) (types.ImageSource, error) {
 	tr := tlsclientconfig.NewTransport()
 	tr.TLSClientConfig = tlsconfig.ServerDefault()
 

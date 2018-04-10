@@ -30,8 +30,8 @@ type dockerImageSource struct {
 
 // newImageSource creates a new ImageSource for the specified image reference.
 // The caller must call .Close() on the returned ImageSource.
-func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerReference) (*dockerImageSource, error) {
-	c, err := newDockerClientFromRef(ctx, sys, ref, false, "pull")
+func newImageSource(sys *types.SystemContext, ref dockerReference) (*dockerImageSource, error) {
+	c, err := newDockerClientFromRef(sys, ref, false, "pull")
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +310,7 @@ func (s *dockerImageSource) getSignaturesFromAPIExtension(ctx context.Context, i
 
 // deleteImage deletes the named image from the registry, if supported.
 func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerReference) error {
-	c, err := newDockerClientFromRef(ctx, sys, ref, true, "push")
+	c, err := newDockerClientFromRef(sys, ref, true, "push")
 	if err != nil {
 		return err
 	}

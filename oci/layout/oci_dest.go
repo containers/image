@@ -25,7 +25,7 @@ type ociImageDestination struct {
 }
 
 // newImageDestination returns an ImageDestination for writing to an existing directory.
-func newImageDestination(ctx context.Context, sys *types.SystemContext, ref ociReference) (types.ImageDestination, error) {
+func newImageDestination(sys *types.SystemContext, ref ociReference) (types.ImageDestination, error) {
 	if ref.image == "" {
 		return nil, errors.Errorf("cannot save image with empty image.ref.name")
 	}

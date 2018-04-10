@@ -16,7 +16,7 @@ type archiveImageDestination struct {
 	writer               io.Closer
 }
 
-func newImageDestination(ctx context.Context, ref archiveReference) (types.ImageDestination, error) {
+func newImageDestination(ref archiveReference) (types.ImageDestination, error) {
 	if ref.destinationRef == nil {
 		return nil, errors.Errorf("docker-archive: destination reference not supplied (must be of form <path>:<reference:tag>)")
 	}

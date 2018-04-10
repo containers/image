@@ -189,7 +189,7 @@ func (ref ostreeReference) NewImage(ctx context.Context, sys *types.SystemContex
 	} else {
 		tmpDir = sys.OSTreeTmpDirPath
 	}
-	src, err := newImageSource(ctx, tmpDir, ref)
+	src, err := newImageSource(tmpDir, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +205,7 @@ func (ref ostreeReference) NewImageSource(ctx context.Context, sys *types.System
 	} else {
 		tmpDir = sys.OSTreeTmpDirPath
 	}
-	return newImageSource(ctx, tmpDir, ref)
+	return newImageSource(tmpDir, ref)
 }
 
 // NewImageDestination returns a types.ImageDestination for this reference.

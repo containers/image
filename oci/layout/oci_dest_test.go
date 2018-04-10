@@ -104,7 +104,7 @@ func TestPutManifestTwice(t *testing.T) {
 }
 
 func putTestManifest(t *testing.T, ociRef ociReference, tmpDir string) {
-	imageDest, err := newImageDestination(context.Background(), nil, ociRef)
+	imageDest, err := newImageDestination(nil, ociRef)
 	assert.NoError(t, err)
 
 	data := []byte("abc")

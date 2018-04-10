@@ -206,5 +206,5 @@ func (s storageReference) NewImageSource(ctx context.Context, sys *types.SystemC
 }
 
 func (s storageReference) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
-	return newImageDestination(ctx, s)
+	return newImageDestination(s)
 }
