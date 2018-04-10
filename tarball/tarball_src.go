@@ -87,6 +87,7 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 			layerType = imgspecv1.MediaTypeImageLayer
 			uncompressed = nil
 		}
+		// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
 		n, err := io.Copy(ioutil.Discard, reader)
 		if err != nil {
 			return nil, fmt.Errorf("error reading %q: %v", filename, err)

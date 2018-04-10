@@ -86,6 +86,7 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 
 		digester := digest.Canonical.Digester()
 		tee := io.TeeReader(stream, digester.Hash())
+		// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
 		size, err := io.Copy(streamCopy, tee)
 		if err != nil {
 			return types.BlobInfo{}, err
@@ -352,6 +353,7 @@ func (d *Destination) sendFile(path string, expectedSize int64, stream io.Reader
 	if err := d.tar.WriteHeader(hdr); err != nil {
 		return err
 	}
+	// TODO: This can take quite some time, and should ideally be cancellable using a context.Context.
 	size, err := io.Copy(d.tar, stream)
 	if err != nil {
 		return err

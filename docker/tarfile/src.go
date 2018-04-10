@@ -81,6 +81,7 @@ func NewSourceFromStream(inputStream io.Reader) (*Source, error) {
 		}
 	}()
 
+	// TODO: This can take quite some time, and should ideally be cancellable using a context.Context.
 	if _, err := io.Copy(tarCopyFile, inputStream); err != nil {
 		return nil, errors.Wrapf(err, "error copying contents to temporary file %q", tarCopyFile.Name())
 	}

@@ -139,6 +139,7 @@ func (d *dirImageDestination) PutBlob(ctx context.Context, stream io.Reader, inp
 	digester := digest.Canonical.Digester()
 	tee := io.TeeReader(stream, digester.Hash())
 
+	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
 	size, err := io.Copy(blobFile, tee)
 	if err != nil {
 		return types.BlobInfo{}, err
