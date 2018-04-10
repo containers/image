@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -48,13 +49,13 @@ func TestPutBlobDigestFailure(t *testing.T) {
 		return 0, errors.Errorf(digestErrorString)
 	})
 
-	dest, err := ref.NewImageDestination(nil)
+	dest, err := ref.NewImageDestination(context.Background(), nil)
 	require.NoError(t, err)
 	defer dest.Close()
-	_, err = dest.PutBlob(reader, types.BlobInfo{Digest: blobDigest, Size: -1}, false)
+	_, err = dest.PutBlob(context.Background(), reader, types.BlobInfo{Digest: blobDigest, Size: -1}, false)
 	assert.Error(t, err)
 	assert.Contains(t, digestErrorString, err.Error())
-	err = dest.Commit()
+	err = dest.Commit(context.Background())
 	assert.NoError(t, err)
 
 	_, err = os.Lstat(blobPath)
@@ -103,14 +104,14 @@ func TestPutManifestTwice(t *testing.T) {
 }
 
 func putTestManifest(t *testing.T, ociRef ociReference, tmpDir string) {
-	imageDest, err := newImageDestination(nil, ociRef)
+	imageDest, err := newImageDestination(context.Background(), nil, ociRef)
 	assert.NoError(t, err)
 
 	data := []byte("abc")
-	err = imageDest.PutManifest(data)
+	err = imageDest.PutManifest(context.Background(), data)
 	assert.NoError(t, err)
 
-	err = imageDest.Commit()
+	err = imageDest.Commit(context.Background())
 	assert.NoError(t, err)
 
 	paths := []string{}

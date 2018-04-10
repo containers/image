@@ -2,6 +2,7 @@ package image
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -168,7 +169,7 @@ func TestManifestOCI1ConfigBlob(t *testing.T) {
 			src = nil
 		}
 		m := manifestOCI1FromFixture(t, src, "oci1.json")
-		blob, err := m.ConfigBlob()
+		blob, err := m.ConfigBlob(context.Background())
 		if c.blob != nil {
 			assert.NoError(t, err)
 			assert.Equal(t, c.blob, blob)
@@ -184,7 +185,7 @@ func TestManifestOCI1ConfigBlob(t *testing.T) {
 	// This just tests that the manifest can be created; we test that the parsed
 	// values are correctly returned in tests for the individual getter methods.
 	m := manifestOCI1FromComponentsLikeFixture(configBlob)
-	cb, err := m.ConfigBlob()
+	cb, err := m.ConfigBlob(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, configBlob, cb)
 }
@@ -249,7 +250,7 @@ func TestManifestOCI1Inspect(t *testing.T) {
 	require.NoError(t, err)
 
 	m := manifestOCI1FromComponentsLikeFixture(configJSON)
-	ii, err := m.Inspect()
+	ii, err := m.Inspect(context.Background())
 	require.NoError(t, err)
 	created := time.Date(2016, 9, 23, 23, 20, 45, 789764590, time.UTC)
 	assert.Equal(t, types.ImageInspectInfo{
@@ -270,11 +271,11 @@ func TestManifestOCI1Inspect(t *testing.T) {
 
 	// nil configBlob will trigger an error in m.ConfigBlob()
 	m = manifestOCI1FromComponentsLikeFixture(nil)
-	_, err = m.Inspect()
+	_, err = m.Inspect(context.Background())
 	assert.Error(t, err)
 
 	m = manifestOCI1FromComponentsLikeFixture([]byte("invalid JSON"))
-	_, err = m.Inspect()
+	_, err = m.Inspect(context.Background())
 	assert.Error(t, err)
 }
 
@@ -322,12 +323,12 @@ func TestManifestOCI1UpdatedImage(t *testing.T) {
 
 	// LayerInfos:
 	layerInfos := append(original.LayerInfos()[1:], original.LayerInfos()[0])
-	res, err := original.UpdatedImage(types.ManifestUpdateOptions{
+	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		LayerInfos: layerInfos,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, layerInfos, res.LayerInfos())
-	_, err = original.UpdatedImage(types.ManifestUpdateOptions{
+	_, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		LayerInfos: append(layerInfos, layerInfos[0]),
 	})
 	assert.Error(t, err)
@@ -336,7 +337,7 @@ func TestManifestOCI1UpdatedImage(t *testing.T) {
 	// … is ignored
 	embeddedRef, err := reference.ParseNormalizedNamed("busybox")
 	require.NoError(t, err)
-	res, err = original.UpdatedImage(types.ManifestUpdateOptions{
+	res, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		EmbeddedDockerReference: embeddedRef,
 	})
 	require.NoError(t, err)
@@ -350,7 +351,7 @@ func TestManifestOCI1UpdatedImage(t *testing.T) {
 	for _, mime := range []string{
 		manifest.DockerV2Schema2MediaType,
 	} {
-		_, err = original.UpdatedImage(types.ManifestUpdateOptions{
+		_, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 			ManifestMIMEType: mime,
 			InformationOnly: types.ManifestUpdateInformation{
 				Destination: &memoryImageDest{ref: originalSrc.ref},
@@ -362,7 +363,7 @@ func TestManifestOCI1UpdatedImage(t *testing.T) {
 		imgspecv1.MediaTypeImageManifest, // This indicates a confused caller, not a no-op.
 		"this is invalid",
 	} {
-		_, err = original.UpdatedImage(types.ManifestUpdateOptions{
+		_, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 			ManifestMIMEType: mime,
 		})
 		assert.Error(t, err, mime)
@@ -380,12 +381,12 @@ func TestManifestOCI1UpdatedImage(t *testing.T) {
 func TestConvertToManifestSchema2(t *testing.T) {
 	originalSrc := newOCI1ImageSource(t, "httpd-copy:latest")
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
-	res, err := original.UpdatedImage(types.ManifestUpdateOptions{
+	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
 	})
 	require.NoError(t, err)
 
-	convertedJSON, mt, err := res.Manifest()
+	convertedJSON, mt, err := res.Manifest(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, manifest.DockerV2Schema2MediaType, mt)
 

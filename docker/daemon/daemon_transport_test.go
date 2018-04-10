@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"context"
 	"testing"
 
 	"github.com/containers/image/docker/reference"
@@ -216,13 +217,13 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 func TestReferenceDeleteImage(t *testing.T) {
 	ref, err := ParseReference(sha256digest)
 	require.NoError(t, err)
-	err = ref.DeleteImage(nil)
+	err = ref.DeleteImage(context.Background(), nil)
 	assert.Error(t, err)
 
 	for _, c := range validNamedReferenceTestCases {
 		ref, err := ParseReference(c.input)
 		require.NoError(t, err, c.input)
-		err = ref.DeleteImage(nil)
+		err = ref.DeleteImage(context.Background(), nil)
 		assert.Error(t, err, c.input)
 	}
 }

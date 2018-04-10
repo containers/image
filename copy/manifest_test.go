@@ -35,7 +35,7 @@ type fakeImageSource string
 func (f fakeImageSource) Reference() types.ImageReference {
 	panic("Unexpected call to a mock function")
 }
-func (f fakeImageSource) Manifest() ([]byte, string, error) {
+func (f fakeImageSource) Manifest(ctx context.Context) ([]byte, string, error) {
 	if string(f) == "" {
 		return nil, "", errors.New("Manifest() directed to fail")
 	}
@@ -47,28 +47,28 @@ func (f fakeImageSource) Signatures(context.Context) ([][]byte, error) {
 func (f fakeImageSource) ConfigInfo() types.BlobInfo {
 	panic("Unexpected call to a mock function")
 }
-func (f fakeImageSource) ConfigBlob() ([]byte, error) {
+func (f fakeImageSource) ConfigBlob(context.Context) ([]byte, error) {
 	panic("Unexpected call to a mock function")
 }
-func (f fakeImageSource) OCIConfig() (*v1.Image, error) {
+func (f fakeImageSource) OCIConfig(context.Context) (*v1.Image, error) {
 	panic("Unexpected call to a mock function")
 }
 func (f fakeImageSource) LayerInfos() []types.BlobInfo {
 	panic("Unexpected call to a mock function")
 }
-func (f fakeImageSource) LayerInfosForCopy() ([]types.BlobInfo, error) {
+func (f fakeImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
 	panic("Unexpected call to a mock function")
 }
 func (f fakeImageSource) EmbeddedDockerReferenceConflicts(ref reference.Named) bool {
 	panic("Unexpected call to a mock function")
 }
-func (f fakeImageSource) Inspect() (*types.ImageInspectInfo, error) {
+func (f fakeImageSource) Inspect(context.Context) (*types.ImageInspectInfo, error) {
 	panic("Unexpected call to a mock function")
 }
 func (f fakeImageSource) UpdatedImageNeedsLayerDiffIDs(options types.ManifestUpdateOptions) bool {
 	panic("Unexpected call to a mock function")
 }
-func (f fakeImageSource) UpdatedImage(options types.ManifestUpdateOptions) (types.Image, error) {
+func (f fakeImageSource) UpdatedImage(ctx context.Context, options types.ManifestUpdateOptions) (types.Image, error) {
 	panic("Unexpected call to a mock function")
 }
 func (f fakeImageSource) Size() (int64, error) {
@@ -144,7 +144,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 			src:               src,
 			canModifyManifest: true,
 		}
-		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(c.destTypes, "")
+		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "")
 		require.NoError(t, err, c.description)
 		assert.Equal(t, c.expectedUpdate, ic.manifestUpdates.ManifestMIMEType, c.description)
 		if c.expectedUpdate == "" {
@@ -163,7 +163,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 			src:               src,
 			canModifyManifest: false,
 		}
-		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(c.destTypes, "")
+		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "")
 		require.NoError(t, err, c.description)
 		assert.Equal(t, "", ic.manifestUpdates.ManifestMIMEType, c.description)
 		assert.Equal(t, manifest.NormalizedMIMEType(c.sourceType), preferredMIMEType, c.description)
@@ -178,7 +178,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 			src:               src,
 			canModifyManifest: true,
 		}
-		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(c.destTypes, v1.MediaTypeImageManifest)
+		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, v1.MediaTypeImageManifest)
 		require.NoError(t, err, c.description)
 		assert.Equal(t, v1.MediaTypeImageManifest, ic.manifestUpdates.ManifestMIMEType, c.description)
 		assert.Equal(t, v1.MediaTypeImageManifest, preferredMIMEType, c.description)
@@ -191,7 +191,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 		src:               fakeImageSource(""),
 		canModifyManifest: true,
 	}
-	_, _, err := ic.determineManifestConversion(supportS1S2, "")
+	_, _, err := ic.determineManifestConversion(context.Background(), supportS1S2, "")
 	assert.Error(t, err)
 }
 
@@ -205,13 +205,13 @@ func TestIsMultiImage(t *testing.T) {
 		{manifest.DockerV2Schema2MediaType, false},
 	} {
 		src := fakeImageSource(c.mt)
-		res, err := isMultiImage(src)
+		res, err := isMultiImage(context.Background(), src)
 		require.NoError(t, err)
 		assert.Equal(t, c.expected, res, c.mt)
 	}
 
 	// Error getting manifest MIME type
 	src := fakeImageSource("")
-	_, err := isMultiImage(src)
+	_, err := isMultiImage(context.Background(), src)
 	assert.Error(t, err)
 }
