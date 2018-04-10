@@ -125,6 +125,7 @@ func tarDirectory(src, dst string) error {
 	defer outFile.Close()
 
 	// copies the contents of the directory to the tar file
+	// TODO: This can take quite some time, and should ideally be cancellable using a context.Context.
 	_, err = io.Copy(outFile, input)
 
 	return err

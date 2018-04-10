@@ -171,7 +171,7 @@ func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
 
 // newDockerClientFromRef returns a new dockerClient instance for refHostname (a host a specified in the Docker image reference, not canonicalized to dockerRegistry)
 // “write” specifies whether the client will be used for "write" access (in particular passed to lookaside.go:toplevelFromSection)
-func newDockerClientFromRef(ctx context.Context, sys *types.SystemContext, ref dockerReference, write bool, actions string) (*dockerClient, error) {
+func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write bool, actions string) (*dockerClient, error) {
 	registry := reference.Domain(ref.ref)
 	username, password, err := config.GetAuthentication(sys, reference.Domain(ref.ref))
 	if err != nil {

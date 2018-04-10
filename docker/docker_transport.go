@@ -135,13 +135,13 @@ func (ref dockerReference) NewImage(ctx context.Context, sys *types.SystemContex
 // NewImageSource returns a types.ImageSource for this reference.
 // The caller must call .Close() on the returned ImageSource.
 func (ref dockerReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
-	return newImageSource(ctx, sys, ref)
+	return newImageSource(sys, ref)
 }
 
 // NewImageDestination returns a types.ImageDestination for this reference.
 // The caller must call .Close() on the returned ImageDestination.
 func (ref dockerReference) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
-	return newImageDestination(ctx, sys, ref)
+	return newImageDestination(sys, ref)
 }
 
 // DeleteImage deletes the named image from the registry, if supported.

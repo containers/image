@@ -239,7 +239,7 @@ func (s *storageImageSource) GetSignatures(ctx context.Context, instanceDigest *
 
 // newImageDestination sets us up to write a new image, caching blobs in a temporary directory until
 // it's time to Commit() the image
-func newImageDestination(ctx context.Context, imageRef storageReference) (*storageImageDestination, error) {
+func newImageDestination(imageRef storageReference) (*storageImageDestination, error) {
 	directory, err := ioutil.TempDir(temporaryDirectoryForBigFiles, "storage")
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating a temporary directory")
@@ -309,6 +309,7 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 		return errorBlobInfo, errors.Wrap(err, "error setting up to decompress blob")
 	}
 	// Copy the data to the file.
+	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
 	_, err = io.Copy(diffID.Hash(), decompressed)
 	decompressed.Close()
 	if err != nil {
@@ -544,6 +545,7 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 			return errors.Errorf("error applying blob %q: content not found", blob.Digest)
 		}
 		// Build the new layer using the diff, regardless of where it came from.
+		// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
 		layer, _, err := s.imageRef.transport.store.PutLayer(id, lastLayer, nil, "", false, nil, diff)
 		if err != nil {
 			return errors.Wrapf(err, "error adding layer with blob %q", blob.Digest)

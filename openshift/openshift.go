@@ -170,7 +170,7 @@ type openshiftImageSource struct {
 
 // newImageSource creates a new ImageSource for the specified reference.
 // The caller must call .Close() on the returned ImageSource.
-func newImageSource(ctx context.Context, sys *types.SystemContext, ref openshiftReference) (types.ImageSource, error) {
+func newImageSource(sys *types.SystemContext, ref openshiftReference) (types.ImageSource, error) {
 	client, err := newOpenshiftClient(ref)
 	if err != nil {
 		return nil, err

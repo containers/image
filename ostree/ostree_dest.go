@@ -140,6 +140,7 @@ func (d *ostreeImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	digester := digest.Canonical.Digester()
 	tee := io.TeeReader(stream, digester.Hash())
 
+	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
 	size, err := io.Copy(blobFile, tee)
 	if err != nil {
 		return types.BlobInfo{}, err
@@ -264,6 +265,8 @@ func generateTarSplitMetadata(output *bytes.Buffer, file string) (digest.Digest,
 }
 
 func (d *ostreeImageDestination) importBlob(selinuxHnd *C.struct_selabel_handle, repo *otbuiltin.Repo, blob *blobToImport) error {
+	// TODO: This can take quite some time, and should ideally be cancellable using a context.Context.
+
 	ostreeBranch := fmt.Sprintf("ociimage/%s", blob.Digest.Hex())
 	destinationPath := filepath.Join(d.tmpDirPath, blob.Digest.Hex(), "root")
 	if err := ensureDirectoryExists(destinationPath); err != nil {

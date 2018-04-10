@@ -42,7 +42,7 @@ type ostreeImageSource struct {
 }
 
 // newImageSource returns an ImageSource for reading from an existing directory.
-func newImageSource(ctx context.Context, tmpDir string, ref ostreeReference) (types.ImageSource, error) {
+func newImageSource(tmpDir string, ref ostreeReference) (types.ImageSource, error) {
 	return &ostreeImageSource{ref: ref, tmpDir: tmpDir, compressed: nil}, nil
 }
 

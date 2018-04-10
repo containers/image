@@ -181,6 +181,7 @@ func createUntarTempDir(ref ociArchiveReference) (tempDirOCIRef, error) {
 	}
 	src := ref.resolvedFile
 	dst := tempDirRef.tempDirectory
+	// TODO: This can take quite some time, and should ideally be cancellable using a context.Context.
 	if err := archive.UntarPath(src, dst); err != nil {
 		if err := tempDirRef.deleteTempDir(); err != nil {
 			return tempDirOCIRef{}, errors.Wrapf(err, "error deleting temp directory %q", tempDirRef.tempDirectory)
