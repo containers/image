@@ -1,8 +1,11 @@
 .PHONY: all tools test validate lint .gitvalidation fmt
 
 # Which github repostiory and branch to use for testing with skopeo
-SKOPEO_REPO = projectatomic/skopeo
-SKOPEO_BRANCH = master
+# TODO: uncomment this again after corresponding skopeo pull request has been merged
+#SKOPEO_REPO = projectatomic/skopeo
+#SKOPEO_BRANCH = master
+SKOPEO_REPO = mgoltzsche/skopeo
+SKOPEO_BRANCH = docker_vendor_update
 # Set SUDO=sudo to run container integration tests using sudo.
 SUDO =
 
