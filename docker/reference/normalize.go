@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/containers/image/types"
 	"github.com/opencontainers/go-digest"
 )
 
 var (
 	legacyDefaultDomain = "index.docker.io"
-	defaultDomain       = "docker.io"
 	officialRepoName    = "library"
 	defaultTag          = "latest"
 )
@@ -29,11 +29,18 @@ type normalizedNamed interface {
 // transforming a familiar name from Docker UI to a fully
 // qualified reference. If the value may be an identifier
 // use ParseAnyReference.
-func ParseNormalizedNamed(s string) (Named, error) {
+func ParseNormalizedNamed(sys *types.SystemContext, s string) (Named, error) {
 	if ok := anchoredIdentifierRegexp.MatchString(s); ok {
 		return nil, fmt.Errorf("invalid repository name (%s), cannot specify 64-byte hexadecimal strings", s)
 	}
-	domain, remainder := splitDockerDomain(s)
+	registries, err := GetRegistries(sys)
+	if err != nil {
+		return nil, err
+	}
+	if len(registries) == 0 {
+		return nil, errors.New("no registries specified")
+	}
+	domain, remainder := splitDockerDomain(registries[0], s)
 	var remoteName string
 	if tagSep := strings.IndexRune(remainder, ':'); tagSep > -1 {
 		remoteName = remainder[:tagSep]
@@ -58,7 +65,7 @@ func ParseNormalizedNamed(s string) (Named, error) {
 // splitDockerDomain splits a repository name to domain and remotename string.
 // If no valid domain is found, the default domain is used. Repository name
 // needs to be already validated before.
-func splitDockerDomain(name string) (domain, remainder string) {
+func splitDockerDomain(defaultDomain, name string) (domain, remainder string) {
 	i := strings.IndexRune(name, '/')
 	if i == -1 || (!strings.ContainsAny(name[:i], ".:") && name[:i] != "localhost") {
 		domain, remainder = defaultDomain, name
@@ -86,12 +93,8 @@ func familiarizeName(named namedRepository) repository {
 		path:   named.Path(),
 	}
 
-	if repo.domain == defaultDomain {
-		repo.domain = ""
-		// Handle official repositories which have the pattern "library/<official repo name>"
-		if split := strings.Split(repo.path, "/"); len(split) == 2 && split[0] == officialRepoName {
-			repo.path = split[1]
-		}
+	if split := strings.Split(repo.path, "/"); len(split) == 2 && split[0] == officialRepoName {
+		repo.path = split[1]
 	}
 	return repo
 }
