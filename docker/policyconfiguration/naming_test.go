@@ -23,13 +23,13 @@ func TestDockerReference(t *testing.T) {
 		"localhost/ns/repo":   {"localhost/ns/repo", "localhost/ns", "localhost"},
 		// Note that "localhost" is special here: notlocalhost/repo is parsed as docker.io/notlocalhost.repo:
 		"localhost/repo":         {"localhost/repo", "localhost"},
-		"notlocalhost/repo":      {"docker.io/notlocalhost/repo", "docker.io/notlocalhost", "docker.io"},
+		"notlocalhost/repo":      {"<local>/notlocalhost/repo", "<local>/notlocalhost", "<local>"},
 		"docker.io/ns/repo":      {"docker.io/ns/repo", "docker.io/ns", "docker.io"},
 		"docker.io/library/repo": {"docker.io/library/repo", "docker.io/library", "docker.io"},
-		"docker.io/repo":         {"docker.io/library/repo", "docker.io/library", "docker.io"},
-		"ns/repo":                {"docker.io/ns/repo", "docker.io/ns", "docker.io"},
-		"library/repo":           {"docker.io/library/repo", "docker.io/library", "docker.io"},
-		"repo":                   {"docker.io/library/repo", "docker.io/library", "docker.io"},
+		"<local>/repo":           {"<local>/library/repo", "<local>/library", "<local>"},
+		"ns/repo":                {"<local>/ns/repo", "<local>/ns", "<local>"},
+		"library/repo":           {"<local>/library/repo", "<local>/library", "<local>"},
+		"repo":                   {"<local>/library/repo", "<local>/library", "<local>"},
 	} {
 		for inputSuffix, mappedSuffix := range map[string]string{
 			":tag":       ":tag",

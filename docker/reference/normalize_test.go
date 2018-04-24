@@ -132,7 +132,7 @@ func TestParseRepositoryInfo(t *testing.T) {
 	tcases := []tcase{
 		{
 			RemoteName:    "fooo/bar",
-			FamiliarName:  "fooo/bar",
+			FamiliarName:  "docker.io/fooo/bar",
 			FullName:      "docker.io/fooo/bar",
 			AmbiguousName: "index.docker.io/fooo/bar",
 			Domain:        "docker.io",
@@ -140,23 +140,23 @@ func TestParseRepositoryInfo(t *testing.T) {
 		{
 			RemoteName:    "library/ubuntu",
 			FamiliarName:  "ubuntu",
-			FullName:      "docker.io/library/ubuntu",
+			FullName:      "<local>/library/ubuntu",
 			AmbiguousName: "library/ubuntu",
-			Domain:        "docker.io",
+			Domain:        "<local>",
 		},
 		{
 			RemoteName:    "nonlibrary/ubuntu",
 			FamiliarName:  "nonlibrary/ubuntu",
-			FullName:      "docker.io/nonlibrary/ubuntu",
+			FullName:      "<local>/nonlibrary/ubuntu",
 			AmbiguousName: "",
-			Domain:        "docker.io",
+			Domain:        "<local>",
 		},
 		{
 			RemoteName:    "other/library",
 			FamiliarName:  "other/library",
-			FullName:      "docker.io/other/library",
+			FullName:      "<local>/other/library",
 			AmbiguousName: "",
-			Domain:        "docker.io",
+			Domain:        "<local>",
 		},
 		{
 			RemoteName:    "private/moonbase",
@@ -202,7 +202,7 @@ func TestParseRepositoryInfo(t *testing.T) {
 		},
 		{
 			RemoteName:    "library/ubuntu-12.04-base",
-			FamiliarName:  "ubuntu-12.04-base",
+			FamiliarName:  "docker.io/library/ubuntu-12.04-base",
 			FullName:      "docker.io/library/ubuntu-12.04-base",
 			AmbiguousName: "index.docker.io/library/ubuntu-12.04-base",
 			Domain:        "docker.io",
@@ -210,23 +210,23 @@ func TestParseRepositoryInfo(t *testing.T) {
 		{
 			RemoteName:    "library/foo",
 			FamiliarName:  "foo",
-			FullName:      "docker.io/library/foo",
-			AmbiguousName: "docker.io/foo",
-			Domain:        "docker.io",
+			FullName:      "<local>/library/foo",
+			AmbiguousName: "<local>/foo",
+			Domain:        "<local>",
 		},
 		{
 			RemoteName:    "library/foo/bar",
 			FamiliarName:  "library/foo/bar",
-			FullName:      "docker.io/library/foo/bar",
+			FullName:      "<local>/library/foo/bar",
 			AmbiguousName: "",
-			Domain:        "docker.io",
+			Domain:        "<local>",
 		},
 		{
 			RemoteName:    "store/foo/bar",
 			FamiliarName:  "store/foo/bar",
-			FullName:      "docker.io/store/foo/bar",
+			FullName:      "<local>/store/foo/bar",
 			AmbiguousName: "",
-			Domain:        "docker.io",
+			Domain:        "<local>",
 		},
 	}
 
@@ -269,7 +269,7 @@ func TestParseReferenceWithTagAndDigest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if expected, actual := "docker.io/library/"+shortRef, ref.String(); actual != expected {
+	if expected, actual := "<local>/library/"+shortRef, ref.String(); actual != expected {
 		t.Fatalf("Invalid parsed reference for %q: expected %q, got %q", ref, expected, actual)
 	}
 
@@ -334,11 +334,11 @@ func TestParseAnyReference(t *testing.T) {
 	}{
 		{
 			Reference:  "redis",
-			Equivalent: "docker.io/library/redis",
+			Equivalent: "<local>/library/redis",
 		},
 		{
 			Reference:  "redis:latest",
-			Equivalent: "docker.io/library/redis:latest",
+			Equivalent: "<local>/library/redis:latest",
 		},
 		{
 			Reference:  "docker.io/library/redis:latest",
@@ -346,7 +346,7 @@ func TestParseAnyReference(t *testing.T) {
 		},
 		{
 			Reference:  "redis@sha256:dbcc1c35ac38df41fd2f5e4130b32ffdb93ebae8b3dbe638c23575912276fc9c",
-			Equivalent: "docker.io/library/redis@sha256:dbcc1c35ac38df41fd2f5e4130b32ffdb93ebae8b3dbe638c23575912276fc9c",
+			Equivalent: "<local>/library/redis@sha256:dbcc1c35ac38df41fd2f5e4130b32ffdb93ebae8b3dbe638c23575912276fc9c",
 		},
 		{
 			Reference:  "docker.io/library/redis@sha256:dbcc1c35ac38df41fd2f5e4130b32ffdb93ebae8b3dbe638c23575912276fc9c",
@@ -354,11 +354,11 @@ func TestParseAnyReference(t *testing.T) {
 		},
 		{
 			Reference:  "dmcgowan/myapp",
-			Equivalent: "docker.io/dmcgowan/myapp",
+			Equivalent: "<local>/dmcgowan/myapp",
 		},
 		{
 			Reference:  "dmcgowan/myapp:latest",
-			Equivalent: "docker.io/dmcgowan/myapp:latest",
+			Equivalent: "<local>/dmcgowan/myapp:latest",
 		},
 		{
 			Reference:  "docker.io/mcgowan/myapp:latest",
@@ -366,7 +366,7 @@ func TestParseAnyReference(t *testing.T) {
 		},
 		{
 			Reference:  "dmcgowan/myapp@sha256:dbcc1c35ac38df41fd2f5e4130b32ffdb93ebae8b3dbe638c23575912276fc9c",
-			Equivalent: "docker.io/dmcgowan/myapp@sha256:dbcc1c35ac38df41fd2f5e4130b32ffdb93ebae8b3dbe638c23575912276fc9c",
+			Equivalent: "<local>/dmcgowan/myapp@sha256:dbcc1c35ac38df41fd2f5e4130b32ffdb93ebae8b3dbe638c23575912276fc9c",
 		},
 		{
 			Reference:  "docker.io/dmcgowan/myapp@sha256:dbcc1c35ac38df41fd2f5e4130b32ffdb93ebae8b3dbe638c23575912276fc9c",
@@ -384,7 +384,7 @@ func TestParseAnyReference(t *testing.T) {
 		},
 		{
 			Reference:  "dbcc1c35ac38df41fd2f5e4130b32ffdb93ebae8b3dbe638c23575912276fc9",
-			Equivalent: "docker.io/library/dbcc1c35ac38df41fd2f5e4130b32ffdb93ebae8b3dbe638c23575912276fc9",
+			Equivalent: "<local>/library/dbcc1c35ac38df41fd2f5e4130b32ffdb93ebae8b3dbe638c23575912276fc9",
 		},
 	}
 
@@ -425,12 +425,12 @@ func TestNormalizedSplitHostname(t *testing.T) {
 		},
 		{
 			input:  "test_com/foo",
-			domain: "docker.io",
+			domain: "<local>",
 			name:   "test_com/foo",
 		},
 		{
 			input:  "docker/migrator",
-			domain: "docker.io",
+			domain: "<local>",
 			name:   "docker/migrator",
 		},
 		{
@@ -445,7 +445,7 @@ func TestNormalizedSplitHostname(t *testing.T) {
 		},
 		{
 			input:  "foo",
-			domain: "docker.io",
+			domain: "<local>",
 			name:   "library/foo",
 		},
 		{
@@ -459,8 +459,8 @@ func TestNormalizedSplitHostname(t *testing.T) {
 			name:   "foo",
 		},
 		{
-			input:  "docker.io/foo",
-			domain: "docker.io",
+			input:  "<local>/foo",
+			domain: "<local>",
 			name:   "library/foo",
 		},
 		{

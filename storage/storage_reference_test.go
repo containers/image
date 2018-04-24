@@ -27,7 +27,7 @@ func TestStorageReferenceDockerReference(t *testing.T) {
 	require.NoError(t, err)
 	dr := ref.DockerReference()
 	require.NotNil(t, dr)
-	assert.Equal(t, "docker.io/library/busybox:latest", dr.String())
+	assert.Equal(t, "<local>/library/busybox:latest", dr.String())
 
 	ref, err = Transport.ParseReference("@" + sha256digestHex)
 	require.NoError(t, err)
@@ -42,8 +42,8 @@ var validReferenceTestCases = []struct {
 	namespaces       []string
 }{
 	{
-		"busybox", "docker.io/library/busybox:latest",
-		[]string{"docker.io/library/busybox", "docker.io/library", "docker.io"},
+		"busybox", "<local>/library/busybox:latest",
+		[]string{"<local>/library/busybox", "<local>/library", "<local>"},
 	},
 	{
 		"example.com/myns/ns2/busybox:notlatest", "example.com/myns/ns2/busybox:notlatest",
@@ -54,12 +54,12 @@ var validReferenceTestCases = []struct {
 		[]string{},
 	},
 	{
-		"busybox@" + sha256digestHex, "docker.io/library/busybox:latest@" + sha256digestHex,
-		[]string{"docker.io/library/busybox", "docker.io/library", "docker.io"},
+		"busybox@" + sha256digestHex, "<local>/library/busybox:latest@" + sha256digestHex,
+		[]string{"<local>/library/busybox", "<local>/library", "<local>"},
 	},
 	{
-		"busybox@sha256:" + sha256digestHex, "docker.io/library/busybox@sha256:" + sha256digestHex,
-		[]string{"docker.io/library/busybox", "docker.io/library", "docker.io"},
+		"busybox@sha256:" + sha256digestHex, "<local>/library/busybox@sha256:" + sha256digestHex,
+		[]string{"<local>/library/busybox", "<local>/library", "<local>"},
 	},
 }
 

@@ -136,7 +136,7 @@ var prmExactMatchTestTable = []prmSymmetricTableTest{
 	{"busybox" + digestSuffix, "busybox" + digestSuffix, true}, // NOTE: This is not documented; signing digests is not recommended at this time.
 	// Non-canonical reference format is canonicalized
 	{"library/busybox:latest", "busybox:latest", true},
-	{"docker.io/library/busybox:latest", "busybox:latest", true},
+	{"<local>/library/busybox:latest", "busybox:latest", true},
 	{"library/busybox" + digestSuffix, "busybox" + digestSuffix, true},
 	// Mismatch
 	{"busybox:latest", "busybox:notlatest", false},
@@ -173,15 +173,15 @@ var prmRepositoryMatchTestTable = []prmSymmetricTableTest{
 	{"busybox" + digestSuffix, "busybox" + digestSuffix, true}, // NOTE: This is not documented; signing digests is not recommended at this time.
 	// Non-canonical reference format is canonicalized
 	{"library/busybox:latest", "busybox:latest", true},
-	{"docker.io/library/busybox:latest", "busybox:latest", true},
+	{"<local>/library/busybox:latest", "busybox:latest", true},
 	{"library/busybox" + digestSuffix, "busybox" + digestSuffix, true},
 	// The same as above, but with mismatching tags
 	{"busybox:latest", "busybox:notlatest", true},
 	{fullRHELRef + "tagsuffix", fullRHELRef, true},
 	{"library/busybox:latest", "busybox:notlatest", true},
 	{"busybox:latest", "library/busybox:notlatest", true},
-	{"docker.io/library/busybox:notlatest", "busybox:latest", true},
-	{"busybox:notlatest", "docker.io/library/busybox:latest", true},
+	{"<local>/library/busybox:notlatest", "busybox:latest", true},
+	{"busybox:notlatest", "<local>/library/busybox:latest", true},
 	{"busybox:latest", "busybox" + digestSuffix, true},
 	{"busybox" + digestSuffix, "busybox" + digestSuffixOther, true}, // Even this is accepted here. (This could more reasonably happen with two different digest algorithms.)
 	// The same as above, but with defaulted tags (should not actually happen)
@@ -189,7 +189,7 @@ var prmRepositoryMatchTestTable = []prmSymmetricTableTest{
 	{fullRHELRef, untaggedRHELRef, true},
 	{"busybox", "busybox" + digestSuffix, true},
 	{"library/busybox", "busybox", true},
-	{"docker.io/library/busybox", "busybox", true},
+	{"<local>/library/busybox", "busybox", true},
 	// Mismatch
 	{"busybox:latest", "notbusybox:latest", false},
 	{"hostname/library/busybox:latest", "busybox:notlatest", false},
@@ -259,8 +259,8 @@ func TestPMMMatchRepoDigestOrExactMatchesDockerReference(t *testing.T) {
 		{fullRHELRef + "tagsuffix", fullRHELRef, false},
 		{"library/busybox:latest", "busybox:notlatest", false},
 		{"busybox:latest", "library/busybox:notlatest", false},
-		{"docker.io/library/busybox:notlatest", "busybox:latest", false},
-		{"busybox:notlatest", "docker.io/library/busybox:latest", false},
+		{"<local>/library/busybox:notlatest", "busybox:latest", false},
+		{"busybox:notlatest", "<local>/library/busybox:latest", false},
 		// NameOnly references
 		{"busybox", "busybox:latest", false},
 		{"busybox:latest", "busybox", false},

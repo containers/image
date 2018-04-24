@@ -9,16 +9,15 @@ import (
 )
 
 var (
-	legacyDefaultDomain = "index.docker.io"
-	defaultDomain       = "docker.io"
-	officialRepoName    = "library"
-	defaultTag          = "latest"
+	defaultDomain    = "<local>"
+	officialRepoName = "library"
+	defaultTag       = "latest"
 )
 
 // normalizedNamed represents a name which has been
 // normalized and has a familiar form. A familiar name
 // is what is used in Docker UI. An example normalized
-// name is "docker.io/library/ubuntu" and corresponding
+// name is "<local>/library/ubuntu" and corresponding
 // familiar name of "ubuntu".
 type normalizedNamed interface {
 	Named
@@ -60,13 +59,13 @@ func ParseNormalizedNamed(s string) (Named, error) {
 // needs to be already validated before.
 func splitDockerDomain(name string) (domain, remainder string) {
 	i := strings.IndexRune(name, '/')
-	if i == -1 || (!strings.ContainsAny(name[:i], ".:") && name[:i] != "localhost") {
+	if i == -1 || (!strings.ContainsAny(name[:i], ".:") && name[:i] != "localhost" && name[:i] != "<local>") {
 		domain, remainder = defaultDomain, name
 	} else {
 		domain, remainder = name[:i], name[i+1:]
 	}
-	if domain == legacyDefaultDomain {
-		domain = defaultDomain
+	if domain == "index.docker.io" {
+		domain = "docker.io"
 	}
 	if domain == defaultDomain && !strings.ContainsRune(remainder, '/') {
 		remainder = officialRepoName + "/" + remainder
@@ -76,9 +75,9 @@ func splitDockerDomain(name string) (domain, remainder string) {
 
 // familiarizeName returns a shortened version of the name familiar
 // to to the Docker UI. Familiar names have the default domain
-// "docker.io" and "library/" repository prefix removed.
-// For example, "docker.io/library/redis" will have the familiar
-// name "redis" and "docker.io/dmcgowan/myapp" will be "dmcgowan/myapp".
+// "<local>" and "library/" repository prefix removed.
+// For example, "<local>/library/redis" will have the familiar
+// name "redis" and "<local>/dmcgowan/myapp" will be "dmcgowan/myapp".
 // Returns a familiarized named only reference.
 func familiarizeName(named namedRepository) repository {
 	repo := repository{

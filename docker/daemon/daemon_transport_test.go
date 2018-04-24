@@ -51,8 +51,8 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 		{"sha256:XX23456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "", ""}, // Invalid digest value
 		{"UPPERCASEISINVALID", "", ""},                                                      // Invalid reference input
 		{"busybox", "", ""},                                                                 // Missing tag or digest
-		{"busybox:latest", "", "docker.io/library/busybox:latest"},                          // Explicit tag
-		{"busybox@" + sha256digest, "", "docker.io/library/busybox@" + sha256digest},        // Explicit digest
+		{"busybox:latest", "", "<local>/library/busybox:latest"},                            // Explicit tag
+		{"busybox@" + sha256digest, "", "<local>/library/busybox@" + sha256digest},          // Explicit digest
 		// A github.com/distribution/reference value can have a tag and a digest at the same time!
 		// Most versions of docker/reference do not handle that (ignoring the tag), so we reject such input.
 		{"busybox:latest@" + sha256digest, "", ""},                                   // Both tag and digest
@@ -92,10 +92,10 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 // A common list of reference formats to test for the various ImageReference methods.
 // (For IDs it is much simpler, we simply use them unmodified)
 var validNamedReferenceTestCases = []struct{ input, dockerRef, stringWithinTransport string }{
-	{"busybox:notlatest", "docker.io/library/busybox:notlatest", "busybox:notlatest"},                // Explicit tag
-	{"busybox" + sha256digest, "docker.io/library/busybox" + sha256digest, "busybox" + sha256digest}, // Explicit digest
-	{"docker.io/library/busybox:latest", "docker.io/library/busybox:latest", "busybox:latest"},       // All implied values explicitly specified
-	{"example.com/ns/foo:bar", "example.com/ns/foo:bar", "example.com/ns/foo:bar"},                   // All values explicitly specified
+	{"busybox:notlatest", "<local>/library/busybox:notlatest", "busybox:notlatest"},                // Explicit tag
+	{"busybox" + sha256digest, "<local>/library/busybox" + sha256digest, "busybox" + sha256digest}, // Explicit digest
+	{"<local>/library/busybox:latest", "<local>/library/busybox:latest", "busybox:latest"},         // All implied values explicitly specified
+	{"example.com/ns/foo:bar", "example.com/ns/foo:bar", "example.com/ns/foo:bar"},                 // All values explicitly specified
 }
 
 func TestNewReference(t *testing.T) {

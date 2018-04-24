@@ -31,8 +31,8 @@ func TestImageNameHandling(t *testing.T) {
 		{"docker", "//busybox:notlatest", "//busybox:notlatest"}, // This also tests handling of multiple ":" characters
 		{"docker-daemon", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
 		{"docker-daemon", "busybox:latest", "busybox:latest"},
-		{"docker-archive", "/var/lib/oci/busybox.tar:busybox:latest", "/var/lib/oci/busybox.tar:docker.io/library/busybox:latest"},
-		{"docker-archive", "busybox.tar:busybox:latest", "busybox.tar:docker.io/library/busybox:latest"},
+		{"docker-archive", "/var/lib/oci/busybox.tar:busybox:latest", "/var/lib/oci/busybox.tar:<local>/library/busybox:latest"},
+		{"docker-archive", "busybox.tar:busybox:latest", "busybox.tar:<local>/library/busybox:latest"},
 		{"oci", "/etc:someimage", "/etc:someimage"},
 		{"oci", "/etc:someimage:mytag", "/etc:someimage:mytag"},
 		{"oci-archive", "/etc:someimage", "/etc:someimage"},

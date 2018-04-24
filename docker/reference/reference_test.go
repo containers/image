@@ -624,7 +624,7 @@ func TestParseNamed(t *testing.T) {
 		},
 		// Ambiguous case, parser will add "library/" to foo
 		{
-			input: "docker.io/foo",
+			input: "<local>/foo",
 			err:   ErrNameNotCanonical,
 		},
 	}
