@@ -50,9 +50,9 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 	for _, c := range []struct{ input, expectedPath, expectedRef string }{
 		{"", "", ""}, // Empty input is explicitly rejected
 		{"/path", "/path", ""},
-		{"/path:busybox:notlatest", "/path", "docker.io/library/busybox:notlatest"}, // Explicit tag
-		{"/path:busybox" + sha256digest, "", ""},                                    // Digest references are forbidden
-		{"/path:busybox", "/path", "docker.io/library/busybox:latest"},              // Default tag
+		{"/path:busybox:notlatest", "/path", "<local>/library/busybox:notlatest"}, // Explicit tag
+		{"/path:busybox" + sha256digest, "", ""},                                  // Digest references are forbidden
+		{"/path:busybox", "/path", "<local>/library/busybox:latest"},              // Default tag
 		// A github.com/distribution/reference value can have a tag and a digest at the same time!
 		{"/path:busybox:latest" + sha256digest, "", ""},                                         // Both tag and digest is rejected
 		{"/path:docker.io/library/busybox:latest", "/path", "docker.io/library/busybox:latest"}, // All implied values explicitly specified
@@ -86,7 +86,7 @@ func (ref refWithTagAndDigest) Tag() string {
 // A common list of reference formats to test for the various ImageReference methods.
 var validReferenceTestCases = []struct{ input, dockerRef, stringWithinTransport string }{
 	{"/pathonly", "", "/pathonly"},
-	{"/path:busybox:notlatest", "docker.io/library/busybox:notlatest", "/path:docker.io/library/busybox:notlatest"},          // Explicit tag
+	{"/path:busybox:notlatest", "<local>/library/busybox:notlatest", "/path:<local>/library/busybox:notlatest"},              // Explicit tag
 	{"/path:docker.io/library/busybox:latest", "docker.io/library/busybox:latest", "/path:docker.io/library/busybox:latest"}, // All implied values explicitly specified
 	{"/path:example.com/ns/foo:bar", "example.com/ns/foo:bar", "/path:example.com/ns/foo:bar"},                               // All values explicitly specified
 }

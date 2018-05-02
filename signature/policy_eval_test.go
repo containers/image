@@ -223,32 +223,32 @@ func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
 		Default: PolicyRequirements{NewPRReject()},
 		Transports: map[string]PolicyTransportScopes{
 			"docker": {
-				"docker.io/testing/manifest:latest": {
+				"<local>/testing/manifest:latest": {
 					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchExact()),
 				},
-				"docker.io/testing/manifest:twoAccepts": {
+				"<local>/testing/manifest:twoAccepts": {
 					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
 					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
 				},
-				"docker.io/testing/manifest:acceptReject": {
+				"<local>/testing/manifest:acceptReject": {
 					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
 					NewPRReject(),
 				},
-				"docker.io/testing/manifest:acceptUnknown": {
+				"<local>/testing/manifest:acceptUnknown": {
 					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
 					xNewPRSignedBaseLayer(NewPRMMatchRepository()),
 				},
-				"docker.io/testing/manifest:rejectUnknown": {
+				"<local>/testing/manifest:rejectUnknown": {
 					NewPRReject(),
 					xNewPRSignedBaseLayer(NewPRMMatchRepository()),
 				},
-				"docker.io/testing/manifest:unknown": {
+				"<local>/testing/manifest:unknown": {
 					xNewPRSignedBaseLayer(NewPRMMatchRepository()),
 				},
-				"docker.io/testing/manifest:unknown2": {
+				"<local>/testing/manifest:unknown2": {
 					NewPRInsecureAcceptAnything(),
 				},
-				"docker.io/testing/manifest:invalidEmptyRequirements": {},
+				"<local>/testing/manifest:invalidEmptyRequirements": {},
 			},
 		},
 	})
@@ -370,24 +370,24 @@ func TestPolicyContextIsRunningImageAllowed(t *testing.T) {
 		Default: PolicyRequirements{NewPRReject()},
 		Transports: map[string]PolicyTransportScopes{
 			"docker": {
-				"docker.io/testing/manifest:latest": {
+				"<local>/testing/manifest:latest": {
 					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchExact()),
 				},
-				"docker.io/testing/manifest:twoAllows": {
+				"<local>/testing/manifest:twoAllows": {
 					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
 					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
 				},
-				"docker.io/testing/manifest:allowDeny": {
+				"<local>/testing/manifest:allowDeny": {
 					xNewPRSignedByKeyPath(SBKeyTypeGPGKeys, "fixtures/public-key.gpg", NewPRMMatchRepository()),
 					NewPRReject(),
 				},
-				"docker.io/testing/manifest:reject": {
+				"<local>/testing/manifest:reject": {
 					NewPRReject(),
 				},
-				"docker.io/testing/manifest:acceptAnything": {
+				"<local>/testing/manifest:acceptAnything": {
 					NewPRInsecureAcceptAnything(),
 				},
-				"docker.io/testing/manifest:invalidEmptyRequirements": {},
+				"<local>/testing/manifest:invalidEmptyRequirements": {},
 			},
 		},
 	})

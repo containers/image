@@ -29,7 +29,9 @@ var (
 	// allowed by DNS to ensure backwards compatibility with Docker image
 	// names.
 	domainRegexp = expression(
+		optional(literal(`<`)),
 		domainComponentRegexp,
+		optional(literal(`>`)),
 		optional(repeated(literal(`.`), domainComponentRegexp)),
 		optional(literal(`:`), match(`[0-9]+`)))
 

@@ -60,7 +60,7 @@ func TestVerifyDockerManifestSignature(t *testing.T) {
 	assert.Equal(t, TestImageManifestDigest, sig.DockerManifestDigest)
 
 	// Verification using a different canonicalization of TestImageSignatureReference
-	sig, err = VerifyDockerManifestSignature(signature, manifest, "docker.io/"+TestImageSignatureReference, mech, TestKeyFingerprint)
+	sig, err = VerifyDockerManifestSignature(signature, manifest, "<local>/"+TestImageSignatureReference, mech, TestKeyFingerprint)
 	require.NoError(t, err)
 	assert.Equal(t, TestImageSignatureReference, sig.DockerReference)
 	assert.Equal(t, TestImageManifestDigest, sig.DockerManifestDigest)

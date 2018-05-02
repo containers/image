@@ -44,9 +44,9 @@ func TestParseReference(t *testing.T) {
 func testParseReference(t *testing.T, fn func(string) (types.ImageReference, error)) {
 	for _, c := range []struct{ input, expected string }{
 		{"busybox", ""}, // Missing // prefix
-		{"//busybox:notlatest", "docker.io/library/busybox:notlatest"},           // Explicit tag
-		{"//busybox" + sha256digest, "docker.io/library/busybox" + sha256digest}, // Explicit digest
-		{"//busybox", "docker.io/library/busybox:latest"},                        // Default tag
+		{"//busybox:notlatest", "<local>/library/busybox:notlatest"},           // Explicit tag
+		{"//busybox" + sha256digest, "<local>/library/busybox" + sha256digest}, // Explicit digest
+		{"//busybox", "<local>/library/busybox:latest"},                        // Default tag
 		// A github.com/distribution/reference value can have a tag and a digest at the same time!
 		// The docker/distribution API does not really support that (we can’t ask for an image with a specific
 		// tag and digest), so fail.  This MAY be accepted in the future.
@@ -68,10 +68,10 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 
 // A common list of reference formats to test for the various ImageReference methods.
 var validReferenceTestCases = []struct{ input, dockerRef, stringWithinTransport string }{
-	{"busybox:notlatest", "docker.io/library/busybox:notlatest", "//busybox:notlatest"},                // Explicit tag
-	{"busybox" + sha256digest, "docker.io/library/busybox" + sha256digest, "//busybox" + sha256digest}, // Explicit digest
-	{"docker.io/library/busybox:latest", "docker.io/library/busybox:latest", "//busybox:latest"},       // All implied values explicitly specified
-	{"example.com/ns/foo:bar", "example.com/ns/foo:bar", "//example.com/ns/foo:bar"},                   // All values explicitly specified
+	{"busybox:notlatest", "<local>/library/busybox:notlatest", "//busybox:notlatest"},                // Explicit tag
+	{"busybox" + sha256digest, "<local>/library/busybox" + sha256digest, "//busybox" + sha256digest}, // Explicit digest
+	{"<local>/library/busybox1:latest", "<local>/library/busybox1:latest", "//busybox1:latest"},      // All implied values explicitly specified
+	{"example.com/ns/foo:bar", "example.com/ns/foo:bar", "//example.com/ns/foo:bar"},                 // All values explicitly specified
 }
 
 func TestNewReference(t *testing.T) {
@@ -136,7 +136,7 @@ func TestReferencePolicyConfigurationIdentity(t *testing.T) {
 	// Just a smoke test, the substance is tested in policyconfiguration.TestDockerReference.
 	ref, err := ParseReference("//busybox")
 	require.NoError(t, err)
-	assert.Equal(t, "docker.io/library/busybox:latest", ref.PolicyConfigurationIdentity())
+	assert.Equal(t, "<local>/library/busybox:latest", ref.PolicyConfigurationIdentity())
 }
 
 func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
@@ -144,14 +144,14 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 	ref, err := ParseReference("//busybox")
 	require.NoError(t, err)
 	assert.Equal(t, []string{
-		"docker.io/library/busybox",
-		"docker.io/library",
-		"docker.io",
+		"<local>/library/busybox",
+		"<local>/library",
+		"<local>",
 	}, ref.PolicyConfigurationNamespaces())
 }
 
 func TestReferenceNewImage(t *testing.T) {
-	ref, err := ParseReference("//busybox")
+	ref, err := ParseReference("//docker.io/library/busybox")
 	require.NoError(t, err)
 	img, err := ref.NewImage(context.Background(), &types.SystemContext{
 		RegistriesDirPath:        "/this/doesnt/exist",

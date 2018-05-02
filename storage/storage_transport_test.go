@@ -27,24 +27,24 @@ func TestTransportParseStoreReference(t *testing.T) {
 		{"", "", ""}, // Empty input
 		// Handling of the store prefix
 		// FIXME? Should we be silently discarding input like this?
-		{"[unterminated", "", ""},                                    // Unterminated store specifier
-		{"[garbage]busybox", "docker.io/library/busybox:latest", ""}, // Store specifier is overridden by the store we pass to ParseStoreReference
+		{"[unterminated", "", ""},                                  // Unterminated store specifier
+		{"[garbage]busybox", "<local>/library/busybox:latest", ""}, // Store specifier is overridden by the store we pass to ParseStoreReference
 
 		{"UPPERCASEISINVALID", "", ""},                                                     // Invalid single-component name
-		{"sha256:" + sha256digestHex, "docker.io/library/sha256:" + sha256digestHex, ""},   // Valid single-component name; the hex part is not an ID unless it has a "@" prefix, so it looks like a tag
+		{"sha256:" + sha256digestHex, "<local>/library/sha256:" + sha256digestHex, ""},     // Valid single-component name; the hex part is not an ID unless it has a "@" prefix, so it looks like a tag
 		{sha256digestHex, "", ""},                                                          // Invalid single-component ID; not an ID without a "@" prefix, so it's parsed as a name, but names aren't allowed to look like IDs
 		{"@" + sha256digestHex, "", sha256digestHex},                                       // Valid single-component ID
-		{"sha256:ab", "docker.io/library/sha256:ab", ""},                                   // Valid single-component name, explicit tag
-		{"busybox", "docker.io/library/busybox:latest", ""},                                // Valid single-component name, implicit tag
-		{"busybox:notlatest", "docker.io/library/busybox:notlatest", ""},                   // Valid single-component name, explicit tag
+		{"sha256:ab", "<local>/library/sha256:ab", ""},                                     // Valid single-component name, explicit tag
+		{"busybox", "<local>/library/busybox:latest", ""},                                  // Valid single-component name, implicit tag
+		{"busybox:notlatest", "<local>/library/busybox:notlatest", ""},                     // Valid single-component name, explicit tag
 		{"docker.io/library/busybox:notlatest", "docker.io/library/busybox:notlatest", ""}, // Valid single-component name, everything explicit
 
 		{"UPPERCASEISINVALID@" + sha256digestHex, "", ""}, // Invalid name in name@ID
 		{"busybox@ab", "", ""},                            // Invalid ID in name@ID
 		{"busybox@", "", ""},                              // Empty ID in name@ID
-		{"busybox@sha256:" + sha256digestHex, "docker.io/library/busybox@sha256:" + sha256digestHex, ""},                   // Valid two-component name, with a digest and no tag
-		{"busybox@" + sha256digestHex, "docker.io/library/busybox:latest", sha256digestHex},                                // Valid two-component name, implicit tag
-		{"busybox:notlatest@" + sha256digestHex, "docker.io/library/busybox:notlatest", sha256digestHex},                   // Valid two-component name, explicit tag
+		{"busybox@sha256:" + sha256digestHex, "<local>/library/busybox@sha256:" + sha256digestHex, ""},                     // Valid two-component name, with a digest and no tag
+		{"busybox@" + sha256digestHex, "<local>/library/busybox:latest", sha256digestHex},                                  // Valid two-component name, implicit tag
+		{"busybox:notlatest@" + sha256digestHex, "<local>/library/busybox:notlatest", sha256digestHex},                     // Valid two-component name, explicit tag
 		{"docker.io/library/busybox:notlatest@" + sha256digestHex, "docker.io/library/busybox:notlatest", sha256digestHex}, // Valid two-component name, everything explicit
 	} {
 		storageRef, err := Transport.ParseStoreReference(store, c.input)
