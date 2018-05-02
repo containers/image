@@ -185,7 +185,13 @@ func getV1Registries(config *tomlConfig) ([]Registry, error) {
 	getRegistry := func(s string) (*Registry, error) { // Note: _pointer_ to a long-lived object
 		url, err := parseURL(s)
 		if err != nil {
-			return nil, err
+			// fallback to https to be compatible with v1
+			if strings.Contains(err.Error(), "unspecified URI scheme: ") {
+				url, err = parseURL("https://" + s)
+			}
+			if err != nil {
+				return nil, err
+			}
 		}
 		prefix := stripURIScheme(url)
 		reg, exists := regMap[prefix]
