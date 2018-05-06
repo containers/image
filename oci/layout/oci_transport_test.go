@@ -13,6 +13,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestGetManifestDescriptor is testing a regression issue where a nil error was being wrapped,
+// this causes the returned error to be nil as well and the user wasn't getting a proper error output.
+//
+// More info: https://github.com/projectatomic/skopeo/issues/496
+func TestGetManifestDescriptor(t *testing.T) {
+	imageRef, err := NewReference("fixtures/two_images_manifest", "")
+	require.NoError(t, err)
+
+	_, err = imageRef.(ociReference).getManifestDescriptor()
+	assert.EqualError(t, err, ErrMoreThanOneImage.Error())
+}
+
 func TestTransportName(t *testing.T) {
 	assert.Equal(t, "oci", Transport.Name())
 }
