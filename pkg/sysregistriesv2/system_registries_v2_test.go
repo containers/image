@@ -234,7 +234,7 @@ insecure = true`)
 func TestV1BackwardsCompatibility(t *testing.T) {
 	testConfig = []byte(`
 [registries.search]
-registries = ["https://registry-a.com////", "https://registry-c.com"]
+registries = ["registry-a.com////", "https://registry-c.com"]
 
 [registries.block]
 registries = ["https://registry-b.com"]
@@ -252,6 +252,8 @@ registries = ["https://registry-d.com", "https://registry-e.com", "https://regis
 	// check if the expected images are actually in the array
 	var reg *Registry
 	reg = FindRegistry("registry-a.com/foo:bar", unqRegs)
+	// test https fallback for v1
+	assert.Equal(t, "https://registry-a.com", reg.URL.String())
 	assert.NotNil(t, reg)
 	reg = FindRegistry("registry-c.com/foo:bar", unqRegs)
 	assert.NotNil(t, reg)
