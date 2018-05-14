@@ -169,7 +169,8 @@ func TestReferenceNewImageDestination(t *testing.T) {
 	ref, err := ParseReference(filepath.Join(tmpDir, "no-reference"))
 	require.NoError(t, err)
 	dest, err := ref.NewImageDestination(context.Background(), nil)
-	assert.Error(t, err)
+	assert.NoError(t, err)
+	dest.Close()
 
 	ref, err = ParseReference(filepath.Join(tmpDir, "with-reference") + "busybox:latest")
 	require.NoError(t, err)
