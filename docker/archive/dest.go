@@ -17,10 +17,6 @@ type archiveImageDestination struct {
 }
 
 func newImageDestination(sys *types.SystemContext, ref archiveReference) (types.ImageDestination, error) {
-	if ref.destinationRef == nil {
-		return nil, errors.Errorf("docker-archive: destination reference not supplied (must be of form <path>:<reference:tag>)")
-	}
-
 	// ref.path can be either a pipe or a regular file
 	// in the case of a pipe, we require that we can open it for write
 	// in the case of a regular file, we don't want to overwrite any pre-existing file

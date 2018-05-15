@@ -41,7 +41,9 @@ func (t archiveTransport) ValidatePolicyConfigurationScope(scope string) error {
 
 // archiveReference is an ImageReference for Docker images.
 type archiveReference struct {
-	destinationRef reference.NamedTagged // only used for destinations
+	// only used for destinations
+	// archiveReference.destinationRef is optional and can be nil for destinations as well.
+	destinationRef reference.NamedTagged
 	path           string
 }
 
