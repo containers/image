@@ -1,6 +1,6 @@
 .PHONY: all tools test validate lint .gitvalidation fmt
 
-# Which github repostiory and branch to use for testing with skopeo
+# Which github repository and branch to use for testing with skopeo
 SKOPEO_REPO = projectatomic/skopeo
 SKOPEO_BRANCH = master
 # Set SUDO=sudo to run container integration tests using sudo.
@@ -47,7 +47,7 @@ test: vendor
 	@$(GPGME_ENV) go test $(BUILDFLAGS) -cover $(PACKAGES)
 
 # This is not run as part of (make all), but Travis CI does run this.
-# Demonstarting a working version of skopeo (possibly with modified SKOPEO_REPO/SKOPEO_BRANCH, e.g.
+# Demonstrating a working version of skopeo (possibly with modified SKOPEO_REPO/SKOPEO_BRANCH, e.g.
 #    make test-skopeo SKOPEO_REPO=runcom/skopeo-1 SKOPEO_BRANCH=oci-3 SUDO=sudo
 # ) is a requirement before merging; note that Travis will only test
 # the master branch of the upstream repo.
