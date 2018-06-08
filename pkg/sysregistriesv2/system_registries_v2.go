@@ -68,6 +68,18 @@ type tomlConfig struct {
 	} `toml:"registries"`
 }
 
+// InvalidRegistries represents an invalid registry configurations.  An example
+// is when "registry.com" is defined multiple times in the configuration but
+// with conflicting security settings.
+type InvalidRegistries struct {
+	s string
+}
+
+// Error returns the error string.
+func (e *InvalidRegistries) Error() string {
+	return e.s
+}
+
 // parseURL parses the input string, performs some sanity checks and returns
 // the sanitized input string.  An error is returned in case parsing fails or
 // or if URI scheme or user is set.
@@ -75,28 +87,31 @@ func parseURL(input string) (string, error) {
 	trimmed := strings.TrimRight(input, "/")
 
 	if trimmed == "" {
-		return "", fmt.Errorf("invalid URL: cannot be empty")
+		return "", &InvalidRegistries{s: "invalid URL: cannot be empty"}
 	}
 
 	uri, err := url.Parse(trimmed)
 	if err != nil {
-		return "", fmt.Errorf("invalid URL '%s': %v", input, err)
+		return "", &InvalidRegistries{s: fmt.Sprintf("invalid URL '%s': %v", input, err)}
 	}
 
 	// Check if a URI SCheme is set.
 	// Note that URLs that do not start with a slash after the scheme are
 	// interpreted as `scheme:opaque[?query][#fragment]`.
 	if uri.Scheme != "" && uri.Opaque == "" {
-		return "", fmt.Errorf("invalid URL '%s': URI schemes are not supported", input)
+		msg := fmt.Sprintf("invalid URL '%s': URI schemes are not supported", input)
+		return "", &InvalidRegistries{s: msg}
 	}
 
 	uri, err = url.Parse("http://" + trimmed)
 	if err != nil {
-		return "", fmt.Errorf("invalid URL '%s': sanitized URL did not parse: %v", input, err)
+		msg := fmt.Sprintf("invalid URL '%s': sanitized URL did not parse: %v", input, err)
+		return "", &InvalidRegistries{s: msg}
 	}
 
 	if uri.User != nil {
-		return "", fmt.Errorf("invalid URL '%s': user/password are not supported", trimmed)
+		msg := fmt.Sprintf("invalid URL '%s': user/password are not supported", trimmed)
+		return "", &InvalidRegistries{s: msg}
 	}
 
 	return trimmed, nil
@@ -154,8 +169,13 @@ func getV1Registries(config *tomlConfig) ([]Registry, error) {
 	return registries, nil
 }
 
-func validateRegistries(regs []Registry) ([]Registry, error) {
+// postProcessRegistries checks the consistency of all registries (e.g., set
+// the Prefix to URL if not set) and applies conflict checks.  It returns an
+// array of cleaned registries and error in case of conflicts.
+func postProcessRegistries(regs []Registry) ([]Registry, error) {
 	var registries []Registry
+	regMap := make(map[string][]Registry)
+
 	for _, reg := range regs {
 		var err error
 
@@ -164,6 +184,7 @@ func validateRegistries(regs []Registry) ([]Registry, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		if reg.Prefix == "" {
 			reg.Prefix = reg.URL
 		} else {
@@ -181,7 +202,30 @@ func validateRegistries(regs []Registry) ([]Registry, error) {
 			}
 		}
 		registries = append(registries, reg)
+		regMap[reg.URL] = append(regMap[reg.URL], reg)
 	}
+
+	// Given a registry can be mentioned multiple times (e.g., to have
+	// multiple prefixes backed by different mirrors), we need to make sure
+	// there are no conflicts among them.
+	//
+	// Note: we need to iterate over the registries array to ensure a
+	// deterministic behavior which is not guaranteed by maps.
+	for _, reg := range registries {
+		others, _ := regMap[reg.URL]
+		for _, other := range others {
+			if reg.Insecure != other.Insecure {
+				msg := fmt.Sprintf("registry '%s' is defined multiple times with conflicting 'insecure' setting", reg.URL)
+
+				return nil, &InvalidRegistries{s: msg}
+			}
+			if reg.Blocked != other.Blocked {
+				msg := fmt.Sprintf("registry '%s' is defined multiple times with conflicting 'blocked' setting", reg.URL)
+				return nil, &InvalidRegistries{s: msg}
+			}
+		}
+	}
+
 	return registries, nil
 }
 
@@ -201,12 +245,12 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 	}
 	if len(v1Registries) > 0 {
 		if len(registries) > 0 {
-			return nil, fmt.Errorf("mixing sysregistry v1/v2 is not supported")
+			return nil, &InvalidRegistries{s: "mixing sysregistry v1/v2 is not supported"}
 		}
 		registries = v1Registries
 	}
 
-	return validateRegistries(registries)
+	return postProcessRegistries(registries)
 }
 
 // FindUnqualifiedSearchRegistries returns all registries that are configured

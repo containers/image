@@ -191,6 +191,52 @@ unqualified-search = true`)
 	assert.NotNil(t, reg)
 }
 
+func TestInsecureConfligs(t *testing.T) {
+	testConfig = []byte(`
+[[registry]]
+url = "registry.com"
+
+[[registry.mirror]]
+url = "mirror-1.registry.com"
+
+[[registry.mirror]]
+url = "mirror-2.registry.com"
+
+
+[[registry]]
+url = "registry.com"
+insecure = true
+`)
+
+	registries, err := GetRegistries(nil)
+	assert.NotNil(t, err)
+	assert.Nil(t, registries)
+	assert.Contains(t, err.Error(), "registry 'registry.com' is defined multiple times with conflicting 'insecure' setting")
+}
+
+func TestBlockConfligs(t *testing.T) {
+	testConfig = []byte(`
+[[registry]]
+url = "registry.com"
+
+[[registry.mirror]]
+url = "mirror-1.registry.com"
+
+[[registry.mirror]]
+url = "mirror-2.registry.com"
+
+
+[[registry]]
+url = "registry.com"
+blocked = true
+`)
+
+	registries, err := GetRegistries(nil)
+	assert.NotNil(t, err)
+	assert.Nil(t, registries)
+	assert.Contains(t, err.Error(), "registry 'registry.com' is defined multiple times with conflicting 'blocked' setting")
+}
+
 func TestUnmarshalConfig(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
@@ -281,5 +327,5 @@ unqualified-search = true `)
 
 	_, err := GetRegistries(nil)
 	assert.NotNil(t, err)
-	assert.Contains(t, "mixing sysregistry v1/v2 is not supported", err.Error())
+	assert.Contains(t, err.Error(), "mixing sysregistry v1/v2 is not supported")
 }
