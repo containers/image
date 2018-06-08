@@ -3,7 +3,6 @@ package sysregistriesv2
 import (
 	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
-	"net/url"
 	"testing"
 )
 
@@ -17,41 +16,33 @@ func init() {
 
 func TestParseURL(t *testing.T) {
 	var err error
-	var url url.URL
+	var url string
 
 	// invalid URLs
-	_, err = parseURL("unspecified.scheme")
+	_, err = parseURL("https://example.com")
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "unspecified URI scheme:")
+	assert.Contains(t, err.Error(), "invalid URL 'https://example.com': URI schemes are not supported")
 
-	_, err = parseURL("httpx://unsupported.scheme")
+	_, err = parseURL("john.doe@example.com")
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "unsupported URI scheme:")
-
-	_, err = parseURL("http://")
-	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "unspecified URI host:")
-
-	_, err = parseURL("https://user:password@unsupported.com")
-	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "unsupported username/password:")
+	assert.Contains(t, err.Error(), "invalid URL 'john.doe@example.com': user/password are not supported")
 
 	// valid URLs
-	url, err = parseURL("http://example.com")
+	url, err = parseURL("example.com")
 	assert.Nil(t, err)
-	assert.Equal(t, "http://example.com", url.String())
+	assert.Equal(t, "example.com", url)
 
-	url, err = parseURL("http://example.com/")
+	url, err = parseURL("example.com/") // trailing slashes are stripped
 	assert.Nil(t, err)
-	assert.Equal(t, "http://example.com", url.String())
+	assert.Equal(t, "example.com", url)
 
-	url, err = parseURL("http://example.com//////")
+	url, err = parseURL("example.com//////") // trailing slahes are stripped
 	assert.Nil(t, err)
-	assert.Equal(t, "http://example.com", url.String())
+	assert.Equal(t, "example.com", url)
 
-	url, err = parseURL("http://example.com:5000/with/path")
+	url, err = parseURL("example.com:5000/with/path")
 	assert.Nil(t, err)
-	assert.Equal(t, "http://example.com:5000/with/path", url.String())
+	assert.Equal(t, "example.com:5000/with/path", url)
 }
 
 func TestEmptyConfig(t *testing.T) {
@@ -65,17 +56,17 @@ func TestEmptyConfig(t *testing.T) {
 func TestMirrors(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "https://registry.com"
+url = "registry.com"
 
 [[registry.mirror]]
-url = "https://mirror-1.registry.com"
+url = "mirror-1.registry.com"
 
 [[registry.mirror]]
-url = "https://mirror-2.registry.com"
+url = "mirror-2.registry.com"
 insecure = true
 
 [[registry]]
-url = "https://blocked.registry.com"
+url = "blocked.registry.com"
 blocked = true`)
 
 	registries, err := GetRegistries(nil)
@@ -86,64 +77,64 @@ blocked = true`)
 	reg = FindRegistry("registry.com/image:tag", registries)
 	assert.NotNil(t, reg)
 	assert.Equal(t, 2, len(reg.Mirrors))
-	assert.Equal(t, "https://mirror-1.registry.com", reg.Mirrors[0].URL.String())
+	assert.Equal(t, "mirror-1.registry.com", reg.Mirrors[0].URL)
 	assert.False(t, reg.Mirrors[0].Insecure)
-	assert.Equal(t, "https://mirror-2.registry.com", reg.Mirrors[1].URL.String())
+	assert.Equal(t, "mirror-2.registry.com", reg.Mirrors[1].URL)
 	assert.True(t, reg.Mirrors[1].Insecure)
 }
 
 func TestMissingRegistryURL(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "https://registry-a.com"
+url = "registry-a.com"
 unqualified-search = true
 
 [[registry]]
-url = "https://registry-b.com"
+url = "registry-b.com"
 
 [[registry]]
 unqualified-search = true`)
 	_, err := GetRegistries(nil)
 	assert.NotNil(t, err)
-	assert.Contains(t, "registry must include a URL", err.Error())
+	assert.Contains(t, err.Error(), "invalid URL")
 }
 
 func TestMissingMirrorURL(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "https://registry-a.com"
+url = "registry-a.com"
 unqualified-search = true
 
 [[registry]]
-url = "https://registry-b.com"
+url = "registry-b.com"
 [[registry.mirror]]
-url = "https://mirror-b.com"
+url = "mirror-b.com"
 [[registry.mirror]]
 `)
 	_, err := GetRegistries(nil)
 	assert.NotNil(t, err)
-	assert.Contains(t, "mirror must include a URL", err.Error())
+	assert.Contains(t, err.Error(), "invalid URL")
 }
 
 func TestFindRegistry(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "https://registry.com:5000"
+url = "registry.com:5000"
 prefix = "simple-prefix.com"
 
 [[registry]]
-url = "https://another-registry.com:5000"
+url = "another-registry.com:5000"
 prefix = "complex-prefix.com:4000/with/path"
 
 [[registry]]
-url = "https://registry.com:5000"
+url = "registry.com:5000"
 prefix = "another-registry.com"
 
 [[registry]]
-url = "https://no-prefix.com"
+url = "no-prefix.com"
 
 [[registry]]
-url = "https://empty-prefix.com"
+url = "empty-prefix.com"
 prefix = ""`)
 
 	registries, err := GetRegistries(nil)
@@ -154,35 +145,35 @@ prefix = ""`)
 	reg = FindRegistry("simple-prefix.com/foo/bar:latest", registries)
 	assert.NotNil(t, reg)
 	assert.Equal(t, "simple-prefix.com", reg.Prefix)
-	assert.Equal(t, reg.URL.String(), "https://registry.com:5000")
+	assert.Equal(t, reg.URL, "registry.com:5000")
 
 	reg = FindRegistry("complex-prefix.com:4000/with/path/and/beyond:tag", registries)
 	assert.NotNil(t, reg)
 	assert.Equal(t, "complex-prefix.com:4000/with/path", reg.Prefix)
-	assert.Equal(t, "https://another-registry.com:5000", reg.URL.String())
+	assert.Equal(t, "another-registry.com:5000", reg.URL)
 
 	reg = FindRegistry("no-prefix.com/foo:tag", registries)
 	assert.NotNil(t, reg)
 	assert.Equal(t, "no-prefix.com", reg.Prefix)
-	assert.Equal(t, "https://no-prefix.com", reg.URL.String())
+	assert.Equal(t, "no-prefix.com", reg.URL)
 
 	reg = FindRegistry("empty-prefix.com/foo:tag", registries)
 	assert.NotNil(t, reg)
 	assert.Equal(t, "empty-prefix.com", reg.Prefix)
-	assert.Equal(t, "https://empty-prefix.com", reg.URL.String())
+	assert.Equal(t, "empty-prefix.com", reg.URL)
 }
 
 func TestFindUnqualifiedSearchRegistries(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "https://registry-a.com"
+url = "registry-a.com"
 unqualified-search = true
 
 [[registry]]
-url = "https://registry-b.com"
+url = "registry-b.com"
 
 [[registry]]
-url = "https://registry-c.com"
+url = "registry-c.com"
 unqualified-search = true`)
 
 	registries, err := GetRegistries(nil)
@@ -203,27 +194,27 @@ unqualified-search = true`)
 func TestUnmarshalConfig(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "https://registry.com"
+url = "registry.com"
 
 [[registry.mirror]]
-url = "https://mirror-1.registry.com"
+url = "mirror-1.registry.com"
 
 [[registry.mirror]]
-url = "https://mirror-2.registry.com"
+url = "mirror-2.registry.com"
 
 
 [[registry]]
-url = "https://blocked.registry.com"
+url = "blocked.registry.com"
 blocked = true
 
 
 [[registry]]
-url = "http://insecure.registry.com"
+url = "insecure.registry.com"
 insecure = true
 
 
 [[registry]]
-url = "https://untrusted.registry.com"
+url = "untrusted.registry.com"
 insecure = true`)
 
 	registries, err := GetRegistries(nil)
@@ -234,13 +225,13 @@ insecure = true`)
 func TestV1BackwardsCompatibility(t *testing.T) {
 	testConfig = []byte(`
 [registries.search]
-registries = ["registry-a.com////", "https://registry-c.com"]
+registries = ["registry-a.com////", "registry-c.com"]
 
 [registries.block]
-registries = ["https://registry-b.com"]
+registries = ["registry-b.com"]
 
 [registries.insecure]
-registries = ["https://registry-d.com", "https://registry-e.com", "https://registry-a.com"]`)
+registries = ["registry-d.com", "registry-e.com", "registry-a.com"]`)
 
 	registries, err := GetRegistries(nil)
 	assert.Nil(t, err)
@@ -253,7 +244,7 @@ registries = ["https://registry-d.com", "https://registry-e.com", "https://regis
 	var reg *Registry
 	reg = FindRegistry("registry-a.com/foo:bar", unqRegs)
 	// test https fallback for v1
-	assert.Equal(t, "https://registry-a.com", reg.URL.String())
+	assert.Equal(t, "registry-a.com", reg.URL)
 	assert.NotNil(t, reg)
 	reg = FindRegistry("registry-c.com/foo:bar", unqRegs)
 	assert.NotNil(t, reg)
@@ -269,23 +260,23 @@ registries = ["https://registry-d.com", "https://registry-e.com", "https://regis
 func TestMixingV1andV2(t *testing.T) {
 	testConfig = []byte(`
 [registries.search]
-registries = ["https://registry-a.com", "https://registry-c.com"]
+registries = ["registry-a.com", "registry-c.com"]
 
 [registries.block]
-registries = ["https://registry-b.com"]
+registries = ["registry-b.com"]
 
 [registries.insecure]
-registries = ["https://registry-d.com", "https://registry-e.com", "https://registry-a.com"]
+registries = ["registry-d.com", "registry-e.com", "registry-a.com"]
 
 [[registry]]
-url = "https://registry-a.com"
+url = "registry-a.com"
 unqualified-search = true
 
 [[registry]]
-url = "https://registry-b.com"
+url = "registry-b.com"
 
 [[registry]]
-url = "https://registry-c.com"
+url = "registry-c.com"
 unqualified-search = true `)
 
 	_, err := GetRegistries(nil)
