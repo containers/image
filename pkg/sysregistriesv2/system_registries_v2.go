@@ -21,53 +21,22 @@ var systemRegistriesConfPath = builtinRegistriesConfPath
 // DO NOT change this, instead see systemRegistriesConfPath above.
 const builtinRegistriesConfPath = "/etc/containers/registries.conf"
 
-// tomlURL is an abstraction required to unmarshal the non-primitive and
-// non-local url.URL type when loading the toml config.
-type tomlURL struct {
-	url url.URL
-}
-
-// UnmashalText interprets and parses text as a net.URL type and assigns it to
-// the tomlURL's url field.
-func (r *tomlURL) UnmarshalText(text []byte) (err error) {
-	r.url, err = parseURL(string(text))
-	return err
-}
-
-// mirror is an internal type including all mirror data but the URL.
-type mirror struct {
+// Mirror represents a mirror. Mirrors can be used as pull-through caches for
+// registries.
+type Mirror struct {
+	// The mirror's URL.
+	URL string `toml:"url"`
 	// If true, certs verification will be skipped and HTTP (non-TLS)
 	// connections will be allowed.
 	Insecure bool `toml:"insecure"`
 }
 
-// Mirror represents a mirror. Mirrors can be used as pull-through caches for
-// registries.
-type Mirror struct {
-	// The mirror's URL.
-	URL url.URL
-	mirror
-}
-
-// tomlMirror is a serializable Mirror.
-type tomlMirror struct {
-	// Serializable mirror URL.
-	URL tomlURL `toml:"url"`
-	mirror
-}
-
-// toMirror transforms tmirror to a Mirror.
-func (tmir *tomlMirror) toMirror() (Mirror, error) {
-	if len(tmir.URL.url.String()) == 0 {
-		return Mirror{}, fmt.Errorf("mirror must include a URL")
-	}
-	mir := Mirror{URL: tmir.URL.url, mirror: tmir.mirror}
-	return mir, nil
-}
-
-// registry is an internal type including all registry data but the URL and the
-// array of associated mirrors.
-type registry struct {
+// Registry represents a registry.
+type Registry struct {
+	// Serializable registry URL.
+	URL string `toml:"url"`
+	// The registry's mirrors.
+	Mirrors []Mirror `toml:"mirror"`
 	// If true, pulling from the registry will be blocked.
 	Blocked bool `toml:"blocked"`
 	// If true, certs verification will be skipped and HTTP (non-TLS)
@@ -76,55 +45,11 @@ type registry struct {
 	// If true, the registry can be used when pulling an unqualified image.
 	Search bool `toml:"unqualified-search"`
 	// Prefix is used for matching images, and to translate one namespace to
-	// another.  If `Prefix="example.com/bar"`, `URL="https://example.com/foo/bar"`
+	// another.  If `Prefix="example.com/bar"`, `URL="example.com/foo/bar"`
 	// and we pull from "example.com/bar/myimage:latest", the image will
-	// effectively be pulled from https://example.com/foo/bar/myimage:latest.
+	// effectively be pulled from "example.com/foo/bar/myimage:latest".
 	// If no Prefix is specified, it defaults to the specified URL.
 	Prefix string `toml:"prefix"`
-}
-
-// Registry represents a registry.
-type Registry struct {
-	// Serializable registry URL.
-	URL url.URL
-	// The registry's mirrors.
-	Mirrors []Mirror
-	registry
-}
-
-// tomlRegistry is serializable Registry.
-type tomlRegistry struct {
-	URL     tomlURL      `toml:"url"`
-	Mirrors []tomlMirror `toml:"mirror"`
-	registry
-}
-
-// stripURIScheme strips the URI scheme from the given URL and returns it as
-// as string.
-func stripURIScheme(url url.URL) string {
-	return strings.TrimPrefix(url.String(), url.Scheme+"://")
-}
-
-// toRegistry transforms treg to a Registry.
-func (treg *tomlRegistry) toRegistry() (Registry, error) {
-	if len(treg.URL.url.String()) == 0 {
-		return Registry{}, fmt.Errorf("registry must include a URL")
-	}
-	reg := Registry{URL: treg.URL.url, registry: treg.registry}
-	// if no prefix is specified, default to the specified URL with
-	// stripped URI scheme
-	if reg.Prefix == "" {
-		reg.Prefix = stripURIScheme(reg.URL)
-	}
-
-	for _, tmir := range treg.Mirrors {
-		mir, err := tmir.toMirror()
-		if err != nil {
-			return Registry{}, err
-		}
-		reg.Mirrors = append(reg.Mirrors, mir)
-	}
-	return reg, nil
 }
 
 // backwards compatability to sysregistries v1
@@ -134,7 +59,7 @@ type v1TOMLregistries struct {
 
 // tomlConfig is the data type used to unmarshal the toml config.
 type tomlConfig struct {
-	TOMLRegistries []tomlRegistry `toml:"registry"`
+	Registries []Registry `toml:"registry"`
 	// backwards compatability to sysregistries v1
 	V1Registries struct {
 		Search   v1TOMLregistries `toml:"search"`
@@ -143,38 +68,53 @@ type tomlConfig struct {
 	} `toml:"registries"`
 }
 
+// InvalidRegistries represents an invalid registry configurations.  An example
+// is when "registry.com" is defined multiple times in the configuration but
+// with conflicting security settings.
+type InvalidRegistries struct {
+	s string
+}
+
+// Error returns the error string.
+func (e *InvalidRegistries) Error() string {
+	return e.s
+}
+
 // parseURL parses the input string, performs some sanity checks and returns
-// a url.URL.  The input must be a valid URI with an "http" or "https" scheme,
-// a specified host and an empty URI user.  Otherwise, an error is returned.
-func parseURL(input string) (url.URL, error) {
-	input = strings.TrimRight(input, "/")
+// the sanitized input string.  An error is returned in case parsing fails or
+// or if URI scheme or user is set.
+func parseURL(input string) (string, error) {
+	trimmed := strings.TrimRight(input, "/")
 
-	uri, err := url.Parse(input)
+	if trimmed == "" {
+		return "", &InvalidRegistries{s: "invalid URL: cannot be empty"}
+	}
+
+	uri, err := url.Parse(trimmed)
 	if err != nil {
-		return url.URL{}, fmt.Errorf("error parsing URL %s: %v", input, err)
+		return "", &InvalidRegistries{s: fmt.Sprintf("invalid URL '%s': %v", input, err)}
 	}
 
-	// only https and http are valid URI schemes
-	if uri.Scheme == "" {
-		return url.URL{}, fmt.Errorf("unspecified URI scheme: %s", input)
-	}
-	if uri.Scheme != "https" && uri.Scheme != "http" {
-		return url.URL{}, fmt.Errorf("unsupported URI scheme: %s", input)
-	}
-
-	// a host must be specified
-	if uri.Host == "" {
-		return url.URL{}, fmt.Errorf("unspecified URI host: %s", input)
+	// Check if a URI SCheme is set.
+	// Note that URLs that do not start with a slash after the scheme are
+	// interpreted as `scheme:opaque[?query][#fragment]`.
+	if uri.Scheme != "" && uri.Opaque == "" {
+		msg := fmt.Sprintf("invalid URL '%s': URI schemes are not supported", input)
+		return "", &InvalidRegistries{s: msg}
 	}
 
-	// user must be empty
+	uri, err = url.Parse("http://" + trimmed)
+	if err != nil {
+		msg := fmt.Sprintf("invalid URL '%s': sanitized URL did not parse: %v", input, err)
+		return "", &InvalidRegistries{s: msg}
+	}
+
 	if uri.User != nil {
-		// strip password for security reasons
-		uri.User = url.UserPassword(uri.User.Username(), "xxxxxx")
-		return url.URL{}, fmt.Errorf("unsupported username/password: %q", uri)
+		msg := fmt.Sprintf("invalid URL '%s': user/password are not supported", trimmed)
+		return "", &InvalidRegistries{s: msg}
 	}
 
-	return *uri, nil
+	return trimmed, nil
 }
 
 // getV1Registries transforms v1 registries in the config into an array of v2
@@ -182,24 +122,20 @@ func parseURL(input string) (url.URL, error) {
 func getV1Registries(config *tomlConfig) ([]Registry, error) {
 	regMap := make(map[string]*Registry)
 
-	getRegistry := func(s string) (*Registry, error) { // Note: _pointer_ to a long-lived object
-		url, err := parseURL(s)
+	getRegistry := func(url string) (*Registry, error) { // Note: _pointer_ to a long-lived object
+		var err error
+		url, err = parseURL(url)
 		if err != nil {
-			// fallback to https to be compatible with v1
-			if strings.Contains(err.Error(), "unspecified URI scheme: ") {
-				url, err = parseURL("https://" + s)
-			}
-			if err != nil {
-				return nil, err
-			}
+			return nil, err
 		}
-		prefix := stripURIScheme(url)
-		reg, exists := regMap[prefix]
+		reg, exists := regMap[url]
 		if !exists {
-			reg = &Registry{URL: url,
-				Mirrors:  []Mirror{},
-				registry: registry{Prefix: prefix}}
-			regMap[prefix] = reg
+			reg = &Registry{
+				URL:     url,
+				Mirrors: []Mirror{},
+				Prefix:  url,
+			}
+			regMap[url] = reg
 		}
 		return reg, nil
 	}
@@ -233,6 +169,66 @@ func getV1Registries(config *tomlConfig) ([]Registry, error) {
 	return registries, nil
 }
 
+// postProcessRegistries checks the consistency of all registries (e.g., set
+// the Prefix to URL if not set) and applies conflict checks.  It returns an
+// array of cleaned registries and error in case of conflicts.
+func postProcessRegistries(regs []Registry) ([]Registry, error) {
+	var registries []Registry
+	regMap := make(map[string][]Registry)
+
+	for _, reg := range regs {
+		var err error
+
+		// make sure URL and Prefix are valid
+		reg.URL, err = parseURL(reg.URL)
+		if err != nil {
+			return nil, err
+		}
+
+		if reg.Prefix == "" {
+			reg.Prefix = reg.URL
+		} else {
+			reg.Prefix, err = parseURL(reg.Prefix)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// make sure mirrors are valid
+		for _, mir := range reg.Mirrors {
+			mir.URL, err = parseURL(mir.URL)
+			if err != nil {
+				return nil, err
+			}
+		}
+		registries = append(registries, reg)
+		regMap[reg.URL] = append(regMap[reg.URL], reg)
+	}
+
+	// Given a registry can be mentioned multiple times (e.g., to have
+	// multiple prefixes backed by different mirrors), we need to make sure
+	// there are no conflicts among them.
+	//
+	// Note: we need to iterate over the registries array to ensure a
+	// deterministic behavior which is not guaranteed by maps.
+	for _, reg := range registries {
+		others, _ := regMap[reg.URL]
+		for _, other := range others {
+			if reg.Insecure != other.Insecure {
+				msg := fmt.Sprintf("registry '%s' is defined multiple times with conflicting 'insecure' setting", reg.URL)
+
+				return nil, &InvalidRegistries{s: msg}
+			}
+			if reg.Blocked != other.Blocked {
+				msg := fmt.Sprintf("registry '%s' is defined multiple times with conflicting 'blocked' setting", reg.URL)
+				return nil, &InvalidRegistries{s: msg}
+			}
+		}
+	}
+
+	return registries, nil
+}
+
 // GetRegistries loads and returns the registries specified in the config.
 func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 	config, err := loadRegistryConf(ctx)
@@ -240,14 +236,7 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 		return nil, err
 	}
 
-	registries := []Registry{}
-	for _, treg := range config.TOMLRegistries {
-		reg, err := treg.toRegistry()
-		if err != nil {
-			return nil, err
-		}
-		registries = append(registries, reg)
-	}
+	registries := config.Registries
 
 	// backwards compatibility for v1 configs
 	v1Registries, err := getV1Registries(config)
@@ -256,12 +245,12 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 	}
 	if len(v1Registries) > 0 {
 		if len(registries) > 0 {
-			return nil, fmt.Errorf("mixing sysregistry v1/v2 is not supported")
+			return nil, &InvalidRegistries{s: "mixing sysregistry v1/v2 is not supported"}
 		}
 		registries = v1Registries
 	}
 
-	return registries, nil
+	return postProcessRegistries(registries)
 }
 
 // FindUnqualifiedSearchRegistries returns all registries that are configured
