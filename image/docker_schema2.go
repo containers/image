@@ -95,11 +95,7 @@ func (m *manifestSchema2) ConfigBlob(ctx context.Context) ([]byte, error) {
 		if m.src == nil {
 			return nil, errors.Errorf("Internal error: neither src nor configBlob set in manifestSchema2")
 		}
-		stream, _, err := m.src.GetBlob(ctx, types.BlobInfo{
-			Digest: m.m.ConfigDescriptor.Digest,
-			Size:   m.m.ConfigDescriptor.Size,
-			URLs:   m.m.ConfigDescriptor.URLs,
-		})
+		stream, _, err := m.src.GetBlob(ctx, manifest.BlobInfoFromSchema2Descriptor(m.m.ConfigDescriptor))
 		if err != nil {
 			return nil, err
 		}
