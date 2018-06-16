@@ -131,6 +131,7 @@ func TestManifestOCI1ConfigInfo(t *testing.T) {
 			Annotations: map[string]string{
 				"test-annotation-1": "one",
 			},
+			MediaType: "application/vnd.oci.image.config.v1+json",
 		}, m.ConfigInfo())
 	}
 }

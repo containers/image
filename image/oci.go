@@ -60,11 +60,7 @@ func (m *manifestOCI1) ConfigBlob(ctx context.Context) ([]byte, error) {
 		if m.src == nil {
 			return nil, errors.Errorf("Internal error: neither src nor configBlob set in manifestOCI1")
 		}
-		stream, _, err := m.src.GetBlob(ctx, types.BlobInfo{
-			Digest: m.m.Config.Digest,
-			Size:   m.m.Config.Size,
-			URLs:   m.m.Config.URLs,
-		})
+		stream, _, err := m.src.GetBlob(ctx, manifest.BlobInfoFromOCI1Descriptor(m.m.Config))
 		if err != nil {
 			return nil, err
 		}

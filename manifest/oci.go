@@ -10,6 +10,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+// BlobInfoFromOCI1Descriptor returns a types.BlobInfo based on the input OCI1 descriptor.
+func BlobInfoFromOCI1Descriptor(desc imgspecv1.Descriptor) types.BlobInfo {
+	return types.BlobInfo{
+		Digest:      desc.Digest,
+		Size:        desc.Size,
+		URLs:        desc.URLs,
+		Annotations: desc.Annotations,
+		MediaType:   desc.MediaType,
+	}
+}
+
 // OCI1 is a manifest.Manifest implementation for OCI images.
 // The underlying data from imgspecv1.Manifest is also available.
 type OCI1 struct {
@@ -45,7 +56,7 @@ func OCI1Clone(src *OCI1) *OCI1 {
 
 // ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
 func (m *OCI1) ConfigInfo() types.BlobInfo {
-	return types.BlobInfo{Digest: m.Config.Digest, Size: m.Config.Size, Annotations: m.Config.Annotations}
+	return BlobInfoFromOCI1Descriptor(m.Config)
 }
 
 // LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
@@ -54,7 +65,7 @@ func (m *OCI1) ConfigInfo() types.BlobInfo {
 func (m *OCI1) LayerInfos() []types.BlobInfo {
 	blobs := []types.BlobInfo{}
 	for _, layer := range m.Layers {
-		blobs = append(blobs, types.BlobInfo{Digest: layer.Digest, Size: layer.Size, Annotations: layer.Annotations, URLs: layer.URLs, MediaType: layer.MediaType})
+		blobs = append(blobs, BlobInfoFromOCI1Descriptor(layer))
 	}
 	return blobs
 }
