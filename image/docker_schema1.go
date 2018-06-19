@@ -2,7 +2,6 @@ package image
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
@@ -152,12 +151,12 @@ func (m *manifestSchema1) UpdatedImage(ctx context.Context, options types.Manife
 
 // Based on github.com/docker/docker/distribution/pull_v2.go
 func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.BlobInfo, layerDiffIDs []digest.Digest) (genericManifest, error) {
-	if len(m.m.History) == 0 {
-		// What would this even mean?! Anyhow, the rest of the code depends on fsLayers[0] and history[0] existing.
+	if len(m.m.ExtractedV1Compatibility) == 0 {
+		// What would this even mean?! Anyhow, the rest of the code depends on FSLayers[0] and ExtractedV1Compatibility[0] existing.
 		return nil, errors.Errorf("Cannot convert an image with 0 history entries to %s", manifest.DockerV2Schema2MediaType)
 	}
-	if len(m.m.History) != len(m.m.FSLayers) {
-		return nil, errors.Errorf("Inconsistent schema 1 manifest: %d history entries, %d fsLayers entries", len(m.m.History), len(m.m.FSLayers))
+	if len(m.m.ExtractedV1Compatibility) != len(m.m.FSLayers) {
+		return nil, errors.Errorf("Inconsistent schema 1 manifest: %d history entries, %d fsLayers entries", len(m.m.ExtractedV1Compatibility), len(m.m.FSLayers))
 	}
 	if uploadedLayerInfos != nil && len(uploadedLayerInfos) != len(m.m.FSLayers) {
 		return nil, errors.Errorf("Internal error: uploaded %d blobs, but schema1 manifest has %d fsLayers", len(uploadedLayerInfos), len(m.m.FSLayers))
@@ -169,14 +168,10 @@ func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.Bl
 	// Build a list of the diffIDs for the non-empty layers.
 	diffIDs := []digest.Digest{}
 	var layers []manifest.Schema2Descriptor
-	for v1Index := len(m.m.History) - 1; v1Index >= 0; v1Index-- {
-		v2Index := (len(m.m.History) - 1) - v1Index
+	for v1Index := len(m.m.ExtractedV1Compatibility) - 1; v1Index >= 0; v1Index-- {
+		v2Index := (len(m.m.ExtractedV1Compatibility) - 1) - v1Index
 
-		var v1compat manifest.Schema1V1Compatibility
-		if err := json.Unmarshal([]byte(m.m.History[v1Index].V1Compatibility), &v1compat); err != nil {
-			return nil, errors.Wrapf(err, "Error decoding history entry %d", v1Index)
-		}
-		if !v1compat.ThrowAway {
+		if !m.m.ExtractedV1Compatibility[v1Index].ThrowAway {
 			var size int64
 			if uploadedLayerInfos != nil {
 				size = uploadedLayerInfos[v2Index].Size

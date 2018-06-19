@@ -399,12 +399,7 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 	case *manifest.Schema1:
 		// Build a list of the diffIDs we've generated for the non-throwaway FS layers,
 		// in reverse of the order in which they were originally listed.
-		for i, history := range m.History {
-			compat := manifest.Schema1V1Compatibility{}
-			if err := json.Unmarshal([]byte(history.V1Compatibility), &compat); err != nil {
-				logrus.Debugf("internal error reading schema 1 history: %v", err)
-				return ""
-			}
+		for i, compat := range m.ExtractedV1Compatibility {
 			if compat.ThrowAway {
 				continue
 			}

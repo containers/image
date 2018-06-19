@@ -25,25 +25,28 @@ type Schema1History struct {
 
 // Schema1 is a manifest in docker/distribution schema 1.
 type Schema1 struct {
-	Name          string            `json:"name"`
-	Tag           string            `json:"tag"`
-	Architecture  string            `json:"architecture"`
-	FSLayers      []Schema1FSLayers `json:"fsLayers"`
-	History       []Schema1History  `json:"history"`
-	SchemaVersion int               `json:"schemaVersion"`
+	Name                     string                   `json:"name"`
+	Tag                      string                   `json:"tag"`
+	Architecture             string                   `json:"architecture"`
+	FSLayers                 []Schema1FSLayers        `json:"fsLayers"`
+	History                  []Schema1History         `json:"history"` // Keep this in sync with ExtractedV1Compatibility!
+	ExtractedV1Compatibility []Schema1V1Compatibility `json:"-"`       // Keep this in sync with History! Does not contain the full config (Schema2V1Image)
+	SchemaVersion            int                      `json:"schemaVersion"`
+}
+
+type schema1V1CompatibilityContainerConfig struct {
+	Cmd []string
 }
 
 // Schema1V1Compatibility is a v1Compatibility in docker/distribution schema 1.
 type Schema1V1Compatibility struct {
-	ID              string    `json:"id"`
-	Parent          string    `json:"parent,omitempty"`
-	Comment         string    `json:"comment,omitempty"`
-	Created         time.Time `json:"created"`
-	ContainerConfig struct {
-		Cmd []string
-	} `json:"container_config,omitempty"`
-	Author    string `json:"author,omitempty"`
-	ThrowAway bool   `json:"throwaway,omitempty"`
+	ID              string                                `json:"id"`
+	Parent          string                                `json:"parent,omitempty"`
+	Comment         string                                `json:"comment,omitempty"`
+	Created         time.Time                             `json:"created"`
+	ContainerConfig schema1V1CompatibilityContainerConfig `json:"container_config,omitempty"`
+	Author          string                                `json:"author,omitempty"`
+	ThrowAway       bool                                  `json:"throwaway,omitempty"`
 }
 
 // Schema1FromManifest creates a Schema1 manifest instance from a manifest blob.
@@ -95,13 +98,19 @@ func Schema1Clone(src *Schema1) *Schema1 {
 	return &copy
 }
 
-// initialize verifies invariants so that the rest of this code can assume a minimally healthy manifest.
+// initialize initializes ExtractedV1Compatibility and verifies invariants, so that the rest of this code can assume a minimally healthy manifest.
 func (m *Schema1) initialize() error {
 	if len(m.FSLayers) != len(m.History) {
 		return errors.New("length of history not equal to number of layers")
 	}
 	if len(m.FSLayers) == 0 {
 		return errors.New("no FSLayers in manifest")
+	}
+	m.ExtractedV1Compatibility = make([]Schema1V1Compatibility, len(m.History))
+	for i, h := range m.History {
+		if err := json.Unmarshal([]byte(h.V1Compatibility), &m.ExtractedV1Compatibility[i]); err != nil {
+			return errors.Wrapf(err, "Error parsing v2s1 history entry %d", i)
+		}
 	}
 	return nil
 }
@@ -124,13 +133,13 @@ func (m *Schema1) LayerInfos() []types.BlobInfo {
 
 // UpdateLayerInfos replaces the original layers with the specified BlobInfos (size+digest+urls), in order (the root layer first, and then successive layered layers)
 func (m *Schema1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
-	// Our LayerInfos includes empty layers (where m.History.V1Compatibility->ThrowAway), so expect them to be included here as well.
+	// Our LayerInfos includes empty layers (where m.ExtractedV1Compatibility[].ThrowAway), so expect them to be included here as well.
 	if len(m.FSLayers) != len(layerInfos) {
 		return errors.Errorf("Error preparing updated manifest: layer count changed from %d to %d", len(m.FSLayers), len(layerInfos))
 	}
 	m.FSLayers = make([]Schema1FSLayers, len(layerInfos))
 	for i, info := range layerInfos {
-		// (docker push) sets up m.History.V1Compatibility->{Id,Parent} based on values of info.Digest,
+		// (docker push) sets up m.ExtractedV1Compatibility[].{Id,Parent} based on values of info.Digest,
 		// but (docker pull) ignores them in favor of computing DiffIDs from uncompressed data, except verifying the child->parent links and uniqueness.
 		// So, we don't bother recomputing the IDs in m.History.V1Compatibility.
 		m.FSLayers[(len(layerInfos)-1)-i].BlobSum = info.Digest
@@ -163,14 +172,11 @@ func (m *Schema1) fixManifestLayers() error {
 	// m.initialize() has verified that len(m.FSLayers) == len(m.History)
 	imgs := make([]*imageV1, len(m.FSLayers))
 	for i := range m.FSLayers {
-		img := &imageV1{}
-
-		if err := json.Unmarshal([]byte(m.History[i].V1Compatibility), img); err != nil {
-			return err
+		imgs[i] = &imageV1{
+			ID:     m.ExtractedV1Compatibility[i].ID,
+			Parent: m.ExtractedV1Compatibility[i].Parent,
 		}
-
-		imgs[i] = img
-		if err := validateV1ID(img.ID); err != nil {
+		if err := validateV1ID(imgs[i].ID); err != nil {
 			return err
 		}
 	}
@@ -193,6 +199,7 @@ func (m *Schema1) fixManifestLayers() error {
 		if imgs[i].ID == imgs[i+1].ID { // repeated ID. remove and continue
 			m.FSLayers = append(m.FSLayers[:i], m.FSLayers[i+1:]...)
 			m.History = append(m.History[:i], m.History[i+1:]...)
+			m.ExtractedV1Compatibility = append(m.ExtractedV1Compatibility[:i], m.ExtractedV1Compatibility[i+1:]...)
 		} else if imgs[i].Parent != imgs[i+1].ID {
 			return errors.Errorf("Invalid parent ID. Expected %v, got %v", imgs[i+1].ID, imgs[i].Parent)
 		}
@@ -252,11 +259,7 @@ func (m *Schema1) ToSchema2Config(diffIDs []digest.Digest) ([]byte, error) {
 	}
 	// Build the history.
 	convertedHistory := []Schema2History{}
-	for _, h := range m.History {
-		compat := Schema1V1Compatibility{}
-		if err := json.Unmarshal([]byte(h.V1Compatibility), &compat); err != nil {
-			return nil, errors.Wrapf(err, "error decoding history information")
-		}
+	for _, compat := range m.ExtractedV1Compatibility {
 		hitem := Schema2History{
 			Created:    compat.Created,
 			CreatedBy:  strings.Join(compat.ContainerConfig.Cmd, " "),

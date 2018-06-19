@@ -2,12 +2,15 @@ package manifest
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSchema1Initialize(t *testing.T) {
 	// Test this indirectly via Schema1FromComponents; otherwise we would have to break the API and create an instance manually.
+
+	// FIXME: this should eventually share a fixture with the other parsing tests.
 	fsLayers := []Schema1FSLayers{
 		{BlobSum: "sha256:e623934bca8d1a74f51014256445937714481e49343a31bda2bc5f534748184d"},
 		{BlobSum: "sha256:62e48e39dc5b30b75a97f05bccc66efbae6058b860ee20a5c9a184b9d5e25788"},
@@ -26,8 +29,65 @@ func TestSchema1Initialize(t *testing.T) {
 	}
 
 	// Valid input
-	_, err := Schema1FromComponents(nil, fsLayers, history, "amd64")
+	m, err := Schema1FromComponents(nil, fsLayers, history, "amd64")
 	assert.NoError(t, err)
+	assert.Equal(t, []Schema1V1Compatibility{
+		{
+			ID:      "486cbbaf6c6f7d890f9368c86eda3f4ebe3ae982b75098037eb3c3cc6f0e0cdf",
+			Parent:  "20d0c9c79f9fee83c4094993335b9b321112f13eef60ed9ec1599c7593dccf20",
+			Created: time.Date(2018, 1, 25, 0, 37, 48, 268558000, time.UTC),
+			ContainerConfig: schema1V1CompatibilityContainerConfig{
+				Cmd: []string{"/bin/sh", "-c", "#(nop) ", "USER [nova]"},
+			},
+			ThrowAway: false,
+		},
+		{
+			ID:      "20d0c9c79f9fee83c4094993335b9b321112f13eef60ed9ec1599c7593dccf20",
+			Parent:  "47a1014db2116c312736e11adcc236fb77d0ad32457f959cbaec0c3fc9ab1caa",
+			Created: time.Date(2018, 1, 24, 23, 8, 25, 300741000, time.UTC),
+			ContainerConfig: schema1V1CompatibilityContainerConfig{
+				Cmd: []string{"/bin/sh -c rm -f '/etc/yum.repos.d/rhel-7.4.repo' '/etc/yum.repos.d/rhos-optools-12.0.repo' '/etc/yum.repos.d/rhos-12.0-container-yum-need_images.repo'"},
+			},
+			ThrowAway: false,
+		},
+		{
+			ID:      "47a1014db2116c312736e11adcc236fb77d0ad32457f959cbaec0c3fc9ab1caa",
+			Parent:  "cec66cab6c92a5f7b50ef407b80b83840a0d089b9896257609fd01de3a595824",
+			Created: time.Date(2018, 1, 24, 22, 0, 57, 807862000, time.UTC),
+			ContainerConfig: schema1V1CompatibilityContainerConfig{
+				Cmd: []string{"/bin/sh -c rm -f '/etc/yum.repos.d/rhel-7.4.repo' '/etc/yum.repos.d/rhos-optools-12.0.repo' '/etc/yum.repos.d/rhos-12.0-container-yum-need_images.repo'"},
+			},
+			ThrowAway: false,
+		},
+		{
+			ID:      "cec66cab6c92a5f7b50ef407b80b83840a0d089b9896257609fd01de3a595824",
+			Parent:  "0e7730eccb3d014b33147b745d771bc0e38a967fd932133a6f5325a3c84282e2",
+			Created: time.Date(2018, 1, 24, 21, 40, 32, 494686000, time.UTC),
+			ContainerConfig: schema1V1CompatibilityContainerConfig{
+				Cmd: []string{"/bin/sh -c rm -f '/etc/yum.repos.d/rhel-7.4.repo' '/etc/yum.repos.d/rhos-optools-12.0.repo' '/etc/yum.repos.d/rhos-12.0-container-yum-need_images.repo'"},
+			},
+			ThrowAway: false,
+		},
+		{
+			ID:      "0e7730eccb3d014b33147b745d771bc0e38a967fd932133a6f5325a3c84282e2",
+			Parent:  "3e49094c0233214ab73f8e5c204af8a14cfc6f0403384553c17fbac2e9d38345",
+			Created: time.Date(2017, 11, 21, 16, 49, 37, 292899000, time.UTC),
+			ContainerConfig: schema1V1CompatibilityContainerConfig{
+				Cmd: []string{"/bin/sh -c rm -f '/etc/yum.repos.d/compose-rpms-1.repo'"},
+			},
+			Author:    "Red Hat, Inc.",
+			ThrowAway: false,
+		},
+		{
+			ID:      "3e49094c0233214ab73f8e5c204af8a14cfc6f0403384553c17fbac2e9d38345",
+			Comment: "Imported from -",
+			Created: time.Date(2017, 11, 21, 16, 47, 27, 755341705, time.UTC),
+			ContainerConfig: schema1V1CompatibilityContainerConfig{
+				Cmd: []string{""},
+			},
+			ThrowAway: false,
+		},
+	}, m.ExtractedV1Compatibility)
 
 	// Layer and history length mismatch
 	_, err = Schema1FromComponents(nil, fsLayers, history[1:], "amd64")
@@ -35,5 +95,12 @@ func TestSchema1Initialize(t *testing.T) {
 
 	// No layers/history
 	_, err = Schema1FromComponents(nil, []Schema1FSLayers{}, []Schema1History{}, "amd64")
+	assert.Error(t, err)
+
+	// Invalid history JSON
+	_, err = Schema1FromComponents(nil,
+		[]Schema1FSLayers{{BlobSum: "sha256:e623934bca8d1a74f51014256445937714481e49343a31bda2bc5f534748184d"}},
+		[]Schema1History{{V1Compatibility: "-"}},
+		"amd64")
 	assert.Error(t, err)
 }
