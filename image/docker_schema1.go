@@ -25,8 +25,12 @@ func manifestSchema1FromManifest(manifestBlob []byte) (genericManifest, error) {
 }
 
 // manifestSchema1FromComponents builds a new manifestSchema1 from the supplied data.
-func manifestSchema1FromComponents(ref reference.Named, fsLayers []manifest.Schema1FSLayers, history []manifest.Schema1History, architecture string) genericManifest {
-	return &manifestSchema1{m: manifest.Schema1FromComponents(ref, fsLayers, history, architecture)}
+func manifestSchema1FromComponents(ref reference.Named, fsLayers []manifest.Schema1FSLayers, history []manifest.Schema1History, architecture string) (genericManifest, error) {
+	m, err := manifest.Schema1FromComponents(ref, fsLayers, history, architecture)
+	if err != nil {
+		return nil, err
+	}
+	return &manifestSchema1{m: m}, nil
 }
 
 func (m *manifestSchema1) serialize() ([]byte, error) {

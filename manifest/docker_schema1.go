@@ -57,11 +57,8 @@ func Schema1FromManifest(manifest []byte) (*Schema1, error) {
 	if s1.SchemaVersion != 1 {
 		return nil, errors.Errorf("unsupported schema version %d", s1.SchemaVersion)
 	}
-	if len(s1.FSLayers) != len(s1.History) {
-		return nil, errors.New("length of history not equal to number of layers")
-	}
-	if len(s1.FSLayers) == 0 {
-		return nil, errors.New("no FSLayers in manifest")
+	if err := s1.initialize(); err != nil {
+		return nil, err
 	}
 	if err := s1.fixManifestLayers(); err != nil {
 		return nil, err
@@ -70,7 +67,7 @@ func Schema1FromManifest(manifest []byte) (*Schema1, error) {
 }
 
 // Schema1FromComponents creates an Schema1 manifest instance from the supplied data.
-func Schema1FromComponents(ref reference.Named, fsLayers []Schema1FSLayers, history []Schema1History, architecture string) *Schema1 {
+func Schema1FromComponents(ref reference.Named, fsLayers []Schema1FSLayers, history []Schema1History, architecture string) (*Schema1, error) {
 	var name, tag string
 	if ref != nil { // Well, what to do if it _is_ nil? Most consumers actually don't use these fields nowadays, so we might as well try not supplying them.
 		name = reference.Path(ref)
@@ -78,7 +75,7 @@ func Schema1FromComponents(ref reference.Named, fsLayers []Schema1FSLayers, hist
 			tag = tagged.Tag()
 		}
 	}
-	return &Schema1{
+	s1 := Schema1{
 		Name:          name,
 		Tag:           tag,
 		Architecture:  architecture,
@@ -86,12 +83,27 @@ func Schema1FromComponents(ref reference.Named, fsLayers []Schema1FSLayers, hist
 		History:       history,
 		SchemaVersion: 1,
 	}
+	if err := s1.initialize(); err != nil {
+		return nil, err
+	}
+	return &s1, nil
 }
 
 // Schema1Clone creates a copy of the supplied Schema1 manifest.
 func Schema1Clone(src *Schema1) *Schema1 {
 	copy := *src
 	return &copy
+}
+
+// initialize verifies invariants so that the rest of this code can assume a minimally healthy manifest.
+func (m *Schema1) initialize() error {
+	if len(m.FSLayers) != len(m.History) {
+		return errors.New("length of history not equal to number of layers")
+	}
+	if len(m.FSLayers) == 0 {
+		return errors.New("no FSLayers in manifest")
+	}
+	return nil
 }
 
 // ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
@@ -148,7 +160,7 @@ func (m *Schema1) fixManifestLayers() error {
 		ID     string
 		Parent string
 	}
-	// Per the specification, we can assume that len(m.FSLayers) == len(m.History)
+	// m.initialize() has verified that len(m.FSLayers) == len(m.History)
 	imgs := make([]*imageV1, len(m.FSLayers))
 	for i := range m.FSLayers {
 		img := &imageV1{}

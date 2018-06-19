@@ -71,7 +71,7 @@ func manifestSchema1FromFixture(t *testing.T, fixture string) genericManifest {
 func manifestSchema1FromComponentsLikeFixture(t *testing.T) genericManifest {
 	ref, err := reference.ParseNormalizedNamed("rhosp12/openstack-nova-api:latest")
 	require.NoError(t, err)
-	return manifestSchema1FromComponents(ref, []manifest.Schema1FSLayers{
+	m, err := manifestSchema1FromComponents(ref, []manifest.Schema1FSLayers{
 		{BlobSum: "sha256:e623934bca8d1a74f51014256445937714481e49343a31bda2bc5f534748184d"},
 		{BlobSum: "sha256:62e48e39dc5b30b75a97f05bccc66efbae6058b860ee20a5c9a184b9d5e25788"},
 		{BlobSum: "sha256:9e92df2aea7dc0baf5f1f8d509678d6a6306de27ad06513f8e218371938c07a6"},
@@ -86,6 +86,8 @@ func manifestSchema1FromComponentsLikeFixture(t *testing.T) genericManifest {
 		{V1Compatibility: "{\"id\":\"0e7730eccb3d014b33147b745d771bc0e38a967fd932133a6f5325a3c84282e2\",\"parent\":\"3e49094c0233214ab73f8e5c204af8a14cfc6f0403384553c17fbac2e9d38345\",\"created\":\"2017-11-21T16:49:37.292899Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c rm -f '/etc/yum.repos.d/compose-rpms-1.repo'\"]},\"author\":\"Red Hat, Inc.\"}"},
 		{V1Compatibility: "{\"id\":\"3e49094c0233214ab73f8e5c204af8a14cfc6f0403384553c17fbac2e9d38345\",\"comment\":\"Imported from -\",\"created\":\"2017-11-21T16:47:27.755341705Z\",\"container_config\":{\"Cmd\":[\"\"]}}"},
 	}, "amd64")
+	require.NoError(t, err)
+	return m
 }
 
 func TestManifestSchema1FromManifest(t *testing.T) {
@@ -102,6 +104,10 @@ func TestManifestSchema1FromComponents(t *testing.T) {
 	// This just smoke-tests that the manifest can be created; we test that the parsed
 	// values are correctly returned in tests for the individual getter methods.
 	_ = manifestSchema1FromComponentsLikeFixture(t)
+
+	// Error on invalid input
+	_, err := manifestSchema1FromComponents(nil, []manifest.Schema1FSLayers{}, []manifest.Schema1History{}, "amd64")
+	assert.Error(t, err)
 }
 
 func TestManifestSchema1Serialize(t *testing.T) {

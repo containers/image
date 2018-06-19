@@ -304,7 +304,10 @@ func (m *manifestSchema2) convertToManifestSchema1(ctx context.Context, dest typ
 	}
 	history[0].V1Compatibility = string(v1Config)
 
-	m1 := manifestSchema1FromComponents(dest.Reference().DockerReference(), fsLayers, history, imageConfig.Architecture)
+	m1, err := manifestSchema1FromComponents(dest.Reference().DockerReference(), fsLayers, history, imageConfig.Architecture)
+	if err != nil {
+		return nil, err // This should never happen, we should have created all the components correctly.
+	}
 	return memoryImageFromManifest(m1), nil
 }
 
