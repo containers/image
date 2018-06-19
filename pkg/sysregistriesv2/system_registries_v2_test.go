@@ -9,7 +9,7 @@ import (
 var testConfig = []byte("")
 
 func init() {
-	readConf = func(_ *types.SystemContext) ([]byte, error) {
+	readConf = func(_ string) ([]byte, error) {
 		return testConfig, nil
 	}
 }
@@ -48,6 +48,7 @@ func TestParseURL(t *testing.T) {
 func TestEmptyConfig(t *testing.T) {
 	testConfig = []byte(``)
 
+	configCache = make(map[string][]Registry)
 	registries, err := GetRegistries(nil)
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(registries))
@@ -69,6 +70,7 @@ insecure = true
 url = "blocked.registry.com"
 blocked = true`)
 
+	configCache = make(map[string][]Registry)
 	registries, err := GetRegistries(nil)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(registries))
@@ -94,6 +96,7 @@ url = "registry-b.com"
 
 [[registry]]
 unqualified-search = true`)
+	configCache = make(map[string][]Registry)
 	_, err := GetRegistries(nil)
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "invalid URL")
@@ -111,6 +114,7 @@ url = "registry-b.com"
 url = "mirror-b.com"
 [[registry.mirror]]
 `)
+	configCache = make(map[string][]Registry)
 	_, err := GetRegistries(nil)
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "invalid URL")
@@ -137,6 +141,7 @@ url = "no-prefix.com"
 url = "empty-prefix.com"
 prefix = ""`)
 
+	configCache = make(map[string][]Registry)
 	registries, err := GetRegistries(nil)
 	assert.Nil(t, err)
 	assert.Equal(t, 5, len(registries))
@@ -176,6 +181,7 @@ url = "registry-b.com"
 url = "registry-c.com"
 unqualified-search = true`)
 
+	configCache = make(map[string][]Registry)
 	registries, err := GetRegistries(nil)
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(registries))
@@ -208,6 +214,7 @@ url = "registry.com"
 insecure = true
 `)
 
+	configCache = make(map[string][]Registry)
 	registries, err := GetRegistries(nil)
 	assert.NotNil(t, err)
 	assert.Nil(t, registries)
@@ -231,6 +238,7 @@ url = "registry.com"
 blocked = true
 `)
 
+	configCache = make(map[string][]Registry)
 	registries, err := GetRegistries(nil)
 	assert.NotNil(t, err)
 	assert.Nil(t, registries)
@@ -263,6 +271,7 @@ insecure = true
 url = "untrusted.registry.com"
 insecure = true`)
 
+	configCache = make(map[string][]Registry)
 	registries, err := GetRegistries(nil)
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
@@ -279,6 +288,7 @@ registries = ["registry-b.com"]
 [registries.insecure]
 registries = ["registry-d.com", "registry-e.com", "registry-a.com"]`)
 
+	configCache = make(map[string][]Registry)
 	registries, err := GetRegistries(nil)
 	assert.Nil(t, err)
 	assert.Equal(t, 5, len(registries))
@@ -325,7 +335,49 @@ url = "registry-b.com"
 url = "registry-c.com"
 unqualified-search = true `)
 
+	configCache = make(map[string][]Registry)
 	_, err := GetRegistries(nil)
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "mixing sysregistry v1/v2 is not supported")
+}
+
+func TestConfigCache(t *testing.T) {
+	testConfig = []byte(`
+[[registry]]
+url = "registry.com"
+
+[[registry.mirror]]
+url = "mirror-1.registry.com"
+
+[[registry.mirror]]
+url = "mirror-2.registry.com"
+
+
+[[registry]]
+url = "blocked.registry.com"
+blocked = true
+
+
+[[registry]]
+url = "insecure.registry.com"
+insecure = true
+
+
+[[registry]]
+url = "untrusted.registry.com"
+insecure = true`)
+
+	ctx := &types.SystemContext{SystemRegistriesConfPath: "foo"}
+
+	configCache = make(map[string][]Registry)
+	registries, err := GetRegistries(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, 4, len(registries))
+
+	// empty the config, but use the same SystemContext to show that the
+	// previously specified registries are in the cache
+	testConfig = []byte("")
+	registries, err = GetRegistries(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, 4, len(registries))
 }

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/BurntSushi/toml"
 	"github.com/containers/image/types"
@@ -248,9 +249,41 @@ func postProcessRegistries(regs []Registry) ([]Registry, error) {
 	return registries, nil
 }
 
+// getConfigPath returns the system-registries config path if specified.
+// Otherwise, systemRegistriesConfPath is returned.
+func getConfigPath(ctx *types.SystemContext) string {
+	confPath := systemRegistriesConfPath
+	if ctx != nil {
+		if ctx.SystemRegistriesConfPath != "" {
+			confPath = ctx.SystemRegistriesConfPath
+		} else if ctx.RootForImplicitAbsolutePaths != "" {
+			confPath = filepath.Join(ctx.RootForImplicitAbsolutePaths, systemRegistriesConfPath)
+		}
+	}
+	return confPath
+}
+
+// configMutex is used to synchronize concurrent accesses to configCache.
+var configMutex = sync.Mutex{}
+
+// configCache caches already loaded configs with config paths as keys and is
+// used to avoid redudantly parsing configs. Concurrent accesses to the cache
+// are synchronized via configMutex.
+var configCache = make(map[string][]Registry)
+
 // GetRegistries loads and returns the registries specified in the config.
 func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
-	config, err := loadRegistryConf(ctx)
+	configPath := getConfigPath(ctx)
+
+	configMutex.Lock()
+	defer configMutex.Unlock()
+	// if the config has already been loaded, return the cached registries
+	if registries, inCache := configCache[configPath]; inCache {
+		return registries, nil
+	}
+
+	// load the config
+	config, err := loadRegistryConf(configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +302,15 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 		registries = v1Registries
 	}
 
-	return postProcessRegistries(registries)
+	registries, err = postProcessRegistries(registries)
+	if err != nil {
+		return nil, err
+	}
+
+	// populate the cache
+	configCache[configPath] = registries
+
+	return registries, err
 }
 
 // FindUnqualifiedSearchRegistries returns all registries that are configured
@@ -305,16 +346,8 @@ func FindRegistry(ref string, registries []Registry) *Registry {
 }
 
 // Reads the global registry file from the filesystem. Returns a byte array.
-func readRegistryConf(ctx *types.SystemContext) ([]byte, error) {
-	dirPath := systemRegistriesConfPath
-	if ctx != nil {
-		if ctx.SystemRegistriesConfPath != "" {
-			dirPath = ctx.SystemRegistriesConfPath
-		} else if ctx.RootForImplicitAbsolutePaths != "" {
-			dirPath = filepath.Join(ctx.RootForImplicitAbsolutePaths, systemRegistriesConfPath)
-		}
-	}
-	configBytes, err := ioutil.ReadFile(dirPath)
+func readRegistryConf(configPath string) ([]byte, error) {
+	configBytes, err := ioutil.ReadFile(configPath)
 	return configBytes, err
 }
 
@@ -323,10 +356,10 @@ var readConf = readRegistryConf
 
 // Loads the registry configuration file from the filesystem and then unmarshals
 // it.  Returns the unmarshalled object.
-func loadRegistryConf(ctx *types.SystemContext) (*tomlConfig, error) {
+func loadRegistryConf(configPath string) (*tomlConfig, error) {
 	config := &tomlConfig{}
 
-	configBytes, err := readConf(ctx)
+	configBytes, err := readConf(configPath)
 	if err != nil {
 		return nil, err
 	}
