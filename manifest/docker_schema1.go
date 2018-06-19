@@ -165,28 +165,19 @@ func (m *Schema1) Serialize() ([]byte, error) {
 // Note that even after this succeeds, m.FSLayers may contain duplicate entries
 // (for Dockerfile operations which change the configuration but not the filesystem).
 func (m *Schema1) fixManifestLayers() error {
-	type imageV1 struct {
-		ID     string
-		Parent string
-	}
 	// m.initialize() has verified that len(m.FSLayers) == len(m.History)
-	imgs := make([]*imageV1, len(m.FSLayers))
-	for i := range m.FSLayers {
-		imgs[i] = &imageV1{
-			ID:     m.ExtractedV1Compatibility[i].ID,
-			Parent: m.ExtractedV1Compatibility[i].Parent,
-		}
-		if err := validateV1ID(imgs[i].ID); err != nil {
+	for _, compat := range m.ExtractedV1Compatibility {
+		if err := validateV1ID(compat.ID); err != nil {
 			return err
 		}
 	}
-	if imgs[len(imgs)-1].Parent != "" {
+	if m.ExtractedV1Compatibility[len(m.ExtractedV1Compatibility)-1].Parent != "" {
 		return errors.New("Invalid parent ID in the base layer of the image")
 	}
 	// check general duplicates to error instead of a deadlock
 	idmap := make(map[string]struct{})
 	var lastID string
-	for _, img := range imgs {
+	for _, img := range m.ExtractedV1Compatibility {
 		// skip IDs that appear after each other, we handle those later
 		if _, exists := idmap[img.ID]; img.ID != lastID && exists {
 			return errors.Errorf("ID %+v appears multiple times in manifest", img.ID)
@@ -195,13 +186,13 @@ func (m *Schema1) fixManifestLayers() error {
 		idmap[lastID] = struct{}{}
 	}
 	// backwards loop so that we keep the remaining indexes after removing items
-	for i := len(imgs) - 2; i >= 0; i-- {
-		if imgs[i].ID == imgs[i+1].ID { // repeated ID. remove and continue
+	for i := len(m.ExtractedV1Compatibility) - 2; i >= 0; i-- {
+		if m.ExtractedV1Compatibility[i].ID == m.ExtractedV1Compatibility[i+1].ID { // repeated ID. remove and continue
 			m.FSLayers = append(m.FSLayers[:i], m.FSLayers[i+1:]...)
 			m.History = append(m.History[:i], m.History[i+1:]...)
 			m.ExtractedV1Compatibility = append(m.ExtractedV1Compatibility[:i], m.ExtractedV1Compatibility[i+1:]...)
-		} else if imgs[i].Parent != imgs[i+1].ID {
-			return errors.Errorf("Invalid parent ID. Expected %v, got %v", imgs[i+1].ID, imgs[i].Parent)
+		} else if m.ExtractedV1Compatibility[i].Parent != m.ExtractedV1Compatibility[i+1].ID {
+			return errors.Errorf("Invalid parent ID. Expected %v, got %v", m.ExtractedV1Compatibility[i+1].ID, m.ExtractedV1Compatibility[i].Parent)
 		}
 	}
 	return nil
