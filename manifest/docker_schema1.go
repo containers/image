@@ -120,13 +120,13 @@ func (m *Schema1) ConfigInfo() types.BlobInfo {
 	return types.BlobInfo{}
 }
 
-// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
+// LayerInfos returns a list of LayerInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
 // The Digest field is guaranteed to be provided; Size may be -1.
 // WARNING: The list may contain duplicates, and they are semantically relevant.
-func (m *Schema1) LayerInfos() []types.BlobInfo {
-	layers := make([]types.BlobInfo, len(m.FSLayers))
+func (m *Schema1) LayerInfos() []LayerInfo {
+	layers := make([]LayerInfo, len(m.FSLayers))
 	for i, layer := range m.FSLayers { // NOTE: This includes empty layers (where m.History.V1Compatibility->ThrowAway)
-		layers[(len(m.FSLayers)-1)-i] = types.BlobInfo{Digest: layer.BlobSum, Size: -1}
+		layers[(len(m.FSLayers)-1)-i] = LayerInfo{BlobInfo: types.BlobInfo{Digest: layer.BlobSum, Size: -1}}
 	}
 	return layers
 }
@@ -219,7 +219,7 @@ func (m *Schema1) Inspect(_ func(types.BlobInfo) ([]byte, error)) (*types.ImageI
 		DockerVersion: s1.DockerVersion,
 		Architecture:  s1.Architecture,
 		Os:            s1.OS,
-		Layers:        LayerInfosToStrings(m.LayerInfos()),
+		Layers:        layerInfosToStrings(m.LayerInfos()),
 	}
 	if s1.Config != nil {
 		i.Labels = s1.Config.Labels

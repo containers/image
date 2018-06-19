@@ -59,13 +59,13 @@ func (m *OCI1) ConfigInfo() types.BlobInfo {
 	return BlobInfoFromOCI1Descriptor(m.Config)
 }
 
-// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
+// LayerInfos returns a list of LayerInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
 // The Digest field is guaranteed to be provided; Size may be -1.
 // WARNING: The list may contain duplicates, and they are semantically relevant.
-func (m *OCI1) LayerInfos() []types.BlobInfo {
-	blobs := []types.BlobInfo{}
+func (m *OCI1) LayerInfos() []LayerInfo {
+	blobs := []LayerInfo{}
 	for _, layer := range m.Layers {
-		blobs = append(blobs, BlobInfoFromOCI1Descriptor(layer))
+		blobs = append(blobs, LayerInfo{BlobInfo: BlobInfoFromOCI1Descriptor(layer)})
 	}
 	return blobs
 }
@@ -112,7 +112,7 @@ func (m *OCI1) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*type
 		Labels:        v1.Config.Labels,
 		Architecture:  v1.Architecture,
 		Os:            v1.OS,
-		Layers:        LayerInfosToStrings(m.LayerInfos()),
+		Layers:        layerInfosToStrings(m.LayerInfos()),
 	}
 	return i, nil
 }

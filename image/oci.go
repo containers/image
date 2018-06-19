@@ -97,7 +97,7 @@ func (m *manifestOCI1) OCIConfig(ctx context.Context) (*imgspecv1.Image, error) 
 // The Digest field is guaranteed to be provided; Size may be -1.
 // WARNING: The list may contain duplicates, and they are semantically relevant.
 func (m *manifestOCI1) LayerInfos() []types.BlobInfo {
-	return m.m.LayerInfos()
+	return manifestLayerInfosToBlobInfos(m.m.LayerInfos())
 }
 
 // EmbeddedDockerReferenceConflicts whether a Docker reference embedded in the manifest, if any, conflicts with destination ref.

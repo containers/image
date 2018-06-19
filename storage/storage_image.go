@@ -466,7 +466,7 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 			// Check if it's elsewhere and the caller just forgot to pass it to us in a PutBlob(),
 			// or to even check if we had it.
 			logrus.Debugf("looking for diffID for blob %+v", blob.Digest)
-			has, _, err := s.HasBlob(ctx, blob)
+			has, _, err := s.HasBlob(ctx, blob.BlobInfo)
 			if err != nil {
 				return errors.Wrapf(err, "error checking for a layer based on blob %q", blob.Digest.String())
 			}

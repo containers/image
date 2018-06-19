@@ -184,13 +184,13 @@ func (m *Schema2) ConfigInfo() types.BlobInfo {
 	return BlobInfoFromSchema2Descriptor(m.ConfigDescriptor)
 }
 
-// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
+// LayerInfos returns a list of LayerInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
 // The Digest field is guaranteed to be provided; Size may be -1.
 // WARNING: The list may contain duplicates, and they are semantically relevant.
-func (m *Schema2) LayerInfos() []types.BlobInfo {
-	blobs := []types.BlobInfo{}
+func (m *Schema2) LayerInfos() []LayerInfo {
+	blobs := []LayerInfo{}
 	for _, layer := range m.LayersDescriptors {
-		blobs = append(blobs, BlobInfoFromSchema2Descriptor(layer))
+		blobs = append(blobs, LayerInfo{BlobInfo: BlobInfoFromSchema2Descriptor(layer)})
 	}
 	return blobs
 }
@@ -233,7 +233,7 @@ func (m *Schema2) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*t
 		DockerVersion: s2.DockerVersion,
 		Architecture:  s2.Architecture,
 		Os:            s2.OS,
-		Layers:        LayerInfosToStrings(m.LayerInfos()),
+		Layers:        layerInfosToStrings(m.LayerInfos()),
 	}
 	if s2.Config != nil {
 		i.Labels = s2.Config.Labels
