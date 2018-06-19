@@ -190,7 +190,10 @@ func (m *Schema2) ConfigInfo() types.BlobInfo {
 func (m *Schema2) LayerInfos() []LayerInfo {
 	blobs := []LayerInfo{}
 	for _, layer := range m.LayersDescriptors {
-		blobs = append(blobs, LayerInfo{BlobInfo: BlobInfoFromSchema2Descriptor(layer)})
+		blobs = append(blobs, LayerInfo{
+			BlobInfo:   BlobInfoFromSchema2Descriptor(layer),
+			EmptyLayer: false,
+		})
 	}
 	return blobs
 }

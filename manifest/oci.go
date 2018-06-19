@@ -65,7 +65,10 @@ func (m *OCI1) ConfigInfo() types.BlobInfo {
 func (m *OCI1) LayerInfos() []LayerInfo {
 	blobs := []LayerInfo{}
 	for _, layer := range m.Layers {
-		blobs = append(blobs, LayerInfo{BlobInfo: BlobInfoFromOCI1Descriptor(layer)})
+		blobs = append(blobs, LayerInfo{
+			BlobInfo:   BlobInfoFromOCI1Descriptor(layer),
+			EmptyLayer: false,
+		})
 	}
 	return blobs
 }

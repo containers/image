@@ -1,11 +1,24 @@
 package manifest
 
 import (
+	"io/ioutil"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func manifestSchema1FromFixture(t *testing.T, fixture string) *Schema1 {
+	manifest, err := ioutil.ReadFile(filepath.Join("fixtures", fixture))
+	require.NoError(t, err)
+
+	m, err := Schema1FromManifest(manifest)
+	require.NoError(t, err)
+	return m
+}
 
 func TestSchema1Initialize(t *testing.T) {
 	// Test this indirectly via Schema1FromComponents; otherwise we would have to break the API and create an instance manually.
@@ -103,4 +116,27 @@ func TestSchema1Initialize(t *testing.T) {
 		[]Schema1History{{V1Compatibility: "-"}},
 		"amd64")
 	assert.Error(t, err)
+}
+
+func TestSchema1LayerInfos(t *testing.T) {
+	// We use this instead of original schema1 manifests, because those, surprisingly,
+	// seem not to set the "throwaway" flag.
+	m := manifestSchema1FromFixture(t, "schema2-to-schema1-by-docker.json") // FIXME: Test also Schema1FromComponents
+	assert.Equal(t, []LayerInfo{
+		{BlobInfo: types.BlobInfo{Digest: "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb", Size: -1}, EmptyLayer: false},
+		{BlobInfo: types.BlobInfo{Digest: "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4", Size: -1}, EmptyLayer: true},
+		{BlobInfo: types.BlobInfo{Digest: "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4", Size: -1}, EmptyLayer: true},
+		{BlobInfo: types.BlobInfo{Digest: "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4", Size: -1}, EmptyLayer: true},
+		{BlobInfo: types.BlobInfo{Digest: "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c", Size: -1}, EmptyLayer: false},
+		{BlobInfo: types.BlobInfo{Digest: "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4", Size: -1}, EmptyLayer: true},
+		{BlobInfo: types.BlobInfo{Digest: "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9", Size: -1}, EmptyLayer: false},
+		{BlobInfo: types.BlobInfo{Digest: "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4", Size: -1}, EmptyLayer: true},
+		{BlobInfo: types.BlobInfo{Digest: "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4", Size: -1}, EmptyLayer: true},
+		{BlobInfo: types.BlobInfo{Digest: "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4", Size: -1}, EmptyLayer: true},
+		{BlobInfo: types.BlobInfo{Digest: "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4", Size: -1}, EmptyLayer: true},
+		{BlobInfo: types.BlobInfo{Digest: "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909", Size: -1}, EmptyLayer: false},
+		{BlobInfo: types.BlobInfo{Digest: "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa", Size: -1}, EmptyLayer: false},
+		{BlobInfo: types.BlobInfo{Digest: "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4", Size: -1}, EmptyLayer: true},
+		{BlobInfo: types.BlobInfo{Digest: "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4", Size: -1}, EmptyLayer: true},
+	}, m.LayerInfos())
 }
