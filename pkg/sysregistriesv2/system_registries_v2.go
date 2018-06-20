@@ -323,19 +323,29 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 
 // FindUnqualifiedSearchRegistries returns all registries that are configured
 // for unqualified image search (i.e., with Registry.Search == true).
-func FindUnqualifiedSearchRegistries(registries []Registry) []Registry {
+func FindUnqualifiedSearchRegistries(ctx *types.SystemContext) ([]Registry, error) {
+	registries, err := GetRegistries(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	unqualified := []Registry{}
 	for _, reg := range registries {
 		if reg.Search {
 			unqualified = append(unqualified, reg)
 		}
 	}
-	return unqualified
+	return unqualified, nil
 }
 
 // FindRegistry returns the Registry with the longest prefix for ref.  If no
 // Registry prefixes the image, nil is returned.
-func FindRegistry(ref string, registries []Registry) *Registry {
+func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
+	registries, err := GetRegistries(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	reg := Registry{}
 	prefixLen := 0
 	for _, r := range registries {
@@ -348,9 +358,9 @@ func FindRegistry(ref string, registries []Registry) *Registry {
 		}
 	}
 	if prefixLen != 0 {
-		return &reg
+		return &reg, nil
 	}
-	return nil
+	return nil, nil
 }
 
 // Reads the global registry file from the filesystem. Returns a byte array.

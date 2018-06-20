@@ -76,8 +76,8 @@ blocked = true`)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(registries))
 
-	var reg *Registry
-	reg = FindRegistry("registry.com/image:tag", registries)
+	reg, err := FindRegistry(nil, "registry.com/image:tag")
+	assert.Nil(t, err)
 	assert.NotNil(t, reg)
 	assert.Equal(t, 2, len(reg.Mirrors))
 	assert.Equal(t, "mirror-1.registry.com", reg.Mirrors[0].URL)
@@ -147,23 +147,26 @@ prefix = ""`)
 	assert.Nil(t, err)
 	assert.Equal(t, 5, len(registries))
 
-	var reg *Registry
-	reg = FindRegistry("simple-prefix.com/foo/bar:latest", registries)
+	reg, err := FindRegistry(nil, "simple-prefix.com/foo/bar:latest")
+	assert.Nil(t, err)
 	assert.NotNil(t, reg)
 	assert.Equal(t, "simple-prefix.com", reg.Prefix)
 	assert.Equal(t, reg.URL, "registry.com:5000")
 
-	reg = FindRegistry("complex-prefix.com:4000/with/path/and/beyond:tag", registries)
+	reg, err = FindRegistry(nil, "complex-prefix.com:4000/with/path/and/beyond:tag")
+	assert.Nil(t, err)
 	assert.NotNil(t, reg)
 	assert.Equal(t, "complex-prefix.com:4000/with/path", reg.Prefix)
 	assert.Equal(t, "another-registry.com:5000", reg.URL)
 
-	reg = FindRegistry("no-prefix.com/foo:tag", registries)
+	reg, err = FindRegistry(nil, "no-prefix.com/foo:tag")
+	assert.Nil(t, err)
 	assert.NotNil(t, reg)
 	assert.Equal(t, "no-prefix.com", reg.Prefix)
 	assert.Equal(t, "no-prefix.com", reg.URL)
 
-	reg = FindRegistry("empty-prefix.com/foo:tag", registries)
+	reg, err = FindRegistry(nil, "empty-prefix.com/foo:tag")
+	assert.Nil(t, err)
 	assert.NotNil(t, reg)
 	assert.Equal(t, "empty-prefix.com", reg.Prefix)
 	assert.Equal(t, "empty-prefix.com", reg.URL)
@@ -201,7 +204,8 @@ unqualified-search = true
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
 
-	unqRegs := FindUnqualifiedSearchRegistries(registries)
+	unqRegs, err := FindUnqualifiedSearchRegistries(nil)
+	assert.Nil(t, err)
 	assertSearchRegistryURLsEqual(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
 }
 
@@ -301,11 +305,13 @@ registries = ["registry-d.com", "registry-e.com", "registry-a.com"]`)
 	assert.Nil(t, err)
 	assert.Equal(t, 5, len(registries))
 
-	unqRegs := FindUnqualifiedSearchRegistries(registries)
+	unqRegs, err := FindUnqualifiedSearchRegistries(nil)
+	assert.Nil(t, err)
 	assertSearchRegistryURLsEqual(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
 
 	// check if merging works
-	reg := FindRegistry("registry-a.com/bar/foo/barfoo:latest", registries)
+	reg, err := FindRegistry(nil, "registry-a.com/bar/foo/barfoo:latest")
+	assert.Nil(t, err)
 	assert.NotNil(t, reg)
 	assert.True(t, reg.Search)
 	assert.True(t, reg.Insecure)
