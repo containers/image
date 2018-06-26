@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -293,6 +294,13 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 	// load the config
 	config, err := loadRegistryConf(configPath)
 	if err != nil {
+		// Return an empty []Registry if we use the default config,
+		// which implies that the config path of the SystemContext
+		// isn't set.  Note: if ctx.SystemRegistriesConfPath points to
+		// the default config, we will still return an error.
+		if os.IsNotExist(err) && (ctx == nil || ctx.SystemRegistriesConfPath == "") {
+			return []Registry{}, nil
+		}
 		return nil, err
 	}
 
