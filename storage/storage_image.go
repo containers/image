@@ -462,7 +462,6 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 	layerBlobs := man.LayerInfos()
 	// Extract or find the layers.
 	lastLayer := ""
-	addedLayers := []string{}
 	for _, blob := range layerBlobs {
 		var diff io.ReadCloser
 		// Check if there's already a layer with the ID that we'd give to the result of applying
@@ -541,7 +540,6 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 			return errors.Wrapf(err, "error adding layer with blob %q", blob.Digest)
 		}
 		lastLayer = layer.ID
-		addedLayers = append([]string{lastLayer}, addedLayers...)
 	}
 	// If one of those blobs was a configuration blob, then we can try to dig out the date when the image
 	// was originally created, in case we're just copying it.  If not, no harm done.
