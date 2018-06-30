@@ -18,17 +18,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// gzippedEmptyLayer is a gzip-compressed version of an empty tar file (1024 NULL bytes)
+// GzippedEmptyLayer is a gzip-compressed version of an empty tar file (1024 NULL bytes)
 // This comes from github.com/docker/distribution/manifest/schema1/config_builder.go; there is
 // a non-zero embedded timestamp; we could zero that, but that would just waste storage space
 // in registries, so let’s use the same values.
-var gzippedEmptyLayer = []byte{
+var GzippedEmptyLayer = []byte{
 	31, 139, 8, 0, 0, 9, 110, 136, 0, 255, 98, 24, 5, 163, 96, 20, 140, 88,
 	0, 8, 0, 0, 255, 255, 46, 175, 181, 239, 0, 4, 0, 0,
 }
 
-// gzippedEmptyLayerDigest is a digest of gzippedEmptyLayer
-const gzippedEmptyLayerDigest = digest.Digest("sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4")
+// GzippedEmptyLayerDigest is a digest of GzippedEmptyLayer
+const GzippedEmptyLayerDigest = digest.Digest("sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4")
 
 type manifestSchema2 struct {
 	src        types.ImageSource // May be nil if configBlob is not nil
@@ -249,16 +249,16 @@ func (m *manifestSchema2) convertToManifestSchema1(ctx context.Context, dest typ
 		if historyEntry.EmptyLayer {
 			if !haveGzippedEmptyLayer {
 				logrus.Debugf("Uploading empty layer during conversion to schema 1")
-				info, err := dest.PutBlob(ctx, bytes.NewReader(gzippedEmptyLayer), types.BlobInfo{Digest: gzippedEmptyLayerDigest, Size: int64(len(gzippedEmptyLayer))}, false)
+				info, err := dest.PutBlob(ctx, bytes.NewReader(GzippedEmptyLayer), types.BlobInfo{Digest: GzippedEmptyLayerDigest, Size: int64(len(GzippedEmptyLayer))}, false)
 				if err != nil {
 					return nil, errors.Wrap(err, "Error uploading empty layer")
 				}
-				if info.Digest != gzippedEmptyLayerDigest {
-					return nil, errors.Errorf("Internal error: Uploaded empty layer has digest %#v instead of %s", info.Digest, gzippedEmptyLayerDigest)
+				if info.Digest != GzippedEmptyLayerDigest {
+					return nil, errors.Errorf("Internal error: Uploaded empty layer has digest %#v instead of %s", info.Digest, GzippedEmptyLayerDigest)
 				}
 				haveGzippedEmptyLayer = true
 			}
-			blobDigest = gzippedEmptyLayerDigest
+			blobDigest = GzippedEmptyLayerDigest
 		} else {
 			if nonemptyLayerIndex >= len(m.m.LayersDescriptors) {
 				return nil, errors.Errorf("Invalid image configuration, needs more than the %d distributed layers", len(m.m.LayersDescriptors))

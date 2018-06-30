@@ -101,6 +101,9 @@ func (s storageImageSource) Close() error {
 
 // GetBlob reads the data blob or filesystem layer which matches the digest and size, if given.
 func (s *storageImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (rc io.ReadCloser, n int64, err error) {
+	if info.Digest == image.GzippedEmptyLayerDigest {
+		return ioutil.NopCloser(bytes.NewReader(image.GzippedEmptyLayer)), int64(len(image.GzippedEmptyLayer)), nil
+	}
 	rc, n, _, err = s.getBlobAndLayerID(info)
 	return rc, n, err
 }

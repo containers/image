@@ -539,7 +539,7 @@ func TestConvertToManifestSchema1(t *testing.T) {
 	delete(converted, "signatures")
 	assert.Equal(t, byDocker, converted)
 
-	assert.Equal(t, gzippedEmptyLayer, memoryDest.storedBlobs[gzippedEmptyLayerDigest])
+	assert.Equal(t, GzippedEmptyLayer, memoryDest.storedBlobs[GzippedEmptyLayerDigest])
 
 	// FIXME? Test also the various failure cases, if only to see that we don't crash?
 }
