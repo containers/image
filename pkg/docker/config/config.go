@@ -135,15 +135,15 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 
 // getPath gets the path of the auth.json file
 // The path can be overriden by the user if the overwrite-path flag is set
-// If the flag is not set and XDG_RUNTIME_DIR is ser, the auth.json file is saved in XDG_RUNTIME_DIR/containers
-// Otherwise, the auth.json file is stored in /run/user/UID/containers
+// If the flag is not set and XDG_RUNTIME_DIR is set, the auth.json file is saved in XDG_RUNTIME_DIR/containers
+// Otherwise, the auth.json file is stored in /run/containers/UID
 func getPathToAuth(sys *types.SystemContext) (string, error) {
 	if sys != nil {
 		if sys.AuthFilePath != "" {
 			return sys.AuthFilePath, nil
 		}
 		if sys.RootForImplicitAbsolutePaths != "" {
-			return filepath.Join(sys.RootForImplicitAbsolutePaths, defaultPath, strconv.Itoa(os.Getuid()), authCfg, authCfgFileName), nil
+			return filepath.Join(sys.RootForImplicitAbsolutePaths, defaultPath, authCfg, strconv.Itoa(os.Getuid()), authCfgFileName), nil
 		}
 	}
 
