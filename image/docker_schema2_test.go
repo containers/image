@@ -139,8 +139,9 @@ func TestManifestSchema2ConfigInfo(t *testing.T) {
 		manifestSchema2FromComponentsLikeFixture(nil),
 	} {
 		assert.Equal(t, types.BlobInfo{
-			Size:   5940,
-			Digest: "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f",
+			Size:      5940,
+			Digest:    "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f",
+			MediaType: "application/octet-stream",
 		}, m.ConfigInfo())
 	}
 }
@@ -220,24 +221,29 @@ func TestManifestSchema2LayerInfo(t *testing.T) {
 	} {
 		assert.Equal(t, []types.BlobInfo{
 			{
-				Digest: "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
-				Size:   51354364,
+				Digest:    "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+				Size:      51354364,
+				MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 			},
 			{
-				Digest: "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
-				Size:   150,
+				Digest:    "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+				Size:      150,
+				MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 			},
 			{
-				Digest: "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
-				Size:   11739507,
+				Digest:    "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
+				Size:      11739507,
+				MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 			},
 			{
-				Digest: "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
-				Size:   8841833,
+				Digest:    "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
+				Size:      8841833,
+				MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 			},
 			{
-				Digest: "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
-				Size:   291,
+				Digest:    "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
+				Size:      291,
+				MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 			},
 		}, m.LayerInfos())
 	}
@@ -533,7 +539,7 @@ func TestConvertToManifestSchema1(t *testing.T) {
 	delete(converted, "signatures")
 	assert.Equal(t, byDocker, converted)
 
-	assert.Equal(t, gzippedEmptyLayer, memoryDest.storedBlobs[gzippedEmptyLayerDigest])
+	assert.Equal(t, GzippedEmptyLayer, memoryDest.storedBlobs[GzippedEmptyLayerDigest])
 
 	// FIXME? Test also the various failure cases, if only to see that we don't crash?
 }
