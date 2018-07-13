@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/ulikunitz/xz"
 )
@@ -69,4 +70,25 @@ func DetectCompression(input io.Reader) (DecompressorFunc, io.Reader, error) {
 	}
 
 	return decompressor, io.MultiReader(bytes.NewReader(buffer[:n]), input), nil
+}
+
+// AutoDecompress takes a stream and returns an uncompressed version of the
+// same stream.
+// The caller must call Close() on the returned stream (even if the input does not need,
+// or does not even support, closing!).
+func AutoDecompress(stream io.Reader) (io.ReadCloser, bool, error) {
+	decompressor, stream, err := DetectCompression(stream)
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "Error detecting compression")
+	}
+	var res io.ReadCloser
+	if decompressor != nil {
+		res, err = decompressor(stream)
+		if err != nil {
+			return nil, false, errors.Wrapf(err, "Error initializing decompression")
+		}
+	} else {
+		res = ioutil.NopCloser(stream)
+	}
+	return res, decompressor != nil, nil
 }

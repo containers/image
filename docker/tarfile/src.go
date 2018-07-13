@@ -346,19 +346,17 @@ func (s *Source) GetManifest(ctx context.Context, instanceDigest *digest.Digest)
 	return s.generatedManifest, manifest.DockerV2Schema2MediaType, nil
 }
 
-// uncompressedReadCloser is an io.ReadCloser that closes both the decompressed stream (if necessary) and the underlying input.
+// uncompressedReadCloser is an io.ReadCloser that closes both the uncompressed stream and the underlying input.
 type uncompressedReadCloser struct {
 	io.Reader
 	underlyingCloser   func() error
-	decompressedCloser func() error // may be nil
+	uncompressedCloser func() error
 }
 
 func (r uncompressedReadCloser) Close() error {
 	var res error
-	if r.decompressedCloser != nil {
-		if err := r.decompressedCloser(); err != nil {
-			res = err
-		}
+	if err := r.uncompressedCloser(); err != nil {
+		res = err
 	}
 	if err := r.underlyingCloser(); err != nil && res == nil {
 		res = err
@@ -400,24 +398,15 @@ func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadClose
 		// be verifing a "digest" which is not the actual layer's digest (but
 		// is instead the DiffID).
 
-		decompressFunc, reader, err := compression.DetectCompression(underlyingStream)
+		uncompressedStream, _, err := compression.AutoDecompress(underlyingStream)
 		if err != nil {
-			return nil, 0, errors.Wrapf(err, "Detecting compression in blob %s", info.Digest)
-		}
-		var decompressedCloser func() error
-		if decompressFunc != nil {
-			s, err := decompressFunc(reader)
-			if err != nil {
-				return nil, 0, errors.Wrapf(err, "Decompressing blob %s stream", info.Digest)
-			}
-			decompressedCloser = s.Close
-			reader = s
+			return nil, 0, errors.Wrapf(err, "Error auto-decompressing blob %s", info.Digest)
 		}
 
 		newStream := uncompressedReadCloser{
-			Reader:             reader,
+			Reader:             uncompressedStream,
 			underlyingCloser:   underlyingStream.Close,
-			decompressedCloser: decompressedCloser,
+			uncompressedCloser: uncompressedStream.Close,
 		}
 		closeUnderlyingStream = false
 
