@@ -5,6 +5,7 @@ import (
 	"compress/bzip2"
 	"compress/gzip"
 	"io"
+	"io/ioutil"
 
 	"github.com/pkg/errors"
 
@@ -12,20 +13,21 @@ import (
 )
 
 // DecompressorFunc returns the decompressed stream, given a compressed stream.
-type DecompressorFunc func(io.Reader) (io.Reader, error)
+// The caller must call Close() on the decompressed stream (even if the compressed input stream does not need closing!).
+type DecompressorFunc func(io.Reader) (io.ReadCloser, error)
 
 // GzipDecompressor is a DecompressorFunc for the gzip compression algorithm.
-func GzipDecompressor(r io.Reader) (io.Reader, error) {
+func GzipDecompressor(r io.Reader) (io.ReadCloser, error) {
 	return gzip.NewReader(r)
 }
 
 // Bzip2Decompressor is a DecompressorFunc for the bzip2 compression algorithm.
-func Bzip2Decompressor(r io.Reader) (io.Reader, error) {
-	return bzip2.NewReader(r), nil
+func Bzip2Decompressor(r io.Reader) (io.ReadCloser, error) {
+	return ioutil.NopCloser(bzip2.NewReader(r)), nil
 }
 
 // XzDecompressor is a DecompressorFunc for the xz compression algorithm.
-func XzDecompressor(r io.Reader) (io.Reader, error) {
+func XzDecompressor(r io.Reader) (io.ReadCloser, error) {
 	return nil, errors.New("Decompressing xz streams is not supported")
 }
 

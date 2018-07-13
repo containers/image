@@ -346,16 +346,24 @@ func (s *Source) GetManifest(ctx context.Context, instanceDigest *digest.Digest)
 	return s.generatedManifest, manifest.DockerV2Schema2MediaType, nil
 }
 
-type readCloseWrapper struct {
+// uncompressedReadCloser is an io.ReadCloser that closes both the decompressed stream (if necessary) and the underlying input.
+type uncompressedReadCloser struct {
 	io.Reader
-	closeFunc func() error
+	underlyingCloser   func() error
+	decompressedCloser func() error // may be nil
 }
 
-func (r readCloseWrapper) Close() error {
-	if r.closeFunc != nil {
-		return r.closeFunc()
+func (r uncompressedReadCloser) Close() error {
+	var res error
+	if r.decompressedCloser != nil {
+		if err := r.decompressedCloser(); err != nil {
+			res = err
+		}
 	}
-	return nil
+	if err := r.underlyingCloser(); err != nil && res == nil {
+		res = err
+	}
+	return res
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
@@ -369,14 +377,14 @@ func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadClose
 	}
 
 	if li, ok := s.knownLayers[info.Digest]; ok { // diffID is a digest of the uncompressed tarball,
-		stream, err := s.openTarComponent(li.path)
+		underlyingStream, err := s.openTarComponent(li.path)
 		if err != nil {
 			return nil, 0, err
 		}
-		closeStream := true
+		closeUnderlyingStream := true
 		defer func() {
-			if closeStream {
-				stream.Close()
+			if closeUnderlyingStream {
+				underlyingStream.Close()
 			}
 		}()
 
@@ -392,23 +400,26 @@ func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadClose
 		// be verifing a "digest" which is not the actual layer's digest (but
 		// is instead the DiffID).
 
-		decompressFunc, reader, err := compression.DetectCompression(stream)
+		decompressFunc, reader, err := compression.DetectCompression(underlyingStream)
 		if err != nil {
 			return nil, 0, errors.Wrapf(err, "Detecting compression in blob %s", info.Digest)
 		}
-
+		var decompressedCloser func() error
 		if decompressFunc != nil {
-			reader, err = decompressFunc(reader)
+			s, err := decompressFunc(reader)
 			if err != nil {
 				return nil, 0, errors.Wrapf(err, "Decompressing blob %s stream", info.Digest)
 			}
+			decompressedCloser = s.Close
+			reader = s
 		}
 
-		newStream := readCloseWrapper{
-			Reader:    reader,
-			closeFunc: stream.Close,
+		newStream := uncompressedReadCloser{
+			Reader:             reader,
+			underlyingCloser:   underlyingStream.Close,
+			decompressedCloser: decompressedCloser,
 		}
-		closeStream = false
+		closeUnderlyingStream = false
 
 		return newStream, li.size, nil
 	}

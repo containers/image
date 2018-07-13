@@ -61,6 +61,7 @@ func TestDetectCompression(t *testing.T) {
 		default:
 			s, err := decompressor(updatedStream)
 			require.NoError(t, err)
+			defer s.Close()
 			uncompressedStream = s
 		}
 
