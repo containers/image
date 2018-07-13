@@ -7,9 +7,8 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/pkg/errors"
-
 	"github.com/sirupsen/logrus"
+	"github.com/ulikunitz/xz"
 )
 
 // DecompressorFunc returns the decompressed stream, given a compressed stream.
@@ -28,7 +27,11 @@ func Bzip2Decompressor(r io.Reader) (io.ReadCloser, error) {
 
 // XzDecompressor is a DecompressorFunc for the xz compression algorithm.
 func XzDecompressor(r io.Reader) (io.ReadCloser, error) {
-	return nil, errors.New("Decompressing xz streams is not supported")
+	r, err := xz.NewReader(r)
+	if err != nil {
+		return nil, err
+	}
+	return ioutil.NopCloser(r), nil
 }
 
 // compressionAlgos is an internal implementation detail of DetectCompression

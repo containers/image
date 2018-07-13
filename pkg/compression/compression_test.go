@@ -15,13 +15,12 @@ import (
 
 func TestDetectCompression(t *testing.T) {
 	cases := []struct {
-		filename      string
-		unimplemented bool
+		filename string
 	}{
-		{"fixtures/Hello.uncompressed", false},
-		{"fixtures/Hello.gz", false},
-		{"fixtures/Hello.bz2", false},
-		{"fixtures/Hello.xz", true},
+		{"fixtures/Hello.uncompressed"},
+		{"fixtures/Hello.gz"},
+		{"fixtures/Hello.bz2"},
+		{"fixtures/Hello.xz"},
 	}
 
 	// The original stream is preserved.
@@ -51,14 +50,9 @@ func TestDetectCompression(t *testing.T) {
 		require.NoError(t, err, c.filename)
 
 		var uncompressedStream io.Reader
-		switch {
-		case decompressor == nil:
+		if decompressor == nil {
 			uncompressedStream = updatedStream
-		case c.unimplemented:
-			_, err := decompressor(updatedStream)
-			assert.Error(t, err)
-			continue
-		default:
+		} else {
 			s, err := decompressor(updatedStream)
 			require.NoError(t, err)
 			defer s.Close()
