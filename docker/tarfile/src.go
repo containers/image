@@ -373,6 +373,12 @@ func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadClose
 		if err != nil {
 			return nil, 0, err
 		}
+		closeStream := true
+		defer func() {
+			if closeStream {
+				stream.Close()
+			}
+		}()
 
 		// In order to handle the fact that digests != diffIDs (and thus that a
 		// caller which is trying to verify the blob will run into problems),
@@ -402,6 +408,7 @@ func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadClose
 			Reader:    reader,
 			closeFunc: stream.Close,
 		}
+		closeStream = false
 
 		return newStream, li.size, nil
 	}
