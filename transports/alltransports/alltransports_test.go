@@ -29,8 +29,6 @@ func TestImageNameHandling(t *testing.T) {
 		{"dir", "/etc", "/etc"},
 		{"docker", "//busybox", "//busybox:latest"},
 		{"docker", "//busybox:notlatest", "//busybox:notlatest"}, // This also tests handling of multiple ":" characters
-		{"docker-daemon", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
-		{"docker-daemon", "busybox:latest", "busybox:latest"},
 		{"docker-archive", "/var/lib/oci/busybox.tar:busybox:latest", "/var/lib/oci/busybox.tar:docker.io/library/busybox:latest"},
 		{"docker-archive", "busybox.tar:busybox:latest", "busybox.tar:docker.io/library/busybox:latest"},
 		{"oci", "/etc:someimage", "/etc:someimage"},
@@ -48,7 +46,7 @@ func TestImageNameHandling(t *testing.T) {
 	}
 
 	// Possibly stubbed-out transports: Only verify that something is registered.
-	for _, c := range []string{"ostree"} {
+	for _, c := range []string{"docker-daemon", "ostree"} {
 		transport := transports.Get(c)
 		assert.NotNil(t, transport, c)
 	}
