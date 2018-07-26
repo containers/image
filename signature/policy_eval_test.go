@@ -18,7 +18,7 @@ import (
 func TestPolicyRequirementError(t *testing.T) {
 	// A stupid test just to keep code coverage
 	s := "test"
-	err := PolicyRequirementError(s)
+	err := NewPolicyRequirementError(s)
 	assert.Equal(t, s, err.Error())
 }
 
@@ -490,7 +490,7 @@ func assertSARRejected(t *testing.T, sar signatureAcceptanceResult, parsedSig *S
 // and that the returned error is a PolicyRequirementError..
 func assertSARRejectedPolicyRequirement(t *testing.T, sar signatureAcceptanceResult, parsedSig *Signature, err error) {
 	assertSARRejected(t, sar, parsedSig, err)
-	assert.IsType(t, PolicyRequirementError(""), err)
+	assert.IsType(t, NewPolicyRequirementError(""), err)
 }
 
 // assertSARRejected verifies that isSignatureAuthorAccepted returns a consistent sarUnknown result.
@@ -518,5 +518,5 @@ func assertRunningRejected(t *testing.T, allowed bool, err error) {
 // and that the returned error is a PolicyRequirementError.
 func assertRunningRejectedPolicyRequirement(t *testing.T, allowed bool, err error) {
 	assertRunningRejected(t, allowed, err)
-	assert.IsType(t, PolicyRequirementError(""), err)
+	assert.IsType(t, NewPolicyRequirementError(""), err)
 }
