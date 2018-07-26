@@ -3,8 +3,10 @@ package sysregistriesv2
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -110,20 +112,30 @@ func parseURL(input string) (string, error) {
 	// "example.com/repo" -> {Scheme:"", Opaque:"", Path:"example.com/repo"}
 	// "example.com:5000" -> {Scheme:"example.com", Opaque:"5000"}
 	// "example.com:5000/repo" -> {Scheme:"example.com", Opaque:"5000/repo"}
-	uri, err := url.Parse(trimmed)
-	if err != nil {
-		return "", &InvalidRegistries{s: fmt.Sprintf("invalid URL '%s': %v", input, err)}
+	trimmedIsIP := false
+	if sep := strings.LastIndex(trimmed, ":"); sep != -1 && net.ParseIP(trimmed[:sep]) != nil {
+		if _, err := strconv.ParseUint(trimmed[sep+1:], 10, 16); err != nil {
+			msg := fmt.Sprintf("invalid URL '%s': invalid port number '%s' in numeric IPv4 address", input, trimmed[sep+1:])
+			return "", &InvalidRegistries{s: msg}
+		}
+		trimmedIsIP = true
+	}
+	if !trimmedIsIP {
+		uri, err := url.Parse(trimmed)
+		if err != nil {
+			return "", &InvalidRegistries{s: fmt.Sprintf("invalid URL '%s': %v", input, err)}
+		}
+
+		// Check if a URI Scheme is set.
+		// Note that URLs that do not start with a slash after the scheme are
+		// interpreted as `scheme:opaque[?query][#fragment]`; see above for examples.
+		if uri.Scheme != "" && uri.Opaque == "" {
+			msg := fmt.Sprintf("invalid URL '%s': URI schemes are not supported", input)
+			return "", &InvalidRegistries{s: msg}
+		}
 	}
 
-	// Check if a URI Scheme is set.
-	// Note that URLs that do not start with a slash after the scheme are
-	// interpreted as `scheme:opaque[?query][#fragment]`; see above for examples.
-	if uri.Scheme != "" && uri.Opaque == "" {
-		msg := fmt.Sprintf("invalid URL '%s': URI schemes are not supported", input)
-		return "", &InvalidRegistries{s: msg}
-	}
-
-	uri, err = url.Parse("http://" + trimmed)
+	uri, err := url.Parse("http://" + trimmed)
 	if err != nil {
 		msg := fmt.Sprintf("invalid URL '%s': sanitized URL did not parse: %v", input, err)
 		return "", &InvalidRegistries{s: msg}

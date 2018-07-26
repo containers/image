@@ -28,6 +28,10 @@ func TestParseURL(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "invalid URL 'john.doe@example.com': user/password are not supported")
 
+	_, err = parseURL("127.0.0.1:123456")
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "invalid port number '123456' in numeric IPv4 address")
+
 	// valid URLs
 	url, err = parseURL("example.com")
 	assert.Nil(t, err)
@@ -44,6 +48,18 @@ func TestParseURL(t *testing.T) {
 	url, err = parseURL("example.com:5000/with/path")
 	assert.Nil(t, err)
 	assert.Equal(t, "example.com:5000/with/path", url)
+
+	url, err = parseURL("example.com:5000")
+	assert.Nil(t, err)
+	assert.Equal(t, "example.com:5000", url)
+
+	url, err = parseURL("172.30.0.1")
+	assert.Nil(t, err)
+	assert.Equal(t, "172.30.0.1", url)
+
+	url, err = parseURL("172.30.0.1:5000") // often used in OpenShift
+	assert.Nil(t, err)
+	assert.Equal(t, "172.30.0.1:5000", url)
 }
 
 func TestEmptyConfig(t *testing.T) {
