@@ -1,7 +1,7 @@
 .PHONY: all tools test validate lint .gitvalidation fmt
 
 # Which github repository and branch to use for testing with skopeo
-SKOPEO_REPO = projectatomic/skopeo
+SKOPEO_REPO = containers/skopeo
 SKOPEO_BRANCH = master
 # Set SUDO=sudo to run container integration tests using sudo.
 SUDO =
@@ -68,7 +68,7 @@ test: vendor
 test-skopeo:
 	@echo === Testing skopeo build
 	@export GOPATH=$$(mktemp -d) && \
-		skopeo_path=$${GOPATH}/src/github.com/projectatomic/skopeo && \
+		skopeo_path=$${GOPATH}/src/github.com/containers/skopeo && \
 		vendor_path=$${skopeo_path}/vendor/github.com/containers/image && \
 		git clone -b $(SKOPEO_BRANCH) https://github.com/$(SKOPEO_REPO) $${skopeo_path} && \
 		rm -rf $${vendor_path} && cp -r . $${vendor_path} && rm -rf $${vendor_path}/vendor && \

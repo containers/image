@@ -16,7 +16,7 @@ import (
 // TestGetManifestDescriptor is testing a regression issue where a nil error was being wrapped,
 // this causes the returned error to be nil as well and the user wasn't getting a proper error output.
 //
-// More info: https://github.com/projectatomic/skopeo/issues/496
+// More info: https://github.com/containers/skopeo/issues/496
 func TestGetManifestDescriptor(t *testing.T) {
 	imageRef, err := NewReference("fixtures/two_images_manifest", "")
 	require.NoError(t, err)
