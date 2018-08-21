@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/containers/image/image"
+	"github.com/containers/image/pkg/blobinfocache"
 	"github.com/containers/image/pkg/compression"
 	"github.com/containers/image/signature"
 	"github.com/containers/image/transports"
@@ -78,6 +79,7 @@ type copier struct {
 	reportWriter     io.Writer
 	progressInterval time.Duration
 	progress         chan types.ProgressProperties
+	blobInfoCache    blobinfocache.BlobInfoCache
 }
 
 // imageCopier tracks state specific to a single image (possibly an item of a manifest list)
@@ -148,6 +150,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		reportWriter:     reportWriter,
 		progressInterval: options.ProgressInterval,
 		progress:         options.Progress,
+		blobInfoCache:    blobinfocache.NewIncorrectJSONCache(),
 	}
 
 	unparsedToplevel := image.UnparsedInstance(rawSource, nil)
