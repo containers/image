@@ -72,7 +72,6 @@ func (d *digestingReader) Read(p []byte) (int, error) {
 // copier allows us to keep track of diffID values for blobs, and other
 // data shared across one or more images in a possible manifest list.
 type copier struct {
-	cachedDiffIDs    map[digest.Digest]digest.Digest
 	dest             types.ImageDestination
 	rawSource        types.ImageSource
 	reportWriter     io.Writer
@@ -143,7 +142,6 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 	}()
 
 	c := &copier{
-		cachedDiffIDs:    make(map[digest.Digest]digest.Digest),
 		dest:             dest,
 		rawSource:        rawSource,
 		reportWriter:     reportWriter,
@@ -510,7 +508,8 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo) (t
 		return types.BlobInfo{}, "", errors.Wrapf(err, "Error checking for blob %s at destination", srcInfo.Digest)
 	}
 	// If we already have a cached diffID for this blob, we don't need to compute it
-	diffIDIsNeeded := ic.diffIDsAreNeeded && (ic.c.cachedDiffIDs[srcInfo.Digest] == "")
+	cachedDiffID := ic.c.blobInfoCache.UncompressedDigest(srcInfo.Digest) // May be ""
+	diffIDIsNeeded := ic.diffIDsAreNeeded && cachedDiffID == ""
 	// If we already have the blob, and we don't need to recompute the diffID, then we might be able to avoid reading it again
 	if haveBlob && !diffIDIsNeeded {
 		// Check the blob sizes match, if we were given a size this time
@@ -524,7 +523,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo) (t
 			return types.BlobInfo{}, "", errors.Wrapf(err, "Error reapplying blob %s at destination", srcInfo.Digest)
 		}
 		ic.c.Printf("Skipping fetch of repeat blob %s\n", srcInfo.Digest)
-		return blobinfo, ic.c.cachedDiffIDs[srcInfo.Digest], err
+		return blobinfo, cachedDiffID, err
 	}
 
 	// Fallback: copy the layer, computing the diffID if we need to do so
@@ -549,11 +548,13 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo) (t
 				return types.BlobInfo{}, "", errors.Wrap(diffIDResult.err, "Error computing layer DiffID")
 			}
 			logrus.Debugf("Computed DiffID %s for layer %s", diffIDResult.digest, srcInfo.Digest)
-			ic.c.cachedDiffIDs[srcInfo.Digest] = diffIDResult.digest
+			// This is safe because we have just computed diffIDResult.Digest ourselves, and in the process
+			// we have read all of the input blob, so srcInfo.Digest must have been validated by digestingReader.
+			ic.c.blobInfoCache.RecordDigestUncompressedPair(srcInfo.Digest, diffIDResult.digest)
 			return blobInfo, diffIDResult.digest, nil
 		}
 	} else {
-		return blobInfo, ic.c.cachedDiffIDs[srcInfo.Digest], nil
+		return blobInfo, cachedDiffID, nil
 	}
 }
 
