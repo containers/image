@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/containers/image/image"
+	"github.com/containers/image/pkg/blobinfocache"
 	"github.com/containers/image/pkg/compression"
 	"github.com/containers/image/signature"
 	"github.com/containers/image/transports"
@@ -77,6 +78,7 @@ type copier struct {
 	reportWriter     io.Writer
 	progressInterval time.Duration
 	progress         chan types.ProgressProperties
+	blobInfoCache    types.BlobInfoCache
 }
 
 // imageCopier tracks state specific to a single image (possibly an item of a manifest list)
@@ -147,6 +149,10 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		reportWriter:     reportWriter,
 		progressInterval: options.ProgressInterval,
 		progress:         options.Progress,
+		// FIXME? The cache is used for sources and destinations equally, but we only have a SourceCtx and DestinationCtx.
+		// For now, use DestinationCtx (because blob reuse changes the behavior of the destination side more); eventually
+		// we might want to add a separate CommonCtx — or would that be too confusing?
+		blobInfoCache: blobinfocache.DefaultCache(options.DestinationCtx),
 	}
 
 	unparsedToplevel := image.UnparsedInstance(rawSource, nil)
