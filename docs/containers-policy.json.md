@@ -1,9 +1,9 @@
-% POLICY.JSON(5) policy.json Man Page
+% CONTAINERS-POLICY.JSON(5) policy.json Man Page
 % Miloslav Trmač
 % September 2016
 
 # NAME
-policy.json - syntax for the signature verification policy file
+containers-policy.json - syntax for the signature verification policy file
 
 ## DESCRIPTION
 
@@ -278,4 +278,6 @@ selectively allow individual transports and scopes as desired.
   atomic(1)
 
 ## HISTORY
+August 2018, Rename to containers-policy.json(5) by Valentin Rothberg <vrothberg@suse.com>
+
 September 2016, Originally compiled by Miloslav Trmač <mitr@redhat.com>

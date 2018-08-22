@@ -1,14 +1,17 @@
-% registries.conf(5) System-wide registry configuration file
+% CONTAINERS-REGISTRIES.CONF(5) System-wide registry configuration file
 % Brent Baude
 % Aug 2017
 
 # NAME
-registries.conf - Syntax of System Registry Configuration File
+containers-registries.conf - Syntax of System Registry Configuration File
 
 # DESCRIPTION
-The REGISTRIES configuration file is a system-wide configuration file for container image
-registries. The file format is TOML.  The valid categories are: 'registries.search',
-'registries.insecure', and 'registries.block'.
+The CONTAINERS-REGISTRIES configuration file is a system-wide configuration
+file for container image registries. The file format is TOML. The valid
+categories are: 'registries.search', 'registries.insecure', and
+'registries.block'.
+
+By default, the configuration file is located at `/etc/containers/registries.conf`.
 
 # FORMAT
 The TOML_format is used to build a simple list format for registries under three
@@ -46,5 +49,8 @@ registries = ['registry.untrusted.com', 'registry.unsafe.com']
 ```
 
 # HISTORY
-Aug 2017, Originally compiled by Brent Baude <bbaude@redhat.com>
+Aug 2018, Renamed to containers-registries.conf(5) by Valentin Rothberg <vrothberg@suse.com>
+
 Jun 2018, Updated by Tom Sweeney <tsweeney@redhat.com>
+
+Aug 2017, Originally compiled by Brent Baude <bbaude@redhat.com>
