@@ -498,7 +498,9 @@ type diffIDResult struct {
 // copyLayer copies a layer with srcInfo (with known Digest and possibly known Size) in src to dest, perhaps compressing it if canCompress,
 // and returns a complete blobInfo of the copied layer, and a value for LayerDiffIDs if diffIDIsNeeded
 func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo) (types.BlobInfo, digest.Digest, error) {
+	// FIXME: Extract DiffID from the manifest/config as well
 	cachedDiffID := ic.c.blobInfoCache.UncompressedDigest(srcInfo.Digest) // May be ""
+	// FIXME: Extended reuse depends on canModifyManifest
 	// Check if we already have a blob with this digest
 	haveBlob, extantBlobSize, err := ic.c.dest.HasBlob(ctx, srcInfo)
 	if err != nil {
@@ -545,7 +547,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo) (t
 				return types.BlobInfo{}, "", errors.Wrap(diffIDResult.err, "Error computing layer DiffID")
 			}
 			logrus.Debugf("Computed DiffID %s for layer %s", diffIDResult.digest, srcInfo.Digest)
-			ic.c.blobInfoCache.RecordUncompressedDigest(srcInfo.Digest, diffIDResult.digest)
+			ic.c.blobInfoCache.RecordUncompressedDigest(srcInfo.Digest, diffIDResult.digest) // FIXME: Might also be determined by PutBlob if the destination uncompresses.
 		}
 	}
 	return blobInfo, diffIDResult.digest, nil
