@@ -84,13 +84,13 @@ func (d *ociArchiveImageDestination) PutBlob(ctx context.Context, stream io.Read
 	return d.unpackedDest.PutBlob(ctx, stream, inputInfo, isConfig)
 }
 
-// HasBlob returns true iff the image destination already contains a blob with the matching digest which can be reapplied using ReapplyBlob
-func (d *ociArchiveImageDestination) HasBlob(ctx context.Context, info types.BlobInfo) (bool, int64, error) {
-	return d.unpackedDest.HasBlob(ctx, info)
-}
-
-func (d *ociArchiveImageDestination) ReapplyBlob(ctx context.Context, info types.BlobInfo) (types.BlobInfo, error) {
-	return d.unpackedDest.ReapplyBlob(ctx, info)
+// TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
+// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
+// info.Digest must not be empty.
+// If the blob has been succesfully reused, returns (true, info, nil); info must contain at least a digest and size.
+// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
+func (d *ociArchiveImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo) (bool, types.BlobInfo, error) {
+	return d.unpackedDest.TryReusingBlob(ctx, info)
 }
 
 // PutManifest writes manifest to the destination

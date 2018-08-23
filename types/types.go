@@ -148,8 +148,7 @@ const (
 // ImageDestination is a service, possibly remote (= slow), to store components of a single image.
 //
 // There is a specific required order for some of the calls:
-// PutBlob on the various blobs, if any, MUST be called before PutManifest (manifest references blobs, which may be created or compressed only at push time)
-// ReapplyBlob, if used, MUST only be called if HasBlob returned true for the same blob digest
+// TryReusingBlob/PutBlob on the various blobs, if any, MUST be called before PutManifest (manifest references blobs, which may be created or compressed only at push time)
 // PutSignatures, if called, MUST be called after PutManifest (signatures reference manifest contents)
 // Finally, Commit MUST be called if the caller wants the image, as formed by the components saved above, to persist.
 //
@@ -187,13 +186,12 @@ type ImageDestination interface {
 	// to any other readers for download using the supplied digest.
 	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 	PutBlob(ctx context.Context, stream io.Reader, inputInfo BlobInfo, isConfig bool) (BlobInfo, error)
-	// HasBlob returns true iff the image destination already contains a blob with the matching digest which can be reapplied using ReapplyBlob.
-	// Unlike PutBlob, the digest can not be empty.  If HasBlob returns true, the size of the blob must also be returned.
-	// If the destination does not contain the blob, or it is unknown, HasBlob ordinarily returns (false, -1, nil);
-	// it returns a non-nil error only on an unexpected failure.
-	HasBlob(ctx context.Context, info BlobInfo) (bool, int64, error)
-	// ReapplyBlob informs the image destination that a blob for which HasBlob previously returned true would have been passed to PutBlob if it had returned false.  Like HasBlob and unlike PutBlob, the digest can not be empty.  If the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree.
-	ReapplyBlob(ctx context.Context, info BlobInfo) (BlobInfo, error)
+	// TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
+	// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
+	// info.Digest must not be empty.
+	// If the blob has been succesfully reused, returns (true, info, nil); info must contain at least a digest and size.
+	// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
+	TryReusingBlob(ctx context.Context, info BlobInfo) (bool, BlobInfo, error)
 	// PutManifest writes manifest to the destination.
 	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 	// If the destination is in principle available, refuses this manifest type (e.g. it does not recognize the schema),

@@ -118,12 +118,12 @@ func (c *sizeCounter) Write(p []byte) (n int, err error) {
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, isConfig bool) (types.BlobInfo, error) {
 	if inputInfo.Digest.String() != "" {
-		haveBlob, size, err := d.HasBlob(ctx, inputInfo)
+		haveBlob, reusedInfo, err := d.TryReusingBlob(ctx, inputInfo)
 		if err != nil {
 			return types.BlobInfo{}, err
 		}
 		if haveBlob {
-			return types.BlobInfo{Digest: inputInfo.Digest, Size: size}, nil
+			return reusedInfo, nil
 		}
 	}
 
@@ -180,39 +180,36 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	return types.BlobInfo{Digest: computedDigest, Size: sizeCounter.size}, nil
 }
 
-// HasBlob returns true iff the image destination already contains a blob with the matching digest which can be reapplied using ReapplyBlob.
-// Unlike PutBlob, the digest can not be empty.  If HasBlob returns true, the size of the blob must also be returned.
-// If the destination does not contain the blob, or it is unknown, HasBlob ordinarily returns (false, -1, nil);
-// it returns a non-nil error only on an unexpected failure.
-func (d *dockerImageDestination) HasBlob(ctx context.Context, info types.BlobInfo) (bool, int64, error) {
+// TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
+// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
+// info.Digest must not be empty.
+// If the blob has been succesfully reused, returns (true, info, nil); info must contain at least a digest and size.
+// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
+func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
-		return false, -1, errors.Errorf(`"Can not check for a blob with unknown digest`)
+		return false, types.BlobInfo{}, errors.Errorf(`"Can not check for a blob with unknown digest`)
 	}
 	checkPath := fmt.Sprintf(blobsPath, reference.Path(d.ref.ref), info.Digest.String())
 
 	logrus.Debugf("Checking %s", checkPath)
 	res, err := d.c.makeRequest(ctx, "HEAD", checkPath, nil, nil)
 	if err != nil {
-		return false, -1, err
+		return false, types.BlobInfo{}, err
 	}
 	defer res.Body.Close()
 	switch res.StatusCode {
 	case http.StatusOK:
 		logrus.Debugf("... already exists")
-		return true, getBlobSize(res), nil
+		return true, types.BlobInfo{Digest: info.Digest, Size: getBlobSize(res)}, nil
 	case http.StatusUnauthorized:
 		logrus.Debugf("... not authorized")
-		return false, -1, errors.Wrapf(client.HandleErrorResponse(res), "Error checking whether a blob %s exists in %s", info.Digest, d.ref.ref.Name())
+		return false, types.BlobInfo{}, errors.Wrapf(client.HandleErrorResponse(res), "Error checking whether a blob %s exists in %s", info.Digest, d.ref.ref.Name())
 	case http.StatusNotFound:
 		logrus.Debugf("... not present")
-		return false, -1, nil
+		return false, types.BlobInfo{}, nil
 	default:
-		return false, -1, errors.Errorf("failed to read from destination repository %s: %v", reference.Path(d.ref.ref), http.StatusText(res.StatusCode))
+		return false, types.BlobInfo{}, errors.Errorf("failed to read from destination repository %s: %v", reference.Path(d.ref.ref), http.StatusText(res.StatusCode))
 	}
-}
-
-func (d *dockerImageDestination) ReapplyBlob(ctx context.Context, info types.BlobInfo) (types.BlobInfo, error) {
-	return info, nil
 }
 
 // PutManifest writes manifest to the destination.

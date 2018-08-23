@@ -501,27 +501,18 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo) (t
 	// FIXME: Extract DiffID from the manifest/config as well
 	cachedDiffID := ic.c.blobInfoCache.UncompressedDigest(srcInfo.Digest) // May be ""
 	// FIXME: Extended reuse depends on canModifyManifest
-	// Check if we already have a blob with this digest
-	haveBlob, extantBlobSize, err := ic.c.dest.HasBlob(ctx, srcInfo)
-	if err != nil {
-		return types.BlobInfo{}, "", errors.Wrapf(err, "Error checking for blob %s at destination", srcInfo.Digest)
-	}
-	// If we already have a cached diffID for this blob, we don't need to compute it
 	diffIDIsNeeded := ic.diffIDsAreNeeded && cachedDiffID == ""
-	// If we already have the blob, and we don't need to recompute the diffID, then we might be able to avoid reading it again
-	if haveBlob && !diffIDIsNeeded {
-		// Check the blob sizes match, if we were given a size this time
-		if srcInfo.Size != -1 && srcInfo.Size != extantBlobSize {
-			return types.BlobInfo{}, "", errors.Errorf("Error: blob %s is already present, but with size %d instead of %d", srcInfo.Digest, extantBlobSize, srcInfo.Size)
-		}
-		srcInfo.Size = extantBlobSize
-		// Tell the image destination that this blob's delta is being applied again.  For some image destinations, this can be faster than using GetBlob/PutBlob
-		blobinfo, err := ic.c.dest.ReapplyBlob(ctx, srcInfo)
+
+	// If we already have the blob, and we don't need to compute the diffID, then we don't need to read it from the source.
+	if !diffIDIsNeeded {
+		reused, blobInfo, err := ic.c.dest.TryReusingBlob(ctx, srcInfo)
 		if err != nil {
-			return types.BlobInfo{}, "", errors.Wrapf(err, "Error reapplying blob %s at destination", srcInfo.Digest)
+			return types.BlobInfo{}, "", errors.Wrapf(err, "Error trying to reuse blob %s at destination", srcInfo.Digest)
 		}
-		ic.c.Printf("Skipping fetch of repeat blob %s\n", srcInfo.Digest)
-		return blobinfo, cachedDiffID, err
+		if reused {
+			ic.c.Printf("Skipping fetch of repeat blob %s\n", srcInfo.Digest)
+			return blobInfo, cachedDiffID, nil
+		}
 	}
 
 	// Fallback: copy the layer, computing the diffID if we need to do so
