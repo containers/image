@@ -322,12 +322,16 @@ func (d *ostreeImageDestination) importConfig(repo *otbuiltin.Repo, blob *blobTo
 	return d.ostreeCommit(repo, ostreeBranch, destinationPath, []string{fmt.Sprintf("docker.size=%d", blob.Size)})
 }
 
-func (d *ostreeImageDestination) HasBlob(ctx context.Context, info types.BlobInfo) (bool, int64, error) {
-
+// TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
+// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
+// info.Digest must not be empty.
+// If the blob has been succesfully reused, returns (true, info, nil); info must contain at least a digest and size.
+// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
+func (d *ostreeImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo) (bool, types.BlobInfo, error) {
 	if d.repo == nil {
 		repo, err := openRepo(d.ref.repo)
 		if err != nil {
-			return false, 0, err
+			return false, types.BlobInfo{}, err
 		}
 		d.repo = repo
 	}
@@ -335,29 +339,25 @@ func (d *ostreeImageDestination) HasBlob(ctx context.Context, info types.BlobInf
 
 	found, data, err := readMetadata(d.repo, branch, "docker.uncompressed_digest")
 	if err != nil || !found {
-		return found, -1, err
+		return found, types.BlobInfo{}, err
 	}
 
 	found, data, err = readMetadata(d.repo, branch, "docker.uncompressed_size")
 	if err != nil || !found {
-		return found, -1, err
+		return found, types.BlobInfo{}, err
 	}
 
 	found, data, err = readMetadata(d.repo, branch, "docker.size")
 	if err != nil || !found {
-		return found, -1, err
+		return found, types.BlobInfo{}, err
 	}
 
 	size, err := strconv.ParseInt(data, 10, 64)
 	if err != nil {
-		return false, -1, err
+		return false, types.BlobInfo{}, err
 	}
 
-	return true, size, nil
-}
-
-func (d *ostreeImageDestination) ReapplyBlob(ctx context.Context, info types.BlobInfo) (types.BlobInfo, error) {
-	return info, nil
+	return true, types.BlobInfo{Digest: info.Digest, Size: size}, nil
 }
 
 // PutManifest writes manifest to the destination.

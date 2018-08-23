@@ -386,16 +386,13 @@ func (d *openshiftImageDestination) PutBlob(ctx context.Context, stream io.Reade
 	return d.docker.PutBlob(ctx, stream, inputInfo, isConfig)
 }
 
-// HasBlob returns true iff the image destination already contains a blob with the matching digest which can be reapplied using ReapplyBlob.
-// Unlike PutBlob, the digest can not be empty.  If HasBlob returns true, the size of the blob must also be returned.
-// If the destination does not contain the blob, or it is unknown, HasBlob ordinarily returns (false, -1, nil);
-// it returns a non-nil error only on an unexpected failure.
-func (d *openshiftImageDestination) HasBlob(ctx context.Context, info types.BlobInfo) (bool, int64, error) {
-	return d.docker.HasBlob(ctx, info)
-}
-
-func (d *openshiftImageDestination) ReapplyBlob(ctx context.Context, info types.BlobInfo) (types.BlobInfo, error) {
-	return d.docker.ReapplyBlob(ctx, info)
+// TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
+// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
+// info.Digest must not be empty.
+// If the blob has been succesfully reused, returns (true, info, nil); info must contain at least a digest and size.
+// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
+func (d *openshiftImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo) (bool, types.BlobInfo, error) {
+	return d.docker.TryReusingBlob(ctx, info)
 }
 
 // PutManifest writes manifest to the destination.

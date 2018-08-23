@@ -120,12 +120,12 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 	}
 
 	// Maybe the blob has been already sent
-	ok, size, err := d.HasBlob(ctx, inputInfo)
+	ok, reusedInfo, err := d.TryReusingBlob(ctx, inputInfo)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
 	if ok {
-		return types.BlobInfo{Digest: inputInfo.Digest, Size: size}, nil
+		return reusedInfo, nil
 	}
 
 	if isConfig {
@@ -151,29 +151,19 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 	return types.BlobInfo{Digest: inputInfo.Digest, Size: inputInfo.Size}, nil
 }
 
-// HasBlob returns true iff the image destination already contains a blob with
-// the matching digest which can be reapplied using ReapplyBlob.  Unlike
-// PutBlob, the digest can not be empty.  If HasBlob returns true, the size of
-// the blob must also be returned.  If the destination does not contain the
-// blob, or it is unknown, HasBlob ordinarily returns (false, -1, nil); it
-// returns a non-nil error only on an unexpected failure.
-func (d *Destination) HasBlob(ctx context.Context, info types.BlobInfo) (bool, int64, error) {
+// TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
+// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
+// info.Digest must not be empty.
+// If the blob has been succesfully reused, returns (true, info, nil); info must contain at least a digest and size.
+// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
+func (d *Destination) TryReusingBlob(ctx context.Context, info types.BlobInfo) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
-		return false, -1, errors.Errorf("Can not check for a blob with unknown digest")
+		return false, types.BlobInfo{}, errors.Errorf("Can not check for a blob with unknown digest")
 	}
 	if blob, ok := d.blobs[info.Digest]; ok {
-		return true, blob.Size, nil
+		return true, types.BlobInfo{Digest: info.Digest, Size: blob.Size}, nil
 	}
-	return false, -1, nil
-}
-
-// ReapplyBlob informs the image destination that a blob for which HasBlob
-// previously returned true would have been passed to PutBlob if it had
-// returned false.  Like HasBlob and unlike PutBlob, the digest can not be
-// empty.  If the blob is a filesystem layer, this signifies that the changes
-// it describes need to be applied again when composing a filesystem tree.
-func (d *Destination) ReapplyBlob(ctx context.Context, info types.BlobInfo) (types.BlobInfo, error) {
-	return info, nil
+	return false, types.BlobInfo{}, nil
 }
 
 func (d *Destination) createRepositoriesFile(rootLayerID string) error {
