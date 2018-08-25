@@ -416,16 +416,7 @@ func (c *dockerClient) setupRequestAuth(req *http.Request) error {
 			return nil
 		case "bearer":
 			if c.token == nil || time.Now().After(c.tokenExpiration) {
-				realm, ok := challenge.Parameters["realm"]
-				if !ok {
-					return errors.Errorf("missing realm in bearer auth challenge")
-				}
-				service, _ := challenge.Parameters["service"] // Will be "" if not present
-				var scope string
-				if c.scope.remoteName != "" && c.scope.actions != "" {
-					scope = fmt.Sprintf("repository:%s:%s", c.scope.remoteName, c.scope.actions)
-				}
-				token, err := c.getBearerToken(req.Context(), realm, service, scope)
+				token, err := c.getBearerToken(req.Context(), challenge, c.scope)
 				if err != nil {
 					return err
 				}
@@ -442,7 +433,17 @@ func (c *dockerClient) setupRequestAuth(req *http.Request) error {
 	return nil
 }
 
-func (c *dockerClient) getBearerToken(ctx context.Context, realm, service, scope string) (*bearerToken, error) {
+func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge, scope authScope) (*bearerToken, error) {
+	realm, ok := challenge.Parameters["realm"]
+	if !ok {
+		return nil, errors.Errorf("missing realm in bearer auth challenge")
+	}
+	service, _ := challenge.Parameters["service"] // Will be "" if not present
+	var scopeString string
+	if c.scope.remoteName != "" && c.scope.actions != "" {
+		scopeString = fmt.Sprintf("repository:%s:%s", c.scope.remoteName, c.scope.actions)
+	}
+
 	authReq, err := http.NewRequest("GET", realm, nil)
 	if err != nil {
 		return nil, err
@@ -455,8 +456,8 @@ func (c *dockerClient) getBearerToken(ctx context.Context, realm, service, scope
 	if service != "" {
 		getParams.Add("service", service)
 	}
-	if scope != "" {
-		getParams.Add("scope", scope)
+	if scopeString != "" {
+		getParams.Add("scope", scopeString)
 	}
 	authReq.URL.RawQuery = getParams.Encode()
 	if c.username != "" && c.password != "" {
