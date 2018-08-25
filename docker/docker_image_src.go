@@ -179,6 +179,9 @@ func (s *dockerImageSource) GetBlob(ctx context.Context, info types.BlobInfo, ca
 		// print url also
 		return nil, 0, errors.Errorf("Invalid status code returned when fetching blob %d", res.StatusCode)
 	}
+	if lr, err := newBICLocationReference(s.ref, info.Digest); err == nil {
+		cache.RecordKnownLocation(s.ref.Transport(), bicTransportScope(s.ref), info.Digest, lr)
+	}
 	return res.Body, getBlobSize(res), nil
 }
 

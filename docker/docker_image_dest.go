@@ -15,6 +15,7 @@ import (
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
+	"github.com/containers/image/pkg/blobinfocache"
 	"github.com/containers/image/types"
 	"github.com/docker/distribution/registry/api/errcode"
 	"github.com/docker/distribution/registry/api/v2"
@@ -119,7 +120,10 @@ func (c *sizeCounter) Write(p []byte) (n int, err error) {
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
 	if inputInfo.Digest.String() != "" {
-		haveBlob, reusedInfo, err := d.TryReusingBlob(ctx, inputInfo, cache)
+		// This should not really be necessary, at least the copy code calls TryReusingBlob automatically.
+		// Still, we need to check, if only because the "initiate upload" endpoint does not have a documented "blob already exists" return value.
+		// But we do that with NoCache, so that it _only_ checks the primary destination, instead of trying all mount candidates _again_.
+		haveBlob, reusedInfo, err := d.TryReusingBlob(ctx, inputInfo, blobinfocache.NoCache)
 		if err != nil {
 			return types.BlobInfo{}, err
 		}
@@ -178,7 +182,76 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	}
 
 	logrus.Debugf("Upload of layer %s complete", computedDigest)
+	if lr, err := newBICLocationReference(d.ref, computedDigest); err == nil {
+		cache.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), computedDigest, lr)
+	}
 	return types.BlobInfo{Digest: computedDigest, Size: sizeCounter.size}, nil
+}
+
+// blobExists returns true iff repo contains a blob with digest, and if so, also its size.
+// If the destination does not contain the blob, or it is unknown, blobexists ordinarily returns (false, -1, nil);
+// it returns a non-nil error only on an unexpected failure.
+func (d *dockerImageDestination) blobExists(ctx context.Context, repo reference.Named, digest digest.Digest) (bool, int64, error) {
+	checkPath := fmt.Sprintf(blobsPath, reference.Path(repo), digest.String())
+	logrus.Debugf("Checking %s", checkPath)
+	res, err := d.c.makeRequest(ctx, "HEAD", checkPath, nil, nil)
+	if err != nil {
+		return false, -1, err
+	}
+	defer res.Body.Close()
+	switch res.StatusCode {
+	case http.StatusOK:
+		logrus.Debugf("... already exists")
+		return true, getBlobSize(res), nil
+	case http.StatusUnauthorized:
+		logrus.Debugf("... not authorized")
+		return false, -1, errors.Wrapf(client.HandleErrorResponse(res), "Error checking whether a blob %s exists in %s", digest, repo.Name())
+	case http.StatusNotFound:
+		logrus.Debugf("... not present")
+		return false, -1, nil
+	default:
+		return false, -1, errors.Errorf("failed to read from destination repository %s: %v", reference.Path(repo), http.StatusText(res.StatusCode))
+	}
+}
+
+// mountBlob tries to mount blob srcDigest from srcRepo to the current destination.
+func (d *dockerImageDestination) mountBlob(ctx context.Context, srcRepo reference.Named, srcDigest digest.Digest) error {
+	u := url.URL{Path: fmt.Sprintf(blobUploadPath, reference.Path(d.ref.ref))}
+	q := u.Query()
+	q.Set("mount", srcDigest.String())
+	q.Set("repo", reference.Path(srcRepo))
+	u.RawQuery = q.Encode()
+	mountPath := u.String()
+	logrus.Debugf("Trying to mount %s", mountPath)
+	res, err := d.c.makeRequest(ctx, "POST", mountPath, nil, nil)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	switch res.StatusCode {
+	case http.StatusCreated:
+		logrus.Debugf("... mount OK")
+		return nil
+	case http.StatusAccepted: // Oops, the mount was ignored - either the registry does not support that yet, or the blob does not exist. Abort! Let the ultimate caller do an upload when its ready, instead.
+		uploadLocation, err := res.Location()
+		if err != nil {
+			return errors.Wrap(err, "Error determining upload URL after a mount attempt")
+		}
+		logrus.Debugf("... started an upload instead of mounting, trying to cancel at %s", uploadLocation.String())
+		res2, err := d.c.makeRequestToResolvedURL(ctx, "DELETE", uploadLocation.String(), nil, nil, -1, true)
+		if err != nil {
+			logrus.Debugf("Error trying to cancel an inadvertent upload: %s", err)
+		} else {
+			defer res2.Body.Close()
+			if res2.StatusCode != http.StatusNoContent {
+				logrus.Debugf("Error trying to cancel an inadvertent upload, response %#v", *res2)
+			}
+		}
+		return fmt.Errorf("Mounting %s from %s to %s started an upload instead", srcDigest, srcRepo.Name(), d.ref.ref.Name())
+	default:
+		logrus.Debugf("Error mounting, response %#v", *res)
+		return errors.Wrapf(client.HandleErrorResponse(res), "Error mounting %s from %s to %s", srcDigest, srcRepo.Name(), d.ref.ref.Name())
+	}
 }
 
 // TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
@@ -192,26 +265,62 @@ func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.
 		return false, types.BlobInfo{}, errors.Errorf(`"Can not check for a blob with unknown digest`)
 	}
 
-	checkPath := fmt.Sprintf(blobsPath, reference.Path(d.ref.ref), info.Digest.String())
-	logrus.Debugf("Checking %s", checkPath)
-	res, err := d.c.makeRequest(ctx, "HEAD", checkPath, nil, nil)
+	// First, check whether the blob happens to already exist at the destination.
+	exists, size, err := d.blobExists(ctx, d.ref.ref, info.Digest)
 	if err != nil {
 		return false, types.BlobInfo{}, err
 	}
-	defer res.Body.Close()
-	switch res.StatusCode {
-	case http.StatusOK:
-		logrus.Debugf("... already exists")
-		return true, types.BlobInfo{Digest: info.Digest, Size: getBlobSize(res)}, nil
-	case http.StatusUnauthorized:
-		logrus.Debugf("... not authorized")
-		return false, types.BlobInfo{}, errors.Wrapf(client.HandleErrorResponse(res), "Error checking whether a blob %s exists in %s", info.Digest, d.ref.ref.Name())
-	case http.StatusNotFound:
-		logrus.Debugf("... not present")
-		return false, types.BlobInfo{}, nil
-	default:
-		return false, types.BlobInfo{}, errors.Errorf("failed to read from destination repository %s: %v", reference.Path(d.ref.ref), http.StatusText(res.StatusCode))
+	if exists {
+		if lr, err := newBICLocationReference(d.ref, info.Digest); err == nil {
+			cache.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), info.Digest, lr)
+		}
+		return true, types.BlobInfo{Digest: info.Digest, Size: size}, nil
 	}
+
+	// Then try reusing blobs from other locations.
+	// FIXME? Currently we only record known locations for compressed blobs with exactly the same digest, so there are no manifest update concerns.
+	for _, candidate := range cache.KnownLocations(d.ref.Transport(), bicTransportScope(d.ref), info.Digest) {
+		candidateRepo, candidateDigest, err := parseBICLocationReference(candidate)
+		if err != nil {
+			logrus.Debugf("Error parsing BlobInfoCache location reference: %s", err)
+			continue
+		}
+		logrus.Debugf("Checking cached location %s in %s", candidateDigest.String(), candidateRepo.Name())
+
+		// Sanity checks:
+		if reference.Domain(candidateRepo) != reference.Domain(d.ref.ref) {
+			logrus.Debugf("... Internal error: domain %s does not match destination %s", reference.Domain(candidateRepo), reference.Domain(d.ref.ref))
+			continue
+		}
+		if info.Digest != candidateDigest { // FIXME? Drop this eventually
+			logrus.Debugf("... Internal error: digest %s does not match required %s", candidateDigest.String(), info.Digest.String())
+			continue
+		}
+		if candidateRepo.Name() == d.ref.ref.Name() {
+			logrus.Debug("... Already tried the primary destination")
+			continue
+		}
+
+		// Whatever happens here, don't abort the entire operation.  It's likely we just don't have permissions, and if it is a critical network error, we will find out soon enough anyway.
+		exists, size, err := d.blobExists(ctx, candidateRepo, candidateDigest)
+		if err != nil {
+			logrus.Debug("... Failed: %v", err)
+			continue
+		}
+		if !exists {
+			continue // logrus.Debug() already happened in blobExists
+		}
+		if err := d.mountBlob(ctx, candidateRepo, candidateDigest); err != nil {
+			logrus.Debugf("... Mount failed: %v", err)
+			continue
+		}
+		if lr, err := newBICLocationReference(d.ref, candidateDigest); err == nil {
+			cache.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), candidateDigest, lr)
+		}
+		return true, types.BlobInfo{Digest: candidateDigest, Size: size}, nil
+	}
+
+	return false, types.BlobInfo{}, nil
 }
 
 // PutManifest writes manifest to the destination.
