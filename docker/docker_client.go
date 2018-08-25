@@ -486,11 +486,6 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge, 
 	if !ok {
 		return nil, errors.Errorf("missing realm in bearer auth challenge")
 	}
-	service, _ := challenge.Parameters["service"] // Will be "" if not present
-	var scopeString string
-	if c.scope.remoteName != "" && c.scope.actions != "" {
-		scopeString = fmt.Sprintf("repository:%s:%s", c.scope.remoteName, c.scope.actions)
-	}
 
 	authReq, err := http.NewRequest("GET", realm, nil)
 	if err != nil {
@@ -501,11 +496,11 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge, 
 	if c.username != "" {
 		getParams.Add("account", c.username)
 	}
-	if service != "" {
+	if service, ok := challenge.Parameters["service"]; ok && service != "" {
 		getParams.Add("service", service)
 	}
-	if scopeString != "" {
-		getParams.Add("scope", scopeString)
+	if c.scope.remoteName != "" && c.scope.actions != "" {
+		getParams.Add("scope", fmt.Sprintf("repository:%s:%s", c.scope.remoteName, c.scope.actions))
 	}
 	authReq.URL.RawQuery = getParams.Encode()
 	if c.username != "" && c.password != "" {
