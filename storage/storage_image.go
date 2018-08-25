@@ -16,6 +16,7 @@ import (
 	"github.com/containers/image/image"
 	"github.com/containers/image/internal/tmpdir"
 	"github.com/containers/image/manifest"
+	"github.com/containers/image/pkg/blobinfocache"
 	"github.com/containers/image/types"
 	"github.com/containers/storage"
 	"github.com/containers/storage/pkg/archive"
@@ -99,8 +100,10 @@ func (s storageImageSource) Close() error {
 	return nil
 }
 
-// GetBlob reads the data blob or filesystem layer which matches the digest and size, if given.
-func (s *storageImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (rc io.ReadCloser, n int64, err error) {
+// GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
+// The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
+// May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
+func (s *storageImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (rc io.ReadCloser, n int64, err error) {
 	if info.Digest == image.GzippedEmptyLayerDigest {
 		return ioutil.NopCloser(bytes.NewReader(image.GzippedEmptyLayer)), int64(len(image.GzippedEmptyLayer)), nil
 	}
@@ -317,9 +320,17 @@ func (s *storageImageDestination) computeNextBlobCacheFile() string {
 	return filepath.Join(s.directory, fmt.Sprintf("%d", atomic.AddInt32(&s.nextTempFileID, 1)))
 }
 
-// PutBlob stores a layer or data blob in our temporary directory, checking that any information
-// in the blobinfo matches the incoming data.
-func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, isConfig bool) (types.BlobInfo, error) {
+// PutBlob writes contents of stream and returns data representing the result.
+// inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
+// inputInfo.Size is the expected length of stream, if known.
+// inputInfo.MediaType describes the blob format, if known.
+// May update cache.
+// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
+// to any other readers for download using the supplied digest.
+// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
+func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
+	// Stores a layer or data blob in our temporary directory, checking that any information
+	// in the blobinfo matches the incoming data.
 	errorBlobInfo := types.BlobInfo{
 		Digest: "",
 		Size:   -1,
@@ -382,7 +393,8 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 // info.Digest must not be empty.
 // If the blob has been succesfully reused, returns (true, info, nil); info must contain at least a digest and size.
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
-func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo types.BlobInfo) (bool, types.BlobInfo, error) {
+// May use and/or update cache.
+func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache) (bool, types.BlobInfo, error) {
 	if blobinfo.Digest == "" {
 		return false, types.BlobInfo{}, errors.Errorf(`Can not check for a blob with unknown digest`)
 	}
@@ -516,7 +528,7 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 			// Check if it's elsewhere and the caller just forgot to pass it to us in a PutBlob(),
 			// or to even check if we had it.
 			logrus.Debugf("looking for diffID for blob %+v", blob.Digest)
-			has, _, err := s.TryReusingBlob(ctx, blob.BlobInfo)
+			has, _, err := s.TryReusingBlob(ctx, blob.BlobInfo, blobinfocache.NoCache)
 			if err != nil {
 				return errors.Wrapf(err, "error checking for a layer based on blob %q", blob.Digest.String())
 			}

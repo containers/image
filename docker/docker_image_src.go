@@ -162,7 +162,9 @@ func getBlobSize(resp *http.Response) int64 {
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
-func (s *dockerImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadCloser, int64, error) {
+// The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
+// May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
+func (s *dockerImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
 	if len(info.URLs) != 0 {
 		return s.getExternalBlob(ctx, info.URLs)
 	}
