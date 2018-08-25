@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -165,7 +166,7 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 		return types.BlobInfo{}, errors.Wrap(err, "Error determining upload URL")
 	}
 
-	// FIXME: DELETE uploadLocation on failure
+	// FIXME: DELETE uploadLocation on failure (does not really work in docker/distribution servers, which incorrectly "delete" action in the token's scope)
 
 	locationQuery := uploadLocation.Query()
 	// TODO: check inputInfo.Digest == computedDigest https://github.com/containers/image/pull/70#discussion_r77646717
@@ -205,6 +206,8 @@ func (d *dockerImageDestination) blobExists(ctx context.Context, repo reference.
 		return true, getBlobSize(res), nil
 	case http.StatusUnauthorized:
 		logrus.Debugf("... not authorized")
+		dro, _ := httputil.DumpResponse(res, true)
+		logrus.Debugf("FIXME: ===\n%s\n===", string(dro))
 		return false, -1, errors.Wrapf(client.HandleErrorResponse(res), "Error checking whether a blob %s exists in %s", digest, repo.Name())
 	case http.StatusNotFound:
 		logrus.Debugf("... not present")
@@ -216,11 +219,14 @@ func (d *dockerImageDestination) blobExists(ctx context.Context, repo reference.
 
 // mountBlob tries to mount blob srcDigest from srcRepo to the current destination.
 func (d *dockerImageDestination) mountBlob(ctx context.Context, srcRepo reference.Named, srcDigest digest.Digest) error {
-	u := url.URL{Path: fmt.Sprintf(blobUploadPath, reference.Path(d.ref.ref))}
-	q := u.Query()
-	q.Set("mount", srcDigest.String())
-	q.Set("repo", reference.Path(srcRepo))
-	u.RawQuery = q.Encode()
+	// FIXME: Requires credentials.
+	u := url.URL{
+		Path: fmt.Sprintf(blobUploadPath, reference.Path(d.ref.ref)),
+		RawQuery: url.Values{
+			"mount": {srcDigest.String()},
+			"from":  {reference.Path(srcRepo)},
+		}.Encode(),
+	}
 	mountPath := u.String()
 	logrus.Debugf("Trying to mount %s", mountPath)
 	res, err := d.c.makeRequest(ctx, "POST", mountPath, nil, nil)
@@ -232,11 +238,16 @@ func (d *dockerImageDestination) mountBlob(ctx context.Context, srcRepo referenc
 	case http.StatusCreated:
 		logrus.Debugf("... mount OK")
 		return nil
-	case http.StatusAccepted: // Oops, the mount was ignored - either the registry does not support that yet, or the blob does not exist. Abort! Let the ultimate caller do an upload when its ready, instead.
+	case http.StatusAccepted:
+		// Oops, the mount was ignored - either the registry does not support that yet, or the blob does not exist; the registry has started an ordinary upload process.
+		// Abort, and let the ultimate caller do an upload when its ready, instead.
+		// NOTE: This does not really work in docker/distribution servers, which incorrectly "delete" action in the token's scope, and is thus entirely untested.
 		uploadLocation, err := res.Location()
 		if err != nil {
 			return errors.Wrap(err, "Error determining upload URL after a mount attempt")
 		}
+		dro, _ := httputil.DumpResponse(res, true)
+		logrus.Debugf("FIXME: ===\n%s\n===", string(dro))
 		logrus.Debugf("... started an upload instead of mounting, trying to cancel at %s", uploadLocation.String())
 		res2, err := d.c.makeRequestToResolvedURL(ctx, "DELETE", uploadLocation.String(), nil, nil, -1, true)
 		if err != nil {
@@ -244,7 +255,7 @@ func (d *dockerImageDestination) mountBlob(ctx context.Context, srcRepo referenc
 		} else {
 			defer res2.Body.Close()
 			if res2.StatusCode != http.StatusNoContent {
-				logrus.Debugf("Error trying to cancel an inadvertent upload, response %#v", *res2)
+				logrus.Debugf("Error trying to cancel an inadvertent upload, status %s", http.StatusText(res.StatusCode))
 			}
 		}
 		return fmt.Errorf("Mounting %s from %s to %s started an upload instead", srcDigest, srcRepo.Name(), d.ref.ref.Name())
@@ -278,14 +289,24 @@ func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.
 	}
 
 	// Then try reusing blobs from other locations.
+	// FIXME: Limit the number of attempts (and prioritize)?
 	// FIXME? Currently we only record known locations for compressed blobs with exactly the same digest, so there are no manifest update concerns.
+
+	// Checking candidateRepo, and mounting from it, requires an expanded token scope.
+	// We still want to reuse the ping information and other aspects of the client, so rather than make a fresh copy, there is this a bit ugly extraScope hack.
+	if d.c.extraScope != nil {
+		return false, types.BlobInfo{}, errors.New("Internal error: dockerClient.extraScope was set before TryReusingBlob")
+	}
+	defer func() {
+		d.c.extraScope = nil
+	}()
 	for _, candidate := range cache.KnownLocations(d.ref.Transport(), bicTransportScope(d.ref), info.Digest) {
 		candidateRepo, candidateDigest, err := parseBICLocationReference(candidate)
 		if err != nil {
 			logrus.Debugf("Error parsing BlobInfoCache location reference: %s", err)
 			continue
 		}
-		logrus.Debugf("Checking cached location %s in %s", candidateDigest.String(), candidateRepo.Name())
+		logrus.Debugf("Trying to reuse cached location %s in %s", candidateDigest.String(), candidateRepo.Name())
 
 		// Sanity checks:
 		if reference.Domain(candidateRepo) != reference.Domain(d.ref.ref) {
@@ -302,12 +323,24 @@ func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.
 		}
 
 		// Whatever happens here, don't abort the entire operation.  It's likely we just don't have permissions, and if it is a critical network error, we will find out soon enough anyway.
+		d.c.extraScope = &authScope{
+			remoteName: reference.Path(candidateRepo),
+			actions:    "pull",
+		}
+		// This existence check is not, strictly speaking, necessary: We only _really_ need it to get the blob size, and we could record that in the cache instead.
+		// But a "failed" d.mountBlob currently leaves around an unterminated server-side upload, which we would try to cancel.
+		// So, without this existence check, it would be 1 request on success, 2 requests on failure; with it, it is 2 requests on success, 1 request on failure.
+		// On success we avoid the actual costly upload; so, in a sense, the success case is "free", but failures are always costly.
+		// Even worse, docker/distribution does not actually reasonably implement canceling uploads
+		// (it would require a "delete" action in the token, and Quay does not give that to anyone, so we can't ask);
+		// so, be a nice client and don't create unnecesary upload sessions on the server.
 		exists, size, err := d.blobExists(ctx, candidateRepo, candidateDigest)
 		if err != nil {
-			logrus.Debug("... Failed: %v", err)
+			logrus.Debugf("... Failed: %v", err)
 			continue
 		}
 		if !exists {
+			// FIXME: Should we drop the blob from cache here (and elsewhere?)?
 			continue // logrus.Debug() already happened in blobExists
 		}
 		if err := d.mountBlob(ctx, candidateRepo, candidateDigest); err != nil {
