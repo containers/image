@@ -77,7 +77,7 @@ type copier struct {
 	reportWriter     io.Writer
 	progressInterval time.Duration
 	progress         chan types.ProgressProperties
-	blobInfoCache    blobinfocache.BlobInfoCache
+	blobInfoCache    types.BlobInfoCache
 }
 
 // imageCopier tracks state specific to a single image (possibly an item of a manifest list)

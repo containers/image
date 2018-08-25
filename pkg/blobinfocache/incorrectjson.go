@@ -15,11 +15,11 @@ type incorrectJSON struct {
 
 type savedJSON struct {
 	UncompressedDigests map[digest.Digest]digest.Digest
-	KnownLocations      map[string]map[TransportScope]map[digest.Digest][]LocationReference
+	KnownLocations      map[string]map[types.BICTransportScope]map[digest.Digest][]types.BICLocationReference
 }
 
 // NewIncorrectJSONCache FIXME
-func NewIncorrectJSONCache() BlobInfoCache {
+func NewIncorrectJSONCache() types.BlobInfoCache {
 	return &incorrectJSON{
 		path: "./incorrect-json-blobinfocache", // FIXME
 	}
@@ -63,31 +63,29 @@ func (i *incorrectJSON) RecordUncompressedDigest(compressed digest.Digest, uncom
 	i.save(data)
 }
 
-func (i *incorrectJSON) KnownLocations(transport types.ImageTransport, scope TransportScope, blobDigest digest.Digest) []LocationReference {
+func (i *incorrectJSON) KnownLocations(transport types.ImageTransport, scope types.BICTransportScope, blobDigest digest.Digest) []types.BICLocationReference {
 	data := i.load()
 	return data.KnownLocations[transport.Name()][scope][blobDigest] // "" if not present in any of the the maps
 }
 
-func (i *incorrectJSON) RecordKnownLocation(transport types.ImageTransport, scope TransportScope, blobDigest digest.Digest, location LocationReference) {
+func (i *incorrectJSON) RecordKnownLocation(transport types.ImageTransport, scope types.BICTransportScope, blobDigest digest.Digest, location types.BICLocationReference) {
 	data := i.load()
 
 	// FIXME? This is ridiculous. We might prefer a single struct key, but that can't be represented in JSON.
 	if _, ok := data.KnownLocations[transport.Name()]; !ok {
-		data.KnownLocations[transport.Name()] = map[TransportScope]map[digest.Digest][]LocationReference{}
+		data.KnownLocations[transport.Name()] = map[types.BICTransportScope]map[digest.Digest][]types.BICLocationReference{}
 	}
 	if _, ok := data.KnownLocations[transport.Name()][scope]; !ok {
-		data.KnownLocations[transport.Name()][scope] = map[digest.Digest][]LocationReference{}
-	}
-	if _, ok := data.KnownLocations[transport.Name()][scope][blobDigest]; !ok {
-		data.KnownLocations[transport.Name()][scope][blobDigest] = []LocationReference{}
+		data.KnownLocations[transport.Name()][scope] = map[digest.Digest][]types.BICLocationReference{}
 	}
 
-	for _, old := range data.KnownLocations[transport.Name()][scope][blobDigest] {
-		if old == location { // FIXME? Need an equality comparison for the abstract reference types.
+	old := data.KnownLocations[transport.Name()][scope][blobDigest] // nil if not present
+	for _, l := range old {
+		if l == location { // FIXME? Need an equality comparison for the abstract reference types.
 			return
 		}
 	}
-	data.KnownLocations[transport.Name()][scope][blobDigest] = append(data.KnownLocations[transport.Name()][scope][blobDigest], location)
+	data.KnownLocations[transport.Name()][scope][blobDigest] = append(old, location)
 
 	i.save(data)
 }

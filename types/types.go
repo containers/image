@@ -100,6 +100,26 @@ type BlobInfo struct {
 	MediaType   string
 }
 
+// BICLocationReference FIXME transport-dependent contents
+type BICLocationReference struct {
+	Opaque string
+}
+
+// BICTransportScope FIXME transport-dependent contents
+type BICTransportScope struct {
+	Opaque string
+}
+
+// BlobInfoCache FIXME
+// FIXME: document methods, also in implementations
+type BlobInfoCache interface {
+	UncompressedDigest(anyDigest digest.Digest) digest.Digest
+	RecordUncompressedDigest(compressed digest.Digest, uncompressed digest.Digest)
+
+	KnownLocations(transport ImageTransport, scope BICTransportScope, digest digest.Digest) []BICLocationReference
+	RecordKnownLocation(transport ImageTransport, scope BICTransportScope, digest digest.Digest, location BICLocationReference)
+}
+
 // ImageSource is a service, possibly remote (= slow), to download components of a single image or a named image set (manifest list).
 // This is primarily useful for copying images around; for examining their properties, Image (below)
 // is usually more useful.
