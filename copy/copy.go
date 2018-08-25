@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/containers/image/image"
+	"github.com/containers/image/pkg/blobinfocache"
 	"github.com/containers/image/pkg/compression"
 	"github.com/containers/image/signature"
 	"github.com/containers/image/transports"
@@ -71,13 +72,12 @@ func (d *digestingReader) Read(p []byte) (int, error) {
 // copier allows us to keep track of diffID values for blobs, and other
 // data shared across one or more images in a possible manifest list.
 type copier struct {
-	copiedBlobs      map[digest.Digest]digest.Digest
-	cachedDiffIDs    map[digest.Digest]digest.Digest
 	dest             types.ImageDestination
 	rawSource        types.ImageSource
 	reportWriter     io.Writer
 	progressInterval time.Duration
 	progress         chan types.ProgressProperties
+	blobInfoCache    types.BlobInfoCache
 }
 
 // imageCopier tracks state specific to a single image (possibly an item of a manifest list)
@@ -141,13 +141,12 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 	}()
 
 	c := &copier{
-		copiedBlobs:      make(map[digest.Digest]digest.Digest),
-		cachedDiffIDs:    make(map[digest.Digest]digest.Digest),
 		dest:             dest,
 		rawSource:        rawSource,
 		reportWriter:     reportWriter,
 		progressInterval: options.ProgressInterval,
 		progress:         options.Progress,
+		blobInfoCache:    blobinfocache.NewIncorrectJSONCache(),
 	}
 
 	unparsedToplevel := image.UnparsedInstance(rawSource, nil)
@@ -499,32 +498,26 @@ type diffIDResult struct {
 // copyLayer copies a layer with srcInfo (with known Digest and possibly known Size) in src to dest, perhaps compressing it if canCompress,
 // and returns a complete blobInfo of the copied layer, and a value for LayerDiffIDs if diffIDIsNeeded
 func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo) (types.BlobInfo, digest.Digest, error) {
-	// Check if we already have a blob with this digest
-	haveBlob, extantBlobSize, err := ic.c.dest.HasBlob(ctx, srcInfo)
-	if err != nil {
-		return types.BlobInfo{}, "", errors.Wrapf(err, "Error checking for blob %s at destination", srcInfo.Digest)
-	}
-	// If we already have a cached diffID for this blob, we don't need to compute it
-	diffIDIsNeeded := ic.diffIDsAreNeeded && (ic.c.cachedDiffIDs[srcInfo.Digest] == "")
-	// If we already have the blob, and we don't need to recompute the diffID, then we might be able to avoid reading it again
-	if haveBlob && !diffIDIsNeeded {
-		// Check the blob sizes match, if we were given a size this time
-		if srcInfo.Size != -1 && srcInfo.Size != extantBlobSize {
-			return types.BlobInfo{}, "", errors.Errorf("Error: blob %s is already present, but with size %d instead of %d", srcInfo.Digest, extantBlobSize, srcInfo.Size)
-		}
-		srcInfo.Size = extantBlobSize
-		// Tell the image destination that this blob's delta is being applied again.  For some image destinations, this can be faster than using GetBlob/PutBlob
-		blobinfo, err := ic.c.dest.ReapplyBlob(ctx, srcInfo)
+	// FIXME: Extract DiffID from the manifest/config as well
+	cachedDiffID := ic.c.blobInfoCache.UncompressedDigest(srcInfo.Digest) // May be ""
+	// FIXME: Extended reuse depends on canModifyManifest
+	diffIDIsNeeded := ic.diffIDsAreNeeded && cachedDiffID == ""
+
+	// If we already have the blob, and we don't need to compute the diffID, then we don't need to read it from the source.
+	if !diffIDIsNeeded {
+		reused, blobInfo, err := ic.c.dest.TryReusingBlob(ctx, srcInfo, ic.c.blobInfoCache)
 		if err != nil {
-			return types.BlobInfo{}, "", errors.Wrapf(err, "Error reapplying blob %s at destination", srcInfo.Digest)
+			return types.BlobInfo{}, "", errors.Wrapf(err, "Error trying to reuse blob %s at destination", srcInfo.Digest)
 		}
-		ic.c.Printf("Skipping fetch of repeat blob %s\n", srcInfo.Digest)
-		return blobinfo, ic.c.cachedDiffIDs[srcInfo.Digest], err
+		if reused {
+			ic.c.Printf("Skipping fetch of repeat blob %s\n", srcInfo.Digest)
+			return blobInfo, cachedDiffID, nil
+		}
 	}
 
 	// Fallback: copy the layer, computing the diffID if we need to do so
 	ic.c.Printf("Copying blob %s\n", srcInfo.Digest)
-	srcStream, srcBlobSize, err := ic.c.rawSource.GetBlob(ctx, srcInfo)
+	srcStream, srcBlobSize, err := ic.c.rawSource.GetBlob(ctx, srcInfo, ic.c.blobInfoCache)
 	if err != nil {
 		return types.BlobInfo{}, "", errors.Wrapf(err, "Error reading blob %s", srcInfo.Digest)
 	}
@@ -545,7 +538,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo) (t
 				return types.BlobInfo{}, "", errors.Wrap(diffIDResult.err, "Error computing layer DiffID")
 			}
 			logrus.Debugf("Computed DiffID %s for layer %s", diffIDResult.digest, srcInfo.Digest)
-			ic.c.cachedDiffIDs[srcInfo.Digest] = diffIDResult.digest
+			ic.c.blobInfoCache.RecordUncompressedDigest(srcInfo.Digest, diffIDResult.digest) // FIXME: Might also be determined by PutBlob if the destination uncompresses.
 		}
 	}
 	return blobInfo, diffIDResult.digest, nil
@@ -699,7 +692,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 	}
 
 	// === Finally, send the layer stream to dest.
-	uploadedInfo, err := c.dest.PutBlob(ctx, destStream, inputInfo, isConfig)
+	uploadedInfo, err := c.dest.PutBlob(ctx, destStream, inputInfo, c.blobInfoCache, isConfig)
 	if err != nil {
 		return types.BlobInfo{}, errors.Wrap(err, "Error writing blob")
 	}

@@ -85,6 +85,7 @@ type dockerClient struct {
 	client        *http.Client
 	signatureBase signatureStorageBase
 	scope         authScope
+	extraScope    *authScope // If non-nil, a temporary extra token scope (necessary for mounting from another repo)
 	// The following members are detected registry properties:
 	// They are set after a successful detectProperties(), and never change afterwards.
 	scheme             string // Empty value also used to indicate detectProperties() has not yet succeeded.
@@ -415,24 +416,25 @@ func (c *dockerClient) setupRequestAuth(req *http.Request) error {
 			req.SetBasicAuth(c.username, c.password)
 			return nil
 		case "bearer":
-			if c.token == nil || time.Now().After(c.tokenExpiration) {
-				realm, ok := challenge.Parameters["realm"]
-				if !ok {
-					return errors.Errorf("missing realm in bearer auth challenge")
-				}
-				service, _ := challenge.Parameters["service"] // Will be "" if not present
-				var scope string
-				if c.scope.remoteName != "" && c.scope.actions != "" {
-					scope = fmt.Sprintf("repository:%s:%s", c.scope.remoteName, c.scope.actions)
-				}
-				token, err := c.getBearerToken(req.Context(), realm, service, scope)
+			var token *bearerToken
+			if c.extraScope != nil {
+				t, err := c.getBearerToken(req.Context(), challenge, []authScope{c.scope, *c.extraScope})
 				if err != nil {
-					return err
+					return nil
 				}
-				c.token = token
-				c.tokenExpiration = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
+				token = t
+			} else {
+				if c.token == nil || time.Now().After(c.tokenExpiration) {
+					token, err := c.getBearerToken(req.Context(), challenge, []authScope{c.scope})
+					if err != nil {
+						return err
+					}
+					c.token = token
+					c.tokenExpiration = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
+				}
+				token = c.token
 			}
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token.Token))
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.Token))
 			return nil
 		default:
 			logrus.Debugf("no handler for %s authentication", challenge.Scheme)
@@ -442,7 +444,12 @@ func (c *dockerClient) setupRequestAuth(req *http.Request) error {
 	return nil
 }
 
-func (c *dockerClient) getBearerToken(ctx context.Context, realm, service, scope string) (*bearerToken, error) {
+func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge, scopes []authScope) (*bearerToken, error) {
+	realm, ok := challenge.Parameters["realm"]
+	if !ok {
+		return nil, errors.Errorf("missing realm in bearer auth challenge")
+	}
+
 	authReq, err := http.NewRequest("GET", realm, nil)
 	if err != nil {
 		return nil, err
@@ -452,11 +459,13 @@ func (c *dockerClient) getBearerToken(ctx context.Context, realm, service, scope
 	if c.username != "" {
 		getParams.Add("account", c.username)
 	}
-	if service != "" {
+	if service, ok := challenge.Parameters["service"]; ok && service != "" {
 		getParams.Add("service", service)
 	}
-	if scope != "" {
-		getParams.Add("scope", scope)
+	for _, scope := range scopes {
+		if scope.remoteName != "" && scope.actions != "" {
+			getParams.Add("scope", fmt.Sprintf("repository:%s:%s", scope.remoteName, scope.actions))
+		}
 	}
 	authReq.URL.RawQuery = getParams.Encode()
 	if c.username != "" && c.password != "" {

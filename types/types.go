@@ -100,6 +100,36 @@ type BlobInfo struct {
 	MediaType   string
 }
 
+// BICLocationReference FIXME transport-dependent contents
+type BICLocationReference struct {
+	Opaque string
+}
+
+// BICTransportScope FIXME transport-dependent contents
+type BICTransportScope struct {
+	Opaque string
+}
+
+// BlobInfoCache FIXME
+// FIXME: document methods, also in implementations
+type BlobInfoCache interface {
+	// "Uncompressed digest" caching records digests of uncompressed versions of the data ("DiffID") and their known compressed variants.
+	// This mapping is, primarily, maintained in generic code (not transports - FIXME: true?), and the uncompressed digest can then be used for giving KnownLocations more possible search options.
+
+	UncompressedDigest(anyDigest digest.Digest) digest.Digest
+	RecordUncompressedDigest(compressed digest.Digest, uncompressed digest.Digest)
+
+	// "Known location" caching allows avoiding copies when the destination, or some related location (e.g. a different repo on the same server) is known to contain the object, or its acceptable variant, already.
+	// This is inherently transport-specific because each transport must determine the relevant scope,
+	// record an appropriate location (our ImageReference types only describe complete images),
+	// and the way to reuse an existing image is also transport-specific.
+	// The digest used below is primarily the raw digest of the object (e.g. a compressed blob), but might also be an uncompressed digest; in that case FIXME the transport must record both?
+	// FIXME: Even dumb transports like dir: could benefit from same-DiffID-other-version reuse.
+
+	KnownLocations(transport ImageTransport, scope BICTransportScope, digest digest.Digest) []BICLocationReference
+	RecordKnownLocation(transport ImageTransport, scope BICTransportScope, digest digest.Digest, location BICLocationReference)
+}
+
 // ImageSource is a service, possibly remote (= slow), to download components of a single image or a named image set (manifest list).
 // This is primarily useful for copying images around; for examining their properties, Image (below)
 // is usually more useful.
@@ -120,7 +150,8 @@ type ImageSource interface {
 	GetManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error)
 	// GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 	// The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
-	GetBlob(context.Context, BlobInfo) (io.ReadCloser, int64, error)
+	// May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
+	GetBlob(context.Context, BlobInfo, BlobInfoCache) (io.ReadCloser, int64, error)
 	// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
 	// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
 	// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
@@ -148,8 +179,7 @@ const (
 // ImageDestination is a service, possibly remote (= slow), to store components of a single image.
 //
 // There is a specific required order for some of the calls:
-// PutBlob on the various blobs, if any, MUST be called before PutManifest (manifest references blobs, which may be created or compressed only at push time)
-// ReapplyBlob, if used, MUST only be called if HasBlob returned true for the same blob digest
+// TryReusingBlob/PutBlob on the various blobs, if any, MUST be called before PutManifest (manifest references blobs, which may be created or compressed only at push time)
 // PutSignatures, if called, MUST be called after PutManifest (signatures reference manifest contents)
 // Finally, Commit MUST be called if the caller wants the image, as formed by the components saved above, to persist.
 //
@@ -183,17 +213,18 @@ type ImageDestination interface {
 	// inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
 	// inputInfo.Size is the expected length of stream, if known.
 	// inputInfo.MediaType describes the blob format, if known.
+	// May update cache.
 	// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 	// to any other readers for download using the supplied digest.
 	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-	PutBlob(ctx context.Context, stream io.Reader, inputInfo BlobInfo, isConfig bool) (BlobInfo, error)
-	// HasBlob returns true iff the image destination already contains a blob with the matching digest which can be reapplied using ReapplyBlob.
-	// Unlike PutBlob, the digest can not be empty.  If HasBlob returns true, the size of the blob must also be returned.
-	// If the destination does not contain the blob, or it is unknown, HasBlob ordinarily returns (false, -1, nil);
-	// it returns a non-nil error only on an unexpected failure.
-	HasBlob(ctx context.Context, info BlobInfo) (bool, int64, error)
-	// ReapplyBlob informs the image destination that a blob for which HasBlob previously returned true would have been passed to PutBlob if it had returned false.  Like HasBlob and unlike PutBlob, the digest can not be empty.  If the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree.
-	ReapplyBlob(ctx context.Context, info BlobInfo) (BlobInfo, error)
+	PutBlob(ctx context.Context, stream io.Reader, inputInfo BlobInfo, cache BlobInfoCache, isConfig bool) (BlobInfo, error)
+	// TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
+	// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
+	// info.Digest must not be empty.
+	// If the blob has been succesfully reused, returns (true, info, nil); info must contain at least a digest and size.
+	// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
+	// May use and/or update cache.
+	TryReusingBlob(ctx context.Context, info BlobInfo, cache BlobInfoCache) (bool, BlobInfo, error)
 	// PutManifest writes manifest to the destination.
 	// FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 	// If the destination is in principle available, refuses this manifest type (e.g. it does not recognize the schema),
