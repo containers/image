@@ -323,7 +323,7 @@ func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.
 		}
 
 		// Whatever happens here, don't abort the entire operation.  It's likely we just don't have permissions, and if it is a critical network error, we will find out soon enough anyway.
-		d.c.extraScope = &authScope{
+		d.c.extraScope = &authScope{ // FIXME? The way d.c.extraScope works, we always get a new token, even if were trying several blobs from the same repo.
 			remoteName: reference.Path(candidateRepo),
 			actions:    "pull",
 		}
