@@ -113,8 +113,17 @@ type BICTransportScope struct {
 // BlobInfoCache FIXME
 // FIXME: document methods, also in implementations
 type BlobInfoCache interface {
+	// "Uncompressed digest" caching records digests of uncompressed versions of the data ("DiffID") and their known compressed variants.
+	// This mapping is, primarily, maintained in generic code (not transports - FIXME: true?), and the uncompressed digest can then be used for giving KnownLocations more possible search options.
+
 	UncompressedDigest(anyDigest digest.Digest) digest.Digest
 	RecordUncompressedDigest(compressed digest.Digest, uncompressed digest.Digest)
+
+	// "Known location" caching allows avoiding copies when the destination, or some related location (e.g. a different repo on the same server) is known to contain the object, or its acceptable variant, already.
+	// This is inherently transport-specific because each transport must determine the relevant scope,
+	// record an appropriate location (our ImageReference types only describe complete images),
+	// and the way to reuse an existing image is also transport-specific.
+	// The digest used below is primarily the raw digest of the object (e.g. a compressed blob), but might also be an uncompressed digest; in that case FIXME the transport must record both?
 
 	KnownLocations(transport ImageTransport, scope BICTransportScope, digest digest.Digest) []BICLocationReference
 	RecordKnownLocation(transport ImageTransport, scope BICTransportScope, digest digest.Digest, location BICLocationReference)
