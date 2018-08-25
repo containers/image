@@ -113,12 +113,13 @@ func (c *sizeCounter) Write(p []byte) (n int, err error) {
 // PutBlob writes contents of stream and returns data representing the result (with all data filled in).
 // inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
 // inputInfo.Size is the expected length of stream, if known.
+// May update cache.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, isConfig bool) (types.BlobInfo, error) {
+func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
 	if inputInfo.Digest.String() != "" {
-		haveBlob, reusedInfo, err := d.TryReusingBlob(ctx, inputInfo)
+		haveBlob, reusedInfo, err := d.TryReusingBlob(ctx, inputInfo, cache)
 		if err != nil {
 			return types.BlobInfo{}, err
 		}
@@ -185,7 +186,8 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 // info.Digest must not be empty.
 // If the blob has been succesfully reused, returns (true, info, nil); info must contain at least a digest and size.
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
-func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo) (bool, types.BlobInfo, error) {
+// May use and/or update cache.
+func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
 		return false, types.BlobInfo{}, errors.Errorf(`"Can not check for a blob with unknown digest`)
 	}

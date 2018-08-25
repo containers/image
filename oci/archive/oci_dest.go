@@ -77,11 +77,16 @@ func (d *ociArchiveImageDestination) IgnoresEmbeddedDockerReference() bool {
 	return d.unpackedDest.IgnoresEmbeddedDockerReference()
 }
 
-// PutBlob writes contents of stream and returns data representing the result (with all data filled in).
+// PutBlob writes contents of stream and returns data representing the result.
 // inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
 // inputInfo.Size is the expected length of stream, if known.
-func (d *ociArchiveImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, isConfig bool) (types.BlobInfo, error) {
-	return d.unpackedDest.PutBlob(ctx, stream, inputInfo, isConfig)
+// inputInfo.MediaType describes the blob format, if known.
+// May update cache.
+// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
+// to any other readers for download using the supplied digest.
+// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
+func (d *ociArchiveImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
+	return d.unpackedDest.PutBlob(ctx, stream, inputInfo, cache, isConfig)
 }
 
 // TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
@@ -89,8 +94,9 @@ func (d *ociArchiveImageDestination) PutBlob(ctx context.Context, stream io.Read
 // info.Digest must not be empty.
 // If the blob has been succesfully reused, returns (true, info, nil); info must contain at least a digest and size.
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
-func (d *ociArchiveImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo) (bool, types.BlobInfo, error) {
-	return d.unpackedDest.TryReusingBlob(ctx, info)
+// May use and/or update cache.
+func (d *ociArchiveImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (bool, types.BlobInfo, error) {
+	return d.unpackedDest.TryReusingBlob(ctx, info, cache)
 }
 
 // PutManifest writes manifest to the destination
