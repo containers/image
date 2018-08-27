@@ -73,7 +73,9 @@ When developing this library, please use `make` (or `make … BUILDTAGS=…`) to
 
 ## License
 
-ASL 2.0
+Apache License 2.0
+
+SPDX-License-Identifier: Apache-2.0
 
 ## Contact
 
