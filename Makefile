@@ -91,13 +91,13 @@ lint:
 		exit 1; \
 	fi
 
-EPOCH_TEST_COMMIT ?= e68e0e1110e64f906f9b482e548f17d73e02e6b1
-
 # When this is running in travis, it will only check the travis commit range
 .gitvalidation:
 	@which git-validation > /dev/null 2>/dev/null || (echo "ERROR: git-validation not found. Consider 'make clean && make tools'" && false)
 ifeq ($(TRAVIS),true)
 	git-validation -q -run DCO,short-subject,dangling-whitespace
 else
-	git-validation -q -run DCO,short-subject,dangling-whitespace -range $(EPOCH_TEST_COMMIT)..HEAD
+	git fetch -q "https://github.com/containers/image.git" "refs/heads/master"
+	upstream="$$(git rev-parse --verify FETCH_HEAD)" ; \
+		git-validation -q -run DCO,short-subject,dangling-whitespace -range $$upstream..HEAD
 endif
