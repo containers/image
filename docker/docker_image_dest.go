@@ -181,6 +181,32 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	return types.BlobInfo{Digest: computedDigest, Size: sizeCounter.size}, nil
 }
 
+// blobExists returns true iff repo contains a blob with digest, and if so, also its size.
+// If the destination does not contain the blob, or it is unknown, blobExists ordinarily returns (false, -1, nil);
+// it returns a non-nil error only on an unexpected failure.
+func (d *dockerImageDestination) blobExists(ctx context.Context, repo reference.Named, digest digest.Digest) (bool, int64, error) {
+	checkPath := fmt.Sprintf(blobsPath, reference.Path(repo), digest.String())
+	logrus.Debugf("Checking %s", checkPath)
+	res, err := d.c.makeRequest(ctx, "HEAD", checkPath, nil, nil, v2Auth)
+	if err != nil {
+		return false, -1, err
+	}
+	defer res.Body.Close()
+	switch res.StatusCode {
+	case http.StatusOK:
+		logrus.Debugf("... already exists")
+		return true, getBlobSize(res), nil
+	case http.StatusUnauthorized:
+		logrus.Debugf("... not authorized")
+		return false, -1, errors.Wrapf(client.HandleErrorResponse(res), "Error checking whether a blob %s exists in %s", digest, repo.Name())
+	case http.StatusNotFound:
+		logrus.Debugf("... not present")
+		return false, -1, nil
+	default:
+		return false, -1, errors.Errorf("failed to read from destination repository %s: %d (%s)", reference.Path(d.ref.ref), res.StatusCode, http.StatusText(res.StatusCode))
+	}
+}
+
 // TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 // (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
 // info.Digest must not be empty.
@@ -193,26 +219,14 @@ func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.
 		return false, types.BlobInfo{}, errors.Errorf(`"Can not check for a blob with unknown digest`)
 	}
 
-	checkPath := fmt.Sprintf(blobsPath, reference.Path(d.ref.ref), info.Digest.String())
-	logrus.Debugf("Checking %s", checkPath)
-	res, err := d.c.makeRequest(ctx, "HEAD", checkPath, nil, nil, v2Auth)
+	exists, size, err := d.blobExists(ctx, d.ref.ref, info.Digest)
 	if err != nil {
 		return false, types.BlobInfo{}, err
 	}
-	defer res.Body.Close()
-	switch res.StatusCode {
-	case http.StatusOK:
-		logrus.Debugf("... already exists")
-		return true, types.BlobInfo{Digest: info.Digest, Size: getBlobSize(res)}, nil
-	case http.StatusUnauthorized:
-		logrus.Debugf("... not authorized")
-		return false, types.BlobInfo{}, errors.Wrapf(client.HandleErrorResponse(res), "Error checking whether a blob %s exists in %s", info.Digest, d.ref.ref.Name())
-	case http.StatusNotFound:
-		logrus.Debugf("... not present")
-		return false, types.BlobInfo{}, nil
-	default:
-		return false, types.BlobInfo{}, errors.Errorf("failed to read from destination repository %s: %d (%s)", reference.Path(d.ref.ref), res.StatusCode, http.StatusText(res.StatusCode))
+	if exists {
+		return true, types.BlobInfo{Digest: info.Digest, Size: size}, nil
 	}
+	return false, types.BlobInfo{}, nil
 }
 
 // PutManifest writes manifest to the destination.
