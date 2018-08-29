@@ -100,6 +100,82 @@ type BlobInfo struct {
 	MediaType   string
 }
 
+// BICTransportScope encapsulates transport-dependent representation of a “scope” where blobs are or are not present.
+// BlobInfocache.RecordKnownLocations / BlobInfocache.CandidateLocations record data aboud blobs keyed by (scope, digest).
+// The scope will typically be similar to an ImageReference, or a superset of it within which blobs are reusable.
+//
+// NOTE: The contents of this structure may be recorded in a persistent file, possibly shared across different
+// tools which use different versions of the transport.  Allow for reasonable backward/forward compatibility,
+// at least by not failing hard when encountering unknown data.
+type BICTransportScope struct {
+	Opaque string
+}
+
+// BICLocationReference encapsulates transport-dependent representation of a blob location within a BICTransportScope.
+// Each transport can store arbitrary data using BlobInfoCache.RecordKnownLocation, and ImageDestination.TryReusingBlob
+// can look it up using BlobInfoCache.CandidateLocations.
+//
+// NOTE: The contents of this structure may be recorded in a persistent file, possibly shared across different
+// tools which use different versions of the transport.  Allow for reasonable backward/forward compatibility,
+// at least by not failing hard when encountering unknown data.
+type BICLocationReference struct {
+	Opaque string
+}
+
+// BICReplacementCandidate is an item returned by BlobInfoCache.CandidateLocations.
+type BICReplacementCandidate struct {
+	Digest   digest.Digest
+	Location BICLocationReference
+}
+
+// BlobInfoCache records data useful for reusing blobs, or substituing equivalent ones, to avoid unnecessary blob copies.
+//
+// It records two kinds of data:
+// - Sets of corresponding digest vs. uncompressed digest ("DiffID") pairs:
+//   One of the two digests is known to be uncompressed, and a single uncompressed digest may correspond to more than one compressed digest.
+//   This allows matching compressed layer blobs to existing local uncompressed layers (to avoid unnecessary download and decompresssion),
+//   or uncompressed layer blobs to existing remote compressed layers (to avoid unnecessary compression and upload)/
+//
+//   It is allowed to record an (uncompressed digest, the same uncompressed digest) correspondence, to express that the digest is known
+//   to be uncompressed (i.e. that a conversion from schema1 does not have to decompress the blob to compute a DiffID value).
+//
+//   This mapping is primarily maintained in generic copy.Image code, but transports may want to contribute more data points if they independently
+//   compress/decompress blobs for their own purposes.
+//
+// - Known blob locations, managed by individual transports:
+//   The transports call RecordKnownLocation when encountering a blob that could possibly be reused (typically in GetBlob/PutBlob/TryReusingBlob),
+//   recording transport-specific information that allows the transport to reuse the blob in the future;
+//   then, TryReusingBlob implementations can call CandidateLocations to look up previously recorded blob locations that could be reused.
+//
+//   Each transport defines its own “scopes” within which blob reuse is possible (e.g. in, the docker/distribution case, blobs
+//   can be directly reused within a registry, or mounted across registries within a registry server.)
+//
+// None of the methods return an error indication: errors when neither reading from, nor writing to, the cache, should be fatal;
+// users of the cahce should just fall back to copying the blobs the usual way.
+type BlobInfoCache interface {
+	// UncompressedDigest returns an uncompressed digest corresponding to anyDigest.
+	// May return anyDigest if it is known to be uncompressed.
+	// Returns "" if nothing is known about the digest (it may be compressed or uncompressed).
+	UncompressedDigest(anyDigest digest.Digest) digest.Digest
+	// RecordDigestUncompressedPair records that the uncompressed version of anyDigest is uncompressed.
+	// It’s allowed for anyDigest == uncompressed.
+	// WARNING: Only call this for LOCALLY VERIFIED data; don’t record a digest pair just because some remote author claims so (e.g.
+	// because a manifest/config pair exists); otherwise the cache could be poisoned and allow substituting unexpected blobs.
+	// (Eventually, the DiffIDs in image config could detect the substitution, but that may be too late, and not all image formats contain that data.)
+	RecordDigestUncompressedPair(anyDigest digest.Digest, uncompressed digest.Digest)
+
+	// RecordKnownLocation records that a blob with the specified digest exists within the specified (transport, scope) scope,
+	// and can be reused given the opaque location data.
+	RecordKnownLocation(transport ImageTransport, scope BICTransportScope, digest digest.Digest, location BICLocationReference)
+	// CandidateLocations returns a prioritized, limited, number of blobs and their locations that could possibly be reused
+	// within the specified (transport scope) (if they still exist, which is not guaranteed).
+	//
+	// If !canSubstitute, the returned cadidates will match the submitted digest exactly; if canSubstitute,
+	// data from previous RecordDigestUncompressedPair calls is used to also look up variants of the blob which have the same
+	// uncompressed digest.
+	CandidateLocations(transport ImageTransport, scope BICTransportScope, digest digest.Digest, canSubstitute bool) []BICReplacementCandidate
+}
+
 // ImageSource is a service, possibly remote (= slow), to download components of a single image or a named image set (manifest list).
 // This is primarily useful for copying images around; for examining their properties, Image (below)
 // is usually more useful.
