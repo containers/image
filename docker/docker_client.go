@@ -70,10 +70,11 @@ type extensionSignatureList struct {
 }
 
 type bearerToken struct {
-	Token       string    `json:"token"`
-	AccessToken string    `json:"access_token"`
-	ExpiresIn   int       `json:"expires_in"`
-	IssuedAt    time.Time `json:"issued_at"`
+	Token          string    `json:"token"`
+	AccessToken    string    `json:"access_token"`
+	ExpiresIn      int       `json:"expires_in"`
+	IssuedAt       time.Time `json:"issued_at"`
+	expirationTime time.Time
 }
 
 // dockerClient is configuration for dealing with a single Docker registry.
@@ -93,9 +94,8 @@ type dockerClient struct {
 	scheme             string // Empty value also used to indicate detectProperties() has not yet succeeded.
 	challenges         []challenge
 	supportsSignatures bool
-	// The following members are private state for setupRequestAuth, both are valid if token != nil.
-	token           *bearerToken
-	tokenExpiration time.Time
+	// Private state for setupRequestAuth, may be nil
+	token *bearerToken
 }
 
 type authScope struct {
@@ -131,6 +131,7 @@ func newBearerTokenFromJSONBlob(blob []byte) (*bearerToken, error) {
 	if token.IssuedAt.IsZero() {
 		token.IssuedAt = time.Now().UTC()
 	}
+	token.expirationTime = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
 	return token, nil
 }
 
@@ -463,13 +464,12 @@ func (c *dockerClient) setupRequestAuth(req *http.Request) error {
 			req.SetBasicAuth(c.username, c.password)
 			return nil
 		case "bearer":
-			if c.token == nil || time.Now().After(c.tokenExpiration) {
+			if c.token == nil || time.Now().After(c.token.expirationTime) {
 				token, err := c.getBearerToken(req.Context(), challenge, c.scope)
 				if err != nil {
 					return err
 				}
 				c.token = token
-				c.tokenExpiration = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
 			}
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token.Token))
 			return nil
