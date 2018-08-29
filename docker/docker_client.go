@@ -498,8 +498,8 @@ func (c *dockerClient) detectProperties(ctx context.Context) error {
 	ping := func(scheme string) error {
 		url := fmt.Sprintf(resolvedPingV2URL, scheme, c.registry)
 		resp, err := c.makeRequestToResolvedURL(ctx, "GET", url, nil, nil, -1, true)
-		logrus.Debugf("Ping %s err %#v", url, err)
 		if err != nil {
+			logrus.Debugf("Ping %s err %#v", url, err)
 			return err
 		}
 		defer resp.Body.Close()
