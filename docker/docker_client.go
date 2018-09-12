@@ -346,7 +346,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 	} else {
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			logrus.Errorf("error getting search results from v2 endpoint %q, status code %d", registry, resp.StatusCode)
+			return nil, errors.Errorf("error getting search results from v2 endpoint %q, status code %d", registry, resp.StatusCode)
 		} else {
 			if err := json.NewDecoder(resp.Body).Decode(v2Res); err != nil {
 				return nil, err
