@@ -577,7 +577,7 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 		// Build the new layer using the diff, regardless of where it came from.
 		// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
 		layer, _, err := s.imageRef.transport.store.PutLayer(id, lastLayer, nil, "", false, nil, diff)
-		if err != nil {
+		if err != nil && errors.Cause(err) != storage.ErrDuplicateID {
 			return errors.Wrapf(err, "error adding layer with blob %q", blob.Digest)
 		}
 		lastLayer = layer.ID
