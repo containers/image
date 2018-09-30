@@ -14,10 +14,20 @@ import (
 )
 
 // PolicyRequirementError is an explanatory text for rejecting a signature or an image.
-type PolicyRequirementError string
+type PolicyRequirementError struct {
+	message string
+}
 
-func (err PolicyRequirementError) Error() string {
-	return string(err)
+// NewPolicyRequirementError is used to create a new PolicyRequirementError
+func NewPolicyRequirementError(message string) *PolicyRequirementError {
+	return &PolicyRequirementError{
+		message: message,
+	}
+}
+
+// Error returns the message from a PolicyRequirementError
+func (e *PolicyRequirementError) Error() string {
+	return e.message
 }
 
 // signatureAcceptanceResult is the principal value returned by isSignatureAuthorAccepted.
@@ -271,7 +281,7 @@ func (pc *PolicyContext) IsRunningImageAllowed(ctx context.Context, image types.
 	reqs := pc.requirementsForImageRef(image.Reference())
 
 	if len(reqs) == 0 {
-		return false, PolicyRequirementError("List of verification policy requirements must not be empty")
+		return false, NewPolicyRequirementError("List of verification policy requirements must not be empty")
 	}
 
 	for reqNumber, req := range reqs {

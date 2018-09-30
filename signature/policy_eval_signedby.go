@@ -48,7 +48,7 @@ func (pr *prSignedBy) isSignatureAuthorAccepted(ctx context.Context, image types
 	}
 	defer mech.Close()
 	if len(trustedIdentities) == 0 {
-		return sarRejected, nil, PolicyRequirementError("No public keys imported")
+		return sarRejected, nil, NewPolicyRequirementError("No public keys imported")
 	}
 
 	signature, err := verifyAndExtractSignature(mech, sig, signatureAcceptanceRules{
@@ -60,11 +60,11 @@ func (pr *prSignedBy) isSignatureAuthorAccepted(ctx context.Context, image types
 			}
 			// Coverage: We use a private GPG home directory and only import trusted keys, so this should
 			// not be reachable.
-			return PolicyRequirementError(fmt.Sprintf("Signature by key %s is not accepted", keyIdentity))
+			return NewPolicyRequirementError(fmt.Sprintf("Signature by key %s is not accepted", keyIdentity))
 		},
 		validateSignedDockerReference: func(ref string) error {
 			if !pr.SignedIdentity.matchesDockerReference(image, ref) {
-				return PolicyRequirementError(fmt.Sprintf("Signature for identity %s is not accepted", ref))
+				return NewPolicyRequirementError(fmt.Sprintf("Signature for identity %s is not accepted", ref))
 			}
 			return nil
 		},
@@ -78,7 +78,7 @@ func (pr *prSignedBy) isSignatureAuthorAccepted(ctx context.Context, image types
 				return err
 			}
 			if !digestMatches {
-				return PolicyRequirementError(fmt.Sprintf("Signature for digest %s does not match", digest))
+				return NewPolicyRequirementError(fmt.Sprintf("Signature for digest %s does not match", digest))
 			}
 			return nil
 		},
@@ -116,7 +116,7 @@ func (pr *prSignedBy) isRunningImageAllowed(ctx context.Context, image types.Unp
 	var summary error
 	switch len(rejections) {
 	case 0:
-		summary = PolicyRequirementError("A signature was required, but no signature exists")
+		summary = NewPolicyRequirementError("A signature was required, but no signature exists")
 	case 1:
 		summary = rejections[0]
 	default:
@@ -124,7 +124,7 @@ func (pr *prSignedBy) isRunningImageAllowed(ctx context.Context, image types.Unp
 		for _, e := range rejections {
 			msgs = append(msgs, e.Error())
 		}
-		summary = PolicyRequirementError(fmt.Sprintf("None of the signatures were accepted, reasons: %s",
+		summary = NewPolicyRequirementError(fmt.Sprintf("None of the signatures were accepted, reasons: %s",
 			strings.Join(msgs, "; ")))
 	}
 	return false, summary

@@ -14,7 +14,7 @@ import (
 func parseImageAndDockerReference(image types.UnparsedImage, s2 string) (reference.Named, reference.Named, error) {
 	r1 := image.Reference().DockerReference()
 	if r1 == nil {
-		return nil, nil, PolicyRequirementError(fmt.Sprintf("Docker reference match attempted on image %s with no known Docker reference identity",
+		return nil, nil, NewPolicyRequirementError(fmt.Sprintf("Docker reference match attempted on image %s with no known Docker reference identity",
 			transports.ImageName(image.Reference())))
 	}
 	r2, err := reference.ParseNormalizedNamed(s2)

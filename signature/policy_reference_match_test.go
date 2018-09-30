@@ -36,7 +36,7 @@ func TestParseImageAndDockerReference(t *testing.T) {
 	// Unidentified images are rejected.
 	_, _, err = parseImageAndDockerReference(refImageMock{nil}, ok2)
 	require.Error(t, err)
-	assert.IsType(t, PolicyRequirementError(""), err)
+	assert.IsType(t, NewPolicyRequirementError(""), err)
 
 	// Failures
 	for _, refs := range [][]string{
