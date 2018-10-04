@@ -3,13 +3,18 @@ package sysregistriesv2
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/url"
+	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/BurntSushi/toml"
 	"github.com/containers/image/types"
+	"github.com/sirupsen/logrus"
 )
 
 // systemRegistriesConfPath is the path to the system-wide registry
@@ -142,11 +147,13 @@ func parseURL(input string) (string, error) {
 func getV1Registries(config *tomlConfig) ([]Registry, error) {
 	regMap := make(map[string]*Registry)
 
-	getRegistry := func(url string) (*Registry, error) { // Note: _pointer_ to a long-lived object
-		var err error
-		url, err = parseURL(url)
+	getRegistry := func(prefix string, isURL bool) (*Registry, error) { // Note: _pointer_ to a long-lived object
+		url, err := parseURL(prefix)
 		if err != nil {
-			return nil, err
+			if isURL {
+				return nil, err
+			}
+			url = prefix
 		}
 		reg, exists := regMap[url]
 		if !exists {
@@ -161,21 +168,21 @@ func getV1Registries(config *tomlConfig) ([]Registry, error) {
 	}
 
 	for _, search := range config.V1Registries.Search.Registries {
-		reg, err := getRegistry(search)
+		reg, err := getRegistry(search, true)
 		if err != nil {
 			return nil, err
 		}
 		reg.Search = true
 	}
 	for _, blocked := range config.V1Registries.Block.Registries {
-		reg, err := getRegistry(blocked)
+		reg, err := getRegistry(blocked, false)
 		if err != nil {
 			return nil, err
 		}
 		reg.Blocked = true
 	}
 	for _, insecure := range config.V1Registries.Insecure.Registries {
-		reg, err := getRegistry(insecure)
+		reg, err := getRegistry(insecure, false)
 		if err != nil {
 			return nil, err
 		}
@@ -189,6 +196,235 @@ func getV1Registries(config *tomlConfig) ([]Registry, error) {
 	return registries, nil
 }
 
+// registryIsMatch returns true if flags in the registry entry indicate that
+// its URL might not be used as-is, but will have URLs matched against it in
+// order to selectively apply configuration flags to an unlisted URL.
+func registryIsMatch(reg Registry) bool {
+	return reg.Insecure || reg.Blocked
+}
+
+// registryMatches returns true if the candidate location matches the pattern.
+// Recognized patterns include:
+// * IPv4[/class][:port][/path]
+// * IPv6[/class][:port][/path]
+// * hostname[:port][/path]
+// where IPv4, IPv6, and hostname may include wildcard characters.  The path
+// is implicitly terminated with "/", and individual components may also
+// include wildcard characters.
+func registryMatches(pattern, candidate string) (bool, error) {
+	defaultRegistryPort := "5000"
+	phost, pport, ppath, err := parseMatchPattern(pattern)
+	if err != nil {
+		return false, err
+	}
+	chost, cport, cpath, err := parseMatchCandidate(candidate)
+	if err != nil {
+		return false, err
+	}
+	// Check the host component
+	_, pipnet, perr := net.ParseCIDR(phost)
+	cip := net.ParseIP(chost)
+	if cip == nil && perr == nil {
+		// can't match a non-IP against a CIDR address
+		return false, nil
+	}
+	if perr == nil {
+		// pattern is CIDR and the candidate is an IP
+		if !pipnet.Contains(cip) {
+			return false, nil
+		}
+	} else {
+		// pattern and candidate are both names
+		hosts, err := path.Match(phost, chost)
+		if err != nil {
+			return false, fmt.Errorf("error matching candidate host %q against pattern host %q: %v", chost, phost, err)
+		}
+		if !hosts {
+			return false, nil
+		}
+	}
+	// Check the ports, if specified, or default ports
+	if pport == "" {
+		pport = defaultRegistryPort
+	}
+	if cport == "" {
+		cport = defaultRegistryPort
+	}
+	if pport != "*" && pport != cport {
+		return false, nil
+	}
+	// Compare paths, only so far as the pattern supplies one
+	pdir, ppath := path.Split(ppath)
+	cdir, cpath := path.Split(cpath)
+	for pdir != "" {
+		if cdir == "" {
+			return false, nil
+		}
+		matches, err := path.Match(pdir, cdir)
+		if err != nil {
+			return false, fmt.Errorf("error comparing path component %q to pattern component %q: %v", cdir, pdir, err)
+		}
+		if !matches {
+			return false, nil
+		}
+		pdir, ppath = path.Split(ppath)
+		cdir, cpath = path.Split(cpath)
+	}
+	return true, nil
+}
+
+// isBogusIP checks if the passed-in value looks superficially like an IPv4
+// address, but contains an invalid octet value.
+func isBogusIP(candidate string) bool {
+	components := strings.Split(candidate, ".")
+	// no problem if there aren't 4 .-separated components
+	if len(components) != 4 {
+		return false
+	}
+	for _, i := range components {
+		// or if any of them don't look like numbers
+		if len(strings.FieldsFunc(i, func(r rune) bool { return unicode.IsDigit(r) })) != 0 {
+			return false
+		}
+	}
+	for _, i := range components {
+		// but if they do, and they're invalid values, that's a problem
+		if _, err := strconv.ParseUint(i, 10, 8); err != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// parseMatchPattern splits up matching information for registries.
+func parseMatchPattern(pattern string) (host, port, path string, err error) {
+	rest := pattern
+	if rest == "" {
+		return "", "", "", fmt.Errorf(`empty registry pattern`)
+	}
+
+	// Isolate the host part.
+	if rest[0] == '[' {
+		// This may be a plain address, or a CIDR address.
+		i := strings.Index(rest, "]")
+		if i == -1 {
+			return "", "", "", fmt.Errorf(`no expected "]" found after "[" in pattern %q`, pattern)
+		}
+		host = rest[1:i]
+		rest = rest[i+1:]
+		if _, _, err := net.ParseCIDR(host); err != nil {
+			if net.ParseIP(host) == nil {
+				return "", "", "", fmt.Errorf(`unable to parse IP or CIDR specification %q in pattern %q`, host, pattern)
+			}
+		}
+	} else {
+		// See if this is a CIDR address and prefix length.
+		i := strings.IndexAny(rest, "/:")
+		if i == -1 {
+			// No separators at all; we're done.
+			return rest, "", "", nil
+		}
+		if rest[i] == '/' {
+			// If the next segment and this segment parse as a CIDR pair, keep them together.
+			maybeCIDR := ""
+			j := strings.IndexAny(rest[i+1:], "/:")
+			if j != -1 {
+				maybeCIDR = rest[:i+1+j]
+			} else {
+				maybeCIDR = rest
+			}
+			if _, _, err := net.ParseCIDR(maybeCIDR); err == nil {
+				if maybeCIDR == rest {
+					// The whole thing is a CIDR pair; we're done here.
+					return rest, "", "", nil
+				}
+				// Continue parsing after the CIDR pair.
+				host = maybeCIDR
+				rest = rest[len(maybeCIDR):]
+			} else {
+				// It's just a host and whatever comes after.
+				if isBogusIP(rest[:i]) {
+					return "", "", "", fmt.Errorf(`unable to parse IP or CIDR specification %q in pattern %q`, rest[:i], pattern)
+				}
+				host = rest[:i]
+				rest = rest[i:]
+			}
+		} else {
+			// It's just a host and whatever comes after.
+			if isBogusIP(rest[:i]) {
+				return "", "", "", fmt.Errorf(`unable to parse IP or CIDR specification %q in pattern %q`, rest[:i], pattern)
+			}
+			host = rest[:i]
+			rest = rest[i:]
+		}
+	}
+
+	// The next part is optionally a port.
+	if rest != "" && rest[0] == ':' {
+		i := strings.Index(rest, "/")
+		if i == -1 {
+			port = rest[1:]
+		} else {
+			port = rest[1:i]
+		}
+		_, err := strconv.ParseUint(port, 10, 16)
+		if err != nil {
+			return "", "", "", fmt.Errorf("error parsing port %q in %q: %v", port, pattern, err)
+		}
+		rest = rest[len(port)+1:]
+	}
+
+	// The rest is a path.
+	return host, port, rest, nil
+}
+
+// parseMatchCandidate splits the candidate registry information.
+func parseMatchCandidate(candidate string) (host, port, path string, err error) {
+	rest := candidate
+	if rest == "" {
+		return "", "", "", fmt.Errorf(`empty candidate name`)
+	}
+
+	if rest[0] == '[' {
+		// This may be an address.
+		i := strings.Index(rest, "]")
+		if i == -1 {
+			return "", "", "", fmt.Errorf(`no expected "]" found after "[" in candidate %q`, candidate)
+		}
+		if net.ParseIP(rest[1:i]) == nil {
+			return "", "", "", fmt.Errorf(`%q is not a valid IP address while parsing candidate %q`, rest[1:i], candidate)
+		}
+		host = rest[1:i]
+		rest = rest[i+1:]
+	} else {
+		i := strings.IndexAny(rest, "/:")
+		if i == -1 {
+			// No separators at all; we're done.
+			return rest, "", "", nil
+		}
+		host = rest[:i]
+		rest = rest[i:]
+	}
+
+	// The next part is optionally a port.
+	if rest != "" && rest[0] == ':' {
+		i := strings.Index(rest, "/")
+		if i == -1 {
+			port = rest[1:]
+		} else {
+			port = rest[1:i]
+		}
+		_, err := strconv.ParseUint(port, 10, 16)
+		if err != nil {
+			return "", "", "", fmt.Errorf("error parsing port %q in %q: %v", port, candidate, err)
+		}
+		rest = rest[len(port)+1:]
+	}
+
+	// The rest is a path.
+	return host, port, rest, nil
+}
+
 // postProcessRegistries checks the consistency of all registries (e.g., set
 // the Prefix to URL if not set) and applies conflict checks.  It returns an
 // array of cleaned registries and error in case of conflicts.
@@ -200,17 +436,21 @@ func postProcessRegistries(regs []Registry) ([]Registry, error) {
 		var err error
 
 		// make sure URL and Prefix are valid
-		reg.URL, err = parseURL(reg.URL)
-		if err != nil {
-			return nil, err
+		if !registryIsMatch(reg) {
+			reg.URL, err = parseURL(reg.URL)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		if reg.Prefix == "" {
 			reg.Prefix = reg.URL
 		} else {
-			reg.Prefix, err = parseURL(reg.Prefix)
-			if err != nil {
-				return nil, err
+			if !registryIsMatch(reg) {
+				reg.Prefix, err = parseURL(reg.Prefix)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 
@@ -336,6 +576,21 @@ func FindRegistry(ref string, registries []Registry) *Registry {
 			if length > prefixLen {
 				reg = r
 				prefixLen = length
+			}
+		}
+		if registryIsMatch(r) {
+			matches, err := registryMatches(r.Prefix, ref)
+			if err != nil {
+				logrus.Debugf("error checking if %q matches %q: %v", ref, r.Prefix, err)
+			} else {
+				if matches {
+					length := len(r.Prefix)
+					if length > prefixLen {
+						reg = r
+						reg.URL = ref
+						prefixLen = length
+					}
+				}
 			}
 		}
 	}

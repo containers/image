@@ -1,6 +1,7 @@
 package sysregistriesv2
 
 import (
+	"fmt"
 	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -197,7 +198,7 @@ unqualified-search = true`)
 	assert.NotNil(t, reg)
 }
 
-func TestInsecureConfligs(t *testing.T) {
+func TestInsecureConflicts(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
 url = "registry.com"
@@ -380,4 +381,291 @@ insecure = true`)
 	registries, err = GetRegistries(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
+}
+
+func TestParseMatchPattern(t *testing.T) {
+	cases := []struct {
+		pattern, host, port, path string
+		err                       bool
+	}{
+		{"localhost", "localhost", "", "", false},
+		{"localhost:5000", "localhost", "5000", "", false},
+		{"localhost/foo", "localhost", "", "/foo", false},
+		{"localhost:5000/foo", "localhost", "5000", "/foo", false},
+
+		{"[172.31.0.1]", "172.31.0.1", "", "", false},
+		{"[172.31.0.1000]", "", "", "", true},
+		{"[::]", "::", "", "", false},
+		{"[::1ffff]", "", "", "", true},
+		{"[::12345]", "", "", "", true},
+
+		{"172.31.0.1", "172.31.0.1", "", "", false},
+		{"172.31.0.1/foo", "172.31.0.1", "", "/foo", false},
+		{"172.31.0.1:5000", "172.31.0.1", "5000", "", false},
+		{"172.31.0.1:5000/foo", "172.31.0.1", "5000", "/foo", false},
+		{"172.31.0.1:50000/foo", "172.31.0.1", "50000", "/foo", false},
+
+		{"172.31.0.1000:50000/foo", "172.31.0.1000", "50000", "/foo", true},
+		{"172.31.0.1:500000/foo", "", "", "", true},
+
+		{"172.31.0.1/23", "172.31.0.1/23", "", "", false},
+		{"172.31.0.1/23/foo", "172.31.0.1/23", "", "/foo", false},
+		{"172.31.0.1/23:5000", "172.31.0.1/23", "5000", "", false},
+		{"172.31.0.1/23:5000/foo", "172.31.0.1/23", "5000", "/foo", false},
+
+		{"[::1/64]", "::1/64", "", "", false},
+		{"[::1/64]/foo", "::1/64", "", "/foo", false},
+		{"[::1/64]:5000", "::1/64", "5000", "", false},
+		{"[::1/64]:5000/foo", "::1/64", "5000", "/foo", false},
+
+		{"172.31.0.*", "172.31.0.*", "", "", false},
+		{"172.31.0.*/foo", "172.31.0.*", "", "/foo", false},
+		{"172.31.0.*:5000", "172.31.0.*", "5000", "", false},
+		{"172.31.0.*:5000/foo", "172.31.0.*", "5000", "/foo", false},
+	}
+	for _, c := range cases {
+		host, port, path, err := parseMatchPattern(c.pattern)
+		t.Logf("%+v -> %q,%q,%q,%v", c, host, port, path, err)
+		if c.err {
+			assert.NotNil(t, err)
+		} else {
+			assert.Nil(t, err)
+			assert.Equal(t, c.host, host)
+			assert.Equal(t, c.port, port)
+			assert.Equal(t, c.path, path)
+		}
+	}
+}
+
+func TestParseMatchCandidate(t *testing.T) {
+	cases := []struct {
+		candidate, host, port, path string
+		err                         bool
+	}{
+		{"localhost", "localhost", "", "", false},
+		{"localhost:5000", "localhost", "5000", "", false},
+		{"localhost/foo", "localhost", "", "/foo", false},
+		{"localhost:5000/foo", "localhost", "5000", "/foo", false},
+
+		{"172.31.0.1", "172.31.0.1", "", "", false},
+		{"172.31.0.1/foo", "172.31.0.1", "", "/foo", false},
+		{"172.31.0.1:5000", "172.31.0.1", "5000", "", false},
+		{"172.31.0.1:5000/foo", "172.31.0.1", "5000", "/foo", false},
+		{"172.31.0.1:50000/foo", "172.31.0.1", "50000", "/foo", false},
+
+		{"172.31.0.1000:50000/foo", "172.31.0.1000", "50000", "/foo", false},
+		{"172.31.0.1:500000/foo", "", "", "", true},
+
+		{"172.31.0.1/23", "172.31.0.1", "", "/23", false},
+		{"172.31.0.1/23/foo", "172.31.0.1", "", "/23/foo", false},
+		{"172.31.0.1/23:5000", "172.31.0.1", "", "/23:5000", false},
+		{"172.31.0.1/23:5000/foo", "172.31.0.1", "", "/23:5000/foo", false},
+
+		{"[::1]", "::1", "", "", false},
+		{"[::1]/foo", "::1", "", "/foo", false},
+		{"[::1]:5000", "::1", "5000", "", false},
+		{"[::1]:5000/foo", "::1", "5000", "/foo", false},
+
+		{"[::1/64]", "", "", "", true},
+		{"[::1/64]/foo", "", "", "", true},
+		{"[::1/64]:5000", "", "", "", true},
+		{"[::1/64]:5000/foo", "", "", "", true},
+
+		{"172.31.0.*", "172.31.0.*", "", "", false},
+		{"172.31.0.*/foo", "172.31.0.*", "", "/foo", false},
+		{"172.31.0.*:5000", "172.31.0.*", "5000", "", false},
+		{"172.31.0.*:5000/foo", "172.31.0.*", "5000", "/foo", false},
+	}
+	for _, c := range cases {
+		host, port, path, err := parseMatchCandidate(c.candidate)
+		t.Logf("%+v -> %q,%q,%q,%v", c, host, port, path, err)
+		if c.err {
+			assert.NotNil(t, err)
+		} else {
+			assert.Nil(t, err)
+			assert.Equal(t, c.host, host)
+			assert.Equal(t, c.port, port)
+			assert.Equal(t, c.path, path)
+		}
+	}
+}
+
+func TestRegistryMatch(t *testing.T) {
+	cases := []struct {
+		pattern, candidate string
+		match, err         bool
+	}{
+		{"localhost", "localhost", true, false},
+		{"*", "localhost", true, false},
+		{"*", "localhost:500", false, false},
+		{"*", "localhost:5000", true, false},
+
+		{"*", "registry.example.com", true, false},
+		{"*.example.com", "registry.example.com", true, false},
+		{"*.example.com", "registry.example.com:5000", true, false},
+		{"*.example.com", "registry.example.com:5000/foo", true, false},
+		{"*.example.com", "registry.example.com/foo", true, false},
+		{"*.example.com", "*", false, false},
+		{"*.example.com", "registry.example.org", false, false},
+		{"*.example.com", "example.com.example.org", false, false},
+
+		{"*", "172.31.0.1", true, false},
+		{"*", "172.31.0.1:443", false, false},
+		{"*", "172.31.0.1:5000", true, false},
+		{"*", "172.31.0.1/foo", true, false},
+		{"*", "172.31.0.1:443/foo", false, false},
+		{"*", "172.31.0.1:5000/foo", true, false},
+
+		{"172.31.0.*", "172.31.0.1", true, false},
+		{"172.31.0.*", "172.31.0.1:443", false, false},
+		{"172.31.0.*", "172.31.0.1:5000", true, false},
+		{"172.31.0.*", "172.31.0.1/foo", true, false},
+		{"172.31.0.*", "172.31.0.1:443/foo", false, false},
+		{"172.31.0.*", "172.31.0.1:5000/foo", true, false},
+
+		{"172.31.0.*", "172.31.1.1", false, false},
+		{"172.31.0.*", "172.31.1.1:5000", false, false},
+		{"172.31.0.*", "172.31.1.1/foo", false, false},
+		{"172.31.0.*", "172.31.1.1:5000/foo", false, false},
+
+		{"172.31.0.0/33", "172.31.0.1/foo", false, false},
+		{"172.31.0.0/24", "172.31.0.1", true, false},
+		{"172.31.0.0/24", "172.31.0.1/foo", true, false},
+		{"172.31.0.0/24/foo", "172.31.0.1/foo", true, false},
+		{"172.31.0.0/24:5000/foo", "172.31.0.1/foo", true, false},
+		{"172.31.0.0/24/foo", "172.31.0.1:5000/foo", true, false},
+		{"172.31.0.0/24/foo", "172.31.0.1", false, false},
+
+		{"172.31.0.0/33", "172.31.0.1/foo", false, false},
+		{"172.31.0.0/24", "172.31.0.1", true, false},
+		{"172.31.0.0/24", "172.31.0.1/foo", true, false},
+		{"172.31.0.0/24/foo", "172.31.0.1/foo", true, false},
+		{"172.31.0.0/24:5000/foo", "172.31.0.1/foo", true, false},
+		{"172.31.0.0/24/foo", "172.31.0.1:5000/foo", true, false},
+		{"172.31.0.0/24/foo", "172.31.0.1", false, false},
+	}
+	for _, c := range cases {
+		matches, err := registryMatches(c.pattern, c.candidate)
+		t.Logf("%+v -> %v,%v", c, matches, err)
+		if c.err {
+			assert.NotNil(t, err)
+		} else {
+			assert.Equal(t, c.match, matches)
+		}
+	}
+}
+
+func TestMatchV2(t *testing.T) {
+	testConfig = []byte(`
+[[registry]]
+url = "registry.com"
+insecure = true
+
+[[registry]]
+url = "registry.org"
+
+[[registry]]
+prefix = "registry.net/images"
+insecure = true
+`)
+
+	configCache = make(map[string][]Registry)
+	registries, err := GetRegistries(nil)
+	assert.Nil(t, err)
+	assert.Equal(t, 3, len(registries))
+
+	var reg *Registry
+	reg = FindRegistry("registry.com/image:tag", registries)
+	assert.NotNil(t, reg)
+	assert.True(t, reg.Insecure)
+
+	reg = FindRegistry("registry.org/image", registries)
+	assert.NotNil(t, reg)
+	assert.False(t, reg.Insecure)
+
+	reg = FindRegistry("registry.net/images/foo", registries)
+	assert.NotNil(t, reg)
+	assert.True(t, reg.Insecure)
+
+	reg = FindRegistry("registry.net/image/foo", registries)
+	assert.Nil(t, reg)
+
+	reg = FindRegistry("registry.foo", registries)
+	assert.Nil(t, reg)
+}
+
+func TestMatchV1(t *testing.T) {
+	var reg *Registry
+	for _, c := range []struct {
+		pattern, candidate string
+		insecure           bool
+	}{
+		{"example.com", "example.org", false},
+		{"example.com", "example.org:5000", false},
+		{"example.com", "example.org/foo", false},
+		{"example.com", "example.org:5000/foo", false},
+
+		{"example.com", "example.com", true},
+		{"example.com", "example.com:5000", true},
+		{"example.com", "example.com/foo", true},
+		{"example.com", "example.com:5000/foo", true},
+
+		{"*.example.com", "example.com", false},
+		{"*.example.com", "example.com:5000", false},
+		{"*.example.com", "example.com/foo", false},
+		{"*.example.com", "example.com:5000/foo", false},
+
+		{"*.example.com", "registry.example.com", true},
+		{"*.example.com", "registry.example.com:5000", true},
+		{"*.example.com", "registry.example.com/foo", true},
+		{"*.example.com", "registry.example.com:5000/foo", true},
+
+		{"*.example.com/foo", "registry.example.com", false},
+		{"*.example.com/foo", "registry.example.com:5000", false},
+		{"*.example.com/foo", "registry.example.com/foo", true},
+		{"*.example.com/foo", "registry.example.com:5000/foo", true},
+
+		{"127.0.0.1/8/foo", "127.0.0.2", false},
+		{"127.0.0.1/8/foo", "127.0.0.2:5000", false},
+		{"127.0.0.1/8/foo", "127.0.0.2/foo", true},
+		{"127.0.0.1/8/foo", "127.0.0.2:5000/foo", true},
+
+		{"127.0.0.1/8:5000/foo", "127.0.0.2", false},
+		{"127.0.0.1/8:5000/foo", "127.0.0.2:5000", false},
+		{"127.0.0.1/8:5000/foo", "127.0.0.2/foo", true},
+		{"127.0.0.1/8:5000/foo", "127.0.0.2:5000/foo", true},
+
+		{"127.0.0.1/8:443/foo", "127.0.0.2", false},
+		{"127.0.0.1/8:443/foo", "127.0.0.2:5000", false},
+		{"127.0.0.1/8:443/foo", "127.0.0.2/foo", false},
+		{"127.0.0.1/8:443/foo", "127.0.0.2:5000/foo", false},
+
+		{"127.0.0.*/foo", "127.0.0.2", false},
+		{"127.0.0.*/foo", "127.0.0.2:5000", false},
+		{"127.0.0.*/foo", "127.0.0.2/foo", true},
+		{"127.0.0.*/foo", "127.0.0.2:5000/foo", true},
+
+		{"127.0.0.*:5000/foo", "127.0.0.2", false},
+		{"127.0.0.*:5000/foo", "127.0.0.2:5000", false},
+		{"127.0.0.*:5000/foo", "127.0.0.2/foo", true},
+		{"127.0.0.*:5000/foo", "127.0.0.2:5000/foo", true},
+
+		{"127.0.0.*:443/foo", "127.0.0.2", false},
+		{"127.0.0.*:443/foo", "127.0.0.2:5000", false},
+		{"127.0.0.*:443/foo", "127.0.0.2/foo", false},
+		{"127.0.0.*:443/foo", "127.0.0.2:5000/foo", false},
+	} {
+		testConfig = []byte(fmt.Sprintf("[registries.insecure]\nregistries = ['%s']\n", c.pattern))
+		configCache = make(map[string][]Registry)
+		registries, err := GetRegistries(nil)
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(registries))
+		reg = FindRegistry(c.candidate, registries)
+		if c.insecure {
+			assert.NotNil(t, reg)
+			assert.True(t, reg.Insecure)
+		} else {
+			assert.Nil(t, reg)
+		}
+	}
 }
