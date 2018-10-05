@@ -90,7 +90,8 @@ func TestSetupCertificates(t *testing.T) {
 	// Unreadable CA certificate
 	tlsc = tls.Config{}
 	err = SetupCertificates("testdata/unreadable-ca", &tlsc)
-	assert.Error(t, err)
+	assert.NoError(t, err)
+	assert.Nil(t, tlsc.RootCAs)
 
 	// Misssing key file
 	tlsc = tls.Config{}
