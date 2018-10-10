@@ -259,7 +259,7 @@ func CheckAuth(ctx context.Context, sys *types.SystemContext, username, password
 	case http.StatusUnauthorized:
 		return ErrUnauthorizedForCredentials
 	default:
-		return errors.Errorf("error occured with status code %q (%s)", resp.StatusCode, http.StatusText(resp.StatusCode))
+		return errors.Errorf("error occured with status code %d (%s)", resp.StatusCode, http.StatusText(resp.StatusCode))
 	}
 }
 
