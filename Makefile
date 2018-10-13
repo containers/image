@@ -45,7 +45,7 @@ cross: vendor
 tools: tools.timestamp
 
 tools.timestamp: Makefile
-	@go get -u $(BUILDFLAGS) github.com/golang/lint/golint
+	@go get -u $(BUILDFLAGS) golang.org/x/lint/golint
 	@go get $(BUILDFLAGS) github.com/vbatts/git-validation
 	@go get -u github.com/rancher/trash
 	@touch tools.timestamp
