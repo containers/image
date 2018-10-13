@@ -1,9 +1,10 @@
 package sysregistriesv2
 
 import (
+	"testing"
+
 	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 var testConfig = []byte("")
@@ -188,22 +189,20 @@ url = "registry-b.com"
 
 [[registry]]
 url = "registry-c.com"
-unqualified-search = true`)
+unqualified-search = true
+
+[[registry]]
+url = "registry-d.com"
+unqualified-search = true
+`)
 
 	configCache = make(map[string][]Registry)
 	registries, err := GetRegistries(nil)
 	assert.Nil(t, err)
-	assert.Equal(t, 3, len(registries))
+	assert.Equal(t, 4, len(registries))
 
 	unqRegs := FindUnqualifiedSearchRegistries(registries)
-	assert.Equal(t, 2, len(unqRegs))
-
-	// check if the expected images are actually in the array
-	var reg *Registry
-	reg = FindRegistry("registry-a.com/foo:bar", unqRegs)
-	assert.NotNil(t, reg)
-	reg = FindRegistry("registry-c.com/foo:bar", unqRegs)
-	assert.NotNil(t, reg)
+	assertSearchRegistryURLsEqual(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
 }
 
 func TestInsecureConfligs(t *testing.T) {
