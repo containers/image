@@ -299,7 +299,6 @@ registries = ["registry-d.com", "registry-e.com", "registry-a.com"]`)
 	// check if the expected images are actually in the array
 	var reg *Registry
 	reg = FindRegistry("registry-a.com/foo:bar", unqRegs)
-	// test https fallback for v1
 	assert.Equal(t, "registry-a.com", reg.URL)
 	assert.NotNil(t, reg)
 	reg = FindRegistry("registry-c.com/foo:bar", unqRegs)
