@@ -168,6 +168,15 @@ prefix = ""`)
 	assert.Equal(t, "empty-prefix.com", reg.URL)
 }
 
+func assertSearchRegistryURLsEqual(t *testing.T, expected []string, regs []Registry) {
+	// verify the expected registries and their order
+	names := []string{}
+	for _, r := range regs {
+		names = append(names, r.URL)
+	}
+	assert.Equal(t, expected, names)
+}
+
 func TestFindUnqualifiedSearchRegistries(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
