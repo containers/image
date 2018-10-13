@@ -288,7 +288,7 @@ insecure = true`)
 func TestV1BackwardsCompatibility(t *testing.T) {
 	testConfig = []byte(`
 [registries.search]
-registries = ["registry-a.com////", "registry-c.com"]
+registries = ["registry-a.com////", "registry-c.com", "registry-d.com"]
 
 [registries.block]
 registries = ["registry-b.com"]
@@ -302,18 +302,10 @@ registries = ["registry-d.com", "registry-e.com", "registry-a.com"]`)
 	assert.Equal(t, 5, len(registries))
 
 	unqRegs := FindUnqualifiedSearchRegistries(registries)
-	assert.Equal(t, 2, len(unqRegs))
-
-	// check if the expected images are actually in the array
-	var reg *Registry
-	reg = FindRegistry("registry-a.com/foo:bar", unqRegs)
-	assert.Equal(t, "registry-a.com", reg.URL)
-	assert.NotNil(t, reg)
-	reg = FindRegistry("registry-c.com/foo:bar", unqRegs)
-	assert.NotNil(t, reg)
+	assertSearchRegistryURLsEqual(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
 
 	// check if merging works
-	reg = FindRegistry("registry-a.com/bar/foo/barfoo:latest", registries)
+	reg := FindRegistry("registry-a.com/bar/foo/barfoo:latest", registries)
 	assert.NotNil(t, reg)
 	assert.True(t, reg.Search)
 	assert.True(t, reg.Insecure)
