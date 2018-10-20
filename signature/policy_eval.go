@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/containers/image/types"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -257,6 +258,10 @@ func (pc *PolicyContext) GetSignaturesWithAcceptedAuthor(ctx context.Context, im
 // WARNING: This validates signatures and the manifest, but does not download or validate the
 // layers. Users must validate that the layers match their expected digests.
 func (pc *PolicyContext) IsRunningImageAllowed(ctx context.Context, image types.UnparsedImage) (res bool, finalErr error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "isRunningImageAllowed")
+	span.SetTag("ref", "policy")
+	defer span.Finish()
+
 	if err := pc.changeState(pcReady, pcInUse); err != nil {
 		return false, err
 	}

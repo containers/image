@@ -18,6 +18,7 @@ import (
 	"github.com/containers/image/types"
 	"github.com/containers/image/version"
 	"github.com/opencontainers/go-digest"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -220,6 +221,10 @@ func (s *openshiftImageSource) HasThreadSafeGetBlob() bool {
 // The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
 // May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
 func (s *openshiftImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "getBlob")
+	span.SetTag("ref", "openshift")
+	defer span.Finish()
+
 	if err := s.ensureImageIsResolved(ctx); err != nil {
 		return nil, 0, err
 	}
@@ -396,6 +401,10 @@ func (d *openshiftImageDestination) HasThreadSafePutBlob() bool {
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (d *openshiftImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "putBlob")
+	span.SetTag("ref", "openshift")
+	defer span.Finish()
+
 	return d.docker.PutBlob(ctx, stream, inputInfo, cache, isConfig)
 }
 
@@ -407,6 +416,10 @@ func (d *openshiftImageDestination) PutBlob(ctx context.Context, stream io.Reade
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 // May use and/or update cache.
 func (d *openshiftImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "tryReusingBlob")
+	span.SetTag("ref", "openshift")
+	defer span.Finish()
+
 	return d.docker.TryReusingBlob(ctx, info, cache, canSubstitute)
 }
 
@@ -490,6 +503,10 @@ sigExists:
 // - Uploaded data MAY be visible to others before Commit() is called
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 func (d *openshiftImageDestination) Commit(ctx context.Context) error {
+	span, _ := opentracing.StartSpanFromContext(ctx, "commit")
+	span.SetTag("ref", "openshift")
+	defer span.Finish()
+
 	return d.docker.Commit(ctx)
 }
 

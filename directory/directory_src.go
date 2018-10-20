@@ -9,6 +9,7 @@ import (
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	"github.com/opencontainers/go-digest"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 )
 
@@ -57,6 +58,10 @@ func (s *dirImageSource) HasThreadSafeGetBlob() bool {
 // The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
 // May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
 func (s *dirImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "getBlob")
+	span.SetTag("ref", "directory")
+	defer span.Finish()
+
 	r, err := os.Open(s.ref.layerPath(info.Digest))
 	if err != nil {
 		return nil, -1, err

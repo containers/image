@@ -12,6 +12,7 @@ import (
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
 	"github.com/opencontainers/go-digest"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 )
 
@@ -147,12 +148,20 @@ func (ref dirReference) NewImage(ctx context.Context, sys *types.SystemContext) 
 // NewImageSource returns a types.ImageSource for this reference.
 // The caller must call .Close() on the returned ImageSource.
 func (ref dirReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "newImageSource")
+	span.SetTag("ref", "directory")
+	defer span.Finish()
+
 	return newImageSource(ref), nil
 }
 
 // NewImageDestination returns a types.ImageDestination for this reference.
 // The caller must call .Close() on the returned ImageDestination.
 func (ref dirReference) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "newImageDestination")
+	span.SetTag("ref", "directory")
+	defer span.Finish()
+
 	compress := false
 	if sys != nil {
 		compress = sys.DirForceCompress

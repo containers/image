@@ -14,6 +14,8 @@ import (
 
 	"github.com/containers/image/types"
 	"github.com/klauspost/pgzip"
+	opentracing "github.com/opentracing/opentracing-go"
+
 	digest "github.com/opencontainers/go-digest"
 	imgspecs "github.com/opencontainers/image-spec/specs-go"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -34,6 +36,10 @@ type tarballImageSource struct {
 }
 
 func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "newImageSource")
+	span.SetTag("ref", "tarball")
+	defer span.Finish()
+
 	// Gather up the digests, sizes, and date information for all of the files.
 	filenames := []string{}
 	diffIDs := []digest.Digest{}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/containers/image/types"
 	"github.com/containers/storage/pkg/archive"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 )
 
@@ -91,6 +92,10 @@ func (d *ociArchiveImageDestination) HasThreadSafePutBlob() bool {
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (d *ociArchiveImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "putBlob")
+	span.SetTag("ref", "oci-archive")
+	defer span.Finish()
+
 	return d.unpackedDest.PutBlob(ctx, stream, inputInfo, cache, isConfig)
 }
 
@@ -102,6 +107,10 @@ func (d *ociArchiveImageDestination) PutBlob(ctx context.Context, stream io.Read
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 // May use and/or update cache.
 func (d *ociArchiveImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "tryReuseBlob")
+	span.SetTag("ref", "oci-archive")
+	defer span.Finish()
+
 	return d.unpackedDest.TryReusingBlob(ctx, info, cache, canSubstitute)
 }
 

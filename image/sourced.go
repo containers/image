@@ -5,7 +5,9 @@ package image
 
 import (
 	"context"
+
 	"github.com/containers/image/types"
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 // imageCloser implements types.ImageCloser, perhaps allowing simple users
@@ -65,6 +67,8 @@ type sourcedImage struct {
 //
 // The Image must not be used after the underlying ImageSource is Close()d.
 func FromUnparsedImage(ctx context.Context, sys *types.SystemContext, unparsed *UnparsedImage) (types.Image, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "fromUnparsedImage")
+	defer span.Finish()
 	// Note that the input parameter above is specifically *image.UnparsedImage, not types.UnparsedImage:
 	// we want to be able to use unparsed.src.  We could make that an explicit interface, but, well,
 	// this is the only UnparsedImage implementation around, anyway.
@@ -99,5 +103,9 @@ func (i *sourcedImage) Manifest(ctx context.Context) ([]byte, string, error) {
 }
 
 func (i *sourcedImage) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "layersInfosForCopy")
+	span.SetTag("ref", "image-sourced")
+	defer span.Finish()
+
 	return i.UnparsedImage.src.LayerInfosForCopy(ctx)
 }

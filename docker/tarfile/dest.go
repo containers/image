@@ -17,6 +17,7 @@ import (
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	"github.com/opencontainers/go-digest"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -95,6 +96,10 @@ func (d *Destination) HasThreadSafePutBlob() bool {
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "putBlob")
+	span.SetTag("ref", "docker-tarfile")
+	defer span.Finish()
+
 	// Ouch, we need to stream the blob into a temporary file just to determine the size.
 	// When the layer is decompressed, we also have to generate the digest on uncompressed datas.
 	if inputInfo.Size == -1 || inputInfo.Digest.String() == "" {
@@ -165,6 +170,10 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 // May use and/or update cache.
 func (d *Destination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "hasBlob")
+	span.SetTag("ref", "docker-tarfile")
+	defer span.Finish()
+
 	if info.Digest == "" {
 		return false, types.BlobInfo{}, errors.Errorf("Can not check for a blob with unknown digest")
 	}
@@ -403,5 +412,9 @@ func (d *Destination) PutSignatures(ctx context.Context, signatures [][]byte) er
 // Commit finishes writing data to the underlying io.Writer.
 // It is the caller's responsibility to close it, if necessary.
 func (d *Destination) Commit(ctx context.Context) error {
+	span, _ := opentracing.StartSpanFromContext(ctx, "commit")
+	span.SetTag("ref", "oci-archive")
+	defer span.Finish()
+
 	return d.tar.Close()
 }

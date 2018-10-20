@@ -16,6 +16,7 @@ import (
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
 	"github.com/containers/storage/pkg/archive"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 )
 
@@ -133,12 +134,20 @@ func (ref ociArchiveReference) NewImage(ctx context.Context, sys *types.SystemCo
 // NewImageSource returns a types.ImageSource for this reference.
 // The caller must call .Close() on the returned ImageSource.
 func (ref ociArchiveReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "newImageSource")
+	span.SetTag("ref", "oci-archive")
+	defer span.Finish()
+
 	return newImageSource(ctx, sys, ref)
 }
 
 // NewImageDestination returns a types.ImageDestination for this reference.
 // The caller must call .Close() on the returned ImageDestination.
 func (ref ociArchiveReference) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "newImageDestination")
+	span.SetTag("ref", "oci-archive")
+	defer span.Finish()
+
 	return newImageDestination(ctx, sys, ref)
 }
 
