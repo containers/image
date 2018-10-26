@@ -57,6 +57,6 @@ func (s *daemonImageSource) Reference() types.ImageReference {
 }
 
 // LayerInfosForCopy() returns updated layer info that should be used when reading, in preference to values in the manifest, if specified.
-func (s *daemonImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+func (s *daemonImageSource) LayerInfosForCopy(ctx context.Context, desiredLayerCompression types.LayerCompression) ([]types.BlobInfo, error) {
 	return nil, nil
 }

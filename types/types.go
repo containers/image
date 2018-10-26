@@ -128,8 +128,10 @@ type ImageSource interface {
 	GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error)
 	// LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer blobsums that are listed in the image's manifest.
 	// The Digest field is guaranteed to be provided; Size may be -1.
+	// Implementations may ignore desiredLayerCompression and always return
+	// digests for there internal compression format
 	// WARNING: The list may contain duplicates, and they are semantically relevant.
-	LayerInfosForCopy(ctx context.Context) ([]BlobInfo, error)
+	LayerInfosForCopy(ctx context.Context, desiredLayerCompression LayerCompression) ([]BlobInfo, error)
 }
 
 // LayerCompression indicates if layers must be compressed, decompressed or preserved
@@ -259,8 +261,8 @@ type Image interface {
 	// LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer blobsums that are listed in the image's manifest.
 	// The Digest field is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
 	// WARNING: The list may contain duplicates, and they are semantically relevant.
-	LayerInfosForCopy(context.Context) ([]BlobInfo, error)
-	// EmbeddedDockerReferenceConflicts whether a Docker reference embedded in the manifest, if any, conflicts with destination ref.
+	LayerInfosForCopy(context.Context, LayerCompression) ([]BlobInfo, error)
+	// EmbeddedDockerReferenceConflicts whether a Dockeur reference embedded in the manifest, if any, conflicts with destination ref.
 	// It returns false if the manifest does not embed a Docker reference.
 	// (This embedding unfortunately happens for Docker schema1, please do not add support for this in any new formats.)
 	EmbeddedDockerReferenceConflicts(ref reference.Named) bool

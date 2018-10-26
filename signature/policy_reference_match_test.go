@@ -67,7 +67,7 @@ func (ref refImageMock) Manifest(ctx context.Context) ([]byte, string, error) {
 func (ref refImageMock) Signatures(context.Context) ([][]byte, error) {
 	panic("unexpected call to a mock function")
 }
-func (ref refImageMock) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+func (ref refImageMock) LayerInfosForCopy(ctx context.Context, desiredLayerCompression types.LayerCompression) ([]types.BlobInfo, error) {
 	panic("unexpected call to a mock function")
 }
 

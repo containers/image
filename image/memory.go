@@ -60,6 +60,6 @@ func (i *memoryImage) Signatures(ctx context.Context) ([][]byte, error) {
 // LayerInfosForCopy returns an updated set of layer blob information which may not match the manifest.
 // The Digest field is guaranteed to be provided; Size may be -1.
 // WARNING: The list may contain duplicates, and they are semantically relevant.
-func (i *memoryImage) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+func (i *memoryImage) LayerInfosForCopy(ctx context.Context, desiredLayerCompression types.LayerCompression) ([]types.BlobInfo, error) {
 	return nil, nil
 }

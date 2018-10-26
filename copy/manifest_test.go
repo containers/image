@@ -56,7 +56,7 @@ func (f fakeImageSource) OCIConfig(context.Context) (*v1.Image, error) {
 func (f fakeImageSource) LayerInfos() []types.BlobInfo {
 	panic("Unexpected call to a mock function")
 }
-func (f fakeImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+func (f fakeImageSource) LayerInfosForCopy(ctx context.Context, desiredLayerCompression types.LayerCompression) ([]types.BlobInfo, error) {
 	panic("Unexpected call to a mock function")
 }
 func (f fakeImageSource) EmbeddedDockerReferenceConflicts(ref reference.Named) bool {

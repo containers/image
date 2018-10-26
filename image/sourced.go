@@ -98,6 +98,6 @@ func (i *sourcedImage) Manifest(ctx context.Context) ([]byte, string, error) {
 	return i.manifestBlob, i.manifestMIMEType, nil
 }
 
-func (i *sourcedImage) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
-	return i.UnparsedImage.src.LayerInfosForCopy(ctx)
+func (i *sourcedImage) LayerInfosForCopy(ctx context.Context, desiredLayerCompression types.LayerCompression) ([]types.BlobInfo, error) {
+	return i.UnparsedImage.src.LayerInfosForCopy(ctx, desiredLayerCompression)
 }

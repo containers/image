@@ -176,7 +176,7 @@ func (s *storageImageSource) GetManifest(ctx context.Context, instanceDigest *di
 
 // LayerInfosForCopy() returns the list of layer blobs that make up the root filesystem of
 // the image, after they've been decompressed.
-func (s *storageImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+func (s *storageImageSource) LayerInfosForCopy(ctx context.Context, desiredLayerCompression types.LayerCompression) ([]types.BlobInfo, error) {
 	manifestBlob, manifestType, err := s.GetManifest(ctx, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading image manifest for %q", s.image.ID)
@@ -187,12 +187,15 @@ func (s *storageImageSource) LayerInfosForCopy(ctx context.Context) ([]types.Blo
 	}
 
 	uncompressedLayerType := ""
+	compressedLayerType := ""
 	switch manifestType {
 	case imgspecv1.MediaTypeImageManifest:
 		uncompressedLayerType = imgspecv1.MediaTypeImageLayer
+		compressedLayerType = imgspecv1.MediaTypeImageLayerGzip
 	case manifest.DockerV2Schema1MediaType, manifest.DockerV2Schema1SignedMediaType, manifest.DockerV2Schema2MediaType:
 		// This is actually a compressed type, but there's no uncompressed type defined
 		uncompressedLayerType = manifest.DockerV2Schema2LayerMediaType
+		compressedLayerType = manifest.DockerV2Schema2LayerMediaType
 	}
 
 	physicalBlobInfos := []types.BlobInfo{}
@@ -202,16 +205,36 @@ func (s *storageImageSource) LayerInfosForCopy(ctx context.Context) ([]types.Blo
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reading layer %q in image %q", layerID, s.image.ID)
 		}
-		if layer.UncompressedDigest == "" {
-			return nil, errors.Errorf("uncompressed digest for layer %q is unknown", layerID)
+
+		var blobInfo types.BlobInfo
+
+		if desiredLayerCompression == types.Compress {
+			if layer.CompressedDigest == "" {
+				desiredLayerCompression = types.PreserveOriginal
+			}
+			if layer.CompressedSize < 0 {
+				desiredLayerCompression = types.PreserveOriginal
+			}
 		}
-		if layer.UncompressedSize < 0 {
-			return nil, errors.Errorf("uncompressed size for layer %q is unknown", layerID)
-		}
-		blobInfo := types.BlobInfo{
-			Digest:    layer.UncompressedDigest,
-			Size:      layer.UncompressedSize,
-			MediaType: uncompressedLayerType,
+
+		if desiredLayerCompression == types.Compress {
+			blobInfo = types.BlobInfo{
+				Digest:    layer.CompressedDigest,
+				Size:      layer.CompressedSize,
+				MediaType: compressedLayerType,
+			}
+		} else {
+			if layer.UncompressedDigest == "" {
+				return nil, errors.Errorf("uncompressed digest for layer %q is unknown", layerID)
+			}
+			if layer.UncompressedSize < 0 {
+				return nil, errors.Errorf("uncompressed size for layer %q is unknown", layerID)
+			}
+			blobInfo = types.BlobInfo{
+				Digest:    layer.UncompressedDigest,
+				Size:      layer.UncompressedSize,
+				MediaType: uncompressedLayerType,
+			}
 		}
 		physicalBlobInfos = append([]types.BlobInfo{blobInfo}, physicalBlobInfos...)
 		layerID = layer.Parent

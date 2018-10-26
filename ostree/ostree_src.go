@@ -262,7 +262,7 @@ func (s *ostreeImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (i
 
 	// Ensure s.compressed is initialized.  It is build by LayerInfosForCopy.
 	if s.compressed == nil {
-		_, err := s.LayerInfosForCopy(ctx)
+		_, err := s.LayerInfosForCopy(ctx, types.PreserveOriginal)
 		if err != nil {
 			return nil, -1, err
 		}
@@ -366,7 +366,7 @@ func (s *ostreeImageSource) GetSignatures(ctx context.Context, instanceDigest *d
 
 // LayerInfosForCopy() returns the list of layer blobs that make up the root filesystem of
 // the image, after they've been decompressed.
-func (s *ostreeImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+func (s *ostreeImageSource) LayerInfosForCopy(ctx context.Context, desiredLayerCompression types.LayerCompression) ([]types.BlobInfo, error) {
 	updatedBlobInfos := []types.BlobInfo{}
 	manifestBlob, manifestType, err := s.GetManifest(ctx, nil)
 	if err != nil {
