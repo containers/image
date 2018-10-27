@@ -633,7 +633,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 	// === Process input through digestingReader to validate against the expected digest.
 	// Be paranoid; in case PutBlob somehow managed to ignore an error from digestingReader,
 	// use a separate validation failure indicator.
-	// Note that we don't use a stronger "validationSucceeded" indicator, because
+	// Note that for this check we don't use the stronger "validationSucceeded" indicator, because
 	// dest.PutBlob may detect that the layer already exists, in which case we don't
 	// read stream to the end, and validation does not happen.
 	digestingReader, err := newDigestingReader(srcStream, srcInfo.Digest)
@@ -669,8 +669,10 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 
 	// === Deal with layer compression/decompression if necessary
 	var inputInfo types.BlobInfo
+	var compressionOperation types.LayerCompression
 	if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && !isCompressed {
 		logrus.Debugf("Compressing blob on the fly")
+		compressionOperation = types.Compress
 		pipeReader, pipeWriter := io.Pipe()
 		defer pipeReader.Close()
 
@@ -683,6 +685,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 		inputInfo.Size = -1
 	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Decompress && isCompressed {
 		logrus.Debugf("Blob will be decompressed")
+		compressionOperation = types.Decompress
 		s, err := decompressor(destStream)
 		if err != nil {
 			return types.BlobInfo{}, err
@@ -693,6 +696,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 		inputInfo.Size = -1
 	} else {
 		logrus.Debugf("Using original blob without modification")
+		compressionOperation = types.PreserveOriginal
 		inputInfo = srcInfo
 	}
 
@@ -730,6 +734,22 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 	}
 	if inputInfo.Digest != "" && uploadedInfo.Digest != inputInfo.Digest {
 		return types.BlobInfo{}, errors.Errorf("Internal error writing blob %s, blob with digest %s saved with digest %s", srcInfo.Digest, inputInfo.Digest, uploadedInfo.Digest)
+	}
+	if digestingReader.validationSucceeded {
+		// If compressionOperation != types.PreserveOriginal, we now have two reliable digest values:
+		// srcinfo.Digest describes the pre-compressionOperation input, verified by digestingReader
+		// uploadedInfo.Digest describes the post-compressionOperation output, computed by PutBlob
+		// (because inputInfo.Digest == "", this must have been computed afresh).
+		switch compressionOperation {
+		case types.PreserveOriginal:
+			break // Do nothing, we have only one digest and we might not have even verified it.
+		case types.Compress:
+			c.blobInfoCache.RecordDigestUncompressedPair(uploadedInfo.Digest, srcInfo.Digest)
+		case types.Decompress:
+			c.blobInfoCache.RecordDigestUncompressedPair(srcInfo.Digest, uploadedInfo.Digest)
+		default:
+			return types.BlobInfo{}, errors.Errorf("Internal error: Unexpected compressionOperation value %#v", compressionOperation)
+		}
 	}
 	return uploadedInfo, nil
 }
