@@ -381,6 +381,8 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	if blobSize < 0 {
 		blobSize = counter.Count
 	}
+	// This is safe because we have just computed both values ourselves.
+	cache.RecordDigestUncompressedPair(blobDigest, diffID.Digest())
 	return types.BlobInfo{
 		Digest:    blobDigest,
 		Size:      blobSize,
