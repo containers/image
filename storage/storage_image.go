@@ -444,6 +444,26 @@ func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo t
 		}, nil
 	}
 
+	// Does the blob correspond to a known DiffID which we already have available?
+	// Because we must return the size, which is unknown for unavailable compressed blobs, the returned BlobInfo refers to the
+	// uncompressed layer, and that can happen only if canSubstitute.
+	if canSubstitute {
+		if uncompressedDigest := cache.UncompressedDigest(blobinfo.Digest); uncompressedDigest != "" && uncompressedDigest != blobinfo.Digest {
+			layers, err := s.imageRef.transport.store.LayersByUncompressedDigest(uncompressedDigest)
+			if err != nil && errors.Cause(err) != storage.ErrLayerUnknown {
+				return false, types.BlobInfo{}, errors.Wrapf(err, `Error looking for layers with digest %q`, uncompressedDigest)
+			}
+			if len(layers) > 0 {
+				s.blobDiffIDs[uncompressedDigest] = layers[0].UncompressedDigest
+				return true, types.BlobInfo{
+					Digest:    uncompressedDigest,
+					Size:      layers[0].UncompressedSize,
+					MediaType: blobinfo.MediaType,
+				}, nil
+			}
+		}
+	}
+
 	// Nope, we don't have it.
 	return false, types.BlobInfo{}, nil
 }
@@ -530,6 +550,10 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 		if !haveDiffID {
 			// Check if it's elsewhere and the caller just forgot to pass it to us in a PutBlob(),
 			// or to even check if we had it.
+			// Use blobinfocache.NoCache to avoid a repeated DiffID lookup in the BlobInfoCache; a caller
+			// that relies on using a blob digest that has never been seeen by the store had better call
+			// TryReusingBlob; not calling PutBlob already violates the documented API, so there’s only
+			// so far we are going to accommodate that (if we should be doing that at all).
 			logrus.Debugf("looking for diffID for blob %+v", blob.Digest)
 			has, _, err := s.TryReusingBlob(ctx, blob.BlobInfo, blobinfocache.NoCache, false)
 			if err != nil {
