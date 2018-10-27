@@ -25,14 +25,16 @@ import (
 )
 
 type digestingReader struct {
-	source           io.Reader
-	digester         digest.Digester
-	expectedDigest   digest.Digest
-	validationFailed bool
+	source              io.Reader
+	digester            digest.Digester
+	expectedDigest      digest.Digest
+	validationFailed    bool
+	validationSucceeded bool
 }
 
 // newDigestingReader returns an io.Reader implementation with contents of source, which will eventually return a non-EOF error
-// and set validationFailed to true if the source stream does not match expectedDigest.
+// or set validationSucceeded/validationFailed to true if the source stream does/does not match expectedDigest.
+// (neither is set if EOF is never reached).
 func newDigestingReader(source io.Reader, expectedDigest digest.Digest) (*digestingReader, error) {
 	if err := expectedDigest.Validate(); err != nil {
 		return nil, errors.Errorf("Invalid digest specification %s", expectedDigest)
@@ -65,6 +67,7 @@ func (d *digestingReader) Read(p []byte) (int, error) {
 			d.validationFailed = true
 			return 0, errors.Errorf("Digest did not match, expected %s, got %s", d.expectedDigest, actualDigest)
 		}
+		d.validationSucceeded = true
 	}
 	return n, err
 }
