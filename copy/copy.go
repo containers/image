@@ -82,11 +82,12 @@ type copier struct {
 
 // imageCopier tracks state specific to a single image (possibly an item of a manifest list)
 type imageCopier struct {
-	c                 *copier
-	manifestUpdates   *types.ManifestUpdateOptions
-	src               types.Image
-	diffIDsAreNeeded  bool
-	canModifyManifest bool
+	c                  *copier
+	manifestUpdates    *types.ManifestUpdateOptions
+	src                types.Image
+	diffIDsAreNeeded   bool
+	canModifyManifest  bool
+	canSubstituteBlobs bool
 }
 
 // Options allows supplying non-default configuration modifying the behavior of CopyImage.
@@ -239,6 +240,13 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 		src:             src,
 		// diffIDsAreNeeded is computed later
 		canModifyManifest: len(sigs) == 0,
+		// Ensure _this_ copy sees exactly the intended data when either processing a signed image or signing it.
+		// This may be too conservative, but for now, better safe than sorry, _especially_ on the SignBy path:
+		// The signature makes the content non-repudiable, so it very much matters that the signature is made over exactly what the user intended.
+		// We do intend the RecordDigestUncompressedPair calls to only work with reliable data, but at least there’s a risk
+		// that the compressed version coming from a third party may be designed to attack some other decompressor implementation,
+		// and we would reuse and sign it.
+		canSubstituteBlobs: len(sigs) == 0 && options.SignBy == "",
 	}
 
 	if err := ic.updateEmbeddedDockerReference(); err != nil {
@@ -507,7 +515,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo) (t
 
 	// If we already have the blob, and we don't need to compute the diffID, then we don't need to read it from the source.
 	if !diffIDIsNeeded {
-		reused, blobInfo, err := ic.c.dest.TryReusingBlob(ctx, srcInfo, ic.c.blobInfoCache)
+		reused, blobInfo, err := ic.c.dest.TryReusingBlob(ctx, srcInfo, ic.c.blobInfoCache, ic.canSubstituteBlobs)
 		if err != nil {
 			return types.BlobInfo{}, "", errors.Wrapf(err, "Error trying to reuse blob %s at destination", srcInfo.Digest)
 		}

@@ -121,7 +121,7 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 	}
 
 	// Maybe the blob has been already sent
-	ok, reusedInfo, err := d.TryReusingBlob(ctx, inputInfo, cache)
+	ok, reusedInfo, err := d.TryReusingBlob(ctx, inputInfo, cache, false)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
@@ -155,10 +155,11 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 // TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 // (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
 // info.Digest must not be empty.
+// If canSubstitute, TryReusingBlob can use an equivalent equivalent of the desired blob; in that case the returned info may not match the input.
 // If the blob has been succesfully reused, returns (true, info, nil); info must contain at least a digest and size.
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 // May use and/or update cache.
-func (d *Destination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (bool, types.BlobInfo, error) {
+func (d *Destination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
 		return false, types.BlobInfo{}, errors.Errorf("Can not check for a blob with unknown digest")
 	}
