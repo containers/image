@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func dockerRefFromString(t *testing.T, s string) dockerReference {
+func dockerRefFromString(t *testing.T, s string) DockerReference {
 	ref, err := ParseReference(s)
 	require.NoError(t, err, s)
-	dockerRef, ok := ref.(dockerReference)
+	dockerRef, ok := ref.(DockerReference)
 	require.True(t, ok, s)
 	return dockerRef
 }

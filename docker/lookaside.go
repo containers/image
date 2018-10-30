@@ -30,7 +30,7 @@ const builtinRegistriesDirPath = "/etc/containers/registries.d"
 // NOTE: Keep this in sync with docs/registries.d.md!
 type registryConfiguration struct {
 	DefaultDocker *registryNamespace `json:"default-docker"`
-	// The key is a namespace, using fully-expanded Docker reference format or parent namespaces (per dockerReference.PolicyConfiguration*),
+	// The key is a namespace, using fully-expanded Docker reference format or parent namespaces (per DockerReference.PolicyConfiguration*),
 	Docker map[string]registryNamespace `json:"docker"`
 }
 
@@ -45,7 +45,7 @@ type registryNamespace struct {
 type signatureStorageBase *url.URL // The only documented value is nil, meaning storage is not supported.
 
 // configuredSignatureStorageBase reads configuration to find an appropriate signature storage URL for ref, for write access if “write”.
-func configuredSignatureStorageBase(sys *types.SystemContext, ref dockerReference, write bool) (signatureStorageBase, error) {
+func configuredSignatureStorageBase(sys *types.SystemContext, ref DockerReference, write bool) (signatureStorageBase, error) {
 	// FIXME? Loading and parsing the config could be cached across calls.
 	dirPath := registriesDirPath(sys)
 	logrus.Debugf(`Using registries.d directory %s for sigstore configuration`, dirPath)
@@ -143,7 +143,7 @@ func loadAndMergeConfig(dirPath string) (*registryConfiguration, error) {
 
 // config.signatureTopLevel returns an URL string configured in config for ref, for write access if “write”.
 // (the top level of the storage, namespaced by repo.FullName etc.), or "" if no signature storage should be used.
-func (config *registryConfiguration) signatureTopLevel(ref dockerReference, write bool) string {
+func (config *registryConfiguration) signatureTopLevel(ref DockerReference, write bool) string {
 	if config.Docker != nil {
 		// Look for a full match.
 		identity := ref.PolicyConfigurationIdentity()

@@ -41,8 +41,8 @@ func (t dockerTransport) ValidatePolicyConfigurationScope(scope string) error {
 	return nil
 }
 
-// dockerReference is an ImageReference for Docker images.
-type dockerReference struct {
+// DockerReference is an ImageReference for Docker images.
+type DockerReference struct {
 	ref reference.Named // By construction we know that !reference.IsNameOnly(ref)
 }
 
@@ -74,12 +74,12 @@ func NewReference(ref reference.Named) (types.ImageReference, error) {
 	if isTagged && isDigested {
 		return nil, errors.Errorf("Docker references with both a tag and digest are currently not supported")
 	}
-	return dockerReference{
+	return DockerReference{
 		ref: ref,
 	}, nil
 }
 
-func (ref dockerReference) Transport() types.ImageTransport {
+func (ref DockerReference) Transport() types.ImageTransport {
 	return Transport
 }
 
@@ -88,14 +88,14 @@ func (ref dockerReference) Transport() types.ImageTransport {
 // NOTE: The returned string is not promised to be equal to the original input to ParseReference;
 // e.g. default attribute values omitted by the user may be filled in in the return value, or vice versa.
 // WARNING: Do not use the return value in the UI to describe an image, it does not contain the Transport().Name() prefix.
-func (ref dockerReference) StringWithinTransport() string {
+func (ref DockerReference) StringWithinTransport() string {
 	return "//" + reference.FamiliarString(ref.ref)
 }
 
 // DockerReference returns a Docker reference associated with this reference
 // (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
-func (ref dockerReference) DockerReference() reference.Named {
+func (ref DockerReference) DockerReference() reference.Named {
 	return ref.ref
 }
 
@@ -106,7 +106,7 @@ func (ref dockerReference) DockerReference() reference.Named {
 // It is fine for the return value to be equal to StringWithinTransport(), and it is desirable but
 // not required/guaranteed that it will be a valid input to Transport().ParseReference().
 // Returns "" if configuration identities for these references are not supported.
-func (ref dockerReference) PolicyConfigurationIdentity() string {
+func (ref DockerReference) PolicyConfigurationIdentity() string {
 	res, err := policyconfiguration.DockerReferenceIdentity(ref.ref)
 	if res == "" || err != nil { // Coverage: Should never happen, NewReference above should refuse values which could cause a failure.
 		panic(fmt.Sprintf("Internal inconsistency: policyconfiguration.DockerReferenceIdentity returned %#v, %v", res, err))
@@ -119,7 +119,7 @@ func (ref dockerReference) PolicyConfigurationIdentity() string {
 // in order, terminating on first match, and an implicit "" is always checked at the end.
 // It is STRONGLY recommended for the first element, if any, to be a prefix of PolicyConfigurationIdentity(),
 // and each following element to be a prefix of the element preceding it.
-func (ref dockerReference) PolicyConfigurationNamespaces() []string {
+func (ref DockerReference) PolicyConfigurationNamespaces() []string {
 	return policyconfiguration.DockerReferenceNamespaces(ref.ref)
 }
 
@@ -128,29 +128,29 @@ func (ref dockerReference) PolicyConfigurationNamespaces() []string {
 // NOTE: If any kind of signature verification should happen, build an UnparsedImage from the value returned by NewImageSource,
 // verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage.
 // WARNING: This may not do the right thing for a manifest list, see image.FromSource for details.
-func (ref dockerReference) NewImage(ctx context.Context, sys *types.SystemContext) (types.ImageCloser, error) {
+func (ref DockerReference) NewImage(ctx context.Context, sys *types.SystemContext) (types.ImageCloser, error) {
 	return newImage(ctx, sys, ref)
 }
 
 // NewImageSource returns a types.ImageSource for this reference.
 // The caller must call .Close() on the returned ImageSource.
-func (ref dockerReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
+func (ref DockerReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
 	return newImageSource(sys, ref)
 }
 
 // NewImageDestination returns a types.ImageDestination for this reference.
 // The caller must call .Close() on the returned ImageDestination.
-func (ref dockerReference) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
+func (ref DockerReference) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
 	return newImageDestination(sys, ref)
 }
 
 // DeleteImage deletes the named image from the registry, if supported.
-func (ref dockerReference) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
+func (ref DockerReference) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
 	return deleteImage(ctx, sys, ref)
 }
 
-// tagOrDigest returns a tag or digest from the reference.
-func (ref dockerReference) tagOrDigest() (string, error) {
+// TagOrDigest returns a tag or digest from the reference.
+func (ref DockerReference) TagOrDigest() (string, error) {
 	if ref, ok := ref.ref.(reference.Canonical); ok {
 		return ref.Digest().String(), nil
 	}

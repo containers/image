@@ -26,15 +26,15 @@ import (
 )
 
 type dockerImageDestination struct {
-	ref dockerReference
+	ref DockerReference
 	c   *dockerClient
 	// State
 	manifestDigest digest.Digest // or "" if not yet known.
 }
 
 // newImageDestination creates a new ImageDestination for the specified image reference.
-func newImageDestination(sys *types.SystemContext, ref dockerReference) (types.ImageDestination, error) {
-	c, err := newDockerClientFromRef(sys, ref, true, "pull,push")
+func newImageDestination(sys *types.SystemContext, ref DockerReference) (types.ImageDestination, error) {
+	c, err := NewDockerClientFromRef(sys, ref, true, "pull,push")
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	// FIXME? Chunked upload, progress reporting, etc.
 	uploadPath := fmt.Sprintf(blobUploadPath, reference.Path(d.ref.ref))
 	logrus.Debugf("Uploading %s", uploadPath)
-	res, err := d.c.makeRequest(ctx, "POST", uploadPath, nil, nil, v2Auth)
+	res, err := d.c.MakeRequest(ctx, "POST", uploadPath, nil, nil, V2Auth)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
@@ -147,7 +147,7 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	digester := digest.Canonical.Digester()
 	sizeCounter := &sizeCounter{}
 	tee := io.TeeReader(stream, io.MultiWriter(digester.Hash(), sizeCounter))
-	res, err = d.c.makeRequestToResolvedURL(ctx, "PATCH", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, tee, inputInfo.Size, v2Auth)
+	res, err = d.c.makeRequestToResolvedURL(ctx, "PATCH", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, tee, inputInfo.Size, V2Auth)
 	if err != nil {
 		logrus.Debugf("Error uploading layer chunked, response %#v", res)
 		return types.BlobInfo{}, err
@@ -166,7 +166,7 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	// TODO: check inputInfo.Digest == computedDigest https://github.com/containers/image/pull/70#discussion_r77646717
 	locationQuery.Set("digest", computedDigest.String())
 	uploadLocation.RawQuery = locationQuery.Encode()
-	res, err = d.c.makeRequestToResolvedURL(ctx, "PUT", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, nil, -1, v2Auth)
+	res, err = d.c.makeRequestToResolvedURL(ctx, "PUT", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, nil, -1, V2Auth)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
@@ -191,7 +191,7 @@ func (d *dockerImageDestination) HasBlob(ctx context.Context, info types.BlobInf
 	checkPath := fmt.Sprintf(blobsPath, reference.Path(d.ref.ref), info.Digest.String())
 
 	logrus.Debugf("Checking %s", checkPath)
-	res, err := d.c.makeRequest(ctx, "HEAD", checkPath, nil, nil, v2Auth)
+	res, err := d.c.MakeRequest(ctx, "HEAD", checkPath, nil, nil, V2Auth)
 	if err != nil {
 		return false, -1, err
 	}
@@ -226,7 +226,7 @@ func (d *dockerImageDestination) PutManifest(ctx context.Context, m []byte) erro
 	}
 	d.manifestDigest = digest
 
-	refTail, err := d.ref.tagOrDigest()
+	refTail, err := d.ref.TagOrDigest()
 	if err != nil {
 		return err
 	}
@@ -237,7 +237,7 @@ func (d *dockerImageDestination) PutManifest(ctx context.Context, m []byte) erro
 	if mimeType != "" {
 		headers["Content-Type"] = []string{mimeType}
 	}
-	res, err := d.c.makeRequest(ctx, "PUT", path, headers, bytes.NewReader(m), v2Auth)
+	res, err := d.c.MakeRequest(ctx, "PUT", path, headers, bytes.NewReader(m), V2Auth)
 	if err != nil {
 		return err
 	}
@@ -442,7 +442,7 @@ sigExists:
 		}
 
 		path := fmt.Sprintf(extensionsSignaturePath, reference.Path(d.ref.ref), d.manifestDigest.String())
-		res, err := d.c.makeRequest(ctx, "PUT", path, nil, bytes.NewReader(body), v2Auth)
+		res, err := d.c.MakeRequest(ctx, "PUT", path, nil, bytes.NewReader(body), V2Auth)
 		if err != nil {
 			return err
 		}

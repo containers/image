@@ -59,7 +59,7 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 			assert.Error(t, err, c.input)
 		} else {
 			require.NoError(t, err, c.input)
-			dockerRef, ok := ref.(dockerReference)
+			dockerRef, ok := ref.(DockerReference)
 			require.True(t, ok, c.input)
 			assert.Equal(t, c.expected, dockerRef.ref.String(), c.input)
 		}
@@ -80,7 +80,7 @@ func TestNewReference(t *testing.T) {
 		require.NoError(t, err)
 		ref, err := NewReference(parsed)
 		require.NoError(t, err, c.input)
-		dockerRef, ok := ref.(dockerReference)
+		dockerRef, ok := ref.(DockerReference)
 		require.True(t, ok, c.input)
 		assert.Equal(t, c.dockerRef, dockerRef.ref.String(), c.input)
 	}
@@ -188,9 +188,9 @@ func TestReferenceTagOrDigest(t *testing.T) {
 	} {
 		ref, err := ParseReference(input)
 		require.NoError(t, err, input)
-		dockerRef, ok := ref.(dockerReference)
+		dockerRef, ok := ref.(DockerReference)
 		require.True(t, ok, input)
-		tod, err := dockerRef.tagOrDigest()
+		tod, err := dockerRef.TagOrDigest()
 		require.NoError(t, err, input)
 		assert.Equal(t, expected, tod, input)
 	}
@@ -198,7 +198,7 @@ func TestReferenceTagOrDigest(t *testing.T) {
 	// Invalid input
 	ref, err := reference.ParseNormalizedNamed("busybox")
 	require.NoError(t, err)
-	dockerRef := dockerReference{ref: ref}
-	_, err = dockerRef.tagOrDigest()
+	dockerRef := DockerReference{ref: ref}
+	_, err = dockerRef.TagOrDigest()
 	assert.Error(t, err)
 }

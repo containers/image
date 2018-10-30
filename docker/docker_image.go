@@ -24,7 +24,7 @@ type Image struct {
 // newImage returns a new Image interface type after setting up
 // a client to the registry hosting the given image.
 // The caller must call .Close() on the returned Image.
-func newImage(ctx context.Context, sys *types.SystemContext, ref dockerReference) (types.ImageCloser, error) {
+func newImage(ctx context.Context, sys *types.SystemContext, ref DockerReference) (types.ImageCloser, error) {
 	s, err := newImageSource(sys, ref)
 	if err != nil {
 		return nil, err
@@ -52,13 +52,13 @@ func (i *Image) GetRepositoryTags(ctx context.Context) ([]string, error) {
 // GetRepositoryTags list all tags available in the repository. The tag
 // provided inside the ImageReference will be ignored.
 func GetRepositoryTags(ctx context.Context, sys *types.SystemContext, ref types.ImageReference) ([]string, error) {
-	dr, ok := ref.(dockerReference)
+	dr, ok := ref.(DockerReference)
 	if !ok {
-		return nil, errors.Errorf("ref must be a dockerReference")
+		return nil, errors.Errorf("ref must be a DockerReference")
 	}
 
 	path := fmt.Sprintf(tagsPath, reference.Path(dr.ref))
-	client, err := newDockerClientFromRef(sys, dr, false, "pull")
+	client, err := NewDockerClientFromRef(sys, dr, false, "pull")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create client")
 	}
@@ -66,7 +66,7 @@ func GetRepositoryTags(ctx context.Context, sys *types.SystemContext, ref types.
 	tags := make([]string, 0)
 
 	for {
-		res, err := client.makeRequest(ctx, "GET", path, nil, nil, v2Auth)
+		res, err := client.MakeRequest(ctx, "GET", path, nil, nil, V2Auth)
 		if err != nil {
 			return nil, err
 		}

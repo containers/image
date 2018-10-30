@@ -21,7 +21,7 @@ import (
 )
 
 type dockerImageSource struct {
-	ref dockerReference
+	ref DockerReference
 	c   *dockerClient
 	// State
 	cachedManifest         []byte // nil if not loaded yet
@@ -30,8 +30,8 @@ type dockerImageSource struct {
 
 // newImageSource creates a new ImageSource for the specified image reference.
 // The caller must call .Close() on the returned ImageSource.
-func newImageSource(sys *types.SystemContext, ref dockerReference) (*dockerImageSource, error) {
-	c, err := newDockerClientFromRef(sys, ref, false, "pull")
+func newImageSource(sys *types.SystemContext, ref DockerReference) (*dockerImageSource, error) {
+	c, err := NewDockerClientFromRef(sys, ref, false, "pull")
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (s *dockerImageSource) fetchManifest(ctx context.Context, tagOrDigest strin
 	path := fmt.Sprintf(manifestPath, reference.Path(s.ref.ref), tagOrDigest)
 	headers := make(map[string][]string)
 	headers["Accept"] = manifest.DefaultRequestedManifestMIMETypes
-	res, err := s.c.makeRequest(ctx, "GET", path, headers, nil, v2Auth)
+	res, err := s.c.MakeRequest(ctx, "GET", path, headers, nil, V2Auth)
 	if err != nil {
 		return nil, "", err
 	}
@@ -116,7 +116,7 @@ func (s *dockerImageSource) ensureManifestIsLoaded(ctx context.Context) error {
 		return nil
 	}
 
-	reference, err := s.ref.tagOrDigest()
+	reference, err := s.ref.TagOrDigest()
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func (s *dockerImageSource) getExternalBlob(ctx context.Context, urls []string) 
 		err  error
 	)
 	for _, url := range urls {
-		resp, err = s.c.makeRequestToResolvedURL(ctx, "GET", url, nil, nil, -1, noAuth)
+		resp, err = s.c.makeRequestToResolvedURL(ctx, "GET", url, nil, nil, -1, NoAuth)
 		if err == nil {
 			if resp.StatusCode != http.StatusOK {
 				err = errors.Errorf("error fetching external blob from %q: %d (%s)", url, resp.StatusCode, http.StatusText(resp.StatusCode))
@@ -169,7 +169,7 @@ func (s *dockerImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (i
 
 	path := fmt.Sprintf(blobsPath, reference.Path(s.ref.ref), info.Digest.String())
 	logrus.Debugf("Downloading %s", path)
-	res, err := s.c.makeRequest(ctx, "GET", path, nil, nil, v2Auth)
+	res, err := s.c.MakeRequest(ctx, "GET", path, nil, nil, V2Auth)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -309,7 +309,7 @@ func (s *dockerImageSource) getSignaturesFromAPIExtension(ctx context.Context, i
 }
 
 // deleteImage deletes the named image from the registry, if supported.
-func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerReference) error {
+func deleteImage(ctx context.Context, sys *types.SystemContext, ref DockerReference) error {
 	// docker/distribution does not document what action should be used for deleting images.
 	//
 	// Current docker/distribution requires "pull" for reading the manifest and "delete" for deleting it.
@@ -317,7 +317,7 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 	// OpenShift ignores the action string (both the password and the token is an OpenShift API token identifying a user).
 	//
 	// We have to hard-code a single string, luckily both docker/distribution and quay.io support "*" to mean "everything".
-	c, err := newDockerClientFromRef(sys, ref, true, "*")
+	c, err := NewDockerClientFromRef(sys, ref, true, "*")
 	if err != nil {
 		return err
 	}
@@ -327,12 +327,12 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 	headers := make(map[string][]string)
 	headers["Accept"] = []string{manifest.DockerV2Schema2MediaType}
 
-	refTail, err := ref.tagOrDigest()
+	refTail, err := ref.TagOrDigest()
 	if err != nil {
 		return err
 	}
 	getPath := fmt.Sprintf(manifestPath, reference.Path(ref.ref), refTail)
-	get, err := c.makeRequest(ctx, "GET", getPath, headers, nil, v2Auth)
+	get, err := c.MakeRequest(ctx, "GET", getPath, headers, nil, V2Auth)
 	if err != nil {
 		return err
 	}
@@ -354,7 +354,7 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 
 	// When retrieving the digest from a registry >= 2.3 use the following header:
 	//   "Accept": "application/vnd.docker.distribution.manifest.v2+json"
-	delete, err := c.makeRequest(ctx, "DELETE", deletePath, headers, nil, v2Auth)
+	delete, err := c.MakeRequest(ctx, "DELETE", deletePath, headers, nil, V2Auth)
 	if err != nil {
 		return err
 	}
