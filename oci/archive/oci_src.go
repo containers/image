@@ -76,6 +76,12 @@ func (s *ociArchiveImageSource) GetManifest(ctx context.Context, instanceDigest 
 	return s.unpackedSrc.GetManifest(ctx, instanceDigest)
 }
 
+// ConcurrentGetBlob returns true as this source supports concurrent calls to
+// GetBlob
+func (s *ociArchiveImageSource) ConcurrentGetBlob() (bool) {
+	return true
+}
+
 // GetBlob returns a stream for the specified blob, and the blob's size.
 func (s *ociArchiveImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadCloser, int64, error) {
 	return s.unpackedSrc.GetBlob(ctx, info)

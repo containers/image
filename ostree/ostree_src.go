@@ -255,6 +255,12 @@ func (s *ostreeImageSource) readSingleFile(commit, path string) (io.ReadCloser, 
 	return getter.Get(path)
 }
 
+// ConcurrentGetBlob returns false as it is unknown whether this source
+// supports concurrent calls to GetBlob
+func (s *ostreeImageSource) ConcurrentGetBlob() (bool) {
+	return false
+}
+
 // GetBlob returns a stream for the specified blob, and the blob's size.
 func (s *ostreeImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadCloser, int64, error) {
 

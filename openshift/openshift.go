@@ -211,6 +211,14 @@ func (s *openshiftImageSource) GetManifest(ctx context.Context, instanceDigest *
 	return s.docker.GetManifest(ctx, instanceDigest)
 }
 
+// ConcurrentGetBlob delegates to the docker source ConcurrentGetBlob
+func (s *openshiftImageSource) ConcurrentGetBlob() (bool) {
+	if s.docker != nil {
+		return s.docker.ConcurrentGetBlob()
+	}
+	return false
+}
+
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 func (s *openshiftImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadCloser, int64, error) {
 	if err := s.ensureImageIsResolved(ctx); err != nil {
@@ -375,6 +383,15 @@ func (d *openshiftImageDestination) MustMatchRuntimeOS() bool {
 func (d *openshiftImageDestination) IgnoresEmbeddedDockerReference() bool {
 	return d.docker.IgnoresEmbeddedDockerReference()
 }
+
+// ConcurrentPutBlob delegates to the docker destination ConcurrentPutBlob
+func (d *openshiftImageDestination) ConcurrentPutBlob() (bool) {
+	if d.docker != nil {
+		return d.docker.ConcurrentPutBlob()
+	}
+	return false
+}
+
 
 // PutBlob writes contents of stream and returns data representing the result (with all data filled in).
 // inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.

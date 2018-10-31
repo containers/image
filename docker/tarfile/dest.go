@@ -82,6 +82,12 @@ func (d *Destination) IgnoresEmbeddedDockerReference() bool {
 	return false // N/A, we only accept schema2 images where EmbeddedDockerReferenceConflicts() is always false.
 }
 
+// ConcurrentPutBlob returns false as this destination does not support concurrent
+// calls to PutBlob, HasBlob, ReapplyBlob 
+func (d *Destination) ConcurrentPutBlob() (bool) {
+	return false
+}
+
 // PutBlob writes contents of stream and returns data representing the result (with all data filled in).
 // inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
 // inputInfo.Size is the expected length of stream, if known.

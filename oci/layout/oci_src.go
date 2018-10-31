@@ -92,6 +92,12 @@ func (s *ociImageSource) GetManifest(ctx context.Context, instanceDigest *digest
 	return m, mimeType, nil
 }
 
+// ConcurrentGetBlob returns true as this source supports concurrent calls to
+// GetBlob
+func (s *ociImageSource) ConcurrentGetBlob() (bool) {
+	return true
+}
+
 // GetBlob returns a stream for the specified blob, and the blob's size.
 func (s *ociImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadCloser, int64, error) {
 	if len(info.URLs) != 0 {

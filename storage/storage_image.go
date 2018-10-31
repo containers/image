@@ -99,6 +99,12 @@ func (s storageImageSource) Close() error {
 	return nil
 }
 
+// ConcurrentGetBlob returns false as this source does not
+// support concurrent calls to GetBlob
+func (s *storageImageSource) ConcurrentGetBlob() (bool) {
+	return false
+}
+
 // GetBlob reads the data blob or filesystem layer which matches the digest and size, if given.
 func (s *storageImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (rc io.ReadCloser, n int64, err error) {
 	if info.Digest == image.GzippedEmptyLayerDigest {
@@ -315,6 +321,12 @@ func (s storageImageDestination) DesiredLayerCompression() types.LayerCompressio
 
 func (s *storageImageDestination) computeNextBlobCacheFile() string {
 	return filepath.Join(s.directory, fmt.Sprintf("%d", atomic.AddInt32(&s.nextTempFileID, 1)))
+}
+
+// ConcurrentPutBlob returns false as this destination does not support concurrent
+// calls to PutBlob, HasBlob, ReapplyBlob 
+func (d *storageImageDestination) ConcurrentPutBlob() (bool) {
+	return false
 }
 
 // PutBlob stores a layer or data blob in our temporary directory, checking that any information

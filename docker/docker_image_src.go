@@ -161,6 +161,12 @@ func getBlobSize(resp *http.Response) int64 {
 	return size
 }
 
+// ConcurrentGetBlob returns true as this source supports concurrent calls to
+// GetBlob
+func (s *dockerImageSource) ConcurrentGetBlob() (bool) {
+	return true
+}
+
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 func (s *dockerImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadCloser, int64, error) {
 	if len(info.URLs) != 0 {

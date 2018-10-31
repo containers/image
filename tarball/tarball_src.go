@@ -207,6 +207,12 @@ func (is *tarballImageSource) Close() error {
 	return nil
 }
 
+// ConcurrentGetBlob returns true as this source supports concurrent calls to
+// GetBlob
+func (s *tarballImageSource) ConcurrentGetBlob() (bool) {
+	return true
+}
+
 func (is *tarballImageSource) GetBlob(ctx context.Context, blobinfo types.BlobInfo) (io.ReadCloser, int64, error) {
 	// We should only be asked about things in the manifest.  Maybe the configuration blob.
 	if blobinfo.Digest == is.configID {

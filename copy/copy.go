@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/containers/image/image"
@@ -381,11 +382,44 @@ func (ic *imageCopier) updateEmbeddedDockerReference() error {
 	return nil
 }
 
+type copyJob struct {
+	ctx context.Context
+	ic *imageCopier
+	srcLayer types.BlobInfo
+	bar *pb.ProgressBar
+	layerIndex int
+}
+type copyResult struct {
+	job copyJob
+	destInfo types.BlobInfo
+	diffID digest.Digest
+	err error
+}
+func copyWorker(i int, wg *sync.WaitGroup, jobs <-chan copyJob, results chan<- copyResult){
+	logrus.Debugf("Worker %v starting\n", i)
+	for j := range jobs {
+		logrus.Debugf("Worker %v job %v\n", i, j.layerIndex)
+		destInfo, diffID, err := j.ic.copyLayer(j.ctx, j.srcLayer, j.bar)
+		result := copyResult{
+			job: j,
+			destInfo: destInfo,
+			diffID: diffID,
+			err: err,
+		}
+		results <- result
+		logrus.Debugf("Worker %v job %v done\n", i, j.layerIndex)
+	}
+	logrus.Debugf("Worker %v finished\n", i)
+	wg.Done()
+}
+
 // copyLayers copies layers from ic.src/ic.c.rawSource to dest, using and updating ic.manifestUpdates if necessary and ic.canModifyManifest.
 func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	srcInfos := ic.src.LayerInfos()
-	destInfos := []types.BlobInfo{}
-	diffIDs := []digest.Digest{}
+	srcCount := len(srcInfos)
+	var destInfos = make([]types.BlobInfo, srcCount)
+	var diffIDs = make([]digest.Digest, srcCount)
+
 	updatedSrcInfos, err := ic.src.LayerInfosForCopy(ctx)
 	if err != nil {
 		return err
@@ -414,16 +448,26 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	var pool *pb.Pool
 	if logrus.GetLevel() < logrus.DebugLevel {
 		pool, err = pb.StartPool(bars...)
+		defer pool.Stop()
 		if err != nil {
 			return err
 		}
 	}
+
+	jobs := make(chan copyJob, srcCount)
+	results := make(chan copyResult, srcCount)
+	var wg sync.WaitGroup
+
+	workers := 1
+	if ic.c.dest.ConcurrentPutBlob() && ic.c.rawSource.ConcurrentGetBlob() {
+		workers = 4
+	}
+	for i := 0 ; i < workers ; i++ {
+		wg.Add(1)
+		go copyWorker(0, &wg, jobs, results)
+	}
+
 	for i, srcLayer := range srcInfos {
-		var (
-			destInfo types.BlobInfo
-			diffID   digest.Digest
-			err      error
-		)
 		bar := bars[i]
 		if ic.c.dest.AcceptsForeignLayerURLs() && len(srcLayer.URLs) != 0 {
 			// DiffIDs are, currently, needed only when converting from schema1.
@@ -432,22 +476,33 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 			if ic.diffIDsAreNeeded {
 				return errors.New("getting DiffID for foreign layers is unimplemented")
 			}
-			destInfo = srcLayer
-			logrus.Debugf("Skipping foreign layer %q copy to %s\n", destInfo.Digest, ic.c.dest.Reference().Transport().Name())
+			destInfos[i] = srcLayer
+			logrus.Debugf("Skipping foreign layer %q copy to %s\n", srcLayer.Digest, ic.c.dest.Reference().Transport().Name())
 			updateBarPrefix(bar, srcLayer, "Skipping foreign layer", true)
 		} else {
-			destInfo, diffID, err = ic.copyLayer(ctx, srcLayer, bar)
-			if err != nil {
-				return err
+			job := copyJob{
+				ctx: ctx,
+				ic: ic,
+				srcLayer: srcLayer,
+				bar: bar,
+				layerIndex: i,
 			}
+			jobs <- job
 		}
-		destInfos = append(destInfos, destInfo)
-		diffIDs = append(diffIDs, diffID)
 	}
-	if pool != nil {
-		pool.Stop()
-		ic.c.Printf("\n")
+	close(jobs)
+	wg.Wait()
+	close(results)
+
+	for result := range results {
+		if result.err != nil {
+			return err
+		}
+		i := result.job.layerIndex
+		destInfos[i] = result.destInfo
+		diffIDs[i] = result.diffID
 	}
+	ic.c.Printf("\n")
 
 	ic.manifestUpdates.InformationOnly.LayerInfos = destInfos
 	if ic.diffIDsAreNeeded {

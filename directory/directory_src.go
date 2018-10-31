@@ -48,6 +48,12 @@ func (s *dirImageSource) GetManifest(ctx context.Context, instanceDigest *digest
 	return m, manifest.GuessMIMEType(m), err
 }
 
+// ConcurrentGetBlob returns true as this source supports concurrent calls to
+// GetBlob
+func (s *dirImageSource) ConcurrentGetBlob() (bool) {
+	return true
+}
+
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 func (s *dirImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadCloser, int64, error) {
 	r, err := os.Open(s.ref.layerPath(info.Digest))

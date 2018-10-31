@@ -32,6 +32,9 @@ func (f unusedImageSource) Close() error {
 func (f unusedImageSource) GetManifest(context.Context, *digest.Digest) ([]byte, string, error) {
 	panic("Unexpected call to a mock function")
 }
+func (f unusedImageSource) ConcurrentGetBlob() (bool) {
+	panic("Unexpected call to a mock function")
+}
 func (f unusedImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadCloser, int64, error) {
 	panic("Unexpected call to a mock function")
 }
@@ -152,6 +155,9 @@ type configBlobImageSource struct {
 	f                 func(digest digest.Digest) (io.ReadCloser, int64, error)
 }
 
+func (f configBlobImageSource) ConcurrentGetBlob() (bool) {
+	return false
+}
 func (f configBlobImageSource) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadCloser, int64, error) {
 	if info.Digest.String() != "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f" {
 		panic("Unexpected digest in GetBlob")
@@ -394,6 +400,9 @@ func (d *memoryImageDest) MustMatchRuntimeOS() bool {
 }
 func (d *memoryImageDest) IgnoresEmbeddedDockerReference() bool {
 	panic("Unexpected call to a mock function")
+}
+func (d *memoryImageDest) ConcurrentPutBlob() (bool) {
+	return false
 }
 func (d *memoryImageDest) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, isConfig bool) (types.BlobInfo, error) {
 	if d.storedBlobs == nil {

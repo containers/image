@@ -132,6 +132,12 @@ func (d *ostreeImageDestination) IgnoresEmbeddedDockerReference() bool {
 	return false // N/A, DockerReference() returns nil.
 }
 
+// ConcurrentPutBlob returns false as it is not known if this destination
+// supports concurrent calls to PutBlob, HasBlob, ReapplyBlob 
+func (d *ostreeImageDestination) ConcurrentPutBlob() (bool) {
+	return false
+}
+
 func (d *ostreeImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, isConfig bool) (types.BlobInfo, error) {
 	tmpDir, err := ioutil.TempDir(d.tmpDirPath, "blob")
 	if err != nil {

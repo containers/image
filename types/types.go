@@ -130,6 +130,9 @@ type ImageSource interface {
 	// The Digest field is guaranteed to be provided; Size may be -1.
 	// WARNING: The list may contain duplicates, and they are semantically relevant.
 	LayerInfosForCopy(ctx context.Context) ([]BlobInfo, error)
+	// ConcurrentGetBlob returns true if multiple concurrent calls to GetBlob
+	// is supported by this source
+	ConcurrentGetBlob() (bool)
 }
 
 // LayerCompression indicates if layers must be compressed, decompressed or preserved
@@ -205,6 +208,9 @@ type ImageDestination interface {
 	// - Uploaded data MAY be visible to others before Commit() is called
 	// - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 	Commit(ctx context.Context) error
+	// ConcurrentPutBlob returns true if multiple concurrent calls to PutBlob,
+	// HasBlob, ReapplyBlob is supported by this destination
+	ConcurrentPutBlob() (bool)
 }
 
 // ManifestTypeRejectedError is returned by ImageDestination.PutManifest if the destination is in principle available,

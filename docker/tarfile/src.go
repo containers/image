@@ -397,6 +397,12 @@ func (r uncompressedReadCloser) Close() error {
 	return res
 }
 
+// ConcurrentGetBlob returns true as this source supports concurrent calls to
+// GetBlob
+func (s *Source) ConcurrentGetBlob() (bool) {
+	return true
+}
+
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo) (io.ReadCloser, int64, error) {
 	if err := s.ensureCachedDataIsPresent(); err != nil {
