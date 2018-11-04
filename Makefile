@@ -99,5 +99,7 @@ ifeq ($(TRAVIS),true)
 else
 	git fetch -q "https://github.com/containers/image.git" "refs/heads/master"
 	upstream="$$(git rev-parse --verify FETCH_HEAD)" ; \
+		ours=$$(git rev-parse --verify HEAD); \
+		[ $$upstream = $$ours ] ||\
 		git-validation -q -run DCO,short-subject,dangling-whitespace -range $$upstream..HEAD
 endif
