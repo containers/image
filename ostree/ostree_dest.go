@@ -25,6 +25,7 @@ import (
 	"github.com/containers/image/types"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/opencontainers/go-digest"
+	rsystem "github.com/opencontainers/runc/libcontainer/system"
 	selinux "github.com/opencontainers/selinux/go-selinux"
 	"github.com/ostreedev/ostree-go/pkg/otbuiltin"
 	"github.com/pkg/errors"
@@ -272,6 +273,18 @@ func generateTarSplitMetadata(output *bytes.Buffer, file string) (digest.Digest,
 	return digester.Digest(), written, nil
 }
 
+func untarPath(src, dst string) error {
+	ar, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer ar.Close()
+	options := &archive.TarOptions{
+		InUserNS: rsystem.RunningInUserNS(),
+	}
+	return archive.Untar(ar, dst, options)
+}
+
 func (d *ostreeImageDestination) importBlob(selinuxHnd *C.struct_selabel_handle, repo *otbuiltin.Repo, blob *blobToImport) error {
 	// TODO: This can take quite some time, and should ideally be cancellable using a context.Context.
 
@@ -290,9 +303,8 @@ func (d *ostreeImageDestination) importBlob(selinuxHnd *C.struct_selabel_handle,
 	if err != nil {
 		return err
 	}
-
 	if os.Getuid() == 0 {
-		if err := archive.UntarPath(blob.BlobPath, destinationPath); err != nil {
+		if err := untarPath(blob.BlobPath, destinationPath); err != nil {
 			return err
 		}
 		if err := fixFiles(selinuxHnd, destinationPath, destinationPath, false); err != nil {
