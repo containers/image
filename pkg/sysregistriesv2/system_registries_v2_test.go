@@ -1,6 +1,7 @@
 package sysregistriesv2
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/containers/image/types"
@@ -118,6 +119,46 @@ url = "mirror-b.com"
 	_, err := GetRegistries(nil)
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "invalid URL")
+}
+
+func TestRefMatchesPrefix(t *testing.T) {
+	for _, c := range []struct {
+		ref, prefix string
+		expected    bool
+	}{
+		// Prefix is a reference.Domain() value
+		{"docker.io", "docker.io", true},
+		{"docker.io", "example.com", false},
+		{"example.com:5000", "example.com:5000", true},
+		{"example.com:50000", "example.com:5000", false},
+		{"example.com:5000", "example.com", true}, // FIXME FIXME This is unintended and undocumented, don't rely on this behavior
+		{"example.com/foo", "example.com", true},
+		{"example.com/foo/bar", "example.com", true},
+		{"example.com/foo/bar:baz", "example.com", true},
+		{"example.com/foo/bar@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "example.com", true},
+		// Prefix is a reference.Named.Name() value or a repo namespace
+		{"docker.io", "docker.io/library", false},
+		{"docker.io/library", "docker.io/library", true},
+		{"example.com/library", "docker.io/library", false},
+		{"docker.io/libraryy", "docker.io/library", false},
+		{"docker.io/library/busybox", "docker.io/library", true},
+		{"docker.io", "docker.io/library/busybox", false},
+		{"docker.io/library/busybox", "docker.io/library/busybox", true},
+		{"example.com/library/busybox", "docker.io/library/busybox", false},
+		{"docker.io/library/busybox2", "docker.io/library/busybox", false},
+		// Prefix is a single image
+		{"example.com", "example.com/foo:bar", false},
+		{"example.com/foo", "example.com/foo:bar", false},
+		{"example.com/foo:bar", "example.com/foo:bar", true},
+		{"example.com/foo:bar2", "example.com/foo:bar", false},
+		{"example.com", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false},
+		{"example.com/foo", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false},
+		{"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", true},
+		{"example.com/foo@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false},
+	} {
+		res := refMatchesPrefix(c.ref, c.prefix)
+		assert.Equal(t, c.expected, res, fmt.Sprintf("%s vs. %s", c.ref, c.prefix))
+	}
 }
 
 func TestFindRegistry(t *testing.T) {
