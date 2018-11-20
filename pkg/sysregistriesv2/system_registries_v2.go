@@ -280,7 +280,18 @@ var configMutex = sync.Mutex{}
 // are synchronized via configMutex.
 var configCache = make(map[string][]Registry)
 
+// InvalidateCache invalidates the registry cache.  This function is meant to be
+// used for long-running processes that need to reload potential changes made to
+// the cached registry config files.
+func InvalidateCache() {
+	configMutex.Lock()
+	defer configMutex.Unlock()
+	configCache = make(map[string][]Registry)
+}
+
 // GetRegistries loads and returns the registries specified in the config.
+// Note the parsed content of registry config files is cached.  For reloading,
+// use `InvalidateCache` and re-call `GetRegistries`.
 func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 	configPath := getConfigPath(ctx)
 

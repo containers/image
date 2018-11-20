@@ -386,3 +386,47 @@ insecure = true`)
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
 }
+
+func TestInvalidateCache(t *testing.T) {
+	testConfig = []byte(`
+[[registry]]
+url = "registry.com"
+
+[[registry.mirror]]
+url = "mirror-1.registry.com"
+
+[[registry.mirror]]
+url = "mirror-2.registry.com"
+
+
+[[registry]]
+url = "blocked.registry.com"
+blocked = true
+
+
+[[registry]]
+url = "insecure.registry.com"
+insecure = true
+
+
+[[registry]]
+url = "untrusted.registry.com"
+insecure = true`)
+
+	ctx := &types.SystemContext{}
+
+	configCache = make(map[string][]Registry)
+	registries, err := GetRegistries(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, 4, len(registries))
+	assertSearchRegistryURLsEqual(t, []string{"registry.com", "blocked.registry.com", "insecure.registry.com", "untrusted.registry.com"}, registries)
+
+	// invalidate the cache, make sure it's empty and reload
+	InvalidateCache()
+	assert.Equal(t, 0, len(configCache))
+
+	registries, err = GetRegistries(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, 4, len(registries))
+	assertSearchRegistryURLsEqual(t, []string{"registry.com", "blocked.registry.com", "insecure.registry.com", "untrusted.registry.com"}, registries)
+}
