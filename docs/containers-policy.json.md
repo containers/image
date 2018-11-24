@@ -1,8 +1,11 @@
-% POLICY.JSON(5) policy.json Man Page
+% CONTAINERS-POLICY.JSON(5) policy.json Man Page
 % Miloslav Trmač
 % September 2016
 
-# Signature verification policy file format
+# NAME
+containers-policy.json - syntax for the signature verification policy file
+
+## DESCRIPTION
 
 Signature verification policy files are used to specify policy, e.g. trusted keys,
 applicable when deciding whether to accept an image, or individual signatures of that image, as valid.
@@ -10,7 +13,7 @@ applicable when deciding whether to accept an image, or individual signatures of
 The default policy is stored (unless overridden at compile-time) at `/etc/containers/policy.json`;
 applications performing verification may allow using a different policy instead.
 
-## Overall structure
+## FORMAT
 
 The signature verification policy file, usually called `policy.json`,
 uses a JSON format.  Unlike some other JSON files, its parsing is fairly strict:
@@ -271,3 +274,10 @@ selectively allow individual transports and scopes as desired.
     "default": [{"type": "insecureAcceptAnything"}]
 }
 ```
+## SEE ALSO
+  atomic(1)
+
+## HISTORY
+August 2018, Rename to containers-policy.json(5) by Valentin Rothberg <vrothberg@suse.com>
+
+September 2016, Originally compiled by Miloslav Trmač <mitr@redhat.com>

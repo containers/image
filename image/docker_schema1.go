@@ -1,7 +1,7 @@
 package image
 
 import (
-	"encoding/json"
+	"context"
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
@@ -24,8 +24,12 @@ func manifestSchema1FromManifest(manifestBlob []byte) (genericManifest, error) {
 }
 
 // manifestSchema1FromComponents builds a new manifestSchema1 from the supplied data.
-func manifestSchema1FromComponents(ref reference.Named, fsLayers []manifest.Schema1FSLayers, history []manifest.Schema1History, architecture string) genericManifest {
-	return &manifestSchema1{m: manifest.Schema1FromComponents(ref, fsLayers, history, architecture)}
+func manifestSchema1FromComponents(ref reference.Named, fsLayers []manifest.Schema1FSLayers, history []manifest.Schema1History, architecture string) (genericManifest, error) {
+	m, err := manifest.Schema1FromComponents(ref, fsLayers, history, architecture)
+	if err != nil {
+		return nil, err
+	}
+	return &manifestSchema1{m: m}, nil
 }
 
 func (m *manifestSchema1) serialize() ([]byte, error) {
@@ -44,26 +48,26 @@ func (m *manifestSchema1) ConfigInfo() types.BlobInfo {
 
 // ConfigBlob returns the blob described by ConfigInfo, iff ConfigInfo().Digest != ""; nil otherwise.
 // The result is cached; it is OK to call this however often you need.
-func (m *manifestSchema1) ConfigBlob() ([]byte, error) {
+func (m *manifestSchema1) ConfigBlob(context.Context) ([]byte, error) {
 	return nil, nil
 }
 
 // OCIConfig returns the image configuration as per OCI v1 image-spec. Information about
 // layers in the resulting configuration isn't guaranteed to be returned to due how
 // old image manifests work (docker v2s1 especially).
-func (m *manifestSchema1) OCIConfig() (*imgspecv1.Image, error) {
+func (m *manifestSchema1) OCIConfig(ctx context.Context) (*imgspecv1.Image, error) {
 	v2s2, err := m.convertToManifestSchema2(nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	return v2s2.OCIConfig()
+	return v2s2.OCIConfig(ctx)
 }
 
 // LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
 // The Digest field is guaranteed to be provided; Size may be -1.
 // WARNING: The list may contain duplicates, and they are semantically relevant.
 func (m *manifestSchema1) LayerInfos() []types.BlobInfo {
-	return m.m.LayerInfos()
+	return manifestLayerInfosToBlobInfos(m.m.LayerInfos())
 }
 
 // EmbeddedDockerReferenceConflicts whether a Docker reference embedded in the manifest, if any, conflicts with destination ref.
@@ -87,7 +91,8 @@ func (m *manifestSchema1) EmbeddedDockerReferenceConflicts(ref reference.Named) 
 	return m.m.Name != name || m.m.Tag != tag
 }
 
-func (m *manifestSchema1) imageInspectInfo() (*types.ImageInspectInfo, error) {
+// Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
+func (m *manifestSchema1) Inspect(context.Context) (*types.ImageInspectInfo, error) {
 	return m.m.Inspect(nil)
 }
 
@@ -95,12 +100,12 @@ func (m *manifestSchema1) imageInspectInfo() (*types.ImageInspectInfo, error) {
 // This is a horribly specific interface, but computing InformationOnly.LayerDiffIDs can be very expensive to compute
 // (most importantly it forces us to download the full layers even if they are already present at the destination).
 func (m *manifestSchema1) UpdatedImageNeedsLayerDiffIDs(options types.ManifestUpdateOptions) bool {
-	return options.ManifestMIMEType == manifest.DockerV2Schema2MediaType
+	return (options.ManifestMIMEType == manifest.DockerV2Schema2MediaType || options.ManifestMIMEType == imgspecv1.MediaTypeImageManifest)
 }
 
 // UpdatedImage returns a types.Image modified according to options.
 // This does not change the state of the original Image object.
-func (m *manifestSchema1) UpdatedImage(options types.ManifestUpdateOptions) (types.Image, error) {
+func (m *manifestSchema1) UpdatedImage(ctx context.Context, options types.ManifestUpdateOptions) (types.Image, error) {
 	copy := manifestSchema1{m: manifest.Schema1Clone(m.m)}
 	if options.LayerInfos != nil {
 		if err := copy.m.UpdateLayerInfos(options.LayerInfos); err != nil {
@@ -133,7 +138,7 @@ func (m *manifestSchema1) UpdatedImage(options types.ManifestUpdateOptions) (typ
 		if err != nil {
 			return nil, err
 		}
-		return m2.UpdatedImage(types.ManifestUpdateOptions{
+		return m2.UpdatedImage(ctx, types.ManifestUpdateOptions{
 			ManifestMIMEType: imgspecv1.MediaTypeImageManifest,
 			InformationOnly:  options.InformationOnly,
 		})
@@ -146,12 +151,12 @@ func (m *manifestSchema1) UpdatedImage(options types.ManifestUpdateOptions) (typ
 
 // Based on github.com/docker/docker/distribution/pull_v2.go
 func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.BlobInfo, layerDiffIDs []digest.Digest) (genericManifest, error) {
-	if len(m.m.History) == 0 {
-		// What would this even mean?! Anyhow, the rest of the code depends on fsLayers[0] and history[0] existing.
+	if len(m.m.ExtractedV1Compatibility) == 0 {
+		// What would this even mean?! Anyhow, the rest of the code depends on FSLayers[0] and ExtractedV1Compatibility[0] existing.
 		return nil, errors.Errorf("Cannot convert an image with 0 history entries to %s", manifest.DockerV2Schema2MediaType)
 	}
-	if len(m.m.History) != len(m.m.FSLayers) {
-		return nil, errors.Errorf("Inconsistent schema 1 manifest: %d history entries, %d fsLayers entries", len(m.m.History), len(m.m.FSLayers))
+	if len(m.m.ExtractedV1Compatibility) != len(m.m.FSLayers) {
+		return nil, errors.Errorf("Inconsistent schema 1 manifest: %d history entries, %d fsLayers entries", len(m.m.ExtractedV1Compatibility), len(m.m.FSLayers))
 	}
 	if uploadedLayerInfos != nil && len(uploadedLayerInfos) != len(m.m.FSLayers) {
 		return nil, errors.Errorf("Internal error: uploaded %d blobs, but schema1 manifest has %d fsLayers", len(uploadedLayerInfos), len(m.m.FSLayers))
@@ -163,14 +168,10 @@ func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.Bl
 	// Build a list of the diffIDs for the non-empty layers.
 	diffIDs := []digest.Digest{}
 	var layers []manifest.Schema2Descriptor
-	for v1Index := len(m.m.History) - 1; v1Index >= 0; v1Index-- {
-		v2Index := (len(m.m.History) - 1) - v1Index
+	for v1Index := len(m.m.ExtractedV1Compatibility) - 1; v1Index >= 0; v1Index-- {
+		v2Index := (len(m.m.ExtractedV1Compatibility) - 1) - v1Index
 
-		var v1compat manifest.Schema1V1Compatibility
-		if err := json.Unmarshal([]byte(m.m.History[v1Index].V1Compatibility), &v1compat); err != nil {
-			return nil, errors.Wrapf(err, "Error decoding history entry %d", v1Index)
-		}
-		if !v1compat.ThrowAway {
+		if !m.m.ExtractedV1Compatibility[v1Index].ThrowAway {
 			var size int64
 			if uploadedLayerInfos != nil {
 				size = uploadedLayerInfos[v2Index].Size
@@ -187,7 +188,7 @@ func (m *manifestSchema1) convertToManifestSchema2(uploadedLayerInfos []types.Bl
 			diffIDs = append(diffIDs, d)
 		}
 	}
-	configJSON, err := m.m.ToSchema2(diffIDs)
+	configJSON, err := m.m.ToSchema2Config(diffIDs)
 	if err != nil {
 		return nil, err
 	}

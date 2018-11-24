@@ -2,7 +2,6 @@ package manifest
 
 import (
 	"encoding/json"
-	"time"
 
 	"github.com/containers/image/types"
 	"github.com/opencontainers/go-digest"
@@ -10,6 +9,17 @@ import (
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
+
+// BlobInfoFromOCI1Descriptor returns a types.BlobInfo based on the input OCI1 descriptor.
+func BlobInfoFromOCI1Descriptor(desc imgspecv1.Descriptor) types.BlobInfo {
+	return types.BlobInfo{
+		Digest:      desc.Digest,
+		Size:        desc.Size,
+		URLs:        desc.URLs,
+		Annotations: desc.Annotations,
+		MediaType:   desc.MediaType,
+	}
+}
 
 // OCI1 is a manifest.Manifest implementation for OCI images.
 // The underlying data from imgspecv1.Manifest is also available.
@@ -46,16 +56,19 @@ func OCI1Clone(src *OCI1) *OCI1 {
 
 // ConfigInfo returns a complete BlobInfo for the separate config object, or a BlobInfo{Digest:""} if there isn't a separate object.
 func (m *OCI1) ConfigInfo() types.BlobInfo {
-	return types.BlobInfo{Digest: m.Config.Digest, Size: m.Config.Size, Annotations: m.Config.Annotations}
+	return BlobInfoFromOCI1Descriptor(m.Config)
 }
 
-// LayerInfos returns a list of BlobInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
+// LayerInfos returns a list of LayerInfos of layers referenced by this image, in order (the root layer first, and then successive layered layers).
 // The Digest field is guaranteed to be provided; Size may be -1.
 // WARNING: The list may contain duplicates, and they are semantically relevant.
-func (m *OCI1) LayerInfos() []types.BlobInfo {
-	blobs := []types.BlobInfo{}
+func (m *OCI1) LayerInfos() []LayerInfo {
+	blobs := []LayerInfo{}
 	for _, layer := range m.Layers {
-		blobs = append(blobs, types.BlobInfo{Digest: layer.Digest, Size: layer.Size, Annotations: layer.Annotations, URLs: layer.URLs, MediaType: layer.MediaType})
+		blobs = append(blobs, LayerInfo{
+			BlobInfo:   BlobInfoFromOCI1Descriptor(layer),
+			EmptyLayer: false,
+		})
 	}
 	return blobs
 }
@@ -95,18 +108,14 @@ func (m *OCI1) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*type
 	}
 	d1 := &Schema2V1Image{}
 	json.Unmarshal(config, d1)
-	created := time.Time{}
-	if v1.Created != nil {
-		created = *v1.Created
-	}
 	i := &types.ImageInspectInfo{
 		Tag:           "",
-		Created:       created,
+		Created:       v1.Created,
 		DockerVersion: d1.DockerVersion,
 		Labels:        v1.Config.Labels,
 		Architecture:  v1.Architecture,
 		Os:            v1.OS,
-		Layers:        LayerInfosToStrings(m.LayerInfos()),
+		Layers:        layerInfosToStrings(m.LayerInfos()),
 	}
 	return i, nil
 }
