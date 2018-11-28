@@ -25,8 +25,7 @@ func TestParseURL(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid URL 'https://example.com': URI schemes are not supported")
 
 	_, err = parseURL("john.doe@example.com")
-	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "invalid URL 'john.doe@example.com': user/password are not supported")
+	assert.Nil(t, err)
 
 	// valid URLs
 	url, err = parseURL("example.com")
