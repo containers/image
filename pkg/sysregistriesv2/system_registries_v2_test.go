@@ -153,6 +153,21 @@ prefix = ""`)
 	assert.Equal(t, "simple-prefix.com", reg.Prefix)
 	assert.Equal(t, reg.URL, "registry.com:5000")
 
+	// path match
+	reg, err = FindRegistry(nil, "simple-prefix.com/")
+	assert.Nil(t, err)
+	assert.NotNil(t, reg)
+
+	// hostname match
+	reg, err = FindRegistry(nil, "simple-prefix.com")
+	assert.Nil(t, err)
+	assert.NotNil(t, reg)
+
+	// invalid match
+	reg, err = FindRegistry(nil, "simple-prefix.comx")
+	assert.Nil(t, err)
+	assert.Nil(t, reg)
+
 	reg, err = FindRegistry(nil, "complex-prefix.com:4000/with/path/and/beyond:tag")
 	assert.Nil(t, err)
 	assert.NotNil(t, reg)

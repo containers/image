@@ -368,7 +368,7 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 	reg := Registry{}
 	prefixLen := 0
 	for _, r := range registries {
-		if strings.HasPrefix(ref, r.Prefix) {
+		if strings.HasPrefix(ref, r.Prefix+"/") || ref == r.Prefix {
 			length := len(r.Prefix)
 			if length > prefixLen {
 				reg = r
