@@ -85,19 +85,19 @@ func GetAuthentication(sys *types.SystemContext, registry string) (string, strin
 	return "", "", nil
 }
 
-// GetUserLoggedIn returns the username logged in to registry from either
+// GetUserLoggedIn returns the username and the password of user logged in to registry from either
 // auth.json or XDG_RUNTIME_DIR
 // Used to tell the user if someone is logged in to the registry when logging in
-func GetUserLoggedIn(sys *types.SystemContext, registry string) (string, error) {
+func GetUserLoggedIn(sys *types.SystemContext, registry string) (string, string, error) {
 	path, err := getPathToAuth(sys)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	username, _, _ := findAuthentication(registry, path, false)
+	username, password, _ := findAuthentication(registry, path, false)
 	if username != "" {
-		return username, nil
+		return username, password, nil
 	}
-	return "", nil
+	return "", "", nil
 }
 
 // RemoveAuthentication deletes the credentials stored in auth.json
