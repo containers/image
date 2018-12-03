@@ -14,7 +14,7 @@ import (
 
 var (
 	// NOTE: There is no versioning data inside the file; this is a “cache”, so on an incompatible format upgrade
-	// we can simply start over with a different filename.
+	// we can simply start over with a different filename; update blobInfoCacheFilename.
 
 	// FIXME: For CRI-O, does this need to hide information between different users?
 
