@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"io"
+	"net/http"
 	"time"
 
 	"github.com/containers/image/docker/reference"
@@ -425,6 +426,11 @@ type SystemContext struct {
 	// === dir.Transport overrides ===
 	// DirForceCompress compresses the image layers if set to true
 	DirForceCompress bool
+
+	// HTTPClient is the HTTP client to use.  If the HTTPClient field is not nil,
+	// the docker client is created with HTTPClient, and the below cert
+	// config are ignored.
+	HTTPClient *http.Client
 }
 
 // ProgressProperties is used to pass information from the copy code to a monitor which

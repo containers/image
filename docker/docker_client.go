@@ -221,44 +221,21 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 	if registry == dockerHostname {
 		registry = dockerRegistry
 	}
-	tr := tlsclientconfig.NewTransport()
-	tr.TLSClientConfig = serverDefault()
 
-	// It is undefined whether the host[:port] string for dockerHostname should be dockerHostname or dockerRegistry,
-	// because docker/docker does not read the certs.d subdirectory at all in that case.  We use the user-visible
-	// dockerHostname here, because it is more symmetrical to read the configuration in that case as well, and because
-	// generally the UI hides the existence of the different dockerRegistry.  But note that this behavior is
-	// undocumented and may change if docker/docker changes.
-	certDir, err := dockerCertDir(sys, hostName)
+	client, err := newHTTPClient(sys, registry, hostName, reference)
 	if err != nil {
 		return nil, err
 	}
-	if err := tlsclientconfig.SetupCertificates(certDir, tr.TLSClientConfig); err != nil {
-		return nil, err
-	}
 
-	// Check if TLS verification shall be skipped (default=false) which can
-	// either be specified in the sysregistriesv2 configuration or via the
-	// SystemContext, whereas the SystemContext is prioritized.
 	skipVerify := false
-	if sys != nil && sys.DockerInsecureSkipTLSVerify != types.OptionalBoolUndefined {
-		// Only use the SystemContext if the actual value is defined.
-		skipVerify = sys.DockerInsecureSkipTLSVerify == types.OptionalBoolTrue
-	} else {
-		reg, err := sysregistriesv2.FindRegistry(sys, reference)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error loading registries")
-		}
-		if reg != nil {
-			skipVerify = reg.Insecure
-		}
+	if tr, ok := client.Transport.(*http.Transport); ok {
+		skipVerify = tr.TLSClientConfig.InsecureSkipVerify
 	}
-	tr.TLSClientConfig.InsecureSkipVerify = skipVerify
 
 	return &dockerClient{
 		sys:                   sys,
 		registry:              registry,
-		client:                &http.Client{Transport: tr},
+		client:                client,
 		insecureSkipTLSVerify: skipVerify,
 	}, nil
 }
@@ -617,4 +594,49 @@ func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerRe
 		return nil, errors.Wrapf(err, "Error decoding signature list")
 	}
 	return &parsedBody, nil
+}
+
+// newHTTPClient returns new http client for docker client.  It returns HTTPClient in SystemContext if set,
+// otherwise returns default client.
+func newHTTPClient(sys *types.SystemContext, registry, hostName, reference string) (*http.Client, error) {
+	if sys.HTTPClient != nil {
+		return sys.HTTPClient, nil
+	}
+
+	tr := tlsclientconfig.NewTransport()
+	tr.TLSClientConfig = serverDefault()
+
+	// It is undefined whether the host[:port] string for dockerHostname should be dockerHostname or dockerRegistry,
+	// because docker/docker does not read the certs.d subdirectory at all in that case.  We use the user-visible
+	// dockerHostname here, because it is more symmetrical to read the configuration in that case as well, and because
+	// generally the UI hides the existence of the different dockerRegistry.  But note that this behavior is
+	// undocumented and may change if docker/docker changes.
+	certDir, err := dockerCertDir(sys, hostName)
+	if err != nil {
+		return nil, err
+	}
+	if err := tlsclientconfig.SetupCertificates(certDir, tr.TLSClientConfig); err != nil {
+		return nil, err
+	}
+
+	// Check if TLS verification shall be skipped (default=false) which can
+	// either be specified in the sysregistriesv2 configuration or via the
+	// SystemContext, whereas the SystemContext is prioritized.
+	skipVerify := false
+	if sys != nil && sys.DockerInsecureSkipTLSVerify != types.OptionalBoolUndefined {
+		// Only use the SystemContext if the actual value is defined.
+		skipVerify = sys.DockerInsecureSkipTLSVerify == types.OptionalBoolTrue
+	} else {
+		reg, err := sysregistriesv2.FindRegistry(sys, reference)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error loading registries")
+		}
+		if reg != nil {
+			skipVerify = reg.Insecure
+		}
+	}
+	tr.TLSClientConfig.InsecureSkipVerify = skipVerify
+
+	return &http.Client{Transport: tr}, nil
+
 }

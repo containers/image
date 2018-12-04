@@ -25,18 +25,11 @@ type ociImageSource struct {
 
 // newImageSource returns an ImageSource for reading from an existing directory.
 func newImageSource(sys *types.SystemContext, ref ociReference) (types.ImageSource, error) {
-	tr := tlsclientconfig.NewTransport()
-	tr.TLSClientConfig = tlsconfig.ServerDefault()
-
-	if sys != nil && sys.OCICertPath != "" {
-		if err := tlsclientconfig.SetupCertificates(sys.OCICertPath, tr.TLSClientConfig); err != nil {
-			return nil, err
-		}
-		tr.TLSClientConfig.InsecureSkipVerify = sys.OCIInsecureSkipTLSVerify
+	client, err := newHTTPClient(sys)
+	if err != nil {
+		return nil, err
 	}
 
-	client := &http.Client{}
-	client.Transport = tr
 	descriptor, err := ref.getManifestDescriptor()
 	if err != nil {
 		return nil, err
@@ -161,4 +154,24 @@ func getBlobSize(resp *http.Response) int64 {
 		size = -1
 	}
 	return size
+}
+
+// newHTTPClient returns new http client for docker client.  It returns HTTPClient in SystemContext if set,
+// otherwise returns default client.
+func newHTTPClient(sys *types.SystemContext) (*http.Client, error) {
+	if sys != nil && sys.HTTPClient != nil {
+		return sys.HTTPClient, nil
+	}
+
+	tr := tlsclientconfig.NewTransport()
+	tr.TLSClientConfig = tlsconfig.ServerDefault()
+
+	if sys != nil && sys.OCICertPath != "" {
+		if err := tlsclientconfig.SetupCertificates(sys.OCICertPath, tr.TLSClientConfig); err != nil {
+			return nil, err
+		}
+		tr.TLSClientConfig.InsecureSkipVerify = sys.OCIInsecureSkipTLSVerify
+	}
+
+	return &http.Client{Transport: tr}, nil
 }
