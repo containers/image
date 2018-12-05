@@ -3,6 +3,7 @@ package sysregistriesv2
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,14 +54,40 @@ type Registry struct {
 	Prefix string `toml:"prefix"`
 }
 
+// HostPortInfo holds information of registries in the form of "host:port"
+// and stores whether it is secure or not
+type HostPortInfo struct {
+	// Name of registry that is in the form "host:port"
+	Name string
+	// Whether the registry is secure or not
+	Secure bool
+}
+
+// SysRegistries stores the registries we get from /etc/containers/registries.conf
+// Registries stores registries with a url, InsecureRegistryCIDRs stores registries
+// with CIDR notation, and IndexConfigs store registiries of the form "host:port"
+type SysRegistries struct {
+	// Registries with a url, e.g example.com
+	Registries []Registry
+	// Registries in the form of CIDR notation, e.g 127.0.0.0/8
+	InsecureRegistryCIDRs []*net.IPNet
+	// Registries in the form of "host:port", e.g localhost:5050
+	HostPortConfigs map[string]*HostPortInfo
+}
+
 // backwards compatability to sysregistries v1
 type v1TOMLregistries struct {
 	Registries []string `toml:"registries"`
 }
 
+type CIDR struct {
+	Range string `toml:"range"`
+}
+
 // tomlConfig is the data type used to unmarshal the toml config.
 type tomlConfig struct {
 	Registries []Registry `toml:"registry"`
+	CIDRRanges []CIDR     `toml:"cidr"`
 	// backwards compatability to sysregistries v1
 	V1Registries struct {
 		Search   v1TOMLregistries `toml:"search"`
@@ -239,7 +266,7 @@ var configMutex = sync.Mutex{}
 // configCache caches already loaded configs with config paths as keys and is
 // used to avoid redudantly parsing configs. Concurrent accesses to the cache
 // are synchronized via configMutex.
-var configCache = make(map[string][]Registry)
+var configCache = make(map[string]*SysRegistries)
 
 // InvalidateCache invalidates the registry cache.  This function is meant to be
 // used for long-running processes that need to reload potential changes made to
@@ -247,20 +274,20 @@ var configCache = make(map[string][]Registry)
 func InvalidateCache() {
 	configMutex.Lock()
 	defer configMutex.Unlock()
-	configCache = make(map[string][]Registry)
+	configCache = make(map[string]*SysRegistries)
 }
 
 // GetRegistries loads and returns the registries specified in the config.
 // Note the parsed content of registry config files is cached.  For reloading,
 // use `InvalidateCache` and re-call `GetRegistries`.
-func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
+func GetRegistries(ctx *types.SystemContext) (*SysRegistries, error) {
 	configPath := getConfigPath(ctx)
 
 	configMutex.Lock()
 	defer configMutex.Unlock()
 	// if the config has already been loaded, return the cached registries
-	if registries, inCache := configCache[configPath]; inCache {
-		return registries, nil
+	if sysRegistries, inCache := configCache[configPath]; inCache {
+		return sysRegistries, nil
 	}
 
 	// load the config
@@ -271,7 +298,7 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 		// isn't set.  Note: if ctx.SystemRegistriesConfPath points to
 		// the default config, we will still return an error.
 		if os.IsNotExist(err) && (ctx == nil || ctx.SystemRegistriesConfPath == "") {
-			return []Registry{}, nil
+			return nil, nil
 		}
 		return nil, err
 	}
@@ -289,28 +316,51 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 		}
 		registries = v1Registries
 	}
-
 	registries, err = postProcessRegistries(registries)
 	if err != nil {
 		return nil, err
 	}
 
-	// populate the cache
-	configCache[configPath] = registries
+	insecureRegistryCIDRs := make([]*net.IPNet, 0)
+	hostPortConfigs := make(map[string]*HostPortInfo)
+	for _, cidr := range config.CIDRRanges {
+		_, ipnet, err := net.ParseCIDR(cidr.Range)
+		if err == nil {
+			// Valid CIDR.
+			insecureRegistryCIDRs = append(insecureRegistryCIDRs, ipnet)
+			continue
+		} else {
+			// Assume `host:port` if not CIDR.
+			hostPortConfigs[cidr.Range] = &HostPortInfo{
+				Name:   cidr.Range,
+				Secure: false,
+			}
+			continue
+		}
+	}
 
-	return registries, err
+	sysRegistries := &SysRegistries{
+		Registries:            registries,
+		InsecureRegistryCIDRs: insecureRegistryCIDRs,
+		HostPortConfigs:       hostPortConfigs,
+	}
+
+	// populate the cache
+	configCache[configPath] = sysRegistries
+
+	return sysRegistries, err
 }
 
 // FindUnqualifiedSearchRegistries returns all registries that are configured
 // for unqualified image search (i.e., with Registry.Search == true).
 func FindUnqualifiedSearchRegistries(ctx *types.SystemContext) ([]Registry, error) {
-	registries, err := GetRegistries(ctx)
+	sysRegistries, err := GetRegistries(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	unqualified := []Registry{}
-	for _, reg := range registries {
+	for _, reg := range sysRegistries.Registries {
 		if reg.Search {
 			unqualified = append(unqualified, reg)
 		}
@@ -321,14 +371,14 @@ func FindUnqualifiedSearchRegistries(ctx *types.SystemContext) ([]Registry, erro
 // FindRegistry returns the Registry with the longest prefix for ref.  If no
 // Registry prefixes the image, nil is returned.
 func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
-	registries, err := GetRegistries(ctx)
+	sysRegistries, err := GetRegistries(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	reg := Registry{}
 	prefixLen := 0
-	for _, r := range registries {
+	for _, r := range sysRegistries.Registries {
 		if strings.HasPrefix(ref, r.Prefix+"/") || ref == r.Prefix {
 			length := len(r.Prefix)
 			if length > prefixLen {
@@ -340,6 +390,7 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 	if prefixLen != 0 {
 		return &reg, nil
 	}
+
 	return nil, nil
 }
 
@@ -364,4 +415,43 @@ func loadRegistryConf(configPath string) (*tomlConfig, error) {
 
 	err = toml.Unmarshal(configBytes, &config)
 	return config, err
+}
+
+// IsSecureIndex returns true if indexName matches an element of CIDRs. indexName can be of form `host:port` or `host`
+// where the `host` part can be either a domain name or an IP address. If it is a domain name, then it will be
+// resolved to IP addresses for matching. If resolution fails, false is returned.
+func (s *SysRegistries) IsSecureIndex(indexName string) bool {
+	if index, ok := s.HostPortConfigs[indexName]; ok {
+		return index.Secure
+	}
+
+	host, _, err := net.SplitHostPort(indexName)
+	if err != nil {
+		// assume indexName is of the form `host` without the port and go on.
+		host = indexName
+	}
+
+	addrs, err := net.LookupIP(host)
+	if err != nil {
+		ip := net.ParseIP(host)
+		if ip != nil {
+			addrs = []net.IP{ip}
+		}
+
+		// if ip == nil, then `host` is neither an IP nor it could be looked up,
+		// either because the index is unreachable, or because the index is behind an HTTP proxy.
+		// So, len(addrs) == 0 and we're not aborting.
+	}
+
+	// Try CIDR notation only if addrs has any elements, i.e. if `host`'s IP could be determined.
+	for _, addr := range addrs {
+		for _, ipnet := range s.InsecureRegistryCIDRs {
+			// check if the addr falls in the subnet
+			if ipnet.Contains(addr) {
+				return false
+			}
+		}
+	}
+
+	return true
 }
