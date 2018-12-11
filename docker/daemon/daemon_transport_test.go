@@ -50,15 +50,15 @@ func TestParseReference(t *testing.T) {
 // testParseReference is a test shared for Transport.ParseReference and ParseReference.
 func testParseReference(t *testing.T, fn func(string) (types.ImageReference, error)) {
 	for _, c := range []struct{ input, expectedID, expectedRef string }{
-		{sha256digest, sha256digest, ""},                                                    // Valid digest format
-		{"sha512:" + sha256digestHex + sha256digestHex, "", ""},                             // Non-digest.Canonical digest
-		{"sha256:ab", "", ""},                                                               // Invalid digest value (too short)
-		{sha256digest + "ab", "", ""},                                                       // Invalid digest value (too long)
+		{sha256digest, sha256digest, ""},                        // Valid digest format
+		{"sha512:" + sha256digestHex + sha256digestHex, "", ""}, // Non-digest.Canonical digest
+		{"sha256:ab", "", ""},                                   // Invalid digest value (too short)
+		{sha256digest + "ab", "", ""},                           // Invalid digest value (too long)
 		{"sha256:XX23456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "", ""}, // Invalid digest value
-		{"UPPERCASEISINVALID", "", ""},                                                      // Invalid reference input
-		{"busybox", "", ""},                                                                 // Missing tag or digest
-		{"busybox:latest", "", "docker.io/library/busybox:latest"},                          // Explicit tag
-		{"busybox@" + sha256digest, "", "docker.io/library/busybox@" + sha256digest},        // Explicit digest
+		{"UPPERCASEISINVALID", "", ""},                                               // Invalid reference input
+		{"busybox", "", ""},                                                          // Missing tag or digest
+		{"busybox:latest", "", "docker.io/library/busybox:latest"},                   // Explicit tag
+		{"busybox@" + sha256digest, "", "docker.io/library/busybox@" + sha256digest}, // Explicit digest
 		// A github.com/distribution/reference value can have a tag and a digest at the same time!
 		// Most versions of docker/reference do not handle that (ignoring the tag), so we reject such input.
 		{"busybox:latest@" + sha256digest, "", ""},                                   // Both tag and digest

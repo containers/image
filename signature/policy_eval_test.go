@@ -9,6 +9,7 @@ import (
 	"github.com/containers/image/docker"
 	"github.com/containers/image/docker/policyconfiguration"
 	"github.com/containers/image/docker/reference"
+	"github.com/containers/image/internal/testing/mocks"
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
@@ -71,7 +72,7 @@ type pcImageReferenceMock struct {
 }
 
 func (ref pcImageReferenceMock) Transport() types.ImageTransport {
-	return nameImageTransportMock(ref.transportName)
+	return mocks.NameImageTransport(ref.transportName)
 }
 func (ref pcImageReferenceMock) StringWithinTransport() string {
 	// We use this in error messages, so sadly we must return something.

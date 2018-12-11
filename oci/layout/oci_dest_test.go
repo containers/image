@@ -3,10 +3,10 @@ package layout
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 
-	"path/filepath"
-
+	"github.com/containers/image/pkg/blobinfocache"
 	"github.com/containers/image/types"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -31,6 +31,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	require.True(t, ok)
 	blobPath, err := dirRef.blobPath(blobDigest, "")
 	assert.NoError(t, err)
+	cache := blobinfocache.NewMemoryCache()
 
 	firstRead := true
 	reader := readerFromFunc(func(p []byte) (int, error) {
@@ -52,7 +53,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	require.NoError(t, err)
 	defer dest.Close()
-	_, err = dest.PutBlob(context.Background(), reader, types.BlobInfo{Digest: blobDigest, Size: -1}, false)
+	_, err = dest.PutBlob(context.Background(), reader, types.BlobInfo{Digest: blobDigest, Size: -1}, cache, false)
 	assert.Error(t, err)
 	assert.Contains(t, digestErrorString, err.Error())
 	err = dest.Commit(context.Background())
