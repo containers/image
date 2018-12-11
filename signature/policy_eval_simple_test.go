@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/containers/image/docker/reference"
+	"github.com/containers/image/internal/testing/mocks"
 	"github.com/containers/image/types"
 )
 
@@ -21,7 +22,7 @@ func (nameOnlyImageMock) Reference() types.ImageReference {
 type nameOnlyImageReferenceMock string
 
 func (ref nameOnlyImageReferenceMock) Transport() types.ImageTransport {
-	return nameImageTransportMock("== Transport mock")
+	return mocks.NameImageTransport("== Transport mock")
 }
 func (ref nameOnlyImageReferenceMock) StringWithinTransport() string {
 	return string(ref)

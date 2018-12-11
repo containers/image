@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/containers/image/manifest"
+	"github.com/containers/image/pkg/blobinfocache"
 	"github.com/containers/image/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -57,13 +58,14 @@ func TestGetPutManifest(t *testing.T) {
 func TestGetPutBlob(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)
+	cache := blobinfocache.NewMemoryCache()
 
 	blob := []byte("test-blob")
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	require.NoError(t, err)
 	defer dest.Close()
 	assert.Equal(t, types.PreserveOriginal, dest.DesiredLayerCompression())
-	info, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{Digest: digest.Digest("sha256:digest-test"), Size: int64(9)}, false)
+	info, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{Digest: digest.Digest("sha256:digest-test"), Size: int64(9)}, cache, false)
 	assert.NoError(t, err)
 	err = dest.Commit(context.Background())
 	assert.NoError(t, err)
@@ -73,7 +75,7 @@ func TestGetPutBlob(t *testing.T) {
 	src, err := ref.NewImageSource(context.Background(), nil)
 	require.NoError(t, err)
 	defer src.Close()
-	rc, size, err := src.GetBlob(context.Background(), info)
+	rc, size, err := src.GetBlob(context.Background(), info, cache)
 	assert.NoError(t, err)
 	defer rc.Close()
 	b, err := ioutil.ReadAll(rc)
@@ -99,6 +101,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	dirRef, ok := ref.(dirReference)
 	require.True(t, ok)
 	blobPath := dirRef.layerPath(blobDigest)
+	cache := blobinfocache.NewMemoryCache()
 
 	firstRead := true
 	reader := readerFromFunc(func(p []byte) (int, error) {
@@ -120,7 +123,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	require.NoError(t, err)
 	defer dest.Close()
-	_, err = dest.PutBlob(context.Background(), reader, types.BlobInfo{Digest: blobDigest, Size: -1}, false)
+	_, err = dest.PutBlob(context.Background(), reader, types.BlobInfo{Digest: blobDigest, Size: -1}, cache, false)
 	assert.Error(t, err)
 	assert.Contains(t, digestErrorString, err.Error())
 	err = dest.Commit(context.Background())
