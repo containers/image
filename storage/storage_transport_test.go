@@ -33,7 +33,7 @@ func TestTransportParseStoreReference(t *testing.T) {
 		{"[unterminated", "", ""},                                    // Unterminated store specifier
 		{"[garbage]busybox", "docker.io/library/busybox:latest", ""}, // Store specifier is overridden by the store we pass to ParseStoreReference
 
-		{"UPPERCASEISINVALID", "", ""},                                                   // Invalid single-component name
+		{"UPPERCASEISINVALID", "", ""}, // Invalid single-component name
 		{"sha256:" + sha256digestHex, "docker.io/library/sha256:" + sha256digestHex, ""}, // Valid single-component name; the hex part is not an ID unless it has a "@" prefix, so it looks like a tag
 		// FIXME: This test is now incorrect, this should not fail _if the image ID matches_
 		{sha256digestHex, "", ""},                    // Invalid single-component ID; not an ID without a "@" prefix, so it's parsed as a name, but names aren't allowed to look like IDs
@@ -45,10 +45,10 @@ func TestTransportParseStoreReference(t *testing.T) {
 		{"busybox:notlatest", "docker.io/library/busybox:notlatest", ""},                   // Valid single-component name, explicit tag
 		{"docker.io/library/busybox:notlatest", "docker.io/library/busybox:notlatest", ""}, // Valid single-component name, everything explicit
 
-		{"UPPERCASEISINVALID@" + sha256digestHex, "", ""},                                                // Invalid name in name@digestOrID
-		{"busybox@ab", "", ""},                                                                           // Invalid ID in name@digestOrID
-		{"busybox@", "", ""},                                                                             // Empty ID in name@digestOrID
-		{"busybox@sha256:ab", "", ""},                                                                    // Invalid digest in name@digestOrID
+		{"UPPERCASEISINVALID@" + sha256digestHex, "", ""}, // Invalid name in name@digestOrID
+		{"busybox@ab", "", ""},                            // Invalid ID in name@digestOrID
+		{"busybox@", "", ""},                              // Empty ID in name@digestOrID
+		{"busybox@sha256:ab", "", ""},                     // Invalid digest in name@digestOrID
 		{"busybox@sha256:" + sha256digestHex, "docker.io/library/busybox@sha256:" + sha256digestHex, ""}, // Valid name@digest, no tag
 		{"busybox@" + sha256digestHex, "docker.io/library/busybox:latest", sha256digestHex},              // Valid name@ID, implicit tag
 		// "busybox@aaaa", a valid image ID prefix, untested
@@ -56,9 +56,9 @@ func TestTransportParseStoreReference(t *testing.T) {
 		{"docker.io/library/busybox:notlatest@" + sha256digestHex, "docker.io/library/busybox:notlatest", sha256digestHex},   // Valid name@ID, everything explicit
 		{"docker.io/library/busybox:notlatest@" + sha256Digest2, "docker.io/library/busybox:notlatest@" + sha256Digest2, ""}, // Valid name:tag@digest, everything explicit
 
-		{"busybox@sha256:" + sha256digestHex + "@ab", "", ""},                                                                                                                       // Invalid ID in name@digest@ID
-		{"busybox@ab@" + sha256digestHex, "", ""},                                                                                                                                   // Invalid digest in name@digest@ID
-		{"busybox@@" + sha256digestHex, "", ""},                                                                                                                                     // Invalid digest in name@digest@ID
+		{"busybox@sha256:" + sha256digestHex + "@ab", "", ""}, // Invalid ID in name@digest@ID
+		{"busybox@ab@" + sha256digestHex, "", ""},             // Invalid digest in name@digest@ID
+		{"busybox@@" + sha256digestHex, "", ""},               // Invalid digest in name@digest@ID
 		{"busybox@" + sha256Digest2 + "@" + sha256digestHex, "docker.io/library/busybox@" + sha256Digest2, sha256digestHex},                                                         // name@digest@ID
 		{"docker.io/library/busybox@" + sha256Digest2 + "@" + sha256digestHex, "docker.io/library/busybox@" + sha256Digest2, sha256digestHex},                                       // name@digest@ID, everything explicit
 		{"docker.io/library/busybox:notlatest@sha256:" + sha256digestHex + "@" + sha256digestHex, "docker.io/library/busybox:notlatest@sha256:" + sha256digestHex, sha256digestHex}, // name:tag@digest@ID, everything explicit
