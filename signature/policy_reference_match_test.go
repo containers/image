@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/containers/image/docker/reference"
+	"github.com/containers/image/internal/testing/mocks"
 	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -77,7 +78,7 @@ type refImageReferenceMock struct{ reference.Named }
 func (ref refImageReferenceMock) Transport() types.ImageTransport {
 	// We use this in error messages, so sady we must return something. But right now we do so only when DockerReference is nil, so restrict to that.
 	if ref.Named == nil {
-		return nameImageTransportMock("== Transport mock")
+		return mocks.NameImageTransport("== Transport mock")
 	}
 	panic("unexpected call to a mock function")
 }
@@ -107,19 +108,6 @@ func (ref refImageReferenceMock) NewImageDestination(ctx context.Context, sys *t
 	panic("unexpected call to a mock function")
 }
 func (ref refImageReferenceMock) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
-	panic("unexpected call to a mock function")
-}
-
-// nameImageTransportMock is a mock of types.ImageTransport which returns itself in Name.
-type nameImageTransportMock string
-
-func (name nameImageTransportMock) Name() string {
-	return string(name)
-}
-func (name nameImageTransportMock) ParseReference(reference string) (types.ImageReference, error) {
-	panic("unexpected call to a mock function")
-}
-func (name nameImageTransportMock) ValidatePolicyConfigurationScope(scope string) error {
 	panic("unexpected call to a mock function")
 }
 

@@ -51,6 +51,7 @@ func TestDigestingReaderRead(t *testing.T) {
 		assert.Equal(t, int64(len(c.input)), n, c.digest.String())
 		assert.Equal(t, c.input, dest.Bytes(), c.digest.String())
 		assert.False(t, reader.validationFailed, c.digest.String())
+		assert.True(t, reader.validationSucceeded, c.digest.String())
 	}
 	// Modified input
 	for _, c := range cases {
@@ -60,7 +61,23 @@ func TestDigestingReaderRead(t *testing.T) {
 		dest := bytes.Buffer{}
 		_, err = io.Copy(&dest, reader)
 		assert.Error(t, err, c.digest.String())
-		assert.True(t, reader.validationFailed)
+		assert.True(t, reader.validationFailed, c.digest.String())
+		assert.False(t, reader.validationSucceeded, c.digest.String())
+	}
+	// Truncated input
+	for _, c := range cases {
+		source := bytes.NewReader(c.input)
+		reader, err := newDigestingReader(source, c.digest)
+		require.NoError(t, err, c.digest.String())
+		if len(c.input) != 0 {
+			dest := bytes.Buffer{}
+			truncatedLen := int64(len(c.input) - 1)
+			n, err := io.CopyN(&dest, reader, truncatedLen)
+			assert.NoError(t, err, c.digest.String())
+			assert.Equal(t, truncatedLen, n, c.digest.String())
+		}
+		assert.False(t, reader.validationFailed, c.digest.String())
+		assert.False(t, reader.validationSucceeded, c.digest.String())
 	}
 }
 
