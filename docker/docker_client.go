@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/containers/image/docker/reference"
@@ -97,6 +98,11 @@ type dockerClient struct {
 	supportsSignatures bool
 	// Private state for setupRequestAuth
 	tokenCache map[string]bearerToken
+	// detectPropertiesError caches the initial error.
+	detectPropertiesError error
+	// detectPropertiesOnce is used to execuute detectProperties() at most once in
+	// in makeRequest().
+	detectPropertiesOnce sync.Once
 }
 
 type authScope struct {
@@ -545,9 +551,9 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge, 
 	return newBearerTokenFromJSONBlob(tokenBlob)
 }
 
-// detectProperties detects various properties of the registry.
-// See the dockerClient documentation for members which are affected by this.
-func (c *dockerClient) detectProperties(ctx context.Context) error {
+// detectPropertiesHelper performs the work of detectProperties which executes
+// it at most once.
+func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 	if c.scheme != "" {
 		return nil
 	}
@@ -602,6 +608,13 @@ func (c *dockerClient) detectProperties(ctx context.Context) error {
 		}
 	}
 	return err
+}
+
+// detectProperties detects various properties of the registry.
+// See the dockerClient documentation for members which are affected by this.
+func (c *dockerClient) detectProperties(ctx context.Context) error {
+	c.detectPropertiesOnce.Do(func() { c.detectPropertiesError = c.detectPropertiesHelper(ctx) })
+	return c.detectPropertiesError
 }
 
 // getExtensionsSignatures returns signatures from the X-Registry-Supports-Signatures API extension,
