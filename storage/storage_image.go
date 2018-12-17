@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 
 	"github.com/containers/image/image"
@@ -56,6 +57,7 @@ type storageImageDestination struct {
 	nextTempFileID int32                           // A counter that we use for computing filenames to assign to blobs
 	manifest       []byte                          // Manifest contents, temporary
 	signatures     []byte                          // Signature contents, temporary
+	putBlobMutex   sync.Mutex                      // Mutex to sync state for parallel PutBlob executions
 	blobDiffIDs    map[digest.Digest]digest.Digest // Mapping from layer blobsums to their corresponding DiffIDs
 	fileSizes      map[digest.Digest]int64         // Mapping from layer blobsums to their sizes
 	filenames      map[digest.Digest]string        // Mapping from layer blobsums to names of files we used to hold them
@@ -305,7 +307,7 @@ func newImageDestination(imageRef storageReference) (*storageImageDestination, e
 
 // Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
 // e.g. it should use the public hostname instead of the result of resolving CNAMEs or following redirects.
-func (s storageImageDestination) Reference() types.ImageReference {
+func (s *storageImageDestination) Reference() types.ImageReference {
 	return s.imageRef
 }
 
@@ -314,7 +316,7 @@ func (s *storageImageDestination) Close() error {
 	return os.RemoveAll(s.directory)
 }
 
-func (s storageImageDestination) DesiredLayerCompression() types.LayerCompression {
+func (s *storageImageDestination) DesiredLayerCompression() types.LayerCompression {
 	// We ultimately have to decompress layers to populate trees on disk,
 	// so callers shouldn't bother compressing them before handing them to
 	// us, if they're not already compressed.
@@ -327,7 +329,7 @@ func (s *storageImageDestination) computeNextBlobCacheFile() string {
 
 // HasThreadSafePutBlob indicates whether PutBlob can be executed concurrently.
 func (d *storageImageDestination) HasThreadSafePutBlob() bool {
-	return false
+	return true
 }
 
 // PutBlob writes contents of stream and returns data representing the result.
@@ -380,9 +382,11 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 		return errorBlobInfo, ErrBlobSizeMismatch
 	}
 	// Record information about the blob.
+	s.putBlobMutex.Lock()
 	s.blobDiffIDs[hasher.Digest()] = diffID.Digest()
 	s.fileSizes[hasher.Digest()] = counter.Count
 	s.filenames[hasher.Digest()] = filename
+	s.putBlobMutex.Unlock()
 	blobDigest := blobinfo.Digest
 	if blobDigest.Validate() != nil {
 		blobDigest = hasher.Digest()
@@ -408,6 +412,9 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 // May use and/or update cache.
 func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
+	// lock the entire method as it executes fairly quickly
+	s.putBlobMutex.Lock()
+	defer s.putBlobMutex.Unlock()
 	if blobinfo.Digest == "" {
 		return false, types.BlobInfo{}, errors.Errorf(`Can not check for a blob with unknown digest`)
 	}
