@@ -163,7 +163,7 @@ func getBlobSize(resp *http.Response) int64 {
 
 // HasThreadSafeGetBlob indicates whether GetBlob can be executed concurrently.
 func (s *dockerImageSource) HasThreadSafeGetBlob() bool {
-	return false
+	return true
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
