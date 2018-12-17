@@ -48,6 +48,7 @@ type storageImageSource struct {
 	image          *storage.Image
 	layerPosition  map[digest.Digest]int // Where we are in reading a blob's layers
 	cachedManifest []byte                // A cached copy of the manifest, if already known, or nil
+	getBlobMutex   sync.Mutex            // Mutex to sync state for parallel GetBlob executions
 	SignatureSizes []int                 `json:"signature-sizes,omitempty"` // List of sizes of each signature slice
 }
 
@@ -93,18 +94,18 @@ func newImageSource(imageRef storageReference) (*storageImageSource, error) {
 }
 
 // Reference returns the image reference that we used to find this image.
-func (s storageImageSource) Reference() types.ImageReference {
+func (s *storageImageSource) Reference() types.ImageReference {
 	return s.imageRef
 }
 
 // Close cleans up any resources we tied up while reading the image.
-func (s storageImageSource) Close() error {
+func (s *storageImageSource) Close() error {
 	return nil
 }
 
 // HasThreadSafeGetBlob indicates whether GetBlob can be executed concurrently.
 func (s *storageImageSource) HasThreadSafeGetBlob() bool {
-	return false
+	return true
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
@@ -144,8 +145,10 @@ func (s *storageImageSource) getBlobAndLayerID(info types.BlobInfo) (rc io.ReadC
 	// Step through the list of matching layers.  Tests may want to verify that if we have multiple layers
 	// which claim to have the same contents, that we actually do have multiple layers, otherwise we could
 	// just go ahead and use the first one every time.
+	s.getBlobMutex.Lock()
 	i := s.layerPosition[info.Digest]
 	s.layerPosition[info.Digest] = i + 1
+	s.getBlobMutex.Unlock()
 	if len(layers) > 0 {
 		layer = layers[i%len(layers)]
 	}
