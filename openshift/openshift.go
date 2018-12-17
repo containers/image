@@ -383,6 +383,11 @@ func (d *openshiftImageDestination) IgnoresEmbeddedDockerReference() bool {
 	return d.docker.IgnoresEmbeddedDockerReference()
 }
 
+// HasThreadSafePutBlob indicates whether PutBlob can be executed concurrently.
+func (d *openshiftImageDestination) HasThreadSafePutBlob() bool {
+	return false
+}
+
 // PutBlob writes contents of stream and returns data representing the result (with all data filled in).
 // inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
 // inputInfo.Size is the expected length of stream, if known.

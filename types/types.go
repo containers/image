@@ -266,6 +266,8 @@ type ImageDestination interface {
 	// to any other readers for download using the supplied digest.
 	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 	PutBlob(ctx context.Context, stream io.Reader, inputInfo BlobInfo, cache BlobInfoCache, isConfig bool) (BlobInfo, error)
+	// HasThreadSafePutBlob indicates whether PutBlob can be executed concurrently.
+	HasThreadSafePutBlob() bool
 	// TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 	// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
 	// info.Digest must not be empty.

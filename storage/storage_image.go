@@ -325,6 +325,11 @@ func (s *storageImageDestination) computeNextBlobCacheFile() string {
 	return filepath.Join(s.directory, fmt.Sprintf("%d", atomic.AddInt32(&s.nextTempFileID, 1)))
 }
 
+// HasThreadSafePutBlob indicates whether PutBlob can be executed concurrently.
+func (d *storageImageDestination) HasThreadSafePutBlob() bool {
+	return false
+}
+
 // PutBlob writes contents of stream and returns data representing the result.
 // inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
 // inputInfo.Size is the expected length of stream, if known.

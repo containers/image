@@ -398,6 +398,9 @@ func (d *memoryImageDest) MustMatchRuntimeOS() bool {
 func (d *memoryImageDest) IgnoresEmbeddedDockerReference() bool {
 	panic("Unexpected call to a mock function")
 }
+func (d *memoryImageDest) HasThreadSafePutBlob() bool {
+	panic("Unexpected call to a mock function")
+}
 func (d *memoryImageDest) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
 	if d.storedBlobs == nil {
 		d.storedBlobs = make(map[digest.Digest][]byte)
