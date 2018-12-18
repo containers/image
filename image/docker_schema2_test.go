@@ -32,6 +32,9 @@ func (f unusedImageSource) Close() error {
 func (f unusedImageSource) GetManifest(context.Context, *digest.Digest) ([]byte, string, error) {
 	panic("Unexpected call to a mock function")
 }
+func (f unusedImageSource) HasThreadSafeGetBlob() bool {
+	panic("Unexpected call to a mock function")
+}
 func (f unusedImageSource) GetBlob(context.Context, types.BlobInfo, types.BlobInfoCache) (io.ReadCloser, int64, error) {
 	panic("Unexpected call to a mock function")
 }
@@ -393,6 +396,9 @@ func (d *memoryImageDest) MustMatchRuntimeOS() bool {
 	panic("Unexpected call to a mock function")
 }
 func (d *memoryImageDest) IgnoresEmbeddedDockerReference() bool {
+	panic("Unexpected call to a mock function")
+}
+func (d *memoryImageDest) HasThreadSafePutBlob() bool {
 	panic("Unexpected call to a mock function")
 }
 func (d *memoryImageDest) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
