@@ -20,6 +20,23 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestSkipTLSVerifyOnLocalhost(t *testing.T) {
+	client, err := newDockerClient(nil, "localhost:5000", "localhost:5000")
+	assert.Nil(t, err)
+	assert.NotNil(t, client)
+	assert.True(t, client.insecureSkipTLSVerify)
+
+	client, err = newDockerClient(nil, "localhost", "localhost")
+	assert.Nil(t, err)
+	assert.NotNil(t, client)
+	assert.False(t, client.insecureSkipTLSVerify)
+
+	client, err = newDockerClient(nil, "127.0.0.1", "127.0.0.1")
+	assert.Nil(t, err)
+	assert.NotNil(t, client)
+	assert.True(t, client.insecureSkipTLSVerify)
+}
+
 func TestDockerCertDir(t *testing.T) {
 	const nondefaultFullPath = "/this/is/not/the/default/full/path"
 	const nondefaultPerHostDir = "/this/is/not/the/default/certs.d"

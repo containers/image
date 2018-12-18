@@ -241,7 +241,9 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 
 	// Check if TLS verification shall be skipped (default=false) which can
 	// either be specified in the sysregistriesv2 configuration or via the
-	// SystemContext, whereas the SystemContext is prioritized.
+	// SystemContext, whereas the SystemContext is prioritized.  If neither
+	// sets it, check if the registry is running on the localhost and mark
+	// it as insecure.
 	skipVerify := false
 	if sys != nil && sys.DockerInsecureSkipTLSVerify != types.OptionalBoolUndefined {
 		// Only use the SystemContext if the actual value is defined.
@@ -253,6 +255,13 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 		}
 		if reg != nil {
 			skipVerify = reg.Insecure
+		} else {
+			// unless specified in the SystemContext or in the
+			// config, set skipVerify to true if the registry
+			// is running on the localhost
+			if strings.HasPrefix(registry, "localhost:") || strings.HasPrefix(registry, "127.0.0.1") {
+				skipVerify = true
+			}
 		}
 	}
 	tr.TLSClientConfig.InsecureSkipVerify = skipVerify
