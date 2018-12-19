@@ -16,7 +16,7 @@ const (
 	fullRHELRef       = "registry.access.redhat.com/rhel7/rhel:7.2.3"
 	untaggedRHELRef   = "registry.access.redhat.com/rhel7/rhel"
 	digestSuffix      = "@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	digestSuffixOther = "@sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	digestSuffixOther = "@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 )
 
 func TestParseImageAndDockerReference(t *testing.T) {

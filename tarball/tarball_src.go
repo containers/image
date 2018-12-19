@@ -207,7 +207,7 @@ func (is *tarballImageSource) Close() error {
 }
 
 // HasThreadSafeGetBlob indicates whether GetBlob can be executed concurrently.
-func (s *tarballImageSource) HasThreadSafeGetBlob() bool {
+func (is *tarballImageSource) HasThreadSafeGetBlob() bool {
 	return false
 }
 
