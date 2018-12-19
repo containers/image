@@ -331,7 +331,7 @@ func (s *storageImageDestination) computeNextBlobCacheFile() string {
 }
 
 // HasThreadSafePutBlob indicates whether PutBlob can be executed concurrently.
-func (d *storageImageDestination) HasThreadSafePutBlob() bool {
+func (s *storageImageDestination) HasThreadSafePutBlob() bool {
 	return true
 }
 
