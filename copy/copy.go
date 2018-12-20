@@ -395,12 +395,13 @@ func shortDigest(d digest.Digest) string {
 }
 
 // createProgressBar creates a pb.ProgressBar.
-func createProgressBar(srcInfo types.BlobInfo, kind string) *pb.ProgressBar {
+func createProgressBar(srcInfo types.BlobInfo, kind string, writer io.Writer) *pb.ProgressBar {
 	bar := pb.New(int(srcInfo.Size)).SetUnits(pb.U_BYTES)
 	bar.SetMaxWidth(80)
 	bar.ShowTimeLeft = false
 	bar.ShowPercent = false
 	bar.Prefix(fmt.Sprintf("Copying %s %s:", kind, shortDigest(srcInfo.Digest)))
+	bar.Output = writer
 	return bar
 }
 
@@ -468,11 +469,12 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 
 	progressBars := make([]*pb.ProgressBar, numLayers)
 	for i, srcInfo := range srcInfos {
-		bar := createProgressBar(srcInfo, "blob")
+		bar := createProgressBar(srcInfo, "blob", nil)
 		progressBars[i] = bar
 	}
 
 	progressPool := pb.NewPool(progressBars...)
+	progressPool.Output = ic.c.reportWriter
 	if err := progressPool.Start(); err != nil {
 		return errors.Wrapf(err, "error creating progress-bar pool")
 	}
@@ -566,7 +568,7 @@ func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 		if err != nil {
 			return errors.Wrapf(err, "Error reading config blob %s", srcInfo.Digest)
 		}
-		bar := createProgressBar(srcInfo, "config")
+		bar := createProgressBar(srcInfo, "config", c.reportWriter)
 		defer bar.Finish()
 		bar.Start()
 		destInfo, err := c.copyBlobFromStream(ctx, bytes.NewReader(configBlob), srcInfo, nil, false, true, bar)
