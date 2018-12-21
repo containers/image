@@ -57,6 +57,11 @@ PRs that fix issues should include a reference like `Closes #XXXX` in the
 commit message so that github will automatically close the referenced issue
 when the PR is merged.
 
+For testing purposes PRs modifying dependencies require a branch of `skopeo` with the
+same name as the branch of the PR in the same group where the PR can be found.
+E.g. if requesting a pull of branch `mybranch` from `mygroup/image`, then a repository
+`mygroup/skopeo` with `mybranch` is needed.
+
 <!--
 All PRs require at least two LGTMs (Looks Good To Me) from maintainers.
 -->

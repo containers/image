@@ -1,8 +1,13 @@
 .PHONY: all tools test validate lint .gitvalidation fmt
 
 # Which github repository and branch to use for testing with skopeo
+ifdef TRAVIS_PULL_REQUEST_SLUG
+SKOPEO_REPO = $(subst image,skopeo,$(TRAVIS_PULL_REQUEST_SLUG))
+SKOPEO_BRANCH = $(TRAVIS_BRANCH)
+else
 SKOPEO_REPO = containers/skopeo
 SKOPEO_BRANCH = master
+endif
 # Set SUDO=sudo to run container integration tests using sudo.
 SUDO =
 
@@ -67,15 +72,10 @@ test: vendor
 # the master branch of the upstream repo.
 test-skopeo:
 	@echo === Testing skopeo build
-	@export GOPATH=$$(mktemp -d) && \
-		skopeo_path=$${GOPATH}/src/github.com/containers/skopeo && \
-		vendor_path=$${skopeo_path}/vendor/github.com/containers/image && \
-		git clone -b $(SKOPEO_BRANCH) https://github.com/$(SKOPEO_REPO) $${skopeo_path} && \
-		rm -rf $${vendor_path} && cp -r . $${vendor_path} && rm -rf $${vendor_path}/vendor && \
-		cd $${skopeo_path} && \
-		make BUILDTAGS="$(BUILDTAGS)" binary-local test-all-local && \
-		$(SUDO) make BUILDTAGS="$(BUILDTAGS)" check && \
-		rm -rf $${skopeo_path}
+	@env TRAVIS_PULL_REQUEST_SLUG="$(TRAVIS_PULL_REQUEST_SLUG)" \
+		TRAVIS_BRANCH="$(TRAVIS_BRANCH)" \
+		BUILDTAGS="$(BUILDTAGS)" \
+		hack/test-skopeo.sh
 
 fmt:
 	@gofmt -l -s -w $(SOURCE_DIRS)

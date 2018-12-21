@@ -20,6 +20,7 @@ script: >
   sudo docker run --privileged -ti --rm --user $(id -u):$(id -g)
   -e TRAVIS=$TRAVIS -e TRAVIS_COMMIT_RANGE=$TRAVIS_COMMIT_RANGE
   -e TRAVIS_PULL_REQUEST=$TRAVIS_PULL_REQUEST -e TRAVIS_REPO_SLUG=$TRAVIS_REPO_SLUG
+  -e TRAVIS_PULL_REQUEST_SLUG=$TRAVIS_PULL_REQUEST_SLUG -e TRAVIS_PULL_REQUEST_BRANCH=$TRAVIS_PULL_REQUEST_BRANCH
   -e TRAVIS_BRANCH=$TRAVIS_BRANCH -e TRAVIS_COMMIT=$TRAVIS_COMMIT
   -e GOPATH=/gopath -e TRASH_CACHE=/gopath/.trashcache -e HOME=/gopath
   -v /etc/passwd:/etc/passwd -v /etc/sudoers:/etc/sudoers -v /etc/sudoers.d:/etc/sudoers.d
