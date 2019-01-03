@@ -6,14 +6,10 @@ skopeo_path=${GOPATH}/src/github.com/containers/skopeo
 
 trap "rm -rf ${GOPATH}" EXIT
 
-if [ -z ${TRAVIS_PULL_REQUEST_SLUG} ] ; then
+if ! git clone -b "${SKOPEO_BRANCH}" \
+        https://:@github.com/"${SKOPEO_REPO}" \
+        ${skopeo_path} ; then
     git clone -b master https://github.com/containers/skopeo ${skopeo_path}
-else
-    if ! git clone -b "${TRAVIS_BRANCH}" \
-            https://:@github.com/"${TRAVIS_PULL_REQUEST_SLUG/image/skopeo}" \
-            ${skopeo_path} ; then
-        git clone -b master https://github.com/containers/skopeo ${skopeo_path}
-    fi
 fi
 
 vendor_path=${skopeo_path}/vendor/github.com/containers/image

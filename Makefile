@@ -72,8 +72,8 @@ test: vendor
 # the master branch of the upstream repo.
 test-skopeo:
 	@echo === Testing skopeo build
-	@env TRAVIS_PULL_REQUEST_SLUG="$(TRAVIS_PULL_REQUEST_SLUG)" \
-		TRAVIS_BRANCH="$(TRAVIS_BRANCH)" \
+	@env SKOPEO_REPO="$(SKOPEO_REPO)" \
+		SKOPEO_BRANCH="$(SKOPEO_BRANCH)" \
 		BUILDTAGS="$(BUILDTAGS)" \
 		hack/test-skopeo.sh
 
