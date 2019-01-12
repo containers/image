@@ -540,7 +540,7 @@ func (d *ostreeImageDestination) Commit(ctx context.Context) error {
 			ptrFunction, err := libselinuxHnd.GetSymbolPointer(function)
 			selinuxFunctions[function] = ptrFunction
 			if err != nil {
-				return fmt.Errorf(`couldn't get symbol %q: %v`, function, err)
+				return fmt.Errorf("couldn't get symbol %q: %v", function, err)
 			}
 		}
 
