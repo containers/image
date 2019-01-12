@@ -154,7 +154,8 @@ type ostreeImageDestination struct {
 	repo          *C.struct_OstreeRepo
 }
 
-var selinuxFunctions map[string]unsafe.Pointer
+// map to hold references to the required libselinux functions
+selinuxFunctions := make(map[string]unsafe.Pointer)
 
 // newImageDestination returns an ImageDestination for writing to an existing ostree.
 func newImageDestination(ref ostreeReference, tmpDirPath string) (types.ImageDestination, error) {
