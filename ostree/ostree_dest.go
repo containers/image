@@ -33,94 +33,98 @@ import (
 	"github.com/vbatts/tar-split/tar/storage"
 )
 
-// #cgo pkg-config: glib-2.0 gobject-2.0 ostree-1
-// #include <glib.h>
-// #include <glib-object.h>
-// #include <gio/gio.h>
-// #include <stdlib.h>
-// #include <ostree.h>
-// #include <gio/ginputstream.h>
-// #include <selinux/selinux.h>
-// #include <selinux/label.h>
-//
-// struct selabel_handle *
-//   my_selabel_open(
-//		void *function,
-//		unsigned int backend,
-//		const struct selinux_opt *opts,
-//		unsigned nopts)
-// {
-//		struct selabel_handle *(*ptr_selabel_open)(
-//			unsigned int,
-//			const struct selinux_opt *,
-//			unsigned);
-//		ptr_selabel_open = (struct selabel_handle *(*)(
-//				unsigned int,
-//				const struct selinux_opt *,
-//				unsigned))function;
-//		return ptr_selabel_open(backend, opts, nopts);
-// }
-//
-// void
-//   my_selabel_close(
-//		void *function,
-//		struct selabel_handle *handle)
-// {
-//		void (*ptr_selabel_close)(
-//			struct selabel_handle *);
-//		ptr_selabel_close = (void (*)(
-//				struct selabel_handle *))function;
-//		return ptr_selabel_close(handle);
-// }
-//
-// int
-//   my_selabel_lookup_raw(
-//		void *function,
-//		struct selabel_handle *handle,
-//		char **con,
-//		const char *key,
-//		int type)
-// {
-//		int (*ptr_selabel_lookup_raw)(
-//				struct selabel_handle *,
-//				char **,
-//				const char*,
-//				int);
-//		ptr_selabel_lookup_raw = (int (*)(
-//				struct selabel_handle *,
-//				char **,
-//				const char*,
-//				int))function;
-//		return ptr_selabel_lookup_raw(handle, con, key, type);
-// }
-//
-// int
-//   my_lsetfilecon_raw(
-//		void *function,
-//		const char *path,
-//		const char *con)
-// {
-//		int (*ptr_lsetfilecon_raw)(
-//				const char *,
-//				const char *);
-//		ptr_lsetfilecon_raw = (int (*)(
-//				const char *,
-//				const char *))function;
-//		return ptr_lsetfilecon_raw(path, con);
-// }
-//
-// void
-//   my_freecon(
-//		void *function,
-//		char *con)
-// {
-//		void (*ptr_freecon)(
-//				char *);
-//		ptr_freecon = (void (*)(
-//				char *))function;
-//		return ptr_freecon(con);
-// }
-//
+// Following block comment contains inline C code to make functions of
+// libselinux usable.
+
+/*
+#cgo pkg-config: glib-2.0 gobject-2.0 ostree-1
+#include <glib.h>
+#include <glib-object.h>
+#include <gio/gio.h>
+#include <stdlib.h>
+#include <ostree.h>
+#include <gio/ginputstream.h>
+#include <selinux/selinux.h>
+#include <selinux/label.h>
+
+struct selabel_handle *
+  my_selabel_open(
+		void *function,
+		unsigned int backend,
+		const struct selinux_opt *opts,
+		unsigned nopts)
+{
+		struct selabel_handle *(*ptr_selabel_open)(
+			unsigned int,
+			const struct selinux_opt *,
+			unsigned);
+		ptr_selabel_open = (struct selabel_handle *(*)(
+				unsigned int,
+				const struct selinux_opt *,
+				unsigned))function;
+		return ptr_selabel_open(backend, opts, nopts);
+}
+
+void
+  my_selabel_close(
+		void *function,
+		struct selabel_handle *handle)
+{
+		void (*ptr_selabel_close)(
+			struct selabel_handle *);
+		ptr_selabel_close = (void (*)(
+				struct selabel_handle *))function;
+		return ptr_selabel_close(handle);
+}
+
+int
+  my_selabel_lookup_raw(
+		void *function,
+		struct selabel_handle *handle,
+		char **con,
+		const char *key,
+		int type)
+{
+		int (*ptr_selabel_lookup_raw)(
+				struct selabel_handle *,
+				char **,
+				const char*,
+				int);
+		ptr_selabel_lookup_raw = (int (*)(
+				struct selabel_handle *,
+				char **,
+				const char*,
+				int))function;
+		return ptr_selabel_lookup_raw(handle, con, key, type);
+}
+
+int
+  my_lsetfilecon_raw(
+		void *function,
+		const char *path,
+		const char *con)
+{
+		int (*ptr_lsetfilecon_raw)(
+				const char *,
+				const char *);
+		ptr_lsetfilecon_raw = (int (*)(
+				const char *,
+				const char *))function;
+		return ptr_lsetfilecon_raw(path, con);
+}
+
+void
+  my_freecon(
+		void *function,
+		char *con)
+{
+		void (*ptr_freecon)(
+				char *);
+		ptr_freecon = (void (*)(
+				char *))function;
+		return ptr_freecon(con);
+}
+*/
 import "C"
 
 type blobToImport struct {
