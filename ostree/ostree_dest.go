@@ -159,7 +159,19 @@ type ostreeImageDestination struct {
 }
 
 // map to hold references to the required libselinux functions
-selinuxFunctions := make(map[string]unsafe.Pointer)
+type Selinuxfunc int
+const (
+	selabel_open Selinuxfunc = 0 < iota
+	selabel_close
+	selabel_lookup_raw
+	lsetfilecon_raw
+	freecon
+)
+func (s Selinuxfunc) String() string {
+	return [...]string{"selabel_open", "selabel_close",
+		"selabel_lookup_raw", "lsetfilecon_raw", "freecon"}[s]
+}
+selinuxFunctions := make(map[Selinuxfunc]unsafe.Pointer)
 
 // newImageDestination returns an ImageDestination for writing to an existing ostree.
 func newImageDestination(ref ostreeReference, tmpDirPath string) (types.ImageDestination, error) {
@@ -295,16 +307,16 @@ func fixFiles(selinuxHnd *C.struct_selabel_handle, root string, dir string, user
 			defer C.free(unsafe.Pointer(relPathC))
 			var context *C.char
 
-			res, err := C.my_selabel_lookup_raw(selinuxFunctions["selabel_lookup_raw"],
+			res, err := C.my_selabel_lookup_raw(selinuxFunctions[selabel_lookup_raw],
 				selinuxHnd, &context, relPathC, C.int(info.Mode()&os.ModePerm))
 			if int(res) < 0 && err != syscall.ENOENT {
 				return errors.Wrapf(err, "cannot selabel_lookup_raw %s", relPath)
 			}
 			if int(res) == 0 {
-				defer C.my_freecon(selinuxFunctions["freecon"], context)
+				defer C.my_freecon(selinuxFunctions[freecon], context)
 				fullpathC := C.CString(fullpath)
 				defer C.free(unsafe.Pointer(fullpathC))
-				res, err := C.my_lsetfilecon_raw(selinuxFunctions["lsetfilecon_raw"],
+				res, err := C.my_lsetfilecon_raw(selinuxFunctions[lsetfilecon_raw],
 					fullpathC, context)
 				if int(res) < 0 {
 					return errors.Wrapf(err, "cannot setfilecon_raw %s", fullpath)
@@ -533,10 +545,7 @@ func (d *ostreeImageDestination) Commit(ctx context.Context) error {
 
 		defer libselinuxHnd.Close()
 
-		selinuxFunctionNames := []string{"selabel_open", "selabel_close",
-			"selabel_lookup_raw", "lsetfilecon_raw", "freecon"}
-
-		for _, function := range selinuxFunctionNames {
+		for _, function := range make([]int, selabel_open, freecon}) {
 			ptrFunction, err := libselinuxHnd.GetSymbolPointer(function)
 			selinuxFunctions[function] = ptrFunction
 			if err != nil {
@@ -544,13 +553,13 @@ func (d *ostreeImageDestination) Commit(ctx context.Context) error {
 			}
 		}
 
-		selinuxHnd, err = C.my_selabel_open(selinuxFunctions["selabel_open"],
+		selinuxHnd, err = C.my_selabel_open(selinuxFunctions[selabel_open],
 			C.SELABEL_CTX_FILE, nil, 0)
 		if selinuxHnd == nil {
 			return errors.Wrapf(err, "cannot open the SELinux DB")
 		}
 
-		defer C.my_selabel_close(selinuxFunctions["selabel_close"], selinuxHnd)
+		defer C.my_selabel_close(selinuxFunctions[selabel_close], selinuxHnd)
 	}
 
 	checkLayer := func(hash string) error {
