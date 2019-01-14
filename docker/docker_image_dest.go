@@ -113,7 +113,7 @@ func (c *sizeCounter) Write(p []byte) (n int, err error) {
 
 // HasThreadSafePutBlob indicates whether PutBlob can be executed concurrently.
 func (d *dockerImageDestination) HasThreadSafePutBlob() bool {
-	return false
+	return true
 }
 
 // PutBlob writes contents of stream and returns data representing the result (with all data filled in).
@@ -307,9 +307,7 @@ func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.
 		// Whatever happens here, don't abort the entire operation.  It's likely we just don't have permissions, and if it is a critical network error, we will find out soon enough anyway.
 
 		// Checking candidateRepo, and mounting from it, requires an
-		// expanded token scope.  We still want to reuse the ping
-		// information and other aspects of the client, so rather than
-		// make a fresh copy, there is this a bit ugly extraScope hack.
+		// expanded token scope.
 		extraScope := &authScope{
 			remoteName: reference.Path(candidateRepo),
 			actions:    "pull",
