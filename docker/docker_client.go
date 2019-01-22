@@ -361,7 +361,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 		q.Set("n", strconv.Itoa(limit))
 		u.RawQuery = q.Encode()
 
-		logrus.Debugf("trying to talk to v1 search endpoint\n")
+		logrus.Debugf("trying to talk to v1 search endpoint")
 		resp, err := client.makeRequest(ctx, "GET", u.String(), nil, nil, noAuth, nil)
 		if err != nil {
 			logrus.Debugf("error getting search results from v1 endpoint %q: %v", registry, err)
@@ -378,7 +378,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 		}
 	}
 
-	logrus.Debugf("trying to talk to v2 search endpoint\n")
+	logrus.Debugf("trying to talk to v2 search endpoint")
 	resp, err := client.makeRequest(ctx, "GET", "/v2/_catalog", nil, nil, v2Auth, nil)
 	if err != nil {
 		logrus.Debugf("error getting search results from v2 endpoint %q: %v", registry, err)

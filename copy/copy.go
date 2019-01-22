@@ -480,7 +480,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 				bar.Finish()
 			} else {
 				cld.destInfo = srcLayer
-				logrus.Debugf("Skipping foreign layer %q copy to %s\n", cld.destInfo.Digest, ic.c.dest.Reference().Transport().Name())
+				logrus.Debugf("Skipping foreign layer %q copy to %s", cld.destInfo.Digest, ic.c.dest.Reference().Transport().Name())
 				bar.Prefix(fmt.Sprintf("Skipping blob %s (foreign layer):", shortDigest(srcLayer.Digest)))
 				bar.Add64(bar.Total)
 				bar.Finish()
