@@ -399,7 +399,7 @@ func (r uncompressedReadCloser) Close() error {
 
 // HasThreadSafeGetBlob indicates whether GetBlob can be executed concurrently.
 func (s *Source) HasThreadSafeGetBlob() bool {
-	return false
+	return true
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
