@@ -7,17 +7,10 @@ SKOPEO_BRANCH = master
 SUDO =
 
 # when cross compiling _for_ a Darwin or windows host, then we must use openpgp
-BUILD_TAGS_WINDOWS_CROSS = containers_image_ostree_stub containers_image_openpgp
-BUILD_TAGS_DARWIN_CROSS = containers_image_ostree_stub containers_image_openpgp
-# when compiling _on_ a Darwin host, then we can link against gpgme
-BUILD_TAGS_DARWIN_NATIVE = containers_image_ostree_stub
+BUILD_TAGS_WINDOWS_CROSS = containers_image_openpgp
+BUILD_TAGS_DARWIN_CROSS = containers_image_openpgp
 
-ifeq ($(shell uname),Darwin)
-PLATFORM_BUILD_TAG = $(BUILD_TAGS_DARWIN_NATIVE)
-endif
-
-
-BUILDTAGS = btrfs_noversion libdm_no_deferred_remove $(PLATFORM_BUILD_TAG)
+BUILDTAGS = btrfs_noversion libdm_no_deferred_remove
 BUILDFLAGS := -tags "$(BUILDTAGS)"
 
 PACKAGES := $(shell go list $(BUILDFLAGS) ./... | grep -v github.com/containers/image/vendor)
