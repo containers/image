@@ -464,15 +464,29 @@ func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo t
 		}, nil
 	}
 
-	// Does the blob correspond to a known DiffID which we already have available?
-	// Because we must return the size, which is unknown for unavailable compressed blobs, the returned BlobInfo refers to the
-	// uncompressed layer, and that can happen only if canSubstitute.
-	if canSubstitute {
-		if uncompressedDigest := cache.UncompressedDigest(blobinfo.Digest); uncompressedDigest != "" && uncompressedDigest != blobinfo.Digest {
-			layers, err := s.imageRef.transport.store.LayersByUncompressedDigest(uncompressedDigest)
-			if err != nil && errors.Cause(err) != storage.ErrLayerUnknown {
-				return false, types.BlobInfo{}, errors.Wrapf(err, `Error looking for layers with digest %q`, uncompressedDigest)
+	// Does the blob correspond to a compressed version of a known DiffID which we have available?
+	if uncompressedDigest := cache.UncompressedDigest(blobinfo.Digest); uncompressedDigest != "" && uncompressedDigest != blobinfo.Digest {
+		layers, err := s.imageRef.transport.store.LayersByUncompressedDigest(uncompressedDigest)
+		if err != nil && errors.Cause(err) != storage.ErrLayerUnknown {
+			return false, types.BlobInfo{}, errors.Wrapf(err, `Error looking for layers with digest %q`, uncompressedDigest)
+		}
+		// If one of the layers with the matching diffID was initialized using a compressed
+		// blob that matches the input, and we recorded the size of that blob, we can report
+		// that digest+size pair.
+		for _, layer := range layers {
+			if layer.CompressedDigest == blobinfo.Digest {
+				s.blobDiffIDs[blobinfo.Digest] = layer.UncompressedDigest
+				return true, types.BlobInfo{
+					Digest:    layer.CompressedDigest,
+					Size:      layer.CompressedSize,
+					MediaType: blobinfo.MediaType,
+				}, nil
 			}
+		}
+		// Because we must return the size, and we don't have a record of the compressed blob's
+		// size, the returned BlobInfo refers to the uncompressed layer, and that's only allowed
+		// if we canSubstitute.
+		if canSubstitute {
 			if len(layers) > 0 {
 				s.blobDiffIDs[uncompressedDigest] = layers[0].UncompressedDigest
 				return true, types.BlobInfo{
