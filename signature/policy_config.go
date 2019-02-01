@@ -48,11 +48,11 @@ func (err InvalidPolicyFormatError) Error() string {
 // NOTE: When this function returns an error, report it to the user and abort.
 // DO NOT hard-code fallback policies in your application.
 func DefaultPolicy(sys *types.SystemContext) (*Policy, error) {
-	return NewPolicyFromFile(defaultPolicyPath(sys))
+	return NewPolicyFromFile(DefaultPolicyPath(sys))
 }
 
-// defaultPolicyPath returns a path to the default policy of the system.
-func defaultPolicyPath(sys *types.SystemContext) string {
+// DefaultPolicyPath returns a path to the default policy of the system.
+func DefaultPolicyPath(sys *types.SystemContext) string {
 	if sys != nil {
 		if sys.SignaturePolicyPath != "" {
 			return sys.SignaturePolicyPath

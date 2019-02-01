@@ -119,7 +119,7 @@ func TestDefaultPolicyPath(t *testing.T) {
 		// No environment expansion happens in the overridden paths
 		{&types.SystemContext{SignaturePolicyPath: variableReference}, variableReference},
 	} {
-		path := defaultPolicyPath(c.sys)
+		path := DefaultPolicyPath(c.sys)
 		assert.Equal(t, c.expected, path)
 	}
 }
