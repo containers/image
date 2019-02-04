@@ -15,24 +15,24 @@ import (
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/pkg/compression"
 	"github.com/containers/image/types"
-	"github.com/opencontainers/go-digest"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 
 // Source is a partial implementation of types.ImageSource for reading from tarPath.
 type Source struct {
 	tarPath              string
-	removeTarPathOnClose bool      // Remove temp file on close if true
-	cacheDataLock        sync.Once // Atomic way to ensure that ensureCachedDataIsPresent is only invoked once
+	removeTarPathOnClose bool // Remove temp file on close if true
 	// The following data is only available after ensureCachedDataIsPresent() succeeds
-	cacheDataResult   error         // The return value of ensureCachedDataIsPresent, since it should be as safe to cache as the side effects
 	tarManifest       *ManifestItem // nil if not available yet.
 	configBytes       []byte
 	configDigest      digest.Digest
 	orderedDiffIDList []digest.Digest
 	knownLayers       map[digest.Digest]*layerInfo
 	// Other state
-	generatedManifest []byte // Private cache for GetManifest(), nil if not set yet.
+	generatedManifest []byte    // Private cache for GetManifest(), nil if not set yet.
+	cacheDataLock     sync.Once // Private state for ensureCachedDataIsPresent to make it concurrency-safe
+	cacheDataResult   error     // Private state for ensureCachedDataIsPresent
 }
 
 type layerInfo struct {
