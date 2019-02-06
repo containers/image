@@ -686,15 +686,9 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 		lastLayer = layer.ID
 	}
 
-	manifestDigest, err := manifest.Digest(s.manifest)
-	if err != nil {
-		return errors.Wrapf(err, "error computing manifest digest")
-	}
 	// If one of those blobs was a configuration blob, then we can try to dig out the date when the image
 	// was originally created, in case we're just copying it.  If not, no harm done.
-	options := &storage.ImageOptions{
-		Digest: manifestDigest,
-	}
+	options := &storage.ImageOptions{}
 	if inspect, err := man.Inspect(s.getConfigBlob); err == nil && inspect.Created != nil {
 		logrus.Debugf("setting image creation date to %s", inspect.Created)
 		options.CreationDate = *inspect.Created
@@ -767,6 +761,10 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 	// Save the manifest.  Allow looking it up by digest by using the key convention defined by the Store.
 	// Record the manifest twice: using a digest-specific key to allow references to that specific digest instance,
 	// and using storage.ImageDigestBigDataKey for future users that don’t specify any digest and for compatibility with older readers.
+	manifestDigest, err := manifest.Digest(s.manifest)
+	if err != nil {
+		return errors.Wrapf(err, "error computing manifest digest")
+	}
 	if err := s.imageRef.transport.store.SetImageBigData(img.ID, manifestBigDataKey(manifestDigest), s.manifest); err != nil {
 		if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
 			logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
