@@ -147,10 +147,10 @@ func (s *dockerImageSource) getExternalBlob(ctx context.Context, urls []string) 
 			break
 		}
 	}
-	if resp.Body != nil && err == nil {
-		return resp.Body, getBlobSize(resp), nil
+	if err != nil {
+		return nil, 0, err
 	}
-	return nil, 0, err
+	return resp.Body, getBlobSize(resp), nil
 }
 
 func getBlobSize(resp *http.Response) int64 {
