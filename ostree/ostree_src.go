@@ -313,11 +313,11 @@ func (s *ostreeImageSource) GetBlob(ctx context.Context, info types.BlobInfo, ca
 	if err != nil {
 		return nil, 0, err
 	}
-	defer mfz.Close()
 	metaUnpacker := storage.NewJSONUnpacker(mfz)
 
 	getter, err := newOSTreePathFileGetter(s.repo, branch)
 	if err != nil {
+		mfz.Close()
 		return nil, 0, err
 	}
 
@@ -331,6 +331,7 @@ func (s *ostreeImageSource) GetBlob(ctx context.Context, info types.BlobInfo, ca
 
 	rc := ioutils.NewReadCloserWrapper(pipeReader, func() error {
 		getter.Close()
+		mfz.Close()
 		return ots.Close()
 	})
 	return rc, layerSize, nil
