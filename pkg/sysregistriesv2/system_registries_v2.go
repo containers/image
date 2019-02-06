@@ -84,6 +84,13 @@ func (e *InvalidRegistries) Error() string {
 	return e.s
 }
 
+// ValidatePrefix calls parseURL but discards the normalized registry value returned
+// It just checks that the registry value given as an input is valid
+func ValidatePrefix(input string) error {
+	_, err := parseURL(input)
+	return err
+}
+
 // parseURL parses the input string, performs some sanity checks and returns
 // the sanitized input string.  An error is returned if the input string is
 // empty or if contains an "http{s,}://" prefix.
