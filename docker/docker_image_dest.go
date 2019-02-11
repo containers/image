@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
@@ -390,14 +391,29 @@ func isManifestInvalidError(err error) bool {
 	if !ok || len(errors) == 0 {
 		return false
 	}
-	ec, ok := errors[0].(errcode.ErrorCoder)
+	err = errors[0]
+	ec, ok := err.(errcode.ErrorCoder)
 	if !ok {
 		return false
 	}
+
+	switch ec.ErrorCode() {
 	// ErrorCodeManifestInvalid is returned by OpenShift with acceptschema2=false.
+	case v2.ErrorCodeManifestInvalid:
+		return true
 	// ErrorCodeTagInvalid is returned by docker/distribution (at least as of commit ec87e9b6971d831f0eff752ddb54fb64693e51cd)
 	// when uploading to a tag (because it can’t find a matching tag inside the manifest)
-	return ec.ErrorCode() == v2.ErrorCodeManifestInvalid || ec.ErrorCode() == v2.ErrorCodeTagInvalid
+	case v2.ErrorCodeTagInvalid:
+		return true
+	// ErrorCodeUnsupported with 'Invalid JSON syntax' is returned by AWS ECR when
+	// uploading an OCI manifest that is (correctly, according to the spec) missing
+	// a top-level media type. See libpod issue #1719
+	// FIXME: remove this case when ECR behavior is fixed
+	case errcode.ErrorCodeUnsupported:
+		return strings.Contains(err.Error(), "Invalid JSON syntax")
+	default:
+		return false
+	}
 }
 
 func (d *dockerImageDestination) PutSignatures(ctx context.Context, signatures [][]byte) error {
