@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
@@ -404,6 +405,12 @@ func isManifestInvalidError(err error) bool {
 	// when uploading to a tag (because it can’t find a matching tag inside the manifest)
 	case v2.ErrorCodeTagInvalid:
 		return true
+	// ErrorCodeUnsupported with 'Invalid JSON syntax' is returned by AWS ECR when
+	// uploading an OCI manifest that is (correctly, according to the spec) missing
+	// a top-level media type. See libpod issue #1719
+	// FIXME: remove this case when ECR behavior is fixed
+	case errcode.ErrorCodeUnsupported:
+		return strings.Contains(err.Error(), "Invalid JSON syntax")
 	default:
 		return false
 	}
