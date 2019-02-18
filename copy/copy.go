@@ -425,9 +425,12 @@ func (ic *imageCopier) updateEmbeddedDockerReference() error {
 	return nil
 }
 
+// shortDigestLen is the length of the string returned by shortDigest()
+const shortDigestLen = 12
+
 // shortDigest returns the first 12 characters of the digest.
 func shortDigest(d digest.Digest) string {
-	return d.Encoded()[:12]
+	return d.Encoded()[:shortDigestLen]
 }
 
 // isTTY returns true if the io.Writer is a file and a tty.
@@ -500,7 +503,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 
 	progressBars := make([]*mpb.Bar, numLayers)
 	for i, srcInfo := range srcInfos {
-		progressBars[i] = ic.c.createProgressBar(srcInfo, shortDigest(srcInfo.Digest), "blob")
+		progressBars[i] = ic.c.createProgressBar(srcInfo, "blob")
 	}
 
 	for i, srcLayer := range srcInfos {
@@ -587,10 +590,18 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest(ctx context.Context) ([]byte
 
 // createProgressBar creates a mpb.Bar.  Note that if the copier's reportWriter
 // is ioutil.Discard, the progress bar's output will be discarded
-func (c *copier) createProgressBar(info types.BlobInfo, name, kind string) *mpb.Bar {
+func (c *copier) createProgressBar(info types.BlobInfo, kind string) *mpb.Bar {
+	prefix := fmt.Sprintf("Copying %s %s", kind, info.Digest.Encoded())
+	// Truncate the prefix (chopping of some part of the digest) to make all progress bars aligned in a column.
+	// For blobs, the most common kind, use the same digest length as shortDigest() does.
+	maxPrefixLen := len("Copying blob ") + shortDigestLen
+	if len(prefix) > maxPrefixLen {
+		prefix = prefix[:maxPrefixLen]
+	}
+
 	bar := c.progressPool.AddBar(info.Size,
 		mpb.PrependDecorators(
-			decor.Name(fmt.Sprintf("Copying %s %s", kind, name)),
+			decor.Name(prefix),
 		),
 		mpb.AppendDecorators(
 			decor.CountersKibiByte("%.1f / %.1f"),
@@ -611,8 +622,7 @@ func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 			return errors.Wrapf(err, "Error reading config blob %s", srcInfo.Digest)
 		}
 
-		// make the short digest only 10 characters long to make it align with the blob output
-		bar := c.createProgressBar(srcInfo, shortDigest(srcInfo.Digest)[0:10], "config")
+		bar := c.createProgressBar(srcInfo, "config")
 		destInfo, err := c.copyBlobFromStream(ctx, bytes.NewReader(configBlob), srcInfo, nil, false, true, bar)
 		if err != nil {
 			return err
