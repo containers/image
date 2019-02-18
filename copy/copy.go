@@ -91,7 +91,6 @@ type copier struct {
 	reportWriter     io.Writer
 	progressOutput   io.Writer
 	progressInterval time.Duration
-	progressPool     *mpb.Progress
 	progress         chan types.ProgressProperties
 	blobInfoCache    types.BlobInfoCache
 	copyInParallel   bool
@@ -180,7 +179,6 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		// we might want to add a separate CommonCtx — or would that be too confusing?
 		blobInfoCache: blobinfocache.DefaultCache(options.DestinationCtx),
 	}
-	c.progressPool = c.newProgressPool()
 
 	unparsedToplevel := image.UnparsedInstance(rawSource, nil)
 	multiImage, err := isMultiImage(ctx, unparsedToplevel)
@@ -493,9 +491,10 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		}
 	}
 
+	progressPool := ic.c.newProgressPool()
 	progressBars := make([]*mpb.Bar, numLayers)
 	for i, srcInfo := range srcInfos {
-		progressBars[i] = ic.c.createProgressBar(ic.c.progressPool, srcInfo, "blob")
+		progressBars[i] = ic.c.createProgressBar(progressPool, srcInfo, "blob")
 	}
 
 	for i, srcLayer := range srcInfos {
@@ -505,6 +504,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 
 	// Wait for all layers to be copied
 	copyGroup.Wait()
+	progressPool.Wait()
 
 	destInfos := make([]types.BlobInfo, numLayers)
 	diffIDs := make([]digest.Digest, numLayers)
@@ -571,7 +571,6 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest(ctx context.Context) ([]byte
 		return nil, err
 	}
 
-	ic.c.progressPool.Wait()
 	ic.c.Printf("Writing manifest to image destination\n")
 	if err := ic.c.dest.PutManifest(ctx, manifest); err != nil {
 		return nil, errors.Wrap(err, "Error writing manifest")
@@ -621,7 +620,8 @@ func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 			return errors.Wrapf(err, "Error reading config blob %s", srcInfo.Digest)
 		}
 
-		bar := c.createProgressBar(c.progressPool, srcInfo, "config")
+		progressPool := c.newProgressPool()
+		bar := c.createProgressBar(progressPool, srcInfo, "config")
 		destInfo, err := c.copyBlobFromStream(ctx, bytes.NewReader(configBlob), srcInfo, nil, false, true, bar)
 		if err != nil {
 			return err
@@ -629,6 +629,7 @@ func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 		if bar != nil {
 			bar.SetTotal(int64(len(configBlob)), true)
 		}
+		progressPool.Wait()
 		if destInfo.Digest != srcInfo.Digest {
 			return errors.Errorf("Internal error: copying uncompressed config blob %s changed digest to %s", srcInfo.Digest, destInfo.Digest)
 		}
