@@ -22,7 +22,7 @@ import (
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
 	"github.com/klauspost/pgzip"
-	"github.com/opencontainers/go-digest"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vbauerster/mpb"
@@ -621,7 +621,7 @@ func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 			return err
 		}
 		if bar != nil {
-			bar.SetTotal(0, true)
+			bar.SetTotal(int64(len(configBlob)), true)
 		}
 		if destInfo.Digest != srcInfo.Digest {
 			return errors.Errorf("Internal error: copying uncompressed config blob %s changed digest to %s", srcInfo.Digest, destInfo.Digest)
