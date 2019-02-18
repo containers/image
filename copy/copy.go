@@ -92,7 +92,6 @@ type copier struct {
 	progressOutput   io.Writer
 	progressInterval time.Duration
 	progressPool     *mpb.Progress
-	progressWG       *sync.WaitGroup
 	progress         chan types.ProgressProperties
 	blobInfoCache    types.BlobInfoCache
 	copyInParallel   bool
@@ -168,15 +167,13 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		progressOutput = ioutil.Discard
 	}
 	copyInParallel := dest.HasThreadSafePutBlob() && rawSource.HasThreadSafeGetBlob()
-	wg := new(sync.WaitGroup)
 	c := &copier{
 		dest:             dest,
 		rawSource:        rawSource,
 		reportWriter:     reportWriter,
 		progressOutput:   progressOutput,
 		progressInterval: options.ProgressInterval,
-		progressPool:     mpb.New(mpb.WithWidth(40), mpb.WithOutput(progressOutput), mpb.WithWaitGroup(wg)),
-		progressWG:       wg,
+		progressPool:     mpb.New(mpb.WithWidth(40), mpb.WithOutput(progressOutput)),
 		progress:         options.Progress,
 		copyInParallel:   copyInParallel,
 		// FIXME? The cache is used for sources and destinations equally, but we only have a SourceCtx and DestinationCtx.
@@ -752,8 +749,6 @@ func computeDiffID(stream io.Reader, decompressor compression.DecompressorFunc) 
 func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, srcInfo types.BlobInfo,
 	getOriginalLayerCopyWriter func(decompressor compression.DecompressorFunc) io.Writer,
 	canModifyBlob bool, isConfig bool, bar *mpb.Bar) (types.BlobInfo, error) {
-	c.progressWG.Add(1)
-	defer c.progressWG.Done()
 	// The copying happens through a pipeline of connected io.Readers.
 	// === Input: srcStream
 
