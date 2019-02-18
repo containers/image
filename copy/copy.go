@@ -486,9 +486,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 			cld.destInfo, cld.diffID, cld.err = ic.copyLayer(ctx, srcLayer, bar)
 		}
 		data[index] = cld
-		if bar != nil {
-			bar.SetTotal(srcLayer.Size, true)
-		}
+		bar.SetTotal(srcLayer.Size, true)
 	}
 
 	progressPool := ic.c.newProgressPool()
@@ -626,9 +624,7 @@ func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 		if err != nil {
 			return err
 		}
-		if bar != nil {
-			bar.SetTotal(int64(len(configBlob)), true)
-		}
+		bar.SetTotal(int64(len(configBlob)), true)
 		progressPool.Wait()
 		if destInfo.Digest != srcInfo.Digest {
 			return errors.Errorf("Internal error: copying uncompressed config blob %s changed digest to %s", srcInfo.Digest, destInfo.Digest)
