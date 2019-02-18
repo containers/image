@@ -425,14 +425,6 @@ func (ic *imageCopier) updateEmbeddedDockerReference() error {
 	return nil
 }
 
-// shortDigestLen is the length of the string returned by shortDigest()
-const shortDigestLen = 12
-
-// shortDigest returns the first 12 characters of the digest.
-func shortDigest(d digest.Digest) string {
-	return d.Encoded()[:shortDigestLen]
-}
-
 // isTTY returns true if the io.Writer is a file and a tty.
 func isTTY(w io.Writer) bool {
 	if f, ok := w.(*os.File); ok {
@@ -591,9 +583,11 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest(ctx context.Context) ([]byte
 // createProgressBar creates a mpb.Bar.  Note that if the copier's reportWriter
 // is ioutil.Discard, the progress bar's output will be discarded
 func (c *copier) createProgressBar(info types.BlobInfo, kind string) *mpb.Bar {
+	// shortDigestLen is the length of the digest used for blobs.
+	const shortDigestLen = 12
+
 	prefix := fmt.Sprintf("Copying %s %s", kind, info.Digest.Encoded())
 	// Truncate the prefix (chopping of some part of the digest) to make all progress bars aligned in a column.
-	// For blobs, the most common kind, use the same digest length as shortDigest() does.
 	maxPrefixLen := len("Copying blob ") + shortDigestLen
 	if len(prefix) > maxPrefixLen {
 		prefix = prefix[:maxPrefixLen]
@@ -657,7 +651,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, ba
 			return types.BlobInfo{}, "", errors.Wrapf(err, "Error trying to reuse blob %s at destination", srcInfo.Digest)
 		}
 		if reused {
-			logrus.Debugf("Skipping blob %s (already present):", shortDigest(srcInfo.Digest))
+			logrus.Debugf("Skipping blob %s (already present):", srcInfo.Digest)
 			return blobInfo, cachedDiffID, nil
 		}
 	}
