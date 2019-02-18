@@ -503,12 +503,11 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		go copyLayerHelper(i, srcLayer, progressBars[i])
 	}
 
-	destInfos := make([]types.BlobInfo, numLayers)
-	diffIDs := make([]digest.Digest, numLayers)
-
 	// Wait for all layers to be copied
 	copyGroup.Wait()
 
+	destInfos := make([]types.BlobInfo, numLayers)
+	diffIDs := make([]digest.Digest, numLayers)
 	for i, cld := range data {
 		if cld.err != nil {
 			return cld.err
