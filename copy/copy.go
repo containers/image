@@ -489,20 +489,23 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		bar.SetTotal(srcLayer.Size, true)
 	}
 
-	progressPool := ic.c.newProgressPool()
-	progressBars := make([]*mpb.Bar, numLayers)
-	for i, srcInfo := range srcInfos {
-		progressBars[i] = ic.c.createProgressBar(progressPool, srcInfo, "blob")
-	}
+	func() { // A scope for defer
+		progressPool, progressCleanup := ic.c.newProgressPool(ctx)
+		defer progressCleanup()
 
-	for i, srcLayer := range srcInfos {
-		copySemaphore.Acquire(ctx, 1)
-		go copyLayerHelper(i, srcLayer, progressBars[i])
-	}
+		progressBars := make([]*mpb.Bar, numLayers)
+		for i, srcInfo := range srcInfos {
+			progressBars[i] = ic.c.createProgressBar(progressPool, srcInfo, "blob")
+		}
 
-	// Wait for all layers to be copied
-	copyGroup.Wait()
-	progressPool.Wait()
+		for i, srcLayer := range srcInfos {
+			copySemaphore.Acquire(ctx, 1)
+			go copyLayerHelper(i, srcLayer, progressBars[i])
+		}
+
+		// Wait for all layers to be copied
+		copyGroup.Wait()
+	}()
 
 	destInfos := make([]types.BlobInfo, numLayers)
 	diffIDs := make([]digest.Digest, numLayers)
@@ -576,10 +579,15 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest(ctx context.Context) ([]byte
 	return manifest, nil
 }
 
-// newProgressPool creates a *mpb.Progress.
-// The caller must eventually call .Wait() on the returned pool.
-func (c *copier) newProgressPool() *mpb.Progress {
-	return mpb.New(mpb.WithWidth(40), mpb.WithOutput(c.progressOutput))
+// newProgressPool creates a *mpb.Progress and a cleanup function.
+// The caller must eventually call the returned cleanup function after the pool will no longer be updated.
+func (c *copier) newProgressPool(ctx context.Context) (*mpb.Progress, func()) {
+	ctx, cancel := context.WithCancel(ctx)
+	pool := mpb.New(mpb.WithWidth(40), mpb.WithOutput(c.progressOutput), mpb.WithContext(ctx))
+	return pool, func() {
+		cancel()
+		pool.Wait()
+	}
 }
 
 // createProgressBar creates a mpb.Bar in pool.  Note that if the copier's reportWriter
@@ -618,14 +626,20 @@ func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 			return errors.Wrapf(err, "Error reading config blob %s", srcInfo.Digest)
 		}
 
-		progressPool := c.newProgressPool()
-		bar := c.createProgressBar(progressPool, srcInfo, "config")
-		destInfo, err := c.copyBlobFromStream(ctx, bytes.NewReader(configBlob), srcInfo, nil, false, true, bar)
+		destInfo, err := func() (types.BlobInfo, error) { // A scope for defer
+			progressPool, progressCleanup := c.newProgressPool(ctx)
+			defer progressCleanup()
+			bar := c.createProgressBar(progressPool, srcInfo, "config")
+			destInfo, err := c.copyBlobFromStream(ctx, bytes.NewReader(configBlob), srcInfo, nil, false, true, bar)
+			if err != nil {
+				return types.BlobInfo{}, err
+			}
+			bar.SetTotal(int64(len(configBlob)), true)
+			return destInfo, nil
+		}()
 		if err != nil {
-			return err
+			return nil
 		}
-		bar.SetTotal(int64(len(configBlob)), true)
-		progressPool.Wait()
 		if destInfo.Digest != srcInfo.Digest {
 			return errors.Errorf("Internal error: copying uncompressed config blob %s changed digest to %s", srcInfo.Digest, destInfo.Digest)
 		}
