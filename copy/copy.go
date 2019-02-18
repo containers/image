@@ -173,7 +173,6 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		reportWriter:     reportWriter,
 		progressOutput:   progressOutput,
 		progressInterval: options.ProgressInterval,
-		progressPool:     mpb.New(mpb.WithWidth(40), mpb.WithOutput(progressOutput)),
 		progress:         options.Progress,
 		copyInParallel:   copyInParallel,
 		// FIXME? The cache is used for sources and destinations equally, but we only have a SourceCtx and DestinationCtx.
@@ -181,6 +180,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		// we might want to add a separate CommonCtx — or would that be too confusing?
 		blobInfoCache: blobinfocache.DefaultCache(options.DestinationCtx),
 	}
+	c.progressPool = c.newProgressPool()
 
 	unparsedToplevel := image.UnparsedInstance(rawSource, nil)
 	multiImage, err := isMultiImage(ctx, unparsedToplevel)
@@ -578,6 +578,12 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest(ctx context.Context) ([]byte
 		return nil, errors.Wrap(err, "Error writing manifest")
 	}
 	return manifest, nil
+}
+
+// newProgressPool creates a *mpb.Progress.
+// The caller must eventually call .Wait() on the returned pool.
+func (c *copier) newProgressPool() *mpb.Progress {
+	return mpb.New(mpb.WithWidth(40), mpb.WithOutput(c.progressOutput))
 }
 
 // createProgressBar creates a mpb.Bar in pool.  Note that if the copier's reportWriter
