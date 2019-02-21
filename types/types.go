@@ -401,10 +401,16 @@ type ImageInspectInfo struct {
 }
 
 // DockerAuthConfig contains authorization information for connecting to a registry.
+//
+// Deprecated: Use github.com/containers/image/credentials/single's AuthStore instead.
 type DockerAuthConfig struct {
 	Username string
 	Password string
 }
+
+// AuthGetter retrieves credentials for HTTP(S) access.  It returns
+// the username and secret as strings.
+type AuthGetter func(serverURL string) (string, string, error)
 
 // OptionalBool is a boolean with an additional undefined value, which is meant
 // to be used in the context of user input to distinguish between a
@@ -451,7 +457,9 @@ type SystemContext struct {
 	RegistriesDirPath string
 	// Path to the system-wide registries configuration file
 	SystemRegistriesConfPath string
-	// If not "", overrides the default path for the authentication file
+	// If not "", overrides the default path for the authentication file.  Ignored for reading if AuthConfig is not "".
+	//
+	// Deprecated: Use the GetAuth property and github.com/containers/image/pkg/docker/config's AuthStore instead.
 	AuthFilePath string
 	// If not "", overrides the use of platform.GOARCH when choosing an image or verifying architecture match.
 	ArchitectureChoice string
@@ -459,6 +467,8 @@ type SystemContext struct {
 	OSChoice string
 	// If not "", overrides the system's default directory containing a blob info cache.
 	BlobInfoCacheDir string
+	// GetAuth retrieves credentials for authenticated HTTP(S) access.
+	GetAuth AuthGetter
 
 	// Additional tags when creating or copying a docker-archive.
 	DockerArchiveAdditionalTags []reference.NamedTagged
@@ -485,7 +495,9 @@ type SystemContext struct {
 	DockerPerHostCertDirPath string
 	// Allow contacting docker registries over HTTP, or HTTPS with failed TLS verification. Note that this does not affect other TLS connections.
 	DockerInsecureSkipTLSVerify OptionalBool
-	// if nil, the library tries to parse ~/.docker/config.json to retrieve credentials
+	// if nil, the library tries to parse ~/.docker/config.json to retrieve credentials.
+	//
+	// Deprecated: Use the GetAuth property and github.com/containers/image/credentials/single's AuthStore instead.
 	DockerAuthConfig *DockerAuthConfig
 	// if not "", an User-Agent header is added to each request when contacting a registry.
 	DockerRegistryUserAgent string
