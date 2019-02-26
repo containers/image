@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/containers/image/types"
-	"github.com/opencontainers/go-digest"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 )
 
@@ -18,7 +18,7 @@ type locationKey struct {
 
 // memoryCache implements an in-memory-only BlobInfoCache
 type memoryCache struct {
-	mutex                 *sync.Mutex // synchronizes concurrent accesses
+	mutex                 sync.Mutex // synchronizes concurrent accesses
 	uncompressedDigests   map[digest.Digest]digest.Digest
 	digestsByUncompressed map[digest.Digest]map[digest.Digest]struct{}             // stores a set of digests for each uncompressed digest
 	knownLocations        map[locationKey]map[types.BICLocationReference]time.Time // stores last known existence time for each location reference
@@ -30,7 +30,6 @@ type memoryCache struct {
 // Manual users of types.{ImageSource,ImageDestination} might also use this instead of a persistent cache.
 func NewMemoryCache() types.BlobInfoCache {
 	return &memoryCache{
-		mutex:                 new(sync.Mutex),
 		uncompressedDigests:   map[digest.Digest]digest.Digest{},
 		digestsByUncompressed: map[digest.Digest]map[digest.Digest]struct{}{},
 		knownLocations:        map[locationKey]map[types.BICLocationReference]time.Time{},
