@@ -732,7 +732,7 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 		if err != nil {
 			return errors.Wrapf(err, "error copying non-layer blob %q to image", blob)
 		}
-		if err := s.imageRef.transport.store.SetImageBigData(img.ID, blob.String(), v); err != nil {
+		if err := s.imageRef.transport.store.SetImageBigData(img.ID, blob.String(), v, manifest.Digest); err != nil {
 			if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
 				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
 			}
@@ -765,14 +765,14 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrapf(err, "error computing manifest digest")
 	}
-	if err := s.imageRef.transport.store.SetImageBigData(img.ID, manifestBigDataKey(manifestDigest), s.manifest); err != nil {
+	if err := s.imageRef.transport.store.SetImageBigData(img.ID, manifestBigDataKey(manifestDigest), s.manifest, manifest.Digest); err != nil {
 		if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
 			logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
 		}
 		logrus.Debugf("error saving manifest for image %q: %v", img.ID, err)
 		return err
 	}
-	if err := s.imageRef.transport.store.SetImageBigData(img.ID, storage.ImageDigestBigDataKey, s.manifest); err != nil {
+	if err := s.imageRef.transport.store.SetImageBigData(img.ID, storage.ImageDigestBigDataKey, s.manifest, manifest.Digest); err != nil {
 		if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
 			logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
 		}
@@ -781,7 +781,7 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 	}
 	// Save the signatures, if we have any.
 	if len(s.signatures) > 0 {
-		if err := s.imageRef.transport.store.SetImageBigData(img.ID, "signatures", s.signatures); err != nil {
+		if err := s.imageRef.transport.store.SetImageBigData(img.ID, "signatures", s.signatures, manifest.Digest); err != nil {
 			if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
 				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
 			}
