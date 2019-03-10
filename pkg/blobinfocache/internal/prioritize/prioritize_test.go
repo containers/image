@@ -1,4 +1,4 @@
-package blobinfocache
+package prioritize
 
 import (
 	"fmt"
@@ -10,10 +10,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	digestUnknown             = digest.Digest("sha256:1111111111111111111111111111111111111111111111111111111111111111")
+	digestUncompressed        = digest.Digest("sha256:2222222222222222222222222222222222222222222222222222222222222222")
+	digestCompressedA         = digest.Digest("sha256:3333333333333333333333333333333333333333333333333333333333333333")
+	digestCompressedB         = digest.Digest("sha256:4444444444444444444444444444444444444444444444444444444444444444")
+	digestCompressedUnrelated = digest.Digest("sha256:5555555555555555555555555555555555555555555555555555555555555555")
+	digestCompressedPrimary   = digest.Digest("sha256:6666666666666666666666666666666666666666666666666666666666666666")
+)
+
 var (
 	// cssLiteral contains a non-trivial candidateSortState shared among several tests below.
 	cssLiteral = candidateSortState{
-		cs: []candidateWithTime{
+		cs: []CandidateWithTime{
 			{types.BICReplacementCandidate{Digest: digestCompressedA, Location: types.BICLocationReference{Opaque: "A1"}}, time.Unix(1, 0)},
 			{types.BICReplacementCandidate{Digest: digestUncompressed, Location: types.BICLocationReference{Opaque: "U2"}}, time.Unix(1, 1)},
 			{types.BICReplacementCandidate{Digest: digestCompressedA, Location: types.BICLocationReference{Opaque: "A2"}}, time.Unix(1, 1)},
@@ -43,7 +52,7 @@ func TestCandidateSortStateLen(t *testing.T) {
 	css := cssLiteral
 	assert.Equal(t, 8, css.Len())
 
-	css.cs = []candidateWithTime{}
+	css.cs = []CandidateWithTime{}
 	assert.Equal(t, 0, css.Len())
 }
 
@@ -66,7 +75,7 @@ func TestCandidateSortStateLess(t *testing.T) {
 		for _, tms := range [][2]int64{{1, 2}, {2, 1}, {1, 1}} {
 			caseName := fmt.Sprintf("%s %v", c.name, tms)
 			css := candidateSortState{
-				cs: []candidateWithTime{
+				cs: []CandidateWithTime{
 					{types.BICReplacementCandidate{Digest: c.d0, Location: types.BICLocationReference{Opaque: "L0"}}, time.Unix(tms[0], 0)},
 					{types.BICReplacementCandidate{Digest: c.d1, Location: types.BICLocationReference{Opaque: "L1"}}, time.Unix(tms[1], 0)},
 				},
@@ -105,7 +114,7 @@ func TestCandidateSortStateLess(t *testing.T) {
 		{"any: t=1 == t=1, d=A == d=A", 0, p{digestCompressedA, 1}, p{digestCompressedA, 1}},
 	} {
 		css := candidateSortState{
-			cs: []candidateWithTime{
+			cs: []CandidateWithTime{
 				{types.BICReplacementCandidate{Digest: c.p0.d, Location: types.BICLocationReference{Opaque: "L0"}}, time.Unix(c.p0.t, 0)},
 				{types.BICReplacementCandidate{Digest: c.p1.d, Location: types.BICLocationReference{Opaque: "L1"}}, time.Unix(c.p1.t, 0)},
 			},
@@ -130,7 +139,7 @@ func TestCandidateSortStateLess(t *testing.T) {
 func TestCandidateSortStateSwap(t *testing.T) {
 	freshCSS := func() candidateSortState { // Return a deep copy of cssLiteral which is safe to modify.
 		res := cssLiteral
-		res.cs = append([]candidateWithTime{}, cssLiteral.cs...)
+		res.cs = append([]CandidateWithTime{}, cssLiteral.cs...)
 		return res
 	}
 
@@ -148,7 +157,7 @@ func TestCandidateSortStateSwap(t *testing.T) {
 func TestDestructivelyPrioritizeReplacementCandidatesWithMax(t *testing.T) {
 	for _, max := range []int{0, 1, replacementAttempts, 100} {
 		// Just a smoke test; we mostly rely on test coverage in TestCandidateSortStateLess
-		res := destructivelyPrioritizeReplacementCandidatesWithMax(append([]candidateWithTime{}, cssLiteral.cs...), digestCompressedPrimary, digestUncompressed, max)
+		res := destructivelyPrioritizeReplacementCandidatesWithMax(append([]CandidateWithTime{}, cssLiteral.cs...), digestCompressedPrimary, digestUncompressed, max)
 		if max > len(cssExpectedReplacementCandidates) {
 			max = len(cssExpectedReplacementCandidates)
 		}
@@ -158,6 +167,6 @@ func TestDestructivelyPrioritizeReplacementCandidatesWithMax(t *testing.T) {
 
 func TestDestructivelyPrioritizeReplacementCandidates(t *testing.T) {
 	// Just a smoke test; we mostly rely on test coverage in TestCandidateSortStateLess
-	res := destructivelyPrioritizeReplacementCandidates(append([]candidateWithTime{}, cssLiteral.cs...), digestCompressedPrimary, digestUncompressed)
+	res := DestructivelyPrioritizeReplacementCandidates(append([]CandidateWithTime{}, cssLiteral.cs...), digestCompressedPrimary, digestUncompressed)
 	assert.Equal(t, cssExpectedReplacementCandidates[:replacementAttempts], res)
 }

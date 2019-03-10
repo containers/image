@@ -1,4 +1,5 @@
-package blobinfocache
+// Package test provides generic BlobInfoCache test helpers.
+package test
 
 import (
 	"testing"
@@ -19,9 +20,9 @@ const (
 	digestCompressedPrimary   = digest.Digest("sha256:6666666666666666666666666666666666666666666666666666666666666666")
 )
 
-// testGenericCache runs an implementation-independent set of tests, given a
+// GenericCache runs an implementation-independent set of tests, given a
 // newTestCache, which can be called repeatedly and always returns a (cache, cleanup callback) pair
-func testGenericCache(t *testing.T, newTestCache func(t *testing.T) (types.BlobInfoCache, func(t *testing.T))) {
+func GenericCache(t *testing.T, newTestCache func(t *testing.T) (types.BlobInfoCache, func(t *testing.T))) {
 	for _, s := range []struct {
 		name string
 		fn   func(t *testing.T, cache types.BlobInfoCache)
