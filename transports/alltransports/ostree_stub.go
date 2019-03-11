@@ -1,4 +1,4 @@
-// +build !ostree_repos !linux
+// +build !containers_image_ostree !linux
 
 package alltransports
 

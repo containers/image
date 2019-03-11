@@ -1,4 +1,4 @@
-// +build ostree_repos
+// +build containers_image_ostree
 
 package ostree
 
