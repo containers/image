@@ -18,7 +18,7 @@ import (
 	"github.com/containers/image/image"
 	"github.com/containers/image/internal/tmpdir"
 	"github.com/containers/image/manifest"
-	"github.com/containers/image/pkg/blobinfocache"
+	"github.com/containers/image/pkg/blobinfocache/none"
 	"github.com/containers/image/types"
 	"github.com/containers/storage"
 	"github.com/containers/storage/pkg/archive"
@@ -595,12 +595,12 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 		if !haveDiffID {
 			// Check if it's elsewhere and the caller just forgot to pass it to us in a PutBlob(),
 			// or to even check if we had it.
-			// Use blobinfocache.NoCache to avoid a repeated DiffID lookup in the BlobInfoCache; a caller
+			// Use none.NoCache to avoid a repeated DiffID lookup in the BlobInfoCache; a caller
 			// that relies on using a blob digest that has never been seeen by the store had better call
 			// TryReusingBlob; not calling PutBlob already violates the documented API, so there’s only
 			// so far we are going to accommodate that (if we should be doing that at all).
 			logrus.Debugf("looking for diffID for blob %+v", blob.Digest)
-			has, _, err := s.TryReusingBlob(ctx, blob.BlobInfo, blobinfocache.NoCache, false)
+			has, _, err := s.TryReusingBlob(ctx, blob.BlobInfo, none.NoCache, false)
 			if err != nil {
 				return errors.Wrapf(err, "error checking for a layer based on blob %q", blob.Digest.String())
 			}
