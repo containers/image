@@ -27,15 +27,6 @@ func newImageDestination(sys *types.SystemContext, ref archiveReference) (types.
 		return nil, errors.Wrapf(err, "error opening file %q", ref.path)
 	}
 
-	fhStat, err := fh.Stat()
-	if err != nil {
-		return nil, errors.Wrapf(err, "error statting file %q", ref.path)
-	}
-
-	if fhStat.Mode().IsRegular() && fhStat.Size() != 0 {
-		return nil, errors.New("docker-archive doesn't support modifying existing images")
-	}
-
 	tarDest := tarfile.NewDestination(fh, ref.destinationRef)
 	if sys != nil && sys.DockerArchiveAdditionalTags != nil {
 		tarDest.AddRepoTags(sys.DockerArchiveAdditionalTags)
