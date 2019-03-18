@@ -197,10 +197,17 @@ func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
 // “write” specifies whether the client will be used for "write" access (in particular passed to lookaside.go:toplevelFromSection)
 func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write bool, actions string) (*dockerClient, error) {
 	registry := reference.Domain(ref.ref)
-	username, password, err := config.GetAuthentication(sys, reference.Domain(ref.ref))
+	getAuth := sys.GetAuth
+	if getAuth == nil {
+		getAuth = func(serverURL string) (string, string, error) {
+			return config.GetAuthentication(sys, serverURL)
+		}
+	}
+	username, password, err := getAuth(registry)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting username and password")
 	}
+
 	sigBase, err := configuredSignatureStorageBase(sys, ref, write)
 	if err != nil {
 		return nil, err
@@ -327,8 +334,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 	v2Res := &V2Results{}
 	v1Res := &V1Results{}
 
-	// Get credentials from authfile for the underlying hostname
-	username, password, err := config.GetAuthentication(sys, registry)
+	username, password, err := sys.GetAuth(registry)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting username and password")
 	}

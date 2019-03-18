@@ -17,7 +17,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetPathToAuth(t *testing.T) {
+func TestAuthJSON(t *testing.T) {
+	auth := Auth{
+		Username: "alice",
+		Secret:   "password",
+	}
+	encoded := "\"YWxpY2U6cGFzc3dvcmQ=\""
+
+	actual, err := json.Marshal(auth)
+	assert.NoError(t, err)
+	if err == nil {
+		assert.Equal(t, encoded, string(actual))
+	}
+
+	var decoded Auth
+	err = json.Unmarshal([]byte(encoded), &decoded)
+	assert.NoError(t, err)
+	if err == nil {
+		assert.Equal(t, auth, decoded)
+	}
+
+	err = json.Unmarshal([]byte("\"\""), &decoded)
+	assert.NoError(t, err)
+	assert.Equal(t, Auth{}, decoded)
+}
+
+func TestGetPathWithContext(t *testing.T) {
 	uid := fmt.Sprintf("%d", os.Getuid())
 
 	tmpDir, err := ioutil.TempDir("", "TestGetPathToAuth")
@@ -54,7 +79,7 @@ func TestGetPathToAuth(t *testing.T) {
 		} else {
 			os.Unsetenv("XDG_RUNTIME_DIR")
 		}
-		res, err := getPathToAuth(c.sys)
+		res, err := getPathWithContext(c.sys)
 		if c.expected == "" {
 			assert.Error(t, err)
 		} else {

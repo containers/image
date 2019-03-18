@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -8,22 +9,68 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/containers/image/types"
 	helperclient "github.com/docker/docker-credential-helpers/client"
 	"github.com/docker/docker-credential-helpers/credentials"
 	"github.com/docker/docker/pkg/homedir"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
-type dockerAuthConfig struct {
-	Auth string `json:"auth,omitempty"`
+// Auth holds per-URI-authority credentials.
+type Auth struct {
+	Username string
+	Secret   string
 }
 
-type dockerConfigFile struct {
-	AuthConfigs map[string]dockerAuthConfig `json:"auths"`
-	CredHelpers map[string]string           `json:"credHelpers,omitempty"`
+// MarshalJSON interface for Auth.
+func (auth Auth) MarshalJSON() ([]byte, error) {
+	return json.Marshal(base64.StdEncoding.EncodeToString([]byte(auth.Username + ":" + auth.Secret)))
+}
+
+// UnmarshalJSON interface for Auth.
+func (auth *Auth) UnmarshalJSON(b []byte) error {
+	var base64auth string
+	err := json.Unmarshal(b, &base64auth)
+	if err != nil {
+		return err
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(base64auth)
+	if err != nil {
+		return err
+	}
+
+	parts := strings.SplitN(string(decoded), ":", 2)
+	if len(parts) != 2 {
+		// if it's invalid just skip, as docker does
+		auth.Username = ""
+		auth.Secret = ""
+		return nil
+	}
+
+	auth.Username = parts[0]
+	auth.Secret = strings.Trim(parts[1], "\x00")
+	return nil
+}
+
+// AuthEntry holds a value from the configurations Auths map.
+type AuthEntry struct {
+	// Auth holds the the credentials for this auth entry.
+	Auth Auth `json:"auth"`
+
+	// Email holds an email address for this auth entry.
+	Email string `json:"email,omitempty"`
+}
+
+// Config holds the full authorization configuration.
+type Config struct {
+	// Auths holds a map of per-URI-authority Auth values.
+	Auths map[string]AuthEntry `json:"auths"`
+
+	// CredHelpers holds a map of per-URI-authority credential helpers.
+	CredHelpers map[string]string `json:"credHelpers,omitempty"`
 }
 
 var (
@@ -37,111 +84,260 @@ var (
 	ErrNotLoggedIn = errors.New("not logged in")
 )
 
-// SetAuthentication stores the username and password in the auth.json file
-func SetAuthentication(sys *types.SystemContext, registry, username, password string) error {
-	return modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
-		if ch, exists := auths.CredHelpers[registry]; exists {
-			return false, setAuthToCredHelper(ch, registry, username, password)
-		}
+// AuthStore implements a credentials store based on Docker's
+// config.json file format.  It stores the data in memory, so multiple
+// reads will only hit the disk once.  That means it is not safe to
+// simultaneously edit different AuthStore instances which are backed
+// by the same file.  The store implements internal locking so
+// concurrent access to a single AuthStore instance is safe (although
+// direct access to the Config property bypasses the lock).
+type AuthStore struct {
+	// Path holks the path to the config file.  If left empty, it will
+	// be poplutated with a reasonable default or auto-detected existing
+	// file during the first save or load call.
+	Path string
 
-		creds := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
-		newCreds := dockerAuthConfig{Auth: creds}
-		auths.AuthConfigs[registry] = newCreds
-		return true, nil
+	// Config holds the structured authorization configuration.
+	Config *Config
+
+	original []byte
+	sync.Mutex
+}
+
+// Add appends credentials to the store.
+func (s *AuthStore) Add(creds *credentials.Credentials) error {
+	s.Lock()
+	defer s.Unlock()
+
+	if s.Config == nil {
+		err := s.load()
+		if err != nil && !credentials.IsErrCredentialsNotFound(err) {
+			return err
+		}
+	}
+
+	if credHelper, exists := s.Config.CredHelpers[creds.ServerURL]; exists {
+		helperName := fmt.Sprintf("docker-credential-%s", credHelper)
+		p := helperclient.NewShellProgramFunc(helperName)
+		return helperclient.Store(p, creds)
+	}
+
+	newAuth := AuthEntry{
+		Auth: Auth{
+			Username: creds.Username,
+			Secret:   creds.Secret,
+		},
+	}
+	if newAuth != s.Config.Auths[creds.ServerURL] {
+		s.Config.Auths[creds.ServerURL] = newAuth
+		return s.save()
+	}
+
+	return nil
+}
+
+// Get retrieves credentials from the store.  It returns the username
+// and secret as strings.
+func (s *AuthStore) Get(serverURL string) (string, string, error) {
+	s.Lock()
+	defer s.Unlock()
+
+	if s.Config == nil {
+		err := s.load()
+		if err != nil {
+			return "", "", err
+		}
+	}
+
+	// First try cred helpers. They should always be normalized.
+	if credHelper, exists := s.Config.CredHelpers[serverURL]; exists {
+		helperName := fmt.Sprintf("docker-credential-%s", credHelper)
+		p := helperclient.NewShellProgramFunc(helperName)
+		creds, err := helperclient.Get(p, serverURL)
+		if err != nil {
+			return "", "", err
+		}
+		return creds.Username, creds.Secret, nil
+	}
+
+	// I'm feeling lucky
+	if val, exists := s.Config.Auths[serverURL]; exists {
+		return val.Auth.Username, val.Auth.Secret, nil
+	}
+
+	// bad luck; let's normalize the entries first
+	serverURL = normalizeRegistry(serverURL)
+	normalizedAuths := map[string]Auth{}
+	for k, v := range s.Config.Auths {
+		normalizedAuths[normalizeRegistry(k)] = v.Auth
+	}
+	if val, exists := normalizedAuths[serverURL]; exists {
+		return val.Username, val.Secret, nil
+	}
+	return "", "", credentials.NewErrCredentialsNotFound()
+}
+
+// Delete removes credentials from the store.
+func (s *AuthStore) Delete(serverURL string) error {
+	s.Lock()
+	defer s.Unlock()
+
+	if s.Config == nil {
+		err := s.load()
+		if err != nil {
+			if credentials.IsErrCredentialsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+	}
+
+	// First try cred helpers.
+	if credHelper, exists := s.Config.CredHelpers[serverURL]; exists {
+		helperName := fmt.Sprintf("docker-credential-%s", credHelper)
+		p := helperclient.NewShellProgramFunc(helperName)
+		return helperclient.Erase(p, serverURL)
+	}
+
+	changed := false
+	if _, ok := s.Config.Auths[serverURL]; ok {
+		delete(s.Config.Auths, serverURL)
+		changed = true
+	} else if _, ok := s.Config.Auths[normalizeRegistry(serverURL)]; ok {
+		delete(s.Config.Auths, normalizeRegistry(serverURL))
+		changed = true
+	}
+	if changed {
+		return s.save()
+	}
+
+	return nil
+}
+
+// SetAuthentication stores the username and password in the auth.json file
+//
+// Deprecated: Use an AuthStore.
+func SetAuthentication(sys *types.SystemContext, registry, username, password string) error {
+	path, err := getPathWithContext(sys)
+	if err != nil {
+		return err
+	}
+
+	authStore := &AuthStore{Path: path}
+	return authStore.Add(&credentials.Credentials{
+		ServerURL: registry,
+		Username:  username,
+		Secret:    password,
 	})
 }
 
 // GetAuthentication returns the registry credentials stored in
 // either auth.json file or .docker/config.json
 // If an entry is not found empty strings are returned for the username and password
+//
+// Deprecated: Use an AuthStore.
 func GetAuthentication(sys *types.SystemContext, registry string) (string, string, error) {
 	if sys != nil && sys.DockerAuthConfig != nil {
 		return sys.DockerAuthConfig.Username, sys.DockerAuthConfig.Password, nil
 	}
 
-	dockerLegacyPath := filepath.Join(homedir.Get(), dockerLegacyHomePath)
-	var paths []string
-	pathToAuth, err := getPathToAuth(sys)
-	if err == nil {
-		paths = append(paths, pathToAuth)
-	} else {
-		// Error means that the path set for XDG_RUNTIME_DIR does not exist
-		// but we don't want to completely fail in the case that the user is pulling a public image
-		// Logging the error as a warning instead and moving on to pulling the image
-		logrus.Warnf("%v: Trying to pull image in the event that it is a public image.", err)
+	path, err := getPathWithContext(sys)
+	if err != nil {
+		return "", "", err
 	}
-	paths = append(paths, filepath.Join(homedir.Get(), dockerHomePath), dockerLegacyPath)
 
-	for _, path := range paths {
-		legacyFormat := path == dockerLegacyPath
-		username, password, err := findAuthentication(registry, path, legacyFormat)
+	authStore := &AuthStore{Path: path}
+	username, secret, err := authStore.Get(registry)
+	if err == nil {
+		return username, secret, nil
+	}
+	if !credentials.IsErrCredentialsNotFound(err) {
+		return "", "", err
+	}
+
+	home := homedir.Get()
+	for _, relPath := range []string{dockerHomePath, dockerLegacyHomePath} {
+		path := filepath.Join(home, relPath)
+		raw, err := ioutil.ReadFile(path)
 		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
 			return "", "", err
 		}
-		if username != "" && password != "" {
-			return username, password, nil
+
+		if relPath == dockerLegacyHomePath {
+			authStore.Config = &Config{
+				CredHelpers: map[string]string{},
+			}
+
+			if err = json.Unmarshal(raw, &authStore.Config.Auths); err != nil {
+				return "", "", errors.Wrapf(err, "error unmarshaling JSON at %q", path)
+			}
+		} else {
+			if err = json.Unmarshal(raw, &authStore.Config); err != nil {
+				return "", "", errors.Wrapf(err, "error unmarshaling JSON at %q\n%s", path, string(raw))
+			}
+		}
+
+		username, secret, err = authStore.Get(registry)
+		if err == nil {
+			return username, secret, nil
 		}
 	}
+
 	return "", "", nil
 }
 
 // GetUserLoggedIn returns the username logged in to registry from either
 // auth.json or XDG_RUNTIME_DIR
 // Used to tell the user if someone is logged in to the registry when logging in
+//
+// Deprecated: Use an AuthStore.
 func GetUserLoggedIn(sys *types.SystemContext, registry string) (string, error) {
-	path, err := getPathToAuth(sys)
+	username, _, err := GetAuthentication(sys, registry)
 	if err != nil {
 		return "", err
 	}
-	username, _, _ := findAuthentication(registry, path, false)
-	if username != "" {
-		return username, nil
-	}
-	return "", nil
+	return username, nil
 }
 
 // RemoveAuthentication deletes the credentials stored in auth.json
+//
+// Deprecated: Use an AuthStore.
 func RemoveAuthentication(sys *types.SystemContext, registry string) error {
-	return modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
-		// First try cred helpers.
-		if ch, exists := auths.CredHelpers[registry]; exists {
-			return false, deleteAuthFromCredHelper(ch, registry)
-		}
+	path, err := getPathWithContext(sys)
+	if err != nil {
+		return err
+	}
 
-		if _, ok := auths.AuthConfigs[registry]; ok {
-			delete(auths.AuthConfigs, registry)
-		} else if _, ok := auths.AuthConfigs[normalizeRegistry(registry)]; ok {
-			delete(auths.AuthConfigs, normalizeRegistry(registry))
-		} else {
-			return false, ErrNotLoggedIn
-		}
-		return true, nil
-	})
+	authStore := &AuthStore{Path: path}
+	return authStore.Delete(registry)
 }
 
 // RemoveAllAuthentication deletes all the credentials stored in auth.json
+//
+// Deprecated: Use an AuthStore.
 func RemoveAllAuthentication(sys *types.SystemContext) error {
-	return modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
-		auths.CredHelpers = make(map[string]string)
-		auths.AuthConfigs = make(map[string]dockerAuthConfig)
-		return true, nil
-	})
-}
-
-// getPath gets the path of the auth.json file
-// The path can be overriden by the user if the overwrite-path flag is set
-// If the flag is not set and XDG_RUNTIME_DIR is set, the auth.json file is saved in XDG_RUNTIME_DIR/containers
-// Otherwise, the auth.json file is stored in /run/containers/UID
-func getPathToAuth(sys *types.SystemContext) (string, error) {
-	if sys != nil {
-		if sys.AuthFilePath != "" {
-			return sys.AuthFilePath, nil
-		}
-		if sys.RootForImplicitAbsolutePaths != "" {
-			return filepath.Join(sys.RootForImplicitAbsolutePaths, fmt.Sprintf(defaultPerUIDPathFormat, os.Getuid())), nil
-		}
+	path, err := getPathWithContext(sys)
+	if err != nil {
+		return err
 	}
 
+	authStore := &AuthStore{
+		Path: path,
+		Config: &Config{
+			Auths:       map[string]AuthEntry{},
+			CredHelpers: map[string]string{},
+		},
+	}
+	return authStore.save()
+}
+
+// getPath gets the path of the credentials JSON file.
+// If the flag is not set and XDG_RUNTIME_DIR is set, the auth.json file is saved in XDG_RUNTIME_DIR/containers
+// Otherwise, the auth.json file is stored in /run/containers/UID
+func getPath() (string, error) {
 	runtimeDir := os.Getenv("XDG_RUNTIME_DIR")
 	if runtimeDir != "" {
 		// This function does not in general need to separately check that the returned path exists; that’s racy, and callers will fail accessing the file anyway.
@@ -158,141 +354,83 @@ func getPathToAuth(sys *types.SystemContext) (string, error) {
 	return fmt.Sprintf(defaultPerUIDPathFormat, os.Getuid()), nil
 }
 
-// readJSONFile unmarshals the authentications stored in the auth.json file and returns it
-// or returns an empty dockerConfigFile data structure if auth.json does not exist
-// if the file exists and is empty, readJSONFile returns an error
-func readJSONFile(path string, legacyFormat bool) (dockerConfigFile, error) {
-	var auths dockerConfigFile
-
-	raw, err := ioutil.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			auths.AuthConfigs = map[string]dockerAuthConfig{}
-			return auths, nil
+func getPathWithContext(sys *types.SystemContext) (string, error) {
+	if sys != nil {
+		if sys.AuthFilePath != "" {
+			return sys.AuthFilePath, nil
+		} else if sys.RootForImplicitAbsolutePaths != "" {
+			return filepath.Join(sys.RootForImplicitAbsolutePaths, fmt.Sprintf(defaultPerUIDPathFormat, os.Getuid())), nil
 		}
-		return dockerConfigFile{}, err
 	}
 
-	if legacyFormat {
-		if err = json.Unmarshal(raw, &auths.AuthConfigs); err != nil {
-			return dockerConfigFile{}, errors.Wrapf(err, "error unmarshaling JSON at %q", path)
-		}
-		return auths, nil
-	}
-
-	if err = json.Unmarshal(raw, &auths); err != nil {
-		return dockerConfigFile{}, errors.Wrapf(err, "error unmarshaling JSON at %q", path)
-	}
-
-	return auths, nil
+	return getPath()
 }
 
-// modifyJSON writes to auth.json if the dockerConfigFile has been updated
-func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (bool, error)) error {
-	path, err := getPathToAuth(sys)
+func (s *AuthStore) load() error {
+	var err error
+	if s.Path == "" {
+		s.Path, err = getPath()
+		if err != nil {
+			return err
+		}
+	}
+
+	s.original, err = ioutil.ReadFile(s.Path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			s.Config = &Config{
+				Auths:       map[string]AuthEntry{},
+				CredHelpers: map[string]string{},
+			}
+			return credentials.NewErrCredentialsNotFound()
+		}
 		return err
 	}
 
-	dir := filepath.Dir(path)
+	if err = json.Unmarshal(s.original, &s.Config); err != nil {
+		return errors.Wrapf(err, "error unmarshaling JSON at %q", s.Path)
+	}
+
+	return nil
+}
+
+func (s *AuthStore) save() error {
+	var err error
+	if s.Path == "" {
+		s.Path, err = getPath()
+		if err != nil {
+			return err
+		}
+	}
+
+	dir := filepath.Dir(s.Path)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		if err = os.MkdirAll(dir, 0700); err != nil {
 			return errors.Wrapf(err, "error creating directory %q", dir)
 		}
 	}
 
-	auths, err := readJSONFile(path, false)
+	// FIXME: this comparison is racy without a flock guard or similar
+	data, err := ioutil.ReadFile(s.Path)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	if !bytes.Equal(data, s.original) {
+		return errors.Errorf("%q modified since we loaded it", s.Path)
+	}
+
+	newConfig, err := json.MarshalIndent(s.Config, "", "\t")
 	if err != nil {
-		return errors.Wrapf(err, "error reading JSON file %q", path)
+		return errors.Wrapf(err, "error marshaling JSON %q", s.Path)
 	}
 
-	updated, err := editor(&auths)
-	if err != nil {
-		return errors.Wrapf(err, "error updating %q", path)
-	}
-	if updated {
-		newData, err := json.MarshalIndent(auths, "", "\t")
-		if err != nil {
-			return errors.Wrapf(err, "error marshaling JSON %q", path)
-		}
-
-		if err = ioutil.WriteFile(path, newData, 0755); err != nil {
-			return errors.Wrapf(err, "error writing to file %q", path)
-		}
+	tempPath := s.Path + ".tmp"
+	if err = ioutil.WriteFile(tempPath, newConfig, 0600); err != nil {
+		return err
 	}
 
-	return nil
-}
-
-func getAuthFromCredHelper(credHelper, registry string) (string, string, error) {
-	helperName := fmt.Sprintf("docker-credential-%s", credHelper)
-	p := helperclient.NewShellProgramFunc(helperName)
-	creds, err := helperclient.Get(p, registry)
-	if err != nil {
-		return "", "", err
-	}
-	return creds.Username, creds.Secret, nil
-}
-
-func setAuthToCredHelper(credHelper, registry, username, password string) error {
-	helperName := fmt.Sprintf("docker-credential-%s", credHelper)
-	p := helperclient.NewShellProgramFunc(helperName)
-	creds := &credentials.Credentials{
-		ServerURL: registry,
-		Username:  username,
-		Secret:    password,
-	}
-	return helperclient.Store(p, creds)
-}
-
-func deleteAuthFromCredHelper(credHelper, registry string) error {
-	helperName := fmt.Sprintf("docker-credential-%s", credHelper)
-	p := helperclient.NewShellProgramFunc(helperName)
-	return helperclient.Erase(p, registry)
-}
-
-// findAuthentication looks for auth of registry in path
-func findAuthentication(registry, path string, legacyFormat bool) (string, string, error) {
-	auths, err := readJSONFile(path, legacyFormat)
-	if err != nil {
-		return "", "", errors.Wrapf(err, "error reading JSON file %q", path)
-	}
-
-	// First try cred helpers. They should always be normalized.
-	if ch, exists := auths.CredHelpers[registry]; exists {
-		return getAuthFromCredHelper(ch, registry)
-	}
-
-	// I'm feeling lucky
-	if val, exists := auths.AuthConfigs[registry]; exists {
-		return decodeDockerAuth(val.Auth)
-	}
-
-	// bad luck; let's normalize the entries first
-	registry = normalizeRegistry(registry)
-	normalizedAuths := map[string]dockerAuthConfig{}
-	for k, v := range auths.AuthConfigs {
-		normalizedAuths[normalizeRegistry(k)] = v
-	}
-	if val, exists := normalizedAuths[registry]; exists {
-		return decodeDockerAuth(val.Auth)
-	}
-	return "", "", nil
-}
-
-func decodeDockerAuth(s string) (string, string, error) {
-	decoded, err := base64.StdEncoding.DecodeString(s)
-	if err != nil {
-		return "", "", err
-	}
-	parts := strings.SplitN(string(decoded), ":", 2)
-	if len(parts) != 2 {
-		// if it's invalid just skip, as docker does
-		return "", "", nil
-	}
-	user := parts[0]
-	password := strings.Trim(parts[1], "\x00")
-	return user, password, nil
+	return os.Rename(tempPath, s.Path)
 }
 
 // convertToHostname converts a registry url which has http|https prepended
