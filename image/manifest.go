@@ -7,7 +7,9 @@ import (
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 )
 
 // genericManifest is an interface for parsing, modifying image manifests and related data.
@@ -56,8 +58,8 @@ func manifestInstanceFromBlob(ctx context.Context, sys *types.SystemContext, src
 		return manifestOCI1FromManifest(src, manblob)
 	case manifest.DockerV2Schema2MediaType:
 		return manifestSchema2FromManifest(src, manblob)
-	case manifest.DockerV2ListMediaType:
-		return manifestSchema2FromManifestList(ctx, sys, src, manblob)
+	case manifest.DockerV2ListMediaType, imgspecv1.MediaTypeImageIndex:
+		return manifestInstanceFromManifestList(ctx, sys, src, manblob, mt)
 	default: // Note that this may not be reachable, manifest.NormalizedMIMEType has a default for unknown values.
 		return nil, fmt.Errorf("Unimplemented manifest MIME type %s", mt)
 	}
@@ -70,4 +72,53 @@ func manifestLayerInfosToBlobInfos(layers []manifest.LayerInfo) []types.BlobInfo
 		blobs[i] = layer.BlobInfo
 	}
 	return blobs
+}
+
+// chooseDigestFromManifestList parses blob as a ManifestList,
+// and returns the digest of the image appropriate for the current environment.
+func chooseDigestFromManifestList(sys *types.SystemContext, blob []byte, mt string) (digest.Digest, error) {
+	if mt != manifest.DockerV2ListMediaType && mt != imgspecv1.MediaTypeImageIndex {
+		return "", fmt.Errorf("Internal error: Trying to select an image from a non-manifest-list manifest type %s", mt)
+	}
+
+	list, err := manifest.ListFromBlob(blob, mt)
+	if err != nil {
+		return "", err
+	}
+
+	return list.ChooseDigest(sys)
+}
+
+// ChooseManifestInstanceFromManifestList returns a digest of a manifest appropriate
+// for the current system from the manifest list available from src.
+func ChooseManifestInstanceFromManifestList(ctx context.Context, sys *types.SystemContext, src types.UnparsedImage) (digest.Digest, error) {
+	// For now this only handles manifest.DockerV2ListMediaType and imgspecv1.MediaTypeImageIndex; we can generalize it later,
+	// probably along with manifest list editing.
+	blob, mt, err := src.Manifest(ctx)
+	if err != nil {
+		return "", err
+	}
+	return chooseDigestFromManifestList(sys, blob, mt)
+}
+
+func manifestInstanceFromManifestList(ctx context.Context, sys *types.SystemContext, src types.ImageSource, manblob []byte, mt string) (genericManifest, error) {
+	targetManifestDigest, err := chooseDigestFromManifestList(sys, manblob, mt)
+	if err != nil {
+		return nil, err
+	}
+
+	manblob, mt, err = src.GetManifest(ctx, &targetManifestDigest)
+	if err != nil {
+		return nil, err
+	}
+
+	matches, err := manifest.MatchesDigest(manblob, targetManifestDigest)
+	if err != nil {
+		return nil, errors.Wrap(err, "Error computing manifest digest")
+	}
+	if !matches {
+		return nil, errors.Errorf("Manifest image does not match selected manifest digest %s", targetManifestDigest)
+	}
+
+	return manifestInstanceFromBlob(ctx, sys, src, manblob, mt)
 }

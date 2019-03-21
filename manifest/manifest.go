@@ -38,6 +38,7 @@ var DefaultRequestedManifestMIMETypes = []string{
 	DockerV2Schema1SignedMediaType,
 	DockerV2Schema1MediaType,
 	DockerV2ListMediaType,
+	imgspecv1.MediaTypeImageIndex,
 }
 
 // Manifest is an interface for parsing, modifying image manifests in isolation.
@@ -186,7 +187,7 @@ func AddDummyV2S1Signature(manifest []byte) ([]byte, error) {
 
 // MIMETypeIsMultiImage returns true if mimeType is a list of images
 func MIMETypeIsMultiImage(mimeType string) bool {
-	return mimeType == DockerV2ListMediaType
+	return mimeType == DockerV2ListMediaType || mimeType == imgspecv1.MediaTypeImageIndex
 }
 
 // NormalizedMIMEType returns the effective MIME type of a manifest MIME type returned by a server,
@@ -200,6 +201,7 @@ func NormalizedMIMEType(input string) string {
 		return DockerV2Schema1SignedMediaType
 	case DockerV2Schema1MediaType, DockerV2Schema1SignedMediaType,
 		imgspecv1.MediaTypeImageManifest,
+		imgspecv1.MediaTypeImageIndex,
 		DockerV2Schema2MediaType,
 		DockerV2ListMediaType:
 		return input
@@ -219,7 +221,7 @@ func NormalizedMIMEType(input string) string {
 
 // FromBlob returns a Manifest instance for the specified manifest blob and the corresponding MIME type
 func FromBlob(manblob []byte, mt string) (Manifest, error) {
-	switch NormalizedMIMEType(mt) {
+	switch nmt := NormalizedMIMEType(mt); nmt {
 	case DockerV2Schema1MediaType, DockerV2Schema1SignedMediaType:
 		return Schema1FromManifest(manblob)
 	case imgspecv1.MediaTypeImageManifest:
@@ -228,8 +230,10 @@ func FromBlob(manblob []byte, mt string) (Manifest, error) {
 		return Schema2FromManifest(manblob)
 	case DockerV2ListMediaType:
 		return nil, fmt.Errorf("Treating manifest lists as individual manifests is not implemented")
+	case imgspecv1.MediaTypeImageIndex:
+		return nil, fmt.Errorf("Treating image indices as individual manifests is not implemented")
 	default: // Note that this may not be reachable, NormalizedMIMEType has a default for unknown values.
-		return nil, fmt.Errorf("Unimplemented manifest MIME type %s", mt)
+		return nil, fmt.Errorf("Unimplemented manifest MIME type %s (normalized as %s)", mt, nmt)
 	}
 }
 

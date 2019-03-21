@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
@@ -13,7 +14,7 @@ import (
 )
 
 func TestChooseDigestFromManifestList(t *testing.T) {
-	manifest, err := ioutil.ReadFile(filepath.Join("fixtures", "schema2list.json"))
+	manifestBytes, err := ioutil.ReadFile(filepath.Join("fixtures", "schema2list.json"))
 	require.NoError(t, err)
 
 	// Match found
@@ -27,7 +28,7 @@ func TestChooseDigestFromManifestList(t *testing.T) {
 		digest, err := chooseDigestFromManifestList(&types.SystemContext{
 			ArchitectureChoice: arch,
 			OSChoice:           "linux",
-		}, manifest)
+		}, manifestBytes, manifest.DockerV2ListMediaType)
 		require.NoError(t, err, arch)
 		assert.Equal(t, expected, digest)
 	}
@@ -35,10 +36,10 @@ func TestChooseDigestFromManifestList(t *testing.T) {
 	// Invalid manifest list
 	_, err = chooseDigestFromManifestList(&types.SystemContext{
 		ArchitectureChoice: "amd64", OSChoice: "linux",
-	}, bytes.Join([][]byte{manifest, []byte("!INVALID")}, nil))
+	}, bytes.Join([][]byte{manifestBytes, []byte("!INVALID")}, nil), manifest.DockerV2ListMediaType)
 	assert.Error(t, err)
 
 	// Not found
-	_, err = chooseDigestFromManifestList(&types.SystemContext{OSChoice: "Unmatched"}, manifest)
+	_, err = chooseDigestFromManifestList(&types.SystemContext{OSChoice: "Unmatched"}, manifestBytes, manifest.DockerV2ListMediaType)
 	assert.Error(t, err)
 }
