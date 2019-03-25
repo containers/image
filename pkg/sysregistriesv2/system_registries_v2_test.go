@@ -6,6 +6,9 @@ import (
 
 	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/containers/image/docker/reference"
 )
 
 var testConfig = []byte("")
@@ -16,34 +19,34 @@ func init() {
 	}
 }
 
-func TestParseURL(t *testing.T) {
+func TestParseLocation(t *testing.T) {
 	var err error
-	var url string
+	var location string
 
-	// invalid URLs
-	_, err = parseURL("https://example.com")
+	// invalid locations
+	_, err = parseLocation("https://example.com")
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "invalid URL 'https://example.com': URI schemes are not supported")
+	assert.Contains(t, err.Error(), "invalid location 'https://example.com': URI schemes are not supported")
 
-	_, err = parseURL("john.doe@example.com")
+	_, err = parseLocation("john.doe@example.com")
 	assert.Nil(t, err)
 
-	// valid URLs
-	url, err = parseURL("example.com")
+	// valid locations
+	location, err = parseLocation("example.com")
 	assert.Nil(t, err)
-	assert.Equal(t, "example.com", url)
+	assert.Equal(t, "example.com", location)
 
-	url, err = parseURL("example.com/") // trailing slashes are stripped
+	location, err = parseLocation("example.com/") // trailing slashes are stripped
 	assert.Nil(t, err)
-	assert.Equal(t, "example.com", url)
+	assert.Equal(t, "example.com", location)
 
-	url, err = parseURL("example.com//////") // trailing slahes are stripped
+	location, err = parseLocation("example.com//////") // trailing slahes are stripped
 	assert.Nil(t, err)
-	assert.Equal(t, "example.com", url)
+	assert.Equal(t, "example.com", location)
 
-	url, err = parseURL("example.com:5000/with/path")
+	location, err = parseLocation("example.com:5000/with/path")
 	assert.Nil(t, err)
-	assert.Equal(t, "example.com:5000/with/path", url)
+	assert.Equal(t, "example.com:5000/with/path", location)
 }
 
 func TestEmptyConfig(t *testing.T) {
@@ -58,17 +61,17 @@ func TestEmptyConfig(t *testing.T) {
 func TestMirrors(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "registry.com"
+location = "registry.com"
 
 [[registry.mirror]]
-url = "mirror-1.registry.com"
+location = "mirror-1.registry.com"
 
 [[registry.mirror]]
-url = "mirror-2.registry.com"
+location = "mirror-2.registry.com"
 insecure = true
 
 [[registry]]
-url = "blocked.registry.com"
+location = "blocked.registry.com"
 blocked = true`)
 
 	configCache = make(map[string][]Registry)
@@ -80,45 +83,45 @@ blocked = true`)
 	assert.Nil(t, err)
 	assert.NotNil(t, reg)
 	assert.Equal(t, 2, len(reg.Mirrors))
-	assert.Equal(t, "mirror-1.registry.com", reg.Mirrors[0].URL)
+	assert.Equal(t, "mirror-1.registry.com", reg.Mirrors[0].Location)
 	assert.False(t, reg.Mirrors[0].Insecure)
-	assert.Equal(t, "mirror-2.registry.com", reg.Mirrors[1].URL)
+	assert.Equal(t, "mirror-2.registry.com", reg.Mirrors[1].Location)
 	assert.True(t, reg.Mirrors[1].Insecure)
 }
 
-func TestMissingRegistryURL(t *testing.T) {
+func TestMissingRegistryLocation(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "registry-a.com"
+location = "registry-a.com"
 unqualified-search = true
 
 [[registry]]
-url = "registry-b.com"
+location = "registry-b.com"
 
 [[registry]]
 unqualified-search = true`)
 	configCache = make(map[string][]Registry)
 	_, err := GetRegistries(nil)
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "invalid URL")
+	assert.Contains(t, err.Error(), "invalid location")
 }
 
-func TestMissingMirrorURL(t *testing.T) {
+func TestMissingMirrorLocation(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "registry-a.com"
+location = "registry-a.com"
 unqualified-search = true
 
 [[registry]]
-url = "registry-b.com"
+location = "registry-b.com"
 [[registry.mirror]]
-url = "mirror-b.com"
+location = "mirror-b.com"
 [[registry.mirror]]
 `)
 	configCache = make(map[string][]Registry)
 	_, err := GetRegistries(nil)
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "invalid URL")
+	assert.Contains(t, err.Error(), "invalid location")
 }
 
 func TestRefMatchesPrefix(t *testing.T) {
@@ -164,22 +167,22 @@ func TestRefMatchesPrefix(t *testing.T) {
 func TestFindRegistry(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "registry.com:5000"
+location = "registry.com:5000"
 prefix = "simple-prefix.com"
 
 [[registry]]
-url = "another-registry.com:5000"
+location = "another-registry.com:5000"
 prefix = "complex-prefix.com:4000/with/path"
 
 [[registry]]
-url = "registry.com:5000"
+location = "registry.com:5000"
 prefix = "another-registry.com"
 
 [[registry]]
-url = "no-prefix.com"
+location = "no-prefix.com"
 
 [[registry]]
-url = "empty-prefix.com"
+location = "empty-prefix.com"
 prefix = ""`)
 
 	configCache = make(map[string][]Registry)
@@ -191,7 +194,7 @@ prefix = ""`)
 	assert.Nil(t, err)
 	assert.NotNil(t, reg)
 	assert.Equal(t, "simple-prefix.com", reg.Prefix)
-	assert.Equal(t, reg.URL, "registry.com:5000")
+	assert.Equal(t, reg.Location, "registry.com:5000")
 
 	// path match
 	reg, err = FindRegistry(nil, "simple-prefix.com/")
@@ -212,26 +215,26 @@ prefix = ""`)
 	assert.Nil(t, err)
 	assert.NotNil(t, reg)
 	assert.Equal(t, "complex-prefix.com:4000/with/path", reg.Prefix)
-	assert.Equal(t, "another-registry.com:5000", reg.URL)
+	assert.Equal(t, "another-registry.com:5000", reg.Location)
 
 	reg, err = FindRegistry(nil, "no-prefix.com/foo:tag")
 	assert.Nil(t, err)
 	assert.NotNil(t, reg)
 	assert.Equal(t, "no-prefix.com", reg.Prefix)
-	assert.Equal(t, "no-prefix.com", reg.URL)
+	assert.Equal(t, "no-prefix.com", reg.Location)
 
 	reg, err = FindRegistry(nil, "empty-prefix.com/foo:tag")
 	assert.Nil(t, err)
 	assert.NotNil(t, reg)
 	assert.Equal(t, "empty-prefix.com", reg.Prefix)
-	assert.Equal(t, "empty-prefix.com", reg.URL)
+	assert.Equal(t, "empty-prefix.com", reg.Location)
 }
 
-func assertSearchRegistryURLsEqual(t *testing.T, expected []string, regs []Registry) {
+func assertSearchRegistryLocationsEqual(t *testing.T, expected []string, regs []Registry) {
 	// verify the expected registries and their order
 	names := []string{}
 	for _, r := range regs {
-		names = append(names, r.URL)
+		names = append(names, r.Location)
 	}
 	assert.Equal(t, expected, names)
 }
@@ -239,18 +242,18 @@ func assertSearchRegistryURLsEqual(t *testing.T, expected []string, regs []Regis
 func TestFindUnqualifiedSearchRegistries(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "registry-a.com"
+location = "registry-a.com"
 unqualified-search = true
 
 [[registry]]
-url = "registry-b.com"
+location = "registry-b.com"
 
 [[registry]]
-url = "registry-c.com"
+location = "registry-c.com"
 unqualified-search = true
 
 [[registry]]
-url = "registry-d.com"
+location = "registry-d.com"
 unqualified-search = true
 `)
 
@@ -261,23 +264,23 @@ unqualified-search = true
 
 	unqRegs, err := FindUnqualifiedSearchRegistries(nil)
 	assert.Nil(t, err)
-	assertSearchRegistryURLsEqual(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
+	assertSearchRegistryLocationsEqual(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
 }
 
 func TestInsecureConfligs(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "registry.com"
+location = "registry.com"
 
 [[registry.mirror]]
-url = "mirror-1.registry.com"
+location = "mirror-1.registry.com"
 
 [[registry.mirror]]
-url = "mirror-2.registry.com"
+location = "mirror-2.registry.com"
 
 
 [[registry]]
-url = "registry.com"
+location = "registry.com"
 insecure = true
 `)
 
@@ -291,17 +294,17 @@ insecure = true
 func TestBlockConfligs(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "registry.com"
+location = "registry.com"
 
 [[registry.mirror]]
-url = "mirror-1.registry.com"
+location = "mirror-1.registry.com"
 
 [[registry.mirror]]
-url = "mirror-2.registry.com"
+location = "mirror-2.registry.com"
 
 
 [[registry]]
-url = "registry.com"
+location = "registry.com"
 blocked = true
 `)
 
@@ -315,27 +318,27 @@ blocked = true
 func TestUnmarshalConfig(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "registry.com"
+location = "registry.com"
 
 [[registry.mirror]]
-url = "mirror-1.registry.com"
+location = "mirror-1.registry.com"
 
 [[registry.mirror]]
-url = "mirror-2.registry.com"
+location = "mirror-2.registry.com"
 
 
 [[registry]]
-url = "blocked.registry.com"
+location = "blocked.registry.com"
 blocked = true
 
 
 [[registry]]
-url = "insecure.registry.com"
+location = "insecure.registry.com"
 insecure = true
 
 
 [[registry]]
-url = "untrusted.registry.com"
+location = "untrusted.registry.com"
 insecure = true`)
 
 	configCache = make(map[string][]Registry)
@@ -362,7 +365,7 @@ registries = ["registry-d.com", "registry-e.com", "registry-a.com"]`)
 
 	unqRegs, err := FindUnqualifiedSearchRegistries(nil)
 	assert.Nil(t, err)
-	assertSearchRegistryURLsEqual(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
+	assertSearchRegistryLocationsEqual(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
 
 	// check if merging works
 	reg, err := FindRegistry(nil, "registry-a.com/bar/foo/barfoo:latest")
@@ -385,14 +388,14 @@ registries = ["registry-b.com"]
 registries = ["registry-d.com", "registry-e.com", "registry-a.com"]
 
 [[registry]]
-url = "registry-a.com"
+location = "registry-a.com"
 unqualified-search = true
 
 [[registry]]
-url = "registry-b.com"
+location = "registry-b.com"
 
 [[registry]]
-url = "registry-c.com"
+location = "registry-c.com"
 unqualified-search = true `)
 
 	configCache = make(map[string][]Registry)
@@ -404,27 +407,27 @@ unqualified-search = true `)
 func TestConfigCache(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "registry.com"
+location = "registry.com"
 
 [[registry.mirror]]
-url = "mirror-1.registry.com"
+location = "mirror-1.registry.com"
 
 [[registry.mirror]]
-url = "mirror-2.registry.com"
+location = "mirror-2.registry.com"
 
 
 [[registry]]
-url = "blocked.registry.com"
+location = "blocked.registry.com"
 blocked = true
 
 
 [[registry]]
-url = "insecure.registry.com"
+location = "insecure.registry.com"
 insecure = true
 
 
 [[registry]]
-url = "untrusted.registry.com"
+location = "untrusted.registry.com"
 insecure = true`)
 
 	ctx := &types.SystemContext{SystemRegistriesConfPath: "foo"}
@@ -445,27 +448,27 @@ insecure = true`)
 func TestInvalidateCache(t *testing.T) {
 	testConfig = []byte(`
 [[registry]]
-url = "registry.com"
+location = "registry.com"
 
 [[registry.mirror]]
-url = "mirror-1.registry.com"
+location = "mirror-1.registry.com"
 
 [[registry.mirror]]
-url = "mirror-2.registry.com"
+location = "mirror-2.registry.com"
 
 
 [[registry]]
-url = "blocked.registry.com"
+location = "blocked.registry.com"
 blocked = true
 
 
 [[registry]]
-url = "insecure.registry.com"
+location = "insecure.registry.com"
 insecure = true
 
 
 [[registry]]
-url = "untrusted.registry.com"
+location = "untrusted.registry.com"
 insecure = true`)
 
 	ctx := &types.SystemContext{}
@@ -474,7 +477,7 @@ insecure = true`)
 	registries, err := GetRegistries(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
-	assertSearchRegistryURLsEqual(t, []string{"registry.com", "blocked.registry.com", "insecure.registry.com", "untrusted.registry.com"}, registries)
+	assertSearchRegistryLocationsEqual(t, []string{"registry.com", "blocked.registry.com", "insecure.registry.com", "untrusted.registry.com"}, registries)
 
 	// invalidate the cache, make sure it's empty and reload
 	InvalidateCache()
@@ -483,5 +486,73 @@ insecure = true`)
 	registries, err = GetRegistries(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
-	assertSearchRegistryURLsEqual(t, []string{"registry.com", "blocked.registry.com", "insecure.registry.com", "untrusted.registry.com"}, registries)
+	assertSearchRegistryLocationsEqual(t, []string{"registry.com", "blocked.registry.com", "insecure.registry.com", "untrusted.registry.com"}, registries)
+}
+
+func toNamedRef(t *testing.T, ref string) reference.Named {
+	parsedRef, err := reference.ParseNamed(ref)
+	require.NoError(t, err)
+	return parsedRef
+}
+
+func TestRewriteReferenceSuccess(t *testing.T) {
+	for _, c := range []struct{ inputRef, prefix, location, expected string }{
+		// Standard use cases
+		{"example.com/image", "example.com", "example.com", "example.com/image"},
+		{"example.com/image:latest", "example.com", "example.com", "example.com/image:latest"},
+		{"example.com:5000/image", "example.com:5000", "example.com:5000", "example.com:5000/image"},
+		{"example.com:5000/image:latest", "example.com:5000", "example.com:5000", "example.com:5000/image:latest"},
+		{"example.com:5000/image:latest", "", "other.com", "example.com:5000/image:latest"},
+		{"example.com:5000/image:latest", "", "", "example.com:5000/image:latest"},
+		// Separator test ('/', '@', ':')
+		{"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"example.com", "example.com",
+			"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		{"example.com/foo/image:latest", "example.com/foo", "example.com", "example.com/image:latest"},
+		{"example.com/foo/image:latest", "example.com/foo", "example.com/path", "example.com/path/image:latest"},
+		// Docker examples
+		{"docker.io/library/image:latest", "docker.io", "docker.io", "docker.io/library/image:latest"},
+		{"docker.io/library/image", "docker.io/library", "example.com", "example.com/image"},
+		{"docker.io/library/image", "docker.io", "example.com", "example.com/library/image"},
+		{"docker.io/library/prefix/image", "docker.io/library/prefix", "example.com", "example.com/image"},
+	} {
+		ref := toNamedRef(t, c.inputRef)
+		testEndpoint := Endpoint{Location: c.location}
+		out, err := testEndpoint.RewriteReference(ref, c.prefix)
+		require.NoError(t, err)
+		assert.Equal(t, c.expected, out.String())
+	}
+}
+
+func TestRewriteReferenceFailedDuringParseNamed(t *testing.T) {
+	for _, c := range []struct{ inputRef, prefix, location string }{
+		// Invalid reference format
+		{"example.com/foo/image:latest", "example.com/foo", "example.com/path/"},
+		{"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"example.com/foo", "example.com"},
+		{"example.com:5000/image:latest", "example.com", ""},
+		{"example.com:5000/image:latest", "example.com", "example.com:5000"},
+		// Malformed prefix
+		{"example.com/foo/image:latest", "example.com//foo", "example.com/path"},
+		{"example.com/image:latest", "image", "anotherimage"},
+		{"example.com/foo/image:latest", "example.com/foo/", "example.com"},
+		{"example.com/foo/image", "example.com/fo", "example.com/foo"},
+		{"example.com/foo:latest", "example.com/fo", "example.com/foo"},
+		{"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"example.com/fo", "example.com/foo"},
+		{"docker.io/library/image", "example.com", "example.com"},
+	} {
+		ref := toNamedRef(t, c.inputRef)
+		testEndpoint := Endpoint{Location: c.location}
+		out, err := testEndpoint.RewriteReference(ref, c.prefix)
+		assert.NotNil(t, err)
+		assert.Nil(t, out)
+	}
+}
+
+func TestRewriteReferenceFailedWithNilRef(t *testing.T) {
+	testEndpoint := Endpoint{}
+	out, err := testEndpoint.RewriteReference(nil, "")
+	assert.NotNil(t, err)
+	assert.Nil(t, out)
 }
