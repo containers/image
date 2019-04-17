@@ -12,6 +12,7 @@ import (
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/manifest"
+	"github.com/containers/image/pkg/progress"
 	"github.com/containers/image/types"
 	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -401,7 +402,7 @@ func (d *memoryImageDest) IgnoresEmbeddedDockerReference() bool {
 func (d *memoryImageDest) HasThreadSafePutBlob() bool {
 	panic("Unexpected call to a mock function")
 }
-func (d *memoryImageDest) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, layerIndexInImage int, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
+func (d *memoryImageDest) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, layerIndexInImage int, cache types.BlobInfoCache, isConfig bool, bar *progress.Bar) (types.BlobInfo, error) {
 	if d.storedBlobs == nil {
 		d.storedBlobs = make(map[digest.Digest][]byte)
 	}
@@ -415,7 +416,7 @@ func (d *memoryImageDest) PutBlob(ctx context.Context, stream io.Reader, inputIn
 	d.storedBlobs[inputInfo.Digest] = contents
 	return types.BlobInfo{Digest: inputInfo.Digest, Size: int64(len(contents))}, nil
 }
-func (d *memoryImageDest) TryReusingBlob(context.Context, types.BlobInfo, int, types.BlobInfoCache, bool) (bool, types.BlobInfo, error) {
+func (d *memoryImageDest) TryReusingBlob(context.Context, types.BlobInfo, int, types.BlobInfoCache, bool, *progress.Bar) (bool, types.BlobInfo, error) {
 	panic("Unexpected call to a mock function")
 }
 func (d *memoryImageDest) PutManifest(ctx context.Context, m []byte) error {

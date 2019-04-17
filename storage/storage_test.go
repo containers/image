@@ -380,11 +380,11 @@ func TestWriteRead(t *testing.T) {
 		if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
 			Size:   size,
 			Digest: digest,
-		}, 0, cache, false); err != nil {
+		}, 0, cache, false, nil); err != nil {
 			t.Fatalf("Error saving randomly-generated layer to destination: %v", err)
 		}
 		t.Logf("Wrote randomly-generated layer %q (%d/%d bytes) to destination", digest, size, decompressedSize)
-		if _, err := dest.PutBlob(context.Background(), bytes.NewBufferString(config), configInfo, 0, cache, false); err != nil {
+		if _, err := dest.PutBlob(context.Background(), bytes.NewBufferString(config), configInfo, 0, cache, false, nil); err != nil {
 			t.Fatalf("Error saving config to destination: %v", err)
 		}
 		manifest := strings.Replace(manifestFmt, "%lh", digest.String(), -1)
@@ -541,7 +541,7 @@ func TestDuplicateName(t *testing.T) {
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
 		Size:   size,
 		Digest: digest,
-	}, 0, cache, false); err != nil {
+	}, 0, cache, false, nil); err != nil {
 		t.Fatalf("Error saving randomly-generated layer to destination, first pass: %v", err)
 	}
 	manifest := fmt.Sprintf(`
@@ -576,7 +576,7 @@ func TestDuplicateName(t *testing.T) {
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
 		Size:   int64(size),
 		Digest: digest,
-	}, 0, cache, false); err != nil {
+	}, 0, cache, false, nil); err != nil {
 		t.Fatalf("Error saving randomly-generated layer to destination, second pass: %v", err)
 	}
 	manifest = fmt.Sprintf(`
@@ -628,7 +628,7 @@ func TestDuplicateID(t *testing.T) {
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
 		Size:   size,
 		Digest: digest,
-	}, 0, cache, false); err != nil {
+	}, 0, cache, false, nil); err != nil {
 		t.Fatalf("Error saving randomly-generated layer to destination, first pass: %v", err)
 	}
 	manifest := fmt.Sprintf(`
@@ -663,7 +663,7 @@ func TestDuplicateID(t *testing.T) {
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
 		Size:   int64(size),
 		Digest: digest,
-	}, 0, cache, false); err != nil {
+	}, 0, cache, false, nil); err != nil {
 		t.Fatalf("Error saving randomly-generated layer to destination, second pass: %v", err)
 	}
 	manifest = fmt.Sprintf(`
@@ -718,7 +718,7 @@ func TestDuplicateNameID(t *testing.T) {
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
 		Size:   size,
 		Digest: digest,
-	}, 0, cache, false); err != nil {
+	}, 0, cache, false, nil); err != nil {
 		t.Fatalf("Error saving randomly-generated layer to destination, first pass: %v", err)
 	}
 	manifest := fmt.Sprintf(`
@@ -753,7 +753,7 @@ func TestDuplicateNameID(t *testing.T) {
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
 		Size:   int64(size),
 		Digest: digest,
-	}, 0, cache, false); err != nil {
+	}, 0, cache, false, nil); err != nil {
 		t.Fatalf("Error saving randomly-generated layer to destination, second pass: %v", err)
 	}
 	manifest = fmt.Sprintf(`
@@ -850,21 +850,21 @@ func TestSize(t *testing.T) {
 	if dest == nil {
 		t.Fatalf("NewImageDestination(%q) returned no destination", ref.StringWithinTransport())
 	}
-	if _, err := dest.PutBlob(context.Background(), bytes.NewBufferString(config), configInfo, 0, cache, true); err != nil {
+	if _, err := dest.PutBlob(context.Background(), bytes.NewBufferString(config), configInfo, 0, cache, true, nil); err != nil {
 		t.Fatalf("Error saving config to destination: %v", err)
 	}
 	digest1, usize1, size1, blob := makeLayer(t, archive.Gzip)
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
 		Size:   size1,
 		Digest: digest1,
-	}, 0, cache, false); err != nil {
+	}, 0, cache, false, nil); err != nil {
 		t.Fatalf("Error saving randomly-generated layer 1 to destination: %v", err)
 	}
 	digest2, usize2, size2, blob := makeLayer(t, archive.Gzip)
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
 		Size:   size2,
 		Digest: digest2,
-	}, 0, cache, false); err != nil {
+	}, 0, cache, false, nil); err != nil {
 		t.Fatalf("Error saving randomly-generated layer 2 to destination: %v", err)
 	}
 	manifest := fmt.Sprintf(`
@@ -946,26 +946,26 @@ func TestDuplicateBlob(t *testing.T) {
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob1), types.BlobInfo{
 		Size:   size1,
 		Digest: digest1,
-	}, 0, cache, false); err != nil {
+	}, 0, cache, false, nil); err != nil {
 		t.Fatalf("Error saving randomly-generated layer 1 to destination (first copy): %v", err)
 	}
 	digest2, _, size2, blob2 := makeLayer(t, archive.Gzip)
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob2), types.BlobInfo{
 		Size:   size2,
 		Digest: digest2,
-	}, 1, cache, false); err != nil {
+	}, 1, cache, false, nil); err != nil {
 		t.Fatalf("Error saving randomly-generated layer 2 to destination (first copy): %v", err)
 	}
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob1), types.BlobInfo{
 		Size:   size1,
 		Digest: digest1,
-	}, 2, cache, false); err != nil {
+	}, 2, cache, false, nil); err != nil {
 		t.Fatalf("Error saving randomly-generated layer 1 to destination (second copy): %v", err)
 	}
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob2), types.BlobInfo{
 		Size:   size2,
 		Digest: digest2,
-	}, 3, cache, false); err != nil {
+	}, 3, cache, false, nil); err != nil {
 		t.Fatalf("Error saving randomly-generated layer 2 to destination (second copy): %v", err)
 	}
 	manifest := fmt.Sprintf(`

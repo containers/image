@@ -19,6 +19,7 @@ import (
 	"github.com/containers/image/internal/tmpdir"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/pkg/blobinfocache/none"
+	"github.com/containers/image/pkg/progress"
 	"github.com/containers/image/types"
 	"github.com/containers/storage"
 	"github.com/containers/storage/pkg/archive"
@@ -389,7 +390,7 @@ func (s *storageImageDestination) HasThreadSafePutBlob() bool {
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, layerIndexInImage int, cache types.BlobInfoCache, isConfig bool) (blob types.BlobInfo, err error) {
+func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, layerIndexInImage int, cache types.BlobInfoCache, isConfig bool, bar *progress.Bar) (blob types.BlobInfo, err error) {
 	errorBlobInfo := types.BlobInfo{
 		Digest: "",
 		Size:   -1,
@@ -612,7 +613,7 @@ func (s *storageImageDestination) tryReusingBlob(ctx context.Context, blobinfo t
 // If the blob has been successfully reused, returns (true, info, nil); info must contain at least a digest and size.
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 // May use and/or update cache.
-func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo types.BlobInfo, layerIndexInImage int, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
+func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo types.BlobInfo, layerIndexInImage int, cache types.BlobInfoCache, canSubstitute bool, bar *progress.Bar) (bool, types.BlobInfo, error) {
 	reusable, blob, err := s.tryReusingBlob(ctx, blobinfo, layerIndexInImage, cache, canSubstitute)
 	// If we can reuse the blob or hit an error trying to do so, we need to
 	// signal the result through the channel as another Goroutine is potentially
