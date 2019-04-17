@@ -1,0 +1,107 @@
+// Package progress is exposes a convenience API and abstractions for creating
+// and managing pools of multi-progress bars.
+package progress
+
+import (
+	"context"
+	"fmt"
+	"io"
+
+	"github.com/vbauerster/mpb"
+	"github.com/vbauerster/mpb/decor"
+)
+
+// Pool allows managing progress bars.
+type Pool struct {
+	pool   *mpb.Progress
+	cancel context.CancelFunc
+	writer io.Writer
+}
+
+// Bar represents a progress bar.
+type Bar struct {
+	bar  *mpb.Bar
+	pool *Pool
+}
+
+// BarOptions includes various options to control AddBar.
+type BarOptions struct {
+	// Remove the bar on completion.
+	RemoveOnCompletion bool
+	// OnCompletionMessage will be shown on completion and replace the progress bar.
+	OnCompletionMessage string
+	// ReplaceBar is the bar to replace.
+	ReplaceBar *Bar
+	// StaticMessage, if set, will replace displaying the progress bar. Use this
+	// field for static progress bars that do not show progress.
+	StaticMessage string
+}
+
+// NewPool returns a Pool. The caller must eventually call ProgressPoo.CleanUp()
+// when the pool will no longer be updated.
+func NewPool(ctx context.Context, writer io.Writer) *Pool {
+	ctx, cancelFunc := context.WithCancel(ctx)
+	return &Pool{
+		pool:   mpb.New(mpb.WithWidth(40), mpb.WithOutput(writer), mpb.WithContext(ctx)),
+		cancel: cancelFunc,
+		writer: writer,
+	}
+}
+
+// CleanUp cleans up resources, such as remaining progress bars, and stops them
+// if necessary.
+func (p *Pool) CleanUp() {
+	p.cancel()
+	p.pool.Wait()
+}
+
+// getWriter returns the Pool's writer.
+func (p *Pool) getWriter() io.Writer {
+	return p.writer
+}
+
+// AddBar adds a new Bar to the Pool.
+func (p *Pool) AddBar(action string, size int64, options BarOptions) *Bar {
+	var bar *mpb.Bar
+
+	mpbOptions := []mpb.BarOption{
+		mpb.PrependDecorators(
+			decor.Name(action),
+		),
+	}
+
+	if options.RemoveOnCompletion {
+		mpbOptions = append(mpbOptions, mpb.BarRemoveOnComplete())
+	}
+
+	if options.ReplaceBar != nil {
+		mpbOptions = append(mpbOptions, mpb.BarReplaceOnComplete(options.ReplaceBar.bar))
+		defer options.ReplaceBar.bar.SetTotal(0, true)
+	}
+
+	if options.StaticMessage == "" {
+		mpbOptions = append(mpbOptions,
+			mpb.AppendDecorators(
+				decor.OnComplete(decor.CountersKibiByte("%.1f / %.1f"), " "+options.OnCompletionMessage),
+			),
+		)
+		mpbOptions = append(mpbOptions, mpb.BarClearOnComplete())
+		bar = p.pool.AddBar(size, mpbOptions...)
+	} else {
+		barFiller := mpb.FillerFunc(
+			func(w io.Writer, width int, st *decor.Statistics) {
+				fmt.Fprint(w, options.StaticMessage)
+			})
+		bar = p.pool.Add(0, barFiller, mpbOptions...)
+	}
+
+	return &Bar{
+		bar:  bar,
+		pool: p,
+	}
+}
+
+// ProxyReader wraps the reader with metrics for progress tracking.
+func (b *Bar) ProxyReader(reader io.Reader) io.ReadCloser {
+	return b.bar.ProxyReader(reader)
+}
