@@ -396,6 +396,20 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 		Size:   -1,
 	}
 
+	if bar != nil {
+		kind := "blob"
+		if isConfig {
+			kind = "config"
+		}
+		bar = bar.ReplaceBar(
+			progress.DigestToCopyAction(blobinfo.Digest, kind),
+			blobinfo.Size,
+			progress.BarOptions{
+				OnCompletionMessage: "done",
+			})
+		stream = bar.ProxyReader(stream)
+	}
+
 	blob, putBlobError := s.putBlob(ctx, stream, blobinfo, layerIndexInImage, cache, isConfig)
 	if putBlobError != nil {
 		return errorBlobInfo, putBlobError
@@ -622,6 +636,14 @@ func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo t
 	if (layerIndexInImage >= 0) && (err != nil || reusable) {
 		channel := s.getChannelForLayer(layerIndexInImage)
 		channel <- (err == nil)
+	}
+	if bar != nil && reusable {
+		bar.ReplaceBar(
+			progress.DigestToCopyAction(blobinfo.Digest, "blob"),
+			0,
+			progress.BarOptions{
+				StaticMessage: "skipped: already exists",
+			})
 	}
 	return reusable, blob, err
 }

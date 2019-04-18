@@ -20,6 +20,7 @@ import (
 	"github.com/containers/image/pkg/compression"
 	"github.com/containers/image/pkg/progress"
 	"github.com/containers/image/signature"
+	"github.com/containers/image/storage"
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
 	"github.com/klauspost/pgzip"
@@ -666,19 +667,23 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, la
 		})
 	// If we already have the blob, and we don't need to compute the diffID, then we don't need to read it from the source.
 	if !diffIDIsNeeded {
-		reused, blobInfo, err := ic.c.dest.TryReusingBlob(ctx, srcInfo, layerIndexInImage, ic.c.blobInfoCache, ic.canSubstituteBlobs, nil)
+		reused, blobInfo, err := ic.c.dest.TryReusingBlob(ctx, srcInfo, layerIndexInImage, ic.c.blobInfoCache, ic.canSubstituteBlobs, bar)
 		if err != nil {
 			return types.BlobInfo{}, "", errors.Wrapf(err, "Error trying to reuse blob %s at destination", srcInfo.Digest)
 		}
 		if reused {
 			logrus.Debugf("Skipping blob %s (already present):", srcInfo.Digest)
-
-			bar.ReplaceBar(
-				progressBarAction,
-				0,
-				progress.BarOptions{
-					StaticMessage: "skipped: already exists",
-				})
+			// Instead of adding boilerplate code to ALL TryReusingBlob()s, just
+			// special case the storage transport, which is the only transport
+			// where we need control over the progress.Bar.
+			if ic.c.dest.Reference().Transport().Name() != storage.Name() {
+				bar.ReplaceBar(
+					progressBarAction,
+					0,
+					progress.BarOptions{
+						StaticMessage: "skipped: already exists",
+					})
+			}
 			return blobInfo, cachedDiffID, nil
 		}
 	}
@@ -856,19 +861,25 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 		}
 	}
 
-	kind := "blob"
-	if isConfig {
-		kind = "config"
+	// Instead of adding boilerplate code to ALL PutBlob()s, just special case
+	// the storage transport, which is the only transport where we need control
+	// over the progress.Bar.
+	if c.dest.Reference().Transport().Name() != storage.Name() {
+		kind := "blob"
+		if isConfig {
+			kind = "config"
+		}
+		bar = bar.ReplaceBar(
+			progress.DigestToCopyAction(srcInfo.Digest, kind),
+			srcInfo.Size,
+			progress.BarOptions{
+				OnCompletionMessage: "done",
+			})
+		destStream = bar.ProxyReader(destStream)
 	}
-	bar = bar.ReplaceBar(
-		progress.DigestToCopyAction(srcInfo.Digest, kind),
-		srcInfo.Size,
-		progress.BarOptions{
-			OnCompletionMessage: "done",
-		})
-	destStream = bar.ProxyReader(destStream)
+
 	// === Finally, send the layer stream to dest.
-	uploadedInfo, err := c.dest.PutBlob(ctx, destStream, inputInfo, layerIndexInImage, c.blobInfoCache, isConfig, nil)
+	uploadedInfo, err := c.dest.PutBlob(ctx, destStream, inputInfo, layerIndexInImage, c.blobInfoCache, isConfig, bar)
 	if err != nil {
 		return types.BlobInfo{}, errors.Wrap(err, "Error writing blob")
 	}
