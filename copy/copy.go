@@ -671,6 +671,14 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, la
 	cachedDiffID := ic.c.blobInfoCache.UncompressedDigest(srcInfo.Digest) // May be ""
 	diffIDIsNeeded := ic.diffIDsAreNeeded && cachedDiffID == ""
 
+	progressBarAction := blobInfoToProgressAction(srcInfo, "blob")
+	bar := pool.AddBar(
+		progressBarAction,
+		0,
+		progress.BarOptions{
+			RemoveOnCompletion: true,
+			StaticMessage:      " ",
+		})
 	// If we already have the blob, and we don't need to compute the diffID, then we don't need to read it from the source.
 	if !diffIDIsNeeded {
 		reused, blobInfo, err := ic.c.dest.TryReusingBlob(ctx, srcInfo, layerIndexInImage, ic.c.blobInfoCache, ic.canSubstituteBlobs, nil)
@@ -685,6 +693,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, la
 				0,
 				progress.BarOptions{
 					StaticMessage: "skipped: already exists",
+					ReplaceBar:    bar,
 				})
 			return blobInfo, cachedDiffID, nil
 		}
@@ -697,11 +706,12 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, la
 	}
 	defer srcStream.Close()
 
-	bar := pool.AddBar(
+	bar = pool.AddBar(
 		blobInfoToProgressAction(srcInfo, "blob"),
 		srcInfo.Size,
 		progress.BarOptions{
 			OnCompletionMessage: "done",
+			ReplaceBar:          bar,
 		})
 
 	blobInfo, diffIDChan, err := ic.copyLayerFromStream(ctx, srcStream, types.BlobInfo{Digest: srcInfo.Digest, Size: srcBlobSize}, layerIndexInImage, diffIDIsNeeded, bar)
