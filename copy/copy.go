@@ -466,6 +466,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	// copyGroup is used to determine if all layers are copied
 	copyGroup := sync.WaitGroup{}
 
+	// progressPool for creating progress bars
 	progressPool := progress.NewPool(ctx, ic.c.progressOutput)
 	defer progressPool.CleanUp()
 
@@ -477,7 +478,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	layerIndex := 0 // some layers might be skipped, so we need a dedicated counter
 	digestToCopyData := make(map[digest.Digest]*copyLayerData)
 	for _, srcLayer := range srcInfos {
-		// Check if we'are already copying the layer
+		// Check if we're already copying the layer
 		if _, ok := digestToCopyData[srcLayer.Digest]; ok {
 			continue
 		}
@@ -489,13 +490,11 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 			// In which case src.LayerInfos will not have URLs because schema1
 			// does not support them.
 			if ic.diffIDsAreNeeded {
-				cancelCopyLayer()
 				return errors.New("getting DiffID for foreign layers is unimplemented")
-			} else {
-				logrus.Debugf("Skipping foreign layer %q copy to %s", srcLayer.Digest, ic.c.dest.Reference().Transport().Name())
-				cld.destInfo = srcLayer
-				continue
 			}
+			logrus.Debugf("Skipping foreign layer %q copy to %s", srcLayer.Digest, ic.c.dest.Reference().Transport().Name())
+			cld.destInfo = srcLayer
+			continue // skip copying
 		}
 
 		copySemaphore.Acquire(cancelCtx, 1) // limits parallel copy operations
@@ -508,8 +507,8 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 			defer copyGroup.Done()
 			cld.destInfo, cld.diffID, cld.err = ic.copyLayer(cancelCtx, srcLayer, index, progressPool)
 			if cld.err != nil {
-				// Note that the error will be caught below.
 				logrus.Errorf("copying layer %d failed: %v", index, cld.err)
+				// Stop all other running goroutines as we can't recover from an error
 				cancelCopyLayer()
 			}
 		}(layerIndex, srcLayer, cld)

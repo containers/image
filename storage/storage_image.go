@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/image"
@@ -379,6 +380,69 @@ func (s *storageImageDestination) HasThreadSafePutBlob() bool {
 	return true
 }
 
+var errorAcquiringDigestLock = errors.New("")
+
+// tryReusingBlobFromOtherProcess is implementing a mechanism to detect if
+// another process is already copying the blobinfo by making use of the
+// blob-digest locks from containers/storage. The caller is expected to send a
+// message through the done channel once the lock has been acquired. If we
+// detect that another process is copying the blob, we wait until we own the
+// lockfile and call tryReusingBlob() to check if we can reuse the committed
+// layer.
+//
+// Note that the returned storage.Locker must be unlocked by the caller if
+// the error is not a errorAcquiringDigestLock.
+func (s *storageImageDestination) tryReusingBlobFromOtherProcess(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, layerIndexInImage int, cache types.BlobInfoCache, done chan bool, bar *progress.Bar) (bool, types.BlobInfo, error) {
+	copiedByAnotherProcess := false
+	select {
+	case <-done:
+	case <-time.After(200 * time.Millisecond):
+		logrus.Debugf("blob %q is being copied by another process", blobinfo.Digest)
+		copiedByAnotherProcess = true
+		if bar != nil {
+			bar = bar.ReplaceBar(
+				progress.DigestToCopyAction(blobinfo.Digest, "blob"),
+				blobinfo.Size,
+				progress.BarOptions{
+					StaticMessage:      "paused: being copied by another process",
+					RemoveOnCompletion: true,
+				})
+		}
+		// Wait until we acquired the lock or encountered an error.
+		<-done
+	}
+
+	// Now, we own the lock.
+	//
+	// In case another process copied the blob, we should attempt reusing the
+	// blob.  If it's not available, either the copy-detection heuristic failed
+	// (i.e., waiting 200 ms was not enough) or the other process failed to copy
+	// the blob.
+	if copiedByAnotherProcess {
+		reusable, blob, err := s.tryReusingBlob(ctx, blobinfo, layerIndexInImage, cache, false)
+		// If we can reuse the blob or hit an error trying to do so, we need to
+		// signal the result through the channel as another Goroutine is potentially
+		// waiting for it.  If we can't resuse the blob and encountered no error, we
+		// need to copy it and will send the signal in PutBlob().
+		if reusable {
+			logrus.Debugf("another process successfully copied blob %q", blobinfo.Digest)
+			if bar != nil {
+				bar = bar.ReplaceBar(
+					progress.DigestToCopyAction(blobinfo.Digest, "blob"),
+					blobinfo.Size,
+					progress.BarOptions{
+						StaticMessage: "done: copied by another process",
+					})
+			}
+		} else {
+			logrus.Debugf("another process must have failed copying blob %q", blobinfo.Digest)
+		}
+		return reusable, blob, err
+	}
+
+	return false, types.BlobInfo{}, nil
+}
+
 // PutBlob writes contents of stream and returns data representing the result.
 // inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
 // inputInfo.Size is the expected length of stream, if known.
@@ -391,9 +455,77 @@ func (s *storageImageDestination) HasThreadSafePutBlob() bool {
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, layerIndexInImage int, cache types.BlobInfoCache, isConfig bool, bar *progress.Bar) (blob types.BlobInfo, err error) {
-	errorBlobInfo := types.BlobInfo{
-		Digest: "",
-		Size:   -1,
+	// Deferred call to an anonymous func to signal potentially waiting
+	// goroutines via the index-specific channel.
+	defer func() {
+		// No need to wait
+		if layerIndexInImage >= 0 {
+			// It's a buffered channel, so we don't wait for the message to be
+			// received
+			channel := s.getChannelForLayer(layerIndexInImage)
+			channel <- err == nil
+			if err != nil {
+				logrus.Errorf("error while committing blob %d: %v", layerIndexInImage, err)
+			}
+		}
+	}()
+
+	waitAndCommit := func(blob types.BlobInfo, err error) (types.BlobInfo, error) {
+		// First, wait for the previous layer to be committed
+		previousID := ""
+		if layerIndexInImage > 0 {
+			channel := s.getChannelForLayer(layerIndexInImage - 1)
+			if committed := <-channel; !committed {
+				err := fmt.Errorf("committing previous layer %d failed", layerIndexInImage-1)
+				logrus.Errorf(err.Error())
+				return types.BlobInfo{}, err
+			}
+			var ok bool
+			s.putBlobMutex.Lock()
+			previousID, ok = s.indexToStorageID[layerIndexInImage-1]
+			s.putBlobMutex.Unlock()
+			if !ok {
+				return types.BlobInfo{}, fmt.Errorf("error committing blob %q: could not find parent layer ID", blob.Digest.String())
+			}
+		}
+
+		// Commit the blob
+		if layerIndexInImage >= 0 {
+			id, err := s.commitBlob(ctx, blob, previousID)
+			if err == nil {
+				s.putBlobMutex.Lock()
+				s.blobLayerIDs[blob.Digest] = id
+				s.indexToStorageID[layerIndexInImage] = id
+				s.putBlobMutex.Unlock()
+			} else {
+				return types.BlobInfo{}, err
+			}
+		}
+		return blob, nil
+	}
+
+	// Check if another process is already copying the blob. Please refer to the
+	// doc of tryReusingBlobFromOtherProcess for further information.
+	if layerIndexInImage >= 0 {
+		// The reasoning for getting the locker here is to make the code paths
+		// of locking and unlocking it more obvious and simple.
+		locker, err := s.imageRef.transport.store.GetDigestLock(blobinfo.Digest)
+		if err != nil {
+			return types.BlobInfo{}, errors.Wrapf(errorAcquiringDigestLock, "error acquiring lock for blob %q: %v", blobinfo.Digest)
+		}
+		done := make(chan bool, 1)
+		defer locker.Unlock()
+		go func() {
+			locker.Lock()
+			done <- true
+		}()
+		reusable, blob, err := s.tryReusingBlobFromOtherProcess(ctx, stream, blobinfo, layerIndexInImage, cache, done, bar)
+		if err != nil {
+			return blob, err
+		}
+		if reusable {
+			return waitAndCommit(blob, err)
+		}
 	}
 
 	if bar != nil {
@@ -410,57 +542,12 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 		stream = bar.ProxyReader(stream)
 	}
 
-	blob, putBlobError := s.putBlob(ctx, stream, blobinfo, layerIndexInImage, cache, isConfig)
-	if putBlobError != nil {
-		return errorBlobInfo, putBlobError
+	blob, err = s.putBlob(ctx, stream, blobinfo, layerIndexInImage, cache, isConfig)
+	if err != nil {
+		return types.BlobInfo{}, err
 	}
 
-	// Deferred call to an anonymous func to signal potentially waiting
-	// goroutines via the index-specific channel.
-	defer func() {
-		// No need to wait
-		if layerIndexInImage >= 0 {
-			// It's a buffered channel, so we don't wait for the message to be
-			// received
-			channel := s.getChannelForLayer(layerIndexInImage)
-			channel <- err == nil
-			if err != nil {
-				logrus.Errorf("error while committing blob %d: %v", layerIndexInImage, err)
-			}
-		}
-	}()
-
-	// First, wait for the previous layer to be committed
-	previousID := ""
-	if layerIndexInImage > 0 {
-		channel := s.getChannelForLayer(layerIndexInImage - 1)
-		if committed := <-channel; !committed {
-			err := fmt.Errorf("committing previous layer %d failed", layerIndexInImage-1)
-			logrus.Errorf(err.Error())
-			return errorBlobInfo, err
-		}
-		var ok bool
-		s.putBlobMutex.Lock()
-		previousID, ok = s.indexToStorageID[layerIndexInImage-1]
-		s.putBlobMutex.Unlock()
-		if !ok {
-			return errorBlobInfo, fmt.Errorf("error committing blob %q: could not find parent layer ID", blob.Digest.String())
-		}
-	}
-
-	// Commit the blob
-	if layerIndexInImage >= 0 {
-		id, err := s.commitBlob(ctx, blob, previousID)
-		if err == nil {
-			s.putBlobMutex.Lock()
-			s.blobLayerIDs[blob.Digest] = id
-			s.indexToStorageID[layerIndexInImage] = id
-			s.putBlobMutex.Unlock()
-		} else {
-			return errorBlobInfo, err
-		}
-	}
-	return blob, nil
+	return waitAndCommit(blob, err)
 }
 
 func (s *storageImageDestination) putBlob(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, layerIndexInImage int, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
