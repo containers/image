@@ -606,22 +606,6 @@ func (c *copier) newProgressPool(ctx context.Context) (*mpb.Progress, func()) {
 	}
 }
 
-// blobInfoToProgressAction creates a string based on the blobinfo's short
-// digest and size and kind, for instance, "Copying blob bdf0201b3a05".
-// Note that kind must either be "blob" or "config".
-func blobInfoToProgressAction(blobinfo types.BlobInfo, kind string) string {
-	// shortDigestLen is the length of the digest used for blobs.
-	const shortDigestLen = 12
-	action := fmt.Sprintf("Copying %s %s", kind, blobinfo.Digest.Encoded())
-	// Truncate the string (chopping of some part of the digest) to make all
-	// progress bars aligned in a column.
-	maxLen := len("Copying blob ") + shortDigestLen
-	if len(action) > maxLen {
-		action = action[:maxLen]
-	}
-	return action
-}
-
 // copyConfig copies config.json, if any, from src to dest.
 func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 	srcInfo := src.ConfigInfo()
@@ -636,10 +620,11 @@ func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 			defer pool.CleanUp()
 
 			bar := pool.AddBar(
-				blobInfoToProgressAction(srcInfo, "config"),
-				srcInfo.Size,
+				progress.DigestToCopyAction(srcInfo.Digest, "config"),
+				0,
 				progress.BarOptions{
-					OnCompletionMessage: "done",
+					RemoveOnCompletion: true,
+					StaticMessage:      " ",
 				})
 
 			destInfo, err := c.copyBlobFromStream(ctx, bytes.NewReader(configBlob), srcInfo, -1, nil, false, true, bar)
@@ -671,7 +656,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, la
 	cachedDiffID := ic.c.blobInfoCache.UncompressedDigest(srcInfo.Digest) // May be ""
 	diffIDIsNeeded := ic.diffIDsAreNeeded && cachedDiffID == ""
 
-	progressBarAction := blobInfoToProgressAction(srcInfo, "blob")
+	progressBarAction := progress.DigestToCopyAction(srcInfo.Digest, "blob")
 	bar := pool.AddBar(
 		progressBarAction,
 		0,
@@ -688,12 +673,11 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, la
 		if reused {
 			logrus.Debugf("Skipping blob %s (already present):", srcInfo.Digest)
 
-			pool.AddBar(
-				blobInfoToProgressAction(srcInfo, "blob"),
+			bar.ReplaceBar(
+				progressBarAction,
 				0,
 				progress.BarOptions{
 					StaticMessage: "skipped: already exists",
-					ReplaceBar:    bar,
 				})
 			return blobInfo, cachedDiffID, nil
 		}
@@ -705,14 +689,6 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, la
 		return types.BlobInfo{}, "", errors.Wrapf(err, "Error reading blob %s", srcInfo.Digest)
 	}
 	defer srcStream.Close()
-
-	bar = pool.AddBar(
-		blobInfoToProgressAction(srcInfo, "blob"),
-		srcInfo.Size,
-		progress.BarOptions{
-			OnCompletionMessage: "done",
-			ReplaceBar:          bar,
-		})
 
 	blobInfo, diffIDChan, err := ic.copyLayerFromStream(ctx, srcStream, types.BlobInfo{Digest: srcInfo.Digest, Size: srcBlobSize}, layerIndexInImage, diffIDIsNeeded, bar)
 	if err != nil {
@@ -828,7 +804,6 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 		return types.BlobInfo{}, errors.Wrapf(err, "Error reading blob %s", srcInfo.Digest)
 	}
 	isCompressed := decompressor != nil
-	destStream = bar.ProxyReader(destStream)
 
 	// === Send a copy of the original, uncompressed, stream, to a separate path if necessary.
 	var originalLayerReader io.Reader // DO NOT USE this other than to drain the input if no other consumer in the pipeline has done so.
@@ -881,6 +856,17 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 		}
 	}
 
+	kind := "blob"
+	if isConfig {
+		kind = "config"
+	}
+	bar = bar.ReplaceBar(
+		progress.DigestToCopyAction(srcInfo.Digest, kind),
+		srcInfo.Size,
+		progress.BarOptions{
+			OnCompletionMessage: "done",
+		})
+	destStream = bar.ProxyReader(destStream)
 	// === Finally, send the layer stream to dest.
 	uploadedInfo, err := c.dest.PutBlob(ctx, destStream, inputInfo, layerIndexInImage, c.blobInfoCache, isConfig, nil)
 	if err != nil {

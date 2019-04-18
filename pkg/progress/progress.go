@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/opencontainers/go-digest"
 	"github.com/vbauerster/mpb"
 	"github.com/vbauerster/mpb/decor"
 )
@@ -26,7 +27,8 @@ type Bar struct {
 
 // BarOptions includes various options to control AddBar.
 type BarOptions struct {
-	// Remove the bar on completion.
+	// Remove the bar on completion. This must be true if the bar will be
+	// replaced by another one.
 	RemoveOnCompletion bool
 	// OnCompletionMessage will be shown on completion and replace the progress bar.
 	OnCompletionMessage string
@@ -58,6 +60,21 @@ func (p *Pool) CleanUp() {
 // getWriter returns the Pool's writer.
 func (p *Pool) getWriter() io.Writer {
 	return p.writer
+}
+
+// DigestToCopyAction returns a string based on the blobinfo and kind.
+// It's a convenience function for the c/image library when copying images.
+func DigestToCopyAction(digest digest.Digest, kind string) string {
+	// shortDigestLen is the length of the digest used for blobs.
+	const shortDigestLen = 12
+	const maxLen = len("Copying blob ") + shortDigestLen
+	// Truncate the string (chopping of some part of the digest) to make all
+	// progress bars aligned in a column.
+	copyAction := fmt.Sprintf("Copying %s %s", kind, digest.Encoded())
+	if len(copyAction) > maxLen {
+		copyAction = copyAction[:maxLen]
+	}
+	return copyAction
 }
 
 // AddBar adds a new Bar to the Pool.
@@ -99,6 +116,14 @@ func (p *Pool) AddBar(action string, size int64, options BarOptions) *Bar {
 		bar:  bar,
 		pool: p,
 	}
+}
+
+// ReplaceBar returns a bar replacing the current one. Note that the current one
+// will be terminated and should have been created with
+// options.RemoveOnCompletion.
+func (b *Bar) ReplaceBar(action string, size int64, options BarOptions) *Bar {
+	options.ReplaceBar = b
+	return b.pool.AddBar(action, size, options)
 }
 
 // ProxyReader wraps the reader with metrics for progress tracking.
