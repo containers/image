@@ -30,7 +30,9 @@ type BarOptions struct {
 	// RemoveOnCompletion the bar on completion. This must be true if the bar
 	// will be replaced by another one.
 	RemoveOnCompletion bool
-	// OnCompletionMessage will be shown on completion and replace the progress bar.
+	// OnCompletionMessage will be shown on completion and replace the progress
+	// bar. Note that setting OnCompletionMessage will cause the progress bar
+	// (or the static message) to be cleared on completion.
 	OnCompletionMessage string
 	// ReplaceBar is the bar to replace.
 	ReplaceBar *Bar
@@ -99,7 +101,7 @@ func (p *Pool) AddBar(action string, size int64, options BarOptions) *Bar {
 		defer options.ReplaceBar.bar.SetTotal(0, true)
 	}
 
-	// If not static message is set, we display the progress bar. Otherwise,
+	// If no static message is set, we display the progress bar. Otherwise,
 	// we'll display the message only.
 	if options.StaticMessage == "" {
 		mpbOptions = append(mpbOptions,
@@ -109,14 +111,29 @@ func (p *Pool) AddBar(action string, size int64, options BarOptions) *Bar {
 		)
 		mpbOptions = append(mpbOptions, mpb.BarClearOnComplete())
 		bar = p.pool.AddBar(size, mpbOptions...)
-	} else {
-		barFiller := mpb.FillerFunc(
-			func(w io.Writer, width int, st *decor.Statistics) {
-				fmt.Fprint(w, options.StaticMessage)
-			})
-		bar = p.pool.Add(0, barFiller, mpbOptions...)
+		return &Bar{
+			bar:  bar,
+			pool: p,
+		}
 	}
 
+	barFiller := mpb.FillerFunc(
+		func(w io.Writer, width int, st *decor.Statistics) {
+			fmt.Fprint(w, options.StaticMessage)
+		})
+
+	// If OnCompletionMessage is set, we need to add the decorator and clear
+	// the bar on completion.
+	if options.OnCompletionMessage != "" {
+		mpbOptions = append(mpbOptions,
+			mpb.AppendDecorators(
+				decor.OnComplete(decor.Name(""), " "+options.OnCompletionMessage),
+			),
+		)
+		mpbOptions = append(mpbOptions, mpb.BarClearOnComplete())
+	}
+
+	bar = p.pool.Add(size, barFiller, mpbOptions...)
 	return &Bar{
 		bar:  bar,
 		pool: p,

@@ -532,13 +532,20 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 
 	if bar != nil {
 		kind := "blob"
+		message := ""
 		if isConfig {
 			kind = "config"
+			// Setting the StaticMessage for the config avoids displaying a
+			// progress bar. Configs are comparatively small and quickly
+			// downloaded, such that displaying a progress is more a distraction
+			// than an indicator.
+			message = " "
 		}
 		bar = bar.ReplaceBar(
 			progress.DigestToCopyAction(blobinfo.Digest, kind),
 			blobinfo.Size,
 			progress.BarOptions{
+				StaticMessage:       message,
 				OnCompletionMessage: "done",
 			})
 		stream = bar.ProxyReader(stream)
