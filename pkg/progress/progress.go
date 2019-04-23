@@ -27,8 +27,8 @@ type Bar struct {
 
 // BarOptions includes various options to control AddBar.
 type BarOptions struct {
-	// Remove the bar on completion. This must be true if the bar will be
-	// replaced by another one.
+	// RemoveOnCompletion the bar on completion. This must be true if the bar
+	// will be replaced by another one.
 	RemoveOnCompletion bool
 	// OnCompletionMessage will be shown on completion and replace the progress bar.
 	OnCompletionMessage string
@@ -77,10 +77,12 @@ func DigestToCopyAction(digest digest.Digest, kind string) string {
 	return copyAction
 }
 
-// AddBar adds a new Bar to the Pool.
+// AddBar adds a new Bar to the Pool. Use options to control the behavior and
+// appearance of the bar.
 func (p *Pool) AddBar(action string, size int64, options BarOptions) *Bar {
 	var bar *mpb.Bar
 
+	// First decorator showing action (e.g., "Copying blob 123456abcd")
 	mpbOptions := []mpb.BarOption{
 		mpb.PrependDecorators(
 			decor.Name(action),
@@ -93,9 +95,12 @@ func (p *Pool) AddBar(action string, size int64, options BarOptions) *Bar {
 
 	if options.ReplaceBar != nil {
 		mpbOptions = append(mpbOptions, mpb.BarReplaceOnComplete(options.ReplaceBar.bar))
+		// bar.SetTotal(0, true) will make sure that the bar is stopped
 		defer options.ReplaceBar.bar.SetTotal(0, true)
 	}
 
+	// If not static message is set, we display the progress bar. Otherwise,
+	// we'll display the message only.
 	if options.StaticMessage == "" {
 		mpbOptions = append(mpbOptions,
 			mpb.AppendDecorators(
@@ -118,8 +123,8 @@ func (p *Pool) AddBar(action string, size int64, options BarOptions) *Bar {
 	}
 }
 
-// ReplaceBar returns a bar replacing the current one. Note that the current one
-// will be terminated and should have been created with
+// ReplaceBar is like Pool.AddBar but replace the bar in it's pool. Note that
+// the bar be terminated and should have been created with
 // options.RemoveOnCompletion.
 func (b *Bar) ReplaceBar(action string, size int64, options BarOptions) *Bar {
 	options.ReplaceBar = b
