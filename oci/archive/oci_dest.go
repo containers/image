@@ -88,6 +88,11 @@ func (d *ociArchiveImageDestination) HasThreadSafePutBlob() bool {
 // inputInfo.Size is the expected length of stream, if known.
 // inputInfo.MediaType describes the blob format, if known.
 // May update cache.
+// layerIndexInImage must be properly set to the layer index of the corresponding blob in the image. This value is required to allow parallel executions of
+// PutBlob() and TryReusingBlob()  where the layers must be written to the backend storage in sequential order. A value >= indicates that the blob a layer.
+// Non-layer blobs (e.g., configs or throwaway layers) must have a value < 0.
+// Note that only the containers-storage destination is sensitive to the layerIndexInImage parameter. Other transport destinations ignore it.
+// Same applies to bar, which is used in the containers-storage destination to update the progress bars displayed in the terminal. If it's nil, it will be ignored.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
@@ -98,8 +103,12 @@ func (d *ociArchiveImageDestination) PutBlob(ctx context.Context, stream io.Read
 // TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 // (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
 // info.Digest must not be empty.
+// layerIndexInImage must be properly set to the layer index of the corresponding blob in the image. This value is required to allow parallel executions of
+// PutBlob() and TryReusingBlob() where the layers must be written to the backend storage in sequential order. A value >= indicates that the blob a layer.
+// Note that only the containers-storage destination is sensitive to the layerIndexInImage parameter. Other transport destinations ignore it.
+// Same applies to bar, which is used in the containers-storage destination to update the progress bars displayed in the terminal. If it's nil, it will be ignored.
 // If canSubstitute, TryReusingBlob can use an equivalent equivalent of the desired blob; in that case the returned info may not match the input.
-// If the blob has been succesfully reused, returns (true, info, nil); info must contain at least a digest and size.
+// If the blob has been successfully reused, returns (true, info, nil); info must contain at least a digest and size.
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 // May use and/or update cache.
 func (d *ociArchiveImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, layerIndexInImage int, cache types.BlobInfoCache, canSubstitute bool, bar *progress.Bar) (bool, types.BlobInfo, error) {

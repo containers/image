@@ -267,6 +267,7 @@ type ImageDestination interface {
 	// PutBlob() and TryReusingBlob()  where the layers must be written to the backend storage in sequential order. A value >= indicates that the blob a layer.
 	// Non-layer blobs (e.g., configs or throwaway layers) must have a value < 0.
 	// Note that only the containers-storage destination is sensitive to the layerIndexInImage parameter. Other transport destinations ignore it.
+	// Same applies to bar, which is used in the containers-storage destination to update the progress bars displayed in the terminal. If it's nil, it will be ignored.
 	// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 	// to any other readers for download using the supplied digest.
 	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
@@ -279,6 +280,7 @@ type ImageDestination interface {
 	// layerIndexInImage must be properly set to the layer index of the corresponding blob in the image. This value is required to allow parallel executions of
 	// PutBlob() and TryReusingBlob() where the layers must be written to the backend storage in sequential order. A value >= indicates that the blob a layer.
 	// Note that only the containers-storage destination is sensitive to the layerIndexInImage parameter. Other transport destinations ignore it.
+	// Same applies to bar, which is used in the containers-storage destination to update the progress bars displayed in the terminal. If it's nil, it will be ignored.
 	// If canSubstitute, TryReusingBlob can use an equivalent equivalent of the desired blob; in that case the returned info may not match the input.
 	// If the blob has been successfully reused, returns (true, info, nil); info must contain at least a digest and size.
 	// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
