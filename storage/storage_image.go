@@ -380,8 +380,6 @@ func (s *storageImageDestination) HasThreadSafePutBlob() bool {
 	return true
 }
 
-var errorAcquiringDigestLock = errors.New("")
-
 // tryReusingBlobFromOtherProcess is implementing a mechanism to detect if
 // another process is already copying the blobinfo by making use of the
 // blob-digest locks from containers/storage. The caller is expected to send a
@@ -389,9 +387,6 @@ var errorAcquiringDigestLock = errors.New("")
 // detect that another process is copying the blob, we wait until we own the
 // lockfile and call tryReusingBlob() to check if we can reuse the committed
 // layer.
-//
-// Note that the returned storage.Locker must be unlocked by the caller if
-// the error is not a errorAcquiringDigestLock.
 func (s *storageImageDestination) tryReusingBlobFromOtherProcess(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, layerIndexInImage int, cache types.BlobInfoCache, done chan bool, bar *progress.Bar) (bool, types.BlobInfo, error) {
 	copiedByAnotherProcess := false
 	select {
@@ -513,7 +508,7 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 		// of locking and unlocking it more obvious and simple.
 		locker, err := s.imageRef.transport.store.GetDigestLock(blobinfo.Digest)
 		if err != nil {
-			return types.BlobInfo{}, errors.Wrapf(errorAcquiringDigestLock, "error acquiring lock for blob %q: %v", blobinfo.Digest)
+			return types.BlobInfo{}, errors.Wrapf(err, "error acquiring lock for blob %q", blobinfo.Digest)
 		}
 		done := make(chan bool, 1)
 		defer locker.Unlock()
