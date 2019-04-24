@@ -23,7 +23,7 @@ import (
 	"github.com/containers/image/types"
 	"github.com/docker/distribution/registry/client"
 	"github.com/docker/go-connections/tlsconfig"
-	"github.com/opencontainers/go-digest"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -84,20 +84,22 @@ type dockerClient struct {
 	sys      *types.SystemContext
 	registry string
 
+	// tlsClientConfig is setup by newDockerClient and will be used and updated
+	// by detectProperties(). Any HTTP request the dockerClient does will be done
+	// by this TLS client configuration.
+	// Callers can edit tlsClientConfig.InsecureSkipVerify before detectProperties().
+	tlsClientConfig *tls.Config
 	// The following members are not set by newDockerClient and must be set by callers if needed.
 	username      string
 	password      string
 	signatureBase signatureStorageBase
 	scope         authScope
+
 	// The following members are detected registry properties:
 	// They are set after a successful detectProperties(), and never change afterwards.
 	scheme             string // Empty value also used to indicate detectProperties() has not yet succeeded.
 	challenges         []challenge
 	supportsSignatures bool
-	// The tlsClientConfig is setup during the creation of the dockerClient and
-	// will be updated by detectPropertiesHelper(). Any HTTP request the
-	// dockerClient does will be done by this TLS client configuration.
-	tlsClientConfig *tls.Config
 
 	// Private state for setupRequestAuth (key: string, value: bearerToken)
 	tokenCache sync.Map
