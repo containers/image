@@ -97,7 +97,7 @@ type dockerClient struct {
 
 	// The following members are detected registry properties:
 	// They are set after a successful detectProperties(), and never change afterwards.
-	scheme             string // Empty value also used to indicate detectProperties() has not yet succeeded.
+	scheme             string
 	challenges         []challenge
 	supportsSignatures bool
 
@@ -560,10 +560,6 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge, 
 // detectPropertiesHelper performs the work of detectProperties which executes
 // it at most once.
 func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
-	if c.scheme != "" {
-		return nil
-	}
-
 	// We overwrite the TLS clients `InsecureSkipVerify` only if explicitly
 	// specified by the system context
 	if c.sys != nil && c.sys.DockerInsecureSkipTLSVerify != types.OptionalBoolUndefined {
