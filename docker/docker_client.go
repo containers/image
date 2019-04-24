@@ -85,9 +85,7 @@ type dockerClient struct {
 	registry string
 
 	// tlsClientConfig is setup by newDockerClient and will be used and updated
-	// by detectProperties(). Any HTTP request the dockerClient does will be done
-	// by this TLS client configuration.
-	// Callers can edit tlsClientConfig.InsecureSkipVerify before detectProperties().
+	// by detectProperties(). Callers can edit tlsClientConfig.InsecureSkipVerify in the meantime.
 	tlsClientConfig *tls.Config
 	// The following members are not set by newDockerClient and must be set by callers if needed.
 	username      string
@@ -97,6 +95,7 @@ type dockerClient struct {
 
 	// The following members are detected registry properties:
 	// They are set after a successful detectProperties(), and never change afterwards.
+	client             *http.Client
 	scheme             string
 	challenges         []challenge
 	supportsSignatures bool
@@ -440,18 +439,11 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 		}
 	}
 	logrus.Debugf("%s %s", method, url)
-
-	// Build the transport and do the request by using the clients tlsclientconfig
-	return c.doHTTP(req)
-}
-
-// doHttp uses the clients internal TLS configuration for doing the
-// provided HTTP request.  It returns the response and an error on failure.
-func (c *dockerClient) doHTTP(req *http.Request) (*http.Response, error) {
-	tr := tlsclientconfig.NewTransport()
-	tr.TLSClientConfig = c.tlsClientConfig
-	httpClient := &http.Client{Transport: tr}
-	return httpClient.Do(req)
+	res, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 // we're using the challenges from the /v2/ ping response and not the one from the destination
@@ -564,6 +556,9 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 	if c.sys != nil && c.sys.DockerInsecureSkipTLSVerify != types.OptionalBoolUndefined {
 		c.tlsClientConfig.InsecureSkipVerify = c.sys.DockerInsecureSkipTLSVerify == types.OptionalBoolTrue
 	}
+	tr := tlsclientconfig.NewTransport()
+	tr.TLSClientConfig = c.tlsClientConfig
+	c.client = &http.Client{Transport: tr}
 
 	ping := func(scheme string) error {
 		url := fmt.Sprintf(resolvedPingV2URL, scheme, c.registry)

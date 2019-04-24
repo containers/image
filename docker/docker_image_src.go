@@ -356,7 +356,7 @@ func (s *dockerImageSource) getOneSignature(ctx context.Context, url *url.URL) (
 			return nil, false, err
 		}
 		req = req.WithContext(ctx)
-		res, err := s.c.doHTTP(req)
+		res, err := s.c.client.Do(req)
 		if err != nil {
 			return nil, false, err
 		}
