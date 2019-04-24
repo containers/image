@@ -39,9 +39,6 @@ type Endpoint struct {
 // endpoints `location` from the `ref` and creates a new named reference from it.
 // The function errors if the newly created reference is not parsable.
 func (e *Endpoint) RewriteReference(ref reference.Named, prefix string) (reference.Named, error) {
-	if ref == nil {
-		return nil, fmt.Errorf("provided reference is nil")
-	}
 	if prefix == "" {
 		return ref, nil
 	}

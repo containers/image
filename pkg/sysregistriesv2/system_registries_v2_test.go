@@ -549,10 +549,3 @@ func TestRewriteReferenceFailedDuringParseNamed(t *testing.T) {
 		assert.Nil(t, out)
 	}
 }
-
-func TestRewriteReferenceFailedWithNilRef(t *testing.T) {
-	testEndpoint := Endpoint{}
-	out, err := testEndpoint.RewriteReference(nil, "")
-	assert.NotNil(t, err)
-	assert.Nil(t, out)
-}
