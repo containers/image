@@ -79,7 +79,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 	// Found the registry within the sysregistriesv2 configuration. Now we test
 	// all endpoints for the manifest availability. If a working image source
 	// was found, it will be used for all future pull actions.
-	var manifestLoadErr error
+	manifestLoadErr := errors.New("Internal error: newImageSource returned without trying any endpoint")
 	for _, endpoint := range append(registry.Mirrors, registry.Endpoint) {
 		logrus.Debugf("Trying to pull %q from endpoint %q", ref.ref, endpoint.Location)
 
