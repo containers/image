@@ -71,6 +71,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 			Endpoint: sysregistriesv2.Endpoint{
 				Location: ref.ref.String(),
 			},
+			Prefix: ref.ref.String(),
 		}
 	}
 
