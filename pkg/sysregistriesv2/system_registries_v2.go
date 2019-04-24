@@ -40,19 +40,19 @@ type Endpoint struct {
 // The function errors if the newly created reference is not parsable.
 func (e *Endpoint) RewriteReference(ref reference.Named, prefix string) (reference.Named, error) {
 	refString := ref.String()
-	if refMatchesPrefix(refString, prefix) {
-		newNamedRef := strings.Replace(refString, prefix, e.Location, 1)
-		newParsedRef, err := reference.ParseNamed(newNamedRef)
-		if newParsedRef != nil {
-			logrus.Debugf("reference rewritten from '%v' to '%v'", refString, newParsedRef.String())
-		}
-		if err != nil {
-			return nil, errors.Wrapf(err, "error rewriting reference")
-		}
-		return newParsedRef, nil
+	if !refMatchesPrefix(refString, prefix) {
+		return nil, fmt.Errorf("invalid prefix '%v' for reference '%v'", prefix, refString)
 	}
 
-	return nil, fmt.Errorf("invalid prefix '%v' for reference '%v'", prefix, refString)
+	newNamedRef := strings.Replace(refString, prefix, e.Location, 1)
+	newParsedRef, err := reference.ParseNamed(newNamedRef)
+	if newParsedRef != nil {
+		logrus.Debugf("reference rewritten from '%v' to '%v'", refString, newParsedRef.String())
+	}
+	if err != nil {
+		return nil, errors.Wrapf(err, "error rewriting reference")
+	}
+	return newParsedRef, nil
 }
 
 // Registry represents a registry.
