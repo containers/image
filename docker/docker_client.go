@@ -103,10 +103,9 @@ type dockerClient struct {
 
 	// Private state for setupRequestAuth (key: string, value: bearerToken)
 	tokenCache sync.Map
-	// detectPropertiesError caches the initial error.
-	detectPropertiesError error
-	// detectPropertiesOnce is used to execuute detectProperties() at most once in in makeRequest().
-	detectPropertiesOnce sync.Once
+	// Private state for detectProperties:
+	detectPropertiesOnce  sync.Once // detectPropertiesOnce is used to execute detectProperties() at most once.
+	detectPropertiesError error     // detectPropertiesError caches the initial error.
 }
 
 type authScope struct {
