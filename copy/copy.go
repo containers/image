@@ -507,7 +507,6 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 			defer copyGroup.Done()
 			cld.destInfo, cld.diffID, cld.err = ic.copyLayer(cancelCtx, srcLayer, index, progressPool)
 			if cld.err != nil {
-				logrus.Errorf("copying layer %d failed: %v", index, cld.err)
 				// Stop all other running goroutines as we can't recover from an error
 				cancelCopyLayer()
 			}
