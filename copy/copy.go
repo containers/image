@@ -808,6 +808,23 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 	}
 	isCompressed := decompressor != nil
 
+	// Instead of adding boilerplate code to ALL PutBlob()s, just special case
+	// the storage transport, which is the only transport where we need control
+	// over the progress.Bar.
+	if c.dest.Reference().Transport().Name() != storage.Name() {
+		kind := "blob"
+		if isConfig {
+			kind = "config"
+		}
+		bar = bar.ReplaceBar(
+			progress.DigestToCopyAction(srcInfo.Digest, kind),
+			srcInfo.Size,
+			progress.BarOptions{
+				OnCompletionMessage: "done",
+			})
+		destStream = bar.ProxyReader(destStream)
+	}
+
 	// === Send a copy of the original, uncompressed, stream, to a separate path if necessary.
 	var originalLayerReader io.Reader // DO NOT USE this other than to drain the input if no other consumer in the pipeline has done so.
 	if getOriginalLayerCopyWriter != nil {
@@ -857,23 +874,6 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 			artifact: srcInfo,
 			lastTime: time.Now(),
 		}
-	}
-
-	// Instead of adding boilerplate code to ALL PutBlob()s, just special case
-	// the storage transport, which is the only transport where we need control
-	// over the progress.Bar.
-	if c.dest.Reference().Transport().Name() != storage.Name() {
-		kind := "blob"
-		if isConfig {
-			kind = "config"
-		}
-		bar = bar.ReplaceBar(
-			progress.DigestToCopyAction(srcInfo.Digest, kind),
-			srcInfo.Size,
-			progress.BarOptions{
-				OnCompletionMessage: "done",
-			})
-		destStream = bar.ProxyReader(destStream)
 	}
 
 	// === Finally, send the layer stream to dest.
