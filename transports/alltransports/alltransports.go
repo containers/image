@@ -7,6 +7,7 @@ import (
 	// NOTE: Make sure docs/containers-policy.json.5.md is updated when adding or updating
 	// a transport.
 	_ "github.com/containers/image/v5/directory"
+	_ "github.com/containers/image/v5/dist"
 	_ "github.com/containers/image/v5/docker"
 	_ "github.com/containers/image/v5/docker/archive"
 	_ "github.com/containers/image/v5/oci/archive"
