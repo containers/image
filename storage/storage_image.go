@@ -462,7 +462,7 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 			channel := s.getChannelForLayer(layerIndexInImage)
 			channel <- err == nil
 			if err != nil {
-				logrus.Errorf("error while committing blob %d: %v", layerIndexInImage, err)
+				logrus.Debugf("error while committing blob %d: %v", layerIndexInImage, err)
 			}
 		}
 	}()
@@ -474,7 +474,6 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 			channel := s.getChannelForLayer(layerIndexInImage - 1)
 			if committed := <-channel; !committed {
 				err := fmt.Errorf("committing previous layer %d failed", layerIndexInImage-1)
-				logrus.Errorf(err.Error())
 				return types.BlobInfo{}, err
 			}
 			var ok bool
