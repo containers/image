@@ -674,7 +674,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, la
 			// Instead of adding boilerplate code to ALL TryReusingBlob()s, just
 			// special case the storage transport, which is the only transport
 			// where we need control over the progress.Bar.
-			if ic.c.dest.Reference().Transport().Name() != storage.Name() {
+			if ic.c.dest.Reference().Transport().Name() != storage.Transport.Name() {
 				bar.ReplaceBar(
 					progressBarAction,
 					0,
@@ -811,7 +811,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 	// Instead of adding boilerplate code to ALL PutBlob()s, just special case
 	// the storage transport, which is the only transport where we need control
 	// over the progress.Bar.
-	if c.dest.Reference().Transport().Name() != storage.Name() {
+	if c.dest.Reference().Transport().Name() != storage.Transport.Name() {
 		kind := "blob"
 		if isConfig {
 			kind = "config"

@@ -38,12 +38,6 @@ var (
 	ErrPathNotAbsolute = errors.New("path name is not absolute")
 )
 
-// Name returns the name of the transport and can be used for type detection of
-// a Transport object.
-func Name() string {
-	return "containers-storage"
-}
-
 // StoreTransport is an ImageTransport that uses a storage.Store to parse
 // references, either its own default or one that it's told to use.
 type StoreTransport interface {
@@ -77,7 +71,7 @@ type storageTransport struct {
 
 func (s *storageTransport) Name() string {
 	// Still haven't really settled on a name.
-	return Name()
+	return "containers-storage"
 }
 
 // SetStore sets the Store object which the Transport will use for parsing
