@@ -51,7 +51,15 @@ tools.timestamp: Makefile
 	@touch tools.timestamp
 
 vendor: tools.timestamp vendor.conf
-	@trash
+	@if which trash > /dev/null ; then \
+		trash ; \
+	else \
+		if [ "$(GOBIN)" ] ; then \
+			$(GOBIN)/trash ; \
+		else \
+			$(GOPATH)/bin/trash ; \
+		fi ; \
+	fi
 	@touch vendor
 
 clean:
