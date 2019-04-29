@@ -66,8 +66,8 @@ type storageImageDestination struct {
 	blobLayerIDs       map[digest.Digest]string        // Mapping from layer blobsums to their corresponding storage layer ID
 	fileSizes          map[digest.Digest]int64         // Mapping from layer blobsums to their sizes
 	filenames          map[digest.Digest]string        // Mapping from layer blobsums to names of files we used to hold them
-	indexToStorageID   map[int]string                  // Mapping from layer index to the layer IDs in the storage
-	indexToDoneChannel map[int]chan bool               // Mapping from layer index to a channel to indicate the layer has been written to storage
+	indexToStorageID   map[int]string                  // Mapping from layer index to the layer IDs in the storage. Only valid after receiving `true` from the corresponding `indexToDoneChannel`.
+	indexToDoneChannel map[int]chan bool               // Mapping from layer index to a channel to indicate the layer has been written to storage. True is written when the corresponding index/layer has successfully been written to the storage.
 	SignatureSizes     []int                           `json:"signature-sizes,omitempty"` // List of sizes of each signature slice
 }
 
