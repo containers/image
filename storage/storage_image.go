@@ -444,9 +444,9 @@ func (s *storageImageDestination) tryReusingBlobFromOtherProcess(ctx context.Con
 // inputInfo.MediaType describes the blob format, if known.
 // May update cache.
 // layerIndexInImage must be properly set to the layer index of the corresponding blob in the image. This value is required to allow parallel executions of
-// PutBlob() and TryReusingBlob()  where the layers must be written to the backend storage in sequential order. A value >= indicates that the blob a layer.
-// Non-layer blobs (e.g., configs or throwaway layers) must have a value < 0.
-// Note that only the containers-storage destination is sensitive to the layerIndexInImage parameter. Other transport destinations ignore it.
+// layerIndexInImage is set to the layer index of the corresponding blob in the image. This value is required to allow parallel executions of
+// PutBlob() and TryReusingBlob() where the layers must be written to the destination in sequential order. A value >= 0 indicates that the blob is a layer.
+// The bar can optionally be specified to allow replacing/updating it. Note that only the containers-storage transport updates the bar; other transports ignore it.
 // Same applies to bar, which is used in the containers-storage destination to update the progress bars displayed in the terminal. If it's nil, it will be ignored.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
