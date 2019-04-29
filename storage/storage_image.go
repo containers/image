@@ -63,7 +63,6 @@ type storageImageDestination struct {
 	signatures         []byte                          // Signature contents, temporary
 	putBlobMutex       sync.Mutex                      // Mutex to sync state for parallel PutBlob executions
 	blobDiffIDs        map[digest.Digest]digest.Digest // Mapping from layer blobsums to their corresponding DiffIDs
-	blobLayerIDs       map[digest.Digest]string        // Mapping from layer blobsums to their corresponding storage layer ID
 	fileSizes          map[digest.Digest]int64         // Mapping from layer blobsums to their sizes
 	filenames          map[digest.Digest]string        // Mapping from layer blobsums to names of files we used to hold them
 	indexToStorageID   map[int]string                  // Mapping from layer index to the layer IDs in the storage. Only valid after receiving `true` from the corresponding `indexToDoneChannel`.
@@ -331,7 +330,6 @@ func newImageDestination(imageRef storageReference) (*storageImageDestination, e
 		imageRef:           imageRef,
 		directory:          directory,
 		blobDiffIDs:        make(map[digest.Digest]digest.Digest),
-		blobLayerIDs:       make(map[digest.Digest]string),
 		fileSizes:          make(map[digest.Digest]int64),
 		filenames:          make(map[digest.Digest]string),
 		indexToStorageID:   make(map[int]string),
@@ -490,7 +488,6 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 			id, err := s.commitBlob(ctx, blob, previousID)
 			if err == nil {
 				s.putBlobMutex.Lock()
-				s.blobLayerIDs[blob.Digest] = id
 				s.indexToStorageID[layerIndexInImage] = id
 				s.putBlobMutex.Unlock()
 			} else {
@@ -648,7 +645,6 @@ func (s *storageImageDestination) tryReusingBlob(ctx context.Context, blobinfo t
 	if len(layers) > 0 {
 		// Save this for completeness.
 		s.blobDiffIDs[blobinfo.Digest] = layers[0].UncompressedDigest
-		s.blobLayerIDs[blobinfo.Digest] = layers[0].ID
 		if layerIndexInImage >= 0 {
 			s.indexToStorageID[layerIndexInImage] = layers[0].ID
 		}
@@ -667,7 +663,6 @@ func (s *storageImageDestination) tryReusingBlob(ctx context.Context, blobinfo t
 	if len(layers) > 0 {
 		// Record the uncompressed value so that we can use it to calculate layer IDs.
 		s.blobDiffIDs[blobinfo.Digest] = layers[0].UncompressedDigest
-		s.blobLayerIDs[blobinfo.Digest] = layers[0].ID
 		if layerIndexInImage >= 0 {
 			s.indexToStorageID[layerIndexInImage] = layers[0].ID
 		}
@@ -689,7 +684,6 @@ func (s *storageImageDestination) tryReusingBlob(ctx context.Context, blobinfo t
 			}
 			if len(layers) > 0 {
 				s.blobDiffIDs[uncompressedDigest] = layers[0].UncompressedDigest
-				s.blobLayerIDs[blobinfo.Digest] = layers[0].ID
 				if layerIndexInImage >= 0 {
 					s.indexToStorageID[layerIndexInImage] = layers[0].ID
 				}
