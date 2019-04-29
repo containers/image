@@ -1,5 +1,5 @@
-// Package progress is exposes a convenience API and abstractions for creating
-// and managing pools of multi-progress bars.
+// Package progress exposes a convenience API and abstractions for creating and
+// managing pools of multi-progress bars.
 package progress
 
 import (
@@ -41,7 +41,7 @@ type BarOptions struct {
 	StaticMessage string
 }
 
-// NewPool returns a Pool. The caller must eventually call ProgressPoo.CleanUp()
+// NewPool returns a Pool. The caller must eventually call ProgressPool.CleanUp()
 // when the pool will no longer be updated.
 func NewPool(ctx context.Context, writer io.Writer) *Pool {
 	ctx, cancelFunc := context.WithCancel(ctx)
@@ -57,11 +57,6 @@ func NewPool(ctx context.Context, writer io.Writer) *Pool {
 func (p *Pool) CleanUp() {
 	p.cancel()
 	p.pool.Wait()
-}
-
-// getWriter returns the Pool's writer.
-func (p *Pool) getWriter() io.Writer {
-	return p.writer
 }
 
 // DigestToCopyAction returns a string based on the blobinfo and kind.
