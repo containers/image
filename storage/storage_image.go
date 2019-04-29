@@ -452,9 +452,8 @@ func (s *storageImageDestination) tryReusingBlobFromOtherProcess(ctx context.Con
 func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, layerIndexInImage int, cache types.BlobInfoCache, isConfig bool, bar *progress.Bar) (blob types.BlobInfo, err error) {
 	// Deferred call to an anonymous func to signal potentially waiting
 	// goroutines via the index-specific channel.
-	defer func() {
-		// No need to wait
-		if layerIndexInImage >= 0 {
+	if layerIndexInImage >= 0 {
+		defer func() {
 			// It's a buffered channel, so we don't wait for the message to be
 			// received
 			channel := s.getChannelForLayer(layerIndexInImage)
@@ -462,10 +461,15 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 			if err != nil {
 				logrus.Debugf("error while committing blob %d: %v", layerIndexInImage, err)
 			}
-		}
-	}()
+
+		}()
+	}
 
 	waitAndCommit := func(blob types.BlobInfo, err error) (types.BlobInfo, error) {
+		if layerIndexInImage >= 0 {
+			return blob, err
+		}
+
 		// First, wait for the previous layer to be committed
 		previousID := ""
 		if layerIndexInImage > 0 {
@@ -484,15 +488,13 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 		}
 
 		// Commit the blob
-		if layerIndexInImage >= 0 {
-			id, err := s.commitBlob(ctx, blob, previousID)
-			if err == nil {
-				s.putBlobMutex.Lock()
-				s.indexToStorageID[layerIndexInImage] = id
-				s.putBlobMutex.Unlock()
-			} else {
-				return types.BlobInfo{}, err
-			}
+		id, err := s.commitBlob(ctx, blob, previousID)
+		if err == nil {
+			s.putBlobMutex.Lock()
+			s.indexToStorageID[layerIndexInImage] = id
+			s.putBlobMutex.Unlock()
+		} else {
+			return types.BlobInfo{}, err
 		}
 		return blob, nil
 	}
