@@ -384,7 +384,7 @@ func TestWriteRead(t *testing.T) {
 			t.Fatalf("Error saving randomly-generated layer to destination: %v", err)
 		}
 		t.Logf("Wrote randomly-generated layer %q (%d/%d bytes) to destination", digest, size, decompressedSize)
-		if _, err := dest.PutBlob(context.Background(), bytes.NewBufferString(config), configInfo, 0, cache, false, nil); err != nil {
+		if _, err := dest.PutBlob(context.Background(), bytes.NewBufferString(config), configInfo, -1, cache, true, nil); err != nil {
 			t.Fatalf("Error saving config to destination: %v", err)
 		}
 		manifest := strings.Replace(manifestFmt, "%lh", digest.String(), -1)
@@ -864,7 +864,7 @@ func TestSize(t *testing.T) {
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
 		Size:   size2,
 		Digest: digest2,
-	}, 0, cache, false, nil); err != nil {
+	}, 1, cache, false, nil); err != nil {
 		t.Fatalf("Error saving randomly-generated layer 2 to destination: %v", err)
 	}
 	manifest := fmt.Sprintf(`
