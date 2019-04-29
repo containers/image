@@ -937,7 +937,7 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 	}
 
 	if lastLayer == "" {
-		return fmt.Errorf("could not find top layer")
+		return fmt.Errorf("image does not contain a non-empty or non-throwaway layer")
 	}
 
 	// If one of those blobs was a configuration blob, then we can try to dig out the date when the image
