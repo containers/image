@@ -818,8 +818,12 @@ func (s *storageImageDestination) commitBlob(ctx context.Context, blob types.Blo
 		logrus.Debugf("layer for blob %q already found in storage", blob.Digest)
 		return layer.ID, nil
 	}
-	// Check if we previously cached a file with that blob's contents.  If we didn't,
-	// then we need to read the desired contents from a layer.
+	// Check if we previously cached a file with that blob's contents.  If we
+	// didn't, then we need to read the desired contents from a layer.
+	//
+	// TODO: the lookup here is only required when being called for an entirely
+	// new layer or reused ones. Maybe we should split that into separate
+	// functions?
 	s.putBlobMutex.Lock()
 	filename, ok := s.filenames[blob.Digest]
 	s.putBlobMutex.Unlock()
