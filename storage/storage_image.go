@@ -718,8 +718,10 @@ func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo t
 	// waiting for it.  If we can't resuse the blob and encountered no error, we
 	// need to copy it and will send the signal in PutBlob().
 	if (layerIndexInImage >= 0) && (err != nil || reusable) {
-		channel := s.getChannelForLayer(layerIndexInImage)
-		channel <- (err == nil)
+		defer func() { // Defer to be **very** sure to always execute the code.
+			channel := s.getChannelForLayer(layerIndexInImage)
+			channel <- (err == nil)
+		}()
 	}
 	if bar != nil && reusable {
 		bar.ReplaceBar(
