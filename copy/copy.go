@@ -27,7 +27,6 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/vbauerster/mpb"
 	"golang.org/x/crypto/ssh/terminal"
 	"golang.org/x/sync/semaphore"
 )
@@ -592,17 +591,6 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest(ctx context.Context) ([]byte
 		return nil, errors.Wrap(err, "Error writing manifest")
 	}
 	return manifest, nil
-}
-
-// newProgressPool creates a *mpb.Progress and a cleanup function.
-// The caller must eventually call the returned cleanup function after the pool will no longer be updated.
-func (c *copier) newProgressPool(ctx context.Context) (*mpb.Progress, func()) {
-	ctx, cancel := context.WithCancel(ctx)
-	pool := mpb.New(mpb.WithWidth(40), mpb.WithOutput(c.progressOutput), mpb.WithContext(ctx))
-	return pool, func() {
-		cancel()
-		pool.Wait()
-	}
 }
 
 // copyConfig copies config.json, if any, from src to dest.
