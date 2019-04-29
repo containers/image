@@ -714,18 +714,18 @@ func (s *storageImageDestination) tryReusingBlob(ctx context.Context, blobinfo t
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 // May use and/or update cache.
 func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo types.BlobInfo, layerIndexInImage int, cache types.BlobInfoCache, canSubstitute bool, bar *progress.Bar) (bool, types.BlobInfo, error) {
-	reusable, blob, err := s.tryReusingBlob(ctx, blobinfo, layerIndexInImage, cache, canSubstitute)
+	reused, blob, err := s.tryReusingBlob(ctx, blobinfo, layerIndexInImage, cache, canSubstitute)
 	// If we can reuse the blob or hit an error trying to do so, we need to
 	// signal the result through the channel as another Goroutine is potentially
-	// waiting for it.  If we can't resuse the blob and encountered no error, we
+	// waiting for it.  If we can't reuse the blob and encountered no error, we
 	// need to copy it and will send the signal in PutBlob().
-	if (layerIndexInImage >= 0) && (err != nil || reusable) {
+	if (layerIndexInImage >= 0) && (err != nil || reused) {
 		defer func() { // Defer to be **very** sure to always execute the code.
 			channel := s.getChannelForLayer(layerIndexInImage)
 			channel <- (err == nil)
 		}()
 	}
-	if bar != nil && reusable {
+	if bar != nil && reused {
 		bar.ReplaceBar(
 			progress.DigestToCopyAction(blobinfo.Digest, "blob"),
 			0,
@@ -733,7 +733,7 @@ func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo t
 				StaticMessage: "skipped: already exists",
 			})
 	}
-	return reusable, blob, err
+	return reused, blob, err
 }
 
 // computeID computes a recommended image ID based on information we have so far.  If
