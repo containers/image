@@ -433,7 +433,6 @@ func isTTY(w io.Writer) bool {
 // copyLayers copies layers from ic.src/ic.c.rawSource to dest, using and updating ic.manifestUpdates if necessary and ic.canModifyManifest.
 func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	srcInfos := ic.src.LayerInfos()
-	numLayers := len(srcInfos)
 	updatedSrcInfos, err := ic.src.LayerInfosForCopy(ctx)
 	if err != nil {
 		return err
@@ -446,6 +445,17 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		srcInfos = updatedSrcInfos
 		srcInfosUpdated = true
 	}
+
+	mblob, mtype, err := ic.src.Manifest(ctx)
+	if err != nil {
+		return err
+	}
+	man, err := manifest.FromBlob(mblob, mtype)
+	if err != nil {
+		return err
+	}
+	layerInfos := man.LayerInfos()
+	numLayers := len(layerInfos)
 
 	type copyLayerData struct {
 		destInfo types.BlobInfo
@@ -476,7 +486,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 
 	layerIndex := 0 // some layers might be skipped, so we need a dedicated counter
 	digestToCopyData := make(map[digest.Digest]*copyLayerData)
-	for _, srcLayer := range srcInfos {
+	for _, srcLayer := range layerInfos {
 		// Check if we're already copying the layer
 		if _, ok := digestToCopyData[srcLayer.Digest]; ok {
 			continue
@@ -492,7 +502,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 				return errors.New("getting DiffID for foreign layers is unimplemented")
 			}
 			logrus.Debugf("Skipping foreign layer %q copy to %s", srcLayer.Digest, ic.c.dest.Reference().Transport().Name())
-			cld.destInfo = srcLayer
+			cld.destInfo = srcLayer.BlobInfo
 			continue // skip copying
 		}
 
@@ -501,17 +511,22 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 
 		// Copy the layer. Note that cld is a pointer; changes to it are
 		// propagated implicitly.
-		go func(index int, srcLayer types.BlobInfo, cld *copyLayerData) {
+		go func(index int, srcLayer manifest.LayerInfo, cld *copyLayerData) {
 			defer copySemaphore.Release(1)
 			defer copyGroup.Done()
-			cld.destInfo, cld.diffID, cld.err = ic.copyLayer(cancelCtx, srcLayer, index, progressPool)
+			if srcLayer.EmptyLayer {
+				index = -1
+			}
+			cld.destInfo, cld.diffID, cld.err = ic.copyLayer(cancelCtx, srcLayer.BlobInfo, index, progressPool)
 			if cld.err != nil {
 				// Stop all other running goroutines as we can't recover from an error
 				cancelCopyLayer()
 			}
 		}(layerIndex, srcLayer, cld)
 
-		layerIndex++
+		if !srcLayer.EmptyLayer {
+			layerIndex++
+		}
 	}
 
 	// Wait for all layer-copy operations to finish
@@ -519,7 +534,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 
 	destInfos := make([]types.BlobInfo, numLayers)
 	diffIDs := make([]digest.Digest, numLayers)
-	for i, srcLayer := range srcInfos {
+	for i, srcLayer := range layerInfos {
 		cld, ok := digestToCopyData[srcLayer.Digest]
 		if !ok {
 			return errors.Errorf("no copy data for layer %q", srcLayer.Digest)
