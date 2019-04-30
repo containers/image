@@ -795,10 +795,7 @@ func (s *storageImageDestination) getConfigBlob(info types.BlobInfo) ([]byte, er
 	return nil, errors.New("blob not found")
 }
 
-// commitBlobs commits the specified blob to the storage. If not already done,
-// it will block until the parent layer is committed to the storage. Note that
-// the only caller of commitBlob() is PutBlob(), which is recording the results
-// and send the error through the corresponding channel in s.previousLayerResult.
+// commitBlobs commits the specified blob to the storage.
 func (s *storageImageDestination) commitBlob(ctx context.Context, blob types.BlobInfo, previousID string) (string, error) {
 	logrus.Debugf("committing blob %q", blob.Digest)
 	// Check if there's already a layer with the ID that we'd give to the result of applying
