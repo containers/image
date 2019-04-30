@@ -537,7 +537,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	for i, srcLayer := range layerInfos {
 		cld, ok := digestToCopyData[srcLayer.Digest]
 		if !ok {
-			return errors.Errorf("no copy data for layer %q", srcLayer.Digest)
+			return errors.Errorf("Internal error: no copy data for layer %q", srcLayer.Digest)
 		}
 		if cld.err != nil {
 			return cld.err
