@@ -531,6 +531,10 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	for i := range copyData {
 		cld := copyData[i]
 		if cld.err != nil {
+			// Skip context.Canceled errors to determine the real error.
+			if cld.err == context.Canceled {
+				continue
+			}
 			return cld.err
 		}
 		destInfos[i] = cld.destInfo
