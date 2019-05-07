@@ -466,10 +466,6 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	}
 
 	waitAndCommit := func(blob types.BlobInfo, err error) (types.BlobInfo, error) {
-		if layerIndexInImage >= 0 {
-			return blob, err
-		}
-
 		// First, wait for the previous layer to be committed
 		previousID := ""
 		if layerIndexInImage > 0 {
@@ -489,7 +485,7 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 
 		// Commit the blob
 		id, err := s.commitBlob(ctx, blob, previousID)
-		if err == nil {
+		if err == nil && layerIndexInImage >= 0 {
 			s.putBlobMutex.Lock()
 			s.indexToStorageID[layerIndexInImage] = id
 			s.putBlobMutex.Unlock()
