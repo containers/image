@@ -1,11 +1,13 @@
 package config
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/containers/image/types"
@@ -109,78 +111,104 @@ func TestGetAuth(t *testing.T) {
 		for _, tc := range []struct {
 			name             string
 			hostname         string
-			path             string
+			authConfig       testAuthConfig
 			expectedUsername string
 			expectedPassword string
 			expectedError    error
 			sys              *types.SystemContext
 		}{
 			{
+				name:       "empty hostname",
+				authConfig: makeTestAuthConfig(testAuthConfigDataMap{"localhost:5000": testAuthConfigData{"bob", "password"}}),
+			},
+			{
 				name:     "no auth config",
 				hostname: "index.docker.io",
 			},
 			{
-				name: "empty hostname",
-				path: filepath.Join("testdata", "example.json"),
-			},
-			{
 				name:             "match one",
 				hostname:         "example.org",
-				path:             filepath.Join("testdata", "example.json"),
-				expectedUsername: "example",
-				expectedPassword: "org",
+				authConfig:       makeTestAuthConfig(testAuthConfigDataMap{"example.org": testAuthConfigData{"joe", "mypass"}}),
+				expectedUsername: "joe",
+				expectedPassword: "mypass",
 			},
 			{
-				name:     "match none",
-				hostname: "registry.example.org",
-				path:     filepath.Join("testdata", "example.json"),
+				name:       "match none",
+				hostname:   "registry.example.org",
+				authConfig: makeTestAuthConfig(testAuthConfigDataMap{"example.org": testAuthConfigData{"joe", "mypass"}}),
 			},
 			{
-				name:             "match docker.io",
-				hostname:         "docker.io",
-				path:             filepath.Join("testdata", "full.json"),
+				name:     "match docker.io",
+				hostname: "docker.io",
+				authConfig: makeTestAuthConfig(testAuthConfigDataMap{
+					"example.org":     testAuthConfigData{"example", "org"},
+					"index.docker.io": testAuthConfigData{"index", "docker.io"},
+					"docker.io":       testAuthConfigData{"docker", "io"},
+				}),
 				expectedUsername: "docker",
 				expectedPassword: "io",
 			},
 			{
-				name:             "match docker.io normalized",
-				hostname:         "docker.io",
-				path:             filepath.Join("testdata", "abnormal.json"),
-				expectedUsername: "index",
-				expectedPassword: "docker.io",
+				name:     "match docker.io normalized",
+				hostname: "docker.io",
+				authConfig: makeTestAuthConfig(testAuthConfigDataMap{
+					"example.org":                testAuthConfigData{"bob", "pw"},
+					"https://index.docker.io/v1": testAuthConfigData{"alice", "wp"},
+				}),
+				expectedUsername: "alice",
+				expectedPassword: "wp",
 			},
 			{
-				name:             "normalize registry",
-				hostname:         "https://docker.io/v1",
-				path:             filepath.Join("testdata", "full.json"),
-				expectedUsername: "docker",
-				expectedPassword: "io",
+				name:     "normalize registry",
+				hostname: "https://docker.io/v1",
+				authConfig: makeTestAuthConfig(testAuthConfigDataMap{
+					"docker.io":      testAuthConfigData{"user", "pw"},
+					"localhost:5000": testAuthConfigData{"joe", "pass"},
+				}),
+				expectedUsername: "user",
+				expectedPassword: "pw",
 			},
 			{
-				name:             "match localhost",
-				hostname:         "http://localhost",
-				path:             filepath.Join("testdata", "full.json"),
-				expectedUsername: "local",
-				expectedPassword: "host",
+				name:     "match localhost",
+				hostname: "http://localhost",
+				authConfig: makeTestAuthConfig(testAuthConfigDataMap{
+					"docker.io":   testAuthConfigData{"user", "pw"},
+					"localhost":   testAuthConfigData{"joe", "pass"},
+					"example.com": testAuthConfigData{"alice", "pwd"},
+				}),
+				expectedUsername: "joe",
+				expectedPassword: "pass",
 			},
 			{
-				name:             "match ip",
-				hostname:         "10.10.30.45:5000",
-				path:             filepath.Join("testdata", "full.json"),
-				expectedUsername: "10.10",
-				expectedPassword: "30.45-5000",
+				name:     "match ip",
+				hostname: "10.10.3.56:5000",
+				authConfig: makeTestAuthConfig(testAuthConfigDataMap{
+					"10.10.30.45":     testAuthConfigData{"user", "pw"},
+					"localhost":       testAuthConfigData{"joe", "pass"},
+					"10.10.3.56":      testAuthConfigData{"alice", "pwd"},
+					"10.10.3.56:5000": testAuthConfigData{"me", "mine"},
+				}),
+				expectedUsername: "me",
+				expectedPassword: "mine",
 			},
 			{
-				name:             "match port",
-				hostname:         "https://localhost:5000",
-				path:             filepath.Join("testdata", "abnormal.json"),
-				expectedUsername: "local",
-				expectedPassword: "host-5000",
+				name:     "match port",
+				hostname: "https://localhost:5000",
+				authConfig: makeTestAuthConfig(testAuthConfigDataMap{
+					"https://127.0.0.1:5000": testAuthConfigData{"user", "pw"},
+					"http://localhost":       testAuthConfigData{"joe", "pass"},
+					"https://localhost:5001": testAuthConfigData{"alice", "pwd"},
+					"localhost:5000":         testAuthConfigData{"me", "mine"},
+				}),
+				expectedUsername: "me",
+				expectedPassword: "mine",
 			},
 			{
-				name:             "use system context",
-				hostname:         "example.org",
-				path:             filepath.Join("testdata", "example.json"),
+				name:     "use system context",
+				hostname: "example.org",
+				authConfig: makeTestAuthConfig(testAuthConfigDataMap{
+					"example.org": testAuthConfigData{"user", "pw"},
+				}),
 				expectedUsername: "foo",
 				expectedPassword: "bar",
 				sys: &types.SystemContext{
@@ -191,34 +219,42 @@ func TestGetAuth(t *testing.T) {
 				},
 			},
 		} {
-			if tc.path == "" {
-				if err := os.RemoveAll(configPath); err != nil {
-					t.Fatal(err)
-				}
+			contents, err := json.MarshalIndent(&tc.authConfig, "", "  ")
+			if err != nil {
+				t.Errorf("[%s] failed to marshal authConfig: %v", tc.name, err)
+				continue
+			}
+			if err := ioutil.WriteFile(configPath, contents, 0640); err != nil {
+				t.Errorf("[%s] failed to write file %q: %v", tc.name, configPath, err)
+				continue
 			}
 
-			t.Run(tc.name, func(t *testing.T) {
-				if tc.path != "" {
-					contents, err := ioutil.ReadFile(tc.path)
-					if err != nil {
-						t.Fatal(err)
-					}
+			var sys *types.SystemContext
+			if tc.sys != nil {
+				sys = tc.sys
+			}
+			username, password, err := GetAuthentication(sys, tc.hostname)
+			if err == nil && tc.expectedError != nil {
+				t.Errorf("[%s] got unexpected non error and username=%q, password=%q", tc.name, username, password)
+				continue
+			}
+			if err != nil && tc.expectedError == nil {
+				t.Errorf("[%s] got unexpected error: %#+v", tc.name, err)
+				continue
+			}
+			if !reflect.DeepEqual(err, tc.expectedError) {
+				t.Errorf("[%s] got unexpected error: %#+v != %#+v", tc.name, err, tc.expectedError)
+				continue
+			}
 
-					if err := ioutil.WriteFile(configPath, contents, 0640); err != nil {
-						t.Fatal(err)
-					}
-				}
-
-				var sys *types.SystemContext
-				if tc.sys != nil {
-					sys = tc.sys
-				}
-				username, password, err := GetAuthentication(sys, tc.hostname)
-				assert.Equal(t, tc.expectedError, err)
-				assert.Equal(t, tc.expectedUsername, username)
-				assert.Equal(t, tc.expectedPassword, password)
-			})
+			if username != tc.expectedUsername {
+				t.Errorf("[%s] got unexpected user name: %q != %q", tc.name, username, tc.expectedUsername)
+			}
+			if password != tc.expectedPassword {
+				t.Errorf("[%s] got unexpected user name: %q != %q", tc.name, password, tc.expectedPassword)
+			}
 		}
+		os.RemoveAll(configPath)
 	}
 }
 
@@ -240,41 +276,66 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 	}()
 
 	configPath := filepath.Join(tmpDir, ".dockercfg")
-	contents, err := ioutil.ReadFile(filepath.Join("testdata", "legacy.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	for _, tc := range []struct {
 		name             string
 		hostname         string
+		authConfig       testAuthConfig
 		expectedUsername string
 		expectedPassword string
 		expectedError    error
 	}{
 		{
-			name:             "normalize registry",
-			hostname:         "https://docker.io/v1",
-			expectedUsername: "docker",
-			expectedPassword: "io-legacy",
+			name:     "normalize registry",
+			hostname: "https://docker.io/v1",
+			authConfig: makeTestAuthConfig(testAuthConfigDataMap{
+				"docker.io":      testAuthConfigData{"user", "pw"},
+				"localhost:5000": testAuthConfigData{"joe", "pass"},
+			}),
+			expectedUsername: "user",
+			expectedPassword: "pw",
 		},
 		{
-			name:             "ignore schema and path",
-			hostname:         "http://index.docker.io/v1",
-			expectedUsername: "docker",
-			expectedPassword: "io-legacy",
+			name:     "ignore schema and path",
+			hostname: "http://index.docker.io/v1",
+			authConfig: makeTestAuthConfig(testAuthConfigDataMap{
+				"docker.io/v2":         testAuthConfigData{"user", "pw"},
+				"https://localhost/v1": testAuthConfigData{"joe", "pwd"},
+			}),
+			expectedUsername: "user",
+			expectedPassword: "pw",
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if err := ioutil.WriteFile(configPath, contents, 0640); err != nil {
-				t.Fatal(err)
-			}
+		contents, err := json.MarshalIndent(&tc.authConfig.Auths, "", "  ")
+		if err != nil {
+			t.Errorf("[%s] failed to marshal authConfig: %v", tc.name, err)
+			continue
+		}
+		if err := ioutil.WriteFile(configPath, contents, 0640); err != nil {
+			t.Errorf("[%s] failed to write file %q: %v", tc.name, configPath, err)
+			continue
+		}
 
-			username, password, err := GetAuthentication(nil, tc.hostname)
-			assert.Equal(t, tc.expectedError, err)
-			assert.Equal(t, tc.expectedUsername, username)
-			assert.Equal(t, tc.expectedPassword, password)
-		})
+		username, password, err := GetAuthentication(nil, tc.hostname)
+		if err == nil && tc.expectedError != nil {
+			t.Errorf("[%s] got unexpected non error and username=%q, password=%q", tc.name, username, password)
+			continue
+		}
+		if err != nil && tc.expectedError == nil {
+			t.Errorf("[%s] got unexpected error: %#+v", tc.name, err)
+			continue
+		}
+		if !reflect.DeepEqual(err, tc.expectedError) {
+			t.Errorf("[%s] got unexpected error: %#+v != %#+v", tc.name, err, tc.expectedError)
+			continue
+		}
+
+		if username != tc.expectedUsername {
+			t.Errorf("[%s] got unexpected user name: %q != %q", tc.name, username, tc.expectedUsername)
+		}
+		if password != tc.expectedPassword {
+			t.Errorf("[%s] got unexpected user name: %q != %q", tc.name, password, tc.expectedPassword)
+		}
 	}
 }
 
@@ -301,32 +362,42 @@ func TestGetAuthPreferNewConfig(t *testing.T) {
 	}
 
 	for _, data := range []struct {
-		source string
-		target string
+		path string
+		ac   interface{}
 	}{
 		{
-			source: filepath.Join("testdata", "full.json"),
-			target: filepath.Join(configDir, "config.json"),
+			filepath.Join(configDir, "config.json"),
+			makeTestAuthConfig(testAuthConfigDataMap{
+				"https://index.docker.io/v1/": testAuthConfigData{"alice", "pass"},
+			}),
 		},
 		{
-			source: filepath.Join("testdata", "legacy.json"),
-			target: filepath.Join(tmpDir, ".dockercfg"),
+			filepath.Join(tmpDir, ".dockercfg"),
+			makeTestAuthConfig(testAuthConfigDataMap{
+				"https://index.docker.io/v1/": testAuthConfigData{"bob", "pw"},
+			}).Auths,
 		},
 	} {
-		contents, err := ioutil.ReadFile(data.source)
+		contents, err := json.MarshalIndent(&data.ac, "", "  ")
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("failed to marshal authConfig: %v", err)
 		}
-
-		if err := ioutil.WriteFile(data.target, contents, 0640); err != nil {
-			t.Fatal(err)
+		if err := ioutil.WriteFile(data.path, contents, 0640); err != nil {
+			t.Fatalf("failed to write file %q: %v", data.path, err)
 		}
 	}
 
-	username, password, err := GetAuthentication(nil, "docker.io")
-	assert.Equal(t, nil, err)
-	assert.Equal(t, "docker", username)
-	assert.Equal(t, "io", password)
+	username, password, err := GetAuthentication(nil, "index.docker.io")
+	if err != nil {
+		t.Fatalf("got unexpected error: %#+v", err)
+	}
+
+	if username != "alice" {
+		t.Fatalf("got unexpected user name: %q != %q", username, "alice")
+	}
+	if password != "pass" {
+		t.Fatalf("got unexpected user name: %q != %q", password, "pass")
+	}
 }
 
 func TestGetAuthFailsOnBadInput(t *testing.T) {
@@ -410,4 +481,41 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if _, ok := errors.Cause(err).(*json.SyntaxError); !ok {
 		t.Fatalf("expected JSON syntax error, not: %#+v", err)
 	}
+}
+
+type testAuthConfigData struct {
+	username string
+	password string
+}
+
+type testAuthConfigDataMap map[string]testAuthConfigData
+
+type testAuthConfigEntry struct {
+	Auth string `json:"auth,omitempty"`
+}
+
+type testAuthConfig struct {
+	Auths map[string]testAuthConfigEntry `json:"auths"`
+}
+
+// encodeAuth creates an auth value from given authConfig data to be stored in auth config file.
+// Inspired by github.com/docker/docker/cliconfig/config.go v1.10.3.
+func encodeAuth(authConfig *testAuthConfigData) string {
+	authStr := authConfig.username + ":" + authConfig.password
+	msg := []byte(authStr)
+	encoded := make([]byte, base64.StdEncoding.EncodedLen(len(msg)))
+	base64.StdEncoding.Encode(encoded, msg)
+	return string(encoded)
+}
+
+func makeTestAuthConfig(authConfigData map[string]testAuthConfigData) testAuthConfig {
+	ac := testAuthConfig{
+		Auths: make(map[string]testAuthConfigEntry),
+	}
+	for host, data := range authConfigData {
+		ac.Auths[host] = testAuthConfigEntry{
+			Auth: encodeAuth(&data),
+		}
+	}
+	return ac
 }
