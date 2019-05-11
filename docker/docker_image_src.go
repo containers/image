@@ -16,7 +16,7 @@ import (
 	"github.com/containers/image/pkg/sysregistriesv2"
 	"github.com/containers/image/types"
 	"github.com/docker/distribution/registry/client"
-	"github.com/opencontainers/go-digest"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -74,6 +74,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 		}
 	}
 
+	primaryDomain := reference.Domain(ref.ref)
 	// Found the registry within the sysregistriesv2 configuration. Now we test
 	// all endpoints for the manifest availability. If a working image source
 	// was found, it will be used for all future pull actions.
@@ -93,7 +94,15 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 			return nil, err
 		}
 
-		client, err := newDockerClientFromRef(sys, dockerRef, false, "pull")
+		endpointSys := sys
+		// sys.DockerAuthConfig does not explicitly specify a registry; we must not blindly send the credentials intended for the primary endpoint to mirrors.
+		if endpointSys != nil && endpointSys.DockerAuthConfig != nil && reference.Domain(dockerRef.ref) != primaryDomain {
+			copy := *endpointSys
+			copy.DockerAuthConfig = nil
+			endpointSys = &copy
+		}
+
+		client, err := newDockerClientFromRef(endpointSys, dockerRef, false, "pull")
 		if err != nil {
 			return nil, err
 		}
