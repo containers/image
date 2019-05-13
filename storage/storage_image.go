@@ -552,12 +552,13 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 
 	// Commit the blob
 	id, err := s.commitBlob(ctx, blob, previousID)
-	if err == nil && layerIndexInImage >= 0 {
+	if err != nil {
+		return types.BlobInfo{}, err
+	}
+	if layerIndexInImage >= 0 {
 		s.putBlobMutex.Lock()
 		s.indexToStorageID[layerIndexInImage] = id
 		s.putBlobMutex.Unlock()
-	} else {
-		return types.BlobInfo{}, err
 	}
 
 	return blob, nil
