@@ -502,8 +502,6 @@ func TestRewriteReferenceSuccess(t *testing.T) {
 		{"example.com/image:latest", "example.com", "example.com", "example.com/image:latest"},
 		{"example.com:5000/image", "example.com:5000", "example.com:5000", "example.com:5000/image"},
 		{"example.com:5000/image:latest", "example.com:5000", "example.com:5000", "example.com:5000/image:latest"},
-		{"example.com:5000/image:latest", "", "other.com", "example.com:5000/image:latest"},
-		{"example.com:5000/image:latest", "", "", "example.com:5000/image:latest"},
 		// Separator test ('/', '@', ':')
 		{"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			"example.com", "example.com",
@@ -548,11 +546,4 @@ func TestRewriteReferenceFailedDuringParseNamed(t *testing.T) {
 		assert.NotNil(t, err)
 		assert.Nil(t, out)
 	}
-}
-
-func TestRewriteReferenceFailedWithNilRef(t *testing.T) {
-	testEndpoint := Endpoint{}
-	out, err := testEndpoint.RewriteReference(nil, "")
-	assert.NotNil(t, err)
-	assert.Nil(t, out)
 }

@@ -71,6 +71,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 			Endpoint: sysregistriesv2.Endpoint{
 				Location: ref.ref.String(),
 			},
+			Prefix: ref.ref.String(),
 		}
 	}
 
@@ -78,10 +79,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 	// Found the registry within the sysregistriesv2 configuration. Now we test
 	// all endpoints for the manifest availability. If a working image source
 	// was found, it will be used for all future pull actions.
-	var (
-		imageSource     *dockerImageSource
-		manifestLoadErr error
-	)
+	manifestLoadErr := errors.New("Internal error: newImageSource returned without trying any endpoint")
 	for _, endpoint := range append(registry.Mirrors, registry.Endpoint) {
 		logrus.Debugf("Trying to pull %q from endpoint %q", ref.ref, endpoint.Location)
 
@@ -115,12 +113,10 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 
 		manifestLoadErr = testImageSource.ensureManifestIsLoaded(ctx)
 		if manifestLoadErr == nil {
-			imageSource = testImageSource
-			break
+			return testImageSource, nil
 		}
 	}
-
-	return imageSource, manifestLoadErr
+	return nil, manifestLoadErr
 }
 
 // Reference returns the reference used to set up this source, _as specified by the user_
@@ -356,7 +352,7 @@ func (s *dockerImageSource) getOneSignature(ctx context.Context, url *url.URL) (
 			return nil, false, err
 		}
 		req = req.WithContext(ctx)
-		res, err := s.c.doHTTP(req)
+		res, err := s.c.client.Do(req)
 		if err != nil {
 			return nil, false, err
 		}
