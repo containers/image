@@ -58,10 +58,13 @@ insecure = false
 prefix = "example.com/foo"
 unqualified-search = false
 blocked = false
-mirror = [
-    { location = "example-mirror-0.local", insecure = false },
-    { location = "example-mirror-1.local", insecure = true }
-]
+
+[[registry.mirror]]
+location = "example-mirror-0.local"
+
+[[registry.mirror]]
+location = "example-mirror-1.local"
+insecure = true
 ```
 
 ## VERSION 1
