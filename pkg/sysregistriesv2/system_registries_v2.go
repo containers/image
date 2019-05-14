@@ -338,11 +338,24 @@ func getConfig(ctx *types.SystemContext) (*V2RegistriesConf, error) {
 	configPath := ConfigPath(ctx)
 
 	configMutex.Lock()
-	defer configMutex.Unlock()
 	// if the config has already been loaded, return the cached registries
 	if config, inCache := configCache[configPath]; inCache {
+		configMutex.Unlock()
 		return config, nil
 	}
+	configMutex.Unlock()
+
+	return TryUpdatingCache(ctx)
+}
+
+// TryUpdatingCache loads the configuration from the provided `SystemContext`
+// without using the internal cache. On success, the loaded configuration will
+// be added into the internal registry cache.
+func TryUpdatingCache(ctx *types.SystemContext) (*V2RegistriesConf, error) {
+	configPath := ConfigPath(ctx)
+
+	configMutex.Lock()
+	defer configMutex.Unlock()
 
 	// load the config
 	config, err := loadRegistryConf(configPath)
