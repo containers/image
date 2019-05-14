@@ -151,10 +151,10 @@ func TestGetAuth(t *testing.T) {
 			},
 			{
 				name:             "normalize registry",
-				hostname:         "https://docker.io/v1",
+				hostname:         "https://example.org/v1",
 				path:             filepath.Join("testdata", "full.json"),
-				expectedUsername: "docker",
-				expectedPassword: "io",
+				expectedUsername: "example",
+				expectedPassword: "org",
 			},
 			{
 				name:             "match localhost",
