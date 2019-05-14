@@ -326,7 +326,7 @@ func TestRewriteReferenceSuccess(t *testing.T) {
 	} {
 		ref := toNamedRef(t, c.inputRef)
 		testEndpoint := Endpoint{Location: c.location}
-		out, err := testEndpoint.RewriteReference(ref, c.prefix)
+		out, err := testEndpoint.rewriteReference(ref, c.prefix)
 		require.NoError(t, err)
 		assert.Equal(t, c.expected, out.String())
 	}
@@ -352,8 +352,51 @@ func TestRewriteReferenceFailedDuringParseNamed(t *testing.T) {
 	} {
 		ref := toNamedRef(t, c.inputRef)
 		testEndpoint := Endpoint{Location: c.location}
-		out, err := testEndpoint.RewriteReference(ref, c.prefix)
+		out, err := testEndpoint.rewriteReference(ref, c.prefix)
 		assert.NotNil(t, err)
 		assert.Nil(t, out)
 	}
+}
+
+func TestPullSourcesFromReference(t *testing.T) {
+	sys := &types.SystemContext{SystemRegistriesConfPath: "testdata/pull-sources-from-reference.conf"}
+	configCache = make(map[string][]Registry)
+	registries, err := GetRegistries(sys)
+	assert.Nil(t, err)
+	assert.Equal(t, 2, len(registries))
+
+	// Registry A allowing any kind of pull from mirrors
+	registryA, err := FindRegistry(sys, "registry-a.com/foo/image:latest")
+	assert.Nil(t, err)
+	assert.NotNil(t, registryA)
+	// Digest
+	referenceADigest := toNamedRef(t, "registry-a.com/foo/image@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	pullSources, err := registryA.PullSourcesFromReference(referenceADigest)
+	assert.Nil(t, err)
+	assert.Equal(t, 3, len(pullSources))
+	assert.Equal(t, "mirror-1.registry-a.com/image@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", pullSources[0].Reference.String())
+	assert.True(t, pullSources[1].Endpoint.Insecure)
+	// Tag
+	referenceATag := toNamedRef(t, "registry-a.com/foo/image:aaa")
+	pullSources, err = registryA.PullSourcesFromReference(referenceATag)
+	assert.Nil(t, err)
+	assert.Equal(t, 3, len(pullSources))
+	assert.Equal(t, "registry-a.com/bar/image:aaa", pullSources[2].Reference.String())
+
+	// Registry B allowing digests pull only from mirrors
+	registryB, err := FindRegistry(sys, "registry-b.com/foo/image:latest")
+	assert.Nil(t, err)
+	assert.NotNil(t, registryB)
+	// Digest
+	referenceBDigest := toNamedRef(t, "registry-b.com/foo/image@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	pullSources, err = registryB.PullSourcesFromReference(referenceBDigest)
+	assert.Nil(t, err)
+	assert.Equal(t, 3, len(pullSources))
+	assert.Equal(t, "registry-b.com/bar", pullSources[2].Endpoint.Location)
+	assert.Equal(t, "registry-b.com/bar/image@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", pullSources[2].Reference.String())
+	// Tag
+	referenceBTag := toNamedRef(t, "registry-b.com/foo/image:aaa")
+	pullSources, err = registryB.PullSourcesFromReference(referenceBTag)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(pullSources))
 }

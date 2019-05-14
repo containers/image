@@ -49,6 +49,14 @@ together with a specified `prefix`.
 
 If `blocked = true` then it is not allowed to pull images from that registry.
 
+If `mirror-by-digest-only = true`, mirrors will only be used during pulling if
+the image is referred to by digest.  Referencing an image by digest enforces to
+always return the same image, independent if it is being pulled from the main
+registry or a mirror.  Pulling an image referenced by tag could yield different
+results, depending on which mirror or registry it is being pulled from.  Setting
+this attribute makes sure to avoid such a situation but requires the primary
+registry to always be available if references by tag are used.
+
 ### EXAMPLE
 
 ```

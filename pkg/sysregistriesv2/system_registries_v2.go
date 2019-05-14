@@ -35,10 +35,10 @@ type Endpoint struct {
 	Insecure bool `toml:"insecure"`
 }
 
-// RewriteReference will substitute the provided reference `prefix` to the
+// rewriteReference will substitute the provided reference `prefix` to the
 // endpoints `location` from the `ref` and creates a new named reference from it.
 // The function errors if the newly created reference is not parsable.
-func (e *Endpoint) RewriteReference(ref reference.Named, prefix string) (reference.Named, error) {
+func (e *Endpoint) rewriteReference(ref reference.Named, prefix string) (reference.Named, error) {
 	refString := ref.String()
 	if !refMatchesPrefix(refString, prefix) {
 		return nil, fmt.Errorf("invalid prefix '%v' for reference '%v'", prefix, refString)
@@ -63,12 +63,51 @@ type Registry struct {
 	Blocked bool `toml:"blocked"`
 	// If true, the registry can be used when pulling an unqualified image.
 	Search bool `toml:"unqualified-search"`
+	// If true, mirrors will only be used for digest pulls. Pulling images by
+	// tag can potentially yield different images, depending on which endpoint
+	// we pull from.  Forcing digest-pulls for mirrors avoids that issue.
+	MirrorByDigestOnly bool `toml:"mirror-by-digest-only"`
 	// Prefix is used for matching images, and to translate one namespace to
 	// another.  If `Prefix="example.com/bar"`, `location="example.com/foo/bar"`
 	// and we pull from "example.com/bar/myimage:latest", the image will
 	// effectively be pulled from "example.com/foo/bar/myimage:latest".
 	// If no Prefix is specified, it defaults to the specified location.
 	Prefix string `toml:"prefix"`
+}
+
+// PullSource consists of an Endpoint and a Reference. Note that the reference is
+// rewritten according to the registries prefix and the Endpoint's location.
+type PullSource struct {
+	Endpoint  Endpoint
+	Reference reference.Named
+}
+
+// PullSourcesFromReference returns a slice of PullSource's based on the passed
+// reference.
+func (r *Registry) PullSourcesFromReference(ref reference.Named) ([]PullSource, error) {
+	var endpoints []Endpoint
+
+	if r.MirrorByDigestOnly {
+		// Only use mirrors when the reference is a digest one.
+		if _, isDigested := ref.(reference.Canonical); isDigested {
+			endpoints = append(r.Mirrors, r.Endpoint)
+		} else {
+			endpoints = []Endpoint{r.Endpoint}
+		}
+	} else {
+		endpoints = append(r.Mirrors, r.Endpoint)
+	}
+
+	sources := []PullSource{}
+	for _, ep := range endpoints {
+		rewritten, err := ep.rewriteReference(ref, r.Prefix)
+		if err != nil {
+			return nil, err
+		}
+		sources = append(sources, PullSource{Endpoint: ep, Reference: rewritten})
+	}
+
+	return sources, nil
 }
 
 // V1TOMLregistries is for backwards compatibility to sysregistries v1
