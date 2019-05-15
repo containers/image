@@ -433,6 +433,7 @@ func isTTY(w io.Writer) bool {
 // copyLayers copies layers from ic.src/ic.c.rawSource to dest, using and updating ic.manifestUpdates if necessary and ic.canModifyManifest.
 func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	srcInfos := ic.src.LayerInfos()
+	numLayers := len(srcInfos)
 	updatedSrcInfos, err := ic.src.LayerInfosForCopy(ctx)
 	if err != nil {
 		return err
@@ -446,6 +447,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		srcInfosUpdated = true
 	}
 
+	// Create a map from the manifest to check if a srcLayer may be empty.
 	mblob, mtype, err := ic.src.Manifest(ctx)
 	if err != nil {
 		return err
@@ -454,8 +456,10 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	layerInfos := man.LayerInfos()
-	numLayers := len(layerInfos)
+	emptyLayerMap := make(map[digest.Digest]bool)
+	for _, info := range man.LayerInfos() {
+		emptyLayerMap[info.Digest] = info.EmptyLayer
+	}
 
 	type copyLayerData struct {
 		destInfo types.BlobInfo
@@ -486,7 +490,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 
 	copyData := make([]copyLayerData, numLayers)
 	layerIndex := 0 // some layers might be skipped, so we need a dedicated counter
-	for i, srcLayer := range layerInfos {
+	for i, srcLayer := range srcInfos {
 		if ic.c.dest.AcceptsForeignLayerURLs() && len(srcLayer.URLs) != 0 {
 			// DiffIDs are, currently, needed only when converting from schema1.
 			// In which case src.LayerInfos will not have URLs because schema1
@@ -495,30 +499,33 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 				return errors.New("getting DiffID for foreign layers is unimplemented")
 			}
 			logrus.Debugf("Skipping foreign layer %q copy to %s", srcLayer.Digest, ic.c.dest.Reference().Transport().Name())
-			copyData[i].destInfo = srcLayer.BlobInfo
+			copyData[i].destInfo = srcLayer
 			continue // skip copying
 		}
 
 		copySemaphore.Acquire(cancelCtx, 1) // limits parallel copy operations
 		copyGroup.Add(1)                    // allows the main routine to wait for all copy operations to finish
 
+		index := layerIndex
+		emptyLayer := false
+		if ok, empty := emptyLayerMap[srcLayer.Digest]; ok && empty {
+			emptyLayer = true
+			index = -1
+		}
 		// Copy the layer.
-		go func(index, layerIndex int, srcLayer manifest.LayerInfo) {
+		go func(dataIndex, layerIndex int, srcLayer types.BlobInfo) {
 			defer copySemaphore.Release(1)
 			defer copyGroup.Done()
-			if srcLayer.EmptyLayer {
-				layerIndex = -1
-			}
 			cld := copyLayerData{}
-			cld.destInfo, cld.diffID, cld.err = ic.copyLayer(cancelCtx, srcLayer.BlobInfo, layerIndex, progressPool)
+			cld.destInfo, cld.diffID, cld.err = ic.copyLayer(cancelCtx, srcLayer, layerIndex, progressPool)
 			if cld.err != nil {
 				// Stop all other running goroutines as we can't recover from an error
 				cancelCopyLayer()
 			}
-			copyData[index] = cld
-		}(i, layerIndex, srcLayer)
+			copyData[dataIndex] = cld
+		}(i, index, srcLayer)
 
-		if !srcLayer.EmptyLayer {
+		if !emptyLayer {
 			layerIndex++
 		}
 	}
