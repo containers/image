@@ -540,6 +540,10 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 		return types.BlobInfo{}, err
 	}
 
+	if isConfig {
+		return blob, err
+	}
+
 	// First, wait for the previous layer to be committed
 	previousID := ""
 	if layerIndexInImage > 0 {
