@@ -502,7 +502,7 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 		done := make(chan bool, 1)
 		defer locker.Unlock()
 		go func() {
-			locker.Lock()
+			locker.RecursiveLock()
 			done <- true
 		}()
 		reusable, blob, err := s.tryReusingBlobFromOtherProcess(ctx, stream, blobinfo, layerIndexInImage, cache, done, bar)
