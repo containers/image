@@ -761,15 +761,6 @@ func (s *storageImageDestination) tryReusingBlob(ctx context.Context, blobinfo t
 		return false, types.BlobInfo{}, errors.Wrapf(err, `Can not check for a blob with invalid digest`)
 	}
 
-	// Check if we've already cached it in a file.
-	s.putBlobMutex.Lock()
-	size, ok := s.fileSizes[blobinfo.Digest]
-	s.putBlobMutex.Unlock()
-	if ok {
-		blobinfo.Size = size
-		return true, blobinfo, nil
-	}
-
 	// Check if we can copy an already existing {un}compressed layer.
 	if layerID, blob, err := s.tryCopyingLayer(ctx, blobinfo, layerIndexInImage, "", "", true, true); err != nil {
 		return false, blob, errors.Wrapf(err, `Error looking for layers with digest %q`, blobinfo.Digest)
