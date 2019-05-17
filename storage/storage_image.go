@@ -746,8 +746,6 @@ func (s *storageImageDestination) tryCopyingLayer(ctx context.Context, blob type
 	s.filenames[blob.Digest] = filename
 	s.putBlobMutex.Unlock()
 
-	blob.Size = layer.UncompressedSize
-
 	return layer.ID, blob, nil
 }
 
