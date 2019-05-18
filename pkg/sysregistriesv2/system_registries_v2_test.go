@@ -14,7 +14,10 @@ import (
 var testConfig = []byte("")
 
 func init() {
-	readConf = func(_ string) ([]byte, error) {
+	readConf = func(configPath string) ([]byte, error) {
+		if testConfig == nil {
+			return readRegistryConf(configPath)
+		}
 		return testConfig, nil
 	}
 }
@@ -50,10 +53,8 @@ func TestParseLocation(t *testing.T) {
 }
 
 func TestEmptyConfig(t *testing.T) {
-	testConfig = []byte(``)
-
-	configCache = make(map[string][]Registry)
-	registries, err := GetRegistries(nil)
+	testConfig = nil
+	registries, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/empty.conf"})
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(registries))
 }
