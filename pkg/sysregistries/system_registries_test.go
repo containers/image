@@ -1,22 +1,26 @@
 package sysregistries
 
 import (
+	"testing"
+
 	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 var testConfig = []byte("")
 
 func init() {
-	readConf = func(_ *types.SystemContext) ([]byte, error) {
-		return testConfig, nil
+	readConf = func(sys *types.SystemContext) ([]byte, error) {
+		if testConfig != nil {
+			return testConfig, nil
+		}
+		return readRegistryConf(sys)
 	}
 }
 
 func TestGetRegistriesWithBlankData(t *testing.T) {
-	testConfig = []byte("")
-	registriesConfig, _ := GetRegistries(nil)
+	testConfig = nil
+	registriesConfig, _ := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/empty.conf"})
 	assert.Nil(t, registriesConfig)
 }
 
