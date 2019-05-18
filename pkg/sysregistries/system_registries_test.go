@@ -26,49 +26,39 @@ func TestGetRegistriesWithBlankData(t *testing.T) {
 
 func TestGetRegistriesWithData(t *testing.T) {
 	answer := []string{"one.com"}
-	testConfig = []byte(`[registries.search]
-registries= ['one.com']
-`)
-	registriesConfig, err := GetRegistries(nil)
+	testConfig = nil
+	registriesConfig, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/search.conf"})
 	assert.Nil(t, err)
 	assert.Equal(t, registriesConfig, answer)
 }
 
 func TestGetRegistriesWithBadData(t *testing.T) {
-	testConfig = []byte(`registries:
-    - one.com
-    ,`)
-	_, err := GetRegistries(nil)
+	testConfig = nil
+	_, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/search-invalid.conf"})
 	assert.Error(t, err)
 }
 
 func TestGetRegistriesWithTrailingSlash(t *testing.T) {
 	answer := []string{"no-slash.com:5000/path", "one-slash.com", "two-slashes.com", "three-slashes.com:5000"}
-	testConfig = []byte(`[registries.search]
-	registries= ['no-slash.com:5000/path', 'one-slash.com', 'two-slashes.com//', 'three-slashes.com:5000///']
-`)
+	testConfig = nil
 	// note: only one trailing gets removed
-	registriesConfig, err := GetRegistries(nil)
+	registriesConfig, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/search-no-trailing-slash.conf"})
 	assert.Nil(t, err)
 	assert.Equal(t, registriesConfig, answer)
 }
 
 func TestGetInsecureRegistriesWithBlankData(t *testing.T) {
 	answer := []string(nil)
-	testConfig = []byte("")
-	insecureRegistriesConfig, err := GetInsecureRegistries(nil)
+	testConfig = nil
+	insecureRegistriesConfig, err := GetInsecureRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/search.conf"})
 	assert.Nil(t, err)
 	assert.Equal(t, insecureRegistriesConfig, answer)
 }
 
 func TestGetInsecureRegistriesWithData(t *testing.T) {
 	answer := []string{"two.com", "three.com"}
-	testConfig = []byte(`[registries.search]
-registries = ['one.com']
-[registries.insecure]
-registries = ['two.com', 'three.com']
-`)
-	insecureRegistriesConfig, err := GetInsecureRegistries(nil)
+	testConfig = nil
+	insecureRegistriesConfig, err := GetInsecureRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/insecure.conf"})
 	if err != nil {
 		t.Fail()
 	}
