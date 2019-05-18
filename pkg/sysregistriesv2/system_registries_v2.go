@@ -393,21 +393,12 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 	return nil, nil
 }
 
-// Reads the global registry file from the filesystem. Returns a byte array.
-func readRegistryConf(configPath string) ([]byte, error) {
-	configBytes, err := ioutil.ReadFile(configPath)
-	return configBytes, err
-}
-
-// Used in unittests to parse custom configs without a types.SystemContext.
-var readConf = readRegistryConf
-
 // Loads the registry configuration file from the filesystem and then unmarshals
 // it.  Returns the unmarshalled object.
 func loadRegistryConf(configPath string) (*tomlConfig, error) {
 	config := &tomlConfig{}
 
-	configBytes, err := readConf(configPath)
+	configBytes, err := ioutil.ReadFile(configPath)
 	if err != nil {
 		return nil, err
 	}

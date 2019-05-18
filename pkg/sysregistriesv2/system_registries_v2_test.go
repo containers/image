@@ -13,17 +13,6 @@ import (
 	"github.com/containers/image/docker/reference"
 )
 
-var testConfig = []byte("")
-
-func init() {
-	readConf = func(configPath string) ([]byte, error) {
-		if testConfig == nil {
-			return readRegistryConf(configPath)
-		}
-		return testConfig, nil
-	}
-}
-
 func TestParseLocation(t *testing.T) {
 	var err error
 	var location string
@@ -55,14 +44,12 @@ func TestParseLocation(t *testing.T) {
 }
 
 func TestEmptyConfig(t *testing.T) {
-	testConfig = nil
 	registries, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/empty.conf"})
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(registries))
 }
 
 func TestMirrors(t *testing.T) {
-	testConfig = nil
 	sys := &types.SystemContext{SystemRegistriesConfPath: "testdata/mirrors.conf"}
 
 	registries, err := GetRegistries(sys)
@@ -80,14 +67,12 @@ func TestMirrors(t *testing.T) {
 }
 
 func TestMissingRegistryLocation(t *testing.T) {
-	testConfig = nil
 	_, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/missing-registry-location.conf"})
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "invalid location")
 }
 
 func TestMissingMirrorLocation(t *testing.T) {
-	testConfig = nil
 	_, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/missing-mirror-location.conf"})
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "invalid location")
@@ -134,7 +119,6 @@ func TestRefMatchesPrefix(t *testing.T) {
 }
 
 func TestFindRegistry(t *testing.T) {
-	testConfig = nil
 	sys := &types.SystemContext{SystemRegistriesConfPath: "testdata/find-registry.conf"}
 
 	registries, err := GetRegistries(sys)
@@ -191,7 +175,6 @@ func assertSearchRegistryLocationsEqual(t *testing.T, expected []string, regs []
 }
 
 func TestFindUnqualifiedSearchRegistries(t *testing.T) {
-	testConfig = nil
 	sys := &types.SystemContext{SystemRegistriesConfPath: "testdata/unqualified-search.conf"}
 
 	registries, err := GetRegistries(sys)
@@ -204,7 +187,6 @@ func TestFindUnqualifiedSearchRegistries(t *testing.T) {
 }
 
 func TestInsecureConflicts(t *testing.T) {
-	testConfig = nil
 	registries, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/insecure-conflicts.conf"})
 	assert.NotNil(t, err)
 	assert.Nil(t, registries)
@@ -212,7 +194,6 @@ func TestInsecureConflicts(t *testing.T) {
 }
 
 func TestBlockConflicts(t *testing.T) {
-	testConfig = nil
 	registries, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/blocked-conflicts.conf"})
 	assert.NotNil(t, err)
 	assert.Nil(t, registries)
@@ -220,14 +201,12 @@ func TestBlockConflicts(t *testing.T) {
 }
 
 func TestUnmarshalConfig(t *testing.T) {
-	testConfig = nil
 	registries, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/unmarshal.conf"})
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
 }
 
 func TestV1BackwardsCompatibility(t *testing.T) {
-	testConfig = nil
 	sys := &types.SystemContext{SystemRegistriesConfPath: "testdata/v1-compatibility.conf"}
 
 	registries, err := GetRegistries(sys)
@@ -248,15 +227,12 @@ func TestV1BackwardsCompatibility(t *testing.T) {
 }
 
 func TestMixingV1andV2(t *testing.T) {
-	testConfig = nil
 	_, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/mixing-v1-v2.conf"})
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "mixing sysregistry v1/v2 is not supported")
 }
 
 func TestConfigCache(t *testing.T) {
-	testConfig = nil
-
 	configFile, err := ioutil.TempFile("", "sysregistriesv2-test")
 	require.NoError(t, err)
 	defer os.Remove(configFile.Name())
@@ -305,7 +281,6 @@ insecure = true`), 0600)
 }
 
 func TestInvalidateCache(t *testing.T) {
-	testConfig = nil
 	ctx := &types.SystemContext{SystemRegistriesConfPath: "testdata/invalidate-cache.conf"}
 
 	configCache = make(map[string][]Registry)
