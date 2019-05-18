@@ -1,12 +1,12 @@
 package sysregistries
 
 import (
+	"io/ioutil"
+	"path/filepath"
 	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/containers/image/types"
-	"io/ioutil"
-	"path/filepath"
 )
 
 // systemRegistriesConfPath is the path to the system-wide registry configuration file
@@ -39,21 +39,12 @@ func normalizeRegistries(regs *registries) {
 	}
 }
 
-// Reads the global registry file from the filesystem. Returns
-// a byte array
-func readRegistryConf(sys *types.SystemContext) ([]byte, error) {
-	return ioutil.ReadFile(RegistriesConfPath(sys))
-}
-
-// For mocking in unittests
-var readConf = readRegistryConf
-
 // Loads the registry configuration file from the filesystem and
 // then unmarshals it.  Returns the unmarshalled object.
 func loadRegistryConf(sys *types.SystemContext) (*tomlConfig, error) {
 	config := &tomlConfig{}
 
-	configBytes, err := readConf(sys)
+	configBytes, err := ioutil.ReadFile(RegistriesConfPath(sys))
 	if err != nil {
 		return nil, err
 	}
