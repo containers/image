@@ -8,8 +8,9 @@ import (
 )
 
 func TestGetRegistriesWithBlankData(t *testing.T) {
-	registriesConfig, _ := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/empty.conf"})
-	assert.Nil(t, registriesConfig)
+	registriesConfig, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/empty.conf"})
+	assert.NoError(t, err)
+	assert.Empty(t, registriesConfig)
 }
 
 func TestGetRegistriesWithData(t *testing.T) {
@@ -25,7 +26,7 @@ func TestGetRegistriesWithBadData(t *testing.T) {
 }
 
 func TestGetRegistriesWithTrailingSlash(t *testing.T) {
-	answer := []string{"no-slash.com:5000/path", "one-slash.com", "two-slashes.com", "three-slashes.com:5000"}
+	answer := []string{"no-slash.com:5000", "one-slash.com", "two-slashes.com", "three-slashes.com:5000"}
 	// note: only one trailing gets removed
 	registriesConfig, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/search-no-trailing-slash.conf"})
 	assert.Nil(t, err)

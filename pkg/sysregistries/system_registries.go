@@ -1,11 +1,9 @@
 package sysregistries
 
 import (
-	"io/ioutil"
 	"path/filepath"
-	"strings"
 
-	"github.com/BurntSushi/toml"
+	"github.com/containers/image/pkg/sysregistriesv2"
 	"github.com/containers/image/types"
 )
 
@@ -19,53 +17,12 @@ var systemRegistriesConfPath = builtinRegistriesConfPath
 // DO NOT change this, instead see systemRegistriesConfPath above.
 const builtinRegistriesConfPath = "/etc/containers/registries.conf"
 
-type registries struct {
-	Registries []string `toml:"registries"`
-}
-
-type tomlConfig struct {
-	Registries struct {
-		Search   registries `toml:"search"`
-		Insecure registries `toml:"insecure"`
-		Block    registries `toml:"block"`
-	} `toml:"registries"`
-}
-
-// normalizeRegistries removes trailing slashes from registries, which is a
-// common pitfall when configuring registries (e.g., "docker.io/library/).
-func normalizeRegistries(regs *registries) {
-	for i := range regs.Registries {
-		regs.Registries[i] = strings.TrimRight(regs.Registries[i], "/")
-	}
-}
-
-// Loads the registry configuration file from the filesystem and
-// then unmarshals it.  Returns the unmarshalled object.
-func loadRegistryConf(sys *types.SystemContext) (*tomlConfig, error) {
-	config := &tomlConfig{}
-
-	configBytes, err := ioutil.ReadFile(RegistriesConfPath(sys))
-	if err != nil {
-		return nil, err
-	}
-
-	err = toml.Unmarshal(configBytes, &config)
-	normalizeRegistries(&config.Registries.Search)
-	normalizeRegistries(&config.Registries.Insecure)
-	normalizeRegistries(&config.Registries.Block)
-	return config, err
-}
-
 // GetRegistries returns an array of strings that contain the names
 // of the registries as defined in the system-wide
 // registries file.  it returns an empty array if none are
 // defined
 func GetRegistries(sys *types.SystemContext) ([]string, error) {
-	config, err := loadRegistryConf(sys)
-	if err != nil {
-		return nil, err
-	}
-	return config.Registries.Search.Registries, nil
+	return sysregistriesv2.UnqualifiedSearchRegistries(sys)
 }
 
 // GetInsecureRegistries returns an array of strings that contain the names
@@ -73,11 +30,20 @@ func GetRegistries(sys *types.SystemContext) ([]string, error) {
 // registries file.  it returns an empty array if none are
 // defined
 func GetInsecureRegistries(sys *types.SystemContext) ([]string, error) {
-	config, err := loadRegistryConf(sys)
+	registries, err := sysregistriesv2.GetRegistries(sys)
 	if err != nil {
 		return nil, err
 	}
-	return config.Registries.Insecure.Registries, nil
+	res := []string(nil)
+	for _, reg := range registries {
+		if reg.Insecure {
+			// NOTE: Traditionally, could only contain host[:port] values; this will include arbitrary prefixes as well.
+			// Strictly speaking, it would be more correct to skip namespace/repository/… values here.
+			// Current known users either don't mind (CRI-O) or benefit from returning the full list (podman info).
+			res = append(res, reg.Prefix)
+		}
+	}
+	return res, nil
 }
 
 // RegistriesConfPath is the path to the system-wide registry configuration file
