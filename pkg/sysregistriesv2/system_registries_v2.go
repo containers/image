@@ -384,18 +384,18 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 	return config.Registries, nil
 }
 
-// FindUnqualifiedSearchRegistries returns all registries that are configured
-// for unqualified image search (i.e., with Registry.Search == true).
-func FindUnqualifiedSearchRegistries(ctx *types.SystemContext) ([]Registry, error) {
+// UnqualifiedSearchRegistries returns a list of host[:port] entries to try
+// for unqualified image search, in the returned order)
+func UnqualifiedSearchRegistries(ctx *types.SystemContext) ([]string, error) {
 	config, err := getConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	unqualified := []Registry{}
+	unqualified := []string{}
 	for _, reg := range config.Registries {
 		if reg.Search {
-			unqualified = append(unqualified, reg)
+			unqualified = append(unqualified, reg.Prefix)
 		}
 	}
 	return unqualified, nil

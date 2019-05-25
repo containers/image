@@ -165,7 +165,7 @@ func TestFindRegistry(t *testing.T) {
 	assert.Equal(t, "empty-prefix.com", reg.Location)
 }
 
-func assertSearchRegistryLocationsEqual(t *testing.T, expected []string, regs []Registry) {
+func assertRegistryLocationsEqual(t *testing.T, expected []string, regs []Registry) {
 	// verify the expected registries and their order
 	names := []string{}
 	for _, r := range regs {
@@ -181,9 +181,9 @@ func TestFindUnqualifiedSearchRegistries(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
 
-	unqRegs, err := FindUnqualifiedSearchRegistries(sys)
+	unqRegs, err := UnqualifiedSearchRegistries(sys)
 	assert.Nil(t, err)
-	assertSearchRegistryLocationsEqual(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
+	assert.Equal(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
 }
 
 func TestInsecureConflicts(t *testing.T) {
@@ -213,9 +213,9 @@ func TestV1BackwardsCompatibility(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 5, len(registries))
 
-	unqRegs, err := FindUnqualifiedSearchRegistries(sys)
+	unqRegs, err := UnqualifiedSearchRegistries(sys)
 	assert.Nil(t, err)
-	assertSearchRegistryLocationsEqual(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
+	assert.Equal(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
 
 	// check if merging works
 	reg, err := FindRegistry(sys, "registry-a.com/bar/foo/barfoo:latest")
@@ -287,7 +287,7 @@ func TestInvalidateCache(t *testing.T) {
 	registries, err := GetRegistries(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
-	assertSearchRegistryLocationsEqual(t, []string{"registry.com", "blocked.registry.com", "insecure.registry.com", "untrusted.registry.com"}, registries)
+	assertRegistryLocationsEqual(t, []string{"registry.com", "blocked.registry.com", "insecure.registry.com", "untrusted.registry.com"}, registries)
 
 	// invalidate the cache, make sure it's empty and reload
 	InvalidateCache()
@@ -296,7 +296,7 @@ func TestInvalidateCache(t *testing.T) {
 	registries, err = GetRegistries(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
-	assertSearchRegistryLocationsEqual(t, []string{"registry.com", "blocked.registry.com", "insecure.registry.com", "untrusted.registry.com"}, registries)
+	assertRegistryLocationsEqual(t, []string{"registry.com", "blocked.registry.com", "insecure.registry.com", "untrusted.registry.com"}, registries)
 }
 
 func toNamedRef(t *testing.T, ref string) reference.Named {
