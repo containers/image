@@ -308,7 +308,7 @@ var configMutex = sync.Mutex{}
 // configCache caches already loaded configs with config paths as keys and is
 // used to avoid redudantly parsing configs. Concurrent accesses to the cache
 // are synchronized via configMutex.
-var configCache = make(map[string][]Registry)
+var configCache = make(map[string]*V2RegistriesConf)
 
 // InvalidateCache invalidates the registry cache.  This function is meant to be
 // used for long-running processes that need to reload potential changes made to
@@ -316,7 +316,7 @@ var configCache = make(map[string][]Registry)
 func InvalidateCache() {
 	configMutex.Lock()
 	defer configMutex.Unlock()
-	configCache = make(map[string][]Registry)
+	configCache = make(map[string]*V2RegistriesConf)
 }
 
 // GetRegistries loads and returns the registries specified in the config.
@@ -328,8 +328,8 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 	configMutex.Lock()
 	defer configMutex.Unlock()
 	// if the config has already been loaded, return the cached registries
-	if registries, inCache := configCache[configPath]; inCache {
-		return registries, nil
+	if config, inCache := configCache[configPath]; inCache {
+		return config.Registries, nil
 	}
 
 	// load the config
@@ -365,7 +365,7 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 	}
 
 	// populate the cache
-	configCache[configPath] = registries
+	configCache[configPath] = &V2RegistriesConf{Registries: registries}
 
 	return registries, err
 }

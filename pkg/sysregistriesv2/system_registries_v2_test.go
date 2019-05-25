@@ -266,7 +266,7 @@ insecure = true`), 0600)
 
 	ctx := &types.SystemContext{SystemRegistriesConfPath: configFile.Name()}
 
-	configCache = make(map[string][]Registry)
+	configCache = make(map[string]*V2RegistriesConf)
 	registries, err := GetRegistries(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
@@ -283,7 +283,7 @@ insecure = true`), 0600)
 func TestInvalidateCache(t *testing.T) {
 	ctx := &types.SystemContext{SystemRegistriesConfPath: "testdata/invalidate-cache.conf"}
 
-	configCache = make(map[string][]Registry)
+	configCache = make(map[string]*V2RegistriesConf)
 	registries, err := GetRegistries(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
@@ -360,7 +360,6 @@ func TestRewriteReferenceFailedDuringParseNamed(t *testing.T) {
 
 func TestPullSourcesFromReference(t *testing.T) {
 	sys := &types.SystemContext{SystemRegistriesConfPath: "testdata/pull-sources-from-reference.conf"}
-	configCache = make(map[string][]Registry)
 	registries, err := GetRegistries(sys)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(registries))
