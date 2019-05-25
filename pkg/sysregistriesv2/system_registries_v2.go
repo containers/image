@@ -180,9 +180,8 @@ func parseLocation(input string) (string, error) {
 	return trimmed, nil
 }
 
-// getV1Registries transforms v1 registries in the config into an array of v2
-// registries of type Registry.
-func getV1Registries(config *tomlConfig) ([]Registry, error) {
+// ConvertToV2 returns a v2 config corresponding to a v1 one.
+func (config *V1RegistriesConf) ConvertToV2() (*V2RegistriesConf, error) {
 	regMap := make(map[string]*Registry)
 	// We must preserve the order of config.V1Registries.Search.Registries at least.  The order of the
 	// other registries is not really important, but make it deterministic (the same for the same config file)
@@ -232,12 +231,12 @@ func getV1Registries(config *tomlConfig) ([]Registry, error) {
 		reg.Insecure = true
 	}
 
-	registries := []Registry{}
+	res := &V2RegistriesConf{}
 	for _, location := range registryOrder {
 		reg := regMap[location]
-		registries = append(registries, *reg)
+		res.Registries = append(res.Registries, *reg)
 	}
-	return registries, nil
+	return res, nil
 }
 
 // postProcess checks the consistency of all the configuration, looks for conflicts,
@@ -358,11 +357,11 @@ func getConfig(ctx *types.SystemContext) (*V2RegistriesConf, error) {
 		if config.V2RegistriesConf.Nonempty() {
 			return nil, &InvalidRegistries{s: "mixing sysregistry v1/v2 is not supported"}
 		}
-		v1Registries, err := getV1Registries(config)
+		v2, err := config.V1RegistriesConf.ConvertToV2()
 		if err != nil {
 			return nil, err
 		}
-		v2Config = &V2RegistriesConf{Registries: v1Registries}
+		v2Config = v2
 	}
 
 	if err := v2Config.postProcess(); err != nil {
