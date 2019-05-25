@@ -122,11 +122,20 @@ type V1TOMLConfig struct {
 	Block    V1TOMLregistries `toml:"block"`
 }
 
+// V1RegistriesConf is the sysregistries v1 configuration format.
+type V1RegistriesConf struct {
+	V1TOMLConfig `toml:"registries"`
+}
+
+// V2RegistriesConf is the sysregistries v2 configuration format.
+type V2RegistriesConf struct {
+	Registries []Registry `toml:"registry"`
+}
+
 // tomlConfig is the data type used to unmarshal the toml config.
 type tomlConfig struct {
-	Registries []Registry `toml:"registry"`
-	// backwards compatability to sysregistries v1
-	V1TOMLConfig `toml:"registries"`
+	V2RegistriesConf
+	V1RegistriesConf // for backwards compatibility with sysregistries v1
 }
 
 // InvalidRegistries represents an invalid registry configurations.  An example
