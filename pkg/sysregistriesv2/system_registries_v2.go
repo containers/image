@@ -319,17 +319,15 @@ func InvalidateCache() {
 	configCache = make(map[string]*V2RegistriesConf)
 }
 
-// GetRegistries loads and returns the registries specified in the config.
-// Note the parsed content of registry config files is cached.  For reloading,
-// use `InvalidateCache` and re-call `GetRegistries`.
-func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
+// getConfig returns the config object corresponding to ctx, loading it if it is not yet cached.
+func getConfig(ctx *types.SystemContext) (*V2RegistriesConf, error) {
 	configPath := getConfigPath(ctx)
 
 	configMutex.Lock()
 	defer configMutex.Unlock()
 	// if the config has already been loaded, return the cached registries
 	if config, inCache := configCache[configPath]; inCache {
-		return config.Registries, nil
+		return config, nil
 	}
 
 	// load the config
@@ -340,7 +338,7 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 		// isn't set.  Note: if ctx.SystemRegistriesConfPath points to
 		// the default config, we will still return an error.
 		if os.IsNotExist(err) && (ctx == nil || ctx.SystemRegistriesConfPath == "") {
-			return []Registry{}, nil
+			return &V2RegistriesConf{Registries: []Registry{}}, nil
 		}
 		return nil, err
 	}
@@ -365,21 +363,32 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 	}
 
 	// populate the cache
-	configCache[configPath] = &V2RegistriesConf{Registries: registries}
+	res := &V2RegistriesConf{Registries: registries}
+	configCache[configPath] = res
+	return res, nil
+}
 
-	return registries, err
+// GetRegistries loads and returns the registries specified in the config.
+// Note the parsed content of registry config files is cached.  For reloading,
+// use `InvalidateCache` and re-call `GetRegistries`.
+func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
+	config, err := getConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return config.Registries, nil
 }
 
 // FindUnqualifiedSearchRegistries returns all registries that are configured
 // for unqualified image search (i.e., with Registry.Search == true).
 func FindUnqualifiedSearchRegistries(ctx *types.SystemContext) ([]Registry, error) {
-	registries, err := GetRegistries(ctx)
+	config, err := getConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	unqualified := []Registry{}
-	for _, reg := range registries {
+	for _, reg := range config.Registries {
 		if reg.Search {
 			unqualified = append(unqualified, reg)
 		}
@@ -419,14 +428,14 @@ func refMatchesPrefix(ref, prefix string) bool {
 // — note that this requires the name to start with an explicit hostname!).
 // If no Registry prefixes the image, nil is returned.
 func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
-	registries, err := GetRegistries(ctx)
+	config, err := getConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	reg := Registry{}
 	prefixLen := 0
-	for _, r := range registries {
+	for _, r := range config.Registries {
 		if refMatchesPrefix(ref, r.Prefix) {
 			length := len(r.Prefix)
 			if length > prefixLen {
