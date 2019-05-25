@@ -228,20 +228,18 @@ func getV1Registries(config *tomlConfig) ([]Registry, error) {
 	return registries, nil
 }
 
-// postProcessRegistries checks the consistency of all registries (e.g., set
-// the Prefix to Location if not set) and applies conflict checks.  It returns an
-// array of cleaned registries and error in case of conflicts.
-func postProcessRegistries(regs []Registry) ([]Registry, error) {
-	var registries []Registry
-	regMap := make(map[string][]Registry)
+// postProcess checks the consistency of all the configuration, looks for conflicts,
+// and normalizes the configuration (e.g., sets the Prefix to Location if not set).
+func (config *V2RegistriesConf) postProcess() error {
+	regMap := make(map[string][]*Registry)
 
-	for _, reg := range regs {
-		var err error
-
+	for i := range config.Registries {
+		reg := &config.Registries[i]
 		// make sure Location and Prefix are valid
+		var err error
 		reg.Location, err = parseLocation(reg.Location)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		if reg.Prefix == "" {
@@ -249,7 +247,7 @@ func postProcessRegistries(regs []Registry) ([]Registry, error) {
 		} else {
 			reg.Prefix, err = parseLocation(reg.Prefix)
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
 
@@ -257,10 +255,9 @@ func postProcessRegistries(regs []Registry) ([]Registry, error) {
 		for _, mir := range reg.Mirrors {
 			mir.Location, err = parseLocation(mir.Location)
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
-		registries = append(registries, reg)
 		regMap[reg.Location] = append(regMap[reg.Location], reg)
 	}
 
@@ -270,22 +267,21 @@ func postProcessRegistries(regs []Registry) ([]Registry, error) {
 	//
 	// Note: we need to iterate over the registries array to ensure a
 	// deterministic behavior which is not guaranteed by maps.
-	for _, reg := range registries {
+	for _, reg := range config.Registries {
 		others, _ := regMap[reg.Location]
 		for _, other := range others {
 			if reg.Insecure != other.Insecure {
 				msg := fmt.Sprintf("registry '%s' is defined multiple times with conflicting 'insecure' setting", reg.Location)
-
-				return nil, &InvalidRegistries{s: msg}
+				return &InvalidRegistries{s: msg}
 			}
 			if reg.Blocked != other.Blocked {
 				msg := fmt.Sprintf("registry '%s' is defined multiple times with conflicting 'blocked' setting", reg.Location)
-				return nil, &InvalidRegistries{s: msg}
+				return &InvalidRegistries{s: msg}
 			}
 		}
 	}
 
-	return registries, nil
+	return nil
 }
 
 // getConfigPath returns the system-registries config path if specified.
@@ -343,7 +339,7 @@ func getConfig(ctx *types.SystemContext) (*V2RegistriesConf, error) {
 		return nil, err
 	}
 
-	registries := config.Registries
+	v2Config := &config.V2RegistriesConf
 
 	// backwards compatibility for v1 configs
 	v1Registries, err := getV1Registries(config)
@@ -351,21 +347,19 @@ func getConfig(ctx *types.SystemContext) (*V2RegistriesConf, error) {
 		return nil, err
 	}
 	if len(v1Registries) > 0 {
-		if len(registries) > 0 {
+		if len(v2Config.Registries) > 0 {
 			return nil, &InvalidRegistries{s: "mixing sysregistry v1/v2 is not supported"}
 		}
-		registries = v1Registries
+		v2Config = &V2RegistriesConf{Registries: v1Registries}
 	}
 
-	registries, err = postProcessRegistries(registries)
-	if err != nil {
+	if err := v2Config.postProcess(); err != nil {
 		return nil, err
 	}
 
 	// populate the cache
-	res := &V2RegistriesConf{Registries: registries}
-	configCache[configPath] = res
-	return res, nil
+	configCache[configPath] = v2Config
+	return v2Config, nil
 }
 
 // GetRegistries loads and returns the registries specified in the config.
