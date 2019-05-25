@@ -127,9 +127,21 @@ type V1RegistriesConf struct {
 	V1TOMLConfig `toml:"registries"`
 }
 
+// Nonempty returns true if config contains at least one configuration entry.
+func (config *V1RegistriesConf) Nonempty() bool {
+	return (len(config.V1TOMLConfig.Search.Registries) != 0 ||
+		len(config.V1TOMLConfig.Insecure.Registries) != 0 ||
+		len(config.V1TOMLConfig.Block.Registries) != 0)
+}
+
 // V2RegistriesConf is the sysregistries v2 configuration format.
 type V2RegistriesConf struct {
 	Registries []Registry `toml:"registry"`
+}
+
+// Nonempty returns true if config contains at least one configuration entry.
+func (config *V2RegistriesConf) Nonempty() bool {
+	return len(config.Registries) != 0
 }
 
 // tomlConfig is the data type used to unmarshal the toml config.
@@ -342,13 +354,13 @@ func getConfig(ctx *types.SystemContext) (*V2RegistriesConf, error) {
 	v2Config := &config.V2RegistriesConf
 
 	// backwards compatibility for v1 configs
-	v1Registries, err := getV1Registries(config)
-	if err != nil {
-		return nil, err
-	}
-	if len(v1Registries) > 0 {
-		if len(v2Config.Registries) > 0 {
+	if config.V1RegistriesConf.Nonempty() {
+		if config.V2RegistriesConf.Nonempty() {
 			return nil, &InvalidRegistries{s: "mixing sysregistry v1/v2 is not supported"}
+		}
+		v1Registries, err := getV1Registries(config)
+		if err != nil {
+			return nil, err
 		}
 		v2Config = &V2RegistriesConf{Registries: v1Registries}
 	}
