@@ -211,19 +211,18 @@ func TestV1BackwardsCompatibility(t *testing.T) {
 
 	registries, err := GetRegistries(sys)
 	assert.Nil(t, err)
-	assert.Equal(t, 5, len(registries))
+	assert.Equal(t, 4, len(registries))
 
 	unqRegs, err := UnqualifiedSearchRegistries(sys)
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
 
 	// check if merging works
-	reg, err := FindRegistry(sys, "registry-a.com/bar/foo/barfoo:latest")
+	reg, err := FindRegistry(sys, "registry-b.com/bar/foo/barfoo:latest")
 	assert.Nil(t, err)
 	assert.NotNil(t, reg)
-	assert.True(t, reg.Search)
 	assert.True(t, reg.Insecure)
-	assert.False(t, reg.Blocked)
+	assert.True(t, reg.Blocked)
 }
 
 func TestMixingV1andV2(t *testing.T) {

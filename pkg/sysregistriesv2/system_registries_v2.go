@@ -61,8 +61,6 @@ type Registry struct {
 	Mirrors []Endpoint `toml:"mirror"`
 	// If true, pulling from the registry will be blocked.
 	Blocked bool `toml:"blocked"`
-	// If true, the registry can be used when pulling an unqualified image.
-	Search bool `toml:"unqualified-search"`
 	// If true, mirrors will only be used for digest pulls. Pulling images by
 	// tag can potentially yield different images, depending on which endpoint
 	// we pull from.  Forcing digest-pulls for mirrors avoids that issue.
@@ -137,11 +135,14 @@ func (config *V1RegistriesConf) Nonempty() bool {
 // V2RegistriesConf is the sysregistries v2 configuration format.
 type V2RegistriesConf struct {
 	Registries []Registry `toml:"registry"`
+	// An array of host[:port] (not prefix!) entries to use for resolving unqualified image references
+	UnqualifiedSearchRegistries []string `toml:"unqualified-search-registries"`
 }
 
 // Nonempty returns true if config contains at least one configuration entry.
 func (config *V2RegistriesConf) Nonempty() bool {
-	return len(config.Registries) != 0
+	return (len(config.Registries) != 0 ||
+		len(config.UnqualifiedSearchRegistries) != 0)
 }
 
 // tomlConfig is the data type used to unmarshal the toml config.
@@ -183,8 +184,7 @@ func parseLocation(input string) (string, error) {
 // ConvertToV2 returns a v2 config corresponding to a v1 one.
 func (config *V1RegistriesConf) ConvertToV2() (*V2RegistriesConf, error) {
 	regMap := make(map[string]*Registry)
-	// We must preserve the order of config.V1Registries.Search.Registries at least.  The order of the
-	// other registries is not really important, but make it deterministic (the same for the same config file)
+	// The order of the registries is not really important, but make it deterministic (the same for the same config file)
 	// to minimize behavior inconsistency and not contribute to difficult-to-reproduce situations.
 	registryOrder := []string{}
 
@@ -207,15 +207,6 @@ func (config *V1RegistriesConf) ConvertToV2() (*V2RegistriesConf, error) {
 		return reg, nil
 	}
 
-	// Note: config.V1Registries.Search needs to be processed first to ensure registryOrder is populated in the right order
-	// if one of the search registries is also in one of the other lists.
-	for _, search := range config.V1TOMLConfig.Search.Registries {
-		reg, err := getRegistry(search)
-		if err != nil {
-			return nil, err
-		}
-		reg.Search = true
-	}
 	for _, blocked := range config.V1TOMLConfig.Block.Registries {
 		reg, err := getRegistry(blocked)
 		if err != nil {
@@ -231,7 +222,9 @@ func (config *V1RegistriesConf) ConvertToV2() (*V2RegistriesConf, error) {
 		reg.Insecure = true
 	}
 
-	res := &V2RegistriesConf{}
+	res := &V2RegistriesConf{
+		UnqualifiedSearchRegistries: config.V1TOMLConfig.Search.Registries,
+	}
 	for _, location := range registryOrder {
 		reg := regMap[location]
 		res.Registries = append(res.Registries, *reg)
@@ -289,6 +282,14 @@ func (config *V2RegistriesConf) postProcess() error {
 				msg := fmt.Sprintf("registry '%s' is defined multiple times with conflicting 'blocked' setting", reg.Location)
 				return &InvalidRegistries{s: msg}
 			}
+		}
+	}
+
+	for i := range config.UnqualifiedSearchRegistries {
+		var err error
+		config.UnqualifiedSearchRegistries[i], err = parseLocation(config.UnqualifiedSearchRegistries[i])
+		if err != nil {
+			return err
 		}
 	}
 
@@ -391,14 +392,7 @@ func UnqualifiedSearchRegistries(ctx *types.SystemContext) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	unqualified := []string{}
-	for _, reg := range config.Registries {
-		if reg.Search {
-			unqualified = append(unqualified, reg.Prefix)
-		}
-	}
-	return unqualified, nil
+	return config.UnqualifiedSearchRegistries, nil
 }
 
 // refMatchesPrefix returns true iff ref,
