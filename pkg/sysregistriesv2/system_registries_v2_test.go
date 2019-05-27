@@ -48,6 +48,14 @@ func TestEmptyConfig(t *testing.T) {
 	registries, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/empty.conf"})
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(registries))
+
+	// When SystemRegistriesConfPath is not explicitly specified (but RootForImplicitAbsolutePaths might be), missing file is treated
+	// the same as an empty one, without reporting an error.
+	nonexistentRoot, err := filepath.Abs("testdata/this-does-not-exist")
+	require.NoError(t, err)
+	registries, err = GetRegistries(&types.SystemContext{RootForImplicitAbsolutePaths: nonexistentRoot})
+	assert.Nil(t, err)
+	assert.Equal(t, 0, len(registries))
 }
 
 func TestMirrors(t *testing.T) {
@@ -221,6 +229,7 @@ func TestInvalidV2Configs(t *testing.T) {
 		{"testdata/missing-registry-location.conf", "invalid location"},
 		{"testdata/missing-mirror-location.conf", "invalid location"},
 		{"testdata/invalid-prefix.conf", "invalid location"},
+		{"testdata/this-does-not-exist.conf", "no such file or directory"},
 	} {
 		_, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: c.path})
 		assert.Error(t, err, c.path)
