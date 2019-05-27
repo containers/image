@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -232,6 +233,9 @@ func (config *V1RegistriesConf) ConvertToV2() (*V2RegistriesConf, error) {
 	return res, nil
 }
 
+// anchoredDomainRegexp is an internal implementation detail of postProcess, defining the valid values of elements of UnqualifiedSearchRegistries.
+var anchoredDomainRegexp = regexp.MustCompile("^" + reference.DomainRegexp.String() + "$")
+
 // postProcess checks the consistency of all the configuration, looks for conflicts,
 // and normalizes the configuration (e.g., sets the Prefix to Location if not set).
 func (config *V2RegistriesConf) postProcess() error {
@@ -286,11 +290,14 @@ func (config *V2RegistriesConf) postProcess() error {
 	}
 
 	for i := range config.UnqualifiedSearchRegistries {
-		var err error
-		config.UnqualifiedSearchRegistries[i], err = parseLocation(config.UnqualifiedSearchRegistries[i])
+		registry, err := parseLocation(config.UnqualifiedSearchRegistries[i])
 		if err != nil {
 			return err
 		}
+		if !anchoredDomainRegexp.MatchString(registry) {
+			return &InvalidRegistries{fmt.Sprintf("Invalid unqualified-search-registries entry %#v", registry)}
+		}
+		config.UnqualifiedSearchRegistries[i] = registry
 	}
 
 	return nil
