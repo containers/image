@@ -183,6 +183,7 @@ func TestInvalidV2Configs(t *testing.T) {
 		{"testdata/blocked-conflicts.conf", "registry 'registry.com' is defined multiple times with conflicting 'blocked' setting"},
 		{"testdata/missing-registry-location.conf", "invalid location"},
 		{"testdata/missing-mirror-location.conf", "invalid location"},
+		{"testdata/invalid-prefix.conf", "invalid location"},
 	} {
 		_, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: c.path})
 		assert.Error(t, err, c.path)
