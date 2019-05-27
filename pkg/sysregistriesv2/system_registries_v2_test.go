@@ -66,18 +66,6 @@ func TestMirrors(t *testing.T) {
 	assert.True(t, reg.Mirrors[1].Insecure)
 }
 
-func TestMissingRegistryLocation(t *testing.T) {
-	_, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/missing-registry-location.conf"})
-	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "invalid location")
-}
-
-func TestMissingMirrorLocation(t *testing.T) {
-	_, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/missing-mirror-location.conf"})
-	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "invalid location")
-}
-
 func TestRefMatchesPrefix(t *testing.T) {
 	for _, c := range []struct {
 		ref, prefix string
@@ -189,18 +177,19 @@ func TestFindUnqualifiedSearchRegistries(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestInsecureConflicts(t *testing.T) {
-	registries, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/insecure-conflicts.conf"})
-	assert.NotNil(t, err)
-	assert.Nil(t, registries)
-	assert.Contains(t, err.Error(), "registry 'registry.com' is defined multiple times with conflicting 'insecure' setting")
-}
-
-func TestBlockConflicts(t *testing.T) {
-	registries, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/blocked-conflicts.conf"})
-	assert.NotNil(t, err)
-	assert.Nil(t, registries)
-	assert.Contains(t, err.Error(), "registry 'registry.com' is defined multiple times with conflicting 'blocked' setting")
+func TestInvalidV2Configs(t *testing.T) {
+	for _, c := range []struct{ path, errorSubstring string }{
+		{"testdata/insecure-conflicts.conf", "registry 'registry.com' is defined multiple times with conflicting 'insecure' setting"},
+		{"testdata/blocked-conflicts.conf", "registry 'registry.com' is defined multiple times with conflicting 'blocked' setting"},
+		{"testdata/missing-registry-location.conf", "invalid location"},
+		{"testdata/missing-mirror-location.conf", "invalid location"},
+	} {
+		_, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: c.path})
+		assert.Error(t, err, c.path)
+		if c.errorSubstring != "" {
+			assert.Contains(t, err.Error(), c.errorSubstring, c.path)
+		}
+	}
 }
 
 func TestUnmarshalConfig(t *testing.T) {
