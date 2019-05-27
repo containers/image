@@ -196,6 +196,9 @@ func TestFindRegistry(t *testing.T) {
 	assert.NotNil(t, reg)
 	assert.Equal(t, "empty-prefix.com", reg.Prefix)
 	assert.Equal(t, "empty-prefix.com", reg.Location)
+
+	_, err = FindRegistry(&types.SystemContext{SystemRegistriesConfPath: "testdata/this-does-not-exist.conf"}, "example.com")
+	assert.Error(t, err)
 }
 
 func assertRegistryLocationsEqual(t *testing.T, expected []string, regs []Registry) {
