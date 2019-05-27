@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/containers/image/types"
@@ -103,6 +104,42 @@ func TestRefMatchesPrefix(t *testing.T) {
 	} {
 		res := refMatchesPrefix(c.ref, c.prefix)
 		assert.Equal(t, c.expected, res, fmt.Sprintf("%s vs. %s", c.ref, c.prefix))
+	}
+}
+
+func TestGetConfigPath(t *testing.T) {
+	const nondefaultPath = "/this/is/not/the/default/registries.conf"
+	const variableReference = "$HOME"
+	const rootPrefix = "/root/prefix"
+
+	for _, c := range []struct {
+		sys      *types.SystemContext
+		expected string
+	}{
+		// The common case
+		{nil, systemRegistriesConfPath},
+		// There is a context, but it does not override the path.
+		{&types.SystemContext{}, systemRegistriesConfPath},
+		// Path overridden
+		{&types.SystemContext{SystemRegistriesConfPath: nondefaultPath}, nondefaultPath},
+		// Root overridden
+		{
+			&types.SystemContext{RootForImplicitAbsolutePaths: rootPrefix},
+			filepath.Join(rootPrefix, systemRegistriesConfPath),
+		},
+		// Root and path overrides present simultaneously,
+		{
+			&types.SystemContext{
+				RootForImplicitAbsolutePaths: rootPrefix,
+				SystemRegistriesConfPath:     nondefaultPath,
+			},
+			nondefaultPath,
+		},
+		// No environment expansion happens in the overridden paths
+		{&types.SystemContext{SystemRegistriesConfPath: variableReference}, variableReference},
+	} {
+		path := getConfigPath(c.sys)
+		assert.Equal(t, c.expected, path)
 	}
 }
 
