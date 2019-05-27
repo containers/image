@@ -226,6 +226,11 @@ func TestV1BackwardsCompatibility(t *testing.T) {
 	assert.NotNil(t, reg)
 	assert.True(t, reg.Insecure)
 	assert.True(t, reg.Blocked)
+
+	for _, c := range []string{"testdata/v1-invalid-block.conf", "testdata/v1-invalid-insecure.conf", "testdata/v1-invalid-search.conf"} {
+		_, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: c})
+		assert.Error(t, err, c)
+	}
 }
 
 func TestMixingV1andV2(t *testing.T) {
