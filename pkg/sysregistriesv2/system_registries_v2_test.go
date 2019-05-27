@@ -184,6 +184,9 @@ func TestFindUnqualifiedSearchRegistries(t *testing.T) {
 	unqRegs, err := UnqualifiedSearchRegistries(sys)
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
+
+	_, err = UnqualifiedSearchRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/invalid-search.conf"})
+	assert.Error(t, err)
 }
 
 func TestInsecureConflicts(t *testing.T) {
