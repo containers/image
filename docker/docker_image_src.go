@@ -80,14 +80,13 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 	// all endpoints for the manifest availability. If a working image source
 	// was found, it will be used for all future pull actions.
 	manifestLoadErr := errors.New("Internal error: newImageSource returned without trying any endpoint")
-	for _, endpoint := range append(registry.Mirrors, registry.Endpoint) {
-		logrus.Debugf("Trying to pull %q from endpoint %q", ref.ref, endpoint.Location)
-
-		newRef, err := endpoint.RewriteReference(ref.ref, registry.Prefix)
-		if err != nil {
-			return nil, err
-		}
-		dockerRef, err := newReference(newRef)
+	pullSources, err := registry.PullSourcesFromReference(ref.ref)
+	if err != nil {
+		return nil, err
+	}
+	for _, pullSource := range pullSources {
+		logrus.Debugf("Trying to pull %q", pullSource.Reference)
+		dockerRef, err := newReference(pullSource.Reference)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +103,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 		if err != nil {
 			return nil, err
 		}
-		client.tlsClientConfig.InsecureSkipVerify = endpoint.Insecure
+		client.tlsClientConfig.InsecureSkipVerify = pullSource.Endpoint.Insecure
 
 		testImageSource := &dockerImageSource{
 			ref: dockerRef,
