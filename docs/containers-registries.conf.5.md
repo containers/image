@@ -43,10 +43,6 @@ mirror you overwrite the `insecure` flag for that specific entry.  This means
 that the container runtime will attempt use unencrypted HTTP to pull the image.
 It also allows you to pull from a registry with self-signed certificates.
 
-If you set the `unqualified-search = true` for the registry, then it is possible
-to omit the registry hostname when pulling images.  This feature does not work
-together with a specified `prefix`.
-
 If `blocked = true` then it is not allowed to pull images from that registry.
 
 If `mirror-by-digest-only = true`, mirrors will only be used during pulling if
@@ -56,6 +52,10 @@ registry or a mirror.  Pulling an image referenced by tag could yield different
 results, depending on which mirror or registry it is being pulled from.  Setting
 this attribute makes sure to avoid such a situation but requires the primary
 registry to always be available if references by tag are used.
+
+In addition, at the top level, an `unqualified-search-registries` array can be
+specified; this is a list of host[:port] (not more general prefix!) entries to
+use when pulling an unqualified image, in order.
 
 ### EXAMPLE
 
