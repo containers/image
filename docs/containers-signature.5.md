@@ -48,7 +48,7 @@ newly added cryptographic signature formats, if necessary.)
 
 Consumers of container signatures SHOULD verify the cryptographic signature
 against one or more trusted public keys
-(e.g. defined in a [policy.json signature verification policy file](policy.json.md))
+(e.g. defined in a [policy.json signature verification policy file](containers-policy.json.5.md))
 before parsing or processing the JSON payload in _any_ way,
 in particular they SHOULD stop processing the container signature
 if the cryptographic signature verification fails, without even starting to process the JSON payload.
@@ -193,10 +193,10 @@ However, depending on the specific application, users or system administrators m
 (e.g. ignoring the tag value in the signature when pulling the `:latest` tag or when referencing an image by digest),
 or they may require `critical.identity.docker-reference` values with a completely different namespace to the reference used to refer to/download the image
 (e.g. requiring a `critical.identity.docker-reference` value which identifies the image as coming from a supplier when fetching it from a company-internal mirror of approved images).
-The software performing this verification SHOULD allow the users to define such a policy using the [policy.json signature verification policy file format](policy.json.md).
+The software performing this verification SHOULD allow the users to define such a policy using the [policy.json signature verification policy file format](containers-policy.json.5.md).
 
 The `critical.identity.docker-reference` value SHOULD contain either a tag or digest;
-in most cases, it SHOULD use a tag rather than a digest.  (See also the default [`matchRepoDigestOrExact` matching semantics in `policy.json`](policy.json.md#signedby).)
+in most cases, it SHOULD use a tag rather than a digest.  (See also the default [`matchRepoDigestOrExact` matching semantics in `policy.json`](containers-policy.json.5.md#signedby).)
 
 ### `optional`
 
