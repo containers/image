@@ -56,6 +56,12 @@ func (e *Endpoint) rewriteReference(ref reference.Named, prefix string) (referen
 
 // Registry represents a registry.
 type Registry struct {
+	// Prefix is used for matching images, and to translate one namespace to
+	// another.  If `Prefix="example.com/bar"`, `location="example.com/foo/bar"`
+	// and we pull from "example.com/bar/myimage:latest", the image will
+	// effectively be pulled from "example.com/foo/bar/myimage:latest".
+	// If no Prefix is specified, it defaults to the specified location.
+	Prefix string `toml:"prefix"`
 	// A registry is an Endpoint too
 	Endpoint
 	// The registry's mirrors.
@@ -66,12 +72,6 @@ type Registry struct {
 	// tag can potentially yield different images, depending on which endpoint
 	// we pull from.  Forcing digest-pulls for mirrors avoids that issue.
 	MirrorByDigestOnly bool `toml:"mirror-by-digest-only,omitempty"`
-	// Prefix is used for matching images, and to translate one namespace to
-	// another.  If `Prefix="example.com/bar"`, `location="example.com/foo/bar"`
-	// and we pull from "example.com/bar/myimage:latest", the image will
-	// effectively be pulled from "example.com/foo/bar/myimage:latest".
-	// If no Prefix is specified, it defaults to the specified location.
-	Prefix string `toml:"prefix"`
 }
 
 // PullSource consists of an Endpoint and a Reference. Note that the reference is
