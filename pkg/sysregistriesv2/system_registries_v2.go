@@ -30,10 +30,10 @@ const builtinRegistriesConfPath = "/etc/containers/registries.conf"
 // Endpoint describes a remote location of a registry.
 type Endpoint struct {
 	// The endpoint's remote location.
-	Location string `toml:"location"`
+	Location string `toml:"location,omitempty"`
 	// If true, certs verification will be skipped and HTTP (non-TLS)
 	// connections will be allowed.
-	Insecure bool `toml:"insecure"`
+	Insecure bool `toml:"insecure,omitempty"`
 }
 
 // rewriteReference will substitute the provided reference `prefix` to the
@@ -59,13 +59,13 @@ type Registry struct {
 	// A registry is an Endpoint too
 	Endpoint
 	// The registry's mirrors.
-	Mirrors []Endpoint `toml:"mirror"`
+	Mirrors []Endpoint `toml:"mirror,omitempty"`
 	// If true, pulling from the registry will be blocked.
-	Blocked bool `toml:"blocked"`
+	Blocked bool `toml:"blocked,omitempty"`
 	// If true, mirrors will only be used for digest pulls. Pulling images by
 	// tag can potentially yield different images, depending on which endpoint
 	// we pull from.  Forcing digest-pulls for mirrors avoids that issue.
-	MirrorByDigestOnly bool `toml:"mirror-by-digest-only"`
+	MirrorByDigestOnly bool `toml:"mirror-by-digest-only,omitempty"`
 	// Prefix is used for matching images, and to translate one namespace to
 	// another.  If `Prefix="example.com/bar"`, `location="example.com/foo/bar"`
 	// and we pull from "example.com/bar/myimage:latest", the image will
