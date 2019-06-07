@@ -43,6 +43,7 @@ var compressionAlgos = map[string]struct {
 	"gzip":  {[]byte{0x1F, 0x8B, 0x08}, GzipDecompressor},                 // gzip (RFC 1952)
 	"bzip2": {[]byte{0x42, 0x5A, 0x68}, Bzip2Decompressor},                // bzip2 (decompress.c:BZ2_decompress)
 	"xz":    {[]byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}, XzDecompressor}, // xz (/usr/share/doc/xz/xz-file-format.txt)
+	"zstd":  {[]byte{0x28, 0xb5, 0x2f, 0xfd}, ZstdDecompressor},           // zstd (http://www.zstd.net)
 }
 
 // DetectCompression returns a DecompressorFunc if the input is recognized as a compressed format, nil otherwise.
