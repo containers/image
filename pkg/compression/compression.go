@@ -3,6 +3,7 @@ package compression
 import (
 	"bytes"
 	"compress/bzip2"
+	"fmt"
 	"io"
 	"io/ioutil"
 
@@ -35,6 +36,28 @@ func XzDecompressor(r io.Reader) (io.ReadCloser, error) {
 	return ioutil.NopCloser(r), nil
 }
 
+// compressorFunc writes the compressed stream to the given writer using the specified compression level.
+// The caller must call Close() on the stream (even if the input stream does not need closing!).
+type compressorFunc func(io.Writer, *int) (io.WriteCloser, error)
+
+// gzipCompressor is a CompressorFunc for the gzip compression algorithm.
+func gzipCompressor(r io.Writer, level *int) (io.WriteCloser, error) {
+	if level != nil {
+		return pgzip.NewWriterLevel(r, *level)
+	}
+	return pgzip.NewWriter(r), nil
+}
+
+// bzip2Compressor is a CompressorFunc for the bzip2 compression algorithm.
+func bzip2Compressor(r io.Writer, level *int) (io.WriteCloser, error) {
+	return nil, fmt.Errorf("bzip2 compression not supported")
+}
+
+// xzCompressor is a CompressorFunc for the xz compression algorithm.
+func xzCompressor(r io.Writer, level *int) (io.WriteCloser, error) {
+	return xz.NewWriter(r)
+}
+
 // compressionAlgos is an internal implementation detail of DetectCompression
 var compressionAlgos = map[string]struct {
 	prefix       []byte
@@ -46,22 +69,40 @@ var compressionAlgos = map[string]struct {
 	"zstd":  {[]byte{0x28, 0xb5, 0x2f, 0xfd}, ZstdDecompressor},           // zstd (http://www.zstd.net)
 }
 
-// DetectCompression returns a DecompressorFunc if the input is recognized as a compressed format, nil otherwise.
+// compressors maps an algorithm to its compression function
+var compressors = map[string]compressorFunc{
+	"gzip":  gzipCompressor,
+	"bzip2": bzip2Compressor,
+	"xz":    xzCompressor,
+	"zstd":  zstdCompressor,
+}
+
+// CompressStream returns the compressor by its name
+func CompressStream(dest io.Writer, name string, level *int) (io.WriteCloser, error) {
+	c, found := compressors[name]
+	if !found {
+		return nil, fmt.Errorf("cannot find compressor for '%s'", name)
+	}
+	return c(dest, level)
+
+// DetectCompressionFormat returns a DecompressorFunc if the input is recognized as a compressed format, nil otherwise.
 // Because it consumes the start of input, other consumers must use the returned io.Reader instead to also read from the beginning.
-func DetectCompression(input io.Reader) (DecompressorFunc, io.Reader, error) {
+func DetectCompressionFormat(input io.Reader) (string, DecompressorFunc, io.Reader, error) {
 	buffer := [8]byte{}
 
 	n, err := io.ReadAtLeast(input, buffer[:], len(buffer))
 	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 		// This is a “real” error. We could just ignore it this time, process the data we have, and hope that the source will report the same error again.
 		// Instead, fail immediately with the original error cause instead of a possibly secondary/misleading error returned later.
-		return nil, nil, err
+		return "", nil, nil, err
 	}
 
+	name := ""
 	var decompressor DecompressorFunc
-	for name, algo := range compressionAlgos {
+	for algoname, algo := range compressionAlgos {
 		if bytes.HasPrefix(buffer[:n], algo.prefix) {
-			logrus.Debugf("Detected compression format %s", name)
+			logrus.Debugf("Detected compression format %s", algoname)
+			name = algoname
 			decompressor = algo.decompressor
 			break
 		}
@@ -70,7 +111,14 @@ func DetectCompression(input io.Reader) (DecompressorFunc, io.Reader, error) {
 		logrus.Debugf("No compression detected")
 	}
 
-	return decompressor, io.MultiReader(bytes.NewReader(buffer[:n]), input), nil
+	return name, decompressor, io.MultiReader(bytes.NewReader(buffer[:n]), input), nil
+}
+
+// DetectCompression returns a DecompressorFunc if the input is recognized as a compressed format, nil otherwise.
+// Because it consumes the start of input, other consumers must use the returned io.Reader instead to also read from the beginning.
+func DetectCompression(input io.Reader) (DecompressorFunc, io.Reader, error) {
+	_, d, r, e := DetectCompressionFormat(input)
+	return d, r, e
 }
 
 // AutoDecompress takes a stream and returns an uncompressed version of the

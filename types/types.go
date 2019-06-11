@@ -511,6 +511,11 @@ type SystemContext struct {
 	// === dir.Transport overrides ===
 	// DirForceCompress compresses the image layers if set to true
 	DirForceCompress bool
+
+	// CompressionFormat is the format to use for the compression of the blobs
+	CompressionFormat string
+	// CompressionLevel specifies what compression level is used
+	CompressionLevel *int
 }
 
 // ProgressProperties is used to pass information from the copy code to a monitor which
