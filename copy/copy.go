@@ -42,6 +42,9 @@ type digestingReader struct {
 // downloads.  Let's follow Firefox by limiting it to 6.
 var maxParallelDownloads = 6
 
+// compressionBufferSize is the buffer size used to compress a blob
+var compressionBufferSize = 1048576
+
 // newDigestingReader returns an io.Reader implementation with contents of source, which will eventually return a non-EOF error
 // or set validationSucceeded/validationFailed to true if the source stream does/does not match expectedDigest.
 // (neither is set if EOF is never reached).
@@ -946,5 +949,7 @@ func (c *copier) compressGoroutine(dest *io.PipeWriter, src io.Reader, compressi
 	}
 	defer compressor.Close()
 
-	_, err = io.Copy(compressor, src) // Sets err to nil, i.e. causes dest.Close()
+	buf := make([]byte, compressionBufferSize)
+
+	_, err = io.CopyBuffer(compressor, src, buf) // Sets err to nil, i.e. causes dest.Close()
 }
