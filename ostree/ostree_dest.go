@@ -217,7 +217,7 @@ func fixFiles(selinuxHnd *C.struct_selabel_handle, root string, dir string, user
 				fullpathC := C.CString(fullpath)
 				defer C.free(unsafe.Pointer(fullpathC))
 				res, err = C.lsetfilecon_raw(fullpathC, context)
-				if int(res) < 0 {
+				if int(res) < 0 && err != syscall.EINVAL {
 					return errors.Wrapf(err, "cannot setfilecon_raw %s", fullpath)
 				}
 			}
