@@ -568,12 +568,21 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 			return err
 		}
 		defer resp.Body.Close()
-		logrus.Debugf("Ping %s status %d", url, resp.StatusCode)
+		respURL := resp.Request.URL
+		location := respURL.String()
+		logrus.Debugf("Ping %s status %d location %s", url, resp.StatusCode, location)
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
 			return errors.Errorf("error pinging registry %s, response code %d (%s)", c.registry, resp.StatusCode, http.StatusText(resp.StatusCode))
 		}
+		if url != location { // redirection occurred
+			if scheme != respURL.Scheme && scheme == "https" {
+				return errors.Errorf("Redirected from https! wanted %s got %s", url, location)
+			}
+			// +3 == len("://")
+			c.registry = location[len(respURL.Scheme)+3 : len(location)-len(fmt.Sprintf(resolvedPingV2URL, "", ""))+3]
+		}
 		c.challenges = parseAuthHeader(resp.Header)
-		c.scheme = scheme
+		c.scheme = respURL.Scheme
 		c.supportsSignatures = resp.Header.Get("X-Registry-Supports-Signatures") == "1"
 		return nil
 	}
