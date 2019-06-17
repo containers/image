@@ -9,6 +9,7 @@ import (
 	"github.com/containers/image/docker/reference"
 	"github.com/containers/image/types"
 	"github.com/containers/storage"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -217,9 +218,17 @@ func (s storageReference) DeleteImage(ctx context.Context, sys *types.SystemCont
 }
 
 func (s storageReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "newImageSource")
+	span.SetTag("ref", "storage")
+	defer span.Finish()
+
 	return newImageSource(s)
 }
 
 func (s storageReference) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "newImageDestination")
+	span.SetTag("ref", "storage")
+	defer span.Finish()
+
 	return newImageDestination(s)
 }

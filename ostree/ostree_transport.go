@@ -16,6 +16,7 @@ import (
 	"github.com/containers/image/image"
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 )
 
@@ -199,6 +200,10 @@ func (ref ostreeReference) NewImage(ctx context.Context, sys *types.SystemContex
 // NewImageSource returns a types.ImageSource for this reference.
 // The caller must call .Close() on the returned ImageSource.
 func (ref ostreeReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "newImageSource")
+	span.SetTag("ref", "ostree")
+	defer span.Finish()
+
 	var tmpDir string
 	if sys == nil || sys.OSTreeTmpDirPath == "" {
 		tmpDir = os.TempDir()
@@ -211,6 +216,10 @@ func (ref ostreeReference) NewImageSource(ctx context.Context, sys *types.System
 // NewImageDestination returns a types.ImageDestination for this reference.
 // The caller must call .Close() on the returned ImageDestination.
 func (ref ostreeReference) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "newImageDestination")
+	span.SetTag("ref", "ostree")
+	defer span.Finish()
+
 	var tmpDir string
 	if sys == nil || sys.OSTreeTmpDirPath == "" {
 		tmpDir = os.TempDir()

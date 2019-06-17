@@ -18,6 +18,7 @@ import (
 	"github.com/containers/storage/pkg/ioutils"
 	"github.com/klauspost/pgzip"
 	digest "github.com/opencontainers/go-digest"
+	opentracing "github.com/opentracing/opentracing-go"
 	glib "github.com/ostreedev/ostree-go/pkg/glibobject"
 	"github.com/pkg/errors"
 	"github.com/vbatts/tar-split/tar/asm"
@@ -264,6 +265,9 @@ func (s *ostreeImageSource) HasThreadSafeGetBlob() bool {
 // The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
 // May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
 func (s *ostreeImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "getBlob")
+	span.SetTag("ref", "ostree")
+	defer span.Finish()
 
 	blob := info.Digest.Hex()
 
@@ -369,6 +373,10 @@ func (s *ostreeImageSource) GetSignatures(ctx context.Context, instanceDigest *d
 // LayerInfosForCopy() returns the list of layer blobs that make up the root filesystem of
 // the image, after they've been decompressed.
 func (s *ostreeImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "layersInfosForCopy")
+	span.SetTag("ref", "ostree")
+	defer span.Finish()
+
 	updatedBlobInfos := []types.BlobInfo{}
 	manifestBlob, manifestType, err := s.GetManifest(ctx, nil)
 	if err != nil {

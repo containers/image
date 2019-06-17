@@ -7,6 +7,7 @@ import (
 
 	"github.com/containers/image/docker/tarfile"
 	"github.com/containers/image/types"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 )
 
@@ -68,5 +69,9 @@ func (d *archiveImageDestination) Close() error {
 // - Uploaded data MAY be visible to others before Commit() is called
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 func (d *archiveImageDestination) Commit(ctx context.Context) error {
+	span, _ := opentracing.StartSpanFromContext(ctx, "commit")
+	span.SetTag("ref", "docker-archive")
+	defer span.Finish()
+
 	return d.Destination.Commit(ctx)
 }

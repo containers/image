@@ -6,6 +6,7 @@ import (
 
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/types"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -43,6 +44,10 @@ func (os *orderedSet) append(s string) {
 // Returns the preferred manifest MIME type (whether we are converting to it or using it unmodified),
 // and a list of other possible alternatives, in order.
 func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupportedManifestMIMETypes []string, forceManifestMIMEType string) (string, []string, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "determineManifestConversion")
+	span.SetTag("ref", "imageCopier")
+	defer span.Finish()
+
 	_, srcType, err := ic.src.Manifest(ctx)
 	if err != nil { // This should have been cached?!
 		return "", nil, errors.Wrap(err, "Error reading manifest")
@@ -113,6 +118,9 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 
 // isMultiImage returns true if img is a list of images
 func isMultiImage(ctx context.Context, img types.UnparsedImage) (bool, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "isMultiImage")
+	defer span.Finish()
+
 	_, mt, err := img.Manifest(ctx)
 	if err != nil {
 		return false, err

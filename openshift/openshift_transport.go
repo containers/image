@@ -11,6 +11,7 @@ import (
 	genericImage "github.com/containers/image/image"
 	"github.com/containers/image/transports"
 	"github.com/containers/image/types"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 )
 
@@ -142,12 +143,20 @@ func (ref openshiftReference) NewImage(ctx context.Context, sys *types.SystemCon
 // NewImageSource returns a types.ImageSource for this reference.
 // The caller must call .Close() on the returned ImageSource.
 func (ref openshiftReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "newImageSource")
+	span.SetTag("ref", "openshift")
+	defer span.Finish()
+
 	return newImageSource(sys, ref)
 }
 
 // NewImageDestination returns a types.ImageDestination for this reference.
 // The caller must call .Close() on the returned ImageDestination.
 func (ref openshiftReference) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "newImageDestination")
+	span.SetTag("ref", "openshift")
+	defer span.Finish()
+
 	return newImageDestination(ctx, sys, ref)
 }
 

@@ -24,8 +24,8 @@ import (
 	"github.com/containers/image/types"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/klauspost/pgzip"
-	"github.com/opencontainers/go-digest"
 	selinux "github.com/opencontainers/selinux/go-selinux"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/ostreedev/ostree-go/pkg/otbuiltin"
 	"github.com/pkg/errors"
 	"github.com/vbatts/tar-split/tar/asm"
@@ -146,6 +146,10 @@ func (d *ostreeImageDestination) HasThreadSafePutBlob() bool {
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (d *ostreeImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "putBlob")
+	span.SetTag("ref", "ostree")
+	defer span.Finish()
+
 	tmpDir, err := ioutil.TempDir(d.tmpDirPath, "blob")
 	if err != nil {
 		return types.BlobInfo{}, err
@@ -343,6 +347,10 @@ func (d *ostreeImageDestination) importConfig(repo *otbuiltin.Repo, blob *blobTo
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 // May use and/or update cache.
 func (d *ostreeImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "hasBlob")
+	span.SetTag("ref", "ostree")
+	defer span.Finish()
+
 	if d.repo == nil {
 		repo, err := openRepo(d.ref.repo)
 		if err != nil {
@@ -417,6 +425,10 @@ func (d *ostreeImageDestination) PutSignatures(ctx context.Context, signatures [
 }
 
 func (d *ostreeImageDestination) Commit(ctx context.Context) error {
+	span, _ := opentracing.StartSpanFromContext(ctx, "commit")
+	span.SetTag("ref", "ostree")
+	defer span.Finish()
+
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 

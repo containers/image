@@ -8,6 +8,7 @@ import (
 	"github.com/containers/image/docker/tarfile"
 	"github.com/containers/image/types"
 	"github.com/docker/docker/client"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -125,6 +126,10 @@ func (d *daemonImageDestination) Reference() types.ImageReference {
 // - Uploaded data MAY be visible to others before Commit() is called
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 func (d *daemonImageDestination) Commit(ctx context.Context) error {
+	span, _ := opentracing.StartSpanFromContext(ctx, "commit")
+	span.SetTag("ref", "docker-daemon")
+	defer span.Finish()
+
 	logrus.Debugf("docker-daemon: Closing tar stream")
 	if err := d.Destination.Commit(ctx); err != nil {
 		return err
