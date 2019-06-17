@@ -17,6 +17,7 @@ import (
 	"github.com/containers/image/types"
 	"github.com/docker/distribution/registry/client"
 	digest "github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -384,7 +385,7 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 	// When retrieving the digest from a registry >= 2.3 use the following header:
 	//   "Accept": "application/vnd.docker.distribution.manifest.v2+json"
 	headers := make(map[string][]string)
-	headers["Accept"] = []string{manifest.DockerV2Schema2MediaType}
+	headers["Accept"] = []string{manifest.DockerV2Schema2MediaType, imgspecv1.MediaTypeImageManifest}
 
 	refTail, err := ref.tagOrDigest()
 	if err != nil {
