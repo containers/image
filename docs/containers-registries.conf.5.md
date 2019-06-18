@@ -83,7 +83,7 @@ internet without having to change `Dockerfile`s, or to add redundancy).
     `internal-registry-for-example.net/bar/myimage:latest` image.
 
 `mirror`
-: An array of TOML tables specifiying (possibly-partial) mirrors for the
+: An array of TOML tables specifying (possibly-partial) mirrors for the
     `prefix`-rooted namespace.
 
     The mirrors are attempted in the specified order; the first one that can be
