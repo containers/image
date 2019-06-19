@@ -138,8 +138,9 @@ func (s *dockerImageSource) GetManifest(ctx context.Context, instanceDigest *dig
 
 func (s *dockerImageSource) fetchManifest(ctx context.Context, tagOrDigest string) ([]byte, string, error) {
 	path := fmt.Sprintf(manifestPath, reference.Path(s.ref.ref), tagOrDigest)
-	headers := make(map[string][]string)
-	headers["Accept"] = manifest.DefaultRequestedManifestMIMETypes
+	headers := map[string][]string{
+		"Accept": manifest.DefaultRequestedManifestMIMETypes,
+	}
 	res, err := s.c.makeRequest(ctx, "GET", path, headers, nil, v2Auth, nil)
 	if err != nil {
 		return nil, "", err
@@ -381,9 +382,9 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 		return err
 	}
 
-	headers := make(map[string][]string)
-	headers["Accept"] = manifest.DefaultRequestedManifestMIMETypes
-
+	headers := map[string][]string{
+		"Accept": manifest.DefaultRequestedManifestMIMETypes,
+	}
 	refTail, err := ref.tagOrDigest()
 	if err != nil {
 		return err
