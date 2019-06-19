@@ -381,8 +381,6 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 		return err
 	}
 
-	// When retrieving the digest from a registry >= 2.3 use the following header:
-	//   "Accept": "application/vnd.docker.distribution.manifest.v2+json"
 	headers := make(map[string][]string)
 	headers["Accept"] = manifest.DefaultRequestedManifestMIMETypes
 
