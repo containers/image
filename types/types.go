@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/containers/image/docker/reference"
+	"github.com/containers/image/pkg/compression"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -513,7 +514,7 @@ type SystemContext struct {
 	DirForceCompress bool
 
 	// CompressionFormat is the format to use for the compression of the blobs
-	CompressionFormat string
+	CompressionFormat *compression.Algorithm
 	// CompressionLevel specifies what compression level is used
 	CompressionLevel *int
 }

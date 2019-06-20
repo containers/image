@@ -96,7 +96,7 @@ type copier struct {
 	progress          chan types.ProgressProperties
 	blobInfoCache     types.BlobInfoCache
 	copyInParallel    bool
-	compressionFormat string
+	compressionFormat compression.Algorithm
 	compressionLevel  *int
 }
 
@@ -183,7 +183,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		// we might want to add a separate CommonCtx — or would that be too confusing?
 		blobInfoCache: blobinfocache.DefaultCache(options.DestinationCtx),
 
-		compressionFormat: options.DestinationCtx.CompressionFormat,
+		compressionFormat: *options.DestinationCtx.CompressionFormat,
 		compressionLevel:  options.DestinationCtx.CompressionLevel,
 	}
 
@@ -844,7 +844,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 		destStream = pipeReader
 		inputInfo.Digest = ""
 		inputInfo.Size = -1
-	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && isCompressed && desiredCompressionFormat != compressionFormat {
+	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && isCompressed && desiredCompressionFormat.Name() != compressionFormat.Name() {
 		// When the blob is compressed, but the desired format is different, it first needs to be decompressed and finally
 		// re-compressed using the desired format.
 		logrus.Debugf("Blob will be converted")
@@ -937,7 +937,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 }
 
 // compressGoroutine reads all input from src and writes its compressed equivalent to dest.
-func (c *copier) compressGoroutine(dest *io.PipeWriter, src io.Reader, compressionFormat string) {
+func (c *copier) compressGoroutine(dest *io.PipeWriter, src io.Reader, compressionFormat compression.Algorithm) {
 	err := errors.New("Internal error: unexpected panic in compressGoroutine")
 	defer func() { // Note that this is not the same as {defer dest.CloseWithError(err)}; we need err to be evaluated lazily.
 		dest.CloseWithError(err) // CloseWithError(nil) is equivalent to Close()
