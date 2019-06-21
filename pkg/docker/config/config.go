@@ -56,7 +56,7 @@ func SetAuthentication(sys *types.SystemContext, registry, username, password st
 // If an entry is not found empty strings are returned for the username and password
 func GetAuthentication(sys *types.SystemContext, registry string) (string, string, error) {
 	if sys != nil && sys.DockerAuthConfig != nil {
-		logrus.Debug("Returning credentials from docker auth config")
+		logrus.Debug("Returning credentials from DockerAuthConfig")
 		return sys.DockerAuthConfig.Username, sys.DockerAuthConfig.Password, nil
 	}
 
