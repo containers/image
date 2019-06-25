@@ -268,6 +268,14 @@ func TestManifestOCI1Inspect(t *testing.T) {
 			"sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
 			"sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
 		},
+		Env: []string{
+			"PATH=/usr/local/apache2/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+			"HTTPD_PREFIX=/usr/local/apache2",
+			"HTTPD_VERSION=2.4.23",
+			"HTTPD_SHA1=5101be34ac4a509b245adb70a56690a84fcc4e7f",
+			"HTTPD_BZ2_URL=https://www.apache.org/dyn/closer.cgi?action=download&filename=httpd/httpd-2.4.23.tar.bz2",
+			"HTTPD_ASC_URL=https://www.apache.org/dist/httpd/httpd-2.4.23.tar.bz2.asc",
+		},
 	}, *ii)
 
 	// nil configBlob will trigger an error in m.ConfigBlob()
