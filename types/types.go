@@ -566,6 +566,8 @@ type SystemContext struct {
 	DockerDisableV1Ping bool
 	// If true, dockerImageDestination.SupportedManifestMIMETypes will omit the Schema1 media types from the supported list
 	DockerDisableDestSchema1MIMETypes bool
+	// Allow uncompressed image layers in Docker images
+	DockerAcceptUncompressedLayers bool
 
 	// === ostree.Transport overrides ===
 	// Directory to use for OSTree temporary files

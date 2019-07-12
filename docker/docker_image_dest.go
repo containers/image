@@ -30,8 +30,10 @@ import (
 )
 
 type dockerImageDestination struct {
-	ref dockerReference
-	c   *dockerClient
+	ref                      dockerReference
+	c                        *dockerClient
+	acceptUncompressedLayers bool
+
 	// State
 	manifestDigest digest.Digest // or "" if not yet known.
 }
@@ -42,10 +44,16 @@ func newImageDestination(sys *types.SystemContext, ref dockerReference) (types.I
 	if err != nil {
 		return nil, err
 	}
-	return &dockerImageDestination{
+	d := &dockerImageDestination{
 		ref: ref,
 		c:   c,
-	}, nil
+	}
+
+	if sys != nil {
+		d.acceptUncompressedLayers = sys.DockerAcceptUncompressedLayers
+	}
+
+	return d, nil
 }
 
 // Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
@@ -89,6 +97,9 @@ func (d *dockerImageDestination) SupportsSignatures(ctx context.Context) error {
 }
 
 func (d *dockerImageDestination) DesiredLayerCompression() types.LayerCompression {
+	if d.acceptUncompressedLayers {
+		return types.PreserveOriginal
+	}
 	return types.Compress
 }
 
