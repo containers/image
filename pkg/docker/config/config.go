@@ -24,6 +24,7 @@ type dockerAuthConfig struct {
 type dockerConfigFile struct {
 	AuthConfigs map[string]dockerAuthConfig `json:"auths"`
 	CredHelpers map[string]string           `json:"credHelpers,omitempty"`
+	CredsStore  string                      `json:"credsStore,omitempty"`
 }
 
 var (
@@ -45,6 +46,7 @@ var (
 func SetAuthentication(sys *types.SystemContext, registry, username, password string) error {
 	return modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
 		if ch, exists := auths.CredHelpers[registry]; exists {
+			logrus.Debugf("storing credentials in docker credential helper (%s)", ch)
 			return false, setAuthToCredHelper(ch, registry, username, password)
 		}
 
@@ -60,6 +62,12 @@ func SetAuthentication(sys *types.SystemContext, registry, username, password st
 			}
 			logrus.Debugf("failed to authenticate with the kernel keyring, falling back to authfiles. %v", err)
 		}
+
+		if auths.CredsStore != "" {
+			logrus.Debugf("storing credentials in docker credential store (%s)", auths.CredsStore)
+			return false, setAuthToCredHelper(auths.CredsStore, registry, username, password)
+		}
+
 		creds := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 		newCreds := dockerAuthConfig{Auth: creds}
 		auths.AuthConfigs[registry] = newCreds
@@ -118,6 +126,7 @@ func RemoveAuthentication(sys *types.SystemContext, registry string) error {
 	return modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
 		// First try cred helpers.
 		if ch, exists := auths.CredHelpers[registry]; exists {
+			logrus.Debugf("deleting credentials from docker credential helper (%s)", ch)
 			return false, deleteAuthFromCredHelper(ch, registry)
 		}
 
@@ -129,6 +138,12 @@ func RemoveAuthentication(sys *types.SystemContext, registry string) error {
 				return false, nil
 			}
 			logrus.Debugf("failed to delete credentials from the kernel keyring, falling back to authfiles")
+		}
+
+		// Then try global credential store, if set.
+		if auths.CredsStore != "" {
+			logrus.Debugf("deleting credentials from docker credential store (%s)", auths.CredsStore)
+			return false, deleteAuthFromCredHelper(auths.CredsStore, registry)
 		}
 
 		if _, ok := auths.AuthConfigs[registry]; ok {
@@ -284,6 +299,11 @@ func findAuthentication(registry, path string, legacyFormat bool) (string, strin
 	// First try cred helpers. They should always be normalized.
 	if ch, exists := auths.CredHelpers[registry]; exists {
 		return getAuthFromCredHelper(ch, registry)
+	}
+
+	// Use the global credential helper, if set
+	if auths.CredsStore != "" {
+		return getAuthFromCredHelper(auths.CredsStore, registry)
 	}
 
 	// I'm feeling lucky
