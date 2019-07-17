@@ -115,7 +115,7 @@ func TestRefMatchesPrefix(t *testing.T) {
 	}
 }
 
-func TestGetConfigPath(t *testing.T) {
+func TestConfigPath(t *testing.T) {
 	const nondefaultPath = "/this/is/not/the/default/registries.conf"
 	const variableReference = "$HOME"
 	const rootPrefix = "/root/prefix"
@@ -146,7 +146,7 @@ func TestGetConfigPath(t *testing.T) {
 		// No environment expansion happens in the overridden paths
 		{&types.SystemContext{SystemRegistriesConfPath: variableReference}, variableReference},
 	} {
-		path := getConfigPath(c.sys)
+		path := ConfigPath(c.sys)
 		assert.Equal(t, c.expected, path)
 	}
 }

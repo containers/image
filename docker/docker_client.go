@@ -254,6 +254,9 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 		return nil, errors.Wrapf(err, "error loading registries")
 	}
 	if reg != nil {
+		if reg.Blocked {
+			return nil, fmt.Errorf("registry %s is blocked in %s", reg.Prefix, sysregistriesv2.ConfigPath(sys))
+		}
 		skipVerify = reg.Insecure
 	}
 	tlsClientConfig.InsecureSkipVerify = skipVerify

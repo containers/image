@@ -303,9 +303,8 @@ func (config *V2RegistriesConf) postProcess() error {
 	return nil
 }
 
-// getConfigPath returns the system-registries config path if specified.
-// Otherwise, systemRegistriesConfPath is returned.
-func getConfigPath(ctx *types.SystemContext) string {
+// ConfigPath returns the path to the system-wide registry configuration file.
+func ConfigPath(ctx *types.SystemContext) string {
 	confPath := systemRegistriesConfPath
 	if ctx != nil {
 		if ctx.SystemRegistriesConfPath != "" {
@@ -336,7 +335,7 @@ func InvalidateCache() {
 
 // getConfig returns the config object corresponding to ctx, loading it if it is not yet cached.
 func getConfig(ctx *types.SystemContext) (*V2RegistriesConf, error) {
-	configPath := getConfigPath(ctx)
+	configPath := ConfigPath(ctx)
 
 	configMutex.Lock()
 	defer configMutex.Unlock()
