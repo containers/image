@@ -587,6 +587,8 @@ type SystemContext struct {
 	CompressionFormat *compression.Algorithm
 	// CompressionLevel specifies what compression level is used
 	CompressionLevel *int
+	// Check blobs across registries
+	CrossRepositoryBlobCheck bool
 }
 
 // ProgressEvent is the type of events a progress reader can produce

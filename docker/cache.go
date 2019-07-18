@@ -6,7 +6,11 @@ import (
 )
 
 // bicTransportScope returns a BICTransportScope appropriate for ref.
-func bicTransportScope(ref dockerReference) types.BICTransportScope {
+func bicTransportScope(ref dockerReference, everywhere bool) types.BICTransportScope {
+	// Blobs can be reused across different registries.
+	if everywhere {
+		return types.BICTransportScope{Opaque: "everywhere"}
+	}
 	// Blobs can be reused across the whole registry.
 	return types.BICTransportScope{Opaque: reference.Domain(ref.ref)}
 }
