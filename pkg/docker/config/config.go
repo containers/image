@@ -35,6 +35,8 @@ var (
 	// ErrNotLoggedIn is returned for users not logged into a registry
 	// that they are trying to logout of
 	ErrNotLoggedIn = errors.New("not logged in")
+	// ErrNotSupported is returned for unsupported methods
+	ErrNotSupported = errors.New("not supported")
 )
 
 // SetAuthentication stores the username and password in the auth.json file
@@ -43,6 +45,13 @@ func SetAuthentication(sys *types.SystemContext, registry, username, password st
 		if ch, exists := auths.CredHelpers[registry]; exists {
 			return false, setAuthToCredHelper(ch, registry, username, password)
 		}
+
+		err := setAuthToKernelKeyring(registry, username, password)
+		if err == nil {
+			logrus.Debugf("credentials for (%s, %s) were stored in the kernel keyring\n", registry, username)
+			return false, nil
+		}
+		logrus.Debugf("failed to authenticate with the kernel keyring, falling back to authfiles.")
 
 		creds := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 		newCreds := dockerAuthConfig{Auth: creds}
@@ -58,6 +67,12 @@ func GetAuthentication(sys *types.SystemContext, registry string) (string, strin
 	if sys != nil && sys.DockerAuthConfig != nil {
 		logrus.Debug("Returning credentials from DockerAuthConfig")
 		return sys.DockerAuthConfig.Username, sys.DockerAuthConfig.Password, nil
+	}
+
+	username, password, err := getAuthFromKernelKeyring(registry)
+	if err == nil {
+		logrus.Debug("returning credentials from kernel keyring")
+		return username, password, nil
 	}
 
 	dockerLegacyPath := filepath.Join(homedir.Get(), dockerLegacyHomePath)
@@ -96,6 +111,14 @@ func RemoveAuthentication(sys *types.SystemContext, registry string) error {
 		if ch, exists := auths.CredHelpers[registry]; exists {
 			return false, deleteAuthFromCredHelper(ch, registry)
 		}
+
+		// Next try kernel keyring
+		err := deleteAuthFromKernelKeyring(registry)
+		if err == nil {
+			logrus.Debugf("credentials for %s were deleted from the kernel keyring", registry)
+			return false, nil
+		}
+		logrus.Debugf("failed to delete credentials from the kernel keyring, falling back to authfiles")
 
 		if _, ok := auths.AuthConfigs[registry]; ok {
 			delete(auths.AuthConfigs, registry)
