@@ -16,6 +16,12 @@ BUILDFLAGS := -tags "$(BUILDTAGS)"
 PACKAGES := $(shell go list $(BUILDFLAGS) ./... | grep -v github.com/containers/image/vendor)
 SOURCE_DIRS = $(shell echo $(PACKAGES) | awk 'BEGIN{FS="/"; RS=" "}{print $$4}' | uniq)
 
+PREFIX ?= ${DESTDIR}/usr
+MANINSTALLDIR=${PREFIX}/share/man
+GOMD2MAN ?= $(shell command -v go-md2man || echo '$(GOBIN)/go-md2man')
+MANPAGES_MD = $(wildcard docs/*.5.md)
+MANPAGES ?= $(MANPAGES_MD:%.md=%)
+
 # On macOS, (brew install gpgme) installs it within /usr/local, but /usr/local/include is not in the default search path.
 # Rather than hard-code this directory, use gpgme-config. Sadly that must be done at the top-level user
 # instead of locally in the gpgme subpackage, because cgo supports only pkg-config, not general shell scripts,
@@ -30,6 +36,17 @@ build: vendor build-internal
 
 build-internal:
 	$(GPGME_ENV) go build $(BUILDFLAGS) $(PACKAGES)
+
+$(MANPAGES): %: %.md
+	$(GOMD2MAN) -in $< -out $@
+
+docs: $(MANPAGES)
+
+install-docs: docs
+	install -d -m 755 ${MANINSTALLDIR}/man5
+	install -m 644 docs/*.5 ${MANINSTALLDIR}/man5/
+
+install: install-docs
 
 cross: vendor
 	GOOS=windows $(MAKE) build-internal BUILDTAGS="$(BUILDTAGS) $(BUILD_TAGS_WINDOWS_CROSS)"
@@ -56,7 +73,7 @@ vendor: tools.timestamp vendor.conf
 	@touch vendor
 
 clean:
-	rm -rf vendor tools.timestamp
+	rm -rf vendor tools.timestamp $(MANPAGES)
 
 test: vendor
 	@$(GPGME_ENV) go test $(BUILDFLAGS) -cover $(PACKAGES)
