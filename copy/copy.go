@@ -869,6 +869,11 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 		return types.BlobInfo{}, errors.Wrap(err, "Error writing blob")
 	}
 
+	// If we can modify the layer's blob, set the desired compression for it to be set in the manifest.
+	if canModifyBlob && !isConfig {
+		uploadedInfo.Compression = c.dest.DesiredLayerCompression()
+	}
+
 	// This is fairly horrible: the writer from getOriginalLayerCopyWriter wants to consumer
 	// all of the input (to compute DiffIDs), even if dest.PutBlob does not need it.
 	// So, read everything from originalLayerReader, which will cause the rest to be

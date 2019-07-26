@@ -207,7 +207,14 @@ func (m *Schema2) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 	original := m.LayersDescriptors
 	m.LayersDescriptors = make([]Schema2Descriptor, len(layerInfos))
 	for i, info := range layerInfos {
-		m.LayersDescriptors[i].MediaType = original[i].MediaType
+		switch info.Compression {
+		case types.PreserveOriginal:
+			m.LayersDescriptors[i].MediaType = original[i].MediaType
+		case types.Decompress:
+			m.LayersDescriptors[i].MediaType = DockerV2SchemaLayerMediaTypeUncompressed
+		case types.Compress:
+			m.LayersDescriptors[i].MediaType = DockerV2SchemaLayerMediaType
+		}
 		m.LayersDescriptors[i].Digest = info.Digest
 		m.LayersDescriptors[i].Size = info.Size
 		m.LayersDescriptors[i].URLs = info.URLs

@@ -81,7 +81,14 @@ func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 	original := m.Layers
 	m.Layers = make([]imgspecv1.Descriptor, len(layerInfos))
 	for i, info := range layerInfos {
-		m.Layers[i].MediaType = original[i].MediaType
+		switch info.Compression {
+		case types.PreserveOriginal:
+			m.Layers[i].MediaType = original[i].MediaType
+		case types.Decompress:
+			m.Layers[i].MediaType = imgspecv1.MediaTypeImageLayer
+		case types.Compress:
+			m.Layers[i].MediaType = imgspecv1.MediaTypeImageLayerGzip
+		}
 		m.Layers[i].Digest = info.Digest
 		m.Layers[i].Size = info.Size
 		m.Layers[i].Annotations = info.Annotations

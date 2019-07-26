@@ -142,6 +142,12 @@ func (m *Schema1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 	}
 	m.FSLayers = make([]Schema1FSLayers, len(layerInfos))
 	for i, info := range layerInfos {
+		switch info.Compression {
+		case types.Decompress:
+			m.FSLayers[(len(layerInfos)-1)-i].MediaType = DockerV2SchemaLayerMediaTypeUncompressed
+		case types.Compress:
+			m.FSLayers[(len(layerInfos)-1)-i].MediaType = DockerV2SchemaLayerMediaType
+		}
 		// (docker push) sets up m.ExtractedV1Compatibility[].{Id,Parent} based on values of info.Digest,
 		// but (docker pull) ignores them in favor of computing DiffIDs from uncompressed data, except verifying the child->parent links and uniqueness.
 		// So, we don't bother recomputing the IDs in m.History.V1Compatibility.
