@@ -410,3 +410,21 @@ func TestConvertToManifestSchema2(t *testing.T) {
 
 	// FIXME? Test also the various failure cases, if only to see that we don't crash?
 }
+
+func TestConvertToManifestSchema2AllMediaTypes(t *testing.T) {
+	originalSrc := newOCI1ImageSource(t, "httpd-copy:latest")
+	original := manifestOCI1FromFixture(t, originalSrc, "oci1-all-media-types.json")
+	_, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
+	})
+	require.Error(t, err) // zstd compression is not supported for docker images
+}
+
+func TestConvertToV2S2WithInvalidMIMEType(t *testing.T) {
+	originalSrc := newOCI1ImageSource(t, "httpd-copy:latest")
+	manifest, err := ioutil.ReadFile(filepath.Join("fixtures", "oci1-invalid-media-type.json"))
+	require.NoError(t, err)
+
+	_, err = manifestOCI1FromManifest(originalSrc, manifest)
+	require.Error(t, err)
+}
