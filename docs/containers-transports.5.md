@@ -11,7 +11,7 @@ containers-transports - description of supported transports for copying and stor
 Tools which use the containers/image library, including skopeo(1), buildah(1), podman(1), all share a common syntax for referring to container images in various locations.
 The general form of the syntax is _transport:details_, where details are dependent on the specified transport, which are documented below.
 
-### **containers-storage:** [storage-specifier]{image-id|docker-reference[@image-id]}
+### **containers-storage**:[**[**storage-specifier**]**]{image-id|docker-reference[@image-id]}
 
 An image located in a local containers storage.
 The format of _docker-reference_ is described in detail in the **docker** transport.
