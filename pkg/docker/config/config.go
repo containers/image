@@ -46,13 +46,18 @@ func SetAuthentication(sys *types.SystemContext, registry, username, password st
 			return false, setAuthToCredHelper(ch, registry, username, password)
 		}
 
-		err := setAuthToKernelKeyring(registry, username, password)
-		if err == nil {
-			logrus.Debugf("credentials for (%s, %s) were stored in the kernel keyring\n", registry, username)
-			return false, nil
+		// Set the credentials to kernel keyring if sys.AuthFile is not specified.
+		// The keyring might not work in all environments (e.g., missing capability) and isn't supported on all platforms.
+		// Hence, we want to fall-back to using the authfile in case the keyring failed.
+		// However, if the sys.AuthFilePath is set, we want adhere to the user specification and not use the keyring.
+		if sys.AuthFilePath == "" {
+			err := setAuthToKernelKeyring(registry, username, password)
+			if err == nil {
+				logrus.Debugf("credentials for (%s, %s) were stored in the kernel keyring\n", registry, username)
+				return false, nil
+			}
+			logrus.Debugf("failed to authenticate with the kernel keyring, falling back to authfiles. %v", err)
 		}
-		logrus.Debugf("failed to authenticate with the kernel keyring, falling back to authfiles.")
-
 		creds := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 		newCreds := dockerAuthConfig{Auth: creds}
 		auths.AuthConfigs[registry] = newCreds
