@@ -1,5 +1,4 @@
 // +build linux
-// +build 386 amd64
 
 package keyctl
 
@@ -82,6 +81,9 @@ func TestLink(t *testing.T) {
 	}
 
 	_, err = userKeyring.Search(testname)
+	if err == nil {
+		t.Fatalf("Expected error, but got key %v", testname)
+	}
 	ExpectedError := "required key not available"
 	if err.Error() != ExpectedError {
 		t.Fatal(err)
