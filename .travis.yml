@@ -1,5 +1,7 @@
 ---
 language: go
+go:
+ - 1.12.x
 sudo: required
 notifications:
   email: false
