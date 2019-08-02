@@ -445,3 +445,22 @@ func TestPullSourcesFromReference(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(pullSources))
 }
+
+func TestTryUpdatingCache(t *testing.T) {
+	ctx := &types.SystemContext{
+		SystemRegistriesConfPath: "testdata/try-update-cache-valid.conf",
+	}
+	configCache = make(map[string]*V2RegistriesConf)
+	registries, err := TryUpdatingCache(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(registries.Registries))
+	assert.Equal(t, 1, len(configCache))
+
+	ctxInvalid := &types.SystemContext{
+		SystemRegistriesConfPath: "testdata/try-update-cache-invalid.conf",
+	}
+	registries, err = TryUpdatingCache(ctxInvalid)
+	assert.NotNil(t, err)
+	assert.Nil(t, registries)
+	assert.Equal(t, 1, len(configCache))
+}
