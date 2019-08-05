@@ -10,11 +10,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type keyID int
-
-func (id keyID) ID() int {
-	return int(id)
-}
+type keyID int32
 
 func newKeyring(id keyID) (*keyring, error) {
 	r1, err := unix.KeyctlGetKeyringID(int(id), true)
