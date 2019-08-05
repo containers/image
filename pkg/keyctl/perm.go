@@ -28,6 +28,6 @@ const (
 
 // SetPerm sets the permissions on a key or keyring.
 func SetPerm(k ID, p KeyPerm) error {
-	err := unix.KeyctlSetperm(k.ID(), uint32(p))
+	err := unix.KeyctlSetperm(int(k.ID()), uint32(p))
 	return err
 }

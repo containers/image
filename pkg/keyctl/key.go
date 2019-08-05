@@ -19,8 +19,8 @@ type Key struct {
 }
 
 // ID returns the 32-bit kernel identifier for a specific key
-func (k *Key) ID() int {
-	return int(k.id)
+func (k *Key) ID() int32 {
+	return int32(k.id)
 }
 
 // Get the key's value as a byte slice

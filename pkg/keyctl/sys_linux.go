@@ -10,10 +10,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type keyID int
+type keyID int32
 
-func (id keyID) ID() int {
-	return int(id)
+func (id keyID) ID() int32 {
+	return int32(id)
 }
 
 func newKeyring(id keyID) (*keyring, error) {
