@@ -453,6 +453,8 @@ type SystemContext struct {
 	RegistriesDirPath string
 	// Path to the system-wide registries configuration file
 	SystemRegistriesConfPath string
+	// If true, stores the user credentials to kernel keyring. Otherwise the credentials will be in the authentication file
+	AuthEnableKeyring bool
 	// If not "", overrides the default path for the authentication file
 	AuthFilePath string
 	// If not "", overrides the use of platform.GOARCH when choosing an image or verifying architecture match.
