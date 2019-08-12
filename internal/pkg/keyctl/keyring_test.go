@@ -4,6 +4,7 @@ package keyctl
 
 import (
 	"crypto/rand"
+	"strings"
 	"testing"
 )
 
@@ -140,6 +141,63 @@ func TestUnlink(t *testing.T) {
 	_, err = keyring.Search(testname)
 	ExpectedError := "required key not available"
 	if err.Error() != ExpectedError {
+		t.Fatal(err)
+	}
+}
+
+func TestReadKeyring(t *testing.T) {
+	token := make([]byte, 20)
+	rand.Read(token)
+
+	testname := "testuser"
+
+	userKeyring, err := UserKeyring()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	userKey, err := userKeyring.Add(testname, token)
+	if err != nil {
+		t.Fatal(err, userKey)
+	}
+	keys, err := ReadUserKeyring()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedKeyLen := 1
+	if len(keys) != 1 {
+		t.Errorf("expected to read %d userkeyring, but get %d", expectedKeyLen, len(keys))
+	}
+	err = Unlink(userKeyring, userKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDescribe(t *testing.T) {
+	token := make([]byte, 20)
+	rand.Read(token)
+
+	testname := "testuser"
+
+	userKeyring, err := UserKeyring()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	userKey, err := userKeyring.Add(testname, token)
+	if err != nil {
+		t.Fatal(err, userKey)
+	}
+	keyAttr, err := userKey.Describe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(keyAttr, testname) {
+		t.Errorf("expect description contains %s, but get %s", testname, keyAttr)
+	}
+	err = Unlink(userKeyring, userKey)
+	if err != nil {
 		t.Fatal(err)
 	}
 }
