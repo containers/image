@@ -42,7 +42,7 @@ func (os *orderedSet) append(s string) {
 // Note that the conversion will only happen later, through ic.src.UpdatedImage
 // Returns the preferred manifest MIME type (whether we are converting to it or using it unmodified),
 // and a list of other possible alternatives, in order.
-func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupportedManifestMIMETypes []string, forceManifestMIMEType string) (string, []string, error) {
+func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupportedManifestMIMETypes []string, forceManifestMIMEType string, requiresOciEncryption bool) (string, []string, error) {
 	_, srcType, err := ic.src.Manifest(ctx)
 	if err != nil { // This should have been cached?!
 		return "", nil, errors.Wrap(err, "Error reading manifest")
@@ -57,7 +57,7 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 		destSupportedManifestMIMETypes = []string{forceManifestMIMEType}
 	}
 
-	if len(destSupportedManifestMIMETypes) == 0 {
+	if len(destSupportedManifestMIMETypes) == 0 && (!requiresOciEncryption || manifestSupportsEncryption(srcType)) {
 		return srcType, []string{}, nil // Anything goes; just use the original as is, do not try any conversions.
 	}
 	supportedByDest := map[string]struct{}{}
@@ -75,7 +75,9 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 
 	// First of all, prefer to keep the original manifest unmodified.
 	if _, ok := supportedByDest[srcType]; ok {
-		prioritizedTypes.append(srcType)
+		if !requiresOciEncryption || manifestSupportsEncryption(srcType) {
+			prioritizedTypes.append(srcType)
+		}
 	}
 	if !ic.canModifyManifest {
 		// We could also drop the !ic.canModifyManifest check and have the caller
@@ -89,13 +91,17 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 	// Then use our list of preferred types.
 	for _, t := range preferredManifestMIMETypes {
 		if _, ok := supportedByDest[t]; ok {
-			prioritizedTypes.append(t)
+			if !requiresOciEncryption || manifestSupportsEncryption(t) {
+				prioritizedTypes.append(t)
+			}
 		}
 	}
 
 	// Finally, try anything else the destination supports.
 	for _, t := range destSupportedManifestMIMETypes {
-		prioritizedTypes.append(t)
+		if !requiresOciEncryption || manifestSupportsEncryption(t) {
+			prioritizedTypes.append(t)
+		}
 	}
 
 	logrus.Debugf("Manifest has MIME type %s, ordered candidate list [%s]", srcType, strings.Join(prioritizedTypes.list, ", "))
