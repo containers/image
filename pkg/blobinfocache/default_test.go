@@ -13,6 +13,7 @@ import (
 	"github.com/containers/image/pkg/blobinfocache/memory"
 	"github.com/containers/image/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/syndtr/gocapability/capability"
 )
 
 func TestBlobInfoCacheDir(t *testing.T) {
@@ -147,6 +148,12 @@ func TestDefaultCache(t *testing.T) {
 	}()
 	os.Unsetenv("HOME")
 	os.Unsetenv("XDG_DATA_HOME")
+	os.Setenv("_CONTAINERS_ROOTLESS_UID", "-1")
+	cap, err := capability.NewPid(0)
+	require.NoError(t, err)
+	cap.Unset(capability.EFFECTIVE|capability.PERMITTED|capability.INHERITABLE|capability.BOUNDING|capability.AMBIENT, capability.CAP_DAC_OVERRIDE)
+	err = cap.Apply(capability.EFFECTIVE | capability.PERMITTED | capability.INHERITABLE | capability.BOUNDING | capability.AMBIENT)
+	require.NoError(t, err)
 	c = DefaultCache(nil)
 	assert.IsType(t, memory.New(), c)
 
