@@ -170,6 +170,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		progressOutput = ioutil.Discard
 	}
 	copyInParallel := dest.HasThreadSafePutBlob() && rawSource.HasThreadSafeGetBlob()
+
 	c := &copier{
 		dest:             dest,
 		rawSource:        rawSource,
@@ -181,10 +182,18 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		// FIXME? The cache is used for sources and destinations equally, but we only have a SourceCtx and DestinationCtx.
 		// For now, use DestinationCtx (because blob reuse changes the behavior of the destination side more); eventually
 		// we might want to add a separate CommonCtx — or would that be too confusing?
-		blobInfoCache: blobinfocache.DefaultCache(options.DestinationCtx),
-
-		compressionFormat: *options.DestinationCtx.CompressionFormat,
-		compressionLevel:  options.DestinationCtx.CompressionLevel,
+		blobInfoCache:    blobinfocache.DefaultCache(options.DestinationCtx),
+		compressionLevel: options.DestinationCtx.CompressionLevel,
+	}
+	// Default to using gzip compression unless specified otherwise.
+	if options.DestinationCtx.CompressionFormat == nil {
+		algo, err := compression.AlgorithmByName("gzip")
+		if err != nil {
+			return nil, err
+		}
+		c.compressionFormat = algo
+	} else {
+		c.compressionFormat = *options.DestinationCtx.CompressionFormat
 	}
 
 	unparsedToplevel := image.UnparsedInstance(rawSource, nil)
