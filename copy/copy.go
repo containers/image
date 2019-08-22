@@ -194,7 +194,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 	} else {
 		c.compressionFormat = *options.DestinationCtx.CompressionFormat
 	}
-	if options.DestinationCtx == nil {
+	if options.DestinationCtx != nil {
 		// Note that the compressionLevel can be nil.
 		c.compressionLevel = options.DestinationCtx.CompressionLevel
 	}
