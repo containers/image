@@ -32,6 +32,10 @@ func TestSessionKeyring(t *testing.T) {
 	if string(data) != string(token) {
 		t.Errorf("Expected data %v, but get %v", token, data)
 	}
+	err = key.Unlink()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestUserKeyring(t *testing.T) {
@@ -56,6 +60,11 @@ func TestUserKeyring(t *testing.T) {
 	}
 	if searchRet.Name != testname {
 		t.Errorf("Expected data %v, but get %v", testname, searchRet.Name)
+	}
+
+	err = userKey.Unlink()
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -94,6 +103,16 @@ func TestLink(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = userKeyring.Search(testname)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = key.Unlink()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = Unlink(userKeyring, key)
 	if err != nil {
 		t.Fatal(err)
 	}
