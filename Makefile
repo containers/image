@@ -1,5 +1,7 @@
 .PHONY: all tools test validate lint .gitvalidation fmt
 
+export GOPROXY=https://proxy.golang.org
+
 # Which github repository and branch to use for testing with skopeo
 SKOPEO_REPO = containers/skopeo
 SKOPEO_BRANCH = master
