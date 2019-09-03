@@ -31,13 +31,7 @@ e.g. `skopeo copy` exposes the `containers/image/copy.Image` functionality.
 
 ## Dependencies
 
-This library does not ship a committed version of its dependencies in a `vendor`
-subdirectory.  This is so you can make well-informed decisions about which
-libraries you should use with this package in your own projects, and because
-types defined in the `vendor` directory would be impossible to use from your projects.
-
-What this project tests against dependencies-wise is located
-[in vendor.conf](https://github.com/containers/image/blob/master/vendor.conf).
+This library ships as a [Go module].
 
 ## Building
 
@@ -45,11 +39,11 @@ If you want to see what the library can do, or an example of how it is called,
 consider starting with the [skopeo](https://github.com/containers/skopeo) tool
 instead.
 
-To integrate this library into your project, put it into `$GOPATH` or use
-your preferred vendoring tool to include a copy in your project.
-Ensure that the dependencies documented [in vendor.conf](https://github.com/containers/image/blob/master/vendor.conf)
-are also available
-(using those exact versions or different versions of your choosing).
+To integrate this library into your project, include it as a [Go module],
+put it into `$GOPATH` or use your preferred vendoring tool to include a copy
+in your project. Ensure that the dependencies documented [in go.mod][go.mod]
+are also available (using those exact versions or different versions of
+your choosing).
 
 This library, by default, also depends on the GpgME and libostree C libraries. Either install them:
 ```sh
@@ -57,6 +51,9 @@ Fedora$ dnf install gpgme-devel libassuan-devel ostree-devel
 macOS$ brew install gpgme
 ```
 or use the build tags described below to avoid the dependencies (e.g. using `go build -tags …`)
+
+[Go module]: https://github.com/golang/go/wiki/Modules
+[go.mod]: https://github.com/containers/image/blob/master/go.mod
 
 ### Supported build tags
 

@@ -32,10 +32,8 @@ GPGME_ENV = CGO_CFLAGS="$(shell gpgme-config --cflags 2>/dev/null)" CGO_LDFLAGS=
 
 all: tools test validate .gitvalidation
 
-build: vendor build-internal
-
-build-internal:
-	$(GPGME_ENV) go build $(BUILDFLAGS) $(PACKAGES)
+build:
+	$(GPGME_ENV) GO111MODULE="on" go build $(BUILDFLAGS) $(PACKAGES)
 
 $(MANPAGES): %: %.md
 	$(GOMD2MAN) -in $< -out $@
@@ -48,35 +46,22 @@ install-docs: docs
 
 install: install-docs
 
-cross: vendor
-	GOOS=windows $(MAKE) build-internal BUILDTAGS="$(BUILDTAGS) $(BUILD_TAGS_WINDOWS_CROSS)"
-	GOOS=darwin $(MAKE) build-internal BUILDTAGS="$(BUILDTAGS) $(BUILD_TAGS_DARWIN_CROSS)"
+cross:
+	GOOS=windows $(MAKE) build BUILDTAGS="$(BUILDTAGS) $(BUILD_TAGS_WINDOWS_CROSS)"
+	GOOS=darwin $(MAKE) build BUILDTAGS="$(BUILDTAGS) $(BUILD_TAGS_DARWIN_CROSS)"
 
 tools: tools.timestamp
 
 tools.timestamp: Makefile
-	@go get -u $(BUILDFLAGS) golang.org/x/lint/golint
-	@go get $(BUILDFLAGS) github.com/vbatts/git-validation
-	@go get -u github.com/rancher/trash
+	@GO111MODULE="off" go get -u $(BUILDFLAGS) golang.org/x/lint/golint
+	@GO111MODULE="off" go get $(BUILDFLAGS) github.com/vbatts/git-validation
 	@touch tools.timestamp
 
-vendor: tools.timestamp vendor.conf
-	@if which trash > /dev/null ; then \
-		trash ; \
-	else \
-		if [ "$(GOBIN)" ] ; then \
-			$(GOBIN)/trash ; \
-		else \
-			$(GOPATH)/bin/trash ; \
-		fi ; \
-	fi
-	@touch vendor
-
 clean:
-	rm -rf vendor tools.timestamp $(MANPAGES)
+	rm -rf tools.timestamp $(MANPAGES)
 
-test: vendor
-	@$(GPGME_ENV) go test $(BUILDFLAGS) -cover $(PACKAGES)
+test:
+	@$(GPGME_ENV) GO111MODULE="on" go test $(BUILDFLAGS) -cover $(PACKAGES)
 
 # This is not run as part of (make all), but Travis CI does run this.
 # Demonstrating a working version of skopeo (possibly with modified SKOPEO_REPO/SKOPEO_BRANCH, e.g.
@@ -99,7 +84,7 @@ fmt:
 	@gofmt -l -s -w $(SOURCE_DIRS)
 
 validate: lint
-	@go vet $(PACKAGES)
+	@GO111MODULE="on" go vet $(PACKAGES)
 	@test -z "$$(gofmt -s -l . | grep -ve '^vendor' | tee /dev/stderr)"
 
 lint:
