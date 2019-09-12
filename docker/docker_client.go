@@ -21,7 +21,7 @@ import (
 	"github.com/containers/image/v4/pkg/sysregistriesv2"
 	"github.com/containers/image/v4/pkg/tlsclientconfig"
 	"github.com/containers/image/v4/types"
-	"github.com/docker/distribution/registry/client"
+	clientLib "github.com/docker/distribution/registry/client"
 	"github.com/docker/go-connections/tlsconfig"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -47,14 +47,7 @@ const (
 	extensionSignatureTypeAtomic    = "atomic" // extensionSignature.Type
 )
 
-var (
-	// ErrV1NotSupported is returned when we're trying to talk to a
-	// docker V1 registry.
-	ErrV1NotSupported = errors.New("can't talk to a V1 docker registry")
-	// ErrUnauthorizedForCredentials is returned when the status code returned is 401
-	ErrUnauthorizedForCredentials = errors.New("unable to retrieve auth token: invalid username/password")
-	systemPerHostCertDirPaths     = [2]string{"/etc/containers/certs.d", "/etc/docker/certs.d"}
-)
+var systemPerHostCertDirPaths = [2]string{"/etc/containers/certs.d", "/etc/docker/certs.d"}
 
 // extensionSignature and extensionSignatureList come from github.com/openshift/origin/pkg/dockerregistry/server/signaturedispatcher.go:
 // signature represents a Docker image signature.
@@ -284,14 +277,7 @@ func CheckAuth(ctx context.Context, sys *types.SystemContext, username, password
 	}
 	defer resp.Body.Close()
 
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return nil
-	case http.StatusUnauthorized:
-		return ErrUnauthorizedForCredentials
-	default:
-		return errors.Errorf("error occured with status code %d (%s)", resp.StatusCode, http.StatusText(resp.StatusCode))
-	}
+	return httpResponseToError(resp)
 }
 
 // SearchResult holds the information of each matching image
@@ -365,7 +351,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 		} else {
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				logrus.Debugf("error getting search results from v1 endpoint %q, status code %d (%s)", registry, resp.StatusCode, http.StatusText(resp.StatusCode))
+				logrus.Debugf("error getting search results from v1 endpoint %q: %v", registry, httpResponseToError(resp))
 			} else {
 				if err := json.NewDecoder(resp.Body).Decode(v1Res); err != nil {
 					return nil, err
@@ -382,7 +368,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 	} else {
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			logrus.Errorf("error getting search results from v2 endpoint %q, status code %d (%s)", registry, resp.StatusCode, http.StatusText(resp.StatusCode))
+			logrus.Errorf("error getting search results from v2 endpoint %q: %v", registry, httpResponseToError(resp))
 		} else {
 			if err := json.NewDecoder(resp.Body).Decode(v2Res); err != nil {
 				return nil, err
@@ -417,8 +403,78 @@ func (c *dockerClient) makeRequest(ctx context.Context, method, path string, hea
 // makeRequestToResolvedURL creates and executes a http.Request with the specified parameters, adding authentication and TLS options for the Docker client.
 // streamLen, if not -1, specifies the length of the data expected on stream.
 // makeRequest should generally be preferred.
+// In case of an http 429 status code in the response, it performs an exponential back off starting at 2 seconds for at most 5 iterations.
+// If the `Retry-After` header is set in the response, the specified value or date is
+// If the stream is non-nil, no back off will be performed.
 // TODO(runcom): too many arguments here, use a struct
 func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url string, headers map[string][]string, stream io.Reader, streamLen int64, auth sendAuth, extraScope *authScope) (*http.Response, error) {
+	var (
+		res   *http.Response
+		err   error
+		delay int64
+	)
+	delay = 2
+	const numIterations = 5
+	const maxDelay = 60
+
+	// math.Min() only supports float64, so have an anonymous func to avoid
+	// casting.
+	min := func(a int64, b int64) int64 {
+		if a < b {
+			return a
+		}
+		return b
+	}
+
+	nextDelay := func(r *http.Response, delay int64) int64 {
+		after := res.Header.Get("Retry-After")
+		if after == "" {
+			return min(delay, maxDelay)
+		}
+		logrus.Debugf("detected 'Retry-After' header %q", after)
+		// First check if we have a numerical value.
+		if num, err := strconv.ParseInt(after, 10, 64); err == nil {
+			return min(num, maxDelay)
+		}
+		// Secondly check if we have an http date.
+		// If the delta between the date and now is positive, use it.
+		// Otherwise, fall back to using the default exponential back off.
+		if t, err := http.ParseTime(after); err == nil {
+			delta := int64(t.Sub(time.Now()).Seconds())
+			if delta > 0 {
+				return min(delta, maxDelay)
+			}
+			logrus.Debugf("negative date: falling back to using %d seconds", delay)
+			return min(delay, maxDelay)
+		}
+		// If the header contains bogus, fall back to using the default
+		// exponential back off.
+		logrus.Debugf("invalid format: falling back to using %d seconds", delay)
+		return min(delay, maxDelay)
+	}
+
+	for i := 0; i < numIterations; i++ {
+		res, err = c.makeRequestToResolvedURLOnce(ctx, method, url, headers, stream, streamLen, auth, extraScope)
+		if stream == nil && res != nil && res.StatusCode == http.StatusTooManyRequests {
+			if i < numIterations-1 {
+				logrus.Errorf("HEADER %v", res.Header)
+				delay = nextDelay(res, delay) // compute next delay - does NOT exceed maxDelay
+				logrus.Debugf("too many request to %s: sleeping for %d seconds before next attempt", url, delay)
+				time.Sleep(time.Duration(delay) * time.Second)
+				delay = delay * 2 // exponential back off
+			}
+			continue
+		}
+		break
+	}
+	return res, err
+}
+
+// makeRequestToResolvedURLOnce creates and executes a http.Request with the specified parameters, adding authentication and TLS options for the Docker client.
+// streamLen, if not -1, specifies the length of the data expected on stream.
+// makeRequest should generally be preferred.
+// Note that no exponential back off is performed when receiving an http 429 status code.
+func (c *dockerClient) makeRequestToResolvedURLOnce(ctx context.Context, method, url string, headers map[string][]string, stream io.Reader, streamLen int64, auth sendAuth, extraScope *authScope) (*http.Response, error) {
 	req, err := http.NewRequest(method, url, stream)
 	if err != nil {
 		return nil, err
@@ -533,7 +589,7 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge, 
 	defer res.Body.Close()
 	switch res.StatusCode {
 	case http.StatusUnauthorized:
-		err := client.HandleErrorResponse(res)
+		err := clientLib.HandleErrorResponse(res)
 		logrus.Debugf("Server response when trying to obtain an access token: \n%q", err.Error())
 		return nil, ErrUnauthorizedForCredentials
 	case http.StatusOK:
@@ -571,7 +627,7 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 		defer resp.Body.Close()
 		logrus.Debugf("Ping %s status %d", url, resp.StatusCode)
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
-			return errors.Errorf("error pinging registry %s, response code %d (%s)", c.registry, resp.StatusCode, http.StatusText(resp.StatusCode))
+			return httpResponseToError(resp)
 		}
 		c.challenges = parseAuthHeader(resp.Header)
 		c.scheme = scheme
@@ -583,7 +639,7 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 		err = ping("http")
 	}
 	if err != nil {
-		err = errors.Wrap(err, "pinging docker registry returned")
+		err = errors.Wrapf(err, "error pinging docker registry %s", c.registry)
 		if c.sys != nil && c.sys.DockerDisableV1Ping {
 			return err
 		}
@@ -629,9 +685,11 @@ func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerRe
 		return nil, err
 	}
 	defer res.Body.Close()
+
 	if res.StatusCode != http.StatusOK {
-		return nil, errors.Wrapf(client.HandleErrorResponse(res), "Error downloading signatures for %s in %s", manifestDigest, ref.ref.Name())
+		return nil, errors.Wrapf(clientLib.HandleErrorResponse(res), "Error downloading signatures for %s in %s", manifestDigest, ref.ref.Name())
 	}
+
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
