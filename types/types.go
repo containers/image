@@ -506,6 +506,8 @@ type SystemContext struct {
 	// this field is ignored if `AuthFilePath` is set (we favor the newer format);
 	// only reading of this data is supported;
 	LegacyFormatAuthFilePath string
+	// If true, credentials are stored in kernel user keyring
+	AuthEnableKeyring bool
 	// If not "", overrides the use of platform.GOARCH when choosing an image or verifying architecture match.
 	ArchitectureChoice string
 	// If not "", overrides the use of platform.GOOS when choosing an image or verifying OS match.
