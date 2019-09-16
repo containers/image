@@ -27,7 +27,7 @@ require (
 	github.com/mattn/go-isatty v0.0.4 // indirect
 	github.com/mtrmac/gpgme v0.0.0-20170102180018-b2432428689c
 	github.com/opencontainers/go-digest v1.0.0-rc1
-	github.com/opencontainers/image-spec v1.0.0
+	github.com/opencontainers/image-spec v1.0.2-0.20190823105129-775207bd45b6
 	github.com/opencontainers/selinux v1.2.2
 	github.com/ostreedev/ostree-go v0.0.0-20190702140239-759a8c1ac913
 	github.com/pkg/errors v0.8.1
