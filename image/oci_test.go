@@ -414,10 +414,23 @@ func TestConvertToManifestSchema2(t *testing.T) {
 func TestConvertToManifestSchema2AllMediaTypes(t *testing.T) {
 	originalSrc := newOCI1ImageSource(t, "httpd-copy:latest")
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1-all-media-types.json")
-	_, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
 	})
-	require.Error(t, err) // zstd compression is not supported for docker images
+	require.NoError(t, err)
+
+	convertedJSON, mt, err := res.Manifest(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, manifest.DockerV2Schema2MediaType, mt)
+
+	byHandJSON, err := ioutil.ReadFile("fixtures/oci1-all-media-types-to-schema2.json")
+	require.NoError(t, err)
+	var converted, byHand map[string]interface{}
+	err = json.Unmarshal(byHandJSON, &byHand)
+	require.NoError(t, err)
+	err = json.Unmarshal(convertedJSON, &converted)
+	require.NoError(t, err)
+	assert.Equal(t, byHand, converted)
 }
 
 func TestConvertToV2S2WithInvalidMIMEType(t *testing.T) {

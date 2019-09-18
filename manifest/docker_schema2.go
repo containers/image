@@ -256,15 +256,22 @@ func (m *Schema2) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 			switch info.CompressionAlgorithm.Name() {
 			case compression.Gzip.Name():
 				switch original[i].MediaType {
-				case DockerV2Schema2ForeignLayerMediaType:
+				case DockerV2Schema2ForeignLayerMediaType, DockerV2Schema2ForeignLayerMediaTypeZstd:
 					m.LayersDescriptors[i].MediaType = DockerV2Schema2ForeignLayerMediaTypeGzip
-				case DockerV2SchemaLayerMediaTypeUncompressed:
+				case DockerV2SchemaLayerMediaTypeUncompressed, DockerV2Schema2LayerMediaTypeZstd:
 					m.LayersDescriptors[i].MediaType = DockerV2Schema2LayerMediaType
 				default:
 					return fmt.Errorf("Error preparing updated manifest: unsupported media type for compression: %q", original[i].MediaType)
 				}
 			case compression.Zstd.Name():
-				return fmt.Errorf("Error preparing updated manifest: zstd compression is not supported for docker images")
+				switch original[i].MediaType {
+				case DockerV2Schema2ForeignLayerMediaType, DockerV2Schema2ForeignLayerMediaTypeGzip:
+					m.LayersDescriptors[i].MediaType = DockerV2Schema2ForeignLayerMediaTypeZstd
+				case DockerV2SchemaLayerMediaTypeUncompressed, DockerV2Schema2LayerMediaType:
+					m.LayersDescriptors[i].MediaType = DockerV2Schema2LayerMediaTypeZstd
+				default:
+					return fmt.Errorf("Error preparing updated manifest: unsupported media type for compression: %q", original[i].MediaType)
+				}
 			default:
 				return fmt.Errorf("Error preparing updated manifest: unknown compression algorithm %q for layer %q", info.CompressionAlgorithm.Name(), info.Digest)
 			}

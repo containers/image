@@ -861,7 +861,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 		// re-compressed using the desired format.
 		logrus.Debugf("Blob will be converted")
 
-		compressionOperation = types.PreserveOriginal
+		compressionOperation = types.Compress
 		s, err := decompressor(destStream)
 		if err != nil {
 			return types.BlobInfo{}, err

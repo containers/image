@@ -24,6 +24,8 @@ const (
 	DockerV2Schema2ConfigMediaType = "application/vnd.docker.container.image.v1+json"
 	// DockerV2Schema2LayerMediaType is the MIME type used for schema 2 layers.
 	DockerV2Schema2LayerMediaType = "application/vnd.docker.image.rootfs.diff.tar.gzip"
+	// DockerV2Schema2LayerMediaTypeZstd is the MIME type used for zstd compressed schema 2 layers. Note that this type is only meant for conversion into an OCI format.
+	DockerV2Schema2LayerMediaTypeZstd = "application/vnd.docker.image.rootfs.diff.tar.zstd"
 	// DockerV2SchemaLayerMediaTypeUncompressed is the mediaType used for uncompressed layers.
 	DockerV2SchemaLayerMediaTypeUncompressed = "application/vnd.docker.image.rootfs.diff.tar"
 	// DockerV2ListMediaType MIME type represents Docker manifest schema 2 list
@@ -32,12 +34,14 @@ const (
 	DockerV2Schema2ForeignLayerMediaType = "application/vnd.docker.image.rootfs.foreign.diff.tar"
 	// DockerV2Schema2ForeignLayerMediaType is the MIME type used for gzippped schema 2 foreign layers.
 	DockerV2Schema2ForeignLayerMediaTypeGzip = "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip"
+	// DockerV2Schema2ForeignLayerMediaType is the MIME type used for zstd compressed schema 2 foreign layers. Note that this type is only meant for conversion into an OCI format.
+	DockerV2Schema2ForeignLayerMediaTypeZstd = "application/vnd.docker.image.rootfs.foreign.diff.tar.zstd"
 )
 
 // SupportedSchema2MediaType checks if the specified string is a supported Docker v2s2 media type.
 func SupportedSchema2MediaType(m string) error {
 	switch m {
-	case DockerV2ListMediaType, DockerV2Schema1MediaType, DockerV2Schema1SignedMediaType, DockerV2Schema2ConfigMediaType, DockerV2Schema2ForeignLayerMediaType, DockerV2Schema2ForeignLayerMediaTypeGzip, DockerV2Schema2LayerMediaType, DockerV2Schema2MediaType, DockerV2SchemaLayerMediaTypeUncompressed:
+	case DockerV2ListMediaType, DockerV2Schema1MediaType, DockerV2Schema1SignedMediaType, DockerV2Schema2ConfigMediaType, DockerV2Schema2ForeignLayerMediaType, DockerV2Schema2ForeignLayerMediaTypeZstd, DockerV2Schema2ForeignLayerMediaTypeGzip, DockerV2Schema2LayerMediaType, DockerV2Schema2MediaType, DockerV2SchemaLayerMediaTypeUncompressed, DockerV2Schema2LayerMediaTypeZstd:
 		return nil
 	default:
 		return fmt.Errorf("unsupported docker v2s2 media type: %q", m)
