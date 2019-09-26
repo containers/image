@@ -51,3 +51,5 @@ require (
 	gopkg.in/yaml.v2 v2.0.0 // indirect
 	k8s.io/client-go v0.0.0-20170217214107-bcde30fb7eae
 )
+
+replace github.com/docker/libtrust => github.com/lsm5/libtrust v0.0.0-20190926171757-a6ab7aebae83
