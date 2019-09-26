@@ -24,6 +24,8 @@ GOMD2MAN ?= $(shell command -v go-md2man || echo '$(GOBIN)/go-md2man')
 MANPAGES_MD = $(wildcard docs/*.5.md)
 MANPAGES ?= $(MANPAGES_MD:%.md=%)
 
+PROJECT_PATH = $(shell pwd)
+
 # On macOS, (brew install gpgme) installs it within /usr/local, but /usr/local/include is not in the default search path.
 # Rather than hard-code this directory, use gpgme-config. Sadly that must be done at the top-level user
 # instead of locally in the gpgme subpackage, because cgo supports only pkg-config, not general shell scripts,
@@ -76,8 +78,10 @@ test-skopeo:
 		skopeo_path=$${GOPATH}/src/github.com/containers/skopeo && \
 		vendor_path=$${skopeo_path}/vendor/github.com/containers/image && \
 		git clone -b $(SKOPEO_BRANCH) https://github.com/$(SKOPEO_REPO) $${skopeo_path} && \
-		rm -rf $${vendor_path} && cp -r . $${vendor_path} && rm -rf $${vendor_path}/vendor && \
 		cd $${skopeo_path} && \
+		env GO111MODULE="on" \
+		go mod edit -replace github.com/containers/image=$(PROJECT_PATH) && \
+		make vendor && \
 		make BUILDTAGS="$(BUILDTAGS)" binary-local test-all-local && \
 		$(SUDO) make BUILDTAGS="$(BUILDTAGS)" check && \
 		rm -rf $${skopeo_path}
