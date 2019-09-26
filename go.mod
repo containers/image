@@ -19,7 +19,7 @@ require (
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v0.0.0-20170217192616-94e7d24fd285 // indirect
 	github.com/gotestyourself/gotestyourself v2.2.0+incompatible // indirect
-	github.com/imdario/mergo v0.0.0-20160517064435-50d4dbd4eb0e
+	github.com/imdario/mergo v0.0.0-20141206190957-6633656539c1
 	github.com/klauspost/compress v1.8.1
 	github.com/klauspost/pgzip v1.2.1
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
@@ -33,7 +33,6 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/pquerna/ffjson v0.0.0-20190813045741-dac163c6c0a9 // indirect
 	github.com/sirupsen/logrus v1.4.2
-	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.4.0
 	github.com/ulikunitz/xz v0.5.6
 	github.com/vbatts/tar-split v0.11.1
