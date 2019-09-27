@@ -19,7 +19,7 @@ require (
 	github.com/gorilla/context v0.0.0-20140604161150-14f550f51af5 // indirect
 	github.com/gorilla/mux v0.0.0-20140926153814-e444e69cbd2e // indirect
 	github.com/gotestyourself/gotestyourself v2.2.0+incompatible // indirect
-	github.com/imdario/mergo v0.0.0-20141206190957-6633656539c1
+	github.com/imdario/mergo v0.3.5
 	github.com/klauspost/compress v1.8.1
 	github.com/klauspost/pgzip v1.2.1
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
