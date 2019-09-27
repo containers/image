@@ -7,12 +7,13 @@ require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/VividCortex/ewma v1.1.1 // indirect
 	github.com/containerd/continuity v0.0.0-20180216233310-d8fb8589b0e8 // indirect
+	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
 	github.com/containers/storage v1.13.4
 	github.com/docker/distribution v0.0.0-20170817175659-5f6282db7d65
 	github.com/docker/docker v0.0.0-20180522102801-da99009bbb11
 	github.com/docker/docker-credential-helpers v0.6.0
 	github.com/docker/go-connections v0.0.0-20180212134524-7beb39f0b969
-	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7
+	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/etcd-io/bbolt v1.3.3
 	github.com/ghodss/yaml v0.0.0-20161207003320-04f313413ffd
 	github.com/gogo/protobuf v0.0.0-20170815085658-fcdc5011193f // indirect
@@ -47,5 +48,3 @@ require (
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	k8s.io/client-go v0.0.0-20170217214107-bcde30fb7eae
 )
-
-replace github.com/docker/libtrust => github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
