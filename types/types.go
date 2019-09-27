@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/containers/image/docker/reference"
-	"github.com/containers/image/pkg/compression"
-	"github.com/opencontainers/go-digest"
+	compression "github.com/containers/image/pkg/compression/types"
+	digest "github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

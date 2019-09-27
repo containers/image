@@ -7,6 +7,8 @@ import (
 	"io"
 	"io/ioutil"
 
+	"github.com/containers/image/pkg/compression/internal"
+	"github.com/containers/image/pkg/compression/types"
 	"github.com/klauspost/pgzip"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -14,35 +16,25 @@ import (
 )
 
 // Algorithm is a compression algorithm that can be used for CompressStream.
-type Algorithm struct {
-	name         string
-	prefix       []byte
-	decompressor DecompressorFunc
-	compressor   compressorFunc
-}
+type Algorithm = types.Algorithm
 
 var (
 	// Gzip compression.
-	Gzip = Algorithm{"gzip", []byte{0x1F, 0x8B, 0x08}, GzipDecompressor, gzipCompressor}
+	Gzip = internal.NewAlgorithm("gzip", []byte{0x1F, 0x8B, 0x08}, GzipDecompressor, gzipCompressor)
 	// Bzip2 compression.
-	Bzip2 = Algorithm{"bzip2", []byte{0x42, 0x5A, 0x68}, Bzip2Decompressor, bzip2Compressor}
+	Bzip2 = internal.NewAlgorithm("bzip2", []byte{0x42, 0x5A, 0x68}, Bzip2Decompressor, bzip2Compressor)
 	// Xz compression.
-	Xz = Algorithm{"Xz", []byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}, XzDecompressor, xzCompressor}
+	Xz = internal.NewAlgorithm("Xz", []byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}, XzDecompressor, xzCompressor)
 	// Zstd compression.
-	Zstd = Algorithm{"zstd", []byte{0x28, 0xb5, 0x2f, 0xfd}, ZstdDecompressor, zstdCompressor}
+	Zstd = internal.NewAlgorithm("zstd", []byte{0x28, 0xb5, 0x2f, 0xfd}, ZstdDecompressor, zstdCompressor)
 
 	compressionAlgorithms = map[string]Algorithm{
-		Gzip.name:  Gzip,
-		Bzip2.name: Bzip2,
-		Xz.name:    Xz,
-		Zstd.name:  Zstd,
+		Gzip.Name():  Gzip,
+		Bzip2.Name(): Bzip2,
+		Xz.Name():    Xz,
+		Zstd.Name():  Zstd,
 	}
 )
-
-// Name returns the name for the compression algorithm.
-func (c Algorithm) Name() string {
-	return c.name
-}
 
 // AlgorithmByName returns the compressor by its name
 func AlgorithmByName(name string) (Algorithm, error) {
@@ -55,7 +47,7 @@ func AlgorithmByName(name string) (Algorithm, error) {
 
 // DecompressorFunc returns the decompressed stream, given a compressed stream.
 // The caller must call Close() on the decompressed stream (even if the compressed input stream does not need closing!).
-type DecompressorFunc func(io.Reader) (io.ReadCloser, error)
+type DecompressorFunc = internal.DecompressorFunc
 
 // GzipDecompressor is a DecompressorFunc for the gzip compression algorithm.
 func GzipDecompressor(r io.Reader) (io.ReadCloser, error) {
@@ -75,10 +67,6 @@ func XzDecompressor(r io.Reader) (io.ReadCloser, error) {
 	}
 	return ioutil.NopCloser(r), nil
 }
-
-// compressorFunc writes the compressed stream to the given writer using the specified compression level.
-// The caller must call Close() on the stream (even if the input stream does not need closing!).
-type compressorFunc func(io.Writer, *int) (io.WriteCloser, error)
 
 // gzipCompressor is a CompressorFunc for the gzip compression algorithm.
 func gzipCompressor(r io.Writer, level *int) (io.WriteCloser, error) {
@@ -100,7 +88,7 @@ func xzCompressor(r io.Writer, level *int) (io.WriteCloser, error) {
 
 // CompressStream returns the compressor by its name
 func CompressStream(dest io.Writer, algo Algorithm, level *int) (io.WriteCloser, error) {
-	return algo.compressor(dest, level)
+	return internal.AlgorithmCompressor(algo)(dest, level)
 }
 
 // DetectCompressionFormat returns a DecompressorFunc if the input is recognized as a compressed format, nil otherwise.
@@ -118,10 +106,10 @@ func DetectCompressionFormat(input io.Reader) (Algorithm, DecompressorFunc, io.R
 	var retAlgo Algorithm
 	var decompressor DecompressorFunc
 	for _, algo := range compressionAlgorithms {
-		if bytes.HasPrefix(buffer[:n], algo.prefix) {
-			logrus.Debugf("Detected compression format %s", algo.name)
+		if bytes.HasPrefix(buffer[:n], internal.AlgorithmPrefix(algo)) {
+			logrus.Debugf("Detected compression format %s", algo.Name())
 			retAlgo = algo
-			decompressor = algo.decompressor
+			decompressor = internal.AlgorithmDecompressor(algo)
 			break
 		}
 	}
