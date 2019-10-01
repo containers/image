@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/containers/image/types"
+	"github.com/containers/image/v4/types"
 	"github.com/containers/storage/pkg/homedir"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"

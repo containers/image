@@ -15,7 +15,7 @@ BUILD_TAGS_DARWIN_CROSS = containers_image_openpgp
 BUILDTAGS = btrfs_noversion libdm_no_deferred_remove
 BUILDFLAGS := -tags "$(BUILDTAGS)"
 
-PACKAGES := $(shell go list $(BUILDFLAGS) ./... | grep -v github.com/containers/image/vendor)
+PACKAGES := $(shell GO111MODULE=on go list $(BUILDFLAGS) ./... | grep -v github.com/containers/image/vendor)
 SOURCE_DIRS = $(shell echo $(PACKAGES) | awk 'BEGIN{FS="/"; RS=" "}{print $$4}' | uniq)
 
 PREFIX ?= ${DESTDIR}/usr
@@ -91,7 +91,7 @@ validate: lint
 	@test -z "$$(gofmt -s -l . | grep -ve '^vendor' | tee /dev/stderr)"
 
 lint:
-	@out="$$(golint $(PACKAGES))"; \
+	@out="$$(GO111MODULE="on" golint $(PACKAGES))"; \
 	if [ -n "$$out" ]; then \
 		echo "$$out"; \
 		exit 1; \

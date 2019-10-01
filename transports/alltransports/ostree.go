@@ -4,5 +4,5 @@ package alltransports
 
 import (
 	// Register the ostree transport
-	_ "github.com/containers/image/ostree"
+	_ "github.com/containers/image/v4/ostree"
 )

@@ -10,8 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/containers/image/manifest"
-	"github.com/containers/image/types"
+	"github.com/containers/image/v4/manifest"
+	"github.com/containers/image/v4/types"
 	"github.com/opencontainers/go-digest"
 )
 

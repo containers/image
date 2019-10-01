@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containers/image/types"
+	"github.com/containers/image/v4/types"
 	"github.com/klauspost/pgzip"
 	digest "github.com/opencontainers/go-digest"
 	imgspecs "github.com/opencontainers/image-spec/specs-go"

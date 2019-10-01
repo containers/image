@@ -3,8 +3,8 @@ package alltransports
 import (
 	"testing"
 
-	"github.com/containers/image/directory"
-	"github.com/containers/image/transports"
+	"github.com/containers/image/v4/directory"
+	"github.com/containers/image/v4/transports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

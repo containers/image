@@ -6,11 +6,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/containers/image/docker/policyconfiguration"
-	"github.com/containers/image/docker/reference"
-	genericImage "github.com/containers/image/image"
-	"github.com/containers/image/transports"
-	"github.com/containers/image/types"
+	"github.com/containers/image/v4/docker/policyconfiguration"
+	"github.com/containers/image/v4/docker/reference"
+	genericImage "github.com/containers/image/v4/image"
+	"github.com/containers/image/v4/transports"
+	"github.com/containers/image/v4/types"
 	"github.com/pkg/errors"
 )
 

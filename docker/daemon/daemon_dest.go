@@ -4,9 +4,9 @@ import (
 	"context"
 	"io"
 
-	"github.com/containers/image/docker/reference"
-	"github.com/containers/image/docker/tarfile"
-	"github.com/containers/image/types"
+	"github.com/containers/image/v4/docker/reference"
+	"github.com/containers/image/v4/docker/tarfile"
+	"github.com/containers/image/v4/types"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

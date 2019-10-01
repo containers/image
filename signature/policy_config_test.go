@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/containers/image/directory"
-	"github.com/containers/image/docker"
+	"github.com/containers/image/v4/directory"
+	"github.com/containers/image/v4/docker"
 	"github.com/pkg/errors"
 	// this import is needed  where we use the "atomic" transport in TestPolicyUnmarshalJSON
-	_ "github.com/containers/image/openshift"
-	"github.com/containers/image/types"
+	_ "github.com/containers/image/v4/openshift"
+	"github.com/containers/image/v4/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
