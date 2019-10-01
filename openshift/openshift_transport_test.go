@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containers/image/docker/reference"
+	"github.com/containers/image/v4/docker/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

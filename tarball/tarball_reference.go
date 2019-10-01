@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/containers/image/docker/reference"
-	"github.com/containers/image/image"
-	"github.com/containers/image/types"
+	"github.com/containers/image/v4/docker/reference"
+	"github.com/containers/image/v4/image"
+	"github.com/containers/image/v4/types"
 
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )

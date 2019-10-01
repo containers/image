@@ -3,9 +3,9 @@ package image
 import (
 	"context"
 
-	"github.com/containers/image/docker/reference"
-	"github.com/containers/image/manifest"
-	"github.com/containers/image/types"
+	"github.com/containers/image/v4/docker/reference"
+	"github.com/containers/image/v4/manifest"
+	"github.com/containers/image/v4/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
