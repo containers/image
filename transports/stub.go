@@ -3,7 +3,7 @@ package transports
 import (
 	"fmt"
 
-	"github.com/containers/image/types"
+	"github.com/containers/image/v4/types"
 )
 
 // stubTransport is an implementation of types.ImageTransport which has a name, but rejects any references with “the transport $name: is not supported in this build”.

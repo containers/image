@@ -11,7 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/containers/image/version"
+	"github.com/containers/image/v4/version"
 	"github.com/opencontainers/go-digest"
 )
 

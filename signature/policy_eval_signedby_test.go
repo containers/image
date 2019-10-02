@@ -7,10 +7,10 @@ import (
 	"path"
 	"testing"
 
-	"github.com/containers/image/directory"
-	"github.com/containers/image/docker/reference"
-	"github.com/containers/image/image"
-	"github.com/containers/image/types"
+	"github.com/containers/image/v4/directory"
+	"github.com/containers/image/v4/docker/reference"
+	"github.com/containers/image/v4/image"
+	"github.com/containers/image/v4/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
