@@ -26,6 +26,11 @@ type dockerConfigFile struct {
 	CredHelpers map[string]string           `json:"credHelpers,omitempty"`
 }
 
+type authPath struct {
+	path         string
+	legacyFormat bool
+}
+
 var (
 	defaultPerUIDPathFormat = filepath.FromSlash("/run/containers/%d/auth.json")
 	xdgRuntimeDirPath       = filepath.FromSlash("containers/auth.json")
@@ -84,28 +89,28 @@ func GetAuthentication(sys *types.SystemContext, registry string) (string, strin
 		}
 	}
 
-	dockerLegacyPath := filepath.Join(homedir.Get(), dockerLegacyHomePath)
-	var paths []string
-	pathToAuth, err := getPathToAuth(sys)
+	paths := []authPath{}
+	pathToAuth, lf, err := getPathToAuth(sys)
 	if err == nil {
-		paths = append(paths, pathToAuth)
+		paths = append(paths, authPath{path: pathToAuth, legacyFormat: lf})
 	} else {
 		// Error means that the path set for XDG_RUNTIME_DIR does not exist
 		// but we don't want to completely fail in the case that the user is pulling a public image
 		// Logging the error as a warning instead and moving on to pulling the image
 		logrus.Warnf("%v: Trying to pull image in the event that it is a public image.", err)
 	}
-	paths = append(paths, filepath.Join(homedir.Get(), dockerHomePath), dockerLegacyPath)
+	paths = append(paths,
+		authPath{path: filepath.Join(homedir.Get(), dockerHomePath), legacyFormat: false},
+		authPath{path: filepath.Join(homedir.Get(), dockerLegacyHomePath), legacyFormat: true})
 
 	for _, path := range paths {
-		legacyFormat := path == dockerLegacyPath
-		username, password, err := findAuthentication(registry, path, legacyFormat)
+		username, password, err := findAuthentication(registry, path.path, path.legacyFormat)
 		if err != nil {
 			logrus.Debugf("Credentials not found")
 			return "", "", err
 		}
 		if username != "" && password != "" {
-			logrus.Debugf("Returning credentials from %s", path)
+			logrus.Debugf("Returning credentials from %s", path.path)
 			return username, password, nil
 		}
 	}
@@ -163,13 +168,16 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 // The path can be overriden by the user if the overwrite-path flag is set
 // If the flag is not set and XDG_RUNTIME_DIR is set, the auth.json file is saved in XDG_RUNTIME_DIR/containers
 // Otherwise, the auth.json file is stored in /run/containers/UID
-func getPathToAuth(sys *types.SystemContext) (string, error) {
+func getPathToAuth(sys *types.SystemContext) (string, bool, error) {
 	if sys != nil {
 		if sys.AuthFilePath != "" {
-			return sys.AuthFilePath, nil
+			return sys.AuthFilePath, false, nil
+		}
+		if sys.LegacyFormatAuthFilePath != "" {
+			return sys.LegacyFormatAuthFilePath, true, nil
 		}
 		if sys.RootForImplicitAbsolutePaths != "" {
-			return filepath.Join(sys.RootForImplicitAbsolutePaths, fmt.Sprintf(defaultPerUIDPathFormat, os.Getuid())), nil
+			return filepath.Join(sys.RootForImplicitAbsolutePaths, fmt.Sprintf(defaultPerUIDPathFormat, os.Getuid())), false, nil
 		}
 	}
 
@@ -182,11 +190,11 @@ func getPathToAuth(sys *types.SystemContext) (string, error) {
 			// This means the user set the XDG_RUNTIME_DIR variable and either forgot to create the directory
 			// or made a typo while setting the environment variable,
 			// so return an error referring to $XDG_RUNTIME_DIR instead of xdgRuntimeDirPath inside.
-			return "", errors.Wrapf(err, "%q directory set by $XDG_RUNTIME_DIR does not exist. Either create the directory or unset $XDG_RUNTIME_DIR.", runtimeDir)
+			return "", false, errors.Wrapf(err, "%q directory set by $XDG_RUNTIME_DIR does not exist. Either create the directory or unset $XDG_RUNTIME_DIR.", runtimeDir)
 		} // else ignore err and let the caller fail accessing xdgRuntimeDirPath.
-		return filepath.Join(runtimeDir, xdgRuntimeDirPath), nil
+		return filepath.Join(runtimeDir, xdgRuntimeDirPath), false, nil
 	}
-	return fmt.Sprintf(defaultPerUIDPathFormat, os.Getuid()), nil
+	return fmt.Sprintf(defaultPerUIDPathFormat, os.Getuid()), false, nil
 }
 
 // readJSONFile unmarshals the authentications stored in the auth.json file and returns it
@@ -220,7 +228,7 @@ func readJSONFile(path string, legacyFormat bool) (dockerConfigFile, error) {
 
 // modifyJSON writes to auth.json if the dockerConfigFile has been updated
 func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (bool, error)) error {
-	path, err := getPathToAuth(sys)
+	path, legacyFormat, err := getPathToAuth(sys)
 	if err != nil {
 		return err
 	}
@@ -232,6 +240,9 @@ func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (
 		}
 	}
 
+	if legacyFormat {
+		return fmt.Errorf("writes to %s using legacy format are not supported", path)
+	}
 	auths, err := readJSONFile(path, false)
 	if err != nil {
 		return errors.Wrapf(err, "error reading JSON file %q", path)
