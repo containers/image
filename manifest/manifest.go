@@ -127,12 +127,11 @@ func GuessMIMEType(manifest []byte) string {
 			Config struct {
 				MediaType string `json:"mediaType"`
 			} `json:"config"`
-			Layers []imgspecv1.Descriptor `json:"layers"`
 		}{}
 		if err := json.Unmarshal(manifest, &ociMan); err != nil {
 			return ""
 		}
-		if ociMan.Config.MediaType == imgspecv1.MediaTypeImageConfig && len(ociMan.Layers) != 0 {
+		if ociMan.Config.MediaType == imgspecv1.MediaTypeImageConfig {
 			return imgspecv1.MediaTypeImageManifest
 		}
 		ociIndex := struct {
