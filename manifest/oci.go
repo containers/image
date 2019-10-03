@@ -95,6 +95,28 @@ func (m *OCI1) LayerInfos() []LayerInfo {
 	return blobs
 }
 
+// isOCI1NonDistributableLayer is a convenience wrapper to check if a given mime
+// type is a compressed or decompressed OCI v1 non-distributable layer.
+func isOCI1NonDistributableLayer(mimeType string) bool {
+	switch mimeType {
+	case imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributableZstd:
+		return true
+	default:
+		return false
+	}
+}
+
+// isOCI1Layer is a convenience wrapper to check if a given mime type is a
+// compressed or decompressed OCI v1 layer.
+func isOCI1Layer(mimeType string) bool {
+	switch mimeType {
+	case imgspecv1.MediaTypeImageLayer, imgspecv1.MediaTypeImageLayerGzip, imgspecv1.MediaTypeImageLayerZstd:
+		return true
+	default:
+		return false
+	}
+}
+
 // UpdateLayerInfos replaces the original layers with the specified BlobInfos (size+digest+urls), in order (the root layer first, and then successive layered layers)
 func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 	if len(m.Layers) != len(layerInfos) {
@@ -111,6 +133,12 @@ func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 		// Set the correct media types based on the specified compression
 		// operation, the desired compression algorithm AND the original media
 		// type.
+		//
+		// Note that manifests in containers-storage might be reporting the
+		// wrong media type since the original manifests are stored while layers
+		// are decompressed in storage.  Hence, we need to consider the case
+		// that an already {de}compressed layer should be {de}compressed, which
+		// is being addressed in `isSchema2{Foreign}Layer`.
 		switch info.CompressionOperation {
 		case types.PreserveOriginal:
 			// Keep the original media type.
@@ -119,11 +147,14 @@ func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 		case types.Decompress:
 			// Decompress the original media type and check if it was
 			// non-distributable one or not.
-			switch original[i].MediaType {
-			case imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributableZstd:
+			mimeType := original[i].MediaType
+			switch {
+			case isOCI1NonDistributableLayer(mimeType):
 				m.Layers[i].MediaType = imgspecv1.MediaTypeImageLayerNonDistributable
-			default:
+			case isOCI1Layer(mimeType):
 				m.Layers[i].MediaType = imgspecv1.MediaTypeImageLayer
+			default:
+				return fmt.Errorf("Error preparing updated manifest: unsupported media type for decompression: %q", original[i].MediaType)
 			}
 
 		case types.Compress:
@@ -135,23 +166,26 @@ func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 			// Compress the original media type and set the new one based on
 			// that type (distributable or not) and the specified compression
 			// algorithm. Throw an error if the algorithm is not supported.
+			mimeType := original[i].MediaType
 			switch info.CompressionAlgorithm.Name() {
 			case compression.Gzip.Name():
-				switch original[i].MediaType {
-				case imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributableZstd:
+				switch {
+				case isOCI1NonDistributableLayer(mimeType):
 					m.Layers[i].MediaType = imgspecv1.MediaTypeImageLayerNonDistributableGzip
-
-				default:
+				case isOCI1Layer(mimeType):
 					m.Layers[i].MediaType = imgspecv1.MediaTypeImageLayerGzip
+				default:
+					return fmt.Errorf("Error preparing updated manifest: unsupported media type for compression: %q", original[i].MediaType)
 				}
 
 			case compression.Zstd.Name():
-				switch original[i].MediaType {
-				case imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributableGzip:
+				switch {
+				case isOCI1NonDistributableLayer(mimeType):
 					m.Layers[i].MediaType = imgspecv1.MediaTypeImageLayerNonDistributableZstd
-
-				default:
+				case isOCI1Layer(mimeType):
 					m.Layers[i].MediaType = imgspecv1.MediaTypeImageLayerZstd
+				default:
+					return fmt.Errorf("Error preparing updated manifest: unsupported media type for compression: %q", original[i].MediaType)
 				}
 
 			default:

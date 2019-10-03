@@ -211,6 +211,28 @@ func (m *Schema2) LayerInfos() []LayerInfo {
 	return blobs
 }
 
+// isSchema2ForeignLayer is a convenience wrapper to check if a given mime type
+// is a compressed or decompressed schema 2 foreign layer.
+func isSchema2ForeignLayer(mimeType string) bool {
+	switch mimeType {
+	case DockerV2Schema2ForeignLayerMediaType, DockerV2Schema2ForeignLayerMediaTypeGzip:
+		return true
+	default:
+		return false
+	}
+}
+
+// isSchema2Layer is a convenience wrapper to check if a given mime type is a
+// compressed or decompressed schema 2 layer.
+func isSchema2Layer(mimeType string) bool {
+	switch mimeType {
+	case DockerV2SchemaLayerMediaTypeUncompressed, DockerV2Schema2LayerMediaType:
+		return true
+	default:
+		return false
+	}
+}
+
 // UpdateLayerInfos replaces the original layers with the specified BlobInfos (size+digest+urls), in order (the root layer first, and then successive layered layers)
 func (m *Schema2) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 	if len(m.LayersDescriptors) != len(layerInfos) {
@@ -227,6 +249,12 @@ func (m *Schema2) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 		// Set the correct media types based on the specified compression
 		// operation, the desired compression algorithm AND the original media
 		// type.
+		//
+		// Note that manifests in containers-storage might be reporting the
+		// wrong media type since the original manifests are stored while layers
+		// are decompressed in storage.  Hence, we need to consider the case
+		// that an already {de}compressed layer should be {de}compressed, which
+		// is being addressed in `isSchema2{Foreign}Layer`.
 		switch info.CompressionOperation {
 		case types.PreserveOriginal:
 			// Keep the original media type.
@@ -235,10 +263,11 @@ func (m *Schema2) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 		case types.Decompress:
 			// Decompress the original media type and check if it was
 			// non-distributable one or not.
-			switch original[i].MediaType {
-			case DockerV2Schema2ForeignLayerMediaTypeGzip:
+			mimeType := original[i].MediaType
+			switch {
+			case isSchema2ForeignLayer(mimeType):
 				m.LayersDescriptors[i].MediaType = DockerV2Schema2ForeignLayerMediaType
-			case DockerV2Schema2LayerMediaType:
+			case isSchema2Layer(mimeType):
 				m.LayersDescriptors[i].MediaType = DockerV2SchemaLayerMediaTypeUncompressed
 			default:
 				return fmt.Errorf("Error preparing updated manifest: unsupported media type for decompression: %q", original[i].MediaType)
@@ -255,10 +284,11 @@ func (m *Schema2) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 			// algorithm. Throw an error if the algorithm is not supported.
 			switch info.CompressionAlgorithm.Name() {
 			case compression.Gzip.Name():
-				switch original[i].MediaType {
-				case DockerV2Schema2ForeignLayerMediaType:
+				mimeType := original[i].MediaType
+				switch {
+				case isSchema2ForeignLayer(mimeType):
 					m.LayersDescriptors[i].MediaType = DockerV2Schema2ForeignLayerMediaTypeGzip
-				case DockerV2SchemaLayerMediaTypeUncompressed:
+				case isSchema2Layer(mimeType):
 					m.LayersDescriptors[i].MediaType = DockerV2Schema2LayerMediaType
 				default:
 					return fmt.Errorf("Error preparing updated manifest: unsupported media type for compression: %q", original[i].MediaType)
