@@ -72,12 +72,11 @@ test:
 # the master branch of the upstream repo.
 test-skopeo:
 	@echo === Testing skopeo build
-	@project_path=$$(pwd) && export GOPATH=$$(mktemp -d) && \
+	@project_path=$$(pwd) && project_module=$$(GO111MODULE="on" go list .) && export GOPATH=$$(mktemp -d) && \
 		skopeo_path=$${GOPATH}/src/github.com/containers/skopeo && \
-		vendor_path=$${skopeo_path}/vendor/github.com/containers/image && \
 		git clone -b $(SKOPEO_BRANCH) https://github.com/$(SKOPEO_REPO) $${skopeo_path} && \
 		cd $${skopeo_path} && \
-		GO111MODULE="on" go mod edit -replace github.com/containers/image=$${project_path} && \
+		GO111MODULE="on" go mod edit -replace $${project_module}=$${project_path} && \
 		make vendor && \
 		make BUILDTAGS="$(BUILDTAGS)" binary-local test-all-local && \
 		$(SUDO) make BUILDTAGS="$(BUILDTAGS)" check && \
