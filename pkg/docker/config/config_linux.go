@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/containers/image/internal/pkg/keyctl"
+	"github.com/containers/image/v4/internal/pkg/keyctl"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

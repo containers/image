@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	_ "github.com/containers/image/internal/testing/explicitfilepath-tmpdir"
-	"github.com/containers/image/types"
+	_ "github.com/containers/image/v4/internal/testing/explicitfilepath-tmpdir"
+	"github.com/containers/image/v4/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

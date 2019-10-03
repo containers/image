@@ -4,9 +4,9 @@ package test
 import (
 	"testing"
 
-	"github.com/containers/image/internal/testing/mocks"
+	"github.com/containers/image/v4/internal/testing/mocks"
 
-	"github.com/containers/image/types"
+	"github.com/containers/image/v4/types"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 )

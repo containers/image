@@ -5,8 +5,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/containers/image/docker/tarfile"
-	"github.com/containers/image/types"
+	"github.com/containers/image/v4/docker/tarfile"
+	"github.com/containers/image/v4/types"
 	"github.com/pkg/errors"
 )
 

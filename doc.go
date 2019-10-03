@@ -6,7 +6,7 @@
 //   	"context"
 //  	"fmt"
 //
-//  	"github.com/containers/image/docker"
+//  	"github.com/containers/image/v4/docker"
 //  )
 //
 //  func main() {

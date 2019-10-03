@@ -15,7 +15,7 @@ BUILD_TAGS_DARWIN_CROSS = containers_image_openpgp
 BUILDTAGS = btrfs_noversion libdm_no_deferred_remove
 BUILDFLAGS := -tags "$(BUILDTAGS)"
 
-PACKAGES := $(shell go list $(BUILDFLAGS) ./... | grep -v github.com/containers/image/vendor)
+PACKAGES := $(shell GO111MODULE=on go list $(BUILDFLAGS) ./...)
 SOURCE_DIRS = $(shell echo $(PACKAGES) | awk 'BEGIN{FS="/"; RS=" "}{print $$4}' | uniq)
 
 PREFIX ?= ${DESTDIR}/usr
@@ -35,7 +35,7 @@ GPGME_ENV = CGO_CFLAGS="$(shell gpgme-config --cflags 2>/dev/null)" CGO_LDFLAGS=
 all: tools test validate .gitvalidation
 
 build:
-	$(GPGME_ENV) GO111MODULE="on" go build $(BUILDFLAGS) $(PACKAGES)
+	$(GPGME_ENV) GO111MODULE="on" go build $(BUILDFLAGS) ./...
 
 $(MANPAGES): %: %.md
 	$(GOMD2MAN) -in $< -out $@
@@ -63,7 +63,7 @@ clean:
 	rm -rf tools.timestamp $(MANPAGES)
 
 test:
-	@$(GPGME_ENV) GO111MODULE="on" go test $(BUILDFLAGS) -cover $(PACKAGES)
+	@$(GPGME_ENV) GO111MODULE="on" go test $(BUILDFLAGS) -cover ./...
 
 # This is not run as part of (make all), but Travis CI does run this.
 # Demonstrating a working version of skopeo (possibly with modified SKOPEO_REPO/SKOPEO_BRANCH, e.g.
@@ -87,11 +87,11 @@ fmt:
 	@gofmt -l -s -w $(SOURCE_DIRS)
 
 validate: lint
-	@GO111MODULE="on" go vet $(PACKAGES)
+	@GO111MODULE="on" go vet ./...
 	@test -z "$$(gofmt -s -l . | grep -ve '^vendor' | tee /dev/stderr)"
 
 lint:
-	@out="$$(golint $(PACKAGES))"; \
+	@out="$$(GO111MODULE="on" golint $(PACKAGES))"; \
 	if [ -n "$$out" ]; then \
 		echo "$$out"; \
 		exit 1; \
