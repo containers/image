@@ -33,31 +33,34 @@ func TestGetPathToAuth(t *testing.T) {
 	}()
 
 	for _, c := range []struct {
-		sys      *types.SystemContext
-		xrd      string
-		expected string
+		sys          *types.SystemContext
+		xrd          string
+		expected     string
+		legacyFormat bool
 	}{
 		// Default paths
-		{&types.SystemContext{}, "", "/run/containers/" + uid + "/auth.json"},
-		{nil, "", "/run/containers/" + uid + "/auth.json"},
+		{&types.SystemContext{}, "", "/run/containers/" + uid + "/auth.json", false},
+		{nil, "", "/run/containers/" + uid + "/auth.json", false},
 		// SystemContext overrides
-		{&types.SystemContext{AuthFilePath: "/absolute/path"}, "", "/absolute/path"},
-		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, "", "/prefix/run/containers/" + uid + "/auth.json"},
+		{&types.SystemContext{AuthFilePath: "/absolute/path"}, "", "/absolute/path", false},
+		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, "", "/absolute/path", true},
+		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, "", "/prefix/run/containers/" + uid + "/auth.json", false},
 		// XDG_RUNTIME_DIR defined
-		{nil, tmpDir, tmpDir + "/containers/auth.json"},
-		{nil, tmpDir + "/thisdoesnotexist", ""},
+		{nil, tmpDir, tmpDir + "/containers/auth.json", false},
+		{nil, tmpDir + "/thisdoesnotexist", "", false},
 	} {
 		if c.xrd != "" {
 			os.Setenv("XDG_RUNTIME_DIR", c.xrd)
 		} else {
 			os.Unsetenv("XDG_RUNTIME_DIR")
 		}
-		res, err := getPathToAuth(c.sys)
+		res, lf, err := getPathToAuth(c.sys)
 		if c.expected == "" {
 			assert.Error(t, err)
 		} else {
 			require.NoError(t, err)
 			assert.Equal(t, c.expected, res)
+			assert.Equal(t, c.legacyFormat, lf)
 		}
 	}
 }

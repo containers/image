@@ -462,8 +462,15 @@ type SystemContext struct {
 	RegistriesDirPath string
 	// Path to the system-wide registries configuration file
 	SystemRegistriesConfPath string
-	// If not "", overrides the default path for the authentication file
+	// If not "", overrides the default path for the authentication file, but only new format files
 	AuthFilePath string
+	// if not "", overrides the default path for the authentication file, but with the legacy format;
+	// the code currently will by default look for legacy format files like .dockercfg in the $HOME dir;
+	// but in addition to the home dir, openshift may mount .dockercfg files (via secret mount)
+	// in locations other than the home dir; openshift components should then set this field in those cases;
+	// this field is ignored if `AuthFilePath` is set (we favor the newer format);
+	// only reading of this data is supported;
+	LegacyFormatAuthFilePath string
 	// If not "", overrides the use of platform.GOARCH when choosing an image or verifying architecture match.
 	ArchitectureChoice string
 	// If not "", overrides the use of platform.GOOS when choosing an image or verifying OS match.
