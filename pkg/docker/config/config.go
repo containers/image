@@ -32,7 +32,7 @@ type authPath struct {
 }
 
 var (
-	defaultPerUIDPathFormat = filepath.FromSlash("/run/containers/%d/auth.json")
+	defaultPerUIDPathFormat = filepath.FromSlash("/run/user/%d/containers/auth.json")
 	xdgRuntimeDirPath       = filepath.FromSlash("containers/auth.json")
 	dockerHomePath          = filepath.FromSlash(".docker/config.json")
 	dockerLegacyHomePath    = ".dockercfg"

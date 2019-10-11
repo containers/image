@@ -39,12 +39,12 @@ func TestGetPathToAuth(t *testing.T) {
 		legacyFormat bool
 	}{
 		// Default paths
-		{&types.SystemContext{}, "", "/run/containers/" + uid + "/auth.json", false},
-		{nil, "", "/run/containers/" + uid + "/auth.json", false},
+		{&types.SystemContext{}, "", "/run/user/" + uid + "/containers/auth.json", false},
+		{nil, "", "/run/user/" + uid + "/containers/auth.json", false},
 		// SystemContext overrides
 		{&types.SystemContext{AuthFilePath: "/absolute/path"}, "", "/absolute/path", false},
 		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, "", "/absolute/path", true},
-		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, "", "/prefix/run/containers/" + uid + "/auth.json", false},
+		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, "", "/prefix/run/user/" + uid + "/containers/auth.json", false},
 		// XDG_RUNTIME_DIR defined
 		{nil, tmpDir, tmpDir + "/containers/auth.json", false},
 		{nil, tmpDir + "/thisdoesnotexist", "", false},
