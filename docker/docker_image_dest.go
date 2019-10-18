@@ -19,7 +19,7 @@ import (
 	"github.com/containers/image/v4/pkg/blobinfocache/none"
 	"github.com/containers/image/v4/types"
 	"github.com/docker/distribution/registry/api/errcode"
-	"github.com/docker/distribution/registry/api/v2"
+	v2 "github.com/docker/distribution/registry/api/v2"
 	"github.com/docker/distribution/registry/client"
 	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"

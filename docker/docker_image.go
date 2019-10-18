@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"net/url"
 	"strings"
 
@@ -71,9 +70,8 @@ func GetRepositoryTags(ctx context.Context, sys *types.SystemContext, ref types.
 			return nil, err
 		}
 		defer res.Body.Close()
-		if res.StatusCode != http.StatusOK {
-			// print url also
-			return nil, errors.Errorf("Invalid status code returned when fetching tags list %d (%s)", res.StatusCode, http.StatusText(res.StatusCode))
+		if err := httpResponseToError(res); err != nil {
+			return nil, err
 		}
 
 		var tagsHolder struct {
