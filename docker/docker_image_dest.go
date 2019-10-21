@@ -61,6 +61,8 @@ func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
 	return []string{
 		imgspecv1.MediaTypeImageManifest,
 		manifest.DockerV2Schema2MediaType,
+		imgspecv1.MediaTypeImageIndex,
+		manifest.DockerV2ListMediaType,
 		manifest.DockerV2Schema1SignedMediaType,
 		manifest.DockerV2Schema1MediaType,
 	}
@@ -343,20 +345,47 @@ func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.
 }
 
 // PutManifest writes manifest to the destination.
+// When the primary manifest is a manifest list, if instanceDigest is nil, we're saving the list
+// itself, else instanceDigest contains a digest of the specific manifest instance to overwrite the
+// manifest for; when the primary manifest is not a manifest list, instanceDigest should always be nil.
 // FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 // If the destination is in principle available, refuses this manifest type (e.g. it does not recognize the schema),
 // but may accept a different manifest type, the returned error must be an ManifestTypeRejectedError.
-func (d *dockerImageDestination) PutManifest(ctx context.Context, m []byte) error {
-	digest, err := manifest.Digest(m)
-	if err != nil {
-		return err
+func (d *dockerImageDestination) PutManifest(ctx context.Context, m []byte, instanceDigest *digest.Digest) error {
+	refTail := ""
+	if instanceDigest != nil {
+		// If the instanceDigest is provided, then use it as the refTail, because the reference,
+		// whether it includes a tag or a digest, refers to the list as a whole, and not this
+		// particular instance.
+		refTail = instanceDigest.String()
+		// Double-check that the manifest we've been given matches the digest we've been given.
+		matches, err := manifest.MatchesDigest(m, *instanceDigest)
+		if err != nil {
+			return errors.Wrapf(err, "error digesting manifest in PutManifest")
+		}
+		if !matches {
+			manifestDigest, merr := manifest.Digest(m)
+			if merr != nil {
+				return errors.Wrapf(err, "Attempted to PutManifest using an explicitly specified digest (%q) that didn't match the manifest's digest (%v attempting to compute it)", instanceDigest.String(), merr)
+			}
+			return errors.Errorf("Attempted to PutManifest using an explicitly specified digest (%q) that didn't match the manifest's digest (%q)", instanceDigest.String(), manifestDigest.String())
+		}
+	} else {
+		// Compute the digest of the main manifest, or the list if it's a list, so that we
+		// have a digest value to use if we're asked to save a signature for the manifest.
+		digest, err := manifest.Digest(m)
+		if err != nil {
+			return err
+		}
+		d.manifestDigest = digest
+		// The refTail should be either a digest (which we expect to match the value we just
+		// computed) or a tag name.
+		refTail, err = d.ref.tagOrDigest()
+		if err != nil {
+			return err
+		}
 	}
-	d.manifestDigest = digest
 
-	refTail, err := d.ref.tagOrDigest()
-	if err != nil {
-		return err
-	}
 	path := fmt.Sprintf(manifestPath, reference.Path(d.ref.ref), refTail)
 
 	headers := map[string][]string{}
@@ -416,19 +445,30 @@ func isManifestInvalidError(err error) bool {
 	}
 }
 
-func (d *dockerImageDestination) PutSignatures(ctx context.Context, signatures [][]byte) error {
+// PutSignatures uploads a set of signatures to the relevant lookaside or API extension point.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to upload the signatures for (when
+// the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
+func (d *dockerImageDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
 	// Do not fail if we don’t really need to support signatures.
 	if len(signatures) == 0 {
 		return nil
 	}
+	if instanceDigest == nil {
+		if d.manifestDigest.String() == "" {
+			// This shouldn’t happen, ImageDestination users are required to call PutManifest before PutSignatures
+			return errors.Errorf("Unknown manifest digest, can't add signatures")
+		}
+		instanceDigest = &d.manifestDigest
+	}
+
 	if err := d.c.detectProperties(ctx); err != nil {
 		return err
 	}
 	switch {
 	case d.c.signatureBase != nil:
-		return d.putSignaturesToLookaside(signatures)
+		return d.putSignaturesToLookaside(signatures, instanceDigest)
 	case d.c.supportsSignatures:
-		return d.putSignaturesToAPIExtension(ctx, signatures)
+		return d.putSignaturesToAPIExtension(ctx, signatures, instanceDigest)
 	default:
 		return errors.Errorf("X-Registry-Supports-Signatures extension not supported, and lookaside is not configured")
 	}
@@ -436,7 +476,7 @@ func (d *dockerImageDestination) PutSignatures(ctx context.Context, signatures [
 
 // putSignaturesToLookaside implements PutSignatures() from the lookaside location configured in s.c.signatureBase,
 // which is not nil.
-func (d *dockerImageDestination) putSignaturesToLookaside(signatures [][]byte) error {
+func (d *dockerImageDestination) putSignaturesToLookaside(signatures [][]byte, instanceDigest *digest.Digest) error {
 	// FIXME? This overwrites files one at a time, definitely not atomic.
 	// A failure when updating signatures with a reordered copy could lose some of them.
 
@@ -445,14 +485,9 @@ func (d *dockerImageDestination) putSignaturesToLookaside(signatures [][]byte) e
 		return nil
 	}
 
-	if d.manifestDigest.String() == "" {
-		// This shouldn’t happen, ImageDestination users are required to call PutManifest before PutSignatures
-		return errors.Errorf("Unknown manifest digest, can't add signatures")
-	}
-
 	// NOTE: Keep this in sync with docs/signature-protocols.md!
 	for i, signature := range signatures {
-		url := signatureStorageURL(d.c.signatureBase, d.manifestDigest, i)
+		url := signatureStorageURL(d.c.signatureBase, *instanceDigest, i)
 		if url == nil {
 			return errors.Errorf("Internal error: signatureStorageURL with non-nil base returned nil")
 		}
@@ -467,7 +502,7 @@ func (d *dockerImageDestination) putSignaturesToLookaside(signatures [][]byte) e
 	// is enough for dockerImageSource to stop looking for other signatures, so that
 	// is sufficient.
 	for i := len(signatures); ; i++ {
-		url := signatureStorageURL(d.c.signatureBase, d.manifestDigest, i)
+		url := signatureStorageURL(d.c.signatureBase, *instanceDigest, i)
 		if url == nil {
 			return errors.Errorf("Internal error: signatureStorageURL with non-nil base returned nil")
 		}
@@ -527,22 +562,17 @@ func (c *dockerClient) deleteOneSignature(url *url.URL) (missing bool, err error
 }
 
 // putSignaturesToAPIExtension implements PutSignatures() using the X-Registry-Supports-Signatures API extension.
-func (d *dockerImageDestination) putSignaturesToAPIExtension(ctx context.Context, signatures [][]byte) error {
+func (d *dockerImageDestination) putSignaturesToAPIExtension(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
 	// Skip dealing with the manifest digest, or reading the old state, if not necessary.
 	if len(signatures) == 0 {
 		return nil
-	}
-
-	if d.manifestDigest.String() == "" {
-		// This shouldn’t happen, ImageDestination users are required to call PutManifest before PutSignatures
-		return errors.Errorf("Unknown manifest digest, can't add signatures")
 	}
 
 	// Because image signatures are a shared resource in Atomic Registry, the default upload
 	// always adds signatures.  Eventually we should also allow removing signatures,
 	// but the X-Registry-Supports-Signatures API extension does not support that yet.
 
-	existingSignatures, err := d.c.getExtensionsSignatures(ctx, d.ref, d.manifestDigest)
+	existingSignatures, err := d.c.getExtensionsSignatures(ctx, d.ref, *instanceDigest)
 	if err != nil {
 		return err
 	}
@@ -567,7 +597,7 @@ sigExists:
 			if err != nil || n != 16 {
 				return errors.Wrapf(err, "Error generating random signature len %d", n)
 			}
-			signatureName = fmt.Sprintf("%s@%032x", d.manifestDigest.String(), randBytes)
+			signatureName = fmt.Sprintf("%s@%032x", instanceDigest.String(), randBytes)
 			if _, ok := existingSigNames[signatureName]; !ok {
 				break
 			}
@@ -606,6 +636,6 @@ sigExists:
 // WARNING: This does not have any transactional semantics:
 // - Uploaded data MAY be visible to others before Commit() is called
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
-func (d *dockerImageDestination) Commit(ctx context.Context) error {
+func (d *dockerImageDestination) Commit(context.Context, types.UnparsedImage) error {
 	return nil
 }

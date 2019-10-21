@@ -7,6 +7,7 @@ import (
 
 	"github.com/containers/image/v4/types"
 	"github.com/containers/storage/pkg/archive"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 
@@ -105,19 +106,26 @@ func (d *ociArchiveImageDestination) TryReusingBlob(ctx context.Context, info ty
 	return d.unpackedDest.TryReusingBlob(ctx, info, cache, canSubstitute)
 }
 
-// PutManifest writes manifest to the destination
-func (d *ociArchiveImageDestination) PutManifest(ctx context.Context, m []byte) error {
-	return d.unpackedDest.PutManifest(ctx, m)
+// PutManifest writes the manifest to the destination.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to overwrite the manifest for (when
+// the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
+// It is expected but not enforced that the instanceDigest, when specified, matches the digest of `manifest` as generated
+// by `manifest.Digest()`.
+func (d *ociArchiveImageDestination) PutManifest(ctx context.Context, m []byte, instanceDigest *digest.Digest) error {
+	return d.unpackedDest.PutManifest(ctx, m, instanceDigest)
 }
 
-func (d *ociArchiveImageDestination) PutSignatures(ctx context.Context, signatures [][]byte) error {
-	return d.unpackedDest.PutSignatures(ctx, signatures)
+// PutSignatures writes a set of signatures to the destination.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to write or overwrite the signatures for
+// (when the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
+func (d *ociArchiveImageDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
+	return d.unpackedDest.PutSignatures(ctx, signatures, instanceDigest)
 }
 
 // Commit marks the process of storing the image as successful and asks for the image to be persisted
 // after the directory is made, it is tarred up into a file and the directory is deleted
-func (d *ociArchiveImageDestination) Commit(ctx context.Context) error {
-	if err := d.unpackedDest.Commit(ctx); err != nil {
+func (d *ociArchiveImageDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {
+	if err := d.unpackedDest.Commit(ctx, unparsedToplevel); err != nil {
 		return errors.Wrapf(err, "error storing image %q", d.ref.image)
 	}
 

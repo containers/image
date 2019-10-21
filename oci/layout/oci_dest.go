@@ -38,6 +38,7 @@ func newImageDestination(sys *types.SystemContext, ref ociReference) (types.Imag
 			Versioned: imgspec.Versioned{
 				SchemaVersion: 2,
 			},
+			Annotations: make(map[string]string),
 		}
 	}
 
@@ -73,6 +74,7 @@ func (d *ociImageDestination) Close() error {
 func (d *ociImageDestination) SupportedManifestMIMETypes() []string {
 	return []string{
 		imgspecv1.MediaTypeImageManifest,
+		imgspecv1.MediaTypeImageIndex,
 	}
 }
 
@@ -205,20 +207,27 @@ func (d *ociImageDestination) TryReusingBlob(ctx context.Context, info types.Blo
 	return true, types.BlobInfo{Digest: info.Digest, Size: finfo.Size()}, nil
 }
 
-// PutManifest writes manifest to the destination.
+// PutManifest writes a manifest to the destination.  Per our list of supported manifest MIME types,
+// this should be either an OCI manifest (possibly converted to this format by the caller) or index,
+// neither of which we'll need to modify further.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to overwrite the manifest for (when
+// the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
+// It is expected but not enforced that the instanceDigest, when specified, matches the digest of `manifest` as generated
+// by `manifest.Digest()`.
 // FIXME? This should also receive a MIME type if known, to differentiate between schema versions.
 // If the destination is in principle available, refuses this manifest type (e.g. it does not recognize the schema),
 // but may accept a different manifest type, the returned error must be an ManifestTypeRejectedError.
-func (d *ociImageDestination) PutManifest(ctx context.Context, m []byte) error {
-	digest, err := manifest.Digest(m)
-	if err != nil {
-		return err
+func (d *ociImageDestination) PutManifest(ctx context.Context, m []byte, instanceDigest *digest.Digest) error {
+	var digest digest.Digest
+	var err error
+	if instanceDigest != nil {
+		digest = *instanceDigest
+	} else {
+		digest, err = manifest.Digest(m)
+		if err != nil {
+			return err
+		}
 	}
-	desc := imgspecv1.Descriptor{}
-	desc.Digest = digest
-	// TODO(runcom): beaware and add support for OCI manifest list
-	desc.MediaType = imgspecv1.MediaTypeImageManifest
-	desc.Size = int64(len(m))
 
 	blobPath, err := d.ref.blobPath(digest, d.sharedBlobDir)
 	if err != nil {
@@ -231,32 +240,59 @@ func (d *ociImageDestination) PutManifest(ctx context.Context, m []byte) error {
 		return err
 	}
 
+	if instanceDigest != nil {
+		return nil
+	}
+
+	// If we had platform information, we'd build an imgspecv1.Platform structure here.
+
+	// Start filling out the descriptor for this entry
+	desc := imgspecv1.Descriptor{}
+	desc.Digest = digest
+	desc.Size = int64(len(m))
 	if d.ref.image != "" {
-		annotations := make(map[string]string)
-		annotations["org.opencontainers.image.ref.name"] = d.ref.image
-		desc.Annotations = annotations
+		desc.Annotations = make(map[string]string)
+		desc.Annotations[imgspecv1.AnnotationRefName] = d.ref.image
 	}
-	desc.Platform = &imgspecv1.Platform{
-		Architecture: runtime.GOARCH,
-		OS:           runtime.GOOS,
-	}
+
+	// If we knew the MIME type, we wouldn't have to guess here.
+	desc.MediaType = manifest.GuessMIMEType(m)
+
 	d.addManifest(&desc)
 
 	return nil
 }
 
 func (d *ociImageDestination) addManifest(desc *imgspecv1.Descriptor) {
+	// If the new entry has a name, remove any conflicting names which we already have.
+	if desc.Annotations != nil && desc.Annotations[imgspecv1.AnnotationRefName] != "" {
+		// The name is being set on a new entry, so remove any older ones that had the same name.
+		// We might be storing an index and all of its component images, and we'll want to attach
+		// the name to the last one, which is the index.
+		for i, manifest := range d.index.Manifests {
+			if manifest.Annotations[imgspecv1.AnnotationRefName] == desc.Annotations[imgspecv1.AnnotationRefName] {
+				delete(d.index.Manifests[i].Annotations, imgspecv1.AnnotationRefName)
+				break
+			}
+		}
+	}
+	// If it has the same digest as another entry in the index, we already overwrote the file,
+	// so just pick up the other information.
 	for i, manifest := range d.index.Manifests {
-		if manifest.Annotations["org.opencontainers.image.ref.name"] == desc.Annotations["org.opencontainers.image.ref.name"] {
-			// TODO Should there first be a cleanup based on the descriptor we are going to replace?
+		if manifest.Digest == desc.Digest {
+			// Replace it completely.
 			d.index.Manifests[i] = *desc
 			return
 		}
 	}
+	// It's a new entry to be added to the index.
 	d.index.Manifests = append(d.index.Manifests, *desc)
 }
 
-func (d *ociImageDestination) PutSignatures(ctx context.Context, signatures [][]byte) error {
+// PutSignatures would add the given signatures to the oci layout (currently not supported).
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to write or overwrite the signatures for
+// (when the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
+func (d *ociImageDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
 	if len(signatures) != 0 {
 		return errors.Errorf("Pushing signatures for OCI images is not supported")
 	}
@@ -267,7 +303,7 @@ func (d *ociImageDestination) PutSignatures(ctx context.Context, signatures [][]
 // WARNING: This does not have any transactional semantics:
 // - Uploaded data MAY be visible to others before Commit() is called
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
-func (d *ociImageDestination) Commit(ctx context.Context) error {
+func (d *ociImageDestination) Commit(context.Context, types.UnparsedImage) error {
 	if err := ioutil.WriteFile(d.ref.ociLayoutPath(), []byte(`{"imageLayoutVersion": "1.0.0"}`), 0644); err != nil {
 		return err
 	}

@@ -248,9 +248,8 @@ func (is *tarballImageSource) GetManifest(ctx context.Context, instanceDigest *d
 }
 
 // GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
-// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
-// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
-// (e.g. if the source never returns manifest lists).
+// This source implementation does not support manifest lists, so the passed-in instanceDigest should always be nil,
+// as there can be no secondary manifests.
 func (*tarballImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
 	if instanceDigest != nil {
 		return nil, fmt.Errorf("manifest lists are not supported by the %q transport", transportName)
@@ -262,7 +261,14 @@ func (is *tarballImageSource) Reference() types.ImageReference {
 	return &is.reference
 }
 
-// LayerInfosForCopy() returns updated layer info that should be used when reading, in preference to values in the manifest, if specified.
-func (*tarballImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+// LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer
+// blobsums that are listed in the image's manifest.  If values are returned, they should be used when using GetBlob()
+// to read the image's layers.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve BlobInfos for
+// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
+// (e.g. if the source never returns manifest lists).
+// The Digest field is guaranteed to be provided; Size may be -1.
+// WARNING: The list may contain duplicates, and they are semantically relevant.
+func (*tarballImageSource) LayerInfosForCopy(context.Context, *digest.Digest) ([]types.BlobInfo, error) {
 	return nil, nil
 }

@@ -67,6 +67,6 @@ func (d *archiveImageDestination) Close() error {
 // WARNING: This does not have any transactional semantics:
 // - Uploaded data MAY be visible to others before Commit() is called
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
-func (d *archiveImageDestination) Commit(ctx context.Context) error {
+func (d *archiveImageDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {
 	return d.Destination.Commit(ctx)
 }

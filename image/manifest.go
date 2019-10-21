@@ -58,6 +58,8 @@ func manifestInstanceFromBlob(ctx context.Context, sys *types.SystemContext, src
 		return manifestSchema2FromManifest(src, manblob)
 	case manifest.DockerV2ListMediaType:
 		return manifestSchema2FromManifestList(ctx, sys, src, manblob)
+	case imgspecv1.MediaTypeImageIndex:
+		return manifestOCI1FromImageIndex(ctx, sys, src, manblob)
 	default: // Note that this may not be reachable, manifest.NormalizedMIMEType has a default for unknown values.
 		return nil, fmt.Errorf("Unimplemented manifest MIME type %s", mt)
 	}

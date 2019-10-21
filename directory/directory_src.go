@@ -9,7 +9,6 @@ import (
 	"github.com/containers/image/v4/manifest"
 	"github.com/containers/image/v4/types"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
 )
 
 type dirImageSource struct {
@@ -38,10 +37,7 @@ func (s *dirImageSource) Close() error {
 // If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve (when the primary manifest is a manifest list);
 // this never happens if the primary manifest is not a manifest list (e.g. if the source never returns manifest lists).
 func (s *dirImageSource) GetManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error) {
-	if instanceDigest != nil {
-		return nil, "", errors.Errorf(`Getting target manifest not supported by "dir:"`)
-	}
-	m, err := ioutil.ReadFile(s.ref.manifestPath())
+	m, err := ioutil.ReadFile(s.ref.manifestPath(instanceDigest))
 	if err != nil {
 		return nil, "", err
 	}
@@ -73,12 +69,9 @@ func (s *dirImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache
 // (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
 // (e.g. if the source never returns manifest lists).
 func (s *dirImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
-	if instanceDigest != nil {
-		return nil, errors.Errorf(`Manifests lists are not supported by "dir:"`)
-	}
 	signatures := [][]byte{}
 	for i := 0; ; i++ {
-		signature, err := ioutil.ReadFile(s.ref.signaturePath(i))
+		signature, err := ioutil.ReadFile(s.ref.signaturePath(i, instanceDigest))
 		if err != nil {
 			if os.IsNotExist(err) {
 				break
@@ -90,7 +83,14 @@ func (s *dirImageSource) GetSignatures(ctx context.Context, instanceDigest *dige
 	return signatures, nil
 }
 
-// LayerInfosForCopy() returns updated layer info that should be used when copying, in preference to values in the manifest, if specified.
-func (s *dirImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+// LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer
+// blobsums that are listed in the image's manifest.  If values are returned, they should be used when using GetBlob()
+// to read the image's layers.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve BlobInfos for
+// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
+// (e.g. if the source never returns manifest lists).
+// The Digest field is guaranteed to be provided; Size may be -1.
+// WARNING: The list may contain duplicates, and they are semantically relevant.
+func (s *dirImageSource) LayerInfosForCopy(context.Context, *digest.Digest) ([]types.BlobInfo, error) {
 	return nil, nil
 }

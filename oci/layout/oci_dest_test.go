@@ -1,13 +1,16 @@
 package layout
 
 import (
+	"bytes"
 	"context"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/containers/image/v4/pkg/blobinfocache/memory"
 	"github.com/containers/image/v4/types"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,7 +59,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	_, err = dest.PutBlob(context.Background(), reader, types.BlobInfo{Digest: blobDigest, Size: -1}, cache, false)
 	assert.Error(t, err)
 	assert.Contains(t, digestErrorString, err.Error())
-	err = dest.Commit(context.Background())
+	err = dest.Commit(context.Background(), nil)
 	assert.NoError(t, err)
 
 	_, err = os.Lstat(blobPath)
@@ -96,23 +99,27 @@ func TestPutManifestTwice(t *testing.T) {
 	ociRef, ok := ref.(ociReference)
 	require.True(t, ok)
 
+	putTestConfig(t, ociRef, tmpDir)
 	putTestManifest(t, ociRef, tmpDir)
 	putTestManifest(t, ociRef, tmpDir)
 
 	index, err := ociRef.getIndex()
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(index.Manifests), "Unexpected number of manifests")
+	assert.Equal(t, 2, len(index.Manifests), "Unexpected number of manifests")
 }
 
-func putTestManifest(t *testing.T, ociRef ociReference, tmpDir string) {
+func putTestConfig(t *testing.T, ociRef ociReference, tmpDir string) {
+	data, err := ioutil.ReadFile("../../image/fixtures/oci1-config.json")
+	assert.NoError(t, err)
 	imageDest, err := newImageDestination(nil, ociRef)
 	assert.NoError(t, err)
 
-	data := []byte("abc")
-	err = imageDest.PutManifest(context.Background(), data)
+	cache := memory.New()
+
+	_, err = imageDest.PutBlob(context.Background(), bytes.NewReader(data), types.BlobInfo{Size: int64(len(data)), Digest: digest.FromBytes(data)}, cache, true)
 	assert.NoError(t, err)
 
-	err = imageDest.Commit(context.Background())
+	err = imageDest.Commit(context.Background(), nil)
 	assert.NoError(t, err)
 
 	paths := []string{}
@@ -121,6 +128,28 @@ func putTestManifest(t *testing.T, ociRef ociReference, tmpDir string) {
 		return nil
 	})
 
-	digest := "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+	digest := digest.FromBytes(data).Encoded()
+	assert.Contains(t, paths, filepath.Join(tmpDir, "blobs", "sha256", digest), "The OCI directory does not contain the new config data")
+}
+
+func putTestManifest(t *testing.T, ociRef ociReference, tmpDir string) {
+	data, err := ioutil.ReadFile("../../image/fixtures/oci1.json")
+	assert.NoError(t, err)
+	imageDest, err := newImageDestination(nil, ociRef)
+	assert.NoError(t, err)
+
+	err = imageDest.PutManifest(context.Background(), data, nil)
+	assert.NoError(t, err)
+
+	err = imageDest.Commit(context.Background(), nil)
+	assert.NoError(t, err)
+
+	paths := []string{}
+	filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+		paths = append(paths, path)
+		return nil
+	})
+
+	digest := digest.FromBytes(data).Encoded()
 	assert.Contains(t, paths, filepath.Join(tmpDir, "blobs", "sha256", digest), "The OCI directory does not contain the new manifest data")
 }

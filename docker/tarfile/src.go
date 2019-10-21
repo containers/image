@@ -349,10 +349,12 @@ func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manif
 // It may use a remote (= slow) service.
 // If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve (when the primary manifest is a manifest list);
 // this never happens if the primary manifest is not a manifest list (e.g. if the source never returns manifest lists).
+// This source implementation does not support manifest lists, so the passed-in instanceDigest should always be nil,
+// as the primary manifest can not be a list, so there can be no secondary instances.
 func (s *Source) GetManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error) {
 	if instanceDigest != nil {
 		// How did we even get here? GetManifest(ctx, nil) has returned a manifest.DockerV2Schema2MediaType.
-		return nil, "", errors.Errorf(`Manifest lists are not supported by "docker-daemon:"`)
+		return nil, "", errors.New(`Manifest lists are not supported by "docker-daemon:"`)
 	}
 	if s.generatedManifest == nil {
 		if err := s.ensureCachedDataIsPresent(); err != nil {
@@ -466,13 +468,23 @@ func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo, cache types.B
 }
 
 // GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
-// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
-// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
-// (e.g. if the source never returns manifest lists).
+// This source implementation does not support manifest lists, so the passed-in instanceDigest should always be nil,
+// as there can be no secondary manifests.
 func (s *Source) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
 	if instanceDigest != nil {
 		// How did we even get here? GetManifest(ctx, nil) has returned a manifest.DockerV2Schema2MediaType.
 		return nil, errors.Errorf(`Manifest lists are not supported by "docker-daemon:"`)
 	}
 	return [][]byte{}, nil
+}
+
+// LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer
+// blobsums that are listed in the image's manifest.  If values are returned, they should be used when using GetBlob()
+// to read the image's layers.
+// This source implementation does not support manifest lists, so the passed-in instanceDigest should always be nil,
+// as the primary manifest can not be a list, so there can be no secondary manifests.
+// The Digest field is guaranteed to be provided; Size may be -1.
+// WARNING: The list may contain duplicates, and they are semantically relevant.
+func (s *Source) LayerInfosForCopy(context.Context, *digest.Digest) ([]types.BlobInfo, error) {
+	return nil, nil
 }

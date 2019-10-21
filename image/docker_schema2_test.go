@@ -41,7 +41,7 @@ func (f unusedImageSource) GetBlob(context.Context, types.BlobInfo, types.BlobIn
 func (f unusedImageSource) GetSignatures(context.Context, *digest.Digest) ([][]byte, error) {
 	panic("Unexpected call to a mock function")
 }
-func (f unusedImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+func (f unusedImageSource) LayerInfosForCopy(context.Context, *digest.Digest) ([]types.BlobInfo, error) {
 	panic("Unexpected call to a mock function")
 }
 
@@ -430,13 +430,13 @@ func (d *memoryImageDest) PutBlob(ctx context.Context, stream io.Reader, inputIn
 func (d *memoryImageDest) TryReusingBlob(context.Context, types.BlobInfo, types.BlobInfoCache, bool) (bool, types.BlobInfo, error) {
 	panic("Unexpected call to a mock function")
 }
-func (d *memoryImageDest) PutManifest(ctx context.Context, m []byte) error {
+func (d *memoryImageDest) PutManifest(context.Context, []byte, *digest.Digest) error {
 	panic("Unexpected call to a mock function")
 }
-func (d *memoryImageDest) PutSignatures(ctx context.Context, signatures [][]byte) error {
+func (d *memoryImageDest) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
 	panic("Unexpected call to a mock function")
 }
-func (d *memoryImageDest) Commit(ctx context.Context) error {
+func (d *memoryImageDest) Commit(context.Context, types.UnparsedImage) error {
 	panic("Unexpected call to a mock function")
 }
 

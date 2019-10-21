@@ -14,10 +14,12 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	imanifest "github.com/containers/image/v4/manifest"
 	"github.com/containers/image/v4/pkg/blobinfocache/memory"
 	"github.com/containers/image/v4/types"
 	"github.com/containers/storage"
@@ -271,6 +273,10 @@ func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, i
 		if n != len(buf) {
 			t.Fatalf("Short write writing tar header: %d < %d", n, len(buf))
 		}
+		err = twriter.Flush()
+		if err != nil {
+			t.Fatalf("Error flushing output to tar archive: %v", err)
+		}
 	}()
 	_, err = io.Copy(&tbuffer, preader)
 	if err != nil {
@@ -394,13 +400,19 @@ func TestWriteRead(t *testing.T) {
 		manifest = strings.Replace(manifest, "%li", li, -1)
 		manifest = strings.Replace(manifest, "%ci", sum.Hex(), -1)
 		t.Logf("this manifest is %q", manifest)
-		if err := dest.PutManifest(context.Background(), []byte(manifest)); err != nil {
+		if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
 			t.Fatalf("Error saving manifest to destination: %v", err)
 		}
-		if err := dest.PutSignatures(context.Background(), signatures); err != nil {
+		if err := dest.PutSignatures(context.Background(), signatures, nil); err != nil {
 			t.Fatalf("Error saving signatures to destination: %v", err)
 		}
-		if err := dest.Commit(context.Background()); err != nil {
+		unparsedToplevel := unparsedImage{
+			imageReference: nil,
+			manifestBytes:  []byte(manifest),
+			manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
+			signatures:     signatures,
+		}
+		if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
 			t.Fatalf("Error committing changes to destination: %v", err)
 		}
 		dest.Close()
@@ -454,10 +466,16 @@ func TestWriteRead(t *testing.T) {
 			t.Fatalf("GetManifest(%q) returned error %v", ref.StringWithinTransport(), err)
 		}
 		t.Logf("this manifest's type appears to be %q", manifestType)
-		sum = ddigest.SHA256.FromBytes([]byte(manifest))
-		_, _, err = src.GetManifest(context.Background(), &sum)
-		if err == nil {
-			t.Fatalf("GetManifest(%q) with an instanceDigest is supposed to fail", ref.StringWithinTransport())
+		sum, err = imanifest.Digest([]byte(manifest))
+		if err != nil {
+			t.Fatalf("manifest.Digest() returned error %v", err)
+		}
+		retrieved, _, err := src.GetManifest(context.Background(), &sum)
+		if err != nil {
+			t.Fatalf("GetManifest(%q) with an instanceDigest is supposed to succeed", ref.StringWithinTransport())
+		}
+		if string(retrieved) != string(manifest) {
+			t.Fatalf("GetManifest(%q) with an instanceDigest retrieved a different manifest", ref.StringWithinTransport())
 		}
 		sigs, err := src.GetSignatures(context.Background(), nil)
 		if err != nil {
@@ -474,9 +492,12 @@ func TestWriteRead(t *testing.T) {
 				t.Fatalf("Signature %d was corrupted", i)
 			}
 		}
-		_, err = src.GetSignatures(context.Background(), &sum)
-		if err == nil {
-			t.Fatalf("GetSignatures(%q) with instanceDigest is supposed to fail", ref.StringWithinTransport())
+		sigs2, err := src.GetSignatures(context.Background(), &sum)
+		if err != nil {
+			t.Fatalf("GetSignatures(%q) with instance %s returned error %v", ref.StringWithinTransport(), sum.String(), err)
+		}
+		if !reflect.DeepEqual(sigs, sigs2) {
+			t.Fatalf("GetSignatures(%q) with instance %s returned a different result", ref.StringWithinTransport(), sum.String())
 		}
 		for _, layerInfo := range layerInfos {
 			buf := bytes.Buffer{}
@@ -493,6 +514,7 @@ func TestWriteRead(t *testing.T) {
 				t.Fatalf("Error decompressing layer %q from %q", layerInfo.Digest, ref.StringWithinTransport())
 			}
 			n, err := io.Copy(&buf, decompressed)
+			layer.Close()
 			if layerInfo.Size >= 0 && compressed.Count != layerInfo.Size {
 				t.Fatalf("Blob size is different than expected: %d != %d, read %d", compressed.Count, layerInfo.Size, n)
 			}
@@ -556,10 +578,16 @@ func TestDuplicateName(t *testing.T) {
 		    ]
 		}
 	`, digest, size)
-	if err := dest.PutManifest(context.Background(), []byte(manifest)); err != nil {
+	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
-	if err := dest.Commit(context.Background()); err != nil {
+	unparsedToplevel := unparsedImage{
+		imageReference: nil,
+		manifestBytes:  []byte(manifest),
+		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
+		signatures:     nil,
+	}
+	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
 		t.Fatalf("Error committing changes to destination, first pass: %v", err)
 	}
 	dest.Close()
@@ -591,10 +619,16 @@ func TestDuplicateName(t *testing.T) {
 		    ]
 		}
 	`, digest, size)
-	if err := dest.PutManifest(context.Background(), []byte(manifest)); err != nil {
+	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
-	if err := dest.Commit(context.Background()); err != nil {
+	unparsedToplevel = unparsedImage{
+		imageReference: nil,
+		manifestBytes:  []byte(manifest),
+		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
+		signatures:     nil,
+	}
+	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
 		t.Fatalf("Error committing changes to destination, second pass: %v", err)
 	}
 	dest.Close()
@@ -643,10 +677,16 @@ func TestDuplicateID(t *testing.T) {
 		    ]
 		}
 	`, digest, size)
-	if err := dest.PutManifest(context.Background(), []byte(manifest)); err != nil {
+	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
-	if err := dest.Commit(context.Background()); err != nil {
+	unparsedToplevel := unparsedImage{
+		imageReference: nil,
+		manifestBytes:  []byte(manifest),
+		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
+		signatures:     nil,
+	}
+	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
 		t.Fatalf("Error committing changes to destination, first pass: %v", err)
 	}
 	dest.Close()
@@ -678,10 +718,16 @@ func TestDuplicateID(t *testing.T) {
 		    ]
 		}
 	`, digest, size)
-	if err := dest.PutManifest(context.Background(), []byte(manifest)); err != nil {
+	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
-	if err := dest.Commit(context.Background()); errors.Cause(err) != storage.ErrDuplicateID {
+	unparsedToplevel = unparsedImage{
+		imageReference: nil,
+		manifestBytes:  []byte(manifest),
+		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
+		signatures:     nil,
+	}
+	if err := dest.Commit(context.Background(), &unparsedToplevel); errors.Cause(err) != storage.ErrDuplicateID {
 		if err != nil {
 			t.Fatalf("Wrong error committing changes to destination, second pass: %v", err)
 		}
@@ -733,10 +779,16 @@ func TestDuplicateNameID(t *testing.T) {
 		    ]
 		}
 	`, digest, size)
-	if err := dest.PutManifest(context.Background(), []byte(manifest)); err != nil {
+	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
-	if err := dest.Commit(context.Background()); err != nil {
+	unparsedToplevel := unparsedImage{
+		imageReference: nil,
+		manifestBytes:  []byte(manifest),
+		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
+		signatures:     nil,
+	}
+	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
 		t.Fatalf("Error committing changes to destination, first pass: %v", err)
 	}
 	dest.Close()
@@ -768,10 +820,16 @@ func TestDuplicateNameID(t *testing.T) {
 		    ]
 		}
 	`, digest, size)
-	if err := dest.PutManifest(context.Background(), []byte(manifest)); err != nil {
+	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
-	if err := dest.Commit(context.Background()); errors.Cause(err) != storage.ErrDuplicateID {
+	unparsedToplevel = unparsedImage{
+		imageReference: nil,
+		manifestBytes:  []byte(manifest),
+		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
+		signatures:     nil,
+	}
+	if err := dest.Commit(context.Background(), &unparsedToplevel); errors.Cause(err) != storage.ErrDuplicateID {
 		if err != nil {
 			t.Fatalf("Wrong error committing changes to destination, second pass: %v", err)
 		}
@@ -889,10 +947,16 @@ func TestSize(t *testing.T) {
 		    ]
 		}
 	`, configInfo.Size, configInfo.Digest, digest1, size1, digest2, size2)
-	if err := dest.PutManifest(context.Background(), []byte(manifest)); err != nil {
+	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
-	if err := dest.Commit(context.Background()); err != nil {
+	unparsedToplevel := unparsedImage{
+		imageReference: nil,
+		manifestBytes:  []byte(manifest),
+		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
+		signatures:     nil,
+	}
+	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
 		t.Fatalf("Error committing changes to destination: %v", err)
 	}
 	dest.Close()
@@ -905,8 +969,8 @@ func TestSize(t *testing.T) {
 	if usize == -1 || err != nil {
 		t.Fatalf("Error calculating image size: %v", err)
 	}
-	if int(usize) != len(config)+int(usize1)+int(usize2)+len(manifest) {
-		t.Fatalf("Unexpected image size: %d != %d + %d + %d + %d", usize, len(config), usize1, usize2, len(manifest))
+	if int(usize) != len(config)+int(usize1)+int(usize2)+2*len(manifest) {
+		t.Fatalf("Unexpected image size: %d != %d + %d + %d + %d (%d)", usize, len(config), usize1, usize2, len(manifest), len(config)+int(usize1)+int(usize2)+2*len(manifest))
 	}
 	img.Close()
 }
@@ -1000,10 +1064,16 @@ func TestDuplicateBlob(t *testing.T) {
 		    ]
 		}
 	`, configInfo.Size, configInfo.Digest, digest1, size1, digest2, size2, digest1, size1, digest2, size2)
-	if err := dest.PutManifest(context.Background(), []byte(manifest)); err != nil {
+	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
-	if err := dest.Commit(context.Background()); err != nil {
+	unparsedToplevel := unparsedImage{
+		imageReference: nil,
+		manifestBytes:  []byte(manifest),
+		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
+		signatures:     nil,
+	}
+	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
 		t.Fatalf("Error committing changes to destination: %v", err)
 	}
 	dest.Close()
@@ -1046,4 +1116,21 @@ func TestDuplicateBlob(t *testing.T) {
 	}
 	src.Close()
 	img.Close()
+}
+
+type unparsedImage struct {
+	imageReference types.ImageReference
+	manifestBytes  []byte
+	manifestType   string
+	signatures     [][]byte
+}
+
+func (u *unparsedImage) Reference() types.ImageReference {
+	return u.imageReference
+}
+func (u *unparsedImage) Manifest(context.Context) ([]byte, string, error) {
+	return u.manifestBytes, u.manifestType, nil
+}
+func (u *unparsedImage) Signatures(context.Context) ([][]byte, error) {
+	return u.signatures, nil
 }

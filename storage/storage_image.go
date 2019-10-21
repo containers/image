@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,38 +33,38 @@ import (
 var (
 	// ErrBlobDigestMismatch is returned when PutBlob() is given a blob
 	// with a digest-based name that doesn't match its contents.
-	ErrBlobDigestMismatch = errors.New("blob digest mismatch")
+	ErrBlobDigestMismatch = stderrors.New("blob digest mismatch")
 	// ErrBlobSizeMismatch is returned when PutBlob() is given a blob
 	// with an expected size that doesn't match the reader.
-	ErrBlobSizeMismatch = errors.New("blob size mismatch")
-	// ErrNoManifestLists is returned when GetManifest() is called.
-	// with a non-nil instanceDigest.
-	ErrNoManifestLists = errors.New("manifest lists are not supported by this transport")
+	ErrBlobSizeMismatch = stderrors.New("blob size mismatch")
 	// ErrNoSuchImage is returned when we attempt to access an image which
 	// doesn't exist in the storage area.
 	ErrNoSuchImage = storage.ErrNotAnImage
 )
 
 type storageImageSource struct {
-	imageRef       storageReference
-	image          *storage.Image
-	layerPosition  map[digest.Digest]int // Where we are in reading a blob's layers
-	cachedManifest []byte                // A cached copy of the manifest, if already known, or nil
-	getBlobMutex   sync.Mutex            // Mutex to sync state for parallel GetBlob executions
-	SignatureSizes []int                 `json:"signature-sizes,omitempty"` // List of sizes of each signature slice
+	imageRef        storageReference
+	image           *storage.Image
+	layerPosition   map[digest.Digest]int   // Where we are in reading a blob's layers
+	cachedManifest  []byte                  // A cached copy of the manifest, if already known, or nil
+	getBlobMutex    sync.Mutex              // Mutex to sync state for parallel GetBlob executions
+	SignatureSizes  []int                   `json:"signature-sizes,omitempty"`  // List of sizes of each signature slice
+	SignaturesSizes map[digest.Digest][]int `json:"signatures-sizes,omitempty"` // List of sizes of each signature slice
 }
 
 type storageImageDestination struct {
-	imageRef       storageReference
-	directory      string                          // Temporary directory where we store blobs until Commit() time
-	nextTempFileID int32                           // A counter that we use for computing filenames to assign to blobs
-	manifest       []byte                          // Manifest contents, temporary
-	signatures     []byte                          // Signature contents, temporary
-	putBlobMutex   sync.Mutex                      // Mutex to sync state for parallel PutBlob executions
-	blobDiffIDs    map[digest.Digest]digest.Digest // Mapping from layer blobsums to their corresponding DiffIDs
-	fileSizes      map[digest.Digest]int64         // Mapping from layer blobsums to their sizes
-	filenames      map[digest.Digest]string        // Mapping from layer blobsums to names of files we used to hold them
-	SignatureSizes []int                           `json:"signature-sizes,omitempty"` // List of sizes of each signature slice
+	imageRef        storageReference
+	directory       string                          // Temporary directory where we store blobs until Commit() time
+	nextTempFileID  int32                           // A counter that we use for computing filenames to assign to blobs
+	manifest        []byte                          // Manifest contents, temporary
+	signatures      []byte                          // Signature contents, temporary
+	signatureses    map[digest.Digest][]byte        // Instance signature contents, temporary
+	putBlobMutex    sync.Mutex                      // Mutex to sync state for parallel PutBlob executions
+	blobDiffIDs     map[digest.Digest]digest.Digest // Mapping from layer blobsums to their corresponding DiffIDs
+	fileSizes       map[digest.Digest]int64         // Mapping from layer blobsums to their sizes
+	filenames       map[digest.Digest]string        // Mapping from layer blobsums to names of files we used to hold them
+	SignatureSizes  []int                           `json:"signature-sizes,omitempty"`  // List of sizes of each signature slice
+	SignaturesSizes map[digest.Digest][]int         `json:"signatures-sizes,omitempty"` // Sizes of each manifest's signature slice
 }
 
 type storageImageCloser struct {
@@ -72,26 +73,33 @@ type storageImageCloser struct {
 }
 
 // manifestBigDataKey returns a key suitable for recording a manifest with the specified digest using storage.Store.ImageBigData and related functions.
-// If a specific manifest digest is explicitly requested by the user, the key retruned function should be used preferably;
+// If a specific manifest digest is explicitly requested by the user, the key returned by this function should be used preferably;
 // for compatibility, if a manifest is not available under this key, check also storage.ImageDigestBigDataKey
 func manifestBigDataKey(digest digest.Digest) string {
 	return storage.ImageDigestManifestBigDataNamePrefix + "-" + digest.String()
 }
 
+// signatureBigDataKey returns a key suitable for recording the signatures associated with the manifest with the specified digest using storage.Store.ImageBigData and related functions.
+// If a specific manifest digest is explicitly requested by the user, the key returned by this function should be used preferably;
+func signatureBigDataKey(digest digest.Digest) string {
+	return "signature-" + digest.Encoded()
+}
+
 // newImageSource sets up an image for reading.
-func newImageSource(imageRef storageReference) (*storageImageSource, error) {
+func newImageSource(ctx context.Context, sys *types.SystemContext, imageRef storageReference) (*storageImageSource, error) {
 	// First, locate the image.
-	img, err := imageRef.resolveImage()
+	img, err := imageRef.resolveImage(sys)
 	if err != nil {
 		return nil, err
 	}
 
 	// Build the reader object.
 	image := &storageImageSource{
-		imageRef:       imageRef,
-		image:          img,
-		layerPosition:  make(map[digest.Digest]int),
-		SignatureSizes: []int{},
+		imageRef:        imageRef,
+		image:           img,
+		layerPosition:   make(map[digest.Digest]int),
+		SignatureSizes:  []int{},
+		SignaturesSizes: make(map[digest.Digest][]int),
 	}
 	if img.Metadata != "" {
 		if err := json.Unmarshal([]byte(img.Metadata), image); err != nil {
@@ -182,7 +190,12 @@ func (s *storageImageSource) getBlobAndLayerID(info types.BlobInfo) (rc io.ReadC
 // GetManifest() reads the image's manifest.
 func (s *storageImageSource) GetManifest(ctx context.Context, instanceDigest *digest.Digest) (manifestBlob []byte, MIMEType string, err error) {
 	if instanceDigest != nil {
-		return nil, "", ErrNoManifestLists
+		key := manifestBigDataKey(*instanceDigest)
+		blob, err := s.imageRef.transport.store.ImageBigData(s.image.ID, key)
+		if err != nil {
+			return nil, "", errors.Wrapf(err, "error reading manifest for image instance %q", *instanceDigest)
+		}
+		return blob, manifest.GuessMIMEType(blob), err
 	}
 	if len(s.cachedManifest) == 0 {
 		// The manifest is stored as a big data item.
@@ -214,10 +227,13 @@ func (s *storageImageSource) GetManifest(ctx context.Context, instanceDigest *di
 
 // LayerInfosForCopy() returns the list of layer blobs that make up the root filesystem of
 // the image, after they've been decompressed.
-func (s *storageImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
-	manifestBlob, manifestType, err := s.GetManifest(ctx, nil)
+func (s *storageImageSource) LayerInfosForCopy(ctx context.Context, instanceDigest *digest.Digest) ([]types.BlobInfo, error) {
+	manifestBlob, manifestType, err := s.GetManifest(ctx, instanceDigest)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading image manifest for %q", s.image.ID)
+	}
+	if manifest.MIMETypeIsMultiImage(manifestType) {
+		return nil, errors.Errorf("can't copy layers for a manifest list (shouldn't be attempted)")
 	}
 	man, err := manifest.FromBlob(manifestBlob, manifestType)
 	if err != nil {
@@ -292,25 +308,33 @@ func buildLayerInfosForCopy(manifestInfos []manifest.LayerInfo, physicalInfos []
 
 // GetSignatures() parses the image's signatures blob into a slice of byte slices.
 func (s *storageImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) (signatures [][]byte, err error) {
-	if instanceDigest != nil {
-		return nil, ErrNoManifestLists
-	}
 	var offset int
 	sigslice := [][]byte{}
 	signature := []byte{}
-	if len(s.SignatureSizes) > 0 {
-		signatureBlob, err := s.imageRef.transport.store.ImageBigData(s.image.ID, "signatures")
+	signatureSizes := s.SignatureSizes
+	key := "signatures"
+	instance := "default instance"
+	if instanceDigest != nil {
+		signatureSizes = s.SignaturesSizes[*instanceDigest]
+		key = signatureBigDataKey(*instanceDigest)
+		instance = instanceDigest.Encoded()
+	}
+	if len(signatureSizes) > 0 {
+		signatureBlob, err := s.imageRef.transport.store.ImageBigData(s.image.ID, key)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error looking up signatures data for image %q", s.image.ID)
+			return nil, errors.Wrapf(err, "error looking up signatures data for image %q (%s)", s.image.ID, instance)
 		}
 		signature = signatureBlob
 	}
-	for _, length := range s.SignatureSizes {
+	for _, length := range signatureSizes {
+		if offset+length > len(signature) {
+			return nil, errors.Wrapf(err, "error looking up signatures data for image %q (%s): expected at least %d bytes, only found %d", s.image.ID, instance, len(signature), offset+length)
+		}
 		sigslice = append(sigslice, signature[offset:offset+length])
 		offset += length
 	}
 	if offset != len(signature) {
-		return nil, errors.Errorf("signatures data contained %d extra bytes", len(signatures)-offset)
+		return nil, errors.Errorf("signatures data (%s) contained %d extra bytes", instance, len(signatures)-offset)
 	}
 	return sigslice, nil
 }
@@ -323,12 +347,14 @@ func newImageDestination(imageRef storageReference) (*storageImageDestination, e
 		return nil, errors.Wrapf(err, "error creating a temporary directory")
 	}
 	image := &storageImageDestination{
-		imageRef:       imageRef,
-		directory:      directory,
-		blobDiffIDs:    make(map[digest.Digest]digest.Digest),
-		fileSizes:      make(map[digest.Digest]int64),
-		filenames:      make(map[digest.Digest]string),
-		SignatureSizes: []int{},
+		imageRef:        imageRef,
+		directory:       directory,
+		signatureses:    make(map[digest.Digest][]byte),
+		blobDiffIDs:     make(map[digest.Digest]digest.Digest),
+		fileSizes:       make(map[digest.Digest]int64),
+		filenames:       make(map[digest.Digest]string),
+		SignatureSizes:  []int{},
+		SignaturesSizes: make(map[digest.Digest][]int),
 	}
 	return image, nil
 }
@@ -404,10 +430,10 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	}
 	// Ensure that any information that we were given about the blob is correct.
 	if blobinfo.Digest.Validate() == nil && blobinfo.Digest != hasher.Digest() {
-		return errorBlobInfo, ErrBlobDigestMismatch
+		return errorBlobInfo, errors.WithStack(ErrBlobDigestMismatch)
 	}
 	if blobinfo.Size >= 0 && blobinfo.Size != counter.Count {
-		return errorBlobInfo, ErrBlobSizeMismatch
+		return errorBlobInfo, errors.WithStack(ErrBlobSizeMismatch)
 	}
 	// Record information about the blob.
 	s.putBlobMutex.Lock()
@@ -579,7 +605,34 @@ func (s *storageImageDestination) getConfigBlob(info types.BlobInfo) ([]byte, er
 	return nil, errors.New("blob not found")
 }
 
-func (s *storageImageDestination) Commit(ctx context.Context) error {
+func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {
+	if len(s.manifest) == 0 {
+		return errors.New("Internal error: storageImageDestination.Commit() called without PutManifest()")
+	}
+	toplevelManifest, _, err := unparsedToplevel.Manifest(ctx)
+	if err != nil {
+		return errors.Wrapf(err, "error retrieving top-level manifest")
+	}
+	// If the name we're saving to includes a digest, then check that the
+	// manifests that we're about to save all either match the one from the
+	// unparsedToplevel, or match the digest in the name that we're using.
+	if s.imageRef.named != nil {
+		if digested, ok := s.imageRef.named.(reference.Digested); ok {
+			matches, err := manifest.MatchesDigest(s.manifest, digested.Digest())
+			if err != nil {
+				return err
+			}
+			if !matches {
+				matches, err = manifest.MatchesDigest(toplevelManifest, digested.Digest())
+				if err != nil {
+					return err
+				}
+			}
+			if !matches {
+				return fmt.Errorf("Manifest to be saved does not match expected digest %s", digested.Digest())
+			}
+		}
+	}
 	// Find the list of layer blobs.
 	if len(s.manifest) == 0 {
 		return errors.New("Internal error: storageImageDestination.Commit() called without PutManifest()")
@@ -747,7 +800,8 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 			return errors.Wrapf(err, "error saving big data %q for image %q", blob.String(), img.ID)
 		}
 	}
-	// Set the reference's name on the image.
+	// Set the reference's name on the image.  We don't need to worry about avoiding duplicate
+	// values because SetNames() will deduplicate the list that we pass to it.
 	if name := s.imageRef.DockerReference(); len(oldNames) > 0 || name != nil {
 		names := []string{}
 		if name != nil {
@@ -765,26 +819,43 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 		}
 		logrus.Debugf("set names of image %q to %v", img.ID, names)
 	}
-	// Save the manifest.  Allow looking it up by digest by using the key convention defined by the Store.
+	// Save the unparsedToplevel's manifest.
+	if len(toplevelManifest) != 0 {
+		manifestDigest, err := manifest.Digest(toplevelManifest)
+		if err != nil {
+			return errors.Wrapf(err, "error digesting top-level manifest")
+		}
+		key := manifestBigDataKey(manifestDigest)
+		if err := s.imageRef.transport.store.SetImageBigData(img.ID, key, toplevelManifest, manifest.Digest); err != nil {
+			if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
+				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
+			}
+			logrus.Debugf("error saving top-level manifest for image %q: %v", img.ID, err)
+			return errors.Wrapf(err, "error saving top-level manifest for image %q", img.ID)
+		}
+	}
+	// Save the image's manifest.  Allow looking it up by digest by using the key convention defined by the Store.
 	// Record the manifest twice: using a digest-specific key to allow references to that specific digest instance,
 	// and using storage.ImageDigestBigDataKey for future users that don’t specify any digest and for compatibility with older readers.
 	manifestDigest, err := manifest.Digest(s.manifest)
 	if err != nil {
 		return errors.Wrapf(err, "error computing manifest digest")
 	}
-	if err := s.imageRef.transport.store.SetImageBigData(img.ID, manifestBigDataKey(manifestDigest), s.manifest, manifest.Digest); err != nil {
+	key := manifestBigDataKey(manifestDigest)
+	if err := s.imageRef.transport.store.SetImageBigData(img.ID, key, s.manifest, manifest.Digest); err != nil {
 		if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
 			logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
 		}
 		logrus.Debugf("error saving manifest for image %q: %v", img.ID, err)
-		return err
+		return errors.Wrapf(err, "error saving manifest for image %q", img.ID)
 	}
-	if err := s.imageRef.transport.store.SetImageBigData(img.ID, storage.ImageDigestBigDataKey, s.manifest, manifest.Digest); err != nil {
+	key = storage.ImageDigestBigDataKey
+	if err := s.imageRef.transport.store.SetImageBigData(img.ID, key, s.manifest, manifest.Digest); err != nil {
 		if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
 			logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
 		}
 		logrus.Debugf("error saving manifest for image %q: %v", img.ID, err)
-		return err
+		return errors.Wrapf(err, "error saving manifest for image %q", img.ID)
 	}
 	// Save the signatures, if we have any.
 	if len(s.signatures) > 0 {
@@ -793,7 +864,17 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
 			}
 			logrus.Debugf("error saving signatures for image %q: %v", img.ID, err)
-			return err
+			return errors.Wrapf(err, "error saving signatures for image %q", img.ID)
+		}
+	}
+	for instanceDigest, signatures := range s.signatureses {
+		key := signatureBigDataKey(instanceDigest)
+		if err := s.imageRef.transport.store.SetImageBigData(img.ID, key, signatures, manifest.Digest); err != nil {
+			if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
+				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
+			}
+			logrus.Debugf("error saving signatures for image %q: %v", img.ID, err)
+			return errors.Wrapf(err, "error saving signatures for image %q", img.ID)
 		}
 	}
 	// Save our metadata.
@@ -803,7 +884,7 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 			logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
 		}
 		logrus.Debugf("error encoding metadata for image %q: %v", img.ID, err)
-		return err
+		return errors.Wrapf(err, "error encoding metadata for image %q", img.ID)
 	}
 	if len(metadata) != 0 {
 		if err = s.imageRef.transport.store.SetMetadata(img.ID, string(metadata)); err != nil {
@@ -811,7 +892,7 @@ func (s *storageImageDestination) Commit(ctx context.Context) error {
 				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
 			}
 			logrus.Debugf("error saving metadata for image %q: %v", img.ID, err)
-			return err
+			return errors.Wrapf(err, "error saving metadata for image %q", img.ID)
 		}
 		logrus.Debugf("saved image metadata %q", string(metadata))
 	}
@@ -830,21 +911,10 @@ func (s *storageImageDestination) SupportedManifestMIMETypes() []string {
 }
 
 // PutManifest writes the manifest to the destination.
-func (s *storageImageDestination) PutManifest(ctx context.Context, manifestBlob []byte) error {
-	if s.imageRef.named != nil {
-		if digested, ok := s.imageRef.named.(reference.Digested); ok {
-			matches, err := manifest.MatchesDigest(manifestBlob, digested.Digest())
-			if err != nil {
-				return err
-			}
-			if !matches {
-				return fmt.Errorf("Manifest does not match expected digest %s", digested.Digest())
-			}
-		}
-	}
-
-	s.manifest = make([]byte, len(manifestBlob))
-	copy(s.manifest, manifestBlob)
+func (s *storageImageDestination) PutManifest(ctx context.Context, manifestBlob []byte, instanceDigest *digest.Digest) error {
+	newBlob := make([]byte, len(manifestBlob))
+	copy(newBlob, manifestBlob)
+	s.manifest = newBlob
 	return nil
 }
 
@@ -873,7 +943,7 @@ func (s *storageImageDestination) IgnoresEmbeddedDockerReference() bool {
 }
 
 // PutSignatures records the image's signatures for committing as a single data blob.
-func (s *storageImageDestination) PutSignatures(ctx context.Context, signatures [][]byte) error {
+func (s *storageImageDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
 	sizes := []int{}
 	sigblob := []byte{}
 	for _, sig := range signatures {
@@ -883,8 +953,21 @@ func (s *storageImageDestination) PutSignatures(ctx context.Context, signatures 
 		copy(newblob[len(sigblob):], sig)
 		sigblob = newblob
 	}
-	s.signatures = sigblob
-	s.SignatureSizes = sizes
+	if instanceDigest == nil {
+		s.signatures = sigblob
+		s.SignatureSizes = sizes
+	}
+	if instanceDigest == nil && len(s.manifest) > 0 {
+		manifestDigest, err := manifest.Digest(s.manifest)
+		if err != nil {
+			return err
+		}
+		instanceDigest = &manifestDigest
+	}
+	if instanceDigest != nil {
+		s.signatureses[*instanceDigest] = sigblob
+		s.SignaturesSizes[*instanceDigest] = sizes
+	}
 	return nil
 }
 
@@ -940,7 +1023,7 @@ func (s *storageImageCloser) Size() (int64, error) {
 
 // newImage creates an image that also knows its size
 func newImage(ctx context.Context, sys *types.SystemContext, s storageReference) (types.ImageCloser, error) {
-	src, err := newImageSource(s)
+	src, err := newImageSource(ctx, sys, s)
 	if err != nil {
 		return nil, err
 	}

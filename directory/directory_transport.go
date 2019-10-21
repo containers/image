@@ -166,18 +166,24 @@ func (ref dirReference) DeleteImage(ctx context.Context, sys *types.SystemContex
 }
 
 // manifestPath returns a path for the manifest within a directory using our conventions.
-func (ref dirReference) manifestPath() string {
+func (ref dirReference) manifestPath(instanceDigest *digest.Digest) string {
+	if instanceDigest != nil {
+		return filepath.Join(ref.path, instanceDigest.Encoded()+".manifest.json")
+	}
 	return filepath.Join(ref.path, "manifest.json")
 }
 
 // layerPath returns a path for a layer tarball within a directory using our conventions.
 func (ref dirReference) layerPath(digest digest.Digest) string {
 	// FIXME: Should we keep the digest identification?
-	return filepath.Join(ref.path, digest.Hex())
+	return filepath.Join(ref.path, digest.Encoded())
 }
 
 // signaturePath returns a path for a signature within a directory using our conventions.
-func (ref dirReference) signaturePath(index int) string {
+func (ref dirReference) signaturePath(index int, instanceDigest *digest.Digest) string {
+	if instanceDigest != nil {
+		return filepath.Join(ref.path, fmt.Sprintf(instanceDigest.Encoded()+".signature-%d", index+1))
+	}
 	return filepath.Join(ref.path, fmt.Sprintf("signature-%d", index+1))
 }
 

@@ -7,8 +7,11 @@ import (
 	"strings"
 
 	"github.com/containers/image/v4/docker/reference"
+	"github.com/containers/image/v4/manifest"
 	"github.com/containers/image/v4/types"
 	"github.com/containers/storage"
+	digest "github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -51,9 +54,79 @@ func imageMatchesRepo(image *storage.Image, ref reference.Named) bool {
 	return false
 }
 
+// imageMatchesSystemContext checks if the passed-in image both contains a
+// manifest that matches the passed-in digest, and identifies itself as being
+// appropriate for running on the system that matches sys.
+// If we somehow ended up sharing the same storage among multiple types of
+// systems, and managed to download multiple images from the same manifest
+// list, their image records will all contain copies of the manifest list, and
+// this check will help us decide which of them we want to return when we've
+// been asked to resolve an image reference that uses the list's digest to a
+// specific image ID.
+func imageMatchesSystemContext(store storage.Store, img *storage.Image, manifestDigest digest.Digest, sys *types.SystemContext) bool {
+	// First, check if the image record has a manifest that matches the
+	// specified digest.
+	key := manifestBigDataKey(manifestDigest)
+	manifestBytes, err := store.ImageBigData(img.ID, key)
+	if err != nil {
+		return false
+	}
+	// The manifest is either a list, or not a list.  If it's a list, find
+	// the digest of the instance that matches the current system, and try
+	// to load that manifest from the image record, and use it.
+	manifestType := manifest.GuessMIMEType(manifestBytes)
+	if manifest.MIMETypeIsMultiImage(manifestType) {
+		list, err := manifest.ListFromBlob(manifestBytes, manifestType)
+		if err != nil {
+			return false
+		}
+		manifestDigest, err = list.ChooseInstance(sys)
+		if err != nil {
+			return false
+		}
+		key = manifestBigDataKey(manifestDigest)
+		manifestBytes, err = store.ImageBigData(img.ID, key)
+		if err != nil {
+			return false
+		}
+		manifestType = manifest.GuessMIMEType(manifestBytes)
+	}
+	// Load the image's configuration blob.
+	m, err := manifest.FromBlob(manifestBytes, manifestType)
+	getConfig := func(blobInfo types.BlobInfo) ([]byte, error) {
+		return store.ImageBigData(img.ID, blobInfo.Digest.String())
+	}
+	ii, err := m.Inspect(getConfig)
+	if err != nil {
+		return false
+	}
+	// Build a dummy index containing one instance and information about
+	// the image's target system from the image's configuration.
+	index := manifest.OCI1IndexFromComponents([]imgspecv1.Descriptor{{
+		MediaType: imgspecv1.MediaTypeImageManifest,
+		Digest:    manifestDigest,
+		Size:      int64(len(manifestBytes)),
+		Platform: &imgspecv1.Platform{
+			OS:           ii.Os,
+			Architecture: ii.Architecture,
+		},
+	}}, nil)
+	// Check that ChooseInstance() would select this image for this system,
+	// from a list of images.
+	instanceDigest, err := index.ChooseInstance(sys)
+	if err != nil {
+		return false
+	}
+	// Double-check that we can read the runnable image's manifest from the
+	// image record.
+	key = manifestBigDataKey(instanceDigest)
+	_, err = store.ImageBigData(img.ID, key)
+	return err == nil
+}
+
 // Resolve the reference's name to an image ID in the store, if there's already
 // one present with the same name or ID, and return the image.
-func (s *storageReference) resolveImage() (*storage.Image, error) {
+func (s *storageReference) resolveImage(sys *types.SystemContext) (*storage.Image, error) {
 	var loadedImage *storage.Image
 	if s.id == "" && s.named != nil {
 		// Look for an image that has the expanded reference name as an explicit Name value.
@@ -72,9 +145,10 @@ func (s *storageReference) resolveImage() (*storage.Image, error) {
 			if err == nil && len(images) > 0 {
 				for _, image := range images {
 					if imageMatchesRepo(image, s.named) {
-						loadedImage = image
-						s.id = image.ID
-						break
+						if loadedImage == nil || imageMatchesSystemContext(s.transport.store, image, digested.Digest(), sys) {
+							loadedImage = image
+							s.id = image.ID
+						}
 					}
 				}
 			}
@@ -202,7 +276,7 @@ func (s storageReference) NewImage(ctx context.Context, sys *types.SystemContext
 }
 
 func (s storageReference) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
-	img, err := s.resolveImage()
+	img, err := s.resolveImage(sys)
 	if err != nil {
 		return err
 	}
@@ -217,7 +291,7 @@ func (s storageReference) DeleteImage(ctx context.Context, sys *types.SystemCont
 }
 
 func (s storageReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
-	return newImageSource(s)
+	return newImageSource(ctx, sys, s)
 }
 
 func (s storageReference) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {

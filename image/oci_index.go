@@ -8,12 +8,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-func manifestSchema2FromManifestList(ctx context.Context, sys *types.SystemContext, src types.ImageSource, manblob []byte) (genericManifest, error) {
-	list, err := manifest.Schema2ListFromManifest(manblob)
+func manifestOCI1FromImageIndex(ctx context.Context, sys *types.SystemContext, src types.ImageSource, manblob []byte) (genericManifest, error) {
+	index, err := manifest.OCI1IndexFromManifest(manblob)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Error parsing schema2 manifest list")
+		return nil, errors.Wrapf(err, "Error parsing OCI1 index")
 	}
-	targetManifestDigest, err := list.ChooseInstance(sys)
+	targetManifestDigest, err := index.ChooseInstance(sys)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Error choosing image instance")
 	}
