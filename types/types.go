@@ -547,9 +547,37 @@ type SystemContext struct {
 	CompressionLevel *int
 }
 
+// ProgressEvent is the type of events a progress reader can produce
+// Warning: new event types may be added any time.
+type ProgressEvent uint
+
+const (
+	// ProgressEventNewArtifact will be fired on progress reader setup
+	ProgressEventNewArtifact ProgressEvent = iota
+
+	// ProgressEventRead indicates that the artifact download is currently in
+	// progress
+	ProgressEventRead
+
+	// ProgressEventDone is fired when the data transfer has been finished for
+	// the specific artifact
+	ProgressEventDone
+)
+
 // ProgressProperties is used to pass information from the copy code to a monitor which
 // can use the real-time information to produce output or react to changes.
 type ProgressProperties struct {
+	// The event indicating what
+	Event ProgressEvent
+
+	// The artifact which has been updated in this interval
 	Artifact BlobInfo
-	Offset   uint64
+
+	// The currently downloaded size in bytes
+	// Increases from 0 to the final Artifact size
+	Offset uint64
+
+	// The additional offset which has been downloaded inside the last update
+	// interval. Will be reset after each ProgressEventRead event.
+	OffsetUpdate uint64
 }
