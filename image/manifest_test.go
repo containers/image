@@ -3,8 +3,8 @@ package image
 import (
 	"testing"
 
-	"github.com/containers/image/v4/manifest"
-	"github.com/containers/image/v4/types"
+	"github.com/containers/image/v5/manifest"
+	"github.com/containers/image/v5/types"
 	"github.com/stretchr/testify/assert"
 )
 

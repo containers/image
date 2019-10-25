@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containers/image/v4/docker/reference"
-	"github.com/containers/image/v4/internal/testing/mocks"
-	"github.com/containers/image/v4/types"
+	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/testing/mocks"
+	"github.com/containers/image/v5/types"
 )
 
 // nameOnlyImageMock is a mock of types.UnparsedImage which only allows transports.ImageName to work

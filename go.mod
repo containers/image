@@ -1,4 +1,4 @@
-module github.com/containers/image/v4
+module github.com/containers/image/v5
 
 go 1.11
 

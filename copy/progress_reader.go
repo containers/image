@@ -4,7 +4,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/containers/image/v4/types"
+	"github.com/containers/image/v5/types"
 )
 
 // progressReader is a reader that reports its progress on an interval.

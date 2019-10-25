@@ -20,8 +20,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/containers/image/v4/manifest"
-	"github.com/containers/image/v4/types"
+	"github.com/containers/image/v5/manifest"
+	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/klauspost/pgzip"
 	"github.com/opencontainers/go-digest"

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containers/image/v4/pkg/compression"
-	"github.com/containers/image/v4/pkg/strslice"
-	"github.com/containers/image/v4/types"
+	"github.com/containers/image/v5/pkg/compression"
+	"github.com/containers/image/v5/pkg/strslice"
+	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

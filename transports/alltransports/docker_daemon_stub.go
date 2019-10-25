@@ -2,7 +2,7 @@
 
 package alltransports
 
-import "github.com/containers/image/v4/transports"
+import "github.com/containers/image/v5/transports"
 
 func init() {
 	transports.Register(transports.NewStubTransport("docker-daemon"))
