@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/containers/image/v5/internal/testing/mocks"
-
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"

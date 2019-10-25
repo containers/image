@@ -10,8 +10,7 @@
 //		cp "github.com/containers/image/v5/copy"
 //		"github.com/containers/image/v5/tarball"
 //		"github.com/containers/image/v5/transports/alltransports"
-//
-//		imgspecv1 "github.com/containers/image/v5/transports/alltransports"
+//		imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 //	)
 //
 //	func imageFromTarball() {

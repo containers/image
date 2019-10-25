@@ -9,10 +9,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/containers/image/v5/version"
-	"github.com/opencontainers/go-digest"
+	digest "github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 )
 
 const (

@@ -3,9 +3,8 @@ package image
 import (
 	"context"
 
-	"github.com/pkg/errors"
-
 	"github.com/containers/image/v5/types"
+	"github.com/pkg/errors"
 )
 
 // memoryImage is a mostly-implementation of types.Image assembled from data

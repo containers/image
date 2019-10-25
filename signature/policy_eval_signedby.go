@@ -8,11 +8,10 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
-	"github.com/opencontainers/go-digest"
+	digest "github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 )
 
 func (pr *prSignedBy) isSignatureAuthorAccepted(ctx context.Context, image types.UnparsedImage, sig []byte) (signatureAcceptanceResult, *Signature, error) {

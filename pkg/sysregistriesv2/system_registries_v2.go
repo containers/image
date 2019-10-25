@@ -10,11 +10,10 @@ import (
 	"sync"
 
 	"github.com/BurntSushi/toml"
+	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-
-	"github.com/containers/image/v5/docker/reference"
 )
 
 // systemRegistriesConfPath is the path to the system-wide registry
