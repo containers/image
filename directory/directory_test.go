@@ -7,9 +7,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/containers/image/v4/manifest"
-	"github.com/containers/image/v4/pkg/blobinfocache/memory"
-	"github.com/containers/image/v4/types"
+	"github.com/containers/image/v5/manifest"
+	"github.com/containers/image/v5/pkg/blobinfocache/memory"
+	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"

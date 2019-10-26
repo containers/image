@@ -6,7 +6,7 @@ package image
 import (
 	"context"
 
-	"github.com/containers/image/v4/types"
+	"github.com/containers/image/v5/types"
 )
 
 // imageCloser implements types.ImageCloser, perhaps allowing simple users

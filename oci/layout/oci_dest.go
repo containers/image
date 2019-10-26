@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/containers/image/v4/manifest"
-	"github.com/containers/image/v4/types"
+	"github.com/containers/image/v5/manifest"
+	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
 	imgspec "github.com/opencontainers/image-spec/specs-go"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"

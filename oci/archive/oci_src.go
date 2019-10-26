@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
-	ocilayout "github.com/containers/image/v4/oci/layout"
-	"github.com/containers/image/v4/types"
+	ocilayout "github.com/containers/image/v5/oci/layout"
+	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containers/image/v4/docker/reference"
-	"github.com/containers/image/v4/manifest"
-	"github.com/containers/image/v4/types"
+	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/manifest"
+	"github.com/containers/image/v5/types"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containers/image/v4/docker/reference"
-	"github.com/containers/image/v4/types"
+	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/types"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"

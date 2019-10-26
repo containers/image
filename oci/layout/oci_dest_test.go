@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/containers/image/v4/pkg/blobinfocache/memory"
-	"github.com/containers/image/v4/types"
+	"github.com/containers/image/v5/pkg/blobinfocache/memory"
+	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"

@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containers/image/v4/docker/policyconfiguration"
-	"github.com/containers/image/v4/docker/reference"
-	"github.com/containers/image/v4/image"
-	"github.com/containers/image/v4/transports"
-	"github.com/containers/image/v4/types"
+	"github.com/containers/image/v5/docker/policyconfiguration"
+	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/image"
+	"github.com/containers/image/v5/transports"
+	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )

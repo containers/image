@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containers/image/v4/types"
+	"github.com/containers/image/v5/types"
 	helperclient "github.com/docker/docker-credential-helpers/client"
 	"github.com/docker/docker-credential-helpers/credentials"
 	"github.com/docker/docker/pkg/homedir"

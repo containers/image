@@ -7,8 +7,8 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/containers/image/v4/pkg/compression/internal"
-	"github.com/containers/image/v4/pkg/compression/types"
+	"github.com/containers/image/v5/pkg/compression/internal"
+	"github.com/containers/image/v5/pkg/compression/types"
 	"github.com/klauspost/pgzip"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

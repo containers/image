@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/containers/image/v4/pkg/compression"
-	"github.com/containers/image/v4/types"
+	"github.com/containers/image/v5/pkg/compression"
+	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"

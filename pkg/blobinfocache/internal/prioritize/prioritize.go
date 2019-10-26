@@ -6,7 +6,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/containers/image/v4/types"
+	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 )
 
