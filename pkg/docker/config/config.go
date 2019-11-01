@@ -24,6 +24,7 @@ type dockerAuthConfig struct {
 type dockerConfigFile struct {
 	AuthConfigs map[string]dockerAuthConfig `json:"auths"`
 	CredHelpers map[string]string           `json:"credHelpers,omitempty"`
+	CredStore   string                      `json:"credsStore,omitempty"`
 }
 
 type authPath struct {
@@ -303,6 +304,11 @@ func findAuthentication(registry, path string, legacyFormat bool) (string, strin
 	// First try cred helpers. They should always be normalized.
 	if ch, exists := auths.CredHelpers[registry]; exists {
 		return getAuthFromCredHelper(ch, registry)
+	}
+
+	// Second try default credential store
+	if cs := auths.CredStore; cs != "" {
+		return getAuthFromCredHelper(cs, registry)
 	}
 
 	// I'm feeling lucky

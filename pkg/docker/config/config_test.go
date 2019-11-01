@@ -225,6 +225,73 @@ func TestGetAuth(t *testing.T) {
 	}
 }
 
+func TestGetHelperAuth(t *testing.T) {
+	origXDG := os.Getenv("XDG_RUNTIME_DIR")
+	tmpDir1, err := ioutil.TempDir("", "test_docker_client_get_auth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("using temporary XDG_RUNTIME_DIR directory: %q", tmpDir1)
+	// override XDG_RUNTIME_DIR
+	os.Setenv("XDG_RUNTIME_DIR", tmpDir1)
+	defer func() {
+		err := os.RemoveAll(tmpDir1)
+		if err != nil {
+			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir1, err)
+		}
+		os.Setenv("XDG_RUNTIME_DIR", origXDG)
+	}()
+
+	origHomeDir := homedir.Get()
+	tmpDir2, err := ioutil.TempDir("", "test_docker_client_get_auth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("using temporary home directory: %q", tmpDir2)
+	//override homedir
+	os.Setenv(homedir.Key(), tmpDir2)
+	defer func() {
+		err := os.RemoveAll(tmpDir2)
+		if err != nil {
+			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir2, err)
+		}
+		os.Setenv(homedir.Key(), origHomeDir)
+	}()
+
+	configDir1 := filepath.Join(tmpDir1, "containers")
+	if err := os.MkdirAll(configDir1, 0700); err != nil {
+		t.Fatal(err)
+	}
+	configDir2 := filepath.Join(tmpDir2, ".docker")
+	if err := os.MkdirAll(configDir2, 0700); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(configDir2, "config.json")
+
+	if err := os.RemoveAll(configPath); err != nil {
+		t.Fatal(err)
+	}
+
+	helperPath := filepath.Join("testdata", "helper.json")
+
+	helperContents, err := ioutil.ReadFile(helperPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("test auth helper", func(t *testing.T) {
+		if err := ioutil.WriteFile(configPath, helperContents, 0640); err != nil {
+			t.Fatal(err)
+		}
+		var sys *types.SystemContext
+		username, password, err := GetAuthentication(sys, "foobar.example.org")
+		assert.Equal(t, nil, err)
+		assert.Equal(t, "foo", username)
+		assert.Equal(t, "bar", password)
+	})
+
+}
+
 func TestGetAuthFromLegacyFile(t *testing.T) {
 	origHomeDir := homedir.Get()
 	tmpDir, err := ioutil.TempDir("", "test_docker_client_get_auth")

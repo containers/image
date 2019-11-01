@@ -1,0 +1,6 @@
+{
+    "auths": {
+        "foobar.example.org": {}
+    },
+    "credsStore": "imagetest"
+}
