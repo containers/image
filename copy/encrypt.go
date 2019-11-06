@@ -6,7 +6,7 @@ import (
 	"github.com/containers/image/v5/types"
 )
 
-// isOciEncrypted returns if a mediatype is encrypted
+// isOciEncrypted returns a bool indicating if a mediatype is encrypted
 // This function will be moved to be part of OCI spec when adopted.
 func isOciEncrypted(mediatype string) bool {
 	return strings.HasSuffix(mediatype, "+encrypted")
