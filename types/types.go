@@ -128,6 +128,8 @@ type BlobInfo struct {
 	// CompressionOperation is used in Image.UpdateLayerInfos to instruct
 	// whether the original layer should be preserved or (de)compressed. The
 	// field defaults to preserve the original layer.
+	// TODO: To remove together with CryptoOperation in re-design to remove
+	// field out out of BlobInfo.
 	CompressionOperation LayerCompression
 	// CompressionAlgorithm is used in Image.UpdateLayerInfos to set the correct
 	// MIME type for compressed layers (e.g., gzip or zstd). This field MUST be
@@ -135,6 +137,8 @@ type BlobInfo struct {
 	CompressionAlgorithm *compression.Algorithm
 	// CryptoOperation is used in Image.UpdateLayerInfos to instruct
 	// whether the original layer was encrypted/decrypted
+	// TODO: To remove together with CompressionOperation in re-design to
+	// remove field out out of BlobInfo.
 	CryptoOperation LayerCrypto
 }
 
