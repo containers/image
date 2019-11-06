@@ -536,11 +536,6 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 		return nil, "", "", errors.Errorf("Encryption request but not supported by source transport %s", src.Reference().Transport().Name())
 	}
 
-	// TODO(LUMJJB): Move into determine manifest conversion
-	if options.OciEncryptLayers != nil && !supportsEncryption(c.dest) {
-		return nil, "", "", errors.Errorf("Encryption request but not supported by destination transport %s", c.dest.Reference().Transport().Name())
-	}
-
 	// If the destination is a digested reference, make a note of that, determine what digest value we're
 	// expecting, and check that the source manifest matches it.  If the source manifest doesn't, but it's
 	// one item from a manifest list that matches it, accept that as a match.
@@ -616,11 +611,11 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 		return nil, "", "", err
 	}
 
-	requiresOciEncryption := isEncrypted(src) || options.OciEncryptLayers != nil
+	destRequiresOciEncryption := (isEncrypted(src) && ic.ociDecryptConfig != nil) || options.OciEncryptLayers != nil
 
 	// We compute preferredManifestMIMEType only to show it in error messages.
 	// Without having to add this context in an error message, we would be happy enough to know only that no conversion is needed.
-	preferredManifestMIMEType, otherManifestMIMETypeCandidates, err := ic.determineManifestConversion(ctx, c.dest.SupportedManifestMIMETypes(), options.ForceManifestMIMEType, requiresOciEncryption)
+	preferredManifestMIMEType, otherManifestMIMETypeCandidates, err := ic.determineManifestConversion(ctx, c.dest.SupportedManifestMIMETypes(), options.ForceManifestMIMEType, destRequiresOciEncryption)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -628,7 +623,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 	// If src.UpdatedImageNeedsLayerDiffIDs(ic.manifestUpdates) will be true, it needs to be true by the time we get here.
 	ic.diffIDsAreNeeded = src.UpdatedImageNeedsLayerDiffIDs(*ic.manifestUpdates)
 	// If encrypted and decryption keys provided, we should try to decrypt
-	ic.diffIDsAreNeeded = ic.diffIDsAreNeeded || (isEncrypted(src) && ic.ociDecryptConfig != nil)
+	ic.diffIDsAreNeeded = ic.diffIDsAreNeeded || (isEncrypted(src) && ic.ociDecryptConfig != nil) || ic.ociEncryptConfig != nil
 
 	if err := ic.copyLayers(ctx); err != nil {
 		return nil, "", "", err
@@ -1397,40 +1392,4 @@ func (c *copier) compressGoroutine(dest *io.PipeWriter, src io.Reader, compressi
 	buf := make([]byte, compressionBufferSize)
 
 	_, err = io.CopyBuffer(compressor, src, buf) // Sets err to nil, i.e. causes dest.Close()
-}
-
-// isOciEncrypted returns if a mediatype is encrypted
-func isOciEncrypted(mediatype string) bool {
-	return strings.HasSuffix(mediatype, "+encrypted")
-}
-
-// isEncrypted checks if an image is encrypted
-func isEncrypted(i types.Image) bool {
-	layers := i.LayerInfos()
-	for _, l := range layers {
-		if isOciEncrypted(l.MediaType) {
-			return true
-		}
-	}
-	return false
-}
-
-// supportsEncryption checks if the image destination supports use of encrypted images
-func supportsEncryption(dst types.ImageDestination) bool {
-	mimeTypes := dst.SupportedManifestMIMETypes()
-	if len(mimeTypes) == 0 {
-		return true
-	}
-
-	for _, m := range mimeTypes {
-		if manifestSupportsEncryption(m) {
-			return true
-		}
-	}
-	return false
-}
-
-// manifestSupportsEncryption returns if the manifest type supports encryption
-func manifestSupportsEncryption(m string) bool {
-	return m == imgspecv1.MediaTypeImageManifest
 }

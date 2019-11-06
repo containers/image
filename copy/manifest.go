@@ -57,12 +57,14 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 		destSupportedManifestMIMETypes = []string{forceManifestMIMEType}
 	}
 
-	if len(destSupportedManifestMIMETypes) == 0 && (!requiresOciEncryption || manifestSupportsEncryption(srcType)) {
+	if len(destSupportedManifestMIMETypes) == 0 && (!requiresOciEncryption || manifest.MIMETypeSupportsEncryption(srcType)) {
 		return srcType, []string{}, nil // Anything goes; just use the original as is, do not try any conversions.
 	}
 	supportedByDest := map[string]struct{}{}
 	for _, t := range destSupportedManifestMIMETypes {
-		supportedByDest[t] = struct{}{}
+		if !requiresOciEncryption || manifest.MIMETypeSupportsEncryption(t) {
+			supportedByDest[t] = struct{}{}
+		}
 	}
 
 	// destSupportedManifestMIMETypes is a static guess; a particular registry may still only support a subset of the types.
@@ -75,9 +77,7 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 
 	// First of all, prefer to keep the original manifest unmodified.
 	if _, ok := supportedByDest[srcType]; ok {
-		if !requiresOciEncryption || manifestSupportsEncryption(srcType) {
-			prioritizedTypes.append(srcType)
-		}
+		prioritizedTypes.append(srcType)
 	}
 	if !ic.canModifyManifest {
 		// We could also drop the !ic.canModifyManifest check and have the caller
@@ -91,17 +91,13 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 	// Then use our list of preferred types.
 	for _, t := range preferredManifestMIMETypes {
 		if _, ok := supportedByDest[t]; ok {
-			if !requiresOciEncryption || manifestSupportsEncryption(t) {
-				prioritizedTypes.append(t)
-			}
+			prioritizedTypes.append(t)
 		}
 	}
 
 	// Finally, try anything else the destination supports.
 	for _, t := range destSupportedManifestMIMETypes {
-		if !requiresOciEncryption || manifestSupportsEncryption(t) {
-			prioritizedTypes.append(t)
-		}
+		prioritizedTypes.append(t)
 	}
 
 	logrus.Debugf("Manifest has MIME type %s, ordered candidate list [%s]", srcType, strings.Join(prioritizedTypes.list, ", "))
