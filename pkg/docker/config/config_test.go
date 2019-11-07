@@ -207,11 +207,14 @@ func TestGetAuth(t *testing.T) {
 				},
 			},
 		} {
-			if tc.path == "" {
-				if err := os.RemoveAll(configPath); err != nil {
-					t.Fatal(err)
-				}
+			for _, cPath := range configPaths {
+				os.RemoveAll(cPath)
 			}
+			// if tc.path == "" {
+			// 	if err := os.RemoveAll(configPath); err != nil {
+			// 		t.Fatal(err)
+			// 	}
+			// }
 
 			t.Run(tc.name, func(t *testing.T) {
 				if tc.path != "" {
