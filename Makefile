@@ -63,7 +63,7 @@ clean:
 	rm -rf tools.timestamp $(MANPAGES)
 
 test:
-	@PATH="$(PATH):$(shell pwd)/pkg/docker/config/testdata" $(GPGME_ENV) GO111MODULE="on" go test $(BUILDFLAGS) -cover ./...
+	@$(GPGME_ENV) GO111MODULE="on" go test $(BUILDFLAGS) -cover ./...
 
 # This is not run as part of (make all), but Travis CI does run this.
 # Demonstrating a working version of skopeo (possibly with modified SKOPEO_REPO/SKOPEO_BRANCH, e.g.
