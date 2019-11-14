@@ -653,19 +653,17 @@ func (c *copier) Printf(format string, a ...interface{}) {
 
 func checkImageDestinationForCurrentRuntimeOS(ctx context.Context, sys *types.SystemContext, src types.Image, dest types.ImageDestination) error {
 	if dest.MustMatchRuntimeOS() {
-		wantedOS := runtime.GOOS
-		if sys != nil && sys.OSChoice != "" {
-			wantedOS = sys.OSChoice
-		}
 		c, err := src.OCIConfig(ctx)
 		if err != nil {
 			return errors.Wrapf(err, "Error parsing image configuration")
 		}
-		osErr := fmt.Errorf("image operating system %q cannot be used on %q", c.OS, wantedOS)
-		if wantedOS == "windows" && c.OS == "linux" {
-			return osErr
-		} else if wantedOS != "windows" && c.OS == "windows" {
-			return osErr
+
+		wantedOS := runtime.GOOS
+		if sys != nil && sys.OSChoice != "" {
+			wantedOS = sys.OSChoice
+		}
+		if (wantedOS == "windows" && c.OS == "linux") || (wantedOS != "windows" && c.OS == "windows") {
+			return fmt.Errorf("image operating system %q cannot be used on %q", c.OS, wantedOS)
 		}
 	}
 	return nil
