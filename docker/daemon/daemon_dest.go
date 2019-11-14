@@ -90,7 +90,7 @@ func (d *daemonImageDestination) DesiredLayerCompression() types.LayerCompressio
 	return types.PreserveOriginal
 }
 
-// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime OS. False otherwise.
+// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime architecture and OS. False otherwise.
 func (d *daemonImageDestination) MustMatchRuntimeOS() bool {
 	return d.mustMatchRuntimeOS
 }

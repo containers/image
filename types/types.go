@@ -264,7 +264,7 @@ type ImageDestination interface {
 	// AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
 	// uploaded to the image destination, true otherwise.
 	AcceptsForeignLayerURLs() bool
-	// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime OS. False otherwise.
+	// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime architecture and OS. False otherwise.
 	MustMatchRuntimeOS() bool
 	// IgnoresEmbeddedDockerReference() returns true iff the destination does not care about Image.EmbeddedDockerReferenceConflicts(),
 	// and would prefer to receive an unmodified manifest instead of one modified for the destination.
