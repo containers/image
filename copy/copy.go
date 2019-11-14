@@ -524,7 +524,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 		}
 	}
 
-	if err := checkImageDestinationForCurrentRuntimeOS(ctx, options.DestinationCtx, src, c.dest); err != nil {
+	if err := checkImageDestinationForCurrentRuntime(ctx, options.DestinationCtx, src, c.dest); err != nil {
 		return nil, "", "", err
 	}
 
@@ -651,7 +651,8 @@ func (c *copier) Printf(format string, a ...interface{}) {
 	fmt.Fprintf(c.reportWriter, format, a...)
 }
 
-func checkImageDestinationForCurrentRuntimeOS(ctx context.Context, sys *types.SystemContext, src types.Image, dest types.ImageDestination) error {
+// checkImageDestinationForCurrentRuntime enforces dest.MustMatchRuntimeOS, if necessary.
+func checkImageDestinationForCurrentRuntime(ctx context.Context, sys *types.SystemContext, src types.Image, dest types.ImageDestination) error {
 	if dest.MustMatchRuntimeOS() {
 		c, err := src.OCIConfig(ctx)
 		if err != nil {
@@ -664,6 +665,14 @@ func checkImageDestinationForCurrentRuntimeOS(ctx context.Context, sys *types.Sy
 		}
 		if wantedOS != c.OS {
 			return fmt.Errorf("Image operating system mismatch: image uses %q, expecting %q", c.OS, wantedOS)
+		}
+
+		wantedArch := runtime.GOARCH
+		if sys != nil && sys.ArchitectureChoice != "" {
+			wantedArch = sys.ArchitectureChoice
+		}
+		if wantedArch != c.Architecture {
+			return fmt.Errorf("Image architecture mismatch: image uses %q, expecting %q", c.Architecture, wantedArch)
 		}
 	}
 	return nil
