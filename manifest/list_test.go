@@ -100,10 +100,14 @@ func TestChooseInstance(t *testing.T) {
 		require.NoError(t, err)
 		// Match found
 		for arch, expected := range manifestList.matchedInstances {
-			digest, err := list.ChooseInstance(&types.SystemContext{
+			ctx := &types.SystemContext{
 				ArchitectureChoice: arch,
 				OSChoice:           "linux",
-			})
+			}
+			if arch == "arm" {
+				ctx.VariantChoice = "v5"
+			}
+			digest, err := list.ChooseInstance(ctx)
 			require.NoError(t, err, arch)
 			assert.Equal(t, expected, digest)
 		}

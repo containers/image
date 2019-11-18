@@ -100,13 +100,17 @@ func (list *Schema2List) ChooseInstance(ctx *types.SystemContext) (digest.Digest
 	if ctx != nil && ctx.OSChoice != "" {
 		wantedOS = ctx.OSChoice
 	}
+	wantedVariant := ""
+	if ctx != nil && ctx.VariantChoice != "" {
+		wantedVariant = ctx.VariantChoice
+	}
 
 	for _, d := range list.Manifests {
-		if d.Platform.Architecture == wantedArch && d.Platform.OS == wantedOS {
+		if d.Platform.Architecture == wantedArch && d.Platform.OS == wantedOS && (d.Platform.Variant == wantedVariant || wantedVariant == "") {
 			return d.Digest, nil
 		}
 	}
-	return "", fmt.Errorf("no image found in manifest list for architecture %s, OS %s", wantedArch, wantedOS)
+	return "", fmt.Errorf("no image found in manifest list for architecture %s(variant \"%s\"), OS %s", wantedArch, wantedVariant, wantedOS)
 }
 
 // Serialize returns the list in a blob format.
