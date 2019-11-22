@@ -1161,13 +1161,14 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 
 	// === Report progress using the c.progress channel, if required.
 	if c.progress != nil && c.progressInterval > 0 {
-		destStream := newProgressReader(
+		progressReader := newProgressReader(
 			destStream,
 			c.progress,
 			c.progressInterval,
 			srcInfo,
 		)
-		defer destStream.reportDone()
+		defer progressReader.reportDone()
+		destStream = progressReader
 	}
 
 	// === Finally, send the layer stream to dest.
