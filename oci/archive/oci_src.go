@@ -20,7 +20,7 @@ type ociArchiveImageSource struct {
 // newImageSource returns an ImageSource for reading from an existing directory.
 // newImageSource untars the file and saves it in a temp directory
 func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiveReference) (types.ImageSource, error) {
-	tempDirRef, err := createUntarTempDir(ref)
+	tempDirRef, err := createUntarTempDir(sys, ref)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating temp directory")
 	}
@@ -38,12 +38,18 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiv
 }
 
 // LoadManifestDescriptor loads the manifest
+// Deprecated: use LoadManifestDescriptorWithContext instead
 func LoadManifestDescriptor(imgRef types.ImageReference) (imgspecv1.Descriptor, error) {
+	return LoadManifestDescriptorWithContext(nil, imgRef)
+}
+
+// LoadManifestDescriptorWithContext loads the manifest
+func LoadManifestDescriptorWithContext(sys *types.SystemContext, imgRef types.ImageReference) (imgspecv1.Descriptor, error) {
 	ociArchRef, ok := imgRef.(ociArchiveReference)
 	if !ok {
 		return imgspecv1.Descriptor{}, errors.Errorf("error typecasting, need type ociArchiveReference")
 	}
-	tempDirRef, err := createUntarTempDir(ociArchRef)
+	tempDirRef, err := createUntarTempDir(sys, ociArchRef)
 	if err != nil {
 		return imgspecv1.Descriptor{}, errors.Wrap(err, "error creating temp directory")
 	}
