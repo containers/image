@@ -3,7 +3,7 @@ language: go
 sudo: required
 notifications:
   email: false
-dist: trusty
+dist: xenial
 services:
   - docker
 os:
