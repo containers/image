@@ -662,7 +662,7 @@ func checkImageDestinationForCurrentRuntimeOS(ctx context.Context, sys *types.Sy
 		if sys != nil && sys.OSChoice != "" {
 			wantedOS = sys.OSChoice
 		}
-		if (wantedOS == "windows" && c.OS == "linux") || (wantedOS != "windows" && c.OS == "windows") {
+		if wantedOS != c.OS {
 			return fmt.Errorf("Image operating system mismatch: image uses %q, expecting %q", c.OS, wantedOS)
 		}
 	}
