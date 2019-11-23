@@ -8,7 +8,7 @@ require (
 	github.com/VividCortex/ewma v1.1.1 // indirect
 	github.com/containerd/continuity v0.0.0-20180216233310-d8fb8589b0e8 // indirect
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
-	github.com/containers/storage v1.13.4
+	github.com/containers/storage v1.14.0
 	github.com/docker/distribution v0.0.0-20170817175659-5f6282db7d65
 	github.com/docker/docker v0.0.0-20180522102801-da99009bbb11
 	github.com/docker/docker-credential-helpers v0.6.0
@@ -21,7 +21,7 @@ require (
 	github.com/gorilla/mux v0.0.0-20170217192616-94e7d24fd285 // indirect
 	github.com/gotestyourself/gotestyourself v2.2.0+incompatible // indirect
 	github.com/imdario/mergo v0.3.5
-	github.com/klauspost/compress v1.8.1
+	github.com/klauspost/compress v1.9.2
 	github.com/klauspost/pgzip v1.2.1
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
@@ -29,7 +29,7 @@ require (
 	github.com/mtrmac/gpgme v0.0.0-20170102180018-b2432428689c
 	github.com/opencontainers/go-digest v1.0.0-rc1
 	github.com/opencontainers/image-spec v1.0.2-0.20190823105129-775207bd45b6
-	github.com/opencontainers/selinux v1.2.2
+	github.com/opencontainers/selinux v1.3.0
 	github.com/ostreedev/ostree-go v0.0.0-20190702140239-759a8c1ac913
 	github.com/pkg/errors v0.8.1
 	github.com/pquerna/ffjson v0.0.0-20190813045741-dac163c6c0a9 // indirect
