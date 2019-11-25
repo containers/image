@@ -11,7 +11,7 @@ require (
 	github.com/containers/storage v1.14.0
 	github.com/docker/distribution v0.0.0-20170817175659-5f6282db7d65
 	github.com/docker/docker v0.0.0-20180522102801-da99009bbb11
-	github.com/docker/docker-credential-helpers v0.6.0
+	github.com/docker/docker-credential-helpers v0.6.3
 	github.com/docker/go-connections v0.0.0-20180212134524-7beb39f0b969
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/etcd-io/bbolt v1.3.3
