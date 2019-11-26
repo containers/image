@@ -5,7 +5,6 @@ go 1.11
 require (
 	github.com/14rcole/gopopulate v0.0.0-20180821133914-b175b219e774 // indirect
 	github.com/BurntSushi/toml v0.3.1
-	github.com/VividCortex/ewma v1.1.1 // indirect
 	github.com/containerd/continuity v0.0.0-20180216233310-d8fb8589b0e8 // indirect
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
 	github.com/containers/ocicrypt v0.0.0-20190930154801-b87a4a69c741
@@ -38,14 +37,14 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/ulikunitz/xz v0.5.6
 	github.com/vbatts/tar-split v0.11.1
-	github.com/vbauerster/mpb v3.4.0+incompatible
+	github.com/vbauerster/mpb/v4 v4.11.1
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190809123943-df4f5c81cb3b // indirect
 	github.com/xeipuuv/gojsonschema v0.0.0-20190816131739-be0936907f66
 	go.etcd.io/bbolt v1.3.3 // indirect
-	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
+	golang.org/x/crypto v0.0.0-20191112222119-e1110fd1c708
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
-	golang.org/x/sys v0.0.0-20190902133755-9109b7679e13
+	golang.org/x/sys v0.0.0-20191127021746-63cb32ae39b2
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	k8s.io/client-go v0.0.0-20170217214107-bcde30fb7eae
 )
