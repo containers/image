@@ -71,6 +71,9 @@ func (f fakeImageSource) UpdatedImageNeedsLayerDiffIDs(options types.ManifestUpd
 func (f fakeImageSource) UpdatedImage(ctx context.Context, options types.ManifestUpdateOptions) (types.Image, error) {
 	panic("Unexpected call to a mock function")
 }
+func (f fakeImageSource) SupportsEncryption(ctx context.Context) bool {
+	panic("Unexpected call to a mock function")
+}
 func (f fakeImageSource) Size() (int64, error) {
 	panic("Unexpected call to a mock function")
 }
@@ -144,7 +147,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 			src:               src,
 			canModifyManifest: true,
 		}
-		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "")
+		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
 		require.NoError(t, err, c.description)
 		assert.Equal(t, c.expectedUpdate, ic.manifestUpdates.ManifestMIMEType, c.description)
 		if c.expectedUpdate == "" {
@@ -163,7 +166,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 			src:               src,
 			canModifyManifest: false,
 		}
-		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "")
+		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
 		require.NoError(t, err, c.description)
 		assert.Equal(t, "", ic.manifestUpdates.ManifestMIMEType, c.description)
 		assert.Equal(t, manifest.NormalizedMIMEType(c.sourceType), preferredMIMEType, c.description)
@@ -178,7 +181,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 			src:               src,
 			canModifyManifest: true,
 		}
-		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, v1.MediaTypeImageManifest)
+		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, v1.MediaTypeImageManifest, false)
 		require.NoError(t, err, c.description)
 		assert.Equal(t, v1.MediaTypeImageManifest, ic.manifestUpdates.ManifestMIMEType, c.description)
 		assert.Equal(t, v1.MediaTypeImageManifest, preferredMIMEType, c.description)
@@ -191,7 +194,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 		src:               fakeImageSource(""),
 		canModifyManifest: true,
 	}
-	_, _, err := ic.determineManifestConversion(context.Background(), supportS1S2, "")
+	_, _, err := ic.determineManifestConversion(context.Background(), supportS1S2, "", false)
 	assert.Error(t, err)
 }
 
