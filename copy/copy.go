@@ -27,8 +27,8 @@ import (
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/vbauerster/mpb"
-	"github.com/vbauerster/mpb/decor"
+	"github.com/vbauerster/mpb/v4"
+	"github.com/vbauerster/mpb/v4/decor"
 	"golang.org/x/crypto/ssh/terminal"
 	"golang.org/x/sync/semaphore"
 )
@@ -925,7 +925,7 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest(ctx context.Context, instanc
 // The caller must eventually call the returned cleanup function after the pool will no longer be updated.
 func (c *copier) newProgressPool(ctx context.Context) (*mpb.Progress, func()) {
 	ctx, cancel := context.WithCancel(ctx)
-	pool := mpb.New(mpb.WithWidth(40), mpb.WithOutput(c.progressOutput), mpb.WithContext(ctx))
+	pool := mpb.NewWithContext(ctx, mpb.WithWidth(40), mpb.WithOutput(c.progressOutput))
 	return pool, func() {
 		cancel()
 		pool.Wait()
@@ -955,7 +955,7 @@ func (c *copier) createProgressBar(pool *mpb.Progress, info types.BlobInfo, kind
 				decor.Name(prefix),
 			),
 			mpb.AppendDecorators(
-				decor.OnComplete(decor.CountersKibiByte("%.1f / %.1f"), " "+onComplete),
+				decor.OnComplete(decor.CountersKibiByte("%.1f / %.1f"), onComplete),
 			),
 		)
 	} else {
@@ -967,7 +967,7 @@ func (c *copier) createProgressBar(pool *mpb.Progress, info types.BlobInfo, kind
 				decor.Name(prefix),
 			),
 			mpb.AppendDecorators(
-				decor.OnComplete(decor.Name(""), " "+onComplete),
+				decor.OnComplete(decor.Name(""), onComplete),
 			),
 		)
 	}
