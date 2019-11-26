@@ -123,10 +123,11 @@ func putTestConfig(t *testing.T, ociRef ociReference, tmpDir string) {
 	assert.NoError(t, err)
 
 	paths := []string{}
-	filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
 		paths = append(paths, path)
 		return nil
 	})
+	assert.NoError(t, err)
 
 	digest := digest.FromBytes(data).Encoded()
 	assert.Contains(t, paths, filepath.Join(tmpDir, "blobs", "sha256", digest), "The OCI directory does not contain the new config data")
@@ -145,10 +146,11 @@ func putTestManifest(t *testing.T, ociRef ociReference, tmpDir string) {
 	assert.NoError(t, err)
 
 	paths := []string{}
-	filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
 		paths = append(paths, path)
 		return nil
 	})
+	assert.NoError(t, err)
 
 	digest := digest.FromBytes(data).Encoded()
 	assert.Contains(t, paths, filepath.Join(tmpDir, "blobs", "sha256", digest), "The OCI directory does not contain the new manifest data")

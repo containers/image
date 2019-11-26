@@ -1113,7 +1113,8 @@ func TestDuplicateBlob(t *testing.T) {
 		if err != nil {
 			t.Fatalf("getBlobAndLayerID(%q) returned error %v", layerInfo.Digest, err)
 		}
-		io.Copy(ioutil.Discard, rc)
+		_, err = io.Copy(ioutil.Discard, rc)
+		require.NoError(t, err)
 		rc.Close()
 		layers = append(layers, layerID)
 	}

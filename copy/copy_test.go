@@ -102,7 +102,8 @@ func TestDiffIDComputationGoroutine(t *testing.T) {
 
 	// Error reading input
 	reader, writer := io.Pipe()
-	writer.CloseWithError(errors.New("Expected error reading input in diffIDComputationGoroutine"))
+	err = writer.CloseWithError(errors.New("Expected error reading input in diffIDComputationGoroutine"))
+	require.NoError(t, err)
 	res = goDiffIDComputationGoroutineWithTimeout(reader, nil)
 	require.NotNil(t, res)
 	assert.Error(t, res.err)
@@ -136,7 +137,8 @@ func TestComputeDiffID(t *testing.T) {
 	// Error reading input
 	reader, writer := io.Pipe()
 	defer reader.Close()
-	writer.CloseWithError(errors.New("Expected error reading input in computeDiffID"))
+	err = writer.CloseWithError(errors.New("Expected error reading input in computeDiffID"))
+	require.NoError(t, err)
 	_, err = computeDiffID(reader, nil)
 	assert.Error(t, err)
 }

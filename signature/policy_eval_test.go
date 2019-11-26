@@ -26,7 +26,10 @@ func TestPolicyRequirementError(t *testing.T) {
 func TestPolicyContextChangeState(t *testing.T) {
 	pc, err := NewPolicyContext(&Policy{Default: PolicyRequirements{NewPRReject()}})
 	require.NoError(t, err)
-	defer pc.Destroy()
+	defer func() {
+		err := pc.Destroy()
+		require.NoError(t, err)
+	}()
 
 	require.Equal(t, pcReady, pc.state)
 	err = pc.changeState(pcReady, pcInUse)
@@ -254,7 +257,10 @@ func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	defer pc.Destroy()
+	defer func() {
+		err := pc.Destroy()
+		require.NoError(t, err)
+	}()
 
 	// Success
 	img, closer := pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
@@ -393,7 +399,10 @@ func TestPolicyContextIsRunningImageAllowed(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	defer pc.Destroy()
+	defer func() {
+		err := pc.Destroy()
+		require.NoError(t, err)
+	}()
 
 	// Success
 	img, closer := pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
