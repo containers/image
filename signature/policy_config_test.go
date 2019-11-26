@@ -10,6 +10,7 @@ import (
 	"github.com/containers/image/v5/directory"
 	"github.com/containers/image/v5/docker"
 	"github.com/pkg/errors"
+
 	// this import is needed  where we use the "atomic" transport in TestPolicyUnmarshalJSON
 	_ "github.com/containers/image/v5/openshift"
 	"github.com/containers/image/v5/types"
@@ -660,17 +661,17 @@ func TestNewPRSignedBy(t *testing.T) {
 	}, pr)
 
 	// Invalid keyType
-	pr, err = newPRSignedBy(sbKeyType(""), testPath, nil, testIdentity)
+	_, err = newPRSignedBy(sbKeyType(""), testPath, nil, testIdentity)
 	assert.Error(t, err)
-	pr, err = newPRSignedBy(sbKeyType("this is invalid"), testPath, nil, testIdentity)
+	_, err = newPRSignedBy(sbKeyType("this is invalid"), testPath, nil, testIdentity)
 	assert.Error(t, err)
 
 	// Both keyPath and keyData specified
-	pr, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, testData, testIdentity)
+	_, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, testData, testIdentity)
 	assert.Error(t, err)
 
 	// Invalid signedIdentity
-	pr, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, nil)
+	_, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, nil)
 	assert.Error(t, err)
 }
 

@@ -116,7 +116,7 @@ func TestAutoDecompress(t *testing.T) {
 	assert.Equal(t, []byte{}, uncompressedContents)
 
 	// Error initializing a decompressor (for a detected format)
-	uncompressedStream, isCompressed, err = AutoDecompress(bytes.NewReader([]byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}))
+	_, _, err = AutoDecompress(bytes.NewReader([]byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}))
 	assert.Error(t, err)
 
 	// Error reading input

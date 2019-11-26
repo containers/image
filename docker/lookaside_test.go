@@ -107,7 +107,7 @@ func TestLoadAndMergeConfig(t *testing.T) {
 	unreadableDir := filepath.Join(tmpDir, "unreadable")
 	err = os.Mkdir(unreadableDir, 0000)
 	require.NoError(t, err)
-	config, err = loadAndMergeConfig(unreadableDir)
+	_, err = loadAndMergeConfig(unreadableDir)
 	assert.Error(t, err)
 
 	// An unreadable file in a registries.d directory
@@ -118,7 +118,7 @@ func TestLoadAndMergeConfig(t *testing.T) {
 	require.NoError(t, err)
 	err = ioutil.WriteFile(filepath.Join(unreadableFileDir, "1.yaml"), nil, 0000)
 	require.NoError(t, err)
-	config, err = loadAndMergeConfig(unreadableFileDir)
+	_, err = loadAndMergeConfig(unreadableFileDir)
 	assert.Error(t, err)
 
 	// Invalid YAML
@@ -127,7 +127,7 @@ func TestLoadAndMergeConfig(t *testing.T) {
 	require.NoError(t, err)
 	err = ioutil.WriteFile(filepath.Join(invalidYAMLDir, "0.yaml"), []byte("}"), 0644)
 	require.NoError(t, err)
-	config, err = loadAndMergeConfig(invalidYAMLDir)
+	_, err = loadAndMergeConfig(invalidYAMLDir)
 	assert.Error(t, err)
 
 	// Duplicate DefaultDocker
@@ -140,7 +140,7 @@ func TestLoadAndMergeConfig(t *testing.T) {
 	err = ioutil.WriteFile(filepath.Join(duplicateDefault, "1.yaml"),
 		[]byte("default-docker:\n sigstore: file:////tmp/different"), 0644)
 	require.NoError(t, err)
-	config, err = loadAndMergeConfig(duplicateDefault)
+	_, err = loadAndMergeConfig(duplicateDefault)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "0.yaml")
 	assert.Contains(t, err.Error(), "1.yaml")
@@ -155,7 +155,7 @@ func TestLoadAndMergeConfig(t *testing.T) {
 	err = ioutil.WriteFile(filepath.Join(duplicateNS, "1.yaml"),
 		[]byte("docker:\n example.com:\n  sigstore: file:////tmp/different"), 0644)
 	require.NoError(t, err)
-	config, err = loadAndMergeConfig(duplicateNS)
+	_, err = loadAndMergeConfig(duplicateNS)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "0.yaml")
 	assert.Contains(t, err.Error(), "1.yaml")

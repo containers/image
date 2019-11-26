@@ -148,6 +148,10 @@ func (s *storageImageSource) getBlobAndLayerID(info types.BlobInfo) (rc io.ReadC
 	// callers should try to retrieve layers using their uncompressed digests, so no need to
 	// check if they're using one of the compressed digests, which we can't reproduce anyway.
 	layers, err := s.imageRef.transport.store.LayersByUncompressedDigest(info.Digest)
+	if err != nil {
+		logrus.Debugf("Can't execute LayersByUncompressedDigest, %v", err)
+	}
+
 	// If it's not a layer, then it must be a data item.
 	if len(layers) == 0 {
 		b, err := s.imageRef.transport.store.ImageBigData(s.image.ID, info.Digest.String())

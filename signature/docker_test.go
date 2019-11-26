@@ -81,6 +81,7 @@ func TestVerifyDockerManifestSignature(t *testing.T) {
 
 	// Error verifying signature
 	corruptSignature, err := ioutil.ReadFile("fixtures/corrupt.signature")
+	require.NoError(t, err)
 	sig, err = VerifyDockerManifestSignature(corruptSignature, manifest, TestImageSignatureReference, mech, TestKeyFingerprint)
 	assert.Error(t, err)
 	assert.Nil(t, sig)
@@ -92,6 +93,7 @@ func TestVerifyDockerManifestSignature(t *testing.T) {
 
 	// Invalid reference in the signature
 	invalidReferenceSignature, err := ioutil.ReadFile("fixtures/invalid-reference.signature")
+	require.NoError(t, err)
 	sig, err = VerifyDockerManifestSignature(invalidReferenceSignature, manifest, TestImageSignatureReference, mech, TestKeyFingerprint)
 	assert.Error(t, err)
 	assert.Nil(t, sig)

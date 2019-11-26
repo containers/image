@@ -170,7 +170,9 @@ func refToTempOCIArchive(t *testing.T) (ref types.ImageReference, tmpTarFile str
 `
 	ioutil.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
 	tarFile, err := ioutil.TempFile("", "oci-transport-test.tar")
+	require.NoError(t, err)
 	err = tarDirectory(tmpDir, tarFile.Name())
+	require.NoError(t, err)
 	ref, err = NewReference(tarFile.Name(), "")
 	require.NoError(t, err)
 	return ref, tarFile.Name()

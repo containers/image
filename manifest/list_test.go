@@ -55,9 +55,11 @@ func TestParseLists(t *testing.T) {
 		require.NoError(t, err, "error converting %q to an Schema2List", c.path)
 
 		index2, err := list.ConvertToMIMEType(imgspecv1.MediaTypeImageIndex)
+		require.NoError(t, err)
 		assert.Equal(t, index, index2, "index %q lost data in conversion", c.path)
 
 		list2, err := index.ConvertToMIMEType(DockerV2ListMediaType)
+		require.NoError(t, err)
 		assert.Equal(t, list, list2, "list %q lost data in conversion", c.path)
 	}
 }

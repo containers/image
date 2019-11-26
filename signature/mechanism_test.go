@@ -290,19 +290,19 @@ func TestGPGSigningMechanismUntrustedSignatureContents(t *testing.T) {
 	// Literal packet, not a signature
 	signature, err := ioutil.ReadFile("./fixtures/unsigned-literal.signature") // Not fixtureVariants, the “literal data” packet does not have V3/V4 versions.
 	require.NoError(t, err)
-	content, shortKeyID, err := mech.UntrustedSignatureContents(signature)
+	_, _, err = mech.UntrustedSignatureContents(signature)
 	assert.Error(t, err)
 
 	// Encrypted data, not a signature.
 	signature, err = ioutil.ReadFile("./fixtures/unsigned-encrypted.signature") // Not fixtureVariants, the “public-key encrypted session key” does not have V3/V4 versions.
 	require.NoError(t, err)
-	content, shortKeyID, err = mech.UntrustedSignatureContents(signature)
+	_, _, err = mech.UntrustedSignatureContents(signature)
 	assert.Error(t, err)
 
 	// Expired signature
 	signature, err = ioutil.ReadFile("./fixtures/expired.signature") // Not fixtureVariants, V3 signature packets don’t support expiration.
 	require.NoError(t, err)
-	content, shortKeyID, err = mech.UntrustedSignatureContents(signature)
+	content, shortKeyID, err := mech.UntrustedSignatureContents(signature)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("This signature is expired.\n"), content)
 	assert.Equal(t, TestKeyShortID, shortKeyID)

@@ -31,6 +31,7 @@ import (
 	ddigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -525,6 +526,7 @@ func TestWriteRead(t *testing.T) {
 				t.Fatalf("Error decompressing layer %q from %q", layerInfo.Digest, ref.StringWithinTransport())
 			}
 			n, err := io.Copy(&buf, decompressed)
+			require.NoError(t, err)
 			layer.Close()
 			if layerInfo.Size >= 0 && compressed.Count != layerInfo.Size {
 				t.Fatalf("Blob size is different than expected: %d != %d, read %d", compressed.Count, layerInfo.Size, n)
