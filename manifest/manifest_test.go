@@ -62,7 +62,6 @@ func TestDigest(t *testing.T) {
 	manifest, err := ioutil.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
 	require.NoError(t, err)
 	_, err = Digest(manifest)
-	require.NoError(t, err)
 	assert.Error(t, err)
 
 	actualDigest, err := Digest([]byte{})
