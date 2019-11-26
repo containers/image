@@ -93,7 +93,7 @@ func TestGetBlobForRemoteLayersOnTLSFailure(t *testing.T) {
 }
 
 func remoteLayerContent(w http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(w, RemoteLayerContent)
+	fmt.Fprint(w, RemoteLayerContent)
 }
 
 func startRemoteLayerServer() (*httptest.Server, error) {

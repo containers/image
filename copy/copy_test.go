@@ -37,7 +37,7 @@ func TestDigestingReaderRead(t *testing.T) {
 	}{
 		{[]byte(""), "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
 		{[]byte("abc"), "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"},
-		{make([]byte, 65537, 65537), "sha256:3266304f31be278d06c3bd3eb9aa3e00c59bedec0a890de466568b0b90b0e01f"},
+		{make([]byte, 65537), "sha256:3266304f31be278d06c3bd3eb9aa3e00c59bedec0a890de466568b0b90b0e01f"},
 	}
 	// Valid input
 	for _, c := range cases {

@@ -499,7 +499,7 @@ func TestWriteRead(t *testing.T) {
 			t.Fatalf("Gained %d signatures", len(sigs)-len(signatures))
 		}
 		for i := range sigs {
-			if bytes.Compare(sigs[i], signatures[i]) != 0 {
+			if !bytes.Equal(sigs[i], signatures[i]) {
 				t.Fatalf("Signature %d was corrupted", i)
 			}
 		}

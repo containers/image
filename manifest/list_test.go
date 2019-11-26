@@ -21,7 +21,6 @@ func pare(m List) {
 			impl.Manifests[i].Platform.Features = nil
 		}
 	}
-	return
 }
 
 func TestParseLists(t *testing.T) {

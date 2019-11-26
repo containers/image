@@ -138,9 +138,8 @@ func (config *deferredLoadingClientConfig) createClientConfig() (clientConfig, e
 			return nil, err
 		}
 
-		var mergedClientConfig clientConfig
 		// REMOVED: Interactive fallback support.
-		mergedClientConfig = newNonInteractiveClientConfig(*mergedConfig)
+		mergedClientConfig := newNonInteractiveClientConfig(*mergedConfig)
 
 		config.clientConfig = mergedClientConfig
 	}
