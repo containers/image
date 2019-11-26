@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -74,13 +73,6 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 			}
 		}
 	}
-}
-
-// refWithTagAndDigest is a reference.NamedTagged and reference.Canonical at the same time.
-type refWithTagAndDigest struct{ reference.Canonical }
-
-func (ref refWithTagAndDigest) Tag() string {
-	return "notLatest"
 }
 
 // A common list of reference formats to test for the various ImageReference methods.

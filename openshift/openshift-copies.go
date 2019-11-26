@@ -272,14 +272,6 @@ func getUserIdentificationPartialConfig(configAuthInfo clientcmdAuthInfo) (*rest
 	return mergedConfig, nil
 }
 
-// canIdentifyUser is a modified copy of k8s.io/kubernetes/pkg/client/unversioned/clientcmd.canIdentifyUser
-func canIdentifyUser(config restConfig) bool {
-	return len(config.Username) > 0 ||
-		(len(config.CertFile) > 0 || len(config.CertData) > 0) ||
-		len(config.BearerToken) > 0
-
-}
-
 // ConfirmUsable is a modified copy of k8s.io/kubernetes/pkg/client/unversioned/clientcmd.DirectClientConfig.ConfirmUsable.
 // ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,
 // but no errors in the sections requested or referenced.  It does not return early so that it can find as many errors as possible.
