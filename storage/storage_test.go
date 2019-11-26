@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -248,6 +249,10 @@ func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, i
 	for i := 1024; i < 2048; i++ {
 		buf[i] = 0
 	}
+
+	wg := sync.WaitGroup{}
+	errs := make(chan error)
+	wg.Add(1)
 	go func() {
 		defer pwriter.Close()
 		if cwriter != nil {
@@ -264,20 +269,30 @@ func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, i
 			Typeflag:   tar.TypeReg,
 		})
 		if err != nil {
-			t.Fatalf("Error writing tar header: %v", err)
+			errs <- fmt.Errorf("Error writing tar header: %v", err)
 		}
 		n, err := twriter.Write(buf)
 		if err != nil {
-			t.Fatalf("Error writing tar header: %v", err)
+			errs <- fmt.Errorf("Error writing tar header: %v", err)
 		}
 		if n != len(buf) {
-			t.Fatalf("Short write writing tar header: %d < %d", n, len(buf))
+			errs <- fmt.Errorf("Short write writing tar header: %d < %d", n, len(buf))
 		}
 		err = twriter.Flush()
 		if err != nil {
-			t.Fatalf("Error flushing output to tar archive: %v", err)
+			errs <- fmt.Errorf("Error flushing output to tar archive: %v", err)
 		}
 	}()
+	go func() {
+		wg.Wait()
+		close(errs)
+	}()
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	_, err = io.Copy(&tbuffer, preader)
 	if err != nil {
 		t.Fatalf("Error reading layer tar: %v", err)
