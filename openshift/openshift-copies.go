@@ -19,6 +19,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
 	"k8s.io/client-go/util/homedir"
 )
@@ -325,6 +326,17 @@ var (
 	errEmptyCluster = errors.New("cluster has no server defined")
 )
 
+//helper for checking certificate/key/CA
+func validateFileIsReadable(name string) error {
+	answer, err := os.Open(name)
+	defer func() {
+		if err := answer.Close(); err != nil {
+			logrus.Debugf("Error closing %v: %v", name, err)
+		}
+	}()
+	return err
+}
+
 // validateClusterInfo is a modified copy of k8s.io/kubernetes/pkg/client/unversioned/clientcmd.DirectClientConfig.validateClusterInfo.
 // validateClusterInfo looks for conflicts and errors in the cluster info
 func validateClusterInfo(clusterName string, clusterInfo clientcmdCluster) []error {
@@ -346,8 +358,7 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdCluster) []err
 		validationErrors = append(validationErrors, errors.Errorf("certificate-authority-data and certificate-authority are both specified for %v. certificate-authority-data will override", clusterName))
 	}
 	if len(clusterInfo.CertificateAuthority) != 0 {
-		clientCertCA, err := os.Open(clusterInfo.CertificateAuthority)
-		defer clientCertCA.Close()
+		err := validateFileIsReadable(clusterInfo.CertificateAuthority)
 		if err != nil {
 			validationErrors = append(validationErrors, errors.Errorf("unable to read certificate-authority %v for %v due to %v", clusterInfo.CertificateAuthority, clusterName, err))
 		}
@@ -385,15 +396,13 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdAuthInfo) []error {
 		}
 
 		if len(authInfo.ClientCertificate) != 0 {
-			clientCertFile, err := os.Open(authInfo.ClientCertificate)
-			defer clientCertFile.Close()
+			err := validateFileIsReadable(authInfo.ClientCertificate)
 			if err != nil {
 				validationErrors = append(validationErrors, errors.Errorf("unable to read client-cert %v for %v due to %v", authInfo.ClientCertificate, authInfoName, err))
 			}
 		}
 		if len(authInfo.ClientKey) != 0 {
-			clientKeyFile, err := os.Open(authInfo.ClientKey)
-			defer clientKeyFile.Close()
+			err := validateFileIsReadable(authInfo.ClientKey)
 			if err != nil {
 				validationErrors = append(validationErrors, errors.Errorf("unable to read client-key %v for %v due to %v", authInfo.ClientKey, authInfoName, err))
 			}
