@@ -126,6 +126,7 @@ func testPathsAreSameFile(t *testing.T, path1, path2, description string) {
 
 func runPathResolvingTestCase(t *testing.T, f func(string) (string, error), c pathResolvingTestCase, suffix string) {
 	topDir, err := ioutil.TempDir("", "pathResolving")
+	require.NoError(t, err)
 	defer func() {
 		// Clean up after the "Unreadable directory" case; os.RemoveAll just fails.
 		_ = os.Chmod(filepath.Join(topDir, "unreadable"), 0755) // Ignore errors, especially if this does not exist.

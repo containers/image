@@ -57,7 +57,7 @@ func TestParseImageAndDockerReference(t *testing.T) {
 type refImageMock struct{ reference.Named }
 
 func (ref refImageMock) Reference() types.ImageReference {
-	return refImageReferenceMock{ref.Named}
+	return refImageReferenceMock(ref)
 }
 func (ref refImageMock) Close() error {
 	panic("unexpected call to a mock function")

@@ -833,7 +833,10 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		defer progressCleanup()
 
 		for i, srcLayer := range srcInfos {
-			copySemaphore.Acquire(ctx, 1)
+			err = copySemaphore.Acquire(ctx, 1)
+			if err != nil {
+				logrus.Debug("Can't acquire semaphoer", err)
+			}
 			go copyLayerHelper(i, srcLayer, encLayerBitmap[i], progressPool)
 		}
 
@@ -1084,7 +1087,7 @@ func (ic *imageCopier) copyLayerFromStream(ctx context.Context, srcStream io.Rea
 		diffIDChan = make(chan diffIDResult, 1) // Buffered, so that sending a value after this or our caller has failed and exited does not block.
 		pipeReader, pipeWriter := io.Pipe()
 		defer func() { // Note that this is not the same as {defer pipeWriter.CloseWithError(err)}; we need err to be evaluated lazily.
-			pipeWriter.CloseWithError(err) // CloseWithError(nil) is equivalent to Close()
+			_ = pipeWriter.CloseWithError(err) // CloseWithError(nil) is equivalent to Close(), always returns nil
 		}()
 
 		getDiffIDRecorder = func(decompressor compression.DecompressorFunc) io.Writer {
@@ -1371,7 +1374,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 func (c *copier) compressGoroutine(dest *io.PipeWriter, src io.Reader, compressionFormat compression.Algorithm) {
 	err := errors.New("Internal error: unexpected panic in compressGoroutine")
 	defer func() { // Note that this is not the same as {defer dest.CloseWithError(err)}; we need err to be evaluated lazily.
-		dest.CloseWithError(err) // CloseWithError(nil) is equivalent to Close()
+		_ = dest.CloseWithError(err) // CloseWithError(nil) is equivalent to Close(), always returns nil
 	}()
 
 	compressor, err := compression.CompressStream(dest, compressionFormat, c.compressionLevel)

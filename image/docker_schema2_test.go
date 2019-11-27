@@ -185,7 +185,8 @@ func TestManifestSchema2ConfigBlob(t *testing.T) {
 		}, nil},
 		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
 			reader, writer := io.Pipe()
-			writer.CloseWithError(errors.New("Expected error reading input in ConfigBlob"))
+			err = writer.CloseWithError(errors.New("Expected error reading input in ConfigBlob"))
+			assert.NoError(t, err)
 			return reader, 1, nil
 		}, nil},
 		{func(digest digest.Digest) (io.ReadCloser, int64, error) {

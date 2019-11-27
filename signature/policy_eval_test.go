@@ -26,7 +26,10 @@ func TestPolicyRequirementError(t *testing.T) {
 func TestPolicyContextChangeState(t *testing.T) {
 	pc, err := NewPolicyContext(&Policy{Default: PolicyRequirements{NewPRReject()}})
 	require.NoError(t, err)
-	defer pc.Destroy()
+	defer func() {
+		err := pc.Destroy()
+		require.NoError(t, err)
+	}()
 
 	require.Equal(t, pcReady, pc.state)
 	err = pc.changeState(pcReady, pcInUse)
@@ -208,7 +211,7 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 
 // pcImageMock returns a types.UnparsedImage for a directory, claiming a specified dockerReference and implementing PolicyConfigurationIdentity/PolicyConfigurationNamespaces.
 // The caller must call the returned close callback when done.
-func pcImageMock(t *testing.T, dir, dockerReference string) (types.UnparsedImage, func() error) {
+func pcImageMock(t *testing.T, dir, dockerReference string) (types.UnparsedImage, func()) {
 	ref, err := reference.ParseNormalizedNamed(dockerReference)
 	require.NoError(t, err)
 	return dirImageMockWithRef(t, dir, pcImageReferenceMock{"docker", ref})
@@ -254,7 +257,10 @@ func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	defer pc.Destroy()
+	defer func() {
+		err := pc.Destroy()
+		require.NoError(t, err)
+	}()
 
 	// Success
 	img, closer := pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
@@ -393,7 +399,10 @@ func TestPolicyContextIsRunningImageAllowed(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	defer pc.Destroy()
+	defer func() {
+		err := pc.Destroy()
+		require.NoError(t, err)
+	}()
 
 	// Success
 	img, closer := pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")

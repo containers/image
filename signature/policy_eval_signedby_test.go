@@ -17,7 +17,7 @@ import (
 
 // dirImageMock returns a types.UnparsedImage for a directory, claiming a specified dockerReference.
 // The caller must call the returned close callback when done.
-func dirImageMock(t *testing.T, dir, dockerReference string) (types.UnparsedImage, func() error) {
+func dirImageMock(t *testing.T, dir, dockerReference string) (types.UnparsedImage, func()) {
 	ref, err := reference.ParseNormalizedNamed(dockerReference)
 	require.NoError(t, err)
 	return dirImageMockWithRef(t, dir, refImageReferenceMock{ref})
@@ -25,15 +25,18 @@ func dirImageMock(t *testing.T, dir, dockerReference string) (types.UnparsedImag
 
 // dirImageMockWithRef returns a types.UnparsedImage for a directory, claiming a specified ref.
 // The caller must call the returned close callback when done.
-func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) (types.UnparsedImage, func() error) {
+func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) (types.UnparsedImage, func()) {
 	srcRef, err := directory.NewReference(dir)
 	require.NoError(t, err)
 	src, err := srcRef.NewImageSource(context.Background(), nil)
 	require.NoError(t, err)
 	return image.UnparsedInstance(&dirImageSourceMock{
-		ImageSource: src,
-		ref:         ref,
-	}, nil), src.Close
+			ImageSource: src,
+			ref:         ref,
+		}, nil), func() {
+			err := src.Close()
+			require.NoError(t, err)
+		}
 }
 
 // dirImageSourceMock inherits dirImageSource, but overrides its Reference method.

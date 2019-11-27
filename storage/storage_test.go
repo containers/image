@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,14 +31,11 @@ import (
 	ddigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 )
 
 var (
-	_imgd      types.ImageDestination = &storageImageDestination{}
-	_imgs      types.ImageSource      = &storageImageSource{}
-	_ref       types.ImageReference   = &storageReference{}
-	_transport types.ImageTransport   = &storageTransport{}
-	topwd                             = ""
+	topwd = ""
 )
 
 const (
@@ -248,6 +246,10 @@ func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, i
 	for i := 1024; i < 2048; i++ {
 		buf[i] = 0
 	}
+
+	wg := sync.WaitGroup{}
+	errs := make(chan error)
+	wg.Add(1)
 	go func() {
 		defer pwriter.Close()
 		if cwriter != nil {
@@ -264,20 +266,30 @@ func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, i
 			Typeflag:   tar.TypeReg,
 		})
 		if err != nil {
-			t.Fatalf("Error writing tar header: %v", err)
+			errs <- fmt.Errorf("Error writing tar header: %v", err)
 		}
 		n, err := twriter.Write(buf)
 		if err != nil {
-			t.Fatalf("Error writing tar header: %v", err)
+			errs <- fmt.Errorf("Error writing tar header: %v", err)
 		}
 		if n != len(buf) {
-			t.Fatalf("Short write writing tar header: %d < %d", n, len(buf))
+			errs <- fmt.Errorf("Short write writing tar header: %d < %d", n, len(buf))
 		}
 		err = twriter.Flush()
 		if err != nil {
-			t.Fatalf("Error flushing output to tar archive: %v", err)
+			errs <- fmt.Errorf("Error flushing output to tar archive: %v", err)
 		}
 	}()
+	go func() {
+		wg.Wait()
+		close(errs)
+	}()
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	_, err = io.Copy(&tbuffer, preader)
 	if err != nil {
 		t.Fatalf("Error reading layer tar: %v", err)
@@ -488,7 +500,7 @@ func TestWriteRead(t *testing.T) {
 			t.Fatalf("Gained %d signatures", len(sigs)-len(signatures))
 		}
 		for i := range sigs {
-			if bytes.Compare(sigs[i], signatures[i]) != 0 {
+			if !bytes.Equal(sigs[i], signatures[i]) {
 				t.Fatalf("Signature %d was corrupted", i)
 			}
 		}
@@ -514,6 +526,7 @@ func TestWriteRead(t *testing.T) {
 				t.Fatalf("Error decompressing layer %q from %q", layerInfo.Digest, ref.StringWithinTransport())
 			}
 			n, err := io.Copy(&buf, decompressed)
+			require.NoError(t, err)
 			layer.Close()
 			if layerInfo.Size >= 0 && compressed.Count != layerInfo.Size {
 				t.Fatalf("Blob size is different than expected: %d != %d, read %d", compressed.Count, layerInfo.Size, n)
@@ -1100,7 +1113,8 @@ func TestDuplicateBlob(t *testing.T) {
 		if err != nil {
 			t.Fatalf("getBlobAndLayerID(%q) returned error %v", layerInfo.Digest, err)
 		}
-		io.Copy(ioutil.Discard, rc)
+		_, err = io.Copy(ioutil.Discard, rc)
+		require.NoError(t, err)
 		rc.Close()
 		layers = append(layers, layerID)
 	}

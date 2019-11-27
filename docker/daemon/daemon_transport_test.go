@@ -213,6 +213,7 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 
 	// Just a smoke test, the substance is tested in policyconfiguration.TestDockerReference.
 	ref, err = ParseReference("busybox:notlatest")
+	require.NoError(t, err)
 	assert.Equal(t, []string{
 		"docker.io/library/busybox",
 		"docker.io/library",

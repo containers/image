@@ -156,6 +156,7 @@ func TestGetPutSignatures(t *testing.T) {
 	require.NoError(t, err)
 
 	err = dest.PutSignatures(context.Background(), signatures, nil)
+	require.NoError(t, err)
 	listSignatures := [][]byte{
 		[]byte("sig3"),
 		[]byte("sig4"),

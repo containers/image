@@ -150,7 +150,8 @@ func refToTempOCI(t *testing.T) (ref types.ImageReference, tmpDir string) {
 		]
 	}
 `
-	ioutil.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
+	err = ioutil.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
+	require.NoError(t, err)
 	ref, err = NewReference(tmpDir, "imageValue")
 	require.NoError(t, err)
 	return ref, tmpDir

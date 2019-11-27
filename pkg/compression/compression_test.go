@@ -74,7 +74,8 @@ func TestDetectCompression(t *testing.T) {
 	// Error reading input
 	reader, writer := io.Pipe()
 	defer reader.Close()
-	writer.CloseWithError(errors.New("Expected error reading input in DetectCompression"))
+	err = writer.CloseWithError(errors.New("Expected error reading input in DetectCompression"))
+	assert.NoError(t, err)
 	_, _, err = DetectCompression(reader)
 	assert.Error(t, err)
 }
@@ -116,13 +117,14 @@ func TestAutoDecompress(t *testing.T) {
 	assert.Equal(t, []byte{}, uncompressedContents)
 
 	// Error initializing a decompressor (for a detected format)
-	uncompressedStream, isCompressed, err = AutoDecompress(bytes.NewReader([]byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}))
+	_, _, err = AutoDecompress(bytes.NewReader([]byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}))
 	assert.Error(t, err)
 
 	// Error reading input
 	reader, writer := io.Pipe()
 	defer reader.Close()
-	writer.CloseWithError(errors.New("Expected error reading input in AutoDecompress"))
+	err = writer.CloseWithError(errors.New("Expected error reading input in AutoDecompress"))
+	require.NoError(t, err)
 	_, _, err = AutoDecompress(reader)
 	assert.Error(t, err)
 }
