@@ -57,7 +57,7 @@ tools: tools.timestamp
 tools.timestamp: Makefile
 	@GO111MODULE="off" go get -u $(BUILDFLAGS) golang.org/x/lint/golint
 	if [ ! -x "$(GOBIN)/golangci-lint" ]; then \
-		curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(GOBIN)/ v1.21.0; \
+		curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sudo sh -s -- -b $(GOBIN)/ v1.21.0; \
 	fi
 	@GO111MODULE="off" go get $(BUILDFLAGS) github.com/vbatts/git-validation
 	@touch tools.timestamp
