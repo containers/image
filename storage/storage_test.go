@@ -35,7 +35,11 @@ import (
 )
 
 var (
-	topwd = ""
+	topwd                             = ""
+	_imgd      types.ImageDestination = &storageImageDestination{} //nolint
+	_imgs      types.ImageSource      = &storageImageSource{}      //nolint
+	_ref       types.ImageReference   = &storageReference{}        //nolint
+	_transport types.ImageTransport   = &storageTransport{}        //nolint
 )
 
 const (
