@@ -9,7 +9,7 @@ require (
 	github.com/containerd/continuity v0.0.0-20180216233310-d8fb8589b0e8 // indirect
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
 	github.com/containers/ocicrypt v0.0.0-20190930154801-b87a4a69c741
-	github.com/containers/storage v1.15.0
+	github.com/containers/storage v1.15.1
 	github.com/docker/distribution v0.0.0-20170817175659-5f6282db7d65
 	github.com/docker/docker v0.0.0-20180522102801-da99009bbb11
 	github.com/docker/docker-credential-helpers v0.6.3
