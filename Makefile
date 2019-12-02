@@ -96,7 +96,7 @@ test-skopeo:
 		cd $${skopeo_path} && \
 		GO111MODULE="on" go mod edit -replace $${project_module}=$${project_path} && \
 		make vendor && \
-		make BUILDTAGS="$(BUILDTAGS)" binary-local test-all-local && \
+		make BUILDTAGS="$(BUILDTAGS)" binary-local test-unit-local && \
 		$(SUDO) make BUILDTAGS="$(BUILDTAGS)" check && \
 		rm -rf $${skopeo_path}
 
