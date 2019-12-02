@@ -8,6 +8,11 @@ SKOPEO_BRANCH = master
 # Set SUDO=sudo to run container integration tests using sudo.
 SUDO =
 
+GOBIN := $(shell go env GOBIN)
+ifeq ($(GOBIN),)
+GOBIN := $(GOPATH)/bin
+endif
+
 # when cross compiling _for_ a Darwin or windows host, then we must use openpgp
 BUILD_TAGS_WINDOWS_CROSS = containers_image_openpgp
 BUILD_TAGS_DARWIN_CROSS = containers_image_openpgp
@@ -23,6 +28,8 @@ MANINSTALLDIR=${PREFIX}/share/man
 GOMD2MAN ?= $(shell command -v go-md2man || echo '$(GOBIN)/go-md2man')
 MANPAGES_MD = $(wildcard docs/*.5.md)
 MANPAGES ?= $(MANPAGES_MD:%.md=%)
+
+export PATH := $(PATH):${GOBIN}
 
 # On macOS, (brew install gpgme) installs it within /usr/local, but /usr/local/include is not in the default search path.
 # Rather than hard-code this directory, use gpgme-config. Sadly that must be done at the top-level user
@@ -52,18 +59,26 @@ cross:
 	GOOS=windows $(MAKE) build BUILDTAGS="$(BUILDTAGS) $(BUILD_TAGS_WINDOWS_CROSS)"
 	GOOS=darwin $(MAKE) build BUILDTAGS="$(BUILDTAGS) $(BUILD_TAGS_DARWIN_CROSS)"
 
-tools: tools.timestamp
+tools: .install.gitvalidation .install.golangci-lint .install.golint
 
-tools.timestamp: Makefile
-	@GO111MODULE="off" go get -u $(BUILDFLAGS) golang.org/x/lint/golint
-	if [ ! -x "$(GOBIN)/golangci-lint" ]; then \
-		curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sudo sh -s -- -b $(GOBIN)/ v1.21.0; \
+.install.gitvalidation:
+	if [ ! -x "$(GOBIN)/git-validation" ]; then \
+		GO111MODULE="off" go get $(BUILDFLAGS) github.com/vbatts/git-validation; \
 	fi
-	@GO111MODULE="off" go get $(BUILDFLAGS) github.com/vbatts/git-validation
-	@touch tools.timestamp
+
+.install.golangci-lint:
+	if [ ! -x "$(GOBIN)/golangci-lint" ]; then \
+		curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(GOBIN) v1.21.0; \
+	fi
+
+.install.golint:
+	# Note, golint is only needed for Skopeo's tests.
+	if [ ! -x "$(GOBIN)/golint" ]; then \
+		GO111MODULE="off" go get -u $(BUILDFLAGS) golang.org/x/lint/golint; \
+	fi
 
 clean:
-	rm -rf tools.timestamp $(MANPAGES)
+	rm -rf $(MANPAGES)
 
 test:
 	@$(GPGME_ENV) GO111MODULE="on" go test $(BUILDFLAGS) -cover ./...
@@ -93,19 +108,15 @@ validate: lint
 	@test -z "$$(gofmt -s -l . | grep -ve '^vendor' | tee /dev/stderr)"
 
 lint:
-	@out="$$(GO111MODULE="on" golangci-lint run)"; \
-	if [ -n "$$out" ]; then \
-		echo "$$out"; \
-		exit 1; \
-	fi
+	$(GOBIN)/golangci-lint run --build-tags "$(BUILDTAGS)"
 
 # When this is running in travis, it will only check the travis commit range
 .gitvalidation:
-	@which git-validation > /dev/null 2>/dev/null || (echo "ERROR: git-validation not found. Consider 'make clean && make tools'" && false)
+	@which $(GOBIN)/git-validation > /dev/null 2>/dev/null || (echo "ERROR: git-validation not found. Consider 'make clean && make tools'" && false)
 ifeq ($(TRAVIS),true)
-	git-validation -q -run DCO,short-subject,dangling-whitespace
+	$(GOBIN)/git-validation -q -run DCO,short-subject,dangling-whitespace
 else
 	git fetch -q "https://github.com/containers/image.git" "refs/heads/master"
 	upstream="$$(git rev-parse --verify FETCH_HEAD)" ; \
-		git-validation -q -run DCO,short-subject,dangling-whitespace -range $$upstream..HEAD
+		$(GOBIN)/git-validation -q -run DCO,short-subject,dangling-whitespace -range $$upstream..HEAD
 endif
