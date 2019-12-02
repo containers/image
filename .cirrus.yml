@@ -1,0 +1,13 @@
+container:
+  image: golang:1.13
+
+env:
+  GOPROXY: https://proxy.golang.org
+
+validate_task:
+  validate_script:
+    - apt-get update -qq
+    - apt-get install -qq -y libgpgme-dev libdevmapper-dev btrfs-tools libbtrfs-dev
+    - make tools
+    - make .gitvalidation
+    - make validate
