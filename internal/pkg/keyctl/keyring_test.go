@@ -11,7 +11,10 @@ import (
 func TestSessionKeyring(t *testing.T) {
 
 	token := make([]byte, 20)
-	rand.Read(token)
+	_, err := rand.Read(token)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	testname := "testname"
 	keyring, err := SessionKeyring()
@@ -41,7 +44,10 @@ func TestSessionKeyring(t *testing.T) {
 
 func TestUserKeyring(t *testing.T) {
 	token := make([]byte, 20)
-	rand.Read(token)
+	_, err := rand.Read(token)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	testname := "testuser"
 
@@ -71,7 +77,10 @@ func TestUserKeyring(t *testing.T) {
 
 func TestLink(t *testing.T) {
 	token := make([]byte, 20)
-	rand.Read(token)
+	_, err := rand.Read(token)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	testname := "testlink"
 
@@ -121,7 +130,10 @@ func TestLink(t *testing.T) {
 
 func TestUnlink(t *testing.T) {
 	token := make([]byte, 20)
-	rand.Read(token)
+	_, err := rand.Read(token)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	testname := "testunlink"
 	keyring, err := SessionKeyring()
@@ -147,7 +159,10 @@ func TestUnlink(t *testing.T) {
 
 func TestReadKeyring(t *testing.T) {
 	token := make([]byte, 20)
-	rand.Read(token)
+	_, err := rand.Read(token)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	testname := "testuser"
 
@@ -176,7 +191,10 @@ func TestReadKeyring(t *testing.T) {
 
 func TestDescribe(t *testing.T) {
 	token := make([]byte, 20)
-	rand.Read(token)
+	_, err := rand.Read(token)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	testname := "testuser"
 
