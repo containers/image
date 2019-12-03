@@ -1,0 +1,11 @@
+container:
+  image: golang:1.13
+
+env:
+  GOPROXY: https://proxy.golang.org
+
+validate:
+  validate:
+    - make tools
+    - make .gitvalidation
+    - make validate
