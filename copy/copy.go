@@ -168,8 +168,11 @@ type Options struct {
 	Progress         chan types.ProgressProperties // Reported to when ProgressInterval has arrived for a single artifact+offset.
 	// manifest MIME type of image set by user. "" is default and means use the autodetection to the the manifest MIME type
 	ForceManifestMIMEType string
-	ImageListSelection    ImageListSelection // set to either CopySystemImage (the default), CopyAllImages, or CopySpecificImages to control which instances we copy when the source reference is a list; ignored if the source reference is not a list
-	Instances             []digest.Digest    // if ImageListSelection is CopySpecificImages, copy only these instances and the list itself
+	// manifest MIME type list for image set by user. Ignored if ForceManifestMIMEType is set. Setting to a single value
+	// is equivalent to setting ForceManifestMIMEType. If source manifest MIME type is in list, it takes priority
+	OverrideManifestMIMETypeList []string
+	ImageListSelection           ImageListSelection // set to either CopySystemImage (the default), CopyAllImages, or CopySpecificImages to control which instances we copy when the source reference is a list; ignored if the source reference is not a list
+	Instances                    []digest.Digest    // if ImageListSelection is CopySpecificImages, copy only these instances and the list itself
 	// If OciEncryptConfig is non-nil, it indicates that an image should be encrypted.
 	// The encryption options is derived from the construction of EncryptConfig object.
 	// Note: During initial encryption process of a layer, the resultant digest is not known
@@ -383,6 +386,9 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 
 	// Determine if we'll need to convert the manifest list to a different format.
 	forceListMIMEType := options.ForceManifestMIMEType
+	if forceListMIMEType == "" && len(options.OverrideManifestMIMETypeList) == 1 {
+		forceListMIMEType = options.OverrideManifestMIMETypeList[0]
+	}
 	switch forceListMIMEType {
 	case manifest.DockerV2Schema1MediaType, manifest.DockerV2Schema1SignedMediaType, manifest.DockerV2Schema2MediaType:
 		forceListMIMEType = manifest.DockerV2ListMediaType
@@ -610,7 +616,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 
 	// We compute preferredManifestMIMEType only to show it in error messages.
 	// Without having to add this context in an error message, we would be happy enough to know only that no conversion is needed.
-	preferredManifestMIMEType, otherManifestMIMETypeCandidates, err := ic.determineManifestConversion(ctx, c.dest.SupportedManifestMIMETypes(), options.ForceManifestMIMEType, destRequiresOciEncryption)
+	preferredManifestMIMEType, otherManifestMIMETypeCandidates, err := ic.determineManifestConversion(ctx, c.dest.SupportedManifestMIMETypes(), options.ForceManifestMIMEType, options.OverrideManifestMIMETypeList, destRequiresOciEncryption)
 	if err != nil {
 		return nil, "", "", err
 	}

@@ -147,7 +147,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 			src:               src,
 			canModifyManifest: true,
 		}
-		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
+		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", []string{}, false)
 		require.NoError(t, err, c.description)
 		assert.Equal(t, c.expectedUpdate, ic.manifestUpdates.ManifestMIMEType, c.description)
 		if c.expectedUpdate == "" {
@@ -166,7 +166,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 			src:               src,
 			canModifyManifest: false,
 		}
-		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
+		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", []string{}, false)
 		require.NoError(t, err, c.description)
 		assert.Equal(t, "", ic.manifestUpdates.ManifestMIMEType, c.description)
 		assert.Equal(t, manifest.NormalizedMIMEType(c.sourceType), preferredMIMEType, c.description)
@@ -181,11 +181,52 @@ func TestDetermineManifestConversion(t *testing.T) {
 			src:               src,
 			canModifyManifest: true,
 		}
-		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, v1.MediaTypeImageManifest, false)
+		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, v1.MediaTypeImageManifest, []string{}, false)
 		require.NoError(t, err, c.description)
 		assert.Equal(t, v1.MediaTypeImageManifest, ic.manifestUpdates.ManifestMIMEType, c.description)
 		assert.Equal(t, v1.MediaTypeImageManifest, preferredMIMEType, c.description)
 		assert.Equal(t, []string{}, otherCandidates, c.description)
+	}
+
+	// With overrideManifestMIMETypeList with one entry, the output is always the forced manifest type (in this case s2)
+	for _, c := range cases {
+		src := fakeImageSource(c.sourceType)
+		ic := &imageCopier{
+			manifestUpdates:   &types.ManifestUpdateOptions{},
+			src:               src,
+			canModifyManifest: true,
+		}
+		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", []string{manifest.DockerV2Schema2MediaType}, false)
+		require.NoError(t, err, c.description)
+		if c.sourceType == manifest.DockerV2Schema2MediaType {
+			assert.Equal(t, "", ic.manifestUpdates.ManifestMIMEType, c.description)
+		} else {
+			assert.Equal(t, manifest.DockerV2Schema2MediaType, ic.manifestUpdates.ManifestMIMEType, c.description)
+		}
+		assert.Equal(t, manifest.DockerV2Schema2MediaType, preferredMIMEType, c.description)
+		assert.Equal(t, []string{}, otherCandidates, c.description)
+	}
+
+	// With overrideManifestMIMETypeList with multiple entries, the output is always a manifest type in the list (
+	for _, c := range cases {
+		src := fakeImageSource(c.sourceType)
+		ic := &imageCopier{
+			manifestUpdates:   &types.ManifestUpdateOptions{},
+			src:               src,
+			canModifyManifest: true,
+		}
+		overrideList := []string{manifest.DockerV2Schema2MediaType, v1.MediaTypeImageManifest, manifest.DockerV2ListMediaType}
+		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", overrideList, false)
+		require.NoError(t, err, c.description)
+		if contains(overrideList, c.sourceType) {
+			assert.Equal(t, "", ic.manifestUpdates.ManifestMIMEType, c.description)
+			assert.Equal(t, removeItem(overrideList, manifest.NormalizedMIMEType(c.sourceType)), otherCandidates, c.description)
+			assert.Equal(t, manifest.NormalizedMIMEType(c.sourceType), preferredMIMEType, c.description)
+		} else {
+			assert.Equal(t, manifest.DockerV2Schema2MediaType, ic.manifestUpdates.ManifestMIMEType, c.description)
+			assert.Equal(t, removeItem(overrideList, ic.manifestUpdates.ManifestMIMEType), otherCandidates, c.description)
+			assert.Equal(t, manifest.DockerV2Schema2MediaType, preferredMIMEType, c.description)
+		}
 	}
 
 	// Error reading the manifest — smoke test only.
@@ -194,8 +235,26 @@ func TestDetermineManifestConversion(t *testing.T) {
 		src:               fakeImageSource(""),
 		canModifyManifest: true,
 	}
-	_, _, err := ic.determineManifestConversion(context.Background(), supportS1S2, "", false)
+	_, _, err := ic.determineManifestConversion(context.Background(), supportS1S2, "", []string{}, false)
 	assert.Error(t, err)
+}
+
+func contains(inSlice []string, value string) bool {
+	for _, item := range inSlice {
+		if item == value {
+			return true
+		}
+	}
+	return false
+}
+
+func removeItem(inSlice []string, value string) []string {
+	for i, item := range inSlice {
+		if item == value {
+			return append(append(inSlice[:0:0], inSlice[:(i)]...), inSlice[i+1:]...)
+		}
+	}
+	return inSlice
 }
 
 func TestIsMultiImage(t *testing.T) {

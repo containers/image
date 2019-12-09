@@ -42,7 +42,8 @@ func (os *orderedSet) append(s string) {
 // Note that the conversion will only happen later, through ic.src.UpdatedImage
 // Returns the preferred manifest MIME type (whether we are converting to it or using it unmodified),
 // and a list of other possible alternatives, in order.
-func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupportedManifestMIMETypes []string, forceManifestMIMEType string, requiresOciEncryption bool) (string, []string, error) {
+func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupportedManifestMIMETypes []string,
+	forceManifestMIMEType string, overrideManifestMIMETypeList []string, requiresOciEncryption bool) (string, []string, error) {
 	_, srcType, err := ic.src.Manifest(ctx)
 	if err != nil { // This should have been cached?!
 		return "", nil, errors.Wrap(err, "Error reading manifest")
@@ -55,6 +56,8 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 
 	if forceManifestMIMEType != "" {
 		destSupportedManifestMIMETypes = []string{forceManifestMIMEType}
+	} else if len(overrideManifestMIMETypeList) > 0 {
+		destSupportedManifestMIMETypes = overrideManifestMIMETypeList
 	}
 
 	if len(destSupportedManifestMIMETypes) == 0 && (!requiresOciEncryption || manifest.MIMETypeSupportsEncryption(srcType)) {
