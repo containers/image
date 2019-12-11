@@ -14,7 +14,7 @@ var (
 	// docker V1 registry.
 	ErrV1NotSupported = errors.New("can't talk to a V1 docker registry")
 	// ErrTooManyRequests is returned when the status code returned is 429
-	ErrTooManyRequests = errors.New("too many request to registry")
+	ErrTooManyRequests = errors.New("too many requests to registry")
 )
 
 // ErrUnauthorizedForCredentials is returned when the status code returned is 401

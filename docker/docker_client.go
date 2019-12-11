@@ -411,12 +411,12 @@ func parseRetryAfter(res *http.Response, fallbackDelay time.Duration) time.Durat
 	if after == "" {
 		return fallbackDelay
 	}
-	logrus.Debugf("detected 'Retry-After' header %q", after)
-	// First check if we have a numerical value.
+	logrus.Debugf("Detected 'Retry-After' header %q", after)
+	// First, check if we have a numerical value.
 	if num, err := strconv.ParseInt(after, 10, 64); err == nil {
 		return time.Duration(num) * time.Second
 	}
-	// Secondly check if we have an http date.
+	// Second, check if we have an HTTP date.
 	// If the delta between the date and now is positive, use it.
 	// Otherwise, fall back to using the default exponential back off.
 	if t, err := http.ParseTime(after); err == nil {
@@ -424,21 +424,18 @@ func parseRetryAfter(res *http.Response, fallbackDelay time.Duration) time.Durat
 		if delta > 0 {
 			return delta
 		}
-		logrus.Debugf("negative date: ignoring it")
+		logrus.Debugf("Retry-After date in the past, ignoring it")
 		return fallbackDelay
 	}
-	// If the header contains bogus, fall back to using the default
-	// exponential back off.
-	logrus.Debugf("invalid format: ignoring it")
+	// If the header contents are bogus, fall back to using the default exponential back off.
+	logrus.Debugf("Invalid Retry-After format, ignoring it")
 	return fallbackDelay
 }
 
 // makeRequestToResolvedURL creates and executes a http.Request with the specified parameters, adding authentication and TLS options for the Docker client.
 // streamLen, if not -1, specifies the length of the data expected on stream.
 // makeRequest should generally be preferred.
-// In case of an http 429 status code in the response, it performs an exponential back off starting at 2 seconds for at most 5 iterations.
-// If the `Retry-After` header is set in the response, the specified value or date is
-// If the stream is non-nil, no back off will be performed.
+// In case of an HTTP 429 status code in the response, it may automatically retry a few times.
 // TODO(runcom): too many arguments here, use a struct
 func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url string, headers map[string][]string, stream io.Reader, streamLen int64, auth sendAuth, extraScope *authScope) (*http.Response, error) {
 	delay := backoffInitialDelay
@@ -456,7 +453,7 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 		if delay > backoffMaxDelay {
 			delay = backoffMaxDelay
 		}
-		logrus.Debugf("too many request to %s: sleeping for %f seconds before next attempt", url, delay.Seconds())
+		logrus.Debugf("Too many requests to %s: sleeping for %f seconds before next attempt", url, delay.Seconds())
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
