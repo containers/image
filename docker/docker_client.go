@@ -446,7 +446,8 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 
 	for i := 0; i < numIterations; i++ {
 		res, err = c.makeRequestToResolvedURLOnce(ctx, method, url, headers, stream, streamLen, auth, extraScope)
-		if stream != nil || res == nil || res.StatusCode != http.StatusTooManyRequests {
+		if res == nil || res.StatusCode != http.StatusTooManyRequests || // Only retry on StatusTooManyRequests, success or other failure is returned to caller immediately
+			stream != nil { // We can't retry with a body (which is not restartable in the general case)
 			break
 		}
 		if i < numIterations-1 {
