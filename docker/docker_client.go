@@ -277,7 +277,7 @@ func CheckAuth(ctx context.Context, sys *types.SystemContext, username, password
 	}
 	defer resp.Body.Close()
 
-	return httpResponseToError(resp)
+	return httpResponseToError(resp, "")
 }
 
 // SearchResult holds the information of each matching image
@@ -351,7 +351,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 		} else {
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				logrus.Debugf("error getting search results from v1 endpoint %q: %v", registry, httpResponseToError(resp))
+				logrus.Debugf("error getting search results from v1 endpoint %q: %v", registry, httpResponseToError(resp, ""))
 			} else {
 				if err := json.NewDecoder(resp.Body).Decode(v1Res); err != nil {
 					return nil, err
@@ -368,7 +368,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 	} else {
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			logrus.Errorf("error getting search results from v2 endpoint %q: %v", registry, httpResponseToError(resp))
+			logrus.Errorf("error getting search results from v2 endpoint %q: %v", registry, httpResponseToError(resp, ""))
 		} else {
 			if err := json.NewDecoder(resp.Body).Decode(v2Res); err != nil {
 				return nil, err
@@ -627,7 +627,7 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 		defer resp.Body.Close()
 		logrus.Debugf("Ping %s status %d", url, resp.StatusCode)
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
-			return httpResponseToError(resp)
+			return httpResponseToError(resp, "")
 		}
 		c.challenges = parseAuthHeader(resp.Header)
 		c.scheme = scheme
