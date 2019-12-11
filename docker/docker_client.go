@@ -446,19 +446,18 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 
 	for i := 0; i < numIterations; i++ {
 		res, err = c.makeRequestToResolvedURLOnce(ctx, method, url, headers, stream, streamLen, auth, extraScope)
-		if stream == nil && res != nil && res.StatusCode == http.StatusTooManyRequests {
-			if i < numIterations-1 {
-				delay = parseRetryAfter(res, delay)
-				if delay > maxDelay {
-					delay = maxDelay
-				}
-				logrus.Debugf("too many request to %s: sleeping for %d seconds before next attempt", url, delay)
-				time.Sleep(time.Duration(delay) * time.Second)
-				delay = delay * 2 // exponential back off
-			}
-			continue
+		if stream != nil || res == nil || res.StatusCode != http.StatusTooManyRequests {
+			break
 		}
-		break
+		if i < numIterations-1 {
+			delay = parseRetryAfter(res, delay)
+			if delay > maxDelay {
+				delay = maxDelay
+			}
+			logrus.Debugf("too many request to %s: sleeping for %d seconds before next attempt", url, delay)
+			time.Sleep(time.Duration(delay) * time.Second)
+			delay = delay * 2 // exponential back off
+		}
 	}
 	return res, err
 }
