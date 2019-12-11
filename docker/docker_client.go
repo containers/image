@@ -426,15 +426,15 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 		return b
 	}
 
-	nextDelay := func(r *http.Response, delay int64) int64 {
+	parseRetryAfter := func(r *http.Response, delay int64) int64 {
 		after := res.Header.Get("Retry-After")
 		if after == "" {
-			return min(delay, maxDelay)
+			return delay
 		}
 		logrus.Debugf("detected 'Retry-After' header %q", after)
 		// First check if we have a numerical value.
 		if num, err := strconv.ParseInt(after, 10, 64); err == nil {
-			return min(num, maxDelay)
+			return num
 		}
 		// Secondly check if we have an http date.
 		// If the delta between the date and now is positive, use it.
@@ -442,15 +442,15 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 		if t, err := http.ParseTime(after); err == nil {
 			delta := int64(time.Until(t).Seconds())
 			if delta > 0 {
-				return min(delta, maxDelay)
+				return delta
 			}
 			logrus.Debugf("negative date: falling back to using %d seconds", delay)
-			return min(delay, maxDelay)
+			return delay
 		}
 		// If the header contains bogus, fall back to using the default
 		// exponential back off.
 		logrus.Debugf("invalid format: falling back to using %d seconds", delay)
-		return min(delay, maxDelay)
+		return delay
 	}
 
 	for i := 0; i < numIterations; i++ {
@@ -458,7 +458,8 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 		if stream == nil && res != nil && res.StatusCode == http.StatusTooManyRequests {
 			if i < numIterations-1 {
 				logrus.Errorf("HEADER %v", res.Header)
-				delay = nextDelay(res, delay) // compute next delay - does NOT exceed maxDelay
+				delay = parseRetryAfter(res, delay)
+				delay = min(delay, maxDelay)
 				logrus.Debugf("too many request to %s: sleeping for %d seconds before next attempt", url, delay)
 				time.Sleep(time.Duration(delay) * time.Second)
 				delay = delay * 2 // exponential back off
