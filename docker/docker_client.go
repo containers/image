@@ -417,10 +417,10 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 	const numIterations = 5
 	const maxDelay = 60
 
-	parseRetryAfter := func(r *http.Response, delay int64) int64 {
+	parseRetryAfter := func(r *http.Response, fallbackDelay int64) int64 {
 		after := res.Header.Get("Retry-After")
 		if after == "" {
-			return delay
+			return fallbackDelay
 		}
 		logrus.Debugf("detected 'Retry-After' header %q", after)
 		// First check if we have a numerical value.
@@ -435,13 +435,13 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 			if delta > 0 {
 				return delta
 			}
-			logrus.Debugf("negative date: falling back to using %d seconds", delay)
-			return delay
+			logrus.Debugf("negative date: falling back to using %d seconds", fallbackDelay)
+			return fallbackDelay
 		}
 		// If the header contains bogus, fall back to using the default
 		// exponential back off.
-		logrus.Debugf("invalid format: falling back to using %d seconds", delay)
-		return delay
+		logrus.Debugf("invalid format: falling back to using %d seconds", fallbackDelay)
+		return fallbackDelay
 	}
 
 	for i := 0; i < numIterations; i++ {
