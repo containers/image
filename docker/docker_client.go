@@ -404,6 +404,35 @@ func (c *dockerClient) makeRequest(ctx context.Context, method, path string, hea
 	return c.makeRequestToResolvedURL(ctx, method, url, headers, stream, -1, auth, extraScope)
 }
 
+// parseRetryAfter determines the delay required by the "Retry-After" header in res and returns it,
+// silently falling back to fallbackDelay if the header is missing or invalid.
+func parseRetryAfter(res *http.Response, fallbackDelay time.Duration) time.Duration {
+	after := res.Header.Get("Retry-After")
+	if after == "" {
+		return fallbackDelay
+	}
+	logrus.Debugf("detected 'Retry-After' header %q", after)
+	// First check if we have a numerical value.
+	if num, err := strconv.ParseInt(after, 10, 64); err == nil {
+		return time.Duration(num) * time.Second
+	}
+	// Secondly check if we have an http date.
+	// If the delta between the date and now is positive, use it.
+	// Otherwise, fall back to using the default exponential back off.
+	if t, err := http.ParseTime(after); err == nil {
+		delta := time.Until(t)
+		if delta > 0 {
+			return delta
+		}
+		logrus.Debugf("negative date: ignoring it")
+		return fallbackDelay
+	}
+	// If the header contains bogus, fall back to using the default
+	// exponential back off.
+	logrus.Debugf("invalid format: ignoring it")
+	return fallbackDelay
+}
+
 // makeRequestToResolvedURL creates and executes a http.Request with the specified parameters, adding authentication and TLS options for the Docker client.
 // streamLen, if not -1, specifies the length of the data expected on stream.
 // makeRequest should generally be preferred.
@@ -412,33 +441,6 @@ func (c *dockerClient) makeRequest(ctx context.Context, method, path string, hea
 // If the stream is non-nil, no back off will be performed.
 // TODO(runcom): too many arguments here, use a struct
 func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url string, headers map[string][]string, stream io.Reader, streamLen int64, auth sendAuth, extraScope *authScope) (*http.Response, error) {
-	parseRetryAfter := func(res *http.Response, fallbackDelay time.Duration) time.Duration {
-		after := res.Header.Get("Retry-After")
-		if after == "" {
-			return fallbackDelay
-		}
-		logrus.Debugf("detected 'Retry-After' header %q", after)
-		// First check if we have a numerical value.
-		if num, err := strconv.ParseInt(after, 10, 64); err == nil {
-			return time.Duration(num) * time.Second
-		}
-		// Secondly check if we have an http date.
-		// If the delta between the date and now is positive, use it.
-		// Otherwise, fall back to using the default exponential back off.
-		if t, err := http.ParseTime(after); err == nil {
-			delta := time.Until(t)
-			if delta > 0 {
-				return delta
-			}
-			logrus.Debugf("negative date: ignoring it")
-			return fallbackDelay
-		}
-		// If the header contains bogus, fall back to using the default
-		// exponential back off.
-		logrus.Debugf("invalid format: ignoring it")
-		return fallbackDelay
-	}
-
 	delay := backoffInitialDelay
 	attempts := 0
 	for {
