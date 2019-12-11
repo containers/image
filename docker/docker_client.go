@@ -408,16 +408,11 @@ func (c *dockerClient) makeRequest(ctx context.Context, method, path string, hea
 // If the stream is non-nil, no back off will be performed.
 // TODO(runcom): too many arguments here, use a struct
 func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url string, headers map[string][]string, stream io.Reader, streamLen int64, auth sendAuth, extraScope *authScope) (*http.Response, error) {
-	var (
-		res   *http.Response
-		err   error
-		delay int64
-	)
-	delay = 2
+	var delay int64 = 2
 	const numIterations = 5
 	const maxDelay = 60
 
-	parseRetryAfter := func(r *http.Response, fallbackDelay int64) int64 {
+	parseRetryAfter := func(res *http.Response, fallbackDelay int64) int64 {
 		after := res.Header.Get("Retry-After")
 		if after == "" {
 			return fallbackDelay
@@ -446,12 +441,12 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 
 	attempts := 0
 	for {
-		res, err = c.makeRequestToResolvedURLOnce(ctx, method, url, headers, stream, streamLen, auth, extraScope)
+		res, err := c.makeRequestToResolvedURLOnce(ctx, method, url, headers, stream, streamLen, auth, extraScope)
 		attempts++
 		if res == nil || res.StatusCode != http.StatusTooManyRequests || // Only retry on StatusTooManyRequests, success or other failure is returned to caller immediately
 			stream != nil || // We can't retry with a body (which is not restartable in the general case)
 			attempts == numIterations {
-			break
+			return res, err
 		}
 		delay = parseRetryAfter(res, delay)
 		if delay > maxDelay {
@@ -461,7 +456,6 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 		time.Sleep(time.Duration(delay) * time.Second)
 		delay = delay * 2 // exponential back off
 	}
-	return res, err
 }
 
 // makeRequestToResolvedURLOnce creates and executes a http.Request with the specified parameters, adding authentication and TLS options for the Docker client.
