@@ -444,21 +444,22 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 		return fallbackDelay
 	}
 
-	for i := 0; i < numIterations; i++ {
+	attempts := 0
+	for {
 		res, err = c.makeRequestToResolvedURLOnce(ctx, method, url, headers, stream, streamLen, auth, extraScope)
+		attempts++
 		if res == nil || res.StatusCode != http.StatusTooManyRequests || // Only retry on StatusTooManyRequests, success or other failure is returned to caller immediately
-			stream != nil { // We can't retry with a body (which is not restartable in the general case)
+			stream != nil || // We can't retry with a body (which is not restartable in the general case)
+			attempts == numIterations {
 			break
 		}
-		if i < numIterations-1 {
-			delay = parseRetryAfter(res, delay)
-			if delay > maxDelay {
-				delay = maxDelay
-			}
-			logrus.Debugf("too many request to %s: sleeping for %d seconds before next attempt", url, delay)
-			time.Sleep(time.Duration(delay) * time.Second)
-			delay = delay * 2 // exponential back off
+		delay = parseRetryAfter(res, delay)
+		if delay > maxDelay {
+			delay = maxDelay
 		}
+		logrus.Debugf("too many request to %s: sleeping for %d seconds before next attempt", url, delay)
+		time.Sleep(time.Duration(delay) * time.Second)
+		delay = delay * 2 // exponential back off
 	}
 	return res, err
 }
