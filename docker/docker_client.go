@@ -409,10 +409,10 @@ func (c *dockerClient) makeRequest(ctx context.Context, method, path string, hea
 // TODO(runcom): too many arguments here, use a struct
 func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url string, headers map[string][]string, stream io.Reader, streamLen int64, auth sendAuth, extraScope *authScope) (*http.Response, error) {
 	const numIterations = 5
-	const initialDelay = 2
-	const maxDelay = 60
+	const initialDelay = 2 * time.Second
+	const maxDelay = 60 * time.Second
 
-	parseRetryAfter := func(res *http.Response, fallbackDelay int64) int64 {
+	parseRetryAfter := func(res *http.Response, fallbackDelay time.Duration) time.Duration {
 		after := res.Header.Get("Retry-After")
 		if after == "" {
 			return fallbackDelay
@@ -420,26 +420,26 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 		logrus.Debugf("detected 'Retry-After' header %q", after)
 		// First check if we have a numerical value.
 		if num, err := strconv.ParseInt(after, 10, 64); err == nil {
-			return num
+			return time.Duration(num) * time.Second
 		}
 		// Secondly check if we have an http date.
 		// If the delta between the date and now is positive, use it.
 		// Otherwise, fall back to using the default exponential back off.
 		if t, err := http.ParseTime(after); err == nil {
-			delta := int64(time.Until(t).Seconds())
+			delta := time.Until(t)
 			if delta > 0 {
 				return delta
 			}
-			logrus.Debugf("negative date: falling back to using %d seconds", fallbackDelay)
+			logrus.Debugf("negative date: ignoring it")
 			return fallbackDelay
 		}
 		// If the header contains bogus, fall back to using the default
 		// exponential back off.
-		logrus.Debugf("invalid format: falling back to using %d seconds", fallbackDelay)
+		logrus.Debugf("invalid format: ignoring it")
 		return fallbackDelay
 	}
 
-	var delay int64 = initialDelay
+	delay := initialDelay
 	attempts := 0
 	for {
 		res, err := c.makeRequestToResolvedURLOnce(ctx, method, url, headers, stream, streamLen, auth, extraScope)
@@ -453,8 +453,8 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 		if delay > maxDelay {
 			delay = maxDelay
 		}
-		logrus.Debugf("too many request to %s: sleeping for %d seconds before next attempt", url, delay)
-		time.Sleep(time.Duration(delay) * time.Second)
+		logrus.Debugf("too many request to %s: sleeping for %f seconds before next attempt", url, delay.Seconds())
+		time.Sleep(delay)
 		delay = delay * 2 // exponential back off
 	}
 }
