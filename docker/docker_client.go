@@ -457,7 +457,12 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 			delay = backoffMaxDelay
 		}
 		logrus.Debugf("too many request to %s: sleeping for %f seconds before next attempt", url, delay.Seconds())
-		time.Sleep(delay)
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(delay):
+			// Nothing
+		}
 		delay = delay * 2 // exponential back off
 	}
 }
