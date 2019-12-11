@@ -417,15 +417,6 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 	const numIterations = 5
 	const maxDelay = 60
 
-	// math.Min() only supports float64, so have an anonymous func to avoid
-	// casting.
-	min := func(a int64, b int64) int64 {
-		if a < b {
-			return a
-		}
-		return b
-	}
-
 	parseRetryAfter := func(r *http.Response, delay int64) int64 {
 		after := res.Header.Get("Retry-After")
 		if after == "" {
@@ -459,7 +450,9 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 			if i < numIterations-1 {
 				logrus.Errorf("HEADER %v", res.Header)
 				delay = parseRetryAfter(res, delay)
-				delay = min(delay, maxDelay)
+				if delay > maxDelay {
+					delay = maxDelay
+				}
 				logrus.Debugf("too many request to %s: sleeping for %d seconds before next attempt", url, delay)
 				time.Sleep(time.Duration(delay) * time.Second)
 				delay = delay * 2 // exponential back off
