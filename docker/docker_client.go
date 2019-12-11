@@ -45,6 +45,10 @@ const (
 
 	extensionSignatureSchemaVersion = 2        // extensionSignature.Version
 	extensionSignatureTypeAtomic    = "atomic" // extensionSignature.Type
+
+	backoffNumIterations = 5
+	backoffInitialDelay  = 2 * time.Second
+	backoffMaxDelay      = 60 * time.Second
 )
 
 var systemPerHostCertDirPaths = [2]string{"/etc/containers/certs.d", "/etc/docker/certs.d"}
@@ -408,10 +412,6 @@ func (c *dockerClient) makeRequest(ctx context.Context, method, path string, hea
 // If the stream is non-nil, no back off will be performed.
 // TODO(runcom): too many arguments here, use a struct
 func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url string, headers map[string][]string, stream io.Reader, streamLen int64, auth sendAuth, extraScope *authScope) (*http.Response, error) {
-	const numIterations = 5
-	const initialDelay = 2 * time.Second
-	const maxDelay = 60 * time.Second
-
 	parseRetryAfter := func(res *http.Response, fallbackDelay time.Duration) time.Duration {
 		after := res.Header.Get("Retry-After")
 		if after == "" {
@@ -439,19 +439,20 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 		return fallbackDelay
 	}
 
-	delay := initialDelay
+	delay := backoffInitialDelay
 	attempts := 0
 	for {
 		res, err := c.makeRequestToResolvedURLOnce(ctx, method, url, headers, stream, streamLen, auth, extraScope)
 		attempts++
 		if res == nil || res.StatusCode != http.StatusTooManyRequests || // Only retry on StatusTooManyRequests, success or other failure is returned to caller immediately
 			stream != nil || // We can't retry with a body (which is not restartable in the general case)
-			attempts == numIterations {
+			attempts == backoffNumIterations {
 			return res, err
 		}
+
 		delay = parseRetryAfter(res, delay)
-		if delay > maxDelay {
-			delay = maxDelay
+		if delay > backoffMaxDelay {
+			delay = backoffMaxDelay
 		}
 		logrus.Debugf("too many request to %s: sleeping for %f seconds before next attempt", url, delay.Seconds())
 		time.Sleep(delay)
