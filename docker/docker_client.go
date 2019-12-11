@@ -408,8 +408,8 @@ func (c *dockerClient) makeRequest(ctx context.Context, method, path string, hea
 // If the stream is non-nil, no back off will be performed.
 // TODO(runcom): too many arguments here, use a struct
 func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url string, headers map[string][]string, stream io.Reader, streamLen int64, auth sendAuth, extraScope *authScope) (*http.Response, error) {
-	var delay int64 = 2
 	const numIterations = 5
+	const initialDelay = 2
 	const maxDelay = 60
 
 	parseRetryAfter := func(res *http.Response, fallbackDelay int64) int64 {
@@ -439,6 +439,7 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 		return fallbackDelay
 	}
 
+	var delay int64 = initialDelay
 	attempts := 0
 	for {
 		res, err := c.makeRequestToResolvedURLOnce(ctx, method, url, headers, stream, streamLen, auth, extraScope)
