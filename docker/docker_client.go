@@ -448,7 +448,6 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 		res, err = c.makeRequestToResolvedURLOnce(ctx, method, url, headers, stream, streamLen, auth, extraScope)
 		if stream == nil && res != nil && res.StatusCode == http.StatusTooManyRequests {
 			if i < numIterations-1 {
-				logrus.Errorf("HEADER %v", res.Header)
 				delay = parseRetryAfter(res, delay)
 				if delay > maxDelay {
 					delay = maxDelay
