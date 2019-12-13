@@ -109,6 +109,26 @@ internet without having to change `Dockerfile`s, or to add redundancy).
 *Note*: Redirection and mirrors are currently processed only when reading images, not when pushing
 to a registry; that may change in the future.
 
+#### Normalization of docker.io references
+
+The Docker Hub `docker.io` is handled in a special way: every push and pull
+operation gets internally normalized with `/library` if no other specific
+namespace is defined (for example on `docker.io/namespace/image`).
+
+(Note that the above-described normalization happens to match the behavior of
+Docker.)
+
+This means that a pull of `docker.io/alpine` will be internally translated to
+`docker.io/library/alpine`. A pull of `docker.io/user/alpine` will not be
+rewritten because this is already the correct remote path.
+
+Therefore, to remap or mirror the `docker.io` images in the (implied) `/library`
+namespace (or that whole namespace), the prefix and location fields in this
+configuration file must explicitly include that `/library` namespace. For
+example `prefix = "docker.io/library/alpine"` and not `prefix =
+"docker.io/alpine"`. The latter would match the `docker.io/alpine/*`
+repositories but not the `docker.io/[library/]alpine` image).
+
 ### EXAMPLE
 
 ```

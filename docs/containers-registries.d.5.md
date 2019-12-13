@@ -24,7 +24,7 @@ don’t matter.
 The contents of these files are merged together; to have a well-defined and easy to understand
 behavior, there can be only one configuration section describing a single namespace within a registry
 (in particular there can be at most one one `default-docker` section across all files,
-and there can be at most one instance of any key under the the `docker` section;
+and there can be at most one instance of any key under the `docker` section;
 these sections are documented later).
 
 Thus, it is forbidden to have two conflicting configurations for a single registry or scope,
@@ -98,7 +98,7 @@ docker:
 For developers in `example.com`:
 
 - Consume most container images using the public servers also used by clients.
-- Use a separate sigure storage for an container images in a namespace corresponding to the developers' department, with a staging storage used before publishing signatures.
+- Use a separate signature storage for an container images in a namespace corresponding to the developers' department, with a staging storage used before publishing signatures.
 - Craft an individual exception for a single branch a specific developer is working on locally.
 
 ```yaml
