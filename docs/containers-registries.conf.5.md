@@ -167,7 +167,29 @@ registries = ['registry3.com']
 registries = ['registry.untrusted.com', 'registry.unsafe.com']
 ```
 
+## NOTE: RISK OF USING UNQUALIFIED IMAGE NAMES.
+Pulling an image that is not fully qualified, i.e., one that includes the
+image name but does not include the registry or  tag, is not recommended.
+There is a risk that the image being pulled could be spoofed. An example
+of this would be if a user wanted to pull an image named `foobar` from a
+registry and expect it to come from myregistry.com.  If myregistry.com is
+not first in the search list, an attacker could place a different `foobar`
+image at a registry earlier in the search list.  Now you would accidentally
+run the attackers code rather than the intended content. Registries that
+are added to this list should be completely controlled, i.e., not allow
+unknown/arbitrary users being able to create accounts with arbitrary names
+to prevent an image from being spoofed, squatted or otherwise made
+insecure.  If it is necessary to use one of these registries, it should be
+added at the end of the list.
+
+It is recommended to use fully-qualified images for pulling as
+the destination registry is unambiguous. Pulling by digest
+(i.e., quay.io/repository/name@digest) further eliminates the ambiguity of
+tags.
+
 # HISTORY
+Dec 2019, Warning added for unqualified image names by Tom Sweeney <tsweeney@redhat.com>
+
 Mar 2019, Added additional configuration format by Sascha Grunert <sgrunert@suse.com>
 
 Aug 2018, Renamed to containers-registries.conf(5) by Valentin Rothberg <vrothberg@suse.com>
