@@ -32,8 +32,9 @@ func TestDockerReference(t *testing.T) {
 		"repo":                   {"docker.io/library/repo", "docker.io/library", "docker.io"},
 	} {
 		for inputSuffix, mappedSuffix := range map[string]string{
-			":tag":       ":tag",
-			sha256Digest: sha256Digest,
+			":tag":                ":tag",
+			sha256Digest:          sha256Digest,
+			":tag" + sha256Digest: sha256Digest, // tag with digest should be treated as digest
 		} {
 			fullInput := inputName + inputSuffix
 			ref, err := reference.ParseNormalizedNamed(fullInput)
@@ -74,6 +75,6 @@ func TestDockerReferenceIdentity(t *testing.T) {
 	_, ok = parsed.(reference.NamedTagged)
 	require.True(t, ok)
 	id, err = DockerReferenceIdentity(parsed)
-	assert.Equal(t, "", id)
-	assert.Error(t, err)
+	assert.Equal(t, "docker.io/library/busybox@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", id)
+	assert.NoError(t, err)
 }

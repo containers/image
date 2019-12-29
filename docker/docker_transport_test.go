@@ -27,6 +27,7 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 	for _, scope := range []string{
 		"docker.io/library/busybox" + sha256digest,
 		"docker.io/library/busybox:notlatest",
+		"docker.io/library/busybox:latest" + sha256digest,
 		"docker.io/library/busybox",
 		"docker.io/library",
 		"docker.io",
@@ -48,11 +49,10 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 		{"//busybox" + sha256digest, "docker.io/library/busybox" + sha256digest}, // Explicit digest
 		{"//busybox", "docker.io/library/busybox:latest"},                        // Default tag
 		// A github.com/distribution/reference value can have a tag and a digest at the same time!
-		// The docker/distribution API does not really support that (we can’t ask for an image with a specific
-		// tag and digest), so fail.  This MAY be accepted in the future.
-		{"//busybox:latest" + sha256digest, ""},                                    // Both tag and digest
-		{"//docker.io/library/busybox:latest", "docker.io/library/busybox:latest"}, // All implied values explicitly specified
-		{"//UPPERCASEISINVALID", ""},                                               // Invalid input
+		// This is docker behaviour: If there's a digest the tag is ignored when pulling an image.
+		{"//busybox:latest" + sha256digest, "docker.io/library/busybox:latest" + sha256digest}, // Both tag and digest
+		{"//docker.io/library/busybox:latest", "docker.io/library/busybox:latest"},             // All implied values explicitly specified
+		{"//UPPERCASEISINVALID", ""}, // Invalid input
 	} {
 		ref, err := fn(c.input)
 		if c.expected == "" {
@@ -68,10 +68,11 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 
 // A common list of reference formats to test for the various ImageReference methods.
 var validReferenceTestCases = []struct{ input, dockerRef, stringWithinTransport string }{
-	{"busybox:notlatest", "docker.io/library/busybox:notlatest", "//busybox:notlatest"},                // Explicit tag
-	{"busybox" + sha256digest, "docker.io/library/busybox" + sha256digest, "//busybox" + sha256digest}, // Explicit digest
-	{"docker.io/library/busybox:latest", "docker.io/library/busybox:latest", "//busybox:latest"},       // All implied values explicitly specified
-	{"example.com/ns/foo:bar", "example.com/ns/foo:bar", "//example.com/ns/foo:bar"},                   // All values explicitly specified
+	{"busybox:notlatest", "docker.io/library/busybox:notlatest", "//busybox:notlatest"},                                     // Explicit tag
+	{"busybox" + sha256digest, "docker.io/library/busybox" + sha256digest, "//busybox" + sha256digest},                      // Explicit digest
+	{"busybox:latest" + sha256digest, "docker.io/library/busybox:latest" + sha256digest, "//busybox:latest" + sha256digest}, // Both tag and digest
+	{"docker.io/library/busybox:latest", "docker.io/library/busybox:latest", "//busybox:latest"},                            // All implied values explicitly specified
+	{"example.com/ns/foo:bar", "example.com/ns/foo:bar", "//example.com/ns/foo:bar"},                                        // All values explicitly specified
 }
 
 func TestNewReference(t *testing.T) {
@@ -99,7 +100,7 @@ func TestNewReference(t *testing.T) {
 	_, ok = parsed.(reference.NamedTagged)
 	require.True(t, ok)
 	_, err = NewReference(parsed)
-	assert.Error(t, err)
+	assert.NoError(t, err)
 }
 
 func TestReferenceTransport(t *testing.T) {
@@ -179,6 +180,14 @@ func TestReferenceNewImageDestination(t *testing.T) {
 		&types.SystemContext{RegistriesDirPath: "/this/doesnt/exist", DockerPerHostCertDirPath: "/this/doesnt/exist"})
 	require.NoError(t, err)
 	defer dest.Close()
+}
+
+func TestReferenceNewImageDestinationWithTagAndDigest(t *testing.T) {
+	ref, err := ParseReference("//busybox:latest" + sha256digest)
+	require.NoError(t, err)
+	_, err = ref.NewImageDestination(context.Background(),
+		&types.SystemContext{RegistriesDirPath: "/this/doesnt/exist", DockerPerHostCertDirPath: "/this/doesnt/exist"})
+	require.Error(t, err)
 }
 
 func TestReferenceTagOrDigest(t *testing.T) {

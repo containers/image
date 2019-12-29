@@ -36,6 +36,15 @@ type dockerImageDestination struct {
 
 // newImageDestination creates a new ImageDestination for the specified image reference.
 func newImageDestination(sys *types.SystemContext, ref dockerReference) (types.ImageDestination, error) {
+	// A github.com/distribution/reference value can have a tag and a digest at the same time!
+	// While some tools (namely skaffold) rely on this docker behaviour to pull the correct image
+	// it is not supported to push an image using such a reference.
+	_, isTagged := ref.ref.(reference.NamedTagged)
+	_, isDigested := ref.ref.(reference.Canonical)
+	if isTagged && isDigested {
+		return nil, errors.Errorf("Docker reference with both a tag and digest is not supported as image destination")
+	}
+
 	c, err := newDockerClientFromRef(sys, ref, true, "pull,push")
 	if err != nil {
 		return nil, err

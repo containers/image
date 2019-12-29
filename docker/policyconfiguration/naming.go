@@ -15,14 +15,12 @@ func DockerReferenceIdentity(ref reference.Named) (string, error) {
 	tagged, isTagged := ref.(reference.NamedTagged)
 	digested, isDigested := ref.(reference.Canonical)
 	switch {
-	case isTagged && isDigested: // Note that this CAN actually happen.
-		return "", errors.Errorf("Unexpected Docker reference %s with both a name and a digest", reference.FamiliarString(ref))
 	case !isTagged && !isDigested: // This should not happen, the caller is expected to ensure !reference.IsNameOnly()
 		return "", errors.Errorf("Internal inconsistency: Docker reference %s with neither a tag nor a digest", reference.FamiliarString(ref))
+	case isDigested: // Note that (isTagged && isDigested) CAN actually happen as well while the digest should be used in this case.
+		res = res + "@" + digested.Digest().String()
 	case isTagged:
 		res = res + ":" + tagged.Tag()
-	case isDigested:
-		res = res + "@" + digested.Digest().String()
 	default: // Coverage: The above was supposed to be exhaustive.
 		return "", errors.New("Internal inconsistency, unexpected default branch")
 	}

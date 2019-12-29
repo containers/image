@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const sha256digest = "@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
 func TestParseImageName(t *testing.T) {
 	// This primarily tests error handling, TestImageNameHandling is a table-driven
 	// test for the expected values.
@@ -30,6 +32,8 @@ func TestImageNameHandling(t *testing.T) {
 		{"dir", "/etc", "/etc"},
 		{"docker", "//busybox", "//busybox:latest"},
 		{"docker", "//busybox:notlatest", "//busybox:notlatest"}, // This also tests handling of multiple ":" characters
+		{"docker", "//busybox" + sha256digest, "//busybox" + sha256digest},
+		{"docker", "//busybox:v1-dirty" + sha256digest, "//busybox:v1-dirty" + sha256digest},
 		{"docker-archive", "/var/lib/oci/busybox.tar:busybox:latest", "/var/lib/oci/busybox.tar:docker.io/library/busybox:latest"},
 		{"docker-archive", "busybox.tar:busybox:latest", "busybox.tar:docker.io/library/busybox:latest"},
 		{"oci", "/etc:someimage", "/etc:someimage"},
