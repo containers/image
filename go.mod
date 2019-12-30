@@ -21,7 +21,7 @@ require (
 	github.com/gorilla/mux v0.0.0-20170217192616-94e7d24fd285 // indirect
 	github.com/gotestyourself/gotestyourself v2.2.0+incompatible // indirect
 	github.com/imdario/mergo v0.3.8
-	github.com/klauspost/compress v1.9.4
+	github.com/klauspost/compress v1.9.5
 	github.com/klauspost/pgzip v1.2.1
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
