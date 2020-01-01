@@ -84,11 +84,23 @@ func (index *OCI1Index) ChooseInstance(ctx *types.SystemContext) (digest.Digest,
 		wantedOS = ctx.OSChoice
 	}
 
+	var fallback digest.Digest
+
 	for _, d := range index.Manifests {
 		if d.Platform != nil && d.Platform.Architecture == wantedArch && d.Platform.OS == wantedOS {
-			return d.Digest, nil
+			// TODO It should be possible to somehow use runtime.GOARM to construct a default VariantChoice
+			if ctx != nil && (ctx.VariantChoice == "" || d.Platform.Variant == ctx.VariantChoice) {
+				return d.Digest, nil
+			}
+			if fallback == "" {
+				fallback = d.Digest
+			}
 		}
 	}
+	if fallback != "" {
+		return fallback, nil
+	}
+
 	for _, d := range index.Manifests {
 		if d.Platform == nil {
 			return d.Digest, nil

@@ -75,9 +75,7 @@ func TestChooseInstance(t *testing.T) {
 			matchedInstances: map[string]digest.Digest{
 				"amd64": "sha256:030fcb92e1487b18c974784dcc110a93147c9fc402188370fbfd17efabffc6af",
 				"s390x": "sha256:e5aa1b0a24620228b75382997a0977f609b3ca3a95533dafdef84c74cc8df642",
-				// There are several "arm" images with different variants;
-				// the current code returns the first match. NOTE: This is NOT an API promise.
-				"arm": "sha256:9142d97ef280a7953cf1a85716de49a24cc1dd62776352afad67e635331ff77a",
+				"arm":   "sha256:b5dbad4bdb4444d919294afe49a095c23e86782f98cdf0aa286198ddb814b50b",
 			},
 			unmatchedInstances: []string{
 				"unmatched",
@@ -104,6 +102,7 @@ func TestChooseInstance(t *testing.T) {
 			digest, err := list.ChooseInstance(&types.SystemContext{
 				ArchitectureChoice: arch,
 				OSChoice:           "linux",
+				VariantChoice:      "v6",
 			})
 			require.NoError(t, err, arch)
 			assert.Equal(t, expected, digest)
@@ -113,6 +112,7 @@ func TestChooseInstance(t *testing.T) {
 			_, err := list.ChooseInstance(&types.SystemContext{
 				ArchitectureChoice: arch,
 				OSChoice:           "linux",
+				VariantChoice:      "v6",
 			})
 			assert.Error(t, err)
 		}
