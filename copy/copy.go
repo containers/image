@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -703,22 +702,17 @@ func checkImageDestinationForCurrentRuntime(ctx context.Context, sys *types.Syst
 		if err != nil {
 			return errors.Wrapf(err, "Error parsing image configuration")
 		}
-
-		wantedOS := runtime.GOOS
-		if sys != nil && sys.OSChoice != "" {
-			wantedOS = sys.OSChoice
+		wantedPlatform, err := manifest.WantedPlatform(sys)
+		if err != nil {
+			return errors.Wrapf(err, "error getting platform information %#v", sys)
 		}
-		if wantedOS != c.OS {
-			return fmt.Errorf("Image operating system mismatch: image uses %q, expecting %q", c.OS, wantedOS)
+		if wantedPlatform.OS != c.OS {
+			return fmt.Errorf("Image operating system mismatch: image uses %q, expecting %q", c.OS, wantedPlatform.OS)
 		}
-
-		wantedArch := runtime.GOARCH
-		if sys != nil && sys.ArchitectureChoice != "" {
-			wantedArch = sys.ArchitectureChoice
+		if wantedPlatform.Architecture != c.Architecture {
+			return fmt.Errorf("Image architecture mismatch: image uses %q, expecting %q", c.Architecture, wantedPlatform.Architecture)
 		}
-		if wantedArch != c.Architecture {
-			return fmt.Errorf("Image architecture mismatch: image uses %q, expecting %q", c.Architecture, wantedArch)
-		}
+		// TODO also check for variant
 	}
 	return nil
 }

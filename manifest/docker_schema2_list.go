@@ -3,7 +3,6 @@ package manifest
 import (
 	"encoding/json"
 	"fmt"
-	"runtime"
 
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
@@ -92,33 +91,19 @@ func (list *Schema2List) UpdateInstances(updates []ListUpdate) error {
 // ChooseInstance parses blob as a schema2 manifest list, and returns the digest
 // of the image which is appropriate for the current environment.
 func (list *Schema2List) ChooseInstance(ctx *types.SystemContext) (digest.Digest, error) {
-	wantedArch := runtime.GOARCH
-	if ctx != nil && ctx.ArchitectureChoice != "" {
-		wantedArch = ctx.ArchitectureChoice
+	wantedPlatform, err := WantedPlatform(ctx)
+	if err != nil {
+		return "", errors.Wrapf(err, "error getting platform information %#v", ctx)
 	}
-	wantedOS := runtime.GOOS
-	if ctx != nil && ctx.OSChoice != "" {
-		wantedOS = ctx.OSChoice
-	}
-
-	var fallback digest.Digest
 
 	for _, d := range list.Manifests {
-		if d.Platform.Architecture == wantedArch && d.Platform.OS == wantedOS {
-			// TODO It should be possible to somehow use runtime.GOARM to construct a default VariantChoice
-			if ctx != nil && (ctx.VariantChoice == "" || d.Platform.Variant == ctx.VariantChoice) {
-				return d.Digest, nil
-			}
-			if fallback == "" {
-				fallback = d.Digest
-			}
+		// TODO some variants might work on different demanded variants (https://github.com/containerd/containerd/blob/master/platforms/compare.go#L29)
+		if d.Platform.Architecture == wantedPlatform.Architecture && d.Platform.OS == wantedPlatform.OS && (wantedPlatform.Variant == "" || d.Platform.Variant == wantedPlatform.Variant) {
+			return d.Digest, nil
 		}
 	}
-	if fallback != "" {
-		return fallback, nil
-	}
 
-	return "", fmt.Errorf("no image found in manifest list for architecture %s, OS %s", wantedArch, wantedOS)
+	return "", fmt.Errorf("no image found in image index for architecture %s, OS %s, Variant %s", wantedPlatform.Architecture, wantedPlatform.OS, wantedPlatform.Variant)
 }
 
 // Serialize returns the list in a blob format.
