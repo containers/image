@@ -239,7 +239,7 @@ func (s *dockerImageSource) GetBlob(ctx context.Context, info types.BlobInfo, ca
 	if err != nil {
 		return nil, 0, err
 	}
-	if err := httpResponseToError(res); err != nil {
+	if err := httpResponseToError(res, "Error fetching blob"); err != nil {
 		return nil, 0, err
 	}
 	cache.RecordKnownLocation(s.ref.Transport(), bicTransportScope(s.ref), info.Digest, newBICLocationReference(s.ref))
