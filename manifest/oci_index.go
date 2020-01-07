@@ -75,15 +75,22 @@ func (index *OCI1Index) UpdateInstances(updates []ListUpdate) error {
 // ChooseInstance parses blob as an oci v1 manifest index, and returns the digest
 // of the image which is appropriate for the current environment.
 func (index *OCI1Index) ChooseInstance(ctx *types.SystemContext) (digest.Digest, error) {
-	wantedPlatform, err := WantedPlatform(ctx)
+	wantedPlatforms, err := WantedPlatforms(ctx)
 	if err != nil {
 		return "", errors.Wrapf(err, "error getting platform information %#v", ctx)
 	}
-
-	for _, d := range index.Manifests {
-		// TODO some variants might work on different demanded variants (https://github.com/containerd/containerd/blob/master/platforms/compare.go#L29)
-		if d.Platform.Architecture == wantedPlatform.Architecture && d.Platform.OS == wantedPlatform.OS && (wantedPlatform.Variant == "" || d.Platform.Variant == wantedPlatform.Variant) {
-			return d.Digest, nil
+	for _, wantedPlatform := range wantedPlatforms {
+		for _, d := range index.Manifests {
+			imagePlatform := Schema2PlatformSpec{
+				Architecture: d.Platform.Architecture,
+				OS:           d.Platform.OS,
+				OSVersion:    d.Platform.OSVersion,
+				OSFeatures:   dupStringSlice(d.Platform.OSFeatures),
+				Variant:      d.Platform.Variant,
+			}
+			if MatchesPlatform(imagePlatform, wantedPlatform) {
+				return d.Digest, nil
+			}
 		}
 	}
 
@@ -92,8 +99,7 @@ func (index *OCI1Index) ChooseInstance(ctx *types.SystemContext) (digest.Digest,
 			return d.Digest, nil
 		}
 	}
-
-	return "", fmt.Errorf("no image found in image index for architecture %s, OS %s, Variant %s", wantedPlatform.Architecture, wantedPlatform.OS, wantedPlatform.Variant)
+	return "", fmt.Errorf("no image found in image index for architecture %s, OS %s, Variant %s", wantedPlatforms[0].Architecture, wantedPlatforms[0].OS, wantedPlatforms[0].Variant)
 }
 
 // Serialize returns the index in a blob format.

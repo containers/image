@@ -93,7 +93,12 @@ func getCPUVariant() string {
 	return variant
 }
 
-func WantedPlatform(ctx *types.SystemContext) (imgspecv1.Platform, error) {
+var compatibility = map[string][]string{
+	"arm":   []string{"v7", "v6", "v5"},
+	"arm64": []string{"v8"},
+}
+
+func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
 	wantedArch := runtime.GOARCH
 	if ctx != nil && ctx.ArchitectureChoice != "" {
 		wantedArch = ctx.ArchitectureChoice
@@ -103,18 +108,53 @@ func WantedPlatform(ctx *types.SystemContext) (imgspecv1.Platform, error) {
 		wantedOS = ctx.OSChoice
 	}
 
-	wantedPlatform := imgspecv1.Platform{
-		OS:           wantedOS,
-		Architecture: wantedArch,
-	}
+	var wantedPlatforms []imgspecv1.Platform
 
-	if ctx != nil && ctx.VariantChoice != "" {
-		if wantedArch == "arm" || wantedArch == "arm64" {
-			wantedPlatform.Variant = ctx.VariantChoice
+	wantedVariant := ""
+	if wantedArch == "arm" || wantedArch == "arm64" {
+		if ctx != nil && ctx.VariantChoice != "" {
+			wantedVariant = ctx.VariantChoice
 		} else {
-			wantedPlatform.Variant = getCPUVariant()
 			// TODO handle Variant == 'unknown'
+			wantedVariant = getCPUVariant()
 		}
 	}
-	return wantedPlatform, nil
+
+	if wantedVariant != "" && compatibility[wantedArch] != nil {
+		wantedPlatforms = make([]imgspecv1.Platform, 0, len(compatibility[wantedArch]))
+		for _, v := range compatibility[wantedArch] {
+			if wantedVariant >= v {
+				wantedPlatforms = append(wantedPlatforms, imgspecv1.Platform{
+					OS:           wantedOS,
+					Architecture: wantedArch,
+					Variant:      v,
+				})
+			}
+		}
+	} else {
+		wantedPlatforms = []imgspecv1.Platform{
+			imgspecv1.Platform{
+				OS:           wantedOS,
+				Architecture: wantedArch,
+				Variant:      wantedVariant,
+			},
+		}
+	}
+
+	return wantedPlatforms, nil
+}
+
+func MatchesPlatform(image Schema2PlatformSpec, wanted imgspecv1.Platform) bool {
+	if image.Architecture != wanted.Architecture {
+		return false
+	}
+	if image.OS != wanted.OS {
+		return false
+	}
+
+	if wanted.Variant == "" || image.Variant == wanted.Variant {
+		return true
+	}
+
+	return false
 }

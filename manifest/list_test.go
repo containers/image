@@ -76,6 +76,7 @@ func TestChooseInstance(t *testing.T) {
 				"amd64": "sha256:030fcb92e1487b18c974784dcc110a93147c9fc402188370fbfd17efabffc6af",
 				"s390x": "sha256:e5aa1b0a24620228b75382997a0977f609b3ca3a95533dafdef84c74cc8df642",
 				"arm":   "sha256:b5dbad4bdb4444d919294afe49a095c23e86782f98cdf0aa286198ddb814b50b",
+				"arm64": "sha256:dc472a59fb006797aa2a6bfb54cc9c57959bb0a6d11fadaa608df8c16dea39cf",
 			},
 			unmatchedInstances: []string{
 				"unmatched",
@@ -104,7 +105,7 @@ func TestChooseInstance(t *testing.T) {
 				OSChoice:           "linux",
 			}
 			if arch == "arm" {
-				ctx.VariantChoice = "v6"
+				ctx.VariantChoice = "v7"
 			}
 			digest, err := list.ChooseInstance(ctx)
 			require.NoError(t, err, arch)

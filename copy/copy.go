@@ -702,10 +702,11 @@ func checkImageDestinationForCurrentRuntime(ctx context.Context, sys *types.Syst
 		if err != nil {
 			return errors.Wrapf(err, "Error parsing image configuration")
 		}
-		wantedPlatform, err := manifest.WantedPlatform(sys)
+		wantedPlatforms, err := manifest.WantedPlatforms(sys)
 		if err != nil {
 			return errors.Wrapf(err, "error getting platform information %#v", sys)
 		}
+		wantedPlatform := wantedPlatforms[0] // TODO fixme
 		if wantedPlatform.OS != c.OS {
 			return fmt.Errorf("Image operating system mismatch: image uses %q, expecting %q", c.OS, wantedPlatform.OS)
 		}
