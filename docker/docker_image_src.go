@@ -60,9 +60,9 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 	}
 	for _, pullSource := range pullSources {
 		logrus.Debugf("Trying to pull %q", pullSource.Reference)
-		testImageSource, err := newImageSourceAttempt(ctx, sys, pullSource, primaryDomain)
+		s, err := newImageSourceAttempt(ctx, sys, pullSource, primaryDomain)
 		if err == nil {
-			return testImageSource, nil
+			return s, nil
 		}
 		manifestLoadErr = err
 	}
@@ -73,35 +73,34 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 // Given a pullSource and primaryDomain, return a dockerImageSource if it is reachable.
 // The caller must call .Close() on the returned ImageSource.
 func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, pullSource sysregistriesv2.PullSource, primaryDomain string) (*dockerImageSource, error) {
-	dockerRef, err := newReference(pullSource.Reference)
+	ref, err := newReference(pullSource.Reference)
 	if err != nil {
 		return nil, err
 	}
 
 	endpointSys := sys
 	// sys.DockerAuthConfig does not explicitly specify a registry; we must not blindly send the credentials intended for the primary endpoint to mirrors.
-	if endpointSys != nil && endpointSys.DockerAuthConfig != nil && reference.Domain(dockerRef.ref) != primaryDomain {
+	if endpointSys != nil && endpointSys.DockerAuthConfig != nil && reference.Domain(ref.ref) != primaryDomain {
 		copy := *endpointSys
 		copy.DockerAuthConfig = nil
 		endpointSys = &copy
 	}
 
-	client, err := newDockerClientFromRef(endpointSys, dockerRef, false, "pull")
+	client, err := newDockerClientFromRef(endpointSys, ref, false, "pull")
 	if err != nil {
 		return nil, err
 	}
 	client.tlsClientConfig.InsecureSkipVerify = pullSource.Endpoint.Insecure
 
-	testImageSource := &dockerImageSource{
-		ref: dockerRef,
+	s := &dockerImageSource{
+		ref: ref,
 		c:   client,
 	}
 
-	manifestLoadErr := testImageSource.ensureManifestIsLoaded(ctx)
-	if manifestLoadErr == nil {
-		return testImageSource, nil
+	if err := s.ensureManifestIsLoaded(ctx); err != nil {
+		return nil, err
 	}
-	return nil, manifestLoadErr
+	return s, nil
 }
 
 // Reference returns the reference used to set up this source, _as specified by the user_
