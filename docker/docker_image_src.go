@@ -60,36 +60,50 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 	}
 	for _, pullSource := range pullSources {
 		logrus.Debugf("Trying to pull %q", pullSource.Reference)
-		dockerRef, err := newReference(pullSource.Reference)
-		if err != nil {
-			return nil, err
-		}
-
-		endpointSys := sys
-		// sys.DockerAuthConfig does not explicitly specify a registry; we must not blindly send the credentials intended for the primary endpoint to mirrors.
-		if endpointSys != nil && endpointSys.DockerAuthConfig != nil && reference.Domain(dockerRef.ref) != primaryDomain {
-			copy := *endpointSys
-			copy.DockerAuthConfig = nil
-			endpointSys = &copy
-		}
-
-		client, err := newDockerClientFromRef(endpointSys, dockerRef, false, "pull")
-		if err != nil {
-			return nil, err
-		}
-		client.tlsClientConfig.InsecureSkipVerify = pullSource.Endpoint.Insecure
-
-		testImageSource := &dockerImageSource{
-			ref: dockerRef,
-			c:   client,
-		}
-
-		manifestLoadErr = testImageSource.ensureManifestIsLoaded(ctx)
-		if manifestLoadErr == nil {
+		testImageSource, fatal, err := newImageSourceAttempt(ctx, sys, pullSource, primaryDomain)
+		if err == nil {
 			return testImageSource, nil
+		} else if fatal {
+			return nil, err
 		}
+		manifestLoadErr = err
 	}
 	return nil, manifestLoadErr
+}
+
+// newImageSourceAttempt is an internal helper for newImageSource. Everyone else must call newImageSource.
+// Given a pullSource and primaryDomain, return a dockerImageSource if it is reachable, or an error, and an indication whether the error is fatal.
+// The caller must call .Close() on the returned ImageSource.
+func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, pullSource sysregistriesv2.PullSource, primaryDomain string) (*dockerImageSource, bool, error) {
+	dockerRef, err := newReference(pullSource.Reference)
+	if err != nil {
+		return nil, true, err
+	}
+
+	endpointSys := sys
+	// sys.DockerAuthConfig does not explicitly specify a registry; we must not blindly send the credentials intended for the primary endpoint to mirrors.
+	if endpointSys != nil && endpointSys.DockerAuthConfig != nil && reference.Domain(dockerRef.ref) != primaryDomain {
+		copy := *endpointSys
+		copy.DockerAuthConfig = nil
+		endpointSys = &copy
+	}
+
+	client, err := newDockerClientFromRef(endpointSys, dockerRef, false, "pull")
+	if err != nil {
+		return nil, true, err
+	}
+	client.tlsClientConfig.InsecureSkipVerify = pullSource.Endpoint.Insecure
+
+	testImageSource := &dockerImageSource{
+		ref: dockerRef,
+		c:   client,
+	}
+
+	manifestLoadErr := testImageSource.ensureManifestIsLoaded(ctx)
+	if manifestLoadErr == nil {
+		return testImageSource, false, nil
+	}
+	return nil, false, manifestLoadErr
 }
 
 // Reference returns the reference used to set up this source, _as specified by the user_
