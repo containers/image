@@ -60,11 +60,9 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 	}
 	for _, pullSource := range pullSources {
 		logrus.Debugf("Trying to pull %q", pullSource.Reference)
-		testImageSource, fatal, err := newImageSourceAttempt(ctx, sys, pullSource, primaryDomain)
+		testImageSource, err := newImageSourceAttempt(ctx, sys, pullSource, primaryDomain)
 		if err == nil {
 			return testImageSource, nil
-		} else if fatal {
-			return nil, err
 		}
 		manifestLoadErr = err
 	}
@@ -72,12 +70,12 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 }
 
 // newImageSourceAttempt is an internal helper for newImageSource. Everyone else must call newImageSource.
-// Given a pullSource and primaryDomain, return a dockerImageSource if it is reachable, or an error, and an indication whether the error is fatal.
+// Given a pullSource and primaryDomain, return a dockerImageSource if it is reachable.
 // The caller must call .Close() on the returned ImageSource.
-func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, pullSource sysregistriesv2.PullSource, primaryDomain string) (*dockerImageSource, bool, error) {
+func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, pullSource sysregistriesv2.PullSource, primaryDomain string) (*dockerImageSource, error) {
 	dockerRef, err := newReference(pullSource.Reference)
 	if err != nil {
-		return nil, true, err
+		return nil, err
 	}
 
 	endpointSys := sys
@@ -90,7 +88,7 @@ func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, pullSo
 
 	client, err := newDockerClientFromRef(endpointSys, dockerRef, false, "pull")
 	if err != nil {
-		return nil, true, err
+		return nil, err
 	}
 	client.tlsClientConfig.InsecureSkipVerify = pullSource.Endpoint.Insecure
 
@@ -101,9 +99,9 @@ func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, pullSo
 
 	manifestLoadErr := testImageSource.ensureManifestIsLoaded(ctx)
 	if manifestLoadErr == nil {
-		return testImageSource, false, nil
+		return testImageSource, nil
 	}
-	return nil, false, manifestLoadErr
+	return nil, manifestLoadErr
 }
 
 // Reference returns the reference used to set up this source, _as specified by the user_
