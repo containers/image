@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/manifest"
@@ -53,20 +54,42 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 	// non-mirror original location last; this both transparently handles the case
 	// of no mirrors configured, and ensures we return the error encountered when
 	// acessing the upstream location if all endpoints fail.
-	manifestLoadErr := errors.New("Internal error: newImageSource returned without trying any endpoint")
 	pullSources, err := registry.PullSourcesFromReference(ref.ref)
 	if err != nil {
 		return nil, err
 	}
+	type attempt struct {
+		ref reference.Named
+		err error
+	}
+	attempts := []attempt{}
 	for _, pullSource := range pullSources {
 		logrus.Debugf("Trying to pull %q", pullSource.Reference)
 		s, err := newImageSourceAttempt(ctx, sys, pullSource, primaryDomain)
 		if err == nil {
 			return s, nil
 		}
-		manifestLoadErr = err
+		attempts = append(attempts, attempt{
+			ref: pullSource.Reference,
+			err: err,
+		})
 	}
-	return nil, manifestLoadErr
+	switch len(attempts) {
+	case 0:
+		return nil, errors.New("Internal error: newImageSource returned without trying any endpoint")
+	case 1:
+		return nil, attempts[0].err // If no mirrors are used, perfectly preserve the error type and add no noise.
+	default:
+		// Don’t just build a string, try to preserve the typed error.
+		primary := &attempts[len(attempts)-1]
+		extras := []string{}
+		for i := 0; i < len(attempts)-1; i++ {
+			// This is difficult to fit into a single-line string, when the error can contain arbitrary strings including any metacharacters we decide to use.
+			// The paired [] at least have some chance of being unambiguous.
+			extras = append(extras, fmt.Sprintf("[%s: %v]", attempts[i].ref.String(), attempts[i].err))
+		}
+		return nil, errors.Wrapf(primary.err, "(Mirrors also failed: %s): %s", strings.Join(extras, "\n"), primary.ref.String())
+	}
 }
 
 // newImageSourceAttempt is an internal helper for newImageSource. Everyone else must call newImageSource.
