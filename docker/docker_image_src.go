@@ -69,6 +69,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 		if err == nil {
 			return s, nil
 		}
+		logrus.Debugf("Accessing %q failed: %v", pullSource.Reference, err)
 		attempts = append(attempts, attempt{
 			ref: pullSource.Reference,
 			err: err,
