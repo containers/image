@@ -64,7 +64,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 	}
 	attempts := []attempt{}
 	for _, pullSource := range pullSources {
-		logrus.Debugf("Trying to pull %q", pullSource.Reference)
+		logrus.Debugf("Trying to access %q", pullSource.Reference)
 		s, err := newImageSourceAttempt(ctx, sys, pullSource, primaryDomain)
 		if err == nil {
 			return s, nil
