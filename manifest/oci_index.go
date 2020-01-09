@@ -100,7 +100,7 @@ func (index *OCI1Index) ChooseInstance(ctx *types.SystemContext) (digest.Digest,
 			return d.Digest, nil
 		}
 	}
-	return "", fmt.Errorf("no image found in image index for architecture %s, OS %s, Variant %s", wantedPlatforms[0].Architecture, wantedPlatforms[0].OS, wantedPlatforms[0].Variant)
+	return "", fmt.Errorf("no image found in manifest list for architecture %s, variant %s, OS %s", wantedPlatforms[0].Architecture, wantedPlatforms[0].Variant, wantedPlatforms[0].OS)
 }
 
 // Serialize returns the index in a blob format.
