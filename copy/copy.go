@@ -705,16 +705,21 @@ func checkImageDestinationForCurrentRuntime(ctx context.Context, sys *types.Syst
 		}
 		wantedPlatforms, err := platform.WantedPlatforms(sys)
 		if err != nil {
-			return errors.Wrapf(err, "error getting platform information %#v", sys)
+			return errors.Wrapf(err, "error getting current platform information %#v", sys)
 		}
-		wantedPlatform := wantedPlatforms[0] // TODO fixme
-		if wantedPlatform.OS != c.OS {
-			return fmt.Errorf("Image operating system mismatch: image uses %q, expecting %q", c.OS, wantedPlatform.OS)
+		for _, wantedPlatform := range wantedPlatforms {
+			if wantedPlatform.OS != c.OS {
+				return fmt.Errorf("Image operating system mismatch: image uses %q, expecting %q", c.OS, wantedPlatform.OS)
+			}
+			if wantedPlatform.Architecture != c.Architecture {
+				return fmt.Errorf("Image architecture mismatch: image uses %q, expecting %q", c.Architecture, wantedPlatform.Architecture)
+			}
+			/*
+				// TODO Waiting for https://github.com/opencontainers/image-spec/pull/777
+				if wantedPlatform.Variant != "" && c.Variant != "" && wantedPlatform.Variant != c.Variant {
+					return fmt.Errorf("Image variant mismatch: image uses %q, expecting %q", c.Variant, wantedPlatform.Variant)
+				}*/
 		}
-		if wantedPlatform.Architecture != c.Architecture {
-			return fmt.Errorf("Image architecture mismatch: image uses %q, expecting %q", c.Architecture, wantedPlatform.Architecture)
-		}
-		// TODO also check for variant
 	}
 	return nil
 }
