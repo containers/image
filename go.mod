@@ -5,7 +5,6 @@ go 1.11
 require (
 	github.com/14rcole/gopopulate v0.0.0-20180821133914-b175b219e774 // indirect
 	github.com/BurntSushi/toml v0.3.1
-	github.com/containerd/continuity v0.0.0-20180216233310-d8fb8589b0e8 // indirect
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
 	github.com/containers/ocicrypt v0.0.0-20190930154801-b87a4a69c741
 	github.com/containers/storage v1.15.5
@@ -16,7 +15,6 @@ require (
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/etcd-io/bbolt v1.3.3
 	github.com/ghodss/yaml v0.0.0-20161207003320-04f313413ffd
-	github.com/gogo/protobuf v0.0.0-20170815085658-fcdc5011193f // indirect
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v0.0.0-20170217192616-94e7d24fd285 // indirect
 	github.com/gotestyourself/gotestyourself v2.2.0+incompatible // indirect
