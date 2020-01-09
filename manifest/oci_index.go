@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime"
 
+	platform "github.com/containers/image/v5/internal/pkg/platform"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	imgspec "github.com/opencontainers/image-spec/specs-go"
@@ -75,20 +76,20 @@ func (index *OCI1Index) UpdateInstances(updates []ListUpdate) error {
 // ChooseInstance parses blob as an oci v1 manifest index, and returns the digest
 // of the image which is appropriate for the current environment.
 func (index *OCI1Index) ChooseInstance(ctx *types.SystemContext) (digest.Digest, error) {
-	wantedPlatforms, err := WantedPlatforms(ctx)
+	wantedPlatforms, err := platform.WantedPlatforms(ctx)
 	if err != nil {
 		return "", errors.Wrapf(err, "error getting platform information %#v", ctx)
 	}
 	for _, wantedPlatform := range wantedPlatforms {
 		for _, d := range index.Manifests {
-			imagePlatform := Schema2PlatformSpec{
+			imagePlatform := imgspecv1.Platform{
 				Architecture: d.Platform.Architecture,
 				OS:           d.Platform.OS,
 				OSVersion:    d.Platform.OSVersion,
 				OSFeatures:   dupStringSlice(d.Platform.OSFeatures),
 				Variant:      d.Platform.Variant,
 			}
-			if MatchesPlatform(imagePlatform, wantedPlatform) {
+			if platform.MatchesPlatform(imagePlatform, wantedPlatform) {
 				return d.Digest, nil
 			}
 		}

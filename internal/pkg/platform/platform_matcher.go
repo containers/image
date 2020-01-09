@@ -144,7 +144,7 @@ func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
 	return wantedPlatforms, nil
 }
 
-func MatchesPlatform(image Schema2PlatformSpec, wanted imgspecv1.Platform) bool {
+func MatchesPlatform(image imgspecv1.Platform, wanted imgspecv1.Platform) bool {
 	if image.Architecture != wanted.Architecture {
 		return false
 	}

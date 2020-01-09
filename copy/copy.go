@@ -14,6 +14,7 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/image"
+	platform "github.com/containers/image/v5/internal/pkg/platform"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache"
 	"github.com/containers/image/v5/pkg/compression"
@@ -702,7 +703,7 @@ func checkImageDestinationForCurrentRuntime(ctx context.Context, sys *types.Syst
 		if err != nil {
 			return errors.Wrapf(err, "Error parsing image configuration")
 		}
-		wantedPlatforms, err := manifest.WantedPlatforms(sys)
+		wantedPlatforms, err := platform.WantedPlatforms(sys)
 		if err != nil {
 			return errors.Wrapf(err, "error getting platform information %#v", sys)
 		}

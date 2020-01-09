@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	platform "github.com/containers/image/v5/internal/pkg/platform"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -91,13 +92,20 @@ func (list *Schema2List) UpdateInstances(updates []ListUpdate) error {
 // ChooseInstance parses blob as a schema2 manifest list, and returns the digest
 // of the image which is appropriate for the current environment.
 func (list *Schema2List) ChooseInstance(ctx *types.SystemContext) (digest.Digest, error) {
-	wantedPlatforms, err := WantedPlatforms(ctx)
+	wantedPlatforms, err := platform.WantedPlatforms(ctx)
 	if err != nil {
 		return "", errors.Wrapf(err, "error getting platform information %#v", ctx)
 	}
 	for _, wantedPlatform := range wantedPlatforms {
 		for _, d := range list.Manifests {
-			if MatchesPlatform(d.Platform, wantedPlatform) {
+			imagePlatform := imgspecv1.Platform{
+				Architecture: d.Platform.Architecture,
+				OS:           d.Platform.OS,
+				OSVersion:    d.Platform.OSVersion,
+				OSFeatures:   dupStringSlice(d.Platform.OSFeatures),
+				Variant:      d.Platform.Variant,
+			}
+			if platform.MatchesPlatform(imagePlatform, wantedPlatform) {
 				return d.Digest, nil
 			}
 		}
