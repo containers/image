@@ -1,4 +1,4 @@
-package manifest
+package platform
 
 // Largely based on
 // https://github.com/moby/moby/blob/bc846d2e8fe5538220e0c31e9d0e8446f6fbc022/distribution/cpuinfo_unix.go
@@ -50,23 +50,23 @@ func getCPUInfo(pattern string) (info string, err error) {
 	return "", fmt.Errorf("getCPUInfo for pattern: %s not found", pattern)
 }
 
-func getCPUVariant() string {
-	if runtime.GOOS == "windows" {
-		// Windows only supports v7 for ARM32 and v8 for ARM64 and so we can use
-		// runtime.GOARCH to determine the variants
-		var variant string
-		switch runtime.GOARCH {
-		case "arm64":
-			variant = "v8"
-		case "arm":
-			variant = "v7"
-		default:
-			variant = "unknown"
-		}
-
-		return variant
+func getCPUVariantWindows() string {
+	// Windows only supports v7 for ARM32 and v8 for ARM64 and so we can use
+	// runtime.GOARCH to determine the variants
+	var variant string
+	switch runtime.GOARCH {
+	case "arm64":
+		variant = "v8"
+	case "arm":
+		variant = "v7"
+	default:
+		variant = ""
 	}
 
+	return variant
+}
+
+func getCPUVariantArm() string {
 	variant, err := getCPUInfo("Cpu architecture")
 	if err != nil {
 		return ""
@@ -87,17 +87,30 @@ func getCPUVariant() string {
 	case "3":
 		variant = "v3"
 	default:
-		variant = "unknown"
+		variant = ""
 	}
 
 	return variant
 }
 
-var compatibility = map[string][]string{
-	"arm":   []string{"v7", "v6", "v5"},
-	"arm64": []string{"v8"},
+func getCPUVariant(os string, arch string) string {
+	if os == "windows" {
+		return getCPUVariantWindows()
+	}
+	if arch == "arm" || arch == "arm64" {
+		return getCPUVariantArm()
+	}
+	return ""
 }
 
+var compatibility = map[string][]string{
+	"arm":   {"v7", "v6", "v5"},
+	"arm64": {"v8"},
+}
+
+// Returns all compatible platforms with the platform specifics possibly overriden by user,
+// the most compatible platform is first.
+// If some option (arch, os, variant) is not present, a value from current platform is detected.
 func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
 	wantedArch := runtime.GOARCH
 	if ctx != nil && ctx.ArchitectureChoice != "" {
@@ -108,22 +121,33 @@ func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
 		wantedOS = ctx.OSChoice
 	}
 
-	var wantedPlatforms []imgspecv1.Platform
-
-	wantedVariant := ""
-	if wantedArch == "arm" || wantedArch == "arm64" {
-		if ctx != nil && ctx.VariantChoice != "" {
-			wantedVariant = ctx.VariantChoice
-		} else {
-			// TODO handle Variant == 'unknown'
-			wantedVariant = getCPUVariant()
-		}
+	wantedVariant := getCPUVariant(runtime.GOOS, runtime.GOARCH)
+	if ctx != nil && ctx.VariantChoice != "" {
+		wantedVariant = ctx.VariantChoice
 	}
 
+	var wantedPlatforms []imgspecv1.Platform
 	if wantedVariant != "" && compatibility[wantedArch] != nil {
 		wantedPlatforms = make([]imgspecv1.Platform, 0, len(compatibility[wantedArch]))
-		for _, v := range compatibility[wantedArch] {
-			if wantedVariant >= v {
+		wantedIndex := -1
+		for i, v := range compatibility[wantedArch] {
+			if wantedVariant == v {
+				wantedIndex = i
+				break
+			}
+		}
+		// user wants a variant which we know nothing about - not even compatibility
+		if wantedIndex == -1 {
+			wantedPlatforms = []imgspecv1.Platform{
+				{
+					OS:           wantedOS,
+					Architecture: wantedArch,
+					Variant:      wantedVariant,
+				},
+			}
+		} else {
+			for i := wantedIndex; i < len(compatibility[wantedArch]); i++ {
+				v := compatibility[wantedArch][i]
 				wantedPlatforms = append(wantedPlatforms, imgspecv1.Platform{
 					OS:           wantedOS,
 					Architecture: wantedArch,
@@ -133,7 +157,7 @@ func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
 		}
 	} else {
 		wantedPlatforms = []imgspecv1.Platform{
-			imgspecv1.Platform{
+			{
 				OS:           wantedOS,
 				Architecture: wantedArch,
 				Variant:      wantedVariant,
