@@ -62,7 +62,7 @@ func (e *Endpoint) rewriteReference(ref reference.Named, prefix string) (referen
 	if err != nil {
 		return nil, errors.Wrapf(err, "error rewriting reference")
 	}
-	logrus.Debugf("reference rewritten from '%v' to '%v'", refString, newParsedRef.String())
+
 	return newParsedRef, nil
 }
 
