@@ -138,6 +138,8 @@ github.com/opencontainers/runtime-spec v0.1.2-0.20190507144316-5b71a03e2700/go.m
 github.com/opencontainers/runtime-tools v0.0.0-20181011054405-1d69bd0f9c39/go.mod h1:r3f7wjNzSs2extwzU3Y+6pKfobzPh+kKFJ3ofN+3nfs=
 github.com/opencontainers/selinux v1.3.0 h1:xsI95WzPZu5exzA6JzkLSfdr/DilzOhCJOqGe5TgR0g=
 github.com/opencontainers/selinux v1.3.0/go.mod h1:+BLncwf63G4dgOzykXAxcmnFlUaOlkDdmw/CqsW6pjs=
+github.com/opencontainers/selinux v1.3.1 h1:dn2Rc3wTEvTB6iVqoFrKKeMb0uZ38ZheeyMu2h5C1TI=
+github.com/opencontainers/selinux v1.3.1/go.mod h1:yTcKuYAh6R95iDpefGLQaPaRwJFwyzAJufJyiTt7s0g=
 github.com/ostreedev/ostree-go v0.0.0-20190702140239-759a8c1ac913 h1:TnbXhKzrTOyuvWrjI8W6pcoI9XPbLHFXCdN2dtUw7Rw=
 github.com/ostreedev/ostree-go v0.0.0-20190702140239-759a8c1ac913/go.mod h1:J6OG6YJVEWopen4avK3VNQSnALmmjvniMmni/YFYAwc=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
@@ -226,6 +228,7 @@ golang.org/x/sys v0.0.0-20190514135907-3a4b5fb9f71f/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20190916202348-b4ddaad3f8a3/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20191025090151-53bf42e6b339/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20191113165036-4c7a9d0fe056/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20191115151921-52ab43148777/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20191127021746-63cb32ae39b2 h1:/J2nHFg1MTqaRLFO7M+J78ASNsJoz3r0cvHBPQ77fsE=
 golang.org/x/sys v0.0.0-20191127021746-63cb32ae39b2/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0 h1:g61tztE5qeGQ89tm6NTjjM9VPIm088od1l6aSorWRWg=
