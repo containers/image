@@ -169,6 +169,10 @@ func (d *dirImageDestination) PutBlob(ctx context.Context, stream io.Reader, inp
 		return types.BlobInfo{}, err
 	}
 
+	// On POSIX systems, blobFile was created with mode 0600, so we need to make it readable.
+	// On Windows, the “permissions of newly created files” argument to syscall.Open is
+	// ignored and the file is already readable; besides, blobFile.Chmod, i.e. syscall.Fchmod,
+	// always fails on Windows.
 	if runtime.GOOS != "windows" {
 		if err := blobFile.Chmod(0644); err != nil {
 			return types.BlobInfo{}, err
