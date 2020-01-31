@@ -38,6 +38,9 @@ const (
 	// MaxOpenShiftStatusBody is the maximum allowed size of an OpenShift status body.
 	// The limit of 4 MB is considered to be greatly sufficient.
 	MaxOpenShiftStatusBody = 4 * megaByte
+	// MaxTarFileManifestSize is the maximum allowed size of a (docker save)-like manifest (which may contain multiple images)
+	// The limit of 1 MB is considered to be greatly sufficient.
+	MaxTarFileManifestSize = megaByte
 )
 
 // ReadAtMost reads from reader and errors out if the specified limit (in bytes) is exceeded.
