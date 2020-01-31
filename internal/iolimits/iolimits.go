@@ -45,7 +45,7 @@ func ReadAtMost(reader io.Reader, limit int) ([]byte, error) {
 	limitedReader := io.LimitReader(reader, int64(limit+1))
 
 	res, err := ioutil.ReadAll(limitedReader)
-	if err != nil && err != io.EOF {
+	if err != nil {
 		return nil, err
 	}
 
