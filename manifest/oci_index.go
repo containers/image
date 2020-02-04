@@ -64,9 +64,6 @@ func (index *OCI1Index) UpdateInstances(updates []ListUpdate) error {
 		if updates[i].MediaType == "" {
 			return errors.Errorf("update %d of %d passed to OCI1Index.UpdateInstances had no media type (was %q)", i+1, len(updates), index.Manifests[i].MediaType)
 		}
-		if err := SupportedOCI1MediaType(updates[i].MediaType); err != nil && SupportedSchema2MediaType(updates[i].MediaType) != nil && updates[i].MediaType != imgspecv1.MediaTypeImageIndex {
-			return errors.Wrapf(err, "update %d of %d passed to OCI1Index.UpdateInstances had an unsupported media type (was %q): %q", i+1, len(updates), index.Manifests[i].MediaType, updates[i].MediaType)
-		}
 		index.Manifests[i].MediaType = updates[i].MediaType
 	}
 	return nil

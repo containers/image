@@ -427,5 +427,5 @@ func TestConvertToV2S2WithInvalidMIMEType(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = manifestOCI1FromManifest(originalSrc, manifest)
-	require.Error(t, err)
+	require.NoError(t, err)
 }
