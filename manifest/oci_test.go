@@ -71,14 +71,6 @@ func TestSupportedOCI1MediaType(t *testing.T) {
 	}
 }
 
-func TestInvalidOCI1MediaType(t *testing.T) {
-	bytes, err := ioutil.ReadFile("fixtures/ociv1.invalid.mediatype.manifest.json")
-	assert.Nil(t, err)
-
-	_, err = OCI1FromManifest(bytes)
-	assert.NotNil(t, err)
-}
-
 func TestUpdateLayerInfosOCIGzipToZstd(t *testing.T) {
 	bytes, err := ioutil.ReadFile("fixtures/ociv1.manifest.json")
 	assert.Nil(t, err)
