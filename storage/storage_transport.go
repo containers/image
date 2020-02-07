@@ -54,6 +54,9 @@ type StoreTransport interface {
 	// ParseStoreReference parses a reference, overriding any store
 	// specification that it may contain.
 	ParseStoreReference(store storage.Store, reference string) (*storageReference, error)
+	// NewStoreReference creates a reference for (named@ID) in store.
+	// either of name or ID can be unset; named must not be a reference.IsNameOnly.
+	NewStoreReference(store storage.Store, named reference.Named, id string) (*storageReference, error)
 	// SetDefaultUIDMap sets the default UID map to use when opening stores.
 	SetDefaultUIDMap(idmap []idtools.IDMap)
 	// SetDefaultGIDMap sets the default GID map to use when opening stores.
@@ -174,12 +177,18 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		named = reference.TagNameOnly(named)
 	}
 
-	result, err := newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, named, id)
+	result, err := s.NewStoreReference(store, named, id)
 	if err != nil {
 		return nil, err
 	}
 	logrus.Debugf("parsed reference into %q", result.StringWithinTransport())
 	return result, nil
+}
+
+// NewStoreReference creates a reference for (named@ID) in store.
+// either of name or ID can be unset; named must not be a reference.IsNameOnly.
+func (s *storageTransport) NewStoreReference(store storage.Store, named reference.Named, id string) (*storageReference, error) {
+	return newReference(storageTransport{store: store, defaultUIDMap: s.defaultUIDMap, defaultGIDMap: s.defaultGIDMap}, named, id)
 }
 
 func (s *storageTransport) GetStore() (storage.Store, error) {
