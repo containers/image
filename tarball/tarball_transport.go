@@ -49,7 +49,6 @@ func (t *tarballTransport) ParseReference(reference string) (types.ImageReferenc
 		f.Close()
 	}
 	ref := &tarballReference{
-		transport: t,
 		filenames: filenames,
 		stdin:     stdin,
 	}
