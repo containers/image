@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -73,6 +74,47 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 			}
 		}
 	}
+}
+
+func TestNewReference(t *testing.T) {
+	for _, path := range []string{"relative", "/absolute"} {
+		for _, c := range []struct {
+			ref string
+			ok  bool
+		}{
+			{"busybox:notlatest", true},
+			{"busybox:notlatest" + sha256digest, false},
+			{"", true},
+		} {
+			var ntRef reference.NamedTagged = nil
+			if c.ref != "" {
+				namedRef, err := reference.ParseNormalizedNamed(c.ref)
+				require.NoError(t, err, c.ref)
+				nt, ok := namedRef.(reference.NamedTagged)
+				require.True(t, ok, c.ref)
+				ntRef = nt
+			}
+
+			res, err := NewReference(path, ntRef)
+			if !c.ok {
+				assert.Error(t, err, c.ref)
+			} else {
+				require.NoError(t, err, c.ref)
+				archiveRef, ok := res.(archiveReference)
+				require.True(t, ok, c.ref)
+				assert.Equal(t, path, archiveRef.path)
+				if c.ref == "" {
+					assert.Nil(t, archiveRef.destinationRef, c.ref)
+				} else {
+					require.NotNil(t, archiveRef.destinationRef, c.ref)
+					assert.Equal(t, ntRef.String(), archiveRef.destinationRef.String(), c.ref)
+				}
+			}
+
+		}
+	}
+	_, err := NewReference("with:colon", nil)
+	assert.Error(t, err)
 }
 
 // A common list of reference formats to test for the various ImageReference methods.
