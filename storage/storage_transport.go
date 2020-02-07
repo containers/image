@@ -136,7 +136,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		// If it looks like a digest, leave it alone for now.
 		if _, err := digest.Parse(possibleID); err != nil {
 			// Otherwise…
-			if _, err := digest.Parse("sha256:" + possibleID); err == nil {
+			if err := validateImageID(possibleID); err == nil {
 				id = possibleID // … it is a full ID
 			} else if img, err := store.Image(possibleID); err == nil && img != nil && len(possibleID) >= minimumTruncatedIDLength && strings.HasPrefix(img.ID, possibleID) {
 				// … it is a truncated version of the ID of an image that's present in local storage,
@@ -349,7 +349,7 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 	switch len(fields) {
 	case 1: // name only
 	case 2: // name:tag@ID or name[:tag]@digest
-		if _, idErr := digest.Parse("sha256:" + fields[1]); idErr != nil {
+		if idErr := validateImageID(fields[1]); idErr != nil {
 			if _, digestErr := digest.Parse(fields[1]); digestErr != nil {
 				return fmt.Errorf("%v is neither a valid digest(%s) nor a valid ID(%s)", fields[1], digestErr.Error(), idErr.Error())
 			}
@@ -358,7 +358,7 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 		if _, err := digest.Parse(fields[1]); err != nil {
 			return err
 		}
-		if _, err := digest.Parse("sha256:" + fields[2]); err != nil {
+		if err := validateImageID(fields[2]); err != nil {
 			return err
 		}
 	default: // Coverage: This should never happen
@@ -369,4 +369,10 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 	// from docker/distribution/reference.regexp.go, but other than that there
 	// are few semantically invalid strings.
 	return nil
+}
+
+// validateImageID returns nil if id is a valid (full) image ID, or an error
+func validateImageID(id string) error {
+	_, err := digest.Parse("sha256:" + id)
+	return err
 }
