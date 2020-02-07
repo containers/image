@@ -43,6 +43,8 @@ type StoreTransport interface {
 	types.ImageTransport
 	// SetStore sets the default store for this transport.
 	SetStore(storage.Store)
+	// GetStoreIfSet returns the default store for this transport, or nil if not set/determined yet.
+	GetStoreIfSet() storage.Store
 	// GetImage retrieves the image from the transport's store that's named
 	// by the reference.
 	GetImage(types.ImageReference) (*storage.Image, error)
@@ -80,6 +82,11 @@ func (s *storageTransport) Name() string {
 // SetStore does not affect previously parsed references.
 func (s *storageTransport) SetStore(store storage.Store) {
 	s.store = store
+}
+
+// GetStoreIfSet returns the default store for this transport, as set using SetStore() or initialized by default, or nil if not set/determined yet.
+func (s *storageTransport) GetStoreIfSet() storage.Store {
+	return s.store
 }
 
 // SetDefaultUIDMap sets the default UID map to use when opening stores.

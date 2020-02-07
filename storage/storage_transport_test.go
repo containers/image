@@ -20,6 +20,16 @@ func TestTransportName(t *testing.T) {
 	assert.Equal(t, "containers-storage", Transport.Name())
 }
 
+func TestTransportSetGetStore(t *testing.T) {
+	Transport.SetStore(nil)
+	res := Transport.GetStoreIfSet()
+	assert.Nil(t, res)
+	store := newStore(t) // Calls SetStore
+	res = Transport.GetStoreIfSet()
+	assert.Equal(t, store, res)
+	Transport.SetStore(nil)
+}
+
 func TestTransportParseStoreReference(t *testing.T) {
 	const digest3 = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
