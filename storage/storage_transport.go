@@ -136,7 +136,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		// If it looks like a digest, leave it alone for now.
 		if _, err := digest.Parse(possibleID); err != nil {
 			// Otherwise…
-			if idSum, err := digest.Parse("sha256:" + possibleID); err == nil && idSum.Validate() == nil {
+			if _, err := digest.Parse("sha256:" + possibleID); err == nil {
 				id = possibleID // … it is a full ID
 			} else if img, err := store.Image(possibleID); err == nil && img != nil && len(possibleID) >= minimumTruncatedIDLength && strings.HasPrefix(img.ID, possibleID) {
 				// … it is a truncated version of the ID of an image that's present in local storage,
