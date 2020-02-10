@@ -1006,7 +1006,7 @@ func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 			return destInfo, nil
 		}()
 		if err != nil {
-			return nil
+			return err
 		}
 		if destInfo.Digest != srcInfo.Digest {
 			return errors.Errorf("Internal error: copying uncompressed config blob %s changed digest to %s", srcInfo.Digest, destInfo.Digest)
