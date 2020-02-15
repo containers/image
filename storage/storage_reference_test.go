@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/containers/image/v5/docker/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,6 +18,12 @@ func TestNewReference(t *testing.T) {
 	require.True(t, ok)
 	// Success is tested throughout; test only the failure
 	_, err := newReference(*st, nil, "")
+	assert.Error(t, err)
+	_, err = newReference(*st, nil, "ab")
+	assert.Error(t, err)
+	ref, err := reference.ParseNormalizedNamed("busybox")
+	require.NoError(t, err)
+	_, err = newReference(*st, ref, "")
 	assert.Error(t, err)
 }
 
