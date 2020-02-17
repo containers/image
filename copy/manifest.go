@@ -125,8 +125,10 @@ func isMultiImage(ctx context.Context, img types.UnparsedImage) (bool, error) {
 // determineListConversion takes the current MIME type of a list of manifests,
 // the list of MIME types supported for a given destination, and a possible
 // forced value, and returns the MIME type to which we should convert the list
-// of manifests, whether we are converting to it or using it unmodified.
-func (c *copier) determineListConversion(currentListMIMEType string, destSupportedMIMETypes []string, forcedListMIMEType string) (string, error) {
+// of manifests (regardless of whether we are converting to it or using it
+// unmodified) and a slice of other list types which might be supported by the
+// destination.
+func (c *copier) determineListConversion(currentListMIMEType string, destSupportedMIMETypes []string, forcedListMIMEType string) (string, []string, error) {
 	// If there's no list of supported types, then anything we support is expected to be supported.
 	if len(destSupportedMIMETypes) == 0 {
 		destSupportedMIMETypes = manifest.SupportedListMIMETypes
@@ -136,6 +138,7 @@ func (c *copier) determineListConversion(currentListMIMEType string, destSupport
 		destSupportedMIMETypes = []string{forcedListMIMEType}
 	}
 	var selectedType string
+	var otherSupportedTypes []string
 	for i := range destSupportedMIMETypes {
 		// The second priority is the first member of the list of acceptable types that is a list,
 		// but keep going in case current type occurs later in the list.
@@ -148,15 +151,21 @@ func (c *copier) determineListConversion(currentListMIMEType string, destSupport
 			selectedType = destSupportedMIMETypes[i]
 		}
 	}
+	// Pick out the other list types that we support.
+	for i := range destSupportedMIMETypes {
+		if selectedType != destSupportedMIMETypes[i] && manifest.MIMETypeIsMultiImage(destSupportedMIMETypes[i]) {
+			otherSupportedTypes = append(otherSupportedTypes, destSupportedMIMETypes[i])
+		}
+	}
 	logrus.Debugf("Manifest list has MIME type %s, ordered candidate list [%s]", currentListMIMEType, strings.Join(destSupportedMIMETypes, ", "))
 	if selectedType == "" {
-		return "", errors.Errorf("destination does not support any supported manifest list types (%v)", manifest.SupportedListMIMETypes)
+		return "", nil, errors.Errorf("destination does not support any supported manifest list types (%v)", manifest.SupportedListMIMETypes)
 	}
 	if selectedType != currentListMIMEType {
-		logrus.Debugf("... will convert to %s", selectedType)
+		logrus.Debugf("... will convert to %s first, and then try %v", selectedType, otherSupportedTypes)
 	} else {
-		logrus.Debugf("... will use the original manifest list type")
+		logrus.Debugf("... will use the original manifest list type, and then try %v", otherSupportedTypes)
 	}
 	// Done.
-	return selectedType, nil
+	return selectedType, otherSupportedTypes, nil
 }

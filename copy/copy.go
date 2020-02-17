@@ -356,11 +356,11 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	if err != nil {
 		return nil, "", errors.Wrapf(err, "Error reading manifest list")
 	}
-	list, err := manifest.ListFromBlob(manifestList, manifestType)
+	originalList, err := manifest.ListFromBlob(manifestList, manifestType)
 	if err != nil {
 		return nil, "", errors.Wrapf(err, "Error parsing manifest list %q", string(manifestList))
 	}
-	originalList := list.Clone()
+	updatedList := originalList.Clone()
 
 	// Read and/or clear the set of signatures for this list.
 	var sigs [][]byte
@@ -390,18 +390,18 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	case imgspecv1.MediaTypeImageManifest:
 		forceListMIMEType = imgspecv1.MediaTypeImageIndex
 	}
-	selectedListType, err := c.determineListConversion(manifestType, c.dest.SupportedManifestMIMETypes(), forceListMIMEType)
+	selectedListType, otherManifestMIMETypeCandidates, err := c.determineListConversion(manifestType, c.dest.SupportedManifestMIMETypes(), forceListMIMEType)
 	if err != nil {
 		return nil, "", errors.Wrapf(err, "Error determining manifest list type to write to destination")
 	}
-	if selectedListType != list.MIMEType() {
+	if selectedListType != originalList.MIMEType() {
 		if !canModifyManifestList {
 			return nil, "", errors.Errorf("Error: manifest list must be converted to type %q to be written to destination, but that would invalidate signatures", selectedListType)
 		}
 	}
 
 	// Copy each image, or just the ones we want to copy, in turn.
-	instanceDigests := list.Instances()
+	instanceDigests := updatedList.Instances()
 	imagesToCopy := len(instanceDigests)
 	if options.ImageListSelection == CopySpecificImages {
 		imagesToCopy = len(options.Instances)
@@ -419,7 +419,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 				}
 			}
 			if skip {
-				update, err := list.Instance(instanceDigest)
+				update, err := updatedList.Instance(instanceDigest)
 				if err != nil {
 					return nil, "", err
 				}
@@ -447,42 +447,58 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	}
 
 	// Now reset the digest/size/types of the manifests in the list to account for any conversions that we made.
-	if err = list.UpdateInstances(updates); err != nil {
+	if err = updatedList.UpdateInstances(updates); err != nil {
 		return nil, "", errors.Wrapf(err, "Error updating manifest list")
 	}
 
-	// Perform the list conversion.
-	if selectedListType != list.MIMEType() {
-		list, err = list.ConvertToMIMEType(selectedListType)
-		if err != nil {
-			return nil, "", errors.Wrapf(err, "Error converting manifest list to list with MIME type %q", selectedListType)
-		}
-	}
-
-	// Check if the updates or a type conversion meaningfully changed the list of images
-	// by serializing them both so that we can compare them.
-	updatedManifestList, err := list.Serialize()
-	if err != nil {
-		return nil, "", errors.Wrapf(err, "Error encoding updated manifest list (%q: %#v)", list.MIMEType(), list.Instances())
-	}
-	originalManifestList, err := originalList.Serialize()
-	if err != nil {
-		return nil, "", errors.Wrapf(err, "Error encoding original manifest list for comparison (%q: %#v)", originalList.MIMEType(), originalList.Instances())
-	}
-
-	// If we can't just use the original value, but we have to change it, flag an error.
-	if !bytes.Equal(updatedManifestList, originalManifestList) {
-		if !canModifyManifestList {
-			return nil, "", errors.Errorf("Error: manifest list must be converted to type %q to be written to destination, but that would invalidate signatures", selectedListType)
-		}
-		manifestList = updatedManifestList
-		logrus.Debugf("Manifest list has been updated")
-	}
-
-	// Save the manifest list.
+	// Iterate through supported list types, preferred format first.
 	c.Printf("Writing manifest list to image destination\n")
-	if err = c.dest.PutManifest(ctx, manifestList, nil); err != nil {
-		return nil, "", errors.Wrapf(err, "Error writing manifest list %q", string(manifestList))
+	var errs []string
+	for _, thisListType := range append([]string{selectedListType}, otherManifestMIMETypeCandidates...) {
+		attemptedList := updatedList
+
+		logrus.Debugf("Trying to use manifest list type %s…", thisListType)
+
+		// Perform the list conversion, if we need one.
+		if thisListType != updatedList.MIMEType() {
+			attemptedList, err = updatedList.ConvertToMIMEType(thisListType)
+			if err != nil {
+				return nil, "", errors.Wrapf(err, "Error converting manifest list to list with MIME type %q", thisListType)
+			}
+		}
+
+		// Check if the updates or a type conversion meaningfully changed the list of images
+		// by serializing them both so that we can compare them.
+		attemptedManifestList, err := attemptedList.Serialize()
+		if err != nil {
+			return nil, "", errors.Wrapf(err, "Error encoding updated manifest list (%q: %#v)", updatedList.MIMEType(), updatedList.Instances())
+		}
+		originalManifestList, err := originalList.Serialize()
+		if err != nil {
+			return nil, "", errors.Wrapf(err, "Error encoding original manifest list for comparison (%q: %#v)", originalList.MIMEType(), originalList.Instances())
+		}
+
+		// If we can't just use the original value, but we have to change it, flag an error.
+		if !bytes.Equal(attemptedManifestList, originalManifestList) {
+			if !canModifyManifestList {
+				return nil, "", errors.Errorf("Error: manifest list must be converted to type %q to be written to destination, but that would invalidate signatures", thisListType)
+			}
+			logrus.Debugf("Manifest list has been updated")
+		}
+
+		// Save the manifest list.
+		err = c.dest.PutManifest(ctx, attemptedManifestList, nil)
+		if err != nil {
+			logrus.Debugf("Upload of manifest list type %s failed: %v", thisListType, err)
+			errs = append(errs, fmt.Sprintf("%s(%v)", thisListType, err))
+			continue
+		}
+		errs = nil
+		manifestList = attemptedManifestList
+		break
+	}
+	if errs != nil {
+		return nil, "", fmt.Errorf("Uploading manifest list failed, attempted the following formats: %s", strings.Join(errs, ", "))
 	}
 
 	// Sign the manifest list.
