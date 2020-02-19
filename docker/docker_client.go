@@ -21,6 +21,7 @@ import (
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/pkg/tlsclientconfig"
 	"github.com/containers/image/v5/types"
+	"github.com/containers/storage/pkg/homedir"
 	clientLib "github.com/docker/distribution/registry/client"
 	"github.com/docker/go-connections/tlsconfig"
 	digest "github.com/opencontainers/go-digest"
@@ -51,7 +52,18 @@ const (
 	backoffMaxDelay      = 60 * time.Second
 )
 
-var systemPerHostCertDirPaths = [2]string{"/etc/containers/certs.d", "/etc/docker/certs.d"}
+type certPath struct {
+	path     string
+	absolute bool
+}
+
+var (
+	homeCertDir     = filepath.FromSlash(".config/containers/certs.d")
+	perHostCertDirs = []certPath{
+		{path: "/etc/containers/certs.d", absolute: true},
+		{path: "/etc/docker/certs.d", absolute: true},
+	}
+)
 
 // extensionSignature and extensionSignatureList come from github.com/openshift/origin/pkg/dockerregistry/server/signaturedispatcher.go:
 // signature represents a Docker image signature.
@@ -166,11 +178,12 @@ func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
 		hostCertDir     string
 		fullCertDirPath string
 	)
-	for _, systemPerHostCertDirPath := range systemPerHostCertDirPaths {
-		if sys != nil && sys.RootForImplicitAbsolutePaths != "" {
-			hostCertDir = filepath.Join(sys.RootForImplicitAbsolutePaths, systemPerHostCertDirPath)
+
+	for _, perHostCertDir := range append([]certPath{{path: filepath.Join(homedir.Get(), homeCertDir), absolute: false}}, perHostCertDirs...) {
+		if sys != nil && sys.RootForImplicitAbsolutePaths != "" && perHostCertDir.absolute {
+			hostCertDir = filepath.Join(sys.RootForImplicitAbsolutePaths, perHostCertDir.path)
 		} else {
-			hostCertDir = systemPerHostCertDirPath
+			hostCertDir = perHostCertDir.path
 		}
 
 		fullCertDirPath = filepath.Join(hostCertDir, hostPort)
