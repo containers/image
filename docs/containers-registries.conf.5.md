@@ -9,7 +9,7 @@ containers-registries.conf - Syntax of System Registry Configuration File
 The CONTAINERS-REGISTRIES configuration file is a system-wide configuration
 file for container image registries. The file format is TOML.
 
-By default, the configuration file is located at `/etc/containers/registries.conf`.
+Container engines will use the `$HOME/.config/containers/registries.conf` if it exists, otherwise they will use `/etc/containers/registries.conf`
 
 # FORMATS
 

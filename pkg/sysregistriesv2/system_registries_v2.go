@@ -11,6 +11,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/types"
+	"github.com/containers/storage/pkg/homedir"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -43,6 +44,9 @@ type Endpoint struct {
 	// connections will be allowed.
 	Insecure bool `toml:"insecure,omitempty"`
 }
+
+// userRegistriesFile is the path to the per user registry configuration file.
+var userRegistriesFile = filepath.FromSlash(".config/containers/registries.conf")
 
 // rewriteReference will substitute the provided reference `prefix` to the
 // endpoints `location` from the `ref` and creates a new named reference from it.
@@ -316,15 +320,20 @@ func (config *V2RegistriesConf) postProcess() error {
 
 // ConfigPath returns the path to the system-wide registry configuration file.
 func ConfigPath(ctx *types.SystemContext) string {
-	confPath := systemRegistriesConfPath
-	if ctx != nil {
-		if ctx.SystemRegistriesConfPath != "" {
-			confPath = ctx.SystemRegistriesConfPath
-		} else if ctx.RootForImplicitAbsolutePaths != "" {
-			confPath = filepath.Join(ctx.RootForImplicitAbsolutePaths, systemRegistriesConfPath)
-		}
+	if ctx != nil && ctx.SystemRegistriesConfPath != "" {
+		return ctx.SystemRegistriesConfPath
 	}
-	return confPath
+
+	userRegistriesFilePath := filepath.Join(homedir.Get(), userRegistriesFile)
+	if _, err := os.Stat(userRegistriesFilePath); err == nil {
+		return userRegistriesFilePath
+	}
+
+	if ctx != nil && ctx.RootForImplicitAbsolutePaths != "" {
+		return filepath.Join(ctx.RootForImplicitAbsolutePaths, systemRegistriesConfPath)
+	}
+
+	return systemRegistriesConfPath
 }
 
 // configMutex is used to synchronize concurrent accesses to configCache.
