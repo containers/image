@@ -4,7 +4,7 @@
 containers-certs.d - Directory for storing custom container-registry TLS configurations
 
 # DESCRIPTION
-A custom TLS configuration for a container registry can be configured by creating a directory under `/etc/containers/certs.d`.
+A custom TLS configuration for a container registry can be configured by creating a directory under `$HOME/.config/containers/certs.d` or `/etc/containers/certs.d`.
 The name of the directory must correspond to the `host:port` of the registry (e.g., `my-registry.com:5000`).
 
 ## Directory Structure

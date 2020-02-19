@@ -18,7 +18,7 @@ func TestDockerCertDir(t *testing.T) {
 	const rootPrefix = "/root/prefix"
 	const registryHostPort = "thishostdefinitelydoesnotexist:5000"
 
-	systemPerHostResult := filepath.Join(systemPerHostCertDirPaths[len(systemPerHostCertDirPaths)-1], registryHostPort)
+	systemPerHostResult := filepath.Join(perHostCertDirs[len(perHostCertDirs)-1].path, registryHostPort)
 	for _, c := range []struct {
 		sys      *types.SystemContext
 		expected string

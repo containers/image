@@ -207,6 +207,9 @@ the destination registry is unambiguous. Pulling by digest
 (i.e., quay.io/repository/name@digest) further eliminates the ambiguity of
 tags.
 
+# SEE ALSO
+  containers-certs.d(5)
+
 # HISTORY
 Dec 2019, Warning added for unqualified image names by Tom Sweeney <tsweeney@redhat.com>
 
