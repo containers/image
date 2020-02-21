@@ -110,13 +110,12 @@ func TestGetAuth(t *testing.T) {
 
 	for _, configPath := range configPaths {
 		for _, tc := range []struct {
-			name             string
-			hostname         string
-			path             string
-			expectedUsername string
-			expectedPassword string
-			expectedError    error
-			sys              *types.SystemContext
+			name          string
+			hostname      string
+			path          string
+			expected      types.DockerAuthConfig
+			expectedError error
+			sys           *types.SystemContext
 		}{
 			{
 				name:     "no auth config",
@@ -127,11 +126,13 @@ func TestGetAuth(t *testing.T) {
 				path: filepath.Join("testdata", "example.json"),
 			},
 			{
-				name:             "match one",
-				hostname:         "example.org",
-				path:             filepath.Join("testdata", "example.json"),
-				expectedUsername: "example",
-				expectedPassword: "org",
+				name:     "match one",
+				hostname: "example.org",
+				path:     filepath.Join("testdata", "example.json"),
+				expected: types.DockerAuthConfig{
+					Username: "example",
+					Password: "org",
+				},
 			},
 			{
 				name:     "match none",
@@ -139,53 +140,67 @@ func TestGetAuth(t *testing.T) {
 				path:     filepath.Join("testdata", "example.json"),
 			},
 			{
-				name:             "match docker.io",
-				hostname:         "docker.io",
-				path:             filepath.Join("testdata", "full.json"),
-				expectedUsername: "docker",
-				expectedPassword: "io",
+				name:     "match docker.io",
+				hostname: "docker.io",
+				path:     filepath.Join("testdata", "full.json"),
+				expected: types.DockerAuthConfig{
+					Username: "docker",
+					Password: "io",
+				},
 			},
 			{
-				name:             "match docker.io normalized",
-				hostname:         "docker.io",
-				path:             filepath.Join("testdata", "abnormal.json"),
-				expectedUsername: "index",
-				expectedPassword: "docker.io",
+				name:     "match docker.io normalized",
+				hostname: "docker.io",
+				path:     filepath.Join("testdata", "abnormal.json"),
+				expected: types.DockerAuthConfig{
+					Username: "index",
+					Password: "docker.io",
+				},
 			},
 			{
-				name:             "normalize registry",
-				hostname:         "https://example.org/v1",
-				path:             filepath.Join("testdata", "full.json"),
-				expectedUsername: "example",
-				expectedPassword: "org",
+				name:     "normalize registry",
+				hostname: "https://example.org/v1",
+				path:     filepath.Join("testdata", "full.json"),
+				expected: types.DockerAuthConfig{
+					Username: "example",
+					Password: "org",
+				},
 			},
 			{
-				name:             "match localhost",
-				hostname:         "http://localhost",
-				path:             filepath.Join("testdata", "full.json"),
-				expectedUsername: "local",
-				expectedPassword: "host",
+				name:     "match localhost",
+				hostname: "http://localhost",
+				path:     filepath.Join("testdata", "full.json"),
+				expected: types.DockerAuthConfig{
+					Username: "local",
+					Password: "host",
+				},
 			},
 			{
-				name:             "match ip",
-				hostname:         "10.10.30.45:5000",
-				path:             filepath.Join("testdata", "full.json"),
-				expectedUsername: "10.10",
-				expectedPassword: "30.45-5000",
+				name:     "match ip",
+				hostname: "10.10.30.45:5000",
+				path:     filepath.Join("testdata", "full.json"),
+				expected: types.DockerAuthConfig{
+					Username: "10.10",
+					Password: "30.45-5000",
+				},
 			},
 			{
-				name:             "match port",
-				hostname:         "https://localhost:5000",
-				path:             filepath.Join("testdata", "abnormal.json"),
-				expectedUsername: "local",
-				expectedPassword: "host-5000",
+				name:     "match port",
+				hostname: "https://localhost:5000",
+				path:     filepath.Join("testdata", "abnormal.json"),
+				expected: types.DockerAuthConfig{
+					Username: "local",
+					Password: "host-5000",
+				},
 			},
 			{
-				name:             "use system context",
-				hostname:         "example.org",
-				path:             filepath.Join("testdata", "example.json"),
-				expectedUsername: "foo",
-				expectedPassword: "bar",
+				name:     "use system context",
+				hostname: "example.org",
+				path:     filepath.Join("testdata", "example.json"),
+				expected: types.DockerAuthConfig{
+					Username: "foo",
+					Password: "bar",
+				},
 				sys: &types.SystemContext{
 					DockerAuthConfig: &types.DockerAuthConfig{
 						Username: "foo",
@@ -193,14 +208,22 @@ func TestGetAuth(t *testing.T) {
 					},
 				},
 			},
+			{
+				name:     "identity token",
+				hostname: "example.org",
+				path:     filepath.Join("testdata", "example_identitytoken.json"),
+				expected: types.DockerAuthConfig{
+					Username:      "00000000-0000-0000-0000-000000000000",
+					Password:      "",
+					IdentityToken: "some very long identity token",
+				},
+			},
 		} {
-			if tc.path == "" {
+			t.Run(tc.name, func(t *testing.T) {
 				if err := os.RemoveAll(configPath); err != nil {
 					t.Fatal(err)
 				}
-			}
 
-			t.Run(tc.name, func(t *testing.T) {
 				if tc.path != "" {
 					contents, err := ioutil.ReadFile(tc.path)
 					if err != nil {
@@ -216,10 +239,23 @@ func TestGetAuth(t *testing.T) {
 				if tc.sys != nil {
 					sys = tc.sys
 				}
-				username, password, err := GetAuthentication(sys, tc.hostname)
+				auth, err := GetCredentials(sys, tc.hostname)
 				assert.Equal(t, tc.expectedError, err)
-				assert.Equal(t, tc.expectedUsername, username)
-				assert.Equal(t, tc.expectedPassword, password)
+				assert.Equal(t, tc.expected, auth)
+
+				// Test for the previous APIs.
+				username, password, err := GetAuthentication(sys, tc.hostname)
+				if tc.expected.IdentityToken != "" {
+					assert.Equal(t, "", username)
+					assert.Equal(t, "", password)
+					assert.Error(t, err)
+				} else {
+					assert.Equal(t, tc.expected.Username, username)
+					assert.Equal(t, tc.expected.Password, password)
+					assert.Equal(t, tc.expectedError, err)
+				}
+
+				require.NoError(t, os.RemoveAll(configPath))
 			})
 		}
 	}
@@ -249,23 +285,26 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name             string
-		hostname         string
-		expectedUsername string
-		expectedPassword string
-		expectedError    error
+		name          string
+		hostname      string
+		expected      types.DockerAuthConfig
+		expectedError error
 	}{
 		{
-			name:             "normalize registry",
-			hostname:         "https://docker.io/v1",
-			expectedUsername: "docker",
-			expectedPassword: "io-legacy",
+			name:     "normalize registry",
+			hostname: "https://docker.io/v1",
+			expected: types.DockerAuthConfig{
+				Username: "docker",
+				Password: "io-legacy",
+			},
 		},
 		{
-			name:             "ignore schema and path",
-			hostname:         "http://index.docker.io/v1",
-			expectedUsername: "docker",
-			expectedPassword: "io-legacy",
+			name:     "ignore schema and path",
+			hostname: "http://index.docker.io/v1",
+			expected: types.DockerAuthConfig{
+				Username: "docker",
+				Password: "io-legacy",
+			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -273,10 +312,15 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			auth, err := GetCredentials(nil, tc.hostname)
+			assert.Equal(t, tc.expectedError, err)
+			assert.Equal(t, tc.expected, auth)
+
+			// Testing for previous APIs
 			username, password, err := GetAuthentication(nil, tc.hostname)
 			assert.Equal(t, tc.expectedError, err)
-			assert.Equal(t, tc.expectedUsername, username)
-			assert.Equal(t, tc.expectedPassword, password)
+			assert.Equal(t, tc.expected.Username, username)
+			assert.Equal(t, tc.expected.Password, password)
 		})
 	}
 }
@@ -326,10 +370,10 @@ func TestGetAuthPreferNewConfig(t *testing.T) {
 		}
 	}
 
-	username, password, err := GetAuthentication(nil, "docker.io")
-	assert.Equal(t, nil, err)
-	assert.Equal(t, "docker", username)
-	assert.Equal(t, "io", password)
+	auth, err := GetCredentials(nil, "docker.io")
+	assert.NoError(t, err)
+	assert.Equal(t, "docker", auth.Username)
+	assert.Equal(t, "io", auth.Password)
 }
 
 func TestGetAuthFailsOnBadInput(t *testing.T) {
@@ -372,20 +416,18 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	configPath := filepath.Join(configDir, "auth.json")
 
 	// no config file present
-	username, password, err := GetAuthentication(nil, "index.docker.io")
+	auth, err := GetCredentials(nil, "index.docker.io")
 	if err != nil {
 		t.Fatalf("got unexpected error: %#+v", err)
 	}
-	if len(username) > 0 || len(password) > 0 {
-		t.Fatalf("got unexpected not empty username/password: %q/%q", username, password)
-	}
+	assert.Equal(t, types.DockerAuthConfig{}, auth)
 
 	if err := ioutil.WriteFile(configPath, []byte("Json rocks! Unless it doesn't."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
-	username, password, err = GetAuthentication(nil, "index.docker.io")
+	auth, err = GetCredentials(nil, "index.docker.io")
 	if err == nil {
-		t.Fatalf("got unexpected non-error: username=%q, password=%q", username, password)
+		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}
 	if _, ok := errors.Cause(err).(*json.SyntaxError); !ok {
 		t.Fatalf("expected JSON syntax error, not: %#+v", err)
@@ -394,21 +436,19 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	// remove the invalid config file
 	os.RemoveAll(configPath)
 	// no config file present
-	username, password, err = GetAuthentication(nil, "index.docker.io")
+	auth, err = GetCredentials(nil, "index.docker.io")
 	if err != nil {
 		t.Fatalf("got unexpected error: %#+v", err)
 	}
-	if len(username) > 0 || len(password) > 0 {
-		t.Fatalf("got unexpected not empty username/password: %q/%q", username, password)
-	}
+	assert.Equal(t, types.DockerAuthConfig{}, auth)
 
 	configPath = filepath.Join(tmpDir2, ".dockercfg")
 	if err := ioutil.WriteFile(configPath, []byte("I'm certainly not a json string."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
-	username, password, err = GetAuthentication(nil, "index.docker.io")
+	auth, err = GetCredentials(nil, "index.docker.io")
 	if err == nil {
-		t.Fatalf("got unexpected non-error: username=%q, password=%q", username, password)
+		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}
 	if _, ok := errors.Cause(err).(*json.SyntaxError); !ok {
 		t.Fatalf("expected JSON syntax error, not: %#+v", err)

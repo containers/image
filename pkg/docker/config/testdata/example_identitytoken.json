@@ -1,0 +1,8 @@
+{
+    "auths": {
+        "example.org": {
+            "auth": "MDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwOg==",
+            "identitytoken": "some very long identity token"
+        }
+    }
+}
