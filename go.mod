@@ -32,7 +32,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/pquerna/ffjson v0.0.0-20190813045741-dac163c6c0a9 // indirect
 	github.com/sirupsen/logrus v1.4.2
-	github.com/stretchr/testify v1.5.0
+	github.com/stretchr/testify v1.5.1
 	github.com/ulikunitz/xz v0.5.6
 	github.com/vbatts/tar-split v0.11.1
 	github.com/vbauerster/mpb/v4 v4.12.1
