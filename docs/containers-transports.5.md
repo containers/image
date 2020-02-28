@@ -62,11 +62,6 @@ Using a _tag_ is optional and allows for storing multiple images at the same _pa
 
 An image compliant with the "Open Container Image Layout Specification" stored as a tar(1) archive at _path_.
 
-### **ostree:**_docker-reference[@/absolute/repo/path]_
-
-An image in the local ostree(1) repository.
-_/absolute/repo/path_ defaults to _/ostree/repo_.
-
 ## Examples
 
 The following examples demonstrate how some of the containers transports can be used.
@@ -101,7 +96,7 @@ $ skopeo copy docker://docker.io/library/alpine:latest containers-storage:alpine
 
 ## SEE ALSO
 
-docker-login(1), docker-save(1), ostree(1), podman-login(1), skopeo-copy(1), skopeo-inspect(1), tar(1), container-registries.conf(5), containers-storage.conf(5)
+docker-login(1), docker-save(1), podman-login(1), skopeo-copy(1), skopeo-inspect(1), tar(1), container-registries.conf(5), containers-storage.conf(5)
 
 ## AUTHORS
 

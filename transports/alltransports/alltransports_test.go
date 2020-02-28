@@ -47,7 +47,7 @@ func TestImageNameHandling(t *testing.T) {
 	}
 
 	// Possibly stubbed-out transports: Only verify that something is registered.
-	for _, c := range []string{"docker-daemon", "ostree"} {
+	for _, c := range []string{"docker-daemon"} {
 		transport := transports.Get(c)
 		assert.NotNil(t, transport, c)
 	}
