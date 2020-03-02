@@ -463,3 +463,18 @@ func TestTryUpdatingCache(t *testing.T) {
 	assert.Nil(t, registries)
 	assert.Equal(t, 1, len(configCache))
 }
+
+func TestRegistriesConfDirectory(t *testing.T) {
+	ctx := &types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/base-for-registries.d.conf",
+		SystemRegistriesConfDirPath: "testdata/registries.conf.d",
+	}
+	configCache = make(map[string]*V2RegistriesConf)
+	registries, err := TryUpdatingCache(ctx)
+	assert.Nil(t, err)
+	assert.NotNil(t, registries)
+
+	assert.Equal(t, registries.UnqualifiedSearchRegistries, []string{"example-overwrite.com"})
+	assert.Equal(t, len(registries.Registries), 1)
+	assert.Equal(t, registries.Registries[0].Location, "2.com")
+}
