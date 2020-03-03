@@ -2,7 +2,6 @@ package sysregistriesv2
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -25,6 +24,16 @@ var systemRegistriesConfPath = builtinRegistriesConfPath
 // builtinRegistriesConfPath is the path to the registry configuration file.
 // DO NOT change this, instead see systemRegistriesConfPath above.
 const builtinRegistriesConfPath = "/etc/containers/registries.conf"
+
+// systemRegistriesConfDirPath is the path to the system-wide registry
+// configuration directory and is used to add/subtract potential registries for
+// obtaining images.  You can override this at build time with
+// -ldflags '-X github.com/containers/image/sysregistries.systemRegistriesConfDirecotyPath=$your_path'
+var systemRegistriesConfDirPath = builtinRegistriesConfDirPath
+
+// builtinRegistriesConfDirPath is the path to the registry configuration directory.
+// DO NOT change this, instead see systemRegistriesConfDirectoryPath above.
+const builtinRegistriesConfDirPath = "/etc/containers/registries.conf.d"
 
 // Endpoint describes a remote location of a registry.
 type Endpoint struct {
@@ -360,16 +369,45 @@ func TryUpdatingCache(ctx *types.SystemContext) (*V2RegistriesConf, error) {
 	defer configMutex.Unlock()
 
 	// load the config
-	config, err := loadRegistryConf(configPath)
-	if err != nil {
+	config := &tomlConfig{}
+	if err := config.loadConfig(configPath); err != nil {
 		// Return an empty []Registry if we use the default config,
 		// which implies that the config path of the SystemContext
 		// isn't set.  Note: if ctx.SystemRegistriesConfPath points to
 		// the default config, we will still return an error.
 		if os.IsNotExist(err) && (ctx == nil || ctx.SystemRegistriesConfPath == "") {
-			return &V2RegistriesConf{Registries: []Registry{}}, nil
+			config = &tomlConfig{}
+			config.V2RegistriesConf = V2RegistriesConf{Registries: []Registry{}}
+		} else {
+			return nil, err
 		}
-		return nil, err
+	}
+
+	// Load the configs from the conf directory path.
+	confDir := systemRegistriesConfDirPath
+	if ctx != nil && ctx.SystemRegistriesConfDirPath != "" {
+		confDir = ctx.SystemRegistriesConfDirPath
+	}
+	err := filepath.Walk(confDir,
+		// WalkFunc to read additional
+		func(path string, info os.FileInfo, err error) error {
+			switch {
+			case info == nil:
+				// registries.conf.d doesn't exist
+				return nil
+			case info.IsDir():
+				// ignore directories
+				return nil
+			default:
+				// expect all files to be a config
+				return config.loadConfig(path)
+			}
+		},
+	)
+	if err != nil && !os.IsNotExist(err) {
+		// Ignore IsNotExist errors: most systems won't have a
+		// registries.conf.d directory.
+		return nil, errors.Wrapf(err, "error reading registries.conf.d")
 	}
 
 	v2Config := &config.V2RegistriesConf
@@ -470,16 +508,12 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 	return nil, nil
 }
 
-// Loads the registry configuration file from the filesystem and then unmarshals
-// it.  Returns the unmarshalled object.
-func loadRegistryConf(configPath string) (*tomlConfig, error) {
-	config := &tomlConfig{}
-
-	configBytes, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		return nil, err
-	}
-
-	err = toml.Unmarshal(configBytes, &config)
-	return config, err
+// tomlConfig loads the unmarshals the configuration at the specified path.
+// Note that the tomlConfig's fields will be overridden if they are set in
+// specified path.  This behavior is necessary for registries.conf.d stances
+// behavior.
+func (t *tomlConfig) loadConfig(path string) error {
+	logrus.Debugf("Loading registries.conf %q", path)
+	_, err := toml.DecodeFile(path, t)
+	return err
 }
