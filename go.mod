@@ -23,7 +23,6 @@ require (
 	github.com/klauspost/pgzip v1.2.1
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
-	github.com/mattn/go-isatty v0.0.4 // indirect
 	github.com/mtrmac/gpgme v0.1.2
 	github.com/opencontainers/go-digest v1.0.0-rc1
 	github.com/opencontainers/image-spec v1.0.2-0.20190823105129-775207bd45b6
