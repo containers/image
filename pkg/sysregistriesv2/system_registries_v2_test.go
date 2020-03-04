@@ -44,7 +44,10 @@ func TestParseLocation(t *testing.T) {
 }
 
 func TestEmptyConfig(t *testing.T) {
-	registries, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/empty.conf"})
+	registries, err := GetRegistries(&types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/empty.conf",
+		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+	})
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(registries))
 
@@ -52,13 +55,19 @@ func TestEmptyConfig(t *testing.T) {
 	// the same as an empty one, without reporting an error.
 	nonexistentRoot, err := filepath.Abs("testdata/this-does-not-exist")
 	require.NoError(t, err)
-	registries, err = GetRegistries(&types.SystemContext{RootForImplicitAbsolutePaths: nonexistentRoot})
+	registries, err = GetRegistries(&types.SystemContext{
+		RootForImplicitAbsolutePaths: nonexistentRoot,
+		SystemRegistriesConfDirPath:  "testdata/this-does-not-exist",
+	})
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(registries))
 }
 
 func TestMirrors(t *testing.T) {
-	sys := &types.SystemContext{SystemRegistriesConfPath: "testdata/mirrors.conf"}
+	sys := &types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/mirrors.conf",
+		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+	}
 
 	registries, err := GetRegistries(sys)
 	assert.Nil(t, err)
@@ -191,7 +200,10 @@ func TestConfigPath(t *testing.T) {
 }
 
 func TestFindRegistry(t *testing.T) {
-	sys := &types.SystemContext{SystemRegistriesConfPath: "testdata/find-registry.conf"}
+	sys := &types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/find-registry.conf",
+		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+	}
 
 	registries, err := GetRegistries(sys)
 	assert.Nil(t, err)
@@ -250,7 +262,10 @@ func assertRegistryLocationsEqual(t *testing.T, expected []string, regs []Regist
 }
 
 func TestFindUnqualifiedSearchRegistries(t *testing.T) {
-	sys := &types.SystemContext{SystemRegistriesConfPath: "testdata/unqualified-search.conf"}
+	sys := &types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/unqualified-search.conf",
+		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+	}
 
 	registries, err := GetRegistries(sys)
 	assert.Nil(t, err)
@@ -260,7 +275,10 @@ func TestFindUnqualifiedSearchRegistries(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
 
-	_, err = UnqualifiedSearchRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/invalid-search.conf"})
+	_, err = UnqualifiedSearchRegistries(&types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/invalid-search.conf",
+		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+	})
 	assert.Error(t, err)
 }
 
@@ -282,13 +300,19 @@ func TestInvalidV2Configs(t *testing.T) {
 }
 
 func TestUnmarshalConfig(t *testing.T) {
-	registries, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/unmarshal.conf"})
+	registries, err := GetRegistries(&types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/unmarshal.conf",
+		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+	})
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
 }
 
 func TestV1BackwardsCompatibility(t *testing.T) {
-	sys := &types.SystemContext{SystemRegistriesConfPath: "testdata/v1-compatibility.conf"}
+	sys := &types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/v1-compatibility.conf",
+		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+	}
 
 	registries, err := GetRegistries(sys)
 	assert.Nil(t, err)
@@ -306,13 +330,19 @@ func TestV1BackwardsCompatibility(t *testing.T) {
 	assert.True(t, reg.Blocked)
 
 	for _, c := range []string{"testdata/v1-invalid-block.conf", "testdata/v1-invalid-insecure.conf", "testdata/v1-invalid-search.conf"} {
-		_, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: c})
+		_, err := GetRegistries(&types.SystemContext{
+			SystemRegistriesConfPath:    c,
+			SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+		})
 		assert.Error(t, err, c)
 	}
 }
 
 func TestMixingV1andV2(t *testing.T) {
-	_, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: "testdata/mixing-v1-v2.conf"})
+	_, err := GetRegistries(&types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/mixing-v1-v2.conf",
+		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+	})
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "mixing sysregistry v1/v2 is not supported")
 }
@@ -351,7 +381,7 @@ insecure = true`), 0600)
 
 	ctx := &types.SystemContext{SystemRegistriesConfPath: configFile.Name()}
 
-	configCache = make(map[string]*V2RegistriesConf)
+	configCache = make(map[configWrapper]*V2RegistriesConf)
 	registries, err := GetRegistries(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
@@ -368,11 +398,11 @@ insecure = true`), 0600)
 func TestInvalidateCache(t *testing.T) {
 	ctx := &types.SystemContext{SystemRegistriesConfPath: "testdata/invalidate-cache.conf"}
 
-	configCache = make(map[string]*V2RegistriesConf)
+	configCache = make(map[configWrapper]*V2RegistriesConf)
 	registries, err := GetRegistries(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
-	assertRegistryLocationsEqual(t, []string{"registry.com", "blocked.registry.com", "insecure.registry.com", "untrusted.registry.com"}, registries)
+	assertRegistryLocationsEqual(t, []string{"blocked.registry.com", "insecure.registry.com", "registry.com", "untrusted.registry.com"}, registries)
 
 	// invalidate the cache, make sure it's empty and reload
 	InvalidateCache()
@@ -381,7 +411,7 @@ func TestInvalidateCache(t *testing.T) {
 	registries, err = GetRegistries(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
-	assertRegistryLocationsEqual(t, []string{"registry.com", "blocked.registry.com", "insecure.registry.com", "untrusted.registry.com"}, registries)
+	assertRegistryLocationsEqual(t, []string{"blocked.registry.com", "insecure.registry.com", "registry.com", "untrusted.registry.com"}, registries)
 }
 
 func toNamedRef(t *testing.T, ref string) reference.Named {
@@ -444,7 +474,10 @@ func TestRewriteReferenceFailedDuringParseNamed(t *testing.T) {
 }
 
 func TestPullSourcesFromReference(t *testing.T) {
-	sys := &types.SystemContext{SystemRegistriesConfPath: "testdata/pull-sources-from-reference.conf"}
+	sys := &types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/pull-sources-from-reference.conf",
+		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+	}
 	registries, err := GetRegistries(sys)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(registries))
@@ -487,16 +520,18 @@ func TestPullSourcesFromReference(t *testing.T) {
 
 func TestTryUpdatingCache(t *testing.T) {
 	ctx := &types.SystemContext{
-		SystemRegistriesConfPath: "testdata/try-update-cache-valid.conf",
+		SystemRegistriesConfPath:    "testdata/try-update-cache-valid.conf",
+		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
 	}
-	configCache = make(map[string]*V2RegistriesConf)
+	configCache = make(map[configWrapper]*V2RegistriesConf)
 	registries, err := TryUpdatingCache(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(registries.Registries))
 	assert.Equal(t, 1, len(configCache))
 
 	ctxInvalid := &types.SystemContext{
-		SystemRegistriesConfPath: "testdata/try-update-cache-invalid.conf",
+		SystemRegistriesConfPath:    "testdata/try-update-cache-invalid.conf",
+		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
 	}
 	registries, err = TryUpdatingCache(ctxInvalid)
 	assert.NotNil(t, err)
@@ -509,12 +544,17 @@ func TestRegistriesConfDirectory(t *testing.T) {
 		SystemRegistriesConfPath:    "testdata/base-for-registries.d.conf",
 		SystemRegistriesConfDirPath: "testdata/registries.conf.d",
 	}
-	configCache = make(map[string]*V2RegistriesConf)
+
+	configCache = make(map[configWrapper]*V2RegistriesConf)
 	registries, err := TryUpdatingCache(ctx)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, registries)
 
-	assert.Equal(t, registries.UnqualifiedSearchRegistries, []string{"example-overwrite.com"})
-	assert.Equal(t, len(registries.Registries), 1)
-	assert.Equal(t, registries.Registries[0].Location, "2.com")
+	assert.Equal(t, []string{"example-overwrite.com"}, registries.UnqualifiedSearchRegistries)
+	assert.Equal(t, 3, len(registries.Registries))
+	assertRegistryLocationsEqual(t, []string{"1.com", "2.com", "base.com"}, registries.Registries)
+
+	reg, err := FindRegistry(ctx, "base.com/test:latest")
+	require.NoError(t, err)
+	assert.True(t, reg.Blocked)
 }
