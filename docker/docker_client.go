@@ -588,6 +588,9 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge, 
 	if c.username != "" && c.password != "" {
 		authReq.SetBasicAuth(c.username, c.password)
 	}
+	if c.sys != nil && c.sys.DockerRegistryUserAgent != "" {
+		authReq.Header.Add("User-Agent", c.sys.DockerRegistryUserAgent)
+	}
 	logrus.Debugf("%s %s", authReq.Method, authReq.URL.String())
 	res, err := c.client.Do(authReq)
 	if err != nil {
