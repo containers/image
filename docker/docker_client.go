@@ -99,6 +99,7 @@ type dockerClient struct {
 	// The following members are not set by newDockerClient and must be set by callers if needed.
 	username      string
 	password      string
+	registryToken string
 	signatureBase signatureStorageBase
 	scope         authScope
 
@@ -224,6 +225,9 @@ func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write
 	}
 	client.username = username
 	client.password = password
+	if sys != nil {
+		client.registryToken = sys.DockerBearerRegistryToken
+	}
 	client.signatureBase = sigBase
 	client.scope.actions = actions
 	client.scope.remoteName = reference.Path(ref.ref)
@@ -348,6 +352,9 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 	}
 	client.username = username
 	client.password = password
+	if sys != nil {
+		client.registryToken = sys.DockerBearerRegistryToken
+	}
 
 	// Only try the v1 search endpoint if the search query is not empty. If it is
 	// empty skip to the v2 endpoint.
@@ -531,27 +538,31 @@ func (c *dockerClient) setupRequestAuth(req *http.Request, extraScope *authScope
 			req.SetBasicAuth(c.username, c.password)
 			return nil
 		case "bearer":
-			cacheKey := ""
-			scopes := []authScope{c.scope}
-			if extraScope != nil {
-				// Using ':' as a separator here is unambiguous because getBearerToken below uses the same separator when formatting a remote request (and because repository names can't contain colons).
-				cacheKey = fmt.Sprintf("%s:%s", extraScope.remoteName, extraScope.actions)
-				scopes = append(scopes, *extraScope)
-			}
-			var token bearerToken
-			t, inCache := c.tokenCache.Load(cacheKey)
-			if inCache {
-				token = t.(bearerToken)
-			}
-			if !inCache || time.Now().After(token.expirationTime) {
-				t, err := c.getBearerToken(req.Context(), challenge, scopes)
-				if err != nil {
-					return err
+			registryToken := c.registryToken
+			if registryToken == "" {
+				cacheKey := ""
+				scopes := []authScope{c.scope}
+				if extraScope != nil {
+					// Using ':' as a separator here is unambiguous because getBearerToken below uses the same separator when formatting a remote request (and because repository names can't contain colons).
+					cacheKey = fmt.Sprintf("%s:%s", extraScope.remoteName, extraScope.actions)
+					scopes = append(scopes, *extraScope)
 				}
-				token = *t
-				c.tokenCache.Store(cacheKey, token)
+				var token bearerToken
+				t, inCache := c.tokenCache.Load(cacheKey)
+				if inCache {
+					token = t.(bearerToken)
+				}
+				if !inCache || time.Now().After(token.expirationTime) {
+					t, err := c.getBearerToken(req.Context(), challenge, scopes)
+					if err != nil {
+						return err
+					}
+					token = *t
+					c.tokenCache.Store(cacheKey, token)
+				}
+				registryToken = token.Token
 			}
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.Token))
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", registryToken))
 			return nil
 		default:
 			logrus.Debugf("no handler for %s authentication", challenge.Scheme)
