@@ -24,6 +24,7 @@ type dockerAuthConfig struct {
 type dockerConfigFile struct {
 	AuthConfigs map[string]dockerAuthConfig `json:"auths"`
 	CredHelpers map[string]string           `json:"credHelpers,omitempty"`
+	CredStore   string                      `json:"credsStore,omitempty"`
 }
 
 type authPath struct {
@@ -51,6 +52,10 @@ func SetAuthentication(sys *types.SystemContext, registry, username, password st
 	return modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
 		if ch, exists := auths.CredHelpers[registry]; exists {
 			return false, setAuthToCredHelper(ch, registry, username, password)
+		}
+
+		if auths.CredStore != "" {
+			return false, setAuthToCredHelper(auths.CredStore, registry, username, password)
 		}
 
 		// Set the credentials to kernel keyring if enableKeyring is true.
@@ -141,6 +146,11 @@ func RemoveAuthentication(sys *types.SystemContext, registry string) error {
 		} else if _, ok := auths.AuthConfigs[normalizeRegistry(registry)]; ok {
 			delete(auths.AuthConfigs, normalizeRegistry(registry))
 		} else {
+			// Lastly try global cred helper
+			if auths.CredStore != "" {
+				return false, deleteAuthFromCredHelper(auths.CredStore, registry)
+			}
+
 			return false, ErrNotLoggedIn
 		}
 		return true, nil
@@ -158,6 +168,16 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 			}
 			logrus.Debugf("error removing credentials from kernel keyring")
 		}
+
+		if auths.CredStore != "" {
+			err := deleteAllAuthFromCredHelper(auths.CredStore)
+			if err != nil {
+				// This could be true or could be false, since it could die on the second, third or subsequent registry entries.
+				return false, err
+			}
+		}
+
+		// Don't change auths.CredStore if it's set, it's probably a system setting.
 		auths.CredHelpers = make(map[string]string)
 		auths.AuthConfigs = make(map[string]dockerAuthConfig)
 		return true, nil
@@ -287,10 +307,31 @@ func setAuthToCredHelper(credHelper, registry, username, password string) error 
 	return helperclient.Store(p, creds)
 }
 
+func listAuthFromCredHelper(credHelper string) (map[string]string, error) {
+	helperName := fmt.Sprintf("docker-credential-%s", credHelper)
+	p := helperclient.NewShellProgramFunc(helperName)
+	return helperclient.List(p)
+}
+
 func deleteAuthFromCredHelper(credHelper, registry string) error {
 	helperName := fmt.Sprintf("docker-credential-%s", credHelper)
 	p := helperclient.NewShellProgramFunc(helperName)
 	return helperclient.Erase(p, registry)
+}
+
+func deleteAllAuthFromCredHelper(credHelper string) error {
+	creds, err := listAuthFromCredHelper(credHelper)
+	if err != nil {
+		return err
+	}
+	for registry := range creds {
+		err = deleteAuthFromCredHelper(credHelper, registry)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // findAuthentication looks for auth of registry in path
@@ -306,7 +347,7 @@ func findAuthentication(registry, path string, legacyFormat bool) (string, strin
 	}
 
 	// I'm feeling lucky
-	if val, exists := auths.AuthConfigs[registry]; exists {
+	if val, exists := auths.AuthConfigs[registry]; exists && val.Auth != "" {
 		return decodeDockerAuth(val.Auth)
 	}
 
@@ -316,9 +357,16 @@ func findAuthentication(registry, path string, legacyFormat bool) (string, strin
 	for k, v := range auths.AuthConfigs {
 		normalizedAuths[normalizeRegistry(k)] = v
 	}
-	if val, exists := normalizedAuths[registry]; exists {
+	if val, exists := normalizedAuths[registry]; exists && val.Auth != "" {
 		return decodeDockerAuth(val.Auth)
 	}
+
+	// Finally check if there is a global CredStore to use.
+	if cs := auths.CredStore; cs != "" {
+		logrus.Debugf("auths: %#v", auths)
+		return getAuthFromCredHelper(cs, registry)
+	}
+
 	return "", "", nil
 }
 

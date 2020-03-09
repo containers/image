@@ -82,6 +82,12 @@ func TestGetAuth(t *testing.T) {
 		os.Setenv("XDG_RUNTIME_DIR", origXDG)
 	}()
 
+	origPath := os.Getenv("PATH")
+	os.Setenv("PATH", fmt.Sprintf("%s:%s", filepath.Join("testdata"), origPath))
+	defer func() {
+		os.Setenv("PATH", origPath)
+	}()
+
 	origHomeDir := homedir.Get()
 	tmpDir2, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
@@ -181,6 +187,13 @@ func TestGetAuth(t *testing.T) {
 				expectedPassword: "host-5000",
 			},
 			{
+				name:             "use external helper",
+				hostname:         "foobar.example.org",
+				path:             filepath.Join("testdata", "helper.json"),
+				expectedUsername: "foo",
+				expectedPassword: "bar",
+			},
+			{
 				name:             "use system context",
 				hostname:         "example.org",
 				path:             filepath.Join("testdata", "example.json"),
@@ -194,11 +207,14 @@ func TestGetAuth(t *testing.T) {
 				},
 			},
 		} {
-			if tc.path == "" {
-				if err := os.RemoveAll(configPath); err != nil {
-					t.Fatal(err)
-				}
+			for _, cPath := range configPaths {
+				os.RemoveAll(cPath)
 			}
+			// if tc.path == "" {
+			// 	if err := os.RemoveAll(configPath); err != nil {
+			// 		t.Fatal(err)
+			// 	}
+			// }
 
 			t.Run(tc.name, func(t *testing.T) {
 				if tc.path != "" {
