@@ -833,21 +833,24 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		}
 	}
 
-	func() { // A scope for defer
+	if err := func() error { // A scope for defer
 		progressPool, progressCleanup := ic.c.newProgressPool(ctx)
 		defer progressCleanup()
 
 		for i, srcLayer := range srcInfos {
 			err = copySemaphore.Acquire(ctx, 1)
 			if err != nil {
-				logrus.Debug("Can't acquire semaphoer", err)
+				return errors.Wrapf(err, "Can't acquire semaphore")
 			}
 			go copyLayerHelper(i, srcLayer, encLayerBitmap[i], progressPool)
 		}
 
 		// Wait for all layers to be copied
 		copyGroup.Wait()
-	}()
+		return nil
+	}(); err != nil {
+		return err
+	}
 
 	destInfos := make([]types.BlobInfo, numLayers)
 	diffIDs := make([]digest.Digest, numLayers)
