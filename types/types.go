@@ -542,7 +542,10 @@ type SystemContext struct {
 	// Allow contacting docker registries over HTTP, or HTTPS with failed TLS verification. Note that this does not affect other TLS connections.
 	DockerInsecureSkipTLSVerify OptionalBool
 	// if nil, the library tries to parse ~/.docker/config.json to retrieve credentials
+	// Ignored if DockerBearerRegistryToken is non-empty.
 	DockerAuthConfig *DockerAuthConfig
+	// if not "", the library uses this registry token to authenticate to the registry
+	DockerBearerRegistryToken string
 	// if not "", an User-Agent header is added to each request when contacting a registry.
 	DockerRegistryUserAgent string
 	// if true, a V1 ping attempt isn't done to give users a better error. Default is false.
