@@ -54,6 +54,8 @@ github.com/containers/storage v1.16.1 h1:gVLVqbqaoyopLJbcQ9PQdsnm8SzVy6Vw24fofwM
 github.com/containers/storage v1.16.1/go.mod h1:toFp72SLn/iyJ6YbrnrZ0bW63aH2Qw3dA8JVwL4ADPo=
 github.com/containers/storage v1.16.2 h1:S77Y+lmJcnGoPEZB2OOrTrRGyjT8viDCGyhVNNz78h8=
 github.com/containers/storage v1.16.2/go.mod h1:/RNmsK01ajCL+VtMSi3W8kHzpBwN+Q5gLYWgfw5wlMg=
+github.com/containers/storage v1.16.3 h1:bctiz1I+0TIivtXbrVmy02ZYlOA+IjKIJMzAMTBifj8=
+github.com/containers/storage v1.16.3/go.mod h1:dNTv0+BaebIAOGgH34dPtwGPR+Km2fObcfOlFxYFwA0=
 github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e/go.mod h1:F5haX7vjVVG0kc13fIWeqUViNPyEJxv/OmvnBo0Yme4=
 github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsrgA7czyZG/E6dU=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
