@@ -8,6 +8,7 @@ import (
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 )
 
 // genericManifest is an interface for parsing, modifying image manifests and related data.
@@ -74,4 +75,31 @@ func manifestLayerInfosToBlobInfos(layers []manifest.LayerInfo) []types.BlobInfo
 		blobs[i] = layer.BlobInfo
 	}
 	return blobs
+}
+
+// manifestConvertFn is used to encapsulate helper manifest converstion functions
+// to perform applying of manifest update information.
+type manifestConvertFn func(context.Context, types.ManifestUpdateInformation) (types.Image, error)
+
+// convertManifestIfRequiredWithUpdate will run conversion functions of a manifest if
+// required and re-apply the options to the converted type.
+// It returns (nil, nil) if no conversion was requested.
+func convertManifestIfRequiredWithUpdate(ctx context.Context, options types.ManifestUpdateOptions, converters map[string]manifestConvertFn) (types.Image, error) {
+	if options.ManifestMIMEType == "" {
+		return nil, nil
+	}
+
+	converter, ok := converters[options.ManifestMIMEType]
+	if !ok {
+		return nil, errors.Errorf("Unsupported conversion type: %v", options.ManifestMIMEType)
+	}
+
+	tmp, err := converter(ctx, options.InformationOnly)
+	if err != nil {
+		return nil, err
+	}
+
+	optionsCopy := options
+	optionsCopy.ManifestMIMEType = ""
+	return tmp.UpdatedImage(ctx, optionsCopy)
 }

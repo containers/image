@@ -585,3 +585,60 @@ func TestConvertToManifestSchema1(t *testing.T) {
 
 	// FIXME? Test also the various failure cases, if only to see that we don't crash?
 }
+
+func TestConvertSchema2ToManifestOCIWithAnnotations(t *testing.T) {
+	// Test when converting an image from schema 2 (which doesn't support certain fields like
+	// URLs, annotations, etc.) to an OCI image (which supports those fields),
+	// that UpdatedImage propagates the features to the converted manifest.
+	originalSrc := newSchema2ImageSource(t, "httpd-copy:latest")
+	original := manifestSchema2FromFixture(t, originalSrc, "schema2.json", false)
+	layerInfoOverwrites := []types.BlobInfo{
+		{
+			Digest:    "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+			Size:      51354364,
+			MediaType: imgspecv1.MediaTypeImageLayerGzip,
+		},
+		{
+			Digest:    "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+			Size:      150,
+			MediaType: imgspecv1.MediaTypeImageLayerGzip,
+		},
+		{
+			Digest: "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
+			Size:   11739507,
+			URLs: []string{
+				"https://layer.url",
+			},
+			MediaType: imgspecv1.MediaTypeImageLayerGzip,
+		},
+		{
+			Digest: "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
+			Size:   8841833,
+			Annotations: map[string]string{
+				"test-annotation-2": "two",
+			},
+			MediaType: imgspecv1.MediaTypeImageLayerGzip,
+		},
+		{
+			Digest:    "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
+			Size:      291,
+			MediaType: imgspecv1.MediaTypeImageLayerGzip,
+		},
+	}
+	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		ManifestMIMEType: imgspecv1.MediaTypeImageManifest,
+		LayerInfos:       layerInfoOverwrites,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, res.LayerInfos(), layerInfoOverwrites)
+
+	// Doing this with schema2 should fail
+	originalSrc = newSchema2ImageSource(t, "httpd-copy:latest")
+	original = manifestSchema2FromFixture(t, originalSrc, "schema2.json", false)
+	res, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		ManifestMIMEType: "",
+		LayerInfos:       layerInfoOverwrites,
+	})
+	require.NoError(t, err)
+	assert.NotEqual(t, res.LayerInfos(), layerInfoOverwrites)
+}
