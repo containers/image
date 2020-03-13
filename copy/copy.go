@@ -527,15 +527,6 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 		return nil, "", "", errors.Wrapf(err, "Error initializing image from source %s", transports.ImageName(c.rawSource.Reference()))
 	}
 
-	// TODO: Remove src.SupportsEncryption call and interface once copyUpdatedConfigAndManifest does not depend on source Image manifest type
-	// Currently, the way copyUpdatedConfigAndManifest updates the manifest is to apply updates to the source manifest and call PutManifest
-	// of the modified source manifest. The implication is that schemas like docker2 cannot be encrypted even though the destination
-	// supports encryption because docker2 struct does not have annotations, which are required.
-	// Reference to issue: https://github.com/containers/image/issues/746
-	if options.OciEncryptLayers != nil && !src.SupportsEncryption(ctx) {
-		return nil, "", "", errors.Errorf("Encryption request but not supported by source transport %s", src.Reference().Transport().Name())
-	}
-
 	// If the destination is a digested reference, make a note of that, determine what digest value we're
 	// expecting, and check that the source manifest matches it.  If the source manifest doesn't, but it's
 	// one item from a manifest list that matches it, accept that as a match.
