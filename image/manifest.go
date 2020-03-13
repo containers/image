@@ -46,6 +46,10 @@ type genericManifest interface {
 	// This does not change the state of the original Image object.
 	UpdatedImage(ctx context.Context, options types.ManifestUpdateOptions) (types.Image, error)
 	// SupportsEncryption returns if encryption is supported for the manifest type
+	//
+	// Deprecated: Initially used to determine if a manifest can be copied from a source manifest type since
+	// the process of updating a manifest between different manifest types was to update then convert.
+	// This resulted in some fields in the update being lost. This has been fixed by: https://github.com/containers/image/pull/836
 	SupportsEncryption(ctx context.Context) bool
 }
 
