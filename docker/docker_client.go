@@ -1,11 +1,13 @@
 package docker
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -97,8 +99,7 @@ type dockerClient struct {
 	// by detectProperties(). Callers can edit tlsClientConfig.InsecureSkipVerify in the meantime.
 	tlsClientConfig *tls.Config
 	// The following members are not set by newDockerClient and must be set by callers if needed.
-	username      string
-	password      string
+	auth          types.DockerAuthConfig
 	registryToken string
 	signatureBase signatureStorageBase
 	scope         authScope
@@ -210,10 +211,11 @@ func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
 // “write” specifies whether the client will be used for "write" access (in particular passed to lookaside.go:toplevelFromSection)
 func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write bool, actions string) (*dockerClient, error) {
 	registry := reference.Domain(ref.ref)
-	username, password, err := config.GetAuthentication(sys, registry)
+	auth, err := config.GetCredentials(sys, registry)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting username and password")
 	}
+
 	sigBase, err := configuredSignatureStorageBase(sys, ref, write)
 	if err != nil {
 		return nil, err
@@ -223,8 +225,7 @@ func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write
 	if err != nil {
 		return nil, err
 	}
-	client.username = username
-	client.password = password
+	client.auth = auth
 	if sys != nil {
 		client.registryToken = sys.DockerBearerRegistryToken
 	}
@@ -289,8 +290,10 @@ func CheckAuth(ctx context.Context, sys *types.SystemContext, username, password
 	if err != nil {
 		return errors.Wrapf(err, "error creating new docker client")
 	}
-	client.username = username
-	client.password = password
+	client.auth = types.DockerAuthConfig{
+		Username: username,
+		Password: password,
+	}
 
 	resp, err := client.makeRequest(ctx, "GET", "/v2/", nil, nil, v2Auth, nil)
 	if err != nil {
@@ -332,7 +335,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 	v1Res := &V1Results{}
 
 	// Get credentials from authfile for the underlying hostname
-	username, password, err := config.GetAuthentication(sys, registry)
+	auth, err := config.GetCredentials(sys, registry)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting username and password")
 	}
@@ -350,8 +353,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating new docker client")
 	}
-	client.username = username
-	client.password = password
+	client.auth = auth
 	if sys != nil {
 		client.registryToken = sys.DockerBearerRegistryToken
 	}
@@ -535,7 +537,7 @@ func (c *dockerClient) setupRequestAuth(req *http.Request, extraScope *authScope
 		schemeNames = append(schemeNames, challenge.Scheme)
 		switch challenge.Scheme {
 		case "basic":
-			req.SetBasicAuth(c.username, c.password)
+			req.SetBasicAuth(c.auth.Username, c.auth.Password)
 			return nil
 		case "bearer":
 			registryToken := c.registryToken
@@ -553,10 +555,19 @@ func (c *dockerClient) setupRequestAuth(req *http.Request, extraScope *authScope
 					token = t.(bearerToken)
 				}
 				if !inCache || time.Now().After(token.expirationTime) {
-					t, err := c.getBearerToken(req.Context(), challenge, scopes)
+					var (
+						t   *bearerToken
+						err error
+					)
+					if c.auth.IdentityToken != "" {
+						t, err = c.getBearerTokenOAuth2(req.Context(), challenge, scopes)
+					} else {
+						t, err = c.getBearerToken(req.Context(), challenge, scopes)
+					}
 					if err != nil {
 						return err
 					}
+
 					token = *t
 					c.tokenCache.Store(cacheKey, token)
 				}
@@ -572,48 +583,96 @@ func (c *dockerClient) setupRequestAuth(req *http.Request, extraScope *authScope
 	return nil
 }
 
-func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge, scopes []authScope) (*bearerToken, error) {
+func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge challenge,
+	scopes []authScope) (*bearerToken, error) {
 	realm, ok := challenge.Parameters["realm"]
 	if !ok {
 		return nil, errors.Errorf("missing realm in bearer auth challenge")
 	}
 
-	authReq, err := http.NewRequest("GET", realm, nil)
+	authReq, err := http.NewRequest(http.MethodPost, realm, nil)
 	if err != nil {
 		return nil, err
 	}
+
 	authReq = authReq.WithContext(ctx)
-	getParams := authReq.URL.Query()
-	if c.username != "" {
-		getParams.Add("account", c.username)
-	}
+
+	// Make the form data required against the oauth2 authentication
+	// More details here: https://docs.docker.com/registry/spec/auth/oauth/
+	params := authReq.URL.Query()
 	if service, ok := challenge.Parameters["service"]; ok && service != "" {
-		getParams.Add("service", service)
+		params.Add("service", service)
 	}
 	for _, scope := range scopes {
 		if scope.remoteName != "" && scope.actions != "" {
-			getParams.Add("scope", fmt.Sprintf("repository:%s:%s", scope.remoteName, scope.actions))
+			params.Add("scope", fmt.Sprintf("repository:%s:%s", scope.remoteName, scope.actions))
 		}
 	}
-	authReq.URL.RawQuery = getParams.Encode()
-	if c.username != "" && c.password != "" {
-		authReq.SetBasicAuth(c.username, c.password)
-	}
+	params.Add("grant_type", "refresh_token")
+	params.Add("refresh_token", c.auth.IdentityToken)
+
+	authReq.Body = ioutil.NopCloser(bytes.NewBufferString(params.Encode()))
+	authReq.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	logrus.Debugf("%s %s", authReq.Method, authReq.URL.String())
 	res, err := c.client.Do(authReq)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
-	switch res.StatusCode {
-	case http.StatusUnauthorized:
-		err := clientLib.HandleErrorResponse(res)
-		logrus.Debugf("Server response when trying to obtain an access token: \n%q", err.Error())
-		return nil, ErrUnauthorizedForCredentials{Err: err}
-	case http.StatusOK:
-		break
-	default:
-		return nil, errors.Errorf("unexpected http code: %d (%s), URL: %s", res.StatusCode, http.StatusText(res.StatusCode), authReq.URL)
+	if err := httpResponseToError(res, "Trying to obtain access token"); err != nil {
+		return nil, err
+	}
+
+	tokenBlob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxAuthTokenBodySize)
+	if err != nil {
+		return nil, err
+	}
+
+	return newBearerTokenFromJSONBlob(tokenBlob)
+}
+
+func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
+	scopes []authScope) (*bearerToken, error) {
+	realm, ok := challenge.Parameters["realm"]
+	if !ok {
+		return nil, errors.Errorf("missing realm in bearer auth challenge")
+	}
+
+	authReq, err := http.NewRequest(http.MethodGet, realm, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	authReq = authReq.WithContext(ctx)
+	params := authReq.URL.Query()
+	if c.auth.Username != "" {
+		params.Add("account", c.auth.Username)
+	}
+
+	if service, ok := challenge.Parameters["service"]; ok && service != "" {
+		params.Add("service", service)
+	}
+
+	for _, scope := range scopes {
+		if scope.remoteName != "" && scope.actions != "" {
+			params.Add("scope", fmt.Sprintf("repository:%s:%s", scope.remoteName, scope.actions))
+		}
+	}
+
+	authReq.URL.RawQuery = params.Encode()
+
+	if c.auth.Username != "" && c.auth.Password != "" {
+		authReq.SetBasicAuth(c.auth.Username, c.auth.Password)
+	}
+
+	logrus.Debugf("%s %s", authReq.Method, authReq.URL.String())
+	res, err := c.client.Do(authReq)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if err := httpResponseToError(res, "Requesting bear token"); err != nil {
+		return nil, err
 	}
 	tokenBlob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxAuthTokenBodySize)
 	if err != nil {

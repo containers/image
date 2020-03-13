@@ -450,6 +450,11 @@ type ImageInspectInfo struct {
 type DockerAuthConfig struct {
 	Username string
 	Password string
+	// IdentityToken can be used as an refresh_token in place of username and
+	// password to obtain the bearer/access token in oauth2 flow. If identity
+	// token is set, password should not be set.
+	// Ref: https://docs.docker.com/registry/spec/auth/oauth/
+	IdentityToken string
 }
 
 // OptionalBool is a boolean with an additional undefined value, which is meant
