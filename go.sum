@@ -30,6 +30,8 @@ github.com/containers/ocicrypt v0.0.0-20190930154801-b87a4a69c741 h1:8tQkOcednLJ
 github.com/containers/ocicrypt v0.0.0-20190930154801-b87a4a69c741/go.mod h1:MeJDzk1RJHv89LjsH0Sp5KTY3ZYkjXO/C+bKAeWFIrc=
 github.com/containers/storage v1.16.3 h1:bctiz1I+0TIivtXbrVmy02ZYlOA+IjKIJMzAMTBifj8=
 github.com/containers/storage v1.16.3/go.mod h1:dNTv0+BaebIAOGgH34dPtwGPR+Km2fObcfOlFxYFwA0=
+github.com/containers/storage v1.16.4 h1:+pEL9A1i11qy1j/MYvh8Y5vs79BBfA+hslyJq1iPOGc=
+github.com/containers/storage v1.16.4/go.mod h1:SdysZeLKJOvfHYysUWg9OZUC3gdZWi5b2b7NC18VpPE=
 github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e/go.mod h1:F5haX7vjVVG0kc13fIWeqUViNPyEJxv/OmvnBo0Yme4=
 github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsrgA7czyZG/E6dU=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
