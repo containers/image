@@ -8,13 +8,13 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/image"
+	"github.com/containers/image/v5/internal/pkg/platform"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache"
 	"github.com/containers/image/v5/pkg/compression"
@@ -715,21 +715,26 @@ func checkImageDestinationForCurrentRuntime(ctx context.Context, sys *types.Syst
 		if err != nil {
 			return errors.Wrapf(err, "Error parsing image configuration")
 		}
-
-		wantedOS := runtime.GOOS
-		if sys != nil && sys.OSChoice != "" {
-			wantedOS = sys.OSChoice
-		}
-		if wantedOS != c.OS {
-			logrus.Infof("Image operating system mismatch: image uses %q, expecting %q", c.OS, wantedOS)
+		wantedPlatforms, err := platform.WantedPlatforms(sys)
+		if err != nil {
+			return errors.Wrapf(err, "error getting current platform information %#v", sys)
 		}
 
-		wantedArch := runtime.GOARCH
-		if sys != nil && sys.ArchitectureChoice != "" {
-			wantedArch = sys.ArchitectureChoice
+		options := newOrderedSet()
+		match := false
+		for _, wantedPlatform := range wantedPlatforms {
+			// Waiting for https://github.com/opencontainers/image-spec/pull/777 :
+			// This currently can’t use image.MatchesPlatform because we don’t know what to use
+			// for image.Variant.
+			if wantedPlatform.OS == c.OS && wantedPlatform.Architecture == c.Architecture {
+				match = true
+				break
+			}
+			options.append(fmt.Sprintf("%s+%s", wantedPlatform.OS, wantedPlatform.Architecture))
 		}
-		if wantedArch != c.Architecture {
-			logrus.Infof("Image architecture mismatch: image uses %q, expecting %q", c.Architecture, wantedArch)
+		if !match {
+			logrus.Infof("Image operating system mismatch: image uses OS %q+architecture %q, expecting one of %q",
+				c.OS, c.Architecture, strings.Join(options.list, ", "))
 		}
 	}
 	return nil

@@ -15,7 +15,7 @@ import (
 // Include v2s1 signed but not v2s1 unsigned, because docker/distribution requires a signature even if the unsigned MIME type is used.
 var preferredManifestMIMETypes = []string{manifest.DockerV2Schema2MediaType, manifest.DockerV2Schema1SignedMediaType}
 
-// orderedSet is a list of strings (MIME types in our case), with each string appearing at most once.
+// orderedSet is a list of strings (MIME types or platform descriptors in our case), with each string appearing at most once.
 type orderedSet struct {
 	list     []string
 	included map[string]struct{}
