@@ -20,7 +20,7 @@ require (
 	github.com/gotestyourself/gotestyourself v2.2.0+incompatible // indirect
 	github.com/imdario/mergo v0.3.8
 	github.com/klauspost/compress v1.10.3
-	github.com/klauspost/pgzip v1.2.2
+	github.com/klauspost/pgzip v1.2.3
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/mtrmac/gpgme v0.1.2
