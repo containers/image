@@ -13,7 +13,6 @@ require (
 	github.com/docker/docker-credential-helpers v0.6.3
 	github.com/docker/go-connections v0.0.0-20180212134524-7beb39f0b969
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
-	github.com/etcd-io/bbolt v1.3.3
 	github.com/ghodss/yaml v0.0.0-20161207003320-04f313413ffd
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v0.0.0-20170217192616-94e7d24fd285 // indirect
@@ -37,7 +36,7 @@ require (
 	github.com/vbauerster/mpb/v4 v4.12.2
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190809123943-df4f5c81cb3b // indirect
 	github.com/xeipuuv/gojsonschema v0.0.0-20190816131739-be0936907f66
-	go.etcd.io/bbolt v1.3.3 // indirect
+	go.etcd.io/bbolt v1.3.3
 	golang.org/x/crypto v0.0.0-20200214034016-1d94cc7ab1c6
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
