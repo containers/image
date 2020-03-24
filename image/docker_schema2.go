@@ -194,7 +194,11 @@ func oci1DescriptorFromSchema2Descriptor(d manifest.Schema2Descriptor) imgspecv1
 	}
 }
 
-func (m *manifestSchema2) convertToManifestOCI1(ctx context.Context, _ types.ManifestUpdateInformation) (types.Image, error) {
+// convertToManifestOCI1 returns a types.Image converted to imgspecv1.MediaTypeImageManifest.
+// It may use options.InformationOnly and also adjust *options to be appropriate for editing the returned
+// value.
+// This does not change the state of the original manifestSchema2 object.
+func (m *manifestSchema2) convertToManifestOCI1(ctx context.Context, _ *types.ManifestUpdateOptions) (types.Image, error) {
 	configOCI, err := m.OCIConfig(ctx)
 	if err != nil {
 		return nil, err
@@ -231,9 +235,14 @@ func (m *manifestSchema2) convertToManifestOCI1(ctx context.Context, _ types.Man
 	return memoryImageFromManifest(m1), nil
 }
 
+// convertToManifestSchema1 returns a types.Image converted to manifest.DockerV2Schema1{Signed,}MediaType.
+// It may use options.InformationOnly and also adjust *options to be appropriate for editing the returned
+// value.
+// This does not change the state of the original manifestSchema2 object.
+//
 // Based on docker/distribution/manifest/schema1/config_builder.go
-func (m *manifestSchema2) convertToManifestSchema1(ctx context.Context, updateInfo types.ManifestUpdateInformation) (types.Image, error) {
-	dest := updateInfo.Destination
+func (m *manifestSchema2) convertToManifestSchema1(ctx context.Context, options *types.ManifestUpdateOptions) (types.Image, error) {
+	dest := options.InformationOnly.Destination
 	configBytes, err := m.ConfigBlob(ctx)
 	if err != nil {
 		return nil, err

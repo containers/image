@@ -56,7 +56,7 @@ func (m *manifestSchema1) ConfigBlob(context.Context) ([]byte, error) {
 // layers in the resulting configuration isn't guaranteed to be returned to due how
 // old image manifests work (docker v2s1 especially).
 func (m *manifestSchema1) OCIConfig(ctx context.Context) (*imgspecv1.Image, error) {
-	v2s2, err := m.convertToManifestSchema2(ctx, types.ManifestUpdateInformation{})
+	v2s2, err := m.convertToManifestSchema2(ctx, &types.ManifestUpdateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -142,10 +142,15 @@ func (m *manifestSchema1) UpdatedImage(ctx context.Context, options types.Manife
 	return memoryImageFromManifest(&copy), nil
 }
 
+// convertToManifestSchema2 returns a types.Image converted to manifest.DockerV2Schema2MediaType.
+// It may use options.InformationOnly and also adjust *options to be appropriate for editing the returned
+// value.
+// This does not change the state of the original manifestSchema1 object.
+//
 // Based on github.com/docker/docker/distribution/pull_v2.go
-func (m *manifestSchema1) convertToManifestSchema2(_ context.Context, updateInfo types.ManifestUpdateInformation) (types.Image, error) {
-	uploadedLayerInfos := updateInfo.LayerInfos
-	layerDiffIDs := updateInfo.LayerDiffIDs
+func (m *manifestSchema1) convertToManifestSchema2(_ context.Context, options *types.ManifestUpdateOptions) (types.Image, error) {
+	uploadedLayerInfos := options.InformationOnly.LayerInfos
+	layerDiffIDs := options.InformationOnly.LayerDiffIDs
 
 	if len(m.m.ExtractedV1Compatibility) == 0 {
 		// What would this even mean?! Anyhow, the rest of the code depends on FSLayers[0] and ExtractedV1Compatibility[0] existing.
@@ -198,16 +203,20 @@ func (m *manifestSchema1) convertToManifestSchema2(_ context.Context, updateInfo
 	return memoryImageFromManifest(m1), nil
 }
 
-func (m *manifestSchema1) convertToManifestOCI1(ctx context.Context, updateInfo types.ManifestUpdateInformation) (types.Image, error) {
+// convertToManifestOCI1 returns a types.Image converted to imgspecv1.MediaTypeImageManifest.
+// It may use options.InformationOnly and also adjust *options to be appropriate for editing the returned
+// value.
+// This does not change the state of the original manifestSchema1 object.
+func (m *manifestSchema1) convertToManifestOCI1(ctx context.Context, options *types.ManifestUpdateOptions) (types.Image, error) {
 	// We can't directly convert to OCI, but we can transitively convert via a Docker V2.2 Distribution manifest
-	m2, err := m.convertToManifestSchema2(ctx, updateInfo)
+	m2, err := m.convertToManifestSchema2(ctx, options)
 	if err != nil {
 		return nil, err
 	}
 
 	return m2.UpdatedImage(ctx, types.ManifestUpdateOptions{
 		ManifestMIMEType: imgspecv1.MediaTypeImageManifest,
-		InformationOnly:  updateInfo,
+		InformationOnly:  options.InformationOnly,
 	})
 }
 

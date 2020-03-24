@@ -174,7 +174,11 @@ func schema2DescriptorFromOCI1Descriptor(d imgspecv1.Descriptor) manifest.Schema
 	}
 }
 
-func (m *manifestOCI1) convertToManifestSchema2(_ context.Context, _ types.ManifestUpdateInformation) (types.Image, error) {
+// convertToManifestSchema2 returns a types.Image converted to manifest.DockerV2Schema2MediaType.
+// It may use options.InformationOnly and also adjust *options to be appropriate for editing the returned
+// value.
+// This does not change the state of the original manifestOCI1 object.
+func (m *manifestOCI1) convertToManifestSchema2(_ context.Context, _ *types.ManifestUpdateOptions) (types.Image, error) {
 	// Create a copy of the descriptor.
 	config := schema2DescriptorFromOCI1Descriptor(m.m.Config)
 
@@ -210,16 +214,20 @@ func (m *manifestOCI1) convertToManifestSchema2(_ context.Context, _ types.Manif
 	return memoryImageFromManifest(m1), nil
 }
 
-func (m *manifestOCI1) convertToManifestSchema1(ctx context.Context, updateInfo types.ManifestUpdateInformation) (types.Image, error) {
+// convertToManifestSchema1 returns a types.Image converted to manifest.DockerV2Schema1{Signed,}MediaType.
+// It may use options.InformationOnly and also adjust *options to be appropriate for editing the returned
+// value.
+// This does not change the state of the original manifestOCI1 object.
+func (m *manifestOCI1) convertToManifestSchema1(ctx context.Context, options *types.ManifestUpdateOptions) (types.Image, error) {
 	// We can't directly convert to V1, but we can transitively convert via a V2 image
-	m2, err := m.convertToManifestSchema2(ctx, updateInfo)
+	m2, err := m.convertToManifestSchema2(ctx, options)
 	if err != nil {
 		return nil, err
 	}
 
 	return m2.UpdatedImage(ctx, types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
-		InformationOnly:  updateInfo,
+		InformationOnly:  options.InformationOnly,
 	})
 }
 
