@@ -398,7 +398,7 @@ func TestManifestSchema1ConvertToSchema2(t *testing.T) {
 	err = json.Unmarshal(byHandJSON, &byHand)
 	require.NoError(t, err)
 	err = json.Unmarshal(convertedJSON, &converted)
-	delete(converted, "config")
+	delete(converted, "config") // We don’t want to hard-code a specific digest and size of the marshaled config here
 	delete(byHand, "config")
 	require.NoError(t, err)
 	assert.Equal(t, byHand, converted)
