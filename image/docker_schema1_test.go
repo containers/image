@@ -167,7 +167,7 @@ func TestManifestSchema1ConfigBlob(t *testing.T) {
 }
 
 func TestManifestSchema1OCIConfig(t *testing.T) {
-	m := manifestSchema1FromFixture(t, "schema1-to-oci-config.json")
+	m := manifestSchema1FromFixture(t, "schema1-for-oci-config.json")
 	configOCI, err := m.OCIConfig(context.Background())
 	require.NoError(t, err)
 	// FIXME: A more comprehensive test?
