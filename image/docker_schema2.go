@@ -260,20 +260,22 @@ func (m *manifestSchema2) convertToManifestSchema1(ctx context.Context, updateIn
 
 		var blobDigest digest.Digest
 		if historyEntry.EmptyLayer {
+			emptyLayerBlobInfo := types.BlobInfo{Digest: GzippedEmptyLayerDigest, Size: int64(len(GzippedEmptyLayer))}
+
 			if !haveGzippedEmptyLayer {
 				logrus.Debugf("Uploading empty layer during conversion to schema 1")
 				// Ideally we should update the relevant BlobInfoCache about this layer, but that would require passing it down here,
 				// and anyway this blob is so small that it’s easier to just copy it than to worry about figuring out another location where to get it.
-				info, err := dest.PutBlob(ctx, bytes.NewReader(GzippedEmptyLayer), types.BlobInfo{Digest: GzippedEmptyLayerDigest, Size: int64(len(GzippedEmptyLayer))}, none.NoCache, false)
+				info, err := dest.PutBlob(ctx, bytes.NewReader(GzippedEmptyLayer), emptyLayerBlobInfo, none.NoCache, false)
 				if err != nil {
 					return nil, errors.Wrap(err, "Error uploading empty layer")
 				}
-				if info.Digest != GzippedEmptyLayerDigest {
-					return nil, errors.Errorf("Internal error: Uploaded empty layer has digest %#v instead of %s", info.Digest, GzippedEmptyLayerDigest)
+				if info.Digest != emptyLayerBlobInfo.Digest {
+					return nil, errors.Errorf("Internal error: Uploaded empty layer has digest %#v instead of %s", info.Digest, emptyLayerBlobInfo.Digest)
 				}
 				haveGzippedEmptyLayer = true
 			}
-			blobDigest = GzippedEmptyLayerDigest
+			blobDigest = emptyLayerBlobInfo.Digest
 		} else {
 			if nonemptyLayerIndex >= len(m.m.LayersDescriptors) {
 				return nil, errors.Errorf("Invalid image configuration, needs more than the %d distributed layers", len(m.m.LayersDescriptors))
