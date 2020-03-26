@@ -128,14 +128,14 @@ func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
 	if ctx != nil && ctx.ArchitectureChoice != "" {
 		wantedArch = ctx.ArchitectureChoice
 	}
-	wantedOS := runtime.GOOS
-	if ctx != nil && ctx.OSChoice != "" {
-		wantedOS = ctx.OSChoice
-	}
-
 	wantedVariant := getCPUVariant(runtime.GOOS, runtime.GOARCH)
 	if ctx != nil && ctx.VariantChoice != "" {
 		wantedVariant = ctx.VariantChoice
+	}
+
+	wantedOS := runtime.GOOS
+	if ctx != nil && ctx.OSChoice != "" {
+		wantedOS = ctx.OSChoice
 	}
 
 	var wantedPlatforms []imgspecv1.Platform
