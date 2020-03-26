@@ -419,6 +419,48 @@ func TestManifestSchema1ConvertToSchema2(t *testing.T) {
 	// FIXME? Test also the various failure cases, if only to see that we don't crash?
 }
 
+func TestManifestSchema1ConvertToManifestOCI1(t *testing.T) {
+	original := manifestSchema1FromFixture(t, "schema1.json")
+	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		ManifestMIMEType: imgspecv1.MediaTypeImageManifest,
+		InformationOnly: types.ManifestUpdateInformation{
+			LayerInfos:   schema1FixtureLayerInfos,
+			LayerDiffIDs: schema1FixtureLayerDiffIDs,
+		},
+	})
+	require.NoError(t, err)
+
+	convertedJSON, mt, err := res.Manifest(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, imgspecv1.MediaTypeImageManifest, mt)
+
+	byHandJSON, err := ioutil.ReadFile("fixtures/schema1-to-oci1.json")
+	require.NoError(t, err)
+	var converted, byHand map[string]interface{}
+	err = json.Unmarshal(byHandJSON, &byHand)
+	require.NoError(t, err)
+	err = json.Unmarshal(convertedJSON, &converted)
+	delete(converted, "config") // We don’t want to hard-code a specific digest and size of the marshaled config here
+	delete(byHand, "config")
+	require.NoError(t, err)
+	assert.Equal(t, byHand, converted)
+
+	convertedConfig, err := res.ConfigBlob(context.Background())
+	require.NoError(t, err)
+
+	byHandConfig, err := ioutil.ReadFile("fixtures/schema1-to-oci1-config.json")
+	require.NoError(t, err)
+	converted = map[string]interface{}{}
+	byHand = map[string]interface{}{}
+	err = json.Unmarshal(byHandConfig, &byHand)
+	require.NoError(t, err)
+	err = json.Unmarshal(convertedConfig, &converted)
+	require.NoError(t, err)
+	assert.Equal(t, byHand, converted)
+
+	// FIXME? Test also the various failure cases, if only to see that we don't crash?
+}
+
 func TestConvertSchema1ToManifestOCIWithAnnotations(t *testing.T) {
 	// Test when converting an image from schema 1 (which doesn't support certain fields like
 	// URLs, annotations, etc.) to an OCI image (which supports those fields),
@@ -487,5 +529,3 @@ func TestConvertSchema1ToManifestOCIWithAnnotations(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, res.LayerInfos(), layerInfoOverwrites)
 }
-
-// FIXME: Schema1→OCI conversion untested

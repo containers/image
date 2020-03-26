@@ -388,6 +388,38 @@ func TestManifestOCI1UpdatedImage(t *testing.T) {
 	assert.Equal(t, *typedM2, *typedOriginal)
 }
 
+func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
+	originalSrc := newOCI1ImageSource(t, "httpd-copy:latest")
+	original := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
+	memoryDest := &memoryImageDest{ref: originalSrc.ref}
+	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
+		InformationOnly: types.ManifestUpdateInformation{
+			Destination: memoryDest,
+		},
+	})
+	require.NoError(t, err)
+
+	convertedJSON, mt, err := res.Manifest(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, manifest.DockerV2Schema1SignedMediaType, mt)
+
+	byHandJSON, err := ioutil.ReadFile("fixtures/oci1-to-schema1.json")
+	require.NoError(t, err)
+	var converted, byHand map[string]interface{}
+	err = json.Unmarshal(byHandJSON, &byHand)
+	require.NoError(t, err)
+	err = json.Unmarshal(convertedJSON, &converted)
+	require.NoError(t, err)
+	delete(byHand, "signatures")
+	delete(converted, "signatures")
+	assert.Equal(t, byHand, converted)
+
+	assert.Equal(t, GzippedEmptyLayer, memoryDest.storedBlobs[GzippedEmptyLayerDigest])
+
+	// FIXME? Test also the various failure cases, if only to see that we don't crash?
+}
+
 func TestConvertToManifestSchema2(t *testing.T) {
 	originalSrc := newOCI1ImageSource(t, "httpd-copy:latest")
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
