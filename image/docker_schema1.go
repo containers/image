@@ -113,7 +113,7 @@ func (m *manifestSchema1) UpdatedImage(ctx context.Context, options types.Manife
 	if options.ManifestMIMEType != manifest.DockerV2Schema1MediaType && options.ManifestMIMEType != manifest.DockerV2Schema1SignedMediaType {
 		converted, err := convertManifestIfRequiredWithUpdate(ctx, options, map[string]manifestConvertFn{
 			imgspecv1.MediaTypeImageManifest:  copy.convertToManifestOCI1,
-			manifest.DockerV2Schema2MediaType: copy.convertToManifestSchema2,
+			manifest.DockerV2Schema2MediaType: copy.convertToManifestSchema2Generic,
 		})
 		if err != nil {
 			return nil, err
@@ -142,13 +142,24 @@ func (m *manifestSchema1) UpdatedImage(ctx context.Context, options types.Manife
 	return memoryImageFromManifest(&copy), nil
 }
 
-// convertToManifestSchema2 returns a types.Image converted to manifest.DockerV2Schema2MediaType.
+// convertToManifestSchema2Generic returns a genericManifest implementation converted to manifest.DockerV2Schema2MediaType.
+// It may use options.InformationOnly and also adjust *options to be appropriate for editing the returned
+// value.
+// This does not change the state of the original manifestSchema1 object.
+//
+// We need this function just because a function returning an implementation of the genericManifest
+// interface is not automatically assignable to a function type returning the genericManifest interface
+func (m *manifestSchema1) convertToManifestSchema2Generic(ctx context.Context, options *types.ManifestUpdateOptions) (genericManifest, error) {
+	return m.convertToManifestSchema2(ctx, options)
+}
+
+// convertToManifestSchema2 returns a genericManifest implementation converted to manifest.DockerV2Schema2MediaType.
 // It may use options.InformationOnly and also adjust *options to be appropriate for editing the returned
 // value.
 // This does not change the state of the original manifestSchema1 object.
 //
 // Based on github.com/docker/docker/distribution/pull_v2.go
-func (m *manifestSchema1) convertToManifestSchema2(_ context.Context, options *types.ManifestUpdateOptions) (types.Image, error) {
+func (m *manifestSchema1) convertToManifestSchema2(_ context.Context, options *types.ManifestUpdateOptions) (*manifestSchema2, error) {
 	uploadedLayerInfos := options.InformationOnly.LayerInfos
 	layerDiffIDs := options.InformationOnly.LayerDiffIDs
 
@@ -199,25 +210,21 @@ func (m *manifestSchema1) convertToManifestSchema2(_ context.Context, options *t
 		Digest:    digest.FromBytes(configJSON),
 	}
 
-	m1 := manifestSchema2FromComponents(configDescriptor, nil, configJSON, layers)
-	return memoryImageFromManifest(m1), nil
+	return manifestSchema2FromComponents(configDescriptor, nil, configJSON, layers), nil
 }
 
-// convertToManifestOCI1 returns a types.Image converted to imgspecv1.MediaTypeImageManifest.
+// convertToManifestOCI1 returns a genericManifest implementation converted to imgspecv1.MediaTypeImageManifest.
 // It may use options.InformationOnly and also adjust *options to be appropriate for editing the returned
 // value.
 // This does not change the state of the original manifestSchema1 object.
-func (m *manifestSchema1) convertToManifestOCI1(ctx context.Context, options *types.ManifestUpdateOptions) (types.Image, error) {
+func (m *manifestSchema1) convertToManifestOCI1(ctx context.Context, options *types.ManifestUpdateOptions) (genericManifest, error) {
 	// We can't directly convert to OCI, but we can transitively convert via a Docker V2.2 Distribution manifest
 	m2, err := m.convertToManifestSchema2(ctx, options)
 	if err != nil {
 		return nil, err
 	}
 
-	return m2.UpdatedImage(ctx, types.ManifestUpdateOptions{
-		ManifestMIMEType: imgspecv1.MediaTypeImageManifest,
-		InformationOnly:  options.InformationOnly,
-	})
+	return m2.convertToManifestOCI1(ctx, options)
 }
 
 // SupportsEncryption returns if encryption is supported for the manifest type
