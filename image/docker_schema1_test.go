@@ -466,6 +466,10 @@ func TestConvertSchema1ToManifestOCIWithAnnotations(t *testing.T) {
 	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: imgspecv1.MediaTypeImageManifest,
 		LayerInfos:       layerInfoOverwrites,
+		InformationOnly: types.ManifestUpdateInformation{
+			LayerInfos:   schema1FixtureLayerInfos,
+			LayerDiffIDs: schema1FixtureLayerDiffIDs,
+		},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, res.LayerInfos(), layerInfoOverwrites)
@@ -475,6 +479,10 @@ func TestConvertSchema1ToManifestOCIWithAnnotations(t *testing.T) {
 	res, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
 		LayerInfos:       layerInfoOverwrites,
+		InformationOnly: types.ManifestUpdateInformation{
+			LayerInfos:   schema1FixtureLayerInfos,
+			LayerDiffIDs: schema1FixtureLayerDiffIDs,
+		},
 	})
 	require.NoError(t, err)
 	assert.NotEqual(t, res.LayerInfos(), layerInfoOverwrites)
