@@ -3,6 +3,7 @@ package image
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -441,6 +442,25 @@ func (d *memoryImageDest) Commit(context.Context, types.UnparsedImage) error {
 	panic("Unexpected call to a mock function")
 }
 
+// modifiedLayerInfos returns two identical (but separately allocated) copies of
+// layers from input, where the size and digest of each item is predictably modified from the original in input.
+// (This is used to test ManifestUpdateOptions.LayerInfos handling.)
+func modifiedLayerInfos(t *testing.T, input []types.BlobInfo) ([]types.BlobInfo, []types.BlobInfo) {
+	modified := []types.BlobInfo{}
+	for _, blob := range input {
+		b2 := blob
+		oldDigest, err := hex.DecodeString(b2.Digest.Encoded())
+		require.NoError(t, err)
+		oldDigest[len(oldDigest)-1] ^= 1
+		b2.Digest = digest.NewDigestFromEncoded(b2.Digest.Algorithm(), hex.EncodeToString(oldDigest))
+		b2.Size = b2.Size ^ 1
+		modified = append(modified, b2)
+	}
+
+	copy := append([]types.BlobInfo{}, modified...)
+	return modified, copy
+}
+
 func TestManifestSchema2UpdatedImage(t *testing.T) {
 	originalSrc := newSchema2ImageSource(t, "httpd:latest")
 	original := manifestSchema2FromFixture(t, originalSrc, "schema2.json", false)
@@ -582,6 +602,42 @@ func TestConvertToManifestSchema1(t *testing.T) {
 	assert.Equal(t, byDocker, converted)
 
 	assert.Equal(t, GzippedEmptyLayer, memoryDest.storedBlobs[GzippedEmptyLayerDigest])
+
+	// Conversion to schema1 together with changing LayerInfos works as expected (which requires
+	// handling schema1 empty layers):
+	updatedLayers, updatedLayersCopy := modifiedLayerInfos(t, original.LayerInfos())
+	res, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		LayerInfos:       updatedLayers,
+		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
+		InformationOnly: types.ManifestUpdateInformation{
+			Destination: memoryDest,
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, updatedLayersCopy, updatedLayers) // updatedLayers have not been modified in place
+	convertedJSON, mt, err = res.Manifest(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, manifest.DockerV2Schema1SignedMediaType, mt)
+	// Layers have been updated as expected
+	s1Manifest, err := manifestSchema1FromManifest(convertedJSON)
+	require.NoError(t, err)
+	assert.Equal(t, []types.BlobInfo{
+		{Digest: "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5ba", Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680d", Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a8", Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25908", Size: -1},
+		{Digest: "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fb", Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+	}, s1Manifest.LayerInfos())
 
 	// FIXME? Test also the various failure cases, if only to see that we don't crash?
 }

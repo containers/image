@@ -59,6 +59,42 @@ var schema1FixtureLayerDiffIDs = []digest.Digest{
 	"sha256:9bd63850e406167b4751f5050f6dc0ebd789bb5ef5e5c6c31ed062bda8c063e8",
 }
 
+var schema1WithThrowawaysFixtureLayerInfos = []types.BlobInfo{
+	{Digest: "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb", Size: 51354364},
+	{Digest: GzippedEmptyLayerDigest, Size: int64(len(GzippedEmptyLayer))},
+	{Digest: GzippedEmptyLayerDigest, Size: int64(len(GzippedEmptyLayer))},
+	{Digest: GzippedEmptyLayerDigest, Size: int64(len(GzippedEmptyLayer))},
+	{Digest: "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c", Size: 150},
+	{Digest: GzippedEmptyLayerDigest, Size: int64(len(GzippedEmptyLayer))},
+	{Digest: "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9", Size: 11739507},
+	{Digest: GzippedEmptyLayerDigest, Size: int64(len(GzippedEmptyLayer))},
+	{Digest: GzippedEmptyLayerDigest, Size: int64(len(GzippedEmptyLayer))},
+	{Digest: GzippedEmptyLayerDigest, Size: int64(len(GzippedEmptyLayer))},
+	{Digest: GzippedEmptyLayerDigest, Size: int64(len(GzippedEmptyLayer))},
+	{Digest: "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909", Size: 8841833},
+	{Digest: "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa", Size: 291},
+	{Digest: GzippedEmptyLayerDigest, Size: int64(len(GzippedEmptyLayer))},
+	{Digest: GzippedEmptyLayerDigest, Size: int64(len(GzippedEmptyLayer))},
+}
+
+var schema1WithThrowawaysFixtureLayerDiffIDs = []digest.Digest{
+	"sha256:142a601d97936307e75220c35dde0348971a9584c21e7cb42e1f7004005432ab",
+	GzippedEmptyLayerDigest,
+	GzippedEmptyLayerDigest,
+	GzippedEmptyLayerDigest,
+	"sha256:90fcc66ad3be9f1757f954b750deb37032f208428aa12599fcb02182b9065a9c",
+	GzippedEmptyLayerDigest,
+	"sha256:5a8624bb7e76d1e6829f9c64c43185e02bc07f97a2189eb048609a8914e72c56",
+	GzippedEmptyLayerDigest,
+	GzippedEmptyLayerDigest,
+	GzippedEmptyLayerDigest,
+	GzippedEmptyLayerDigest,
+	"sha256:d349ff6b3afc6a2800054768c82bfbf4289c9aa5da55c1290f802943dcd4d1e9",
+	"sha256:8c064bb1f60e84fa8cc6079b6d2e76e0423389fd6aeb7e497dfdae5e05b2b25b",
+	GzippedEmptyLayerDigest,
+	GzippedEmptyLayerDigest,
+}
+
 func manifestSchema1FromFixture(t *testing.T, fixture string) genericManifest {
 	manifest, err := ioutil.ReadFile(filepath.Join("fixtures", fixture))
 	require.NoError(t, err)
@@ -416,6 +452,57 @@ func TestManifestSchema1ConvertToSchema2(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, byHand, converted)
 
+	// Conversion to schema2 together with changing LayerInfos works as expected (which requires
+	// handling schema1 throwaway layers):
+	// Use the recorded result of converting the schema2 fixture to schema1, because that one
+	// (unlike schem1.json) contains throwaway layers.
+	original = manifestSchema1FromFixture(t, "schema2-to-schema1-by-docker.json")
+	updatedLayers, updatedLayersCopy := modifiedLayerInfos(t, schema1WithThrowawaysFixtureLayerInfos)
+	res, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		LayerInfos:       updatedLayers,
+		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
+		InformationOnly: types.ManifestUpdateInformation{
+			LayerInfos:   updatedLayers,
+			LayerDiffIDs: schema1WithThrowawaysFixtureLayerDiffIDs,
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, updatedLayersCopy, updatedLayers) // updatedLayers have not been modified in place
+	convertedJSON, mt, err = res.Manifest(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, manifest.DockerV2Schema2MediaType, mt)
+	// Layers have been updated as expected
+	originalSrc := newSchema2ImageSource(t, "httpd:latest")
+	s2Manifest, err := manifestSchema2FromManifest(originalSrc, convertedJSON)
+	require.NoError(t, err)
+	assert.Equal(t, []types.BlobInfo{
+		{
+			Digest:    "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5ba",
+			Size:      51354365,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+		},
+		{
+			Digest:    "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680d",
+			Size:      151,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+		},
+		{
+			Digest:    "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a8",
+			Size:      11739506,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+		},
+		{
+			Digest:    "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25908",
+			Size:      8841832,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+		},
+		{
+			Digest:    "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fb",
+			Size:      290,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+		},
+	}, s2Manifest.LayerInfos())
+
 	// FIXME? Test also the various failure cases, if only to see that we don't crash?
 }
 
@@ -457,6 +544,57 @@ func TestManifestSchema1ConvertToManifestOCI1(t *testing.T) {
 	err = json.Unmarshal(convertedConfig, &converted)
 	require.NoError(t, err)
 	assert.Equal(t, byHand, converted)
+
+	// Conversion to OCI together with changing LayerInfos works as expected (which requires
+	// handling schema1 throwaway layers):
+	// Use the recorded result of converting the schema2 fixture to schema1, because that one
+	// (unlike schem1.json) contains throwaway layers.
+	original = manifestSchema1FromFixture(t, "schema2-to-schema1-by-docker.json")
+	updatedLayers, updatedLayersCopy := modifiedLayerInfos(t, schema1WithThrowawaysFixtureLayerInfos)
+	res, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		LayerInfos:       updatedLayers,
+		ManifestMIMEType: imgspecv1.MediaTypeImageManifest,
+		InformationOnly: types.ManifestUpdateInformation{ // FIXME: deduplicate this data
+			LayerInfos:   updatedLayers,
+			LayerDiffIDs: schema1WithThrowawaysFixtureLayerDiffIDs,
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, updatedLayersCopy, updatedLayers) // updatedLayers have not been modified in place
+	convertedJSON, mt, err = res.Manifest(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, imgspecv1.MediaTypeImageManifest, mt)
+	// Layers have been updated as expected
+	originalSrc := newSchema2ImageSource(t, "httpd:latest")
+	ociManifest, err := manifestOCI1FromManifest(originalSrc, convertedJSON)
+	require.NoError(t, err)
+	assert.Equal(t, []types.BlobInfo{
+		{
+			Digest:    "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5ba",
+			Size:      51354365,
+			MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+		},
+		{
+			Digest:    "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680d",
+			Size:      151,
+			MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+		},
+		{
+			Digest:    "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a8",
+			Size:      11739506,
+			MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+		},
+		{
+			Digest:    "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25908",
+			Size:      8841832,
+			MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+		},
+		{
+			Digest:    "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fb",
+			Size:      290,
+			MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+		},
+	}, ociManifest.LayerInfos())
 
 	// FIXME? Test also the various failure cases, if only to see that we don't crash?
 }

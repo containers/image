@@ -177,6 +177,15 @@ func (m *manifestSchema1) convertToManifestSchema2(_ context.Context, options *t
 		return nil, errors.Errorf("Internal error: collected %d DiffID values, but schema1 manifest has %d fsLayers", len(layerDiffIDs), len(m.m.FSLayers))
 	}
 
+	var convertedLayerUpdates []types.BlobInfo // Only used if options.LayerInfos != nil
+	if options.LayerInfos != nil {
+		if len(options.LayerInfos) != len(m.m.FSLayers) {
+			return nil, errors.Errorf("Error converting image: layer edits for %d layers vs %d existing layers",
+				len(options.LayerInfos), len(m.m.FSLayers))
+		}
+		convertedLayerUpdates = []types.BlobInfo{}
+	}
+
 	// Build a list of the diffIDs for the non-empty layers.
 	diffIDs := []digest.Digest{}
 	var layers []manifest.Schema2Descriptor
@@ -197,6 +206,9 @@ func (m *manifestSchema1) convertToManifestSchema2(_ context.Context, options *t
 				Size:      size,
 				Digest:    m.m.FSLayers[v1Index].BlobSum,
 			})
+			if options.LayerInfos != nil {
+				convertedLayerUpdates = append(convertedLayerUpdates, options.LayerInfos[v2Index])
+			}
 			diffIDs = append(diffIDs, d)
 		}
 	}
@@ -210,6 +222,9 @@ func (m *manifestSchema1) convertToManifestSchema2(_ context.Context, options *t
 		Digest:    digest.FromBytes(configJSON),
 	}
 
+	if options.LayerInfos != nil {
+		options.LayerInfos = convertedLayerUpdates
+	}
 	return manifestSchema2FromComponents(configDescriptor, nil, configJSON, layers), nil
 }
 

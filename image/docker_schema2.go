@@ -242,6 +242,16 @@ func (m *manifestSchema2) convertToManifestOCI1(ctx context.Context, _ *types.Ma
 // Based on docker/distribution/manifest/schema1/config_builder.go
 func (m *manifestSchema2) convertToManifestSchema1(ctx context.Context, options *types.ManifestUpdateOptions) (genericManifest, error) {
 	dest := options.InformationOnly.Destination
+
+	var convertedLayerUpdates []types.BlobInfo // Only used if options.LayerInfos != nil
+	if options.LayerInfos != nil {
+		if len(options.LayerInfos) != len(m.m.LayersDescriptors) {
+			return nil, fmt.Errorf("Error converting image: layer edits for %d layers vs %d existing layers",
+				len(options.LayerInfos), len(m.m.LayersDescriptors))
+		}
+		convertedLayerUpdates = []types.BlobInfo{}
+	}
+
 	configBytes, err := m.ConfigBlob(ctx)
 	if err != nil {
 		return nil, err
@@ -283,10 +293,16 @@ func (m *manifestSchema2) convertToManifestSchema1(ctx context.Context, options 
 				}
 				haveGzippedEmptyLayer = true
 			}
+			if options.LayerInfos != nil {
+				convertedLayerUpdates = append(convertedLayerUpdates, emptyLayerBlobInfo)
+			}
 			blobDigest = emptyLayerBlobInfo.Digest
 		} else {
 			if nonemptyLayerIndex >= len(m.m.LayersDescriptors) {
 				return nil, errors.Errorf("Invalid image configuration, needs more than the %d distributed layers", len(m.m.LayersDescriptors))
+			}
+			if options.LayerInfos != nil {
+				convertedLayerUpdates = append(convertedLayerUpdates, options.LayerInfos[nonemptyLayerIndex])
 			}
 			blobDigest = m.m.LayersDescriptors[nonemptyLayerIndex].Digest
 			nonemptyLayerIndex++
@@ -329,6 +345,9 @@ func (m *manifestSchema2) convertToManifestSchema1(ctx context.Context, options 
 	}
 	history[0].V1Compatibility = string(v1Config)
 
+	if options.LayerInfos != nil {
+		options.LayerInfos = convertedLayerUpdates
+	}
 	m1, err := manifestSchema1FromComponents(dest.Reference().DockerReference(), fsLayers, history, imageConfig.Architecture)
 	if err != nil {
 		return nil, err // This should never happen, we should have created all the components correctly.
