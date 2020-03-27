@@ -78,7 +78,7 @@ func TestDirectClientConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, &restConfig{
 		Host: "https://172.17.0.2:8443",
-		restTLSClientConfig: restTLSClientConfig{
+		TLSClientConfig: restTLSClientConfig{
 			CertData: []byte("Client cert"),
 			KeyData:  []byte("Client key"),
 			CAData:   []byte("Cluster CA"),
@@ -96,7 +96,7 @@ func TestDeferredLoadingClientConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, &restConfig{
 		Host: "https://172.17.0.2:8443",
-		restTLSClientConfig: restTLSClientConfig{
+		TLSClientConfig: restTLSClientConfig{
 			CertData: []byte("Client cert"),
 			KeyData:  []byte("Client key"),
 			CAData:   []byte("Cluster CA"),
@@ -113,7 +113,7 @@ func TestDefaultClientConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, &restConfig{
 		Host: "https://172.17.0.2:8443",
-		restTLSClientConfig: restTLSClientConfig{
+		TLSClientConfig: restTLSClientConfig{
 			CertData: []byte("Client cert"),
 			KeyData:  []byte("Client key"),
 			CAData:   []byte("Cluster CA"),
