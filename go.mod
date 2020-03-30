@@ -15,7 +15,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
-	github.com/ghodss/yaml v0.0.0-20161207003320-04f313413ffd
+	github.com/ghodss/yaml v1.0.0
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v0.0.0-20170217192616-94e7d24fd285 // indirect
 	github.com/gotestyourself/gotestyourself v2.2.0+incompatible // indirect
