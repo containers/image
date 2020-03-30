@@ -5,6 +5,7 @@ go 1.11
 require (
 	github.com/14rcole/gopopulate v0.0.0-20180821133914-b175b219e774 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
+	github.com/Azure/go-autorest v11.1.2+incompatible // indirect
 	github.com/BurntSushi/toml v0.3.1
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
 	github.com/containers/ocicrypt v1.0.1
@@ -23,7 +24,6 @@ require (
 	github.com/klauspost/compress v1.10.3
 	github.com/klauspost/pgzip v1.2.3
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
-	github.com/kr/pretty v0.1.0 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mtrmac/gpgme v0.1.2
 	github.com/opencontainers/go-digest v1.0.0-rc1
@@ -46,5 +46,5 @@ require (
 	golang.org/x/sys v0.0.0-20200327173247-9dae0f8f5775
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
-	k8s.io/client-go v0.0.0-20170217214107-bcde30fb7eae
+	k8s.io/client-go v0.17.4
 )
