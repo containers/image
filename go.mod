@@ -38,7 +38,7 @@ require (
 	github.com/vbatts/tar-split v0.11.1
 	github.com/vbauerster/mpb/v5 v5.0.3
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190809123943-df4f5c81cb3b // indirect
-	github.com/xeipuuv/gojsonschema v0.0.0-20190816131739-be0936907f66
+	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.4
 	golang.org/x/crypto v0.0.0-20200311171314-f7b00557c8c4
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7
