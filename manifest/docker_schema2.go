@@ -118,11 +118,11 @@ type Schema2V1Image struct {
 	Author string `json:"author,omitempty"`
 	// Config is the configuration of the container received from the client
 	Config *Schema2Config `json:"config,omitempty"`
-	// Architecture is the hardware that the image is build and runs on
+	// Architecture is the hardware that the image is built and runs on
 	Architecture string `json:"architecture,omitempty"`
-	// Variant is a variant of the CPU that the image is build and runs on
+	// Variant is a variant of the CPU that the image is built and runs on
 	Variant string `json:"variant,omitempty"`
-	// OS is the operating system used to build and run the image
+	// OS is the operating system used to built and run the image
 	OS string `json:"os,omitempty"`
 	// Size is the total size of the image including all layers it is composed of
 	Size int64 `json:",omitempty"`
