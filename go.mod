@@ -43,5 +43,5 @@ require (
 	golang.org/x/sys v0.0.0-20200327173247-9dae0f8f5775
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
-	k8s.io/client-go v0.17.4
+	k8s.io/client-go v0.18.0
 )
