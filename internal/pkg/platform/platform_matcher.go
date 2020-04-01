@@ -124,6 +124,11 @@ var compatibility = map[string][]string{
 // the most compatible platform is first.
 // If some option (arch, os, variant) is not present, a value from current platform is detected.
 func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
+	wantedOS := runtime.GOOS
+	if ctx != nil && ctx.OSChoice != "" {
+		wantedOS = ctx.OSChoice
+	}
+
 	wantedArch := runtime.GOARCH
 	wantedVariant := ""
 	if ctx != nil && ctx.ArchitectureChoice != "" {
@@ -134,15 +139,10 @@ func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
 		// ctx.ArchitectureChoice == runtime.GOARCH, because we have no idea whether the runtime.GOARCH
 		// value is relevant to the use case, and if we do autodetect a variant,
 		// ctx.VariantChoice can't be used to override it back to "".
-		wantedVariant = getCPUVariant(runtime.GOOS, runtime.GOARCH)
+		wantedVariant = getCPUVariant(wantedOS, runtime.GOARCH)
 	}
 	if ctx != nil && ctx.VariantChoice != "" {
 		wantedVariant = ctx.VariantChoice
-	}
-
-	wantedOS := runtime.GOOS
-	if ctx != nil && ctx.OSChoice != "" {
-		wantedOS = ctx.OSChoice
 	}
 
 	var wantedPlatforms []imgspecv1.Platform
