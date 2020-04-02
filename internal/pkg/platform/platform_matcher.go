@@ -106,7 +106,7 @@ func getCPUVariantArm() string {
 }
 
 func getCPUVariant(os string, arch string) string {
-	if os == "windows" {
+	if os == "windows" || runtime.GOOS == "windows" {
 		return getCPUVariantWindows(arch)
 	}
 	if arch == "arm" || arch == "arm64" {
