@@ -16,11 +16,13 @@ require (
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/ghodss/yaml v1.0.0
+	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/imdario/mergo v0.3.9
 	github.com/klauspost/compress v1.10.3
 	github.com/klauspost/pgzip v1.2.3
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
+	github.com/kr/pretty v0.1.0 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mtrmac/gpgme v0.1.2
 	github.com/opencontainers/go-digest v1.0.0-rc1
@@ -43,5 +45,5 @@ require (
 	golang.org/x/sys v0.0.0-20200327173247-9dae0f8f5775
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
-	k8s.io/client-go v0.18.0
+	gopkg.in/yaml.v2 v2.2.8 // indirect
 )
