@@ -154,11 +154,9 @@ func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
 				break
 			}
 		}
+	}
+	if variants == nil {
 		// user wants a variant which we know nothing about - not even compatibility
-		if variants == nil {
-			variants = []string{wantedVariant}
-		}
-	} else {
 		variants = []string{wantedVariant}
 	}
 
