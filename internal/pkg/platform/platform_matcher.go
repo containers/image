@@ -120,7 +120,7 @@ var compatibility = map[string][]string{
 	"arm64": {"v8"},
 }
 
-// Returns all compatible platforms with the platform specifics possibly overriden by user,
+// WantedPlatforms returns all compatible platforms with the platform specifics possibly overriden by user,
 // the most compatible platform is first.
 // If some option (arch, os, variant) is not present, a value from current platform is detected.
 func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
