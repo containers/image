@@ -148,21 +148,15 @@ func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
 	var variants []string = nil
 	if wantedVariant != "" && compatibility[wantedArch] != nil {
 		variantOrder := compatibility[wantedArch]
-		variants = make([]string, 0, len(variantOrder))
-		wantedIndex := -1
 		for i, v := range variantOrder {
 			if wantedVariant == v {
-				wantedIndex = i
+				variants = variantOrder[i:]
 				break
 			}
 		}
 		// user wants a variant which we know nothing about - not even compatibility
-		if wantedIndex == -1 {
+		if variants == nil {
 			variants = []string{wantedVariant}
-		} else {
-			for i := wantedIndex; i < len(variantOrder); i++ {
-				variants = append(variants, variantOrder[i])
-			}
 		}
 	} else {
 		variants = []string{wantedVariant}
