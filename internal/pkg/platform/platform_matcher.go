@@ -145,10 +145,10 @@ func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
 		wantedOS = ctx.OSChoice
 	}
 
-	var wantedPlatforms []imgspecv1.Platform
+	var variants []string = nil
 	if wantedVariant != "" && compatibility[wantedArch] != nil {
 		variantOrder := compatibility[wantedArch]
-		wantedPlatforms = make([]imgspecv1.Platform, 0, len(variantOrder))
+		variants = make([]string, 0, len(variantOrder))
 		wantedIndex := -1
 		for i, v := range variantOrder {
 			if wantedVariant == v {
@@ -158,34 +158,25 @@ func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
 		}
 		// user wants a variant which we know nothing about - not even compatibility
 		if wantedIndex == -1 {
-			wantedPlatforms = []imgspecv1.Platform{
-				{
-					OS:           wantedOS,
-					Architecture: wantedArch,
-					Variant:      wantedVariant,
-				},
-			}
+			variants = []string{wantedVariant}
 		} else {
 			for i := wantedIndex; i < len(variantOrder); i++ {
-				v := variantOrder[i]
-				wantedPlatforms = append(wantedPlatforms, imgspecv1.Platform{
-					OS:           wantedOS,
-					Architecture: wantedArch,
-					Variant:      v,
-				})
+				variants = append(variants, variantOrder[i])
 			}
 		}
 	} else {
-		wantedPlatforms = []imgspecv1.Platform{
-			{
-				OS:           wantedOS,
-				Architecture: wantedArch,
-				Variant:      wantedVariant,
-			},
-		}
+		variants = []string{wantedVariant}
 	}
 
-	return wantedPlatforms, nil
+	res := make([]imgspecv1.Platform, 0, len(variants))
+	for _, v := range variants {
+		res = append(res, imgspecv1.Platform{
+			OS:           wantedOS,
+			Architecture: wantedArch,
+			Variant:      v,
+		})
+	}
+	return res, nil
 }
 
 func MatchesPlatform(image imgspecv1.Platform, wanted imgspecv1.Platform) bool {
