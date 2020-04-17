@@ -16,17 +16,10 @@ func TestWantedPlatformsCompatibility(t *testing.T) {
 	}
 	platforms, err := WantedPlatforms(ctx)
 	assert.Nil(t, err)
-	assert.Equal(t, len(platforms), 2)
-	assert.Equal(t, platforms[0], imgspecv1.Platform{
-		OS:           ctx.OSChoice,
-		Architecture: ctx.ArchitectureChoice,
-		Variant:      "v6",
-	})
-	assert.Equal(t, platforms[1], imgspecv1.Platform{
-		OS:           ctx.OSChoice,
-		Architecture: ctx.ArchitectureChoice,
-		Variant:      "v5",
-	})
+	assert.Equal(t, []imgspecv1.Platform{
+		{OS: ctx.OSChoice, Architecture: ctx.ArchitectureChoice, Variant: "v6"},
+		{OS: ctx.OSChoice, Architecture: ctx.ArchitectureChoice, Variant: "v5"},
+	}, platforms)
 }
 
 func TestWantedPlatformsCustom(t *testing.T) {
@@ -37,10 +30,7 @@ func TestWantedPlatformsCustom(t *testing.T) {
 	}
 	platforms, err := WantedPlatforms(ctx)
 	assert.Nil(t, err)
-	assert.Equal(t, len(platforms), 1)
-	assert.Equal(t, platforms[0], imgspecv1.Platform{
-		OS:           ctx.OSChoice,
-		Architecture: ctx.ArchitectureChoice,
-		Variant:      ctx.VariantChoice,
-	})
+	assert.Equal(t, []imgspecv1.Platform{
+		{OS: ctx.OSChoice, Architecture: ctx.ArchitectureChoice, Variant: ctx.VariantChoice},
+	}, platforms)
 }
