@@ -147,9 +147,10 @@ func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
 
 	var wantedPlatforms []imgspecv1.Platform
 	if wantedVariant != "" && compatibility[wantedArch] != nil {
-		wantedPlatforms = make([]imgspecv1.Platform, 0, len(compatibility[wantedArch]))
+		variantOrder := compatibility[wantedArch]
+		wantedPlatforms = make([]imgspecv1.Platform, 0, len(variantOrder))
 		wantedIndex := -1
-		for i, v := range compatibility[wantedArch] {
+		for i, v := range variantOrder {
 			if wantedVariant == v {
 				wantedIndex = i
 				break
@@ -165,8 +166,8 @@ func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
 				},
 			}
 		} else {
-			for i := wantedIndex; i < len(compatibility[wantedArch]); i++ {
-				v := compatibility[wantedArch][i]
+			for i := wantedIndex; i < len(variantOrder); i++ {
+				v := variantOrder[i]
 				wantedPlatforms = append(wantedPlatforms, imgspecv1.Platform{
 					OS:           wantedOS,
 					Architecture: wantedArch,
