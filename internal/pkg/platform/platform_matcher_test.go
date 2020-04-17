@@ -14,17 +14,32 @@ func TestWantedPlatforms(t *testing.T) {
 		ctx      types.SystemContext
 		expected []imgspecv1.Platform
 	}{
+		{ // X86_64 does not have variants
+			types.SystemContext{ArchitectureChoice: "amd64", OSChoice: "linux"},
+			[]imgspecv1.Platform{
+				{OS: "linux", Architecture: "amd64", Variant: ""},
+			},
+		},
 		{ // ARM
 			types.SystemContext{ArchitectureChoice: "arm", OSChoice: "linux", VariantChoice: "v6"},
 			[]imgspecv1.Platform{
 				{OS: "linux", Architecture: "arm", Variant: "v6"},
 				{OS: "linux", Architecture: "arm", Variant: "v5"},
+				{OS: "linux", Architecture: "arm", Variant: ""},
+			},
+		},
+		{ // ARM64 has a base variant
+			types.SystemContext{ArchitectureChoice: "arm64", OSChoice: "linux"},
+			[]imgspecv1.Platform{
+				{OS: "linux", Architecture: "arm64", Variant: ""},
+				{OS: "linux", Architecture: "arm64", Variant: "v8"},
 			},
 		},
 		{ // Custom (completely unrecognized data)
 			types.SystemContext{ArchitectureChoice: "armel", OSChoice: "freeBSD", VariantChoice: "custom"},
 			[]imgspecv1.Platform{
 				{OS: "freeBSD", Architecture: "armel", Variant: "custom"},
+				{OS: "freeBSD", Architecture: "armel", Variant: ""},
 			},
 		},
 	} {

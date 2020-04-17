@@ -115,9 +115,20 @@ func getCPUVariant(os string, arch string) string {
 	return ""
 }
 
+// compatibility contains, for a specified architecture, a list of known variants, in the
+// order from most capable (most restrictive) to least capable (most compatible).
+// Architectures that don’t have variants should not have an entry here.
 var compatibility = map[string][]string{
 	"arm":   {"v7", "v6", "v5"},
 	"arm64": {"v8"},
+}
+
+// baseVariants contains, for a specified architecture, a variant that is known to be
+// supported by _all_ machines using that architecture.
+// Architectures that don’t have variants, or where there are possible versions without
+// an established variant name, should not have an entry here.
+var baseVariants = map[string]string{
+	"arm64": "v8",
 }
 
 // WantedPlatforms returns all compatible platforms with the platform specifics possibly overriden by user,
@@ -146,18 +157,27 @@ func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
 	}
 
 	var variants []string = nil
-	if wantedVariant != "" && compatibility[wantedArch] != nil {
-		variantOrder := compatibility[wantedArch]
-		for i, v := range variantOrder {
-			if wantedVariant == v {
-				variants = variantOrder[i:]
-				break
+	if wantedVariant != "" {
+		if compatibility[wantedArch] != nil {
+			variantOrder := compatibility[wantedArch]
+			for i, v := range variantOrder {
+				if wantedVariant == v {
+					variants = variantOrder[i:]
+					break
+				}
 			}
 		}
-	}
-	if variants == nil {
-		// user wants a variant which we know nothing about - not even compatibility
-		variants = []string{wantedVariant}
+		if variants == nil {
+			// user wants a variant which we know nothing about - not even compatibility
+			variants = []string{wantedVariant}
+		}
+		variants = append(variants, "")
+	} else {
+		variants = append(variants, "") // No variant specified, use a “no variant specified” image if present
+		if baseVariant, ok := baseVariants[wantedArch]; ok {
+			// But also accept an image with the “base” variant for the architecture, if it exists.
+			variants = append(variants, baseVariant)
+		}
 	}
 
 	res := make([]imgspecv1.Platform, 0, len(variants))
@@ -179,7 +199,7 @@ func MatchesPlatform(image imgspecv1.Platform, wanted imgspecv1.Platform) bool {
 		return false
 	}
 
-	if wanted.Variant == "" || image.Variant == wanted.Variant {
+	if image.Variant == wanted.Variant {
 		return true
 	}
 
