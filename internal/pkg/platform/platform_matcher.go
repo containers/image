@@ -120,7 +120,7 @@ var compatibility = map[string][]string{
 	"arm64": {"v8"},
 }
 
-// Returns all compatible platforms with the platform specifics possibly overriden by user,
+// WantedPlatforms returns all compatible platforms with the platform specifics possibly overriden by user,
 // the most compatible platform is first.
 // If some option (arch, os, variant) is not present, a value from current platform is detected.
 func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
@@ -145,46 +145,30 @@ func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {
 		wantedOS = ctx.OSChoice
 	}
 
-	var wantedPlatforms []imgspecv1.Platform
+	var variants []string = nil
 	if wantedVariant != "" && compatibility[wantedArch] != nil {
-		wantedPlatforms = make([]imgspecv1.Platform, 0, len(compatibility[wantedArch]))
-		wantedIndex := -1
-		for i, v := range compatibility[wantedArch] {
+		variantOrder := compatibility[wantedArch]
+		for i, v := range variantOrder {
 			if wantedVariant == v {
-				wantedIndex = i
+				variants = variantOrder[i:]
 				break
 			}
 		}
+	}
+	if variants == nil {
 		// user wants a variant which we know nothing about - not even compatibility
-		if wantedIndex == -1 {
-			wantedPlatforms = []imgspecv1.Platform{
-				{
-					OS:           wantedOS,
-					Architecture: wantedArch,
-					Variant:      wantedVariant,
-				},
-			}
-		} else {
-			for i := wantedIndex; i < len(compatibility[wantedArch]); i++ {
-				v := compatibility[wantedArch][i]
-				wantedPlatforms = append(wantedPlatforms, imgspecv1.Platform{
-					OS:           wantedOS,
-					Architecture: wantedArch,
-					Variant:      v,
-				})
-			}
-		}
-	} else {
-		wantedPlatforms = []imgspecv1.Platform{
-			{
-				OS:           wantedOS,
-				Architecture: wantedArch,
-				Variant:      wantedVariant,
-			},
-		}
+		variants = []string{wantedVariant}
 	}
 
-	return wantedPlatforms, nil
+	res := make([]imgspecv1.Platform, 0, len(variants))
+	for _, v := range variants {
+		res = append(res, imgspecv1.Platform{
+			OS:           wantedOS,
+			Architecture: wantedArch,
+			Variant:      v,
+		})
+	}
+	return res, nil
 }
 
 func MatchesPlatform(image imgspecv1.Platform, wanted imgspecv1.Platform) bool {
