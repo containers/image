@@ -66,6 +66,20 @@ func (i *UnparsedImage) Manifest(ctx context.Context) ([]byte, string, error) {
 	return i.cachedManifest, i.cachedManifestMIMEType, nil
 }
 
+func (i *UnparsedImage) DeltaLayers(ctx context.Context) ([]types.BlobInfo, error) {
+	// Note that GetDeltaManifest can return nil with a nil error. This is ok if no deltas exist
+	mb, mt, err := types.ImageSourceGetDeltaManifest(i.src, ctx, i.instanceDigest)
+	if mb == nil {
+		return nil, err
+	}
+
+	m, err := manifestInstanceFromBlob(ctx, nil, i.src, mb, mt)
+	if err != nil {
+		return nil, err
+	}
+	return m.LayerInfos(), nil
+}
+
 // expectedManifestDigest returns a the expected value of the manifest digest, and an indicator whether it is known.
 // The bool return value seems redundant with digest != ""; it is used explicitly
 // to refuse (unexpected) situations when the digest exists but is "".

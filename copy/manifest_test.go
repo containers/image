@@ -9,6 +9,7 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -75,6 +76,15 @@ func (f fakeImageSource) SupportsEncryption(ctx context.Context) bool {
 	panic("Unexpected call to a mock function")
 }
 func (f fakeImageSource) Size() (int64, error) {
+	panic("Unexpected call to a mock function")
+}
+func (f fakeImageSource) GetDeltaManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error) {
+	panic("Unexpected call to a mock function")
+}
+func (f fakeImageSource) GetDeltaIndex(ctx context.Context) (types.ImageReference, error) {
+	panic("Unexpected call to a mock function")
+}
+func (f fakeImageSource) DeltaLayers(ctx context.Context) ([]types.BlobInfo, error) {
 	panic("Unexpected call to a mock function")
 }
 

@@ -258,6 +258,36 @@ type ImageSource interface {
 	LayerInfosForCopy(ctx context.Context, instanceDigest *digest.Digest) ([]BlobInfo, error)
 }
 
+// This is an optional extension of ImageSource
+type DeltaImageSource interface {
+	ImageSource
+	// GetDeltaManifest returns the delta manifest for the current image, as well as its type, if it exist.
+	// No error is returned if no delta manifest exists, just a nil slice
+	// It may use a remote (= slow) service.
+	// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve deltas for (when the primary manifest is a manifest list);
+	// this never happens if the primary manifest is not a manifest list (e.g. if the source never returns manifest lists).
+	GetDeltaManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error)
+	// GetDeltaIndex returns an ImageReference that can be used to update the delta index for deltas for Image.
+	// If deltas are not supported it will return nil
+	GetDeltaIndex(ctx context.Context) (ImageReference, error)
+}
+
+// These are wrappers for ImageSource extensions that do the dynamic type cast required to work if the type is supported
+// and the default implementation otherwise
+func ImageSourceGetDeltaManifest(src ImageSource, ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error) {
+	if d, ok := src.(DeltaImageSource); ok {
+		return d.GetDeltaManifest(ctx, instanceDigest)
+	}
+	return nil, "", nil
+}
+
+func ImageSourceGetDeltaIndex(src ImageSource, ctx context.Context) (ImageReference, error) {
+	if d, ok := src.(DeltaImageSource); ok {
+		return d.GetDeltaIndex(ctx)
+	}
+	return nil, nil
+}
+
 // ImageDestination is a service, possibly remote (= slow), to store components of a single image.
 //
 // There is a specific required order for some of the calls:
@@ -329,6 +359,23 @@ type ImageDestination interface {
 	// - Uploaded data MAY be visible to others before Commit() is called
 	// - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 	Commit(ctx context.Context, unparsedToplevel UnparsedImage) error
+}
+
+// This is an optional extension of ImageSource
+type DeltaImageDestination interface {
+	ImageDestination
+	// Tries to get access to the uncompressed data of a given DiffID that is locally available
+	// This data is used to apply a delta from this layer
+	// If deltas are not supported or the layer is not available, nil is returned (and no error)
+	GetLayerDeltaData(ctx context.Context, diffID digest.Digest) (DeltaDataSource, error)
+}
+
+func ImageDestinationGetLayerDeltaData(dst ImageDestination, ctx context.Context, diffID digest.Digest) (DeltaDataSource, error) {
+	if d, ok := dst.(DeltaImageDestination); ok {
+		return d.GetLayerDeltaData(ctx, diffID)
+	}
+	return nil, nil
+
 }
 
 // ManifestTypeRejectedError is returned by ImageDestination.PutManifest if the destination is in principle available,
@@ -407,6 +454,21 @@ type Image interface {
 	// Size returns an approximation of the amount of disk space which is consumed by the image in its current
 	// location.  If the size is not known, -1 will be returned.
 	Size() (int64, error)
+}
+
+// This is an optional extension of Image
+type DeltaImage interface {
+	Image
+	// Downloads and parses the delta manifest for the image, returning the available delta layers
+	// If no deltas available, returns nil without an error
+	DeltaLayers(ctx context.Context) ([]BlobInfo, error)
+}
+
+func ImageDeltaLayers(img Image, ctx context.Context) ([]BlobInfo, error) {
+	if d, ok := img.(DeltaImage); ok {
+		return d.DeltaLayers(ctx)
+	}
+	return nil, nil
 }
 
 // ImageCloser is an Image with a Close() method which must be called by the user.
@@ -622,4 +684,14 @@ type ProgressProperties struct {
 	// The additional offset which has been downloaded inside the last update
 	// interval. Will be reset after each ProgressEventRead event.
 	OffsetUpdate uint64
+}
+
+// This is an interface that allows you to access existing local data to
+// use as existing content when applying a delta file
+// It is identical to the DataSource interface in tar_diff but re-exported
+// here to avoid unncecceary dependencies
+type DeltaDataSource interface {
+	io.ReadSeeker
+	io.Closer
+	SetCurrentFile(file string) error
 }
