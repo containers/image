@@ -19,7 +19,7 @@ require (
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/imdario/mergo v0.3.9
-	github.com/klauspost/compress v1.10.4
+	github.com/klauspost/compress v1.10.5
 	github.com/klauspost/pgzip v1.2.3
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
