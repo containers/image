@@ -119,7 +119,7 @@ func getCPUVariant(os string, arch string) string {
 // order from most capable (most restrictive) to least capable (most compatible).
 // Architectures that don’t have variants should not have an entry here.
 var compatibility = map[string][]string{
-	"arm":   {"v7", "v6", "v5"},
+	"arm":   {"v8", "v7", "v6", "v5"},
 	"arm64": {"v8"},
 }
 
