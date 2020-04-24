@@ -35,7 +35,7 @@ require (
 	github.com/stretchr/testify v1.5.1
 	github.com/ulikunitz/xz v0.5.7
 	github.com/vbatts/tar-split v0.11.1
-	github.com/vbauerster/mpb/v5 v5.0.3
+	github.com/vbauerster/mpb/v5 v5.0.4
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190809123943-df4f5c81cb3b // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.4
