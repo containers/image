@@ -170,7 +170,7 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 		defer uploadReader.Terminate(errors.New("Reading data from an already terminated upload"))
 		res, err = d.c.makeRequestToResolvedURL(ctx, "PATCH", uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, uploadReader, inputInfo.Size, v2Auth, nil)
 		if err != nil {
-			logrus.Debugf("Error uploading layer chunked, response %#v", res)
+			logrus.Debugf("Error uploading layer chunked %v", err)
 			return nil, err
 		}
 		defer res.Body.Close()
