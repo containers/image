@@ -139,7 +139,7 @@ func updatedOCI1MIMEType(mimeType string, updated types.BlobInfo) (string, error
 		case isOCI1Layer(mimeType):
 			return imgspecv1.MediaTypeImageLayer, nil
 		default:
-			return "", fmt.Errorf("Error preparing updated manifest: unsupported media type for decompression: %q", mimeType)
+			return "", fmt.Errorf("unsupported media type for decompression: %q", mimeType)
 		}
 
 	case types.Compress:
@@ -158,7 +158,7 @@ func updatedOCI1MIMEType(mimeType string, updated types.BlobInfo) (string, error
 			case isOCI1Layer(mimeType):
 				return imgspecv1.MediaTypeImageLayerGzip, nil
 			default:
-				return "", fmt.Errorf("Error preparing updated manifest: unsupported media type for compression: %q", mimeType)
+				return "", fmt.Errorf("unsupported media type for compression: %q", mimeType)
 			}
 
 		case compression.Zstd.Name():
@@ -168,15 +168,15 @@ func updatedOCI1MIMEType(mimeType string, updated types.BlobInfo) (string, error
 			case isOCI1Layer(mimeType):
 				return imgspecv1.MediaTypeImageLayerZstd, nil
 			default:
-				return "", fmt.Errorf("Error preparing updated manifest: unsupported media type for compression: %q", mimeType)
+				return "", fmt.Errorf("unsupported media type for compression: %q", mimeType)
 			}
 
 		default:
-			return "", fmt.Errorf("Error preparing updated manifest: unknown compression algorithm %q for layer %q", updated.CompressionAlgorithm.Name(), updated.Digest)
+			return "", fmt.Errorf("unknown compression algorithm %q", updated.CompressionAlgorithm.Name())
 		}
 
 	default:
-		return "", fmt.Errorf("Error preparing updated manifest: unknown compression operation (%d) for layer %q", updated.CompressionOperation, updated.Digest)
+		return "", fmt.Errorf("unknown compression operation (%d)", updated.CompressionOperation)
 	}
 }
 
@@ -198,7 +198,7 @@ func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 		}
 		mimeType, err := updatedOCI1MIMEType(mimeType, info)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "Error preparing updated manifest, layer %q", info.Digest)
 		}
 		if info.CryptoOperation == types.Encrypt {
 			encMediaType, err := getEncryptedMediaType(mimeType)

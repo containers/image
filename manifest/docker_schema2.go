@@ -236,11 +236,11 @@ func isSchema2Layer(mimeType string) bool {
 }
 
 // updatedSchema2MIMEType returns the result of applying edits in updated (MediaType, CompressionOperation) to
-// mimeType. It may use updated.Digest for error messages.
+// mimeType. It may use updated.Digest for logging.
 func updatedSchema2MIMEType(mimeType string, updated types.BlobInfo) (string, error) {
 	// First make sure we support the media type of the original layer.
 	if err := SupportedSchema2MediaType(mimeType); err != nil {
-		return "", fmt.Errorf("Error preparing updated manifest: unknown media type of original layer: %q", mimeType)
+		return "", fmt.Errorf("unknown media type of original layer: %q", mimeType)
 	}
 
 	// Note that manifests in containers-storage might be reporting the
@@ -262,7 +262,7 @@ func updatedSchema2MIMEType(mimeType string, updated types.BlobInfo) (string, er
 		case isSchema2Layer(mimeType):
 			return DockerV2SchemaLayerMediaTypeUncompressed, nil
 		default:
-			return "", fmt.Errorf("Error preparing updated manifest: unsupported media type for decompression: %q", mimeType)
+			return "", fmt.Errorf("unsupported media type for decompression: %q", mimeType)
 		}
 
 	case types.Compress:
@@ -281,16 +281,16 @@ func updatedSchema2MIMEType(mimeType string, updated types.BlobInfo) (string, er
 			case isSchema2Layer(mimeType):
 				return DockerV2Schema2LayerMediaType, nil
 			default:
-				return "", fmt.Errorf("Error preparing updated manifest: unsupported media type for compression: %q", mimeType)
+				return "", fmt.Errorf("unsupported media type for compression: %q", mimeType)
 			}
 		case compression.Zstd.Name():
-			return "", fmt.Errorf("Error preparing updated manifest: zstd compression is not supported for docker images")
+			return "", fmt.Errorf("zstd compression is not supported for docker images")
 		default:
-			return "", fmt.Errorf("Error preparing updated manifest: unknown compression algorithm %q for layer %q", updated.CompressionAlgorithm.Name(), updated.Digest)
+			return "", fmt.Errorf("unknown compression algorithm %q", updated.CompressionAlgorithm.Name())
 		}
 
 	default:
-		return "", fmt.Errorf("Error preparing updated manifest: unknown compression operation (%d) for layer %q", updated.CompressionOperation, updated.Digest)
+		return "", fmt.Errorf("unknown compression operation (%d)", updated.CompressionOperation)
 	}
 }
 
@@ -304,7 +304,7 @@ func (m *Schema2) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 	for i, info := range layerInfos {
 		mimeType, err := updatedSchema2MIMEType(original[i].MediaType, info)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "Error preparing updated manifest, layer %q", info.Digest)
 		}
 		m.LayersDescriptors[i].MediaType = mimeType
 		m.LayersDescriptors[i].Digest = info.Digest
