@@ -95,26 +95,17 @@ func (m *OCI1) LayerInfos() []LayerInfo {
 	return blobs
 }
 
-// isOCI1NonDistributableLayer is a convenience wrapper to check if a given mime
-// type is a compressed or decompressed OCI v1 non-distributable layer.
-func isOCI1NonDistributableLayer(mimeType string) bool {
-	switch mimeType {
-	case imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributableZstd:
-		return true
-	default:
-		return false
-	}
-}
-
-// isOCI1Layer is a convenience wrapper to check if a given mime type is a
-// compressed or decompressed OCI v1 layer.
-func isOCI1Layer(mimeType string) bool {
-	switch mimeType {
-	case imgspecv1.MediaTypeImageLayer, imgspecv1.MediaTypeImageLayerGzip, imgspecv1.MediaTypeImageLayerZstd:
-		return true
-	default:
-		return false
-	}
+var oci1CompressionMIMETypeSets = []compressionMIMETypeSet{
+	{
+		mtsUncompressed:         imgspecv1.MediaTypeImageLayerNonDistributable,
+		compression.Gzip.Name(): imgspecv1.MediaTypeImageLayerNonDistributableGzip,
+		compression.Zstd.Name(): imgspecv1.MediaTypeImageLayerNonDistributableZstd,
+	},
+	{
+		mtsUncompressed:         imgspecv1.MediaTypeImageLayer,
+		compression.Gzip.Name(): imgspecv1.MediaTypeImageLayerGzip,
+		compression.Zstd.Name(): imgspecv1.MediaTypeImageLayerZstd,
+	},
 }
 
 // updatedOCI1MIMEType returns the result of applying edits in updated (MediaType, CompressionOperation) to
@@ -123,57 +114,23 @@ func updatedOCI1MIMEType(mimeType string, updated types.BlobInfo) (string, error
 	// Note that manifests in containers-storage might be reporting the
 	// wrong media type since the original manifests are stored while layers
 	// are decompressed in storage.  Hence, we need to consider the case
-	// that an already {de}compressed layer should be {de}compressed, which
-	// is being addressed in `isSchema2{Foreign}Layer`.
+	// that an already {de}compressed layer should be {de}compressed;
+	// compressionVariantMIMEType does that by not caring whether the original is
+	// {de}compressed.
 	switch updated.CompressionOperation {
 	case types.PreserveOriginal:
 		// Keep the original media type.
 		return mimeType, nil
 
 	case types.Decompress:
-		// Decompress the original media type and check if it was
-		// non-distributable one or not.
-		switch {
-		case isOCI1NonDistributableLayer(mimeType):
-			return imgspecv1.MediaTypeImageLayerNonDistributable, nil
-		case isOCI1Layer(mimeType):
-			return imgspecv1.MediaTypeImageLayer, nil
-		default:
-			return "", fmt.Errorf("unsupported media type for decompression: %q", mimeType)
-		}
+		return compressionVariantMIMEType(oci1CompressionMIMETypeSets, mimeType, nil)
 
 	case types.Compress:
 		if updated.CompressionAlgorithm == nil {
 			logrus.Debugf("Error preparing updated manifest: blob %q was compressed but does not specify by which algorithm: falling back to use the original blob", updated.Digest)
 			return mimeType, nil
 		}
-		// Compress the original media type and set the new one based on
-		// that type (distributable or not) and the specified compression
-		// algorithm. Throw an error if the algorithm is not supported.
-		switch updated.CompressionAlgorithm.Name() {
-		case compression.Gzip.Name():
-			switch {
-			case isOCI1NonDistributableLayer(mimeType):
-				return imgspecv1.MediaTypeImageLayerNonDistributableGzip, nil
-			case isOCI1Layer(mimeType):
-				return imgspecv1.MediaTypeImageLayerGzip, nil
-			default:
-				return "", fmt.Errorf("unsupported media type for compression: %q", mimeType)
-			}
-
-		case compression.Zstd.Name():
-			switch {
-			case isOCI1NonDistributableLayer(mimeType):
-				return imgspecv1.MediaTypeImageLayerNonDistributableZstd, nil
-			case isOCI1Layer(mimeType):
-				return imgspecv1.MediaTypeImageLayerZstd, nil
-			default:
-				return "", fmt.Errorf("unsupported media type for compression: %q", mimeType)
-			}
-
-		default:
-			return "", fmt.Errorf("unknown compression algorithm %q", updated.CompressionAlgorithm.Name())
-		}
+		return compressionVariantMIMEType(oci1CompressionMIMETypeSets, mimeType, updated.CompressionAlgorithm)
 
 	default:
 		return "", fmt.Errorf("unknown compression operation (%d)", updated.CompressionOperation)
