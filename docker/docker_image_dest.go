@@ -174,6 +174,9 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 			return nil, err
 		}
 		defer res.Body.Close()
+		if !successStatus(res.StatusCode) {
+			return nil, errors.Wrapf(client.HandleErrorResponse(res), "Error uploading layer chunked")
+		}
 		uploadLocation, err := res.Location()
 		if err != nil {
 			return nil, errors.Wrap(err, "Error determining upload URL")
