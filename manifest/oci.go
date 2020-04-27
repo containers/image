@@ -12,7 +12,6 @@ import (
 	"github.com/opencontainers/image-spec/specs-go"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // BlobInfoFromOCI1Descriptor returns a types.BlobInfo based on the input OCI1 descriptor.
@@ -111,30 +110,7 @@ var oci1CompressionMIMETypeSets = []compressionMIMETypeSet{
 // updatedOCI1MIMEType returns the result of applying edits in updated (MediaType, CompressionOperation) to
 // mimeType. It may use updated.Digest for error messages.
 func updatedOCI1MIMEType(mimeType string, updated types.BlobInfo) (string, error) {
-	// Note that manifests in containers-storage might be reporting the
-	// wrong media type since the original manifests are stored while layers
-	// are decompressed in storage.  Hence, we need to consider the case
-	// that an already {de}compressed layer should be {de}compressed;
-	// compressionVariantMIMEType does that by not caring whether the original is
-	// {de}compressed.
-	switch updated.CompressionOperation {
-	case types.PreserveOriginal:
-		// Keep the original media type.
-		return mimeType, nil
-
-	case types.Decompress:
-		return compressionVariantMIMEType(oci1CompressionMIMETypeSets, mimeType, nil)
-
-	case types.Compress:
-		if updated.CompressionAlgorithm == nil {
-			logrus.Debugf("Error preparing updated manifest: blob %q was compressed but does not specify by which algorithm: falling back to use the original blob", updated.Digest)
-			return mimeType, nil
-		}
-		return compressionVariantMIMEType(oci1CompressionMIMETypeSets, mimeType, updated.CompressionAlgorithm)
-
-	default:
-		return "", fmt.Errorf("unknown compression operation (%d)", updated.CompressionOperation)
-	}
+	return updatedMIMEType(oci1CompressionMIMETypeSets, mimeType, updated)
 }
 
 // UpdateLayerInfos replaces the original layers with the specified BlobInfos (size+digest+urls+mediatype), in order (the root layer first, and then successive layered layers)

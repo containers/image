@@ -10,7 +10,6 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // Schema2Descriptor is a “descriptor” in docker/distribution schema 2.
@@ -234,30 +233,7 @@ func updatedSchema2MIMEType(mimeType string, updated types.BlobInfo) (string, er
 		return "", fmt.Errorf("unknown media type of original layer: %q", mimeType)
 	}
 
-	// Note that manifests in containers-storage might be reporting the
-	// wrong media type since the original manifests are stored while layers
-	// are decompressed in storage.  Hence, we need to consider the case
-	// that an already {de}compressed layer should be {de}compressed;
-	// compressionVariantMIMEType does that by not caring whether the original is
-	// {de}compressed.
-	switch updated.CompressionOperation {
-	case types.PreserveOriginal:
-		// Keep the original media type.
-		return mimeType, nil
-
-	case types.Decompress:
-		return compressionVariantMIMEType(schema2CompressionMIMETypeSets, mimeType, nil)
-
-	case types.Compress:
-		if updated.CompressionAlgorithm == nil {
-			logrus.Debugf("Preparing updated manifest: blob %q was compressed but does not specify by which algorithm: falling back to use the original blob", updated.Digest)
-			return mimeType, nil
-		}
-		return compressionVariantMIMEType(schema2CompressionMIMETypeSets, mimeType, updated.CompressionAlgorithm)
-
-	default:
-		return "", fmt.Errorf("unknown compression operation (%d)", updated.CompressionOperation)
-	}
+	return updatedMIMEType(schema2CompressionMIMETypeSets, mimeType, updated)
 }
 
 // UpdateLayerInfos replaces the original layers with the specified BlobInfos (size+digest+urls), in order (the root layer first, and then successive layered layers)

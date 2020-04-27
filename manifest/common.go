@@ -4,7 +4,9 @@ import (
 	"fmt"
 
 	"github.com/containers/image/v5/pkg/compression"
+	"github.com/containers/image/v5/types"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // dupStringSlice returns a deep copy of a slice of strings, or nil if the
@@ -84,4 +86,33 @@ func compressionVariantMIMEType(variantTable []compressionMIMETypeSet, mimeType 
 		return "", fmt.Errorf("unsupported MIME type for compression: %s", mimeType)
 	}
 	return "", fmt.Errorf("unsupported MIME type for decompression: %s", mimeType)
+}
+
+// updatedMIMEType returns the result of applying edits in updated (MediaType, CompressionOperation) to
+// mimeType, based on variantTable. It may use updated.Digest for error messages.
+func updatedMIMEType(variantTable []compressionMIMETypeSet, mimeType string, updated types.BlobInfo) (string, error) {
+	// Note that manifests in containers-storage might be reporting the
+	// wrong media type since the original manifests are stored while layers
+	// are decompressed in storage.  Hence, we need to consider the case
+	// that an already {de}compressed layer should be {de}compressed;
+	// compressionVariantMIMEType does that by not caring whether the original is
+	// {de}compressed.
+	switch updated.CompressionOperation {
+	case types.PreserveOriginal:
+		// Keep the original media type.
+		return mimeType, nil
+
+	case types.Decompress:
+		return compressionVariantMIMEType(variantTable, mimeType, nil)
+
+	case types.Compress:
+		if updated.CompressionAlgorithm == nil {
+			logrus.Debugf("Error preparing updated manifest: blob %q was compressed but does not specify by which algorithm: falling back to use the original blob", updated.Digest)
+			return mimeType, nil
+		}
+		return compressionVariantMIMEType(variantTable, mimeType, updated.CompressionAlgorithm)
+
+	default:
+		return "", fmt.Errorf("unknown compression operation (%d)", updated.CompressionOperation)
+	}
 }
