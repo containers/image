@@ -225,17 +225,6 @@ var schema2CompressionMIMETypeSets = []compressionMIMETypeSet{
 	},
 }
 
-// updatedSchema2MIMEType returns the result of applying edits in updated (MediaType, CompressionOperation) to
-// mimeType. It may use updated.Digest for logging.
-func updatedSchema2MIMEType(mimeType string, updated types.BlobInfo) (string, error) {
-	// First make sure we support the media type of the original layer.
-	if err := SupportedSchema2MediaType(mimeType); err != nil {
-		return "", fmt.Errorf("unknown media type of original layer: %q", mimeType)
-	}
-
-	return updatedMIMEType(schema2CompressionMIMETypeSets, mimeType, updated)
-}
-
 // UpdateLayerInfos replaces the original layers with the specified BlobInfos (size+digest+urls), in order (the root layer first, and then successive layered layers)
 func (m *Schema2) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 	if len(m.LayersDescriptors) != len(layerInfos) {
@@ -244,7 +233,12 @@ func (m *Schema2) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 	original := m.LayersDescriptors
 	m.LayersDescriptors = make([]Schema2Descriptor, len(layerInfos))
 	for i, info := range layerInfos {
-		mimeType, err := updatedSchema2MIMEType(original[i].MediaType, info)
+		mimeType := original[i].MediaType
+		// First make sure we support the media type of the original layer.
+		if err := SupportedSchema2MediaType(mimeType); err != nil {
+			return fmt.Errorf("Error preparing updated manifest: unknown media type of original layer %q: %q", info.Digest, mimeType)
+		}
+		mimeType, err := updatedMIMEType(schema2CompressionMIMETypeSets, mimeType, info)
 		if err != nil {
 			return errors.Wrapf(err, "Error preparing updated manifest, layer %q", info.Digest)
 		}

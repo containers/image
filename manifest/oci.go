@@ -107,12 +107,6 @@ var oci1CompressionMIMETypeSets = []compressionMIMETypeSet{
 	},
 }
 
-// updatedOCI1MIMEType returns the result of applying edits in updated (MediaType, CompressionOperation) to
-// mimeType. It may use updated.Digest for error messages.
-func updatedOCI1MIMEType(mimeType string, updated types.BlobInfo) (string, error) {
-	return updatedMIMEType(oci1CompressionMIMETypeSets, mimeType, updated)
-}
-
 // UpdateLayerInfos replaces the original layers with the specified BlobInfos (size+digest+urls+mediatype), in order (the root layer first, and then successive layered layers)
 func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 	if len(m.Layers) != len(layerInfos) {
@@ -129,7 +123,7 @@ func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 			}
 			mimeType = decMimeType
 		}
-		mimeType, err := updatedOCI1MIMEType(mimeType, info)
+		mimeType, err := updatedMIMEType(oci1CompressionMIMETypeSets, mimeType, info)
 		if err != nil {
 			return errors.Wrapf(err, "Error preparing updated manifest, layer %q", info.Digest)
 		}
