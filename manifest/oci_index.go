@@ -79,6 +79,9 @@ func (index *OCI1Index) ChooseInstance(ctx *types.SystemContext) (digest.Digest,
 	}
 	for _, wantedPlatform := range wantedPlatforms {
 		for _, d := range index.Manifests {
+			if d.Platform == nil {
+				continue
+			}
 			imagePlatform := imgspecv1.Platform{
 				Architecture: d.Platform.Architecture,
 				OS:           d.Platform.OS,
