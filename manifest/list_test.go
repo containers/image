@@ -87,6 +87,21 @@ func TestChooseInstance(t *testing.T) {
 				"unmatched",
 			},
 		},
+		{ // Focus on ARM variant field testing
+			listFile: "schema2list-variants.json",
+			matchedInstances: []expectedMatch{
+				{"amd64", "", "sha256:59eec8837a4d942cc19a52b8c09ea75121acc38114a2c68b98983ce9356b8610"},
+				{"arm", "v7", "sha256:f365626a556e58189fc21d099fc64603db0f440bff07f77c740989515c544a39"},
+				{"arm", "v6", "sha256:f365626a556e58189fc21d099fc64603db0f440bff07f77c740989515c544a39"},
+				{"arm", "v5", "sha256:c84b0a3a07b628bc4d62e5047d0f8dff80f7c00979e1e28a821a033ecda8fe53"},
+				{"arm", "", "sha256:c84b0a3a07b628bc4d62e5047d0f8dff80f7c00979e1e28a821a033ecda8fe53"},
+				{"arm", "unrecognized-present", "sha256:bcf9771c0b505e68c65440474179592ffdfa98790eb54ffbf129969c5e429990"},
+				{"arm", "unrecognized-not-present", "sha256:c84b0a3a07b628bc4d62e5047d0f8dff80f7c00979e1e28a821a033ecda8fe53"},
+			},
+			unmatchedInstances: []string{
+				"unmatched",
+			},
+		},
 		{
 			listFile: "oci1index.json",
 			matchedInstances: []expectedMatch{
