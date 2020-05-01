@@ -628,7 +628,7 @@ sigExists:
 			return err
 		}
 
-		path := fmt.Sprintf(extensionsSignaturePath, reference.Path(d.ref.ref), d.manifestDigest.String())
+		path := fmt.Sprintf(extensionsSignaturePath, reference.Path(d.ref.ref), instanceDigest.String())
 		res, err := d.c.makeRequest(ctx, "PUT", path, nil, bytes.NewReader(body), v2Auth, nil)
 		if err != nil {
 			return err
