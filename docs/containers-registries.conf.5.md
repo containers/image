@@ -11,13 +11,6 @@ file for container image registries. The file format is TOML.
 
 Container engines will use the `$HOME/.config/containers/registries.conf` if it exists, otherwise they will use `/etc/containers/registries.conf`
 
-# FORMATS
-
-## VERSION 2
-VERSION 2 is the latest format of the `registries.conf` and is currently in
-beta. This means in general VERSION 1 should be used in production environments
-for now.
-
 ### GLOBAL SETTINGS
 
 `unqualified-search-registries`
@@ -154,8 +147,8 @@ Given the above, a pull of `example.com/foo/image:latest` will try:
 
 in order, and use the first one that exists.
 
-## VERSION 1
-VERSION 1 can be used as alternative to the VERSION 2, but it does not support
+## VERSION 1 FORMAT - DEPRECATED
+VERSION 1 format is still supported but it does not support
 using registry mirrors, longest-prefix matches, or location rewriting.
 
 The TOML format is used to build a simple list of registries under three
@@ -170,7 +163,7 @@ Note that insecure registries can be used for any registry, not just the registr
 under search.
 
 The `registries.insecure` and `registries.block` lists have the same meaning as the
-`insecure` and `blocked` fields in VERSION 2.
+`insecure` and `blocked` fields in the current version.
 
 ### EXAMPLE
 The following example configuration defines two searchable registries, one
