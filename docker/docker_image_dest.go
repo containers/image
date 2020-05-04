@@ -481,17 +481,17 @@ func (d *dockerImageDestination) PutSignatures(ctx context.Context, signatures [
 	}
 	switch {
 	case d.c.signatureBase != nil:
-		return d.putSignaturesToLookaside(signatures, instanceDigest)
+		return d.putSignaturesToLookaside(signatures, *instanceDigest)
 	case d.c.supportsSignatures:
-		return d.putSignaturesToAPIExtension(ctx, signatures, instanceDigest)
+		return d.putSignaturesToAPIExtension(ctx, signatures, *instanceDigest)
 	default:
 		return errors.Errorf("X-Registry-Supports-Signatures extension not supported, and lookaside is not configured")
 	}
 }
 
 // putSignaturesToLookaside implements PutSignatures() from the lookaside location configured in s.c.signatureBase,
-// which is not nil.
-func (d *dockerImageDestination) putSignaturesToLookaside(signatures [][]byte, instanceDigest *digest.Digest) error {
+// which is not nil, for a manifest with manifestDigest.
+func (d *dockerImageDestination) putSignaturesToLookaside(signatures [][]byte, manifestDigest digest.Digest) error {
 	// FIXME? This overwrites files one at a time, definitely not atomic.
 	// A failure when updating signatures with a reordered copy could lose some of them.
 
@@ -502,7 +502,7 @@ func (d *dockerImageDestination) putSignaturesToLookaside(signatures [][]byte, i
 
 	// NOTE: Keep this in sync with docs/signature-protocols.md!
 	for i, signature := range signatures {
-		url := signatureStorageURL(d.c.signatureBase, *instanceDigest, i)
+		url := signatureStorageURL(d.c.signatureBase, manifestDigest, i)
 		if url == nil {
 			return errors.Errorf("Internal error: signatureStorageURL with non-nil base returned nil")
 		}
@@ -517,7 +517,7 @@ func (d *dockerImageDestination) putSignaturesToLookaside(signatures [][]byte, i
 	// is enough for dockerImageSource to stop looking for other signatures, so that
 	// is sufficient.
 	for i := len(signatures); ; i++ {
-		url := signatureStorageURL(d.c.signatureBase, *instanceDigest, i)
+		url := signatureStorageURL(d.c.signatureBase, manifestDigest, i)
 		if url == nil {
 			return errors.Errorf("Internal error: signatureStorageURL with non-nil base returned nil")
 		}
@@ -576,8 +576,9 @@ func (c *dockerClient) deleteOneSignature(url *url.URL) (missing bool, err error
 	}
 }
 
-// putSignaturesToAPIExtension implements PutSignatures() using the X-Registry-Supports-Signatures API extension.
-func (d *dockerImageDestination) putSignaturesToAPIExtension(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
+// putSignaturesToAPIExtension implements PutSignatures() using the X-Registry-Supports-Signatures API extension,
+// for a manifest with manifestDigest.
+func (d *dockerImageDestination) putSignaturesToAPIExtension(ctx context.Context, signatures [][]byte, manifestDigest digest.Digest) error {
 	// Skip dealing with the manifest digest, or reading the old state, if not necessary.
 	if len(signatures) == 0 {
 		return nil
@@ -587,7 +588,7 @@ func (d *dockerImageDestination) putSignaturesToAPIExtension(ctx context.Context
 	// always adds signatures.  Eventually we should also allow removing signatures,
 	// but the X-Registry-Supports-Signatures API extension does not support that yet.
 
-	existingSignatures, err := d.c.getExtensionsSignatures(ctx, d.ref, *instanceDigest)
+	existingSignatures, err := d.c.getExtensionsSignatures(ctx, d.ref, manifestDigest)
 	if err != nil {
 		return err
 	}
@@ -612,7 +613,7 @@ sigExists:
 			if err != nil || n != 16 {
 				return errors.Wrapf(err, "Error generating random signature len %d", n)
 			}
-			signatureName = fmt.Sprintf("%s@%032x", instanceDigest.String(), randBytes)
+			signatureName = fmt.Sprintf("%s@%032x", manifestDigest.String(), randBytes)
 			if _, ok := existingSigNames[signatureName]; !ok {
 				break
 			}
@@ -628,7 +629,7 @@ sigExists:
 			return err
 		}
 
-		path := fmt.Sprintf(extensionsSignaturePath, reference.Path(d.ref.ref), d.manifestDigest.String())
+		path := fmt.Sprintf(extensionsSignaturePath, reference.Path(d.ref.ref), manifestDigest.String())
 		res, err := d.c.makeRequest(ctx, "PUT", path, nil, bytes.NewReader(body), v2Auth, nil)
 		if err != nil {
 			return err
