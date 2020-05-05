@@ -10,8 +10,7 @@ containers-policy.json - syntax for the signature verification policy file
 Signature verification policy files are used to specify policy, e.g. trusted keys,
 applicable when deciding whether to accept an image, or individual signatures of that image, as valid.
 
-The default policy is stored (unless overridden at compile-time) at `/etc/containers/policy.json`;
-applications performing verification may allow using a different policy instead.
+The default policy is stored (unless overridden at compile-time) at `/etc/containers/policy.json`;  applications performing verification may allow using a different policy instead. Rootless applications may also read default policy from `$HOME/.config/containers/policy.json` if it exist.
 
 ## FORMAT
 
