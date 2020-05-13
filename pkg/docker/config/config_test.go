@@ -82,6 +82,19 @@ func TestGetAuth(t *testing.T) {
 		os.Setenv("XDG_RUNTIME_DIR", origXDG)
 	}()
 
+	// override PATH for executing credHelper
+	path, err := os.Getwd()
+	require.NoError(t, err)
+	origPath := os.Getenv("PATH")
+	newPath := fmt.Sprintf("%s:%s", filepath.Join(path, "testdata"), origPath)
+	os.Setenv("PATH", newPath)
+	t.Logf("using PATH: %q", newPath)
+	defer func() {
+		os.Setenv("PATH", origPath)
+	}()
+	err = os.Chmod(filepath.Join(path, "testdata", "docker-credential-helpertest"), os.ModePerm)
+	require.NoError(t, err)
+
 	origHomeDir := homedir.Get()
 	tmpDir2, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
@@ -216,6 +229,15 @@ func TestGetAuth(t *testing.T) {
 					Username:      "00000000-0000-0000-0000-000000000000",
 					Password:      "",
 					IdentityToken: "some very long identity token",
+				},
+			},
+			{
+				name:     "credential helper",
+				hostname: "foobar.example.org",
+				path:     filepath.Join("testdata", "helper.json"),
+				expected: types.DockerAuthConfig{
+					Username: "foo",
+					Password: "bar",
 				},
 			},
 		} {

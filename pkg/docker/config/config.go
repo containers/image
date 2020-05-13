@@ -25,6 +25,7 @@ type dockerAuthConfig struct {
 type dockerConfigFile struct {
 	AuthConfigs map[string]dockerAuthConfig `json:"auths"`
 	CredHelpers map[string]string           `json:"credHelpers,omitempty"`
+	CredsStore  string                      `json:"credsStore,omitempty"`
 }
 
 type authPath struct {
@@ -52,6 +53,9 @@ func SetAuthentication(sys *types.SystemContext, registry, username, password st
 	return modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
 		if ch, exists := auths.CredHelpers[registry]; exists {
 			return false, setAuthToCredHelper(ch, registry, username, password)
+		}
+		if auths.CredsStore != "" {
+			return false, setAuthToCredHelper(auths.CredsStore, registry, username, password)
 		}
 
 		// Set the credentials to kernel keyring if enableKeyring is true.
@@ -150,6 +154,9 @@ func RemoveAuthentication(sys *types.SystemContext, registry string) error {
 		if ch, exists := auths.CredHelpers[registry]; exists {
 			return false, deleteAuthFromCredHelper(ch, registry)
 		}
+		if auths.CredsStore != "" {
+			return false, deleteAuthFromCredHelper(auths.CredsStore, registry)
+		}
 
 		// Next if keyring is enabled try kernel keyring
 		if enableKeyring {
@@ -183,7 +190,26 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 			}
 			logrus.Debugf("error removing credentials from kernel keyring")
 		}
+		if len(auths.CredHelpers) != 0 {
+			for cred, registry := range auths.CredHelpers {
+				if err := deleteAuthFromCredHelper(cred, registry); err != nil {
+					// ingore the error if no credential stored for the registry
+					if credentials.IsCredentialsMissingServerURLMessage(err.Error()) {
+						continue
+					}
+					logrus.Debugf("error removing credentials for %s from credential helper %s: %q", registry, cred, err)
+					return false, err
+				}
+			}
+		}
+		if auths.CredsStore != "" {
+			if err := deleteAuthFromCredsStore(auths.CredsStore); err != nil {
+				logrus.Debugf("error removing credentials from credential helper %s: %q", auths.CredsStore, err)
+				return false, err
+			}
+		}
 		auths.CredHelpers = make(map[string]string)
+		auths.CredsStore = ""
 		auths.AuthConfigs = make(map[string]dockerAuthConfig)
 		return true, nil
 	})
@@ -295,7 +321,9 @@ func getAuthFromCredHelper(credHelper, registry string) (string, string, error) 
 	helperName := fmt.Sprintf("docker-credential-%s", credHelper)
 	p := helperclient.NewShellProgramFunc(helperName)
 	creds, err := helperclient.Get(p, registry)
-	if err != nil {
+	// skip the IsErrCredentialsNotFoundMessage error, caller can continue check
+	// the auth from other authfiles
+	if err != nil && !credentials.IsErrCredentialsNotFoundMessage(err.Error()) {
 		return "", "", err
 	}
 	return creds.Username, creds.Secret, nil
@@ -318,6 +346,25 @@ func deleteAuthFromCredHelper(credHelper, registry string) error {
 	return helperclient.Erase(p, registry)
 }
 
+func deleteAuthFromCredsStore(credHelper string) error {
+	creds, err := listAuthFromCredHelper(credHelper)
+	if err != nil {
+		return err
+	}
+	for registry := range creds {
+		if err = deleteAuthFromCredHelper(credHelper, registry); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func listAuthFromCredHelper(credHelper string) (map[string]string, error) {
+	helperName := fmt.Sprintf("docker-credential-%s", credHelper)
+	p := helperclient.NewShellProgramFunc(helperName)
+	return helperclient.List(p)
+}
+
 // findAuthentication looks for auth of registry in path
 func findAuthentication(registry, path string, legacyFormat bool) (types.DockerAuthConfig, error) {
 	auths, err := readJSONFile(path, legacyFormat)
@@ -336,6 +383,18 @@ func findAuthentication(registry, path string, legacyFormat bool) (types.DockerA
 			Username: username,
 			Password: password,
 		}, nil
+	}
+	if auths.CredsStore != "" {
+		username, password, err := getAuthFromCredHelper(auths.CredsStore, registry)
+		if err != nil {
+			return types.DockerAuthConfig{}, err
+		}
+		if username != "" && password != "" {
+			return types.DockerAuthConfig{
+				Username: username,
+				Password: password,
+			}, nil
+		}
 	}
 
 	// I'm feeling lucky

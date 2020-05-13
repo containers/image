@@ -36,8 +36,26 @@ their accounts on quay.io and docker.io:
 An entry can be removed by using a `logout` command from a container
 tool such as `podman logout` or `buildah logout`.
 
+In addition, credential store and credential helpers can be configured and the credentials-helper
+software can be used to manage the credentials in a more secure way than depending on the base64 encoded authentication
+provided by `login`. If the credential helpers are configured for specific registries, the `credsStore` will not be used
+for operations concerning credentials of the specified registries.
+
+When the credential store is in use on a Linux platform, the auth.json file would contain:
+
+```
+    "auths": {
+        "localhost:5001": {}
+    },
+    "credsStore": "secretservice"
+}
+```
+
+For more information on Docker credential stores, please reference the [GitHub docker-credential-helpers project](https://github.com/docker/docker-credential-helpers/releases).
+
+
 # SEE ALSO
-    buildah-login(1), buildah-logout(1), podman-login(1), podman-logout(1)
+    buildah-login(1), buildah-logout(1), podman-login(1), podman-logout(1), skopeo-login(1), skopeo-logout(1)
 
 # HISTORY
 Feb 2020, Originally compiled by Tom Sweeney <tsweeney@redhat.com>
