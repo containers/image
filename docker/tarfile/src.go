@@ -11,8 +11,8 @@ import (
 	"path"
 	"sync"
 
-	"github.com/containers/image/internal/tmpdir"
 	"github.com/containers/image/internal/iolimits"
+	"github.com/containers/image/internal/tmpdir"
 	"github.com/containers/image/manifest"
 	"github.com/containers/image/pkg/compression"
 	"github.com/containers/image/types"
