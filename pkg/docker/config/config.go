@@ -73,6 +73,42 @@ func SetAuthentication(sys *types.SystemContext, registry, username, password st
 	})
 }
 
+// GetAllCredentials returns the registry credentials for all registries stored
+// in either the auth.json file or the docker/config.json.
+func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthConfig, error) {
+	path, legacyFormat, err := getPathToAuth(sys)
+	if err != nil {
+		return nil, err
+	}
+
+	auths, err := readJSONFile(path, legacyFormat)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error reading JSON file %q", path)
+	}
+
+	authConfigs := make(map[string]types.DockerAuthConfig)
+	for registry, data := range auths.AuthConfigs {
+		conf, err := decodeDockerAuth(data)
+		if err != nil {
+			return nil, err
+		}
+		authConfigs[registry] = conf
+	}
+
+	// Credential helpers may override credentials from the auth file.
+	for registry, credHelper := range auths.CredHelpers {
+		username, password, err := getAuthFromCredHelper(credHelper, registry)
+		if err != nil {
+			return nil, err
+		}
+
+		conf := types.DockerAuthConfig{Username: username, Password: password}
+		authConfigs[registry] = conf
+	}
+
+	return authConfigs, nil
+}
+
 // GetCredentials returns the registry credentials stored in either auth.json
 // file or .docker/config.json, including support for OAuth2 and IdentityToken.
 // If an entry is not found, an empty struct is returned.
