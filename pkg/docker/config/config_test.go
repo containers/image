@@ -218,6 +218,11 @@ func TestGetAuth(t *testing.T) {
 					IdentityToken: "some very long identity token",
 				},
 			},
+			{
+				name:     "match none (empty.json)",
+				hostname: "https://localhost:5000",
+				path:     filepath.Join("testdata", "empty.json"),
+			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				if err := os.RemoveAll(configPath); err != nil {
