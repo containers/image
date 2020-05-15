@@ -248,6 +248,13 @@ func readJSONFile(path string, legacyFormat bool) (dockerConfigFile, error) {
 		return dockerConfigFile{}, errors.Wrapf(err, "error unmarshaling JSON at %q", path)
 	}
 
+	if auths.AuthConfigs == nil {
+		auths.AuthConfigs = map[string]dockerAuthConfig{}
+	}
+	if auths.CredHelpers == nil {
+		auths.CredHelpers = make(map[string]string)
+	}
+
 	return auths, nil
 }
 
