@@ -459,3 +459,56 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 		t.Fatalf("expected JSON syntax error, not: %#+v", err)
 	}
 }
+
+func TestGetAllCredentials(t *testing.T) {
+	// Create a temporary authentication file.
+	tmpFile, err := ioutil.TempFile("", "auth.json.")
+	require.NoError(t, err)
+	_, err = tmpFile.Write([]byte{'{', '}'})
+	require.NoError(t, err)
+	err = tmpFile.Close()
+	require.NoError(t, err)
+	authFilePath := tmpFile.Name()
+	sys := types.SystemContext{AuthFilePath: authFilePath}
+
+	data := []struct {
+		server   string
+		username string
+		password string
+	}{
+		{
+			server:   "example.org",
+			username: "example-user",
+			password: "example-password",
+		},
+		{
+			server:   "quay.io",
+			username: "quay-user",
+			password: "quay-password",
+		},
+		{
+			server:   "localhost:5000",
+			username: "local-user",
+			password: "local-password",
+		},
+	}
+
+	// Write the credentials to the authfile.
+	for _, d := range data {
+		err := SetAuthentication(&sys, d.server, d.username, d.password)
+		require.NoError(t, err)
+	}
+
+	// Now ask for all credentials and make sure that map includes all
+	// servers and the correct credentials.
+	authConfigs, err := GetAllCredentials(&sys)
+	require.NoError(t, err)
+	assert.Equal(t, len(data), len(authConfigs))
+	for _, d := range data {
+		conf, exists := authConfigs[d.server]
+		assert.True(t, exists)
+		assert.Equal(t, d.username, conf.Username)
+		assert.Equal(t, d.password, conf.Password)
+	}
+
+}
