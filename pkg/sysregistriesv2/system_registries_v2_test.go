@@ -558,3 +558,36 @@ func TestRegistriesConfDirectory(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, reg.Blocked)
 }
+
+func TestLocationsForReferences(t *testing.T) {
+	for _, c := range []struct {
+		refs     []string
+		path     string
+		expected []string
+		mustFail bool
+	}{
+		// No references
+		{nil, "testdata/unqualified-search.conf", []string{"registry-a.com", "registry-c.com", "registry-d.com"}, false},
+		{nil, "testdata/unqualified-search-and-mirrors.conf", []string{"mirror-1.com", "mirror-2.com", "registry-a.com", "registry-c.com", "registry-d.com"}, false},
+		{nil, "testdata/invalid-search.conf", nil, true},
+
+		// With references and no mirrors
+		{[]string{"unqualified:latest"}, "testdata/unqualified-search.conf", []string{"registry-a.com", "registry-c.com", "registry-d.com"}, false},
+		{[]string{"docker.io/library/alpine"}, "testdata/unqualified-search.conf", []string{"docker.io"}, false},
+		{[]string{"docker.io/library/alpine", "unqualified"}, "testdata/unqualified-search.conf", []string{"docker.io", "registry-a.com", "registry-c.com", "registry-d.com"}, false},
+
+		// With references and mirrors
+		{[]string{"unqualified:latest"}, "testdata/unqualified-search-and-mirrors.conf", []string{"mirror-1.com", "mirror-2.com", "registry-a.com", "registry-c.com", "registry-d.com"}, false},
+		{[]string{"docker.io/library/alpine:latest", "quay.io/foo:bar"}, "testdata/unqualified-search-and-mirrors.conf", []string{"docker.io", "quay.io"}, false},
+		{[]string{"docker.io/library/alpine:latest", "quay.io/foo:bar", "registry-a.com/foo:bar"}, "testdata/unqualified-search-and-mirrors.conf", []string{"docker.io", "mirror-2.com", "quay.io", "registry-a.com"}, false},
+	} {
+		ctx := &types.SystemContext{SystemRegistriesConfPath: c.path}
+		locations, err := LocationsForReferences(ctx, c.refs)
+		if c.mustFail {
+			require.Error(t, err)
+		} else {
+			require.NoError(t, err)
+		}
+		assert.Equal(t, c.expected, locations)
+	}
+}

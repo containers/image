@@ -519,6 +519,75 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 	return config.Registries, nil
 }
 
+// LocationsForReferences returns a sorted list of locations (i.e., registries)
+// that may be contacted when pulling the specified references.  If the
+// references are empty, all unqualified-search registries and their mirrors
+// will be returned.
+func LocationsForReferences(ctx *types.SystemContext, references []string) ([]string, error) {
+	locations := make(map[string]bool)
+	needUnqualified := len(references) == 0
+
+	addLocation := func(loc string) {
+		locations[loc] = true
+	}
+
+	addRegistry := func(reg *Registry) {
+		if reg == nil {
+			return
+		}
+		addLocation(reg.Location)
+		for _, mir := range reg.Mirrors {
+			addLocation(mir.Location)
+		}
+	}
+
+	for _, ref := range references {
+		// Parse each reference.
+		namedRef, err := reference.ParseNamed(ref)
+		if err != nil {
+			// If it's not a fully-qualified reference, we need to
+			// query unqualified registries and their mirrors.
+			needUnqualified = true
+			continue
+		}
+		// Add the domain of the "raw" reference.
+		addLocation(reference.Domain(namedRef))
+		// Add the registry and all mirrors for the reference.
+		reg, err := FindRegistry(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		addRegistry(reg)
+	}
+
+	// If needed, add all unqualified-search registries and their mirrors.
+	if needUnqualified {
+		config, err := getConfig(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, searchReg := range config.UnqualifiedSearchRegistries {
+			// Add the search registry.
+			addLocation(searchReg)
+			for _, reg := range config.Registries {
+				if !refMatchesPrefix(searchReg, reg.Prefix) {
+					continue
+				}
+				addRegistry(&reg)
+			}
+		}
+	}
+
+	// Turn the map into a slice and sort it.
+	result := []string{}
+	for loc := range locations {
+		result = append(result, loc)
+	}
+	sort.Strings(result)
+
+	return result, nil
+}
+
 // UnqualifiedSearchRegistries returns a list of host[:port] entries to try
 // for unqualified image search, in the returned order)
 func UnqualifiedSearchRegistries(ctx *types.SystemContext) ([]string, error) {
