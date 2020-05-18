@@ -19,7 +19,7 @@ require (
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/imdario/mergo v0.3.9
 	github.com/klauspost/compress v1.10.5
-	github.com/klauspost/pgzip v1.2.3
+	github.com/klauspost/pgzip v1.2.4
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mtrmac/gpgme v0.1.2
 	github.com/opencontainers/go-digest v1.0.0
