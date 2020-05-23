@@ -257,17 +257,15 @@ func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (
 	if err != nil {
 		return err
 	}
-
-	dir := filepath.Dir(path)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if err = os.MkdirAll(dir, 0700); err != nil {
-			return errors.Wrapf(err, "error creating directory %q", dir)
-		}
-	}
-
 	if legacyFormat {
 		return fmt.Errorf("writes to %s using legacy format are not supported", path)
 	}
+
+	dir := filepath.Dir(path)
+	if err = os.MkdirAll(dir, 0700); err != nil {
+		return err
+	}
+
 	auths, err := readJSONFile(path, false)
 	if err != nil {
 		return errors.Wrapf(err, "error reading JSON file %q", path)
