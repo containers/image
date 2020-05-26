@@ -5,8 +5,9 @@ containers-auth.json - syntax for the registry authentication file
 
 # DESCRIPTION
 
-A credentials file stored at `${XDG_RUNTIME_DIR}/containers/auth.json` in
-json format used to authenticate against container image registries.
+A credentials file in JSON format used to authenticate against container image registries.
+On Linux it is stored at `${XDG_RUNTIME_DIR}/containers/auth.json`;
+on Windows and macOS, at `$HOME/.config/containers/auth.json`
 
 ## FORMAT
 
