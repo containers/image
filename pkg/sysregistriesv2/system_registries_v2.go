@@ -338,40 +338,18 @@ func (config *V2RegistriesConf) postProcess() error {
 }
 
 // ConfigPath returns the path to the system-wide registry configuration file.
+// Deprecated: This API implies configuration is read from files, and that there is only one.
+// Please use ConfigurationSourceDescription to obtain a string usable for error messages.
 func ConfigPath(ctx *types.SystemContext) string {
-	if ctx != nil && ctx.SystemRegistriesConfPath != "" {
-		return ctx.SystemRegistriesConfPath
-	}
-
-	userRegistriesFilePath := filepath.Join(homedir.Get(), userRegistriesFile)
-	if _, err := os.Stat(userRegistriesFilePath); err == nil {
-		return userRegistriesFilePath
-	}
-
-	if ctx != nil && ctx.RootForImplicitAbsolutePaths != "" {
-		return filepath.Join(ctx.RootForImplicitAbsolutePaths, systemRegistriesConfPath)
-	}
-
-	return systemRegistriesConfPath
+	return newConfigWrapper(ctx).configPath
 }
 
 // ConfigDirPath returns the path to the system-wide directory for drop-in
 // registry configuration files.
+// Deprecated: This API implies configuration is read from directories, and that there is only one.
+// Please use ConfigurationSourceDescription to obtain a string usable for error messages.
 func ConfigDirPath(ctx *types.SystemContext) string {
-	if ctx != nil && ctx.SystemRegistriesConfDirPath != "" {
-		return ctx.SystemRegistriesConfDirPath
-	}
-
-	userRegistriesDirPath := filepath.Join(homedir.Get(), userRegistriesDir)
-	if _, err := os.Stat(userRegistriesDirPath); err == nil {
-		return userRegistriesDirPath
-	}
-
-	if ctx != nil && ctx.RootForImplicitAbsolutePaths != "" {
-		return filepath.Join(ctx.RootForImplicitAbsolutePaths, systemRegistriesConfDirPath)
-	}
-
-	return systemRegistriesConfDirPath
+	return newConfigWrapper(ctx).configDirPath
 }
 
 // configWrapper is used to store the paths from ConfigPath and ConfigDirPath
@@ -383,10 +361,35 @@ type configWrapper struct {
 
 // newConfigWrapper returns a configWrapper for the specified SystemContext.
 func newConfigWrapper(ctx *types.SystemContext) configWrapper {
-	return configWrapper{
-		configPath:    ConfigPath(ctx),
-		configDirPath: ConfigDirPath(ctx),
+	var wrapper configWrapper
+	userRegistriesFilePath := filepath.Join(homedir.Get(), userRegistriesFile)
+	userRegistriesDirPath := filepath.Join(homedir.Get(), userRegistriesDir)
+	if ctx != nil && ctx.SystemRegistriesConfPath != "" {
+		wrapper.configPath = ctx.SystemRegistriesConfPath
+	} else if _, err := os.Stat(userRegistriesFilePath); err == nil {
+		wrapper.configPath = userRegistriesFilePath
+	} else if ctx != nil && ctx.RootForImplicitAbsolutePaths != "" {
+		wrapper.configPath = filepath.Join(ctx.RootForImplicitAbsolutePaths, systemRegistriesConfPath)
+	} else {
+		wrapper.configPath = systemRegistriesConfPath
 	}
+
+	if ctx != nil && ctx.SystemRegistriesConfDirPath != "" {
+		wrapper.configDirPath = ctx.SystemRegistriesConfDirPath
+	} else if _, err := os.Stat(userRegistriesDirPath); err == nil {
+		wrapper.configDirPath = userRegistriesDirPath
+	} else if ctx != nil && ctx.RootForImplicitAbsolutePaths != "" {
+		wrapper.configDirPath = filepath.Join(ctx.RootForImplicitAbsolutePaths, systemRegistriesConfDirPath)
+	} else {
+		wrapper.configDirPath = systemRegistriesConfDirPath
+	}
+	return wrapper
+}
+
+// ConfigurationSourceDescription returns a string containres paths of registries.conf and registries.conf.d
+func ConfigurationSourceDescription(ctx *types.SystemContext) string {
+	wrapper := newConfigWrapper(ctx)
+	return strings.Join([]string{wrapper.configPath, wrapper.configDirPath}, ", ")
 }
 
 // configMutex is used to synchronize concurrent accesses to configCache.
