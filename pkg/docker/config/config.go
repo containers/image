@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/containers/image/v5/types"
@@ -37,6 +38,7 @@ var (
 	xdgRuntimeDirPath       = filepath.FromSlash("containers/auth.json")
 	dockerHomePath          = filepath.FromSlash(".docker/config.json")
 	dockerLegacyHomePath    = ".dockercfg"
+	nonLinuxAuthFilePath    = filepath.FromSlash(".config/containers/auth.json")
 
 	enableKeyring = false
 
@@ -189,10 +191,8 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 	})
 }
 
-// getPath gets the path of the auth.json file
-// The path can be overriden by the user if the overwrite-path flag is set
-// If the flag is not set and XDG_RUNTIME_DIR is set, the auth.json file is saved in XDG_RUNTIME_DIR/containers
-// Otherwise, the auth.json file is stored in /run/containers/UID
+// getPathToAuth gets the path of the auth.json file used for reading and writting credentials
+// returns the path, and a bool specifies whether the file is in legacy format
 func getPathToAuth(sys *types.SystemContext) (string, bool, error) {
 	if sys != nil {
 		if sys.AuthFilePath != "" {
@@ -204,6 +204,9 @@ func getPathToAuth(sys *types.SystemContext) (string, bool, error) {
 		if sys.RootForImplicitAbsolutePaths != "" {
 			return filepath.Join(sys.RootForImplicitAbsolutePaths, fmt.Sprintf(defaultPerUIDPathFormat, os.Getuid())), false, nil
 		}
+	}
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		return filepath.Join(homedir.Get(), nonLinuxAuthFilePath), false, nil
 	}
 
 	runtimeDir := os.Getenv("XDG_RUNTIME_DIR")
