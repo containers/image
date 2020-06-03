@@ -1060,6 +1060,14 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 			logrus.Debugf("Skipping blob %s (already present):", srcInfo.Digest)
 			bar := ic.c.createProgressBar(pool, srcInfo, "blob", "skipped: already exists")
 			bar.SetTotal(0, true)
+
+			// Throw an event that the layer has been skipped
+			if ic.c.progress != nil && ic.c.progressInterval > 0 {
+				ic.c.progress <- types.ProgressProperties{
+					Event:    types.ProgressEventSkipped,
+					Artifact: srcInfo,
+				}
+			}
 			return blobInfo, cachedDiffID, nil
 		}
 	}
