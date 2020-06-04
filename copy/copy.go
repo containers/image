@@ -659,7 +659,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 		// With !ic.canModifyManifest, that would just be a string of repeated failures for the same reason,
 		// so let’s bail out early and with a better error message.
 		if !ic.canModifyManifest {
-			return nil, "", "", errors.Wrap(err, "Writing manifest failed (and converting it is not possible)")
+			return nil, "", "", errors.Wrap(err, "Writing manifest failed (and converting it is not possible, image is signed or the destination specifies a digest)")
 		}
 
 		// errs is a list of errors when trying various manifest types. Also serves as an "upload succeeded" flag when set to nil.
@@ -757,7 +757,7 @@ func (ic *imageCopier) updateEmbeddedDockerReference() error {
 	}
 
 	if !ic.canModifyManifest {
-		return errors.Errorf("Copying a schema1 image with an embedded Docker reference to %s (Docker reference %s) would invalidate existing signatures. Explicitly enable signature removal to proceed anyway",
+		return errors.Errorf("Copying a schema1 image with an embedded Docker reference to %s (Docker reference %s) would change the manifest, which is not possible (image is signed or the destination specifies a digest)",
 			transports.ImageName(ic.c.dest.Reference()), destRef.String())
 	}
 	ic.manifestUpdates.EmbeddedDockerReference = destRef
@@ -784,7 +784,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	// If we only need to check authorization, no updates required.
 	if updatedSrcInfos != nil && !reflect.DeepEqual(srcInfos, updatedSrcInfos) {
 		if !ic.canModifyManifest {
-			return errors.Errorf("Internal error: copyLayers() needs to use an updated manifest but that was known to be forbidden")
+			return errors.Errorf("Copying this image requires changing layer representation, which is not possible (image is signed or the destination specifies a digest)")
 		}
 		srcInfos = updatedSrcInfos
 		srcInfosUpdated = true
