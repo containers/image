@@ -47,8 +47,12 @@ func newImageDestination(sys *types.SystemContext, ref archiveReference) (types.
 	}, nil
 }
 
-// DesiredLayerCompression indicates if layers must be compressed, decompressed or preserved
 func (d *archiveImageDestination) DesiredLayerCompression() types.LayerCompression {
+	return types.Decompress
+}
+
+// DesiredBlobCompression indicates if layers must be compressed, decompressed or preserved
+func (d *archiveImageDestination) DesiredBlobCompression(info types.BlobInfo) types.LayerCompression {
 	return types.Decompress
 }
 

@@ -155,3 +155,16 @@ func putTestManifest(t *testing.T, ociRef ociReference, tmpDir string) {
 	digest := digest.FromBytes(data).Encoded()
 	assert.Contains(t, paths, filepath.Join(tmpDir, "blobs", "sha256", digest), "The OCI directory does not contain the new manifest data")
 }
+
+func TestOCIDesiredBlobCompression(t *testing.T) {
+	ref, tmpDir := refToTempOCI(t)
+	defer os.RemoveAll(tmpDir)
+	ociRef, ok := ref.(ociReference)
+	require.True(t, ok)
+
+	imageDest, err := newImageDestination(nil, ociRef)
+	assert.NoError(t, err)
+
+	info := types.BlobInfo{MediaType: "this is not a known media type"}
+	assert.Equal(t, types.PreserveOriginal, imageDest.DesiredBlobCompression(info))
+}

@@ -372,6 +372,10 @@ func (s *storageImageDestination) Close() error {
 }
 
 func (s *storageImageDestination) DesiredLayerCompression() types.LayerCompression {
+	return types.PreserveOriginal
+}
+
+func (s *storageImageDestination) DesiredBlobCompression(info types.BlobInfo) types.LayerCompression {
 	// We ultimately have to decompress layers to populate trees on disk
 	// and need to explicitly ask for it here, so that the layers' MIME
 	// types can be set accordingly.

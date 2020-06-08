@@ -110,7 +110,7 @@ func (d *ostreeImageDestination) SupportsSignatures(ctx context.Context) error {
 }
 
 // ShouldCompressLayers returns true iff it is desirable to compress layer blobs written to this destination.
-func (d *ostreeImageDestination) DesiredLayerCompression() types.LayerCompression {
+func (d *ostreeImageDestination) DesiredBlobCompression() types.LayerCompression {
 	return types.PreserveOriginal
 }
 

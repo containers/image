@@ -372,6 +372,10 @@ func (d *openshiftImageDestination) DesiredLayerCompression() types.LayerCompres
 	return types.Compress
 }
 
+func (d *openshiftImageDestination) DesiredBlobCompression(info types.BlobInfo) types.LayerCompression {
+	return types.Compress
+}
+
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
 // uploaded to the image destination, true otherwise.
 func (d *openshiftImageDestination) AcceptsForeignLayerURLs() bool {

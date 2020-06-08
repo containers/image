@@ -20,6 +20,7 @@ import (
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache/none"
 	"github.com/containers/image/v5/types"
+	ociencspec "github.com/containers/ocicrypt/spec"
 	"github.com/docker/distribution/registry/api/errcode"
 	v2 "github.com/docker/distribution/registry/api/v2"
 	"github.com/docker/distribution/registry/client"
@@ -90,6 +91,25 @@ func (d *dockerImageDestination) SupportsSignatures(ctx context.Context) error {
 
 func (d *dockerImageDestination) DesiredLayerCompression() types.LayerCompression {
 	return types.Compress
+}
+
+func (d *dockerImageDestination) DesiredBlobCompression(info types.BlobInfo) types.LayerCompression {
+	// it's ok to compress known media types
+	if manifest.SupportedSchema2MediaType(info.MediaType) == nil {
+		return types.Compress
+	}
+	switch info.MediaType {
+	case imgspecv1.MediaTypeImageLayer, imgspecv1.MediaTypeImageLayerGzip, imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributableZstd, imgspecv1.MediaTypeImageLayerZstd, ociencspec.MediaTypeLayerEnc, ociencspec.MediaTypeLayerGzipEnc:
+		return types.Compress
+	}
+
+	// v1 manifests didn't have MediaTypes, so "" is still "known"
+	if info.MediaType == "" {
+		return types.Compress
+	}
+
+	// don't compress anything else
+	return types.PreserveOriginal
 }
 
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually

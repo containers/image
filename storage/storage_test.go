@@ -392,16 +392,12 @@ func TestWriteRead(t *testing.T) {
 		if err := dest.SupportsSignatures(context.Background()); err != nil {
 			t.Fatalf("Destination image doesn't support signatures: %v", err)
 		}
-		t.Logf("compress layers: %v", dest.DesiredLayerCompression())
-		compression := archive.Uncompressed
-		if dest.DesiredLayerCompression() == types.Compress {
-			compression = archive.Gzip
-		}
-		digest, decompressedSize, size, blob := makeLayer(t, compression)
-		if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
+		digest, decompressedSize, size, blob := makeLayer(t, archive.Uncompressed)
+		info := types.BlobInfo{
 			Size:   size,
 			Digest: digest,
-		}, cache, false); err != nil {
+		}
+		if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), info, cache, false); err != nil {
 			t.Fatalf("Error saving randomly-generated layer to destination: %v", err)
 		}
 		t.Logf("Wrote randomly-generated layer %q (%d/%d bytes) to destination", digest, size, decompressedSize)

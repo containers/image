@@ -87,8 +87,12 @@ func imageLoadGoroutine(ctx context.Context, c *client.Client, reader *io.PipeRe
 	defer resp.Body.Close()
 }
 
-// DesiredLayerCompression indicates if layers must be compressed, decompressed or preserved
 func (d *daemonImageDestination) DesiredLayerCompression() types.LayerCompression {
+	return types.PreserveOriginal
+}
+
+// DesiredBlobCompression indicates if layers must be compressed, decompressed or preserved
+func (d *daemonImageDestination) DesiredBlobCompression(info types.BlobInfo) types.LayerCompression {
 	return types.PreserveOriginal
 }
 
