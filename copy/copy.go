@@ -3,6 +3,7 @@ package copy
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -148,6 +149,24 @@ const (
 	// only accept one image (i.e., it cannot accept lists), an error
 	// should be returned.
 	CopySpecificImages
+
+	// Labels which indicate information about the targetting images and layers.
+	// This can be included in the BlobInfo as annotations and can be passed into
+	// the destination. These labels will help the destination to discover the
+	// targetting contents on that side and avoid duplication of downloads.
+	//
+	// layerTargetDiffID is a label contains the digest of the uncompressed contents
+	// of the targetting layer.
+	layerTargetDiffID = "containers/image/target.diffID"
+	// layerTargetDigest is a label contains the digest of the (possibly compressed)
+	// targetting layer.
+	layerTargetDigest = "containers/image/target.layerdigest"
+	// layerTargetReference is a label contains the reference string of the
+	// targetting image which contains the targetting layer.
+	layerTargetReference = "containers/image/target.reference"
+	// layerTargetImageLayers is a label contains the comma-separated cryptographic
+	// signatures of layers which are contained in the targetting image.
+	layerTargetImageLayers = "containers/image/target.layers"
 )
 
 // ImageListSelection is one of CopySystemImage, CopyAllImages, or
@@ -847,6 +866,17 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		}
 	}
 
+	// Get DiffIDs from config if possible
+	var chain []digest.Digest
+	if cfgInfo := ic.src.ConfigInfo(); cfgInfo.Digest != "" {
+		if configBlob, err := ic.src.ConfigBlob(ctx); err == nil {
+			imageConfig := &manifest.Schema2Image{}
+			if err := json.Unmarshal(configBlob, imageConfig); err == nil && len(srcInfos) == len(imageConfig.RootFS.DiffIDs) {
+				chain = imageConfig.RootFS.DiffIDs
+			}
+		}
+	}
+
 	if err := func() error { // A scope for defer
 		progressPool, progressCleanup := ic.c.newProgressPool(ctx)
 		defer func() {
@@ -855,10 +885,25 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 			progressCleanup()
 		}()
 
+		var layerDigests string
+		for _, srcLayer := range srcInfos {
+			layerDigests += fmt.Sprintf("%s,", srcLayer.Digest.String())
+		}
 		for i, srcLayer := range srcInfos {
 			err = copySemaphore.Acquire(ctx, 1)
 			if err != nil {
 				return errors.Wrapf(err, "Can't acquire semaphore")
+			}
+			// Add labels containing information of the targetting image and layers.
+			// This will help the destination to discover the targetting layer on that side.
+			if srcLayer.Annotations == nil {
+				srcLayer.Annotations = make(map[string]string)
+			}
+			if len(chain) > i {
+				srcLayer.Annotations[layerTargetDiffID] = chain[i].String()
+				srcLayer.Annotations[layerTargetDigest] = srcLayer.Digest.String()
+				srcLayer.Annotations[layerTargetReference] = ic.c.rawSource.Reference().DockerReference().String()
+				srcLayer.Annotations[layerTargetImageLayers] = layerDigests
 			}
 			copyGroup.Add(1)
 			go copyLayerHelper(i, srcLayer, encLayerBitmap[i], progressPool)

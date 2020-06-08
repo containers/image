@@ -24,6 +24,7 @@ import (
 	"github.com/containers/storage"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/containers/storage/pkg/ioutils"
+	"github.com/containers/storage/pkg/stringid"
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -54,17 +55,18 @@ type storageImageSource struct {
 
 type storageImageDestination struct {
 	imageRef        storageReference
-	directory       string                          // Temporary directory where we store blobs until Commit() time
-	nextTempFileID  int32                           // A counter that we use for computing filenames to assign to blobs
-	manifest        []byte                          // Manifest contents, temporary
-	signatures      []byte                          // Signature contents, temporary
-	signatureses    map[digest.Digest][]byte        // Instance signature contents, temporary
-	putBlobMutex    sync.Mutex                      // Mutex to sync state for parallel PutBlob executions
-	blobDiffIDs     map[digest.Digest]digest.Digest // Mapping from layer blobsums to their corresponding DiffIDs
-	fileSizes       map[digest.Digest]int64         // Mapping from layer blobsums to their sizes
-	filenames       map[digest.Digest]string        // Mapping from layer blobsums to names of files we used to hold them
-	SignatureSizes  []int                           `json:"signature-sizes,omitempty"`  // List of sizes of each signature slice
-	SignaturesSizes map[digest.Digest][]int         `json:"signatures-sizes,omitempty"` // Sizes of each manifest's signature slice
+	directory       string                           // Temporary directory where we store blobs until Commit() time
+	nextTempFileID  int32                            // A counter that we use for computing filenames to assign to blobs
+	manifest        []byte                           // Manifest contents, temporary
+	signatures      []byte                           // Signature contents, temporary
+	signatureses    map[digest.Digest][]byte         // Instance signature contents, temporary
+	putBlobMutex    sync.Mutex                       // Mutex to sync state for parallel PutBlob executions
+	blobDiffIDs     map[digest.Digest]digest.Digest  // Mapping from layer blobsums to their corresponding DiffIDs
+	blobInfos       map[digest.Digest]types.BlobInfo // Mapping from layer blobsums to their corresponding information
+	fileSizes       map[digest.Digest]int64          // Mapping from layer blobsums to their sizes
+	filenames       map[digest.Digest]string         // Mapping from layer blobsums to names of files we used to hold them
+	SignatureSizes  []int                            `json:"signature-sizes,omitempty"`  // List of sizes of each signature slice
+	SignaturesSizes map[digest.Digest][]int          `json:"signatures-sizes,omitempty"` // Sizes of each manifest's signature slice
 }
 
 type storageImageCloser struct {
@@ -352,6 +354,7 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 		directory:       directory,
 		signatureses:    make(map[digest.Digest][]byte),
 		blobDiffIDs:     make(map[digest.Digest]digest.Digest),
+		blobInfos:       make(map[digest.Digest]types.BlobInfo),
 		fileSizes:       make(map[digest.Digest]int64),
 		filenames:       make(map[digest.Digest]string),
 		SignatureSizes:  []int{},
@@ -484,6 +487,25 @@ func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo t
 			Size:      size,
 			MediaType: blobinfo.MediaType,
 		}, nil
+	}
+
+	// Check if we can get the blob from the underlying store. Here we use CreateLayer
+	// API for asking if the store has the targetting layer blob or not. The store can
+	// discover the targetting contents of the blob using the image and layers information
+	// passed through labels.
+	// The store can return storage.ErrTargetLayerAlreadyExists error for indicating the
+	// existence of the targetting contents on their side. We can get the layer information
+	// with normal APIs (LayersByUncompressedDigest, LayersByCompressedDigest, etc.)
+	if blobinfo.Annotations != nil {
+		tmpID := stringid.GenerateRandomID()
+		_, err := s.imageRef.transport.store.CreateLayer(tmpID, "", nil, "", false, &storage.LayerOptions{Labels: blobinfo.Annotations})
+		if err != nil && errors.Cause(err) == storage.ErrTargetLayerAlreadyExists {
+			s.blobInfos[blobinfo.Digest] = blobinfo // will be used during commit
+		} else if err == nil { // needs cleanup
+			if err := s.imageRef.transport.store.Delete(tmpID); err != nil {
+				return false, types.BlobInfo{}, err
+			}
+		}
 	}
 
 	// Check if we have a wasn't-compressed layer in storage that's based on that blob.
@@ -682,6 +704,25 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 			lastLayer = layer.ID
 			continue
 		}
+
+		// If we have blobinfo, the underlying store already has the layer blob corresponding to
+		// this information, which we want to apply on top of the `lastLayer`. Here we expect
+		// the underlying store also has the chained view of this layer (on top of the
+		// `lastLayer`). The store can return storage.ErrTargetLayerAlreadyExists for indicating
+		// the existence of the chain.
+		if blobinfo, ok := s.blobInfos[blob.Digest]; ok {
+			if _, err := s.imageRef.transport.store.CreateLayer(id, lastLayer, nil, "", false, &storage.LayerOptions{Labels: blobinfo.Annotations}); err != nil && errors.Cause(err) == storage.ErrTargetLayerAlreadyExists {
+				if layer, err := s.imageRef.transport.store.Layer(id); layer != nil && err == nil {
+					lastLayer = layer.ID
+					continue
+				}
+			} else if err == nil { // needs cleanup
+				if err := s.imageRef.transport.store.Delete(id); err != nil {
+					return err
+				}
+			}
+		}
+
 		// Check if we previously cached a file with that blob's contents.  If we didn't,
 		// then we need to read the desired contents from a layer.
 		filename, ok := s.filenames[blob.Digest]
