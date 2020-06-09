@@ -72,6 +72,9 @@ func SetAuthentication(sys *types.SystemContext, registry, username, password st
 			}
 			logrus.Debugf("failed to authenticate with the kernel keyring, falling back to authfiles. %v", err)
 		}
+		fmt.Fprintf(os.Stderr, "%s\n", `WARNING! Your password will be stored unencrypted in authentication file
+Configure a credential helper to remove this warning. See
+https://github.com/containers/image/blob/master/docs/containers-auth.json.5.md`)
 		creds := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 		newCreds := dockerAuthConfig{Auth: creds}
 		auths.AuthConfigs[registry] = newCreds
