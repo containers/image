@@ -11,6 +11,7 @@ import (
 	"github.com/containers/image/v5/pkg/blobinfocache/memory"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -106,6 +107,30 @@ func TestPutManifestTwice(t *testing.T) {
 	index, err := ociRef.getIndex()
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(index.Manifests), "Unexpected number of manifests")
+}
+
+func TestPutTwoDifferentTags(t *testing.T) {
+	ref, tmpDir := refToTempOCI(t)
+	defer os.RemoveAll(tmpDir)
+
+	ociRef, ok := ref.(ociReference)
+	require.True(t, ok)
+
+	putTestConfig(t, ociRef, tmpDir)
+	putTestManifest(t, ociRef, tmpDir)
+
+	// add the same manifest with a different tag; it shouldn't get overwritten
+	ref, err := NewReference(tmpDir, "zomg")
+	assert.NoError(t, err)
+	ociRef, ok = ref.(ociReference)
+	require.True(t, ok)
+	putTestManifest(t, ociRef, tmpDir)
+
+	index, err := ociRef.getIndex()
+	assert.NoError(t, err)
+	assert.Len(t, index.Manifests, 3, "Unexpected number of manifests")
+	assert.Equal(t, "imageValue", index.Manifests[1].Annotations[imgspecv1.AnnotationRefName])
+	assert.Equal(t, "zomg", index.Manifests[2].Annotations[imgspecv1.AnnotationRefName])
 }
 
 func putTestConfig(t *testing.T, ociRef ociReference, tmpDir string) {
