@@ -106,7 +106,7 @@ func TestPutManifestTwice(t *testing.T) {
 
 	index, err := ociRef.getIndex()
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(index.Manifests), "Unexpected number of manifests")
+	assert.Len(t, index.Manifests, 2, "Unexpected number of manifests")
 }
 
 func TestPutTwoDifferentTags(t *testing.T) {
