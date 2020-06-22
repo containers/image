@@ -476,6 +476,9 @@ func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo t
 	if err := blobinfo.Digest.Validate(); err != nil {
 		return false, types.BlobInfo{}, errors.Wrapf(err, `Can not check for a blob with invalid digest`)
 	}
+	if blobinfo.Digest == image.GzippedEmptyLayerDigest {
+		return true, blobinfo, nil
+	}
 
 	// Check if we've already cached it in a file.
 	if size, ok := s.fileSizes[blobinfo.Digest]; ok {
