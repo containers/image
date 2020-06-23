@@ -1,16 +1,15 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/containers/image/v5/types"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -95,6 +94,17 @@ func TestGetAuth(t *testing.T) {
 			t.Logf("failed to cleanup temporary home directory %q: %v", tmpXDGRuntimeDir, err)
 		}
 		os.Setenv("XDG_RUNTIME_DIR", origXDG)
+	}()
+
+	// override PATH for executing credHelper
+	curtDir, err := os.Getwd()
+	require.NoError(t, err)
+	origPath := os.Getenv("PATH")
+	newPath := fmt.Sprintf("%s:%s", filepath.Join(curtDir, "testdata"), origPath)
+	os.Setenv("PATH", newPath)
+	t.Logf("using PATH: %q", newPath)
+	defer func() {
+		os.Setenv("PATH", origPath)
 	}()
 
 	tmpHomeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
@@ -236,6 +246,18 @@ func TestGetAuth(t *testing.T) {
 				name:     "match none (empty.json)",
 				hostname: "https://localhost:5000",
 				path:     filepath.Join("testdata", "empty.json"),
+			},
+			{
+				name:     "credhelper from registries.conf",
+				hostname: "registry-a.com",
+				sys: &types.SystemContext{
+					SystemRegistriesConfPath:    filepath.Join("testdata", "cred-helper.conf"),
+					SystemRegistriesConfDirPath: filepath.Join("testdata", "IdoNotExist"),
+				},
+				expected: types.DockerAuthConfig{
+					Username: "foo",
+					Password: "bar",
+				},
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
@@ -439,7 +461,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if err == nil {
 		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}
-	if _, ok := errors.Cause(err).(*json.SyntaxError); !ok {
+	if !strings.Contains(err.Error(), "error unmarshaling JSON") {
 		t.Fatalf("expected JSON syntax error, not: %#+v", err)
 	}
 
@@ -460,7 +482,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if err == nil {
 		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}
-	if _, ok := errors.Cause(err).(*json.SyntaxError); !ok {
+	if !strings.Contains(err.Error(), "error unmarshaling JSON") {
 		t.Fatalf("expected JSON syntax error, not: %#+v", err)
 	}
 }
@@ -474,12 +496,29 @@ func TestGetAllCredentials(t *testing.T) {
 	err = tmpFile.Close()
 	require.NoError(t, err)
 	authFilePath := tmpFile.Name()
-	sys := types.SystemContext{AuthFilePath: authFilePath}
+	// override PATH for executing credHelper
+	path, err := os.Getwd()
+	require.NoError(t, err)
+	origPath := os.Getenv("PATH")
+	newPath := fmt.Sprintf("%s:%s", filepath.Join(path, "testdata"), origPath)
+	os.Setenv("PATH", newPath)
+	t.Logf("using PATH: %q", newPath)
+	defer func() {
+		os.Setenv("PATH", origPath)
+	}()
+	err = os.Chmod(filepath.Join(path, "testdata", "docker-credential-helper-registry"), os.ModePerm)
+	require.NoError(t, err)
+	sys := types.SystemContext{
+		AuthFilePath:                authFilePath,
+		SystemRegistriesConfPath:    filepath.Join("testdata", "cred-helper-with-auth-files.conf"),
+		SystemRegistriesConfDirPath: filepath.Join("testdata", "IdoNotExist"),
+	}
 
 	data := []struct {
 		server   string
 		username string
 		password string
+		noStore  bool
 	}{
 		{
 			server:   "example.org",
@@ -496,10 +535,19 @@ func TestGetAllCredentials(t *testing.T) {
 			username: "local-user",
 			password: "local-password",
 		},
+		{
+			server:   "registry-a.com",
+			username: "foo",
+			password: "bar",
+			noStore:  true,
+		},
 	}
 
 	// Write the credentials to the authfile.
 	for _, d := range data {
+		if d.noStore {
+			continue
+		}
 		err := SetAuthentication(&sys, d.server, d.username, d.password)
 		require.NoError(t, err)
 	}
@@ -508,12 +556,13 @@ func TestGetAllCredentials(t *testing.T) {
 	// servers and the correct credentials.
 	authConfigs, err := GetAllCredentials(&sys)
 	require.NoError(t, err)
-	assert.Equal(t, len(data), len(authConfigs))
+	require.Equal(t, len(data), len(authConfigs))
+
 	for _, d := range data {
 		conf, exists := authConfigs[d.server]
-		assert.True(t, exists)
-		assert.Equal(t, d.username, conf.Username)
-		assert.Equal(t, d.password, conf.Password)
+		require.True(t, exists, "%v", d)
+		require.Equal(t, d.username, conf.Username, "%v", d)
+		require.Equal(t, d.password, conf.Password, "%v", d)
 	}
 
 }

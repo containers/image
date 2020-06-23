@@ -17,6 +17,7 @@ require (
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/gorilla/mux v1.7.4 // indirect
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/imdario/mergo v0.3.11
 	github.com/klauspost/compress v1.11.13
 	github.com/klauspost/pgzip v1.2.5

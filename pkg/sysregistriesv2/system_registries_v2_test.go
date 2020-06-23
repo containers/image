@@ -636,3 +636,43 @@ func TestGetShortNameMode(t *testing.T) {
 		assert.Equal(t, test.mode, mode, "%s", test.path)
 	}
 }
+
+func TestCredentialHelpers(t *testing.T) {
+	tests := []struct {
+		confPath    string
+		confDirPath string
+		helpers     []string
+	}{
+		{
+			confPath:    "testdata/cred-helper.conf",
+			confDirPath: "testdata/this-does-not-exist",
+			helpers:     []string{"helper-1", "helper-2"},
+		},
+		{
+			confPath:    "testdata/empty.conf",
+			confDirPath: "testdata/this-does-not-exist",
+			helpers:     []string{"containers-auth.json"},
+		},
+		{
+			confPath:    "testdata/cred-helper.conf",
+			confDirPath: "testdata/registries.conf.d-empty-helpers",
+			helpers:     []string{"containers-auth.json"},
+		},
+		{
+			confPath:    "testdata/cred-helper.conf",
+			confDirPath: "testdata/registries.conf.d",
+			helpers:     []string{"dropin-1", "dropin-2"},
+		},
+	}
+
+	for _, test := range tests {
+		ctx := &types.SystemContext{
+			SystemRegistriesConfPath:    test.confPath,
+			SystemRegistriesConfDirPath: test.confDirPath,
+		}
+
+		helpers, err := CredentialHelpers(ctx)
+		require.NoError(t, err)
+		require.Equal(t, test.helpers, helpers, "%v", test)
+	}
+}
