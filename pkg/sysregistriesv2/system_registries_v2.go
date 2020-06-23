@@ -78,6 +78,9 @@ type Registry struct {
 	// effectively be pulled from "example.com/foo/bar/myimage:latest".
 	// If no Prefix is specified, it defaults to the specified location.
 	Prefix string `toml:"prefix"`
+	// The credential helper for specified registry
+	// global default CredentialHelpers is used if CredentialHelper is not specified
+	CredentialHelper string `toml:"credential-helper,omitempty"`
 	// A registry is an Endpoint too
 	Endpoint
 	// The registry's mirrors.
@@ -151,7 +154,9 @@ func (config *V1RegistriesConf) Nonempty() bool {
 
 // V2RegistriesConf is the sysregistries v2 configuration format.
 type V2RegistriesConf struct {
-	Registries []Registry `toml:"registry"`
+	// The credential store for registries
+	CredentialHelpers []string   `toml:"credential-helpers"`
+	Registries        []Registry `toml:"registry"`
 	// An array of host[:port] (not prefix!) entries to use for resolving unqualified image references
 	UnqualifiedSearchRegistries []string `toml:"unqualified-search-registries"`
 
@@ -299,6 +304,11 @@ func (config *V2RegistriesConf) postProcessRegistries() error {
 			if err != nil {
 				return err
 			}
+		}
+
+		// ignore the credHelper if it is set for inner namespace
+		if reg.CredentialHelper != "" && strings.Contains(reg.Prefix, "/") {
+			return &InvalidRegistries{s: fmt.Sprintf("credential-helper can only be configured for registry domain, not for inner namespaces %s", reg.Prefix)}
 		}
 
 		// make sure mirrors are valid
@@ -661,6 +671,51 @@ func GetShortNameMode(ctx *types.SystemContext) (types.ShortNameMode, error) {
 		return -1, err
 	}
 	return config.shortNameMode, err
+}
+
+// AllConfiguredCredentialHelpers returns a list of all credential helpers that are configured for some registry
+// Almost all callers should use CredentialHelpersForRegistry to get configuration applicable to a specific registry.
+func AllConfiguredCredentialHelpers(sys *types.SystemContext) ([]string, error) {
+	helpers := make(map[string]bool)
+	config, err := getConfig(sys)
+	if err != nil {
+		return nil, err
+	}
+	for _, store := range config.partialV2.CredentialHelpers {
+		helpers[store] = true
+	}
+	for _, reg := range config.partialV2.Registries {
+		if reg.CredentialHelper != "" {
+			if ok := helpers[reg.CredentialHelper]; !ok {
+				helpers[reg.CredentialHelper] = true
+			}
+		}
+	}
+
+	var result []string
+	for cred := range helpers {
+		result = append(result, cred)
+	}
+
+	return result, nil
+}
+
+// CredentialHelpersForRegistry returns a list of credential helpers to try to use for the given registry,
+// in the order to try.
+func CredentialHelpersForRegistry(sys *types.SystemContext, registry string) ([]string, error) {
+	config, err := getConfig(sys)
+	if err != nil {
+		return nil, err
+	}
+	for _, reg := range config.partialV2.Registries {
+		if reg.Prefix == registry && reg.CredentialHelper != "" {
+			return []string{reg.CredentialHelper}, nil
+		}
+	}
+	if len(config.partialV2.CredentialHelpers) > 0 {
+		return config.partialV2.CredentialHelpers, nil
+	}
+	return nil, nil
 }
 
 // refMatchesPrefix returns true iff ref,

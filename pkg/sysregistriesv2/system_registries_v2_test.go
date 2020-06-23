@@ -636,3 +636,41 @@ func TestGetShortNameMode(t *testing.T) {
 		assert.Equal(t, test.mode, mode, "%s", test.path)
 	}
 }
+
+func TestCredentialHelpersForRegistry(t *testing.T) {
+	ctx := &types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/cred-helper.conf",
+		SystemRegistriesConfDirPath: "testdata/registries.conf.d",
+	}
+	for _, c := range []struct {
+		registry string
+		helper   []string
+	}{
+		{"registry-a.com", []string{"helper-a"}},
+		{"registry-b.com", []string{"helper-b", "helper"}},
+		{"registry-c.com", []string{"helper-c"}},
+		{"registry-not-conf.com", []string{"helper-b", "helper"}},
+	} {
+		ret, err := CredentialHelpersForRegistry(ctx, c.registry)
+		require.NoError(t, err)
+		assert.ElementsMatch(t, c.helper, ret)
+	}
+
+	ctx = &types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/cred-helper-invalid.conf",
+		SystemRegistriesConfDirPath: "testdata/registries.conf.d",
+	}
+	_, err := CredentialHelpersForRegistry(ctx, "registry-c.com")
+	assert.NotEqual(t, nil, err)
+}
+
+func TestAllConfiguredCredentialHelpers(t *testing.T) {
+	ctx := &types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/cred-helper.conf",
+		SystemRegistriesConfDirPath: "testdata/registries.conf.d",
+	}
+	expect := []string{"helper-b", "helper-c", "helper-a", "helper"}
+	ret, err := AllConfiguredCredentialHelpers(ctx)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, expect, ret)
+}

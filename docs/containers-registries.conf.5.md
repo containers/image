@@ -16,6 +16,8 @@ Container engines will use the `$HOME/.config/containers/registries.conf` if it 
 `unqualified-search-registries`
 : An array of _host_[`:`_port_] registries to try when pulling an unqualified image, in order.
 
+`credential-helpers`: An array of credential helpers used as external credential store for the registries.
+
 ### NAMESPACED `[[registry]]` SETTINGS
 
 The bulk of the configuration is represented as an array of `[[registry]]`
@@ -50,6 +52,9 @@ Given an image name, a single `[[registry]]` TOML table is chosen based on its `
 `blocked`
 : `true` or `false`.
     If `true`, pulling images with matching names is forbidden.
+
+`credential-helper`
+: The credential helper for registry specified by the `prefix` field.  Global default `credential-helpers` is used if `credential-helper` is not specified. This configuration only works if the `prefix` field is a registry domain, not used for inner namespace.
 
 #### Remapping and mirroring registries
 

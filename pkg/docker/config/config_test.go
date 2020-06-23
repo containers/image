@@ -97,6 +97,17 @@ func TestGetAuth(t *testing.T) {
 		os.Setenv("XDG_RUNTIME_DIR", origXDG)
 	}()
 
+	// override PATH for executing credHelper
+	curtDir, err := os.Getwd()
+	require.NoError(t, err)
+	origPath := os.Getenv("PATH")
+	newPath := fmt.Sprintf("%s:%s", filepath.Join(curtDir, "testdata"), origPath)
+	os.Setenv("PATH", newPath)
+	t.Logf("using PATH: %q", newPath)
+	defer func() {
+		os.Setenv("PATH", origPath)
+	}()
+
 	tmpHomeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
 		t.Fatal(err)
@@ -236,6 +247,17 @@ func TestGetAuth(t *testing.T) {
 				name:     "match none (empty.json)",
 				hostname: "https://localhost:5000",
 				path:     filepath.Join("testdata", "empty.json"),
+			},
+			{
+				name:     "credhelper from registries.conf",
+				hostname: "registry-a.com",
+				sys: &types.SystemContext{
+					SystemRegistriesConfPath: filepath.Join("testdata", "cred-helper.conf"),
+				},
+				expected: types.DockerAuthConfig{
+					Username: "foo",
+					Password: "bar",
+				},
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
@@ -474,7 +496,22 @@ func TestGetAllCredentials(t *testing.T) {
 	err = tmpFile.Close()
 	require.NoError(t, err)
 	authFilePath := tmpFile.Name()
-	sys := types.SystemContext{AuthFilePath: authFilePath}
+	// override PATH for executing credHelper
+	path, err := os.Getwd()
+	require.NoError(t, err)
+	origPath := os.Getenv("PATH")
+	newPath := fmt.Sprintf("%s:%s", filepath.Join(path, "testdata"), origPath)
+	os.Setenv("PATH", newPath)
+	t.Logf("using PATH: %q", newPath)
+	defer func() {
+		os.Setenv("PATH", origPath)
+	}()
+	err = os.Chmod(filepath.Join(path, "testdata", "docker-credential-helper-registry"), os.ModePerm)
+	require.NoError(t, err)
+	sys := types.SystemContext{
+		AuthFilePath:             authFilePath,
+		SystemRegistriesConfPath: filepath.Join("testdata", "cred-helper.conf"),
+	}
 
 	data := []struct {
 		server   string
@@ -495,6 +532,11 @@ func TestGetAllCredentials(t *testing.T) {
 			server:   "localhost:5000",
 			username: "local-user",
 			password: "local-password",
+		},
+		{
+			server:   "registry-a.com",
+			username: "foo",
+			password: "bar",
 		},
 	}
 
