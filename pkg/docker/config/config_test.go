@@ -20,6 +20,7 @@ func TestGetPathToAuth(t *testing.T) {
 
 	tmpDir, err := ioutil.TempDir("", "TestGetPathToAuth")
 	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
 
 	// Environment is per-process, so this looks very unsafe; actually it seems fine because tests are not
 	// run in parallel unless they opt in by calling t.Parallel().  So don’t do that.
