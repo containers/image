@@ -117,7 +117,7 @@ func TestBlobInfoCacheDir(t *testing.T) {
 func TestDefaultCache(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "TestDefaultCache")
 	require.NoError(t, err)
-	//defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir)
 
 	// Success
 	normalDir := filepath.Join(tmpDir, "normal")
