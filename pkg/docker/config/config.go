@@ -284,11 +284,11 @@ func getPathToAuth(sys *types.SystemContext) (string, bool, error) {
 // if the file exists and is empty, readJSONFile returns an error
 func readJSONFile(path string, legacyFormat bool) (dockerConfigFile, error) {
 	var auths dockerConfigFile
+	auths.AuthConfigs = map[string]dockerAuthConfig{}
 
 	raw, err := ioutil.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			auths.AuthConfigs = map[string]dockerAuthConfig{}
 			return auths, nil
 		}
 		return dockerConfigFile{}, err
