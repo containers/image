@@ -1212,6 +1212,8 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 			}
 		}
 		decrypted = true
+	} else if isOciEncrypted(srcInfo.MediaType) && c.ociDecryptConfig == nil {
+		return types.BlobInfo{}, errors.Errorf("Error decrypting layer %s, no decryption keys provided", srcInfo.Digest)
 	}
 
 	// === Detect compression of the input stream.
