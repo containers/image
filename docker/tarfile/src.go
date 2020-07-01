@@ -24,6 +24,7 @@ import (
 type Source struct {
 	tarPath              string
 	removeTarPathOnClose bool // Remove temp file on close if true
+	manifests            []ManifestItem
 	// The following data is only available after ensureCachedDataIsPresent() succeeds
 	tarManifest       *ManifestItem // nil if not available yet.
 	configBytes       []byte
@@ -74,6 +75,26 @@ func NewSourceFromFileWithContext(sys *types.SystemContext, path string) (*Sourc
 		}, nil
 	}
 	return NewSourceFromStreamWithSystemContext(sys, stream)
+}
+
+// FromManifest returns a Source for the ManifestItem at the specified index.
+// Close() is a NOP for the returned Source.
+func (s *Source) FromManifest(index int) (*Source, error) {
+	// Note: selecting sub-sources rather than spliting one into multiple
+	// sub-sources entails the benefit that we can select images within an
+	// archive.  This leaves the door open to provide tags for sources and
+	// copy a specific image from the archive.
+	items, err := s.LoadTarManifest()
+	if err != nil {
+		return nil, err
+	}
+	if index < 0 || index >= len(items) {
+		return nil, errors.Errorf("no manifest item for index %d", index)
+	}
+	return &Source{
+		tarPath:   s.tarPath,
+		manifests: []ManifestItem{items[index]},
+	}, nil
 }
 
 // NewSourceFromStream returns a tarfile.Source for the specified inputStream,
@@ -230,14 +251,9 @@ func (s *Source) ensureCachedDataIsPresent() error {
 // Call ensureCachedDataIsPresent instead.
 func (s *Source) ensureCachedDataIsPresentPrivate() error {
 	// Read and parse manifest.json
-	tarManifest, err := s.loadTarManifest()
+	tarManifest, err := s.LoadTarManifest()
 	if err != nil {
 		return err
-	}
-
-	// Check to make sure length is 1
-	if len(tarManifest) != 1 {
-		return errors.Errorf("Unexpected tar manifest.json: expected 1 item, got %d", len(tarManifest))
 	}
 
 	// Read and parse config.
@@ -267,20 +283,6 @@ func (s *Source) ensureCachedDataIsPresentPrivate() error {
 	return nil
 }
 
-// loadTarManifest loads and decodes the manifest.json.
-func (s *Source) loadTarManifest() ([]ManifestItem, error) {
-	// FIXME? Do we need to deal with the legacy format?
-	bytes, err := s.readTarComponent(manifestFileName, iolimits.MaxTarFileManifestSize)
-	if err != nil {
-		return nil, err
-	}
-	var items []ManifestItem
-	if err := json.Unmarshal(bytes, &items); err != nil {
-		return nil, errors.Wrap(err, "Error decoding tar manifest.json")
-	}
-	return items, nil
-}
-
 // Close removes resources associated with an initialized Source, if any.
 func (s *Source) Close() error {
 	if s.removeTarPathOnClose {
@@ -291,7 +293,20 @@ func (s *Source) Close() error {
 
 // LoadTarManifest loads and decodes the manifest.json
 func (s *Source) LoadTarManifest() ([]ManifestItem, error) {
-	return s.loadTarManifest()
+	if s.manifests != nil {
+		return s.manifests, nil
+	}
+	// FIXME? Do we need to deal with the legacy format?
+	bytes, err := s.readTarComponent(manifestFileName, iolimits.MaxTarFileManifestSize)
+	if err != nil {
+		return nil, err
+	}
+	var items []ManifestItem
+	if err := json.Unmarshal(bytes, &items); err != nil {
+		return nil, errors.Wrap(err, "Error decoding tar manifest.json")
+	}
+	s.manifests = items
+	return s.manifests, nil
 }
 
 func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manifest.Schema2Image) (map[digest.Digest]*layerInfo, error) {

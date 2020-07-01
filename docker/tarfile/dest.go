@@ -24,9 +24,11 @@ import (
 
 // Destination is a partial implementation of types.ImageDestination for writing to an io.Writer.
 type Destination struct {
-	writer   io.Writer
-	tar      *tar.Writer
-	repoTags []reference.NamedTagged
+	writer       io.Writer
+	tar          *tar.Writer
+	repoTags     []reference.NamedTagged
+	manifest     []ManifestItem
+	repositories map[string]map[string]string
 	// Other state.
 	blobs  map[digest.Digest]types.BlobInfo // list of already-sent blobs
 	config []byte
@@ -46,11 +48,12 @@ func NewDestinationWithContext(sys *types.SystemContext, dest io.Writer, ref ref
 		repoTags = append(repoTags, ref)
 	}
 	return &Destination{
-		writer:   dest,
-		tar:      tar.NewWriter(dest),
-		repoTags: repoTags,
-		blobs:    make(map[digest.Digest]types.BlobInfo),
-		sysCtx:   sys,
+		writer:       dest,
+		tar:          tar.NewWriter(dest),
+		repoTags:     repoTags,
+		blobs:        make(map[digest.Digest]types.BlobInfo),
+		sysCtx:       sys,
+		repositories: map[string]map[string]string{},
 	}
 }
 
@@ -183,24 +186,14 @@ func (d *Destination) TryReusingBlob(ctx context.Context, info types.BlobInfo, c
 	return false, types.BlobInfo{}, nil
 }
 
-func (d *Destination) createRepositoriesFile(rootLayerID string) error {
-	repositories := map[string]map[string]string{}
+func (d *Destination) addRootLayerToRepositories(rootLayerID string) {
 	for _, repoTag := range d.repoTags {
-		if val, ok := repositories[repoTag.Name()]; ok {
+		if val, ok := d.repositories[repoTag.Name()]; ok {
 			val[repoTag.Tag()] = rootLayerID
 		} else {
-			repositories[repoTag.Name()] = map[string]string{repoTag.Tag(): rootLayerID}
+			d.repositories[repoTag.Name()] = map[string]string{repoTag.Tag(): rootLayerID}
 		}
 	}
-
-	b, err := json.Marshal(repositories)
-	if err != nil {
-		return errors.Wrap(err, "Error marshaling repositories")
-	}
-	if err := d.sendBytes(legacyRepositoriesFileName, b); err != nil {
-		return errors.Wrap(err, "Error writing config json file")
-	}
-	return nil
 }
 
 // PutManifest writes manifest to the destination.
@@ -229,9 +222,7 @@ func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest 
 	}
 
 	if len(man.LayersDescriptors) > 0 {
-		if err := d.createRepositoriesFile(lastLayerID); err != nil {
-			return err
-		}
+		d.addRootLayerToRepositories(lastLayerID)
 	}
 
 	repoTags := []string{}
@@ -256,20 +247,18 @@ func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest 
 		repoTags = append(repoTags, refString)
 	}
 
-	items := []ManifestItem{{
+	d.manifest = append(d.manifest, ManifestItem{
 		Config:       man.ConfigDescriptor.Digest.Hex() + ".json",
 		RepoTags:     repoTags,
 		Layers:       layerPaths,
 		Parent:       "",
 		LayerSources: nil,
-	}}
-	itemsBytes, err := json.Marshal(&items)
-	if err != nil {
-		return err
-	}
+	})
 
-	// FIXME? Do we also need to support the legacy format?
-	return d.sendBytes(manifestFileName, itemsBytes)
+	// Reset the repoTags to prevent them from leaking into a following
+	// image/manifest.
+	d.repoTags = []reference.NamedTagged{}
+	return nil
 }
 
 // writeLegacyLayerMetadata writes legacy VERSION and configuration files for all layers
@@ -419,6 +408,34 @@ func (d *Destination) PutSignatures(ctx context.Context, signatures [][]byte, in
 
 // Commit finishes writing data to the underlying io.Writer.
 // It is the caller's responsibility to close it, if necessary.
-func (d *Destination) Commit(ctx context.Context) error {
-	return d.tar.Close()
+func (d *Destination) Commit(ctx context.Context) (finalErr error) {
+	defer func() {
+		if err := d.tar.Close(); err != nil {
+			if finalErr == nil {
+				finalErr = err
+			} else {
+				finalErr = errors.Wrap(finalErr, err.Error())
+			}
+		}
+	}()
+	// Writing the manifest here instead of PutManifest allows for
+	// supporting multi-image archives.
+	itemsBytes, err := json.Marshal(d.manifest)
+	if err != nil {
+		return err
+	}
+
+	// FIXME? Do we also need to support the legacy format?
+	if err := d.sendBytes(manifestFileName, itemsBytes); err != nil {
+		return err
+	}
+
+	repoBytes, err := json.Marshal(d.repositories)
+	if err != nil {
+		return errors.Wrap(err, "Error marshaling repositories")
+	}
+	if err := d.sendBytes(legacyRepositoriesFileName, repoBytes); err != nil {
+		return errors.Wrap(err, "Error writing config json file")
+	}
+	return nil
 }
