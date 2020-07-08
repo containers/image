@@ -7,7 +7,7 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
 	github.com/BurntSushi/toml v0.3.1
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
-	github.com/containers/ocicrypt v1.0.2
+	github.com/containers/ocicrypt v1.0.3
 	github.com/containers/storage v1.20.2
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v1.4.2-0.20191219165747-a9416c67da9f
