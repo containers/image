@@ -24,6 +24,7 @@ import (
 	"github.com/containers/storage"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/containers/storage/pkg/ioutils"
+	"github.com/containers/tar-diff/pkg/tar-patch"
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -898,6 +899,54 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		logrus.Debugf("saved image metadata %q", string(metadata))
 	}
 	return nil
+}
+
+type LayerDeltaDataSource struct {
+	fs    *tar_patch.FilesystemDataSource
+	store storage.Store
+	id    string
+}
+
+func (s *LayerDeltaDataSource) Close() error {
+	err := s.fs.Close()
+	if _, err := s.store.Unmount(s.id, false); err != nil {
+		logrus.Infof("Failed to unmount layer %v: %v", s.id, err)
+	}
+	return err
+}
+
+func (s *LayerDeltaDataSource) Read(data []byte) (n int, err error) {
+	return s.fs.Read(data)
+}
+
+func (s *LayerDeltaDataSource) SetCurrentFile(file string) error {
+	return s.fs.SetCurrentFile(file)
+}
+
+func (s *LayerDeltaDataSource) Seek(offset int64, whence int) (int64, error) {
+	return s.fs.Seek(offset, whence)
+}
+
+func (s *storageImageDestination) GetLayerDeltaData(ctx context.Context, diffID digest.Digest) (types.DeltaDataSource, error) {
+	layers, err := s.imageRef.transport.store.LayersByUncompressedDigest(diffID)
+	if err != nil && err != storage.ErrLayerUnknown {
+		return nil, err // Internal error
+	}
+	if len(layers) == 0 {
+		return nil, nil // Unknown layer
+	}
+
+	layerId := layers[len(layers)-1].ID
+	mountPoint, err := s.imageRef.transport.store.Mount(layerId, "")
+	if err != nil {
+		return nil, err
+	}
+
+	return &LayerDeltaDataSource{
+		fs:    tar_patch.NewFilesystemDataSource(mountPoint),
+		store: s.imageRef.transport.store,
+		id:    layerId,
+	}, nil
 }
 
 var manifestMIMETypes = []string{

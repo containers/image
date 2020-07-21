@@ -203,6 +203,44 @@ func (s *dockerImageSource) fetchManifest(ctx context.Context, tagOrDigest strin
 	return manblob, simplifyContentType(res.Header.Get("Content-Type")), nil
 }
 
+func (s *dockerImageSource) GetDeltaManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error) {
+	// Get the real manifest digest
+	srcManifestDigest, err := s.manifestDigest(ctx, instanceDigest)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// Load the delta manifest index
+	ib, _, err := s.fetchManifest(ctx, "_deltaindex")
+	// Don't return error if the  manifest doesn't exist, only for internal errors
+	// Deltas are an optional optimization anyway
+	if err == nil {
+		index, err := manifest.OCI1IndexFromManifest(ib)
+		if err != nil {
+			return nil, "", err
+		}
+
+		// Look up the delta manifest in the index by the real manifest digest
+		for _, manifest := range index.Manifests {
+			if manifest.Annotations["io.github.containers.delta.target"] == srcManifestDigest.String() {
+				return s.fetchManifest(ctx, manifest.Digest.String())
+			}
+		}
+	}
+
+	// No delta
+	return nil, "", nil
+}
+
+func (s *dockerImageSource) GetDeltaIndex(ctx context.Context) (types.ImageReference, error) {
+	deltaRef, err := reference.WithTag(s.logicalRef.ref, "_deltaindex")
+	if err != nil {
+		return nil, err
+	}
+
+	return newReference(deltaRef)
+}
+
 // ensureManifestIsLoaded sets s.cachedManifest and s.cachedManifestMIMEType
 //
 // ImageSource implementations are not required or expected to do any caching,

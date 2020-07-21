@@ -31,6 +31,11 @@ type OCI1 struct {
 	imgspecv1.Manifest
 }
 
+const (
+	// MediaTypeDescriptor specifies the media type for a content descriptor.
+	MediaTypeTarDiff = "application/vnd.tar-diff"
+)
+
 // SupportedOCI1MediaType checks if the specified string is a supported OCI1
 // media type.
 //
@@ -41,7 +46,7 @@ type OCI1 struct {
 // useful for validation anyway.
 func SupportedOCI1MediaType(m string) error {
 	switch m {
-	case imgspecv1.MediaTypeDescriptor, imgspecv1.MediaTypeImageConfig, imgspecv1.MediaTypeImageLayer, imgspecv1.MediaTypeImageLayerGzip, imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributableZstd, imgspecv1.MediaTypeImageLayerZstd, imgspecv1.MediaTypeImageManifest, imgspecv1.MediaTypeLayoutHeader, ociencspec.MediaTypeLayerEnc, ociencspec.MediaTypeLayerGzipEnc:
+	case imgspecv1.MediaTypeDescriptor, imgspecv1.MediaTypeImageConfig, imgspecv1.MediaTypeImageLayer, imgspecv1.MediaTypeImageLayerGzip, imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributableZstd, imgspecv1.MediaTypeImageLayerZstd, imgspecv1.MediaTypeImageManifest, imgspecv1.MediaTypeLayoutHeader, ociencspec.MediaTypeLayerEnc, ociencspec.MediaTypeLayerGzipEnc, MediaTypeTarDiff:
 		return nil
 	default:
 		return fmt.Errorf("unsupported OCIv1 media type: %q", m)
@@ -210,4 +215,8 @@ func getDecryptedMediaType(mediatype string) (string, error) {
 	}
 
 	return strings.TrimSuffix(mediatype, "+encrypted"), nil
+}
+
+func IsNoCompressType(mediatype string) bool {
+	return mediatype == MediaTypeTarDiff
 }
