@@ -284,6 +284,8 @@ github.com/vbauerster/mpb/v5 v5.2.2 h1:zIICVOm+XD+uV6crpSORaL6I0Q1WqOdvxZTp+r3L9
 github.com/vbauerster/mpb/v5 v5.2.2/go.mod h1:W5Fvgw4dm3/0NhqzV8j6EacfuTe5SvnzBRwiXxDR9ww=
 github.com/vbauerster/mpb/v5 v5.2.3 h1:OfqncMAhUojApki4/AxW4Z14cpiYBw7+MVLOyGklBmM=
 github.com/vbauerster/mpb/v5 v5.2.3/go.mod h1:K4iCHQp5sWnmAgEn+uW1sAxSilctb4JPAGXx49jV+Aw=
+github.com/vbauerster/mpb/v5 v5.2.4 h1:PLP8vv75RcEgxGoJVtKaRD2FHSxEmIV/u4ZuOrfO8Qg=
+github.com/vbauerster/mpb/v5 v5.2.4/go.mod h1:K4iCHQp5sWnmAgEn+uW1sAxSilctb4JPAGXx49jV+Aw=
 github.com/vishvananda/netlink v1.1.0/go.mod h1:cTgwzPIzzgDAYoQrMm0EdrjRUBkTqKYppBueQtXaqoE=
 github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df/go.mod h1:JP3t17pCcGlemwknint6hfoeCVQrEMVwxRLRjXpq+BU=
 github.com/willf/bitset v1.1.11-0.20200630133818-d5bec3311243 h1:R43TdZy32XXSXjJn7M/HhALJ9imq6ztLnChfYJpVDnM=
