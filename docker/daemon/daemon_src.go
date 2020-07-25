@@ -35,7 +35,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref daemonRef
 	}
 	defer inputStream.Close()
 
-	src, err := tarfile.NewSourceFromStreamWithSystemContext(sys, inputStream)
+	src, err := tarfile.NewSourceFromStream(sys, inputStream)
 	if err != nil {
 		return nil, err
 	}
