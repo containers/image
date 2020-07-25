@@ -19,7 +19,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref archiveRe
 	if ref.destinationRef != nil {
 		logrus.Warnf("docker-archive: references are not supported for sources (ignoring)")
 	}
-	src, err := tarfile.NewSourceFromFileWithContext(sys, ref.path)
+	src, err := tarfile.NewSourceFromFile(sys, ref.path)
 	if err != nil {
 		return nil, err
 	}
