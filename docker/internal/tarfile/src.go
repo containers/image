@@ -66,56 +66,37 @@ func (s *Source) ensureCachedDataIsPresent() error {
 // ensureCachedDataIsPresentPrivate is a private implementation detail of ensureCachedDataIsPresent.
 // Call ensureCachedDataIsPresent instead.
 func (s *Source) ensureCachedDataIsPresentPrivate() error {
-	// Read and parse manifest.json
-	tarManifest, err := s.loadTarManifest()
-	if err != nil {
-		return err
-	}
-
 	// Check to make sure length is 1
-	if len(tarManifest) != 1 {
-		return errors.Errorf("Unexpected tar manifest.json: expected 1 item, got %d", len(tarManifest))
+	if len(s.archive.Manifest) != 1 {
+		return errors.Errorf("Unexpected tar manifest.json: expected 1 item, got %d", len(s.archive.Manifest))
 	}
+	tarManifest := &s.archive.Manifest[0]
 
 	// Read and parse config.
-	configBytes, err := s.archive.readTarComponent(tarManifest[0].Config, iolimits.MaxConfigBodySize)
+	configBytes, err := s.archive.readTarComponent(tarManifest.Config, iolimits.MaxConfigBodySize)
 	if err != nil {
 		return err
 	}
 	var parsedConfig manifest.Schema2Image // There's a lot of info there, but we only really care about layer DiffIDs.
 	if err := json.Unmarshal(configBytes, &parsedConfig); err != nil {
-		return errors.Wrapf(err, "Error decoding tar config %s", tarManifest[0].Config)
+		return errors.Wrapf(err, "Error decoding tar config %s", tarManifest.Config)
 	}
 	if parsedConfig.RootFS == nil {
-		return errors.Errorf("Invalid image config (rootFS is not set): %s", tarManifest[0].Config)
+		return errors.Errorf("Invalid image config (rootFS is not set): %s", tarManifest.Config)
 	}
 
-	knownLayers, err := s.prepareLayerData(&tarManifest[0], &parsedConfig)
+	knownLayers, err := s.prepareLayerData(tarManifest, &parsedConfig)
 	if err != nil {
 		return err
 	}
 
 	// Success; commit.
-	s.tarManifest = &tarManifest[0]
+	s.tarManifest = tarManifest
 	s.configBytes = configBytes
 	s.configDigest = digest.FromBytes(configBytes)
 	s.orderedDiffIDList = parsedConfig.RootFS.DiffIDs
 	s.knownLayers = knownLayers
 	return nil
-}
-
-// loadTarManifest loads and decodes the manifest.json.
-func (s *Source) loadTarManifest() ([]ManifestItem, error) {
-	// FIXME? Do we need to deal with the legacy format?
-	bytes, err := s.archive.readTarComponent(manifestFileName, iolimits.MaxTarFileManifestSize)
-	if err != nil {
-		return nil, err
-	}
-	var items []ManifestItem
-	if err := json.Unmarshal(bytes, &items); err != nil {
-		return nil, errors.Wrap(err, "Error decoding tar manifest.json")
-	}
-	return items, nil
 }
 
 // Close removes resources associated with an initialized Source, if any.
@@ -128,7 +109,7 @@ func (s *Source) Close() error {
 
 // LoadTarManifest loads and decodes the manifest.json
 func (s *Source) LoadTarManifest() ([]ManifestItem, error) {
-	return s.loadTarManifest()
+	return s.archive.Manifest, nil
 }
 
 func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manifest.Schema2Image) (map[digest.Digest]*layerInfo, error) {
