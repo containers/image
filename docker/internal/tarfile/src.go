@@ -23,8 +23,10 @@ import (
 // Source is a partial implementation of types.ImageSource for reading from tarPath.
 type Source struct {
 	archive      *Reader
-	closeArchive bool                  // .Close() the archive when the source is closed.
-	ref          reference.NamedTagged // May be nil to indicate the only image in the archive
+	closeArchive bool // .Close() the archive when the source is closed.
+	// If ref is nil and sourceIndex is -1, indicates the only image in the archive.
+	ref         reference.NamedTagged // May be nil
+	sourceIndex int                   // May be -1
 	// The following data is only available after ensureCachedDataIsPresent() succeeds
 	tarManifest       *ManifestItem // nil if not available yet.
 	configBytes       []byte
@@ -43,13 +45,14 @@ type layerInfo struct {
 }
 
 // NewSource returns a tarfile.Source for an image in the specified archive matching ref
-// (or the only image if ref is nil).
+// and sourceIndex (or the only image if they are (nil, -1)).
 // The archive will be closed if closeArchive
-func NewSource(archive *Reader, closeArchive bool, ref reference.NamedTagged) *Source {
+func NewSource(archive *Reader, closeArchive bool, ref reference.NamedTagged, sourceIndex int) *Source {
 	return &Source{
 		archive:      archive,
 		closeArchive: closeArchive,
 		ref:          ref,
+		sourceIndex:  sourceIndex,
 	}
 }
 
@@ -65,7 +68,7 @@ func (s *Source) ensureCachedDataIsPresent() error {
 // ensureCachedDataIsPresentPrivate is a private implementation detail of ensureCachedDataIsPresent.
 // Call ensureCachedDataIsPresent instead.
 func (s *Source) ensureCachedDataIsPresentPrivate() error {
-	tarManifest, err := s.archive.chooseManifestItem(s.ref)
+	tarManifest, err := s.archive.chooseManifestItem(s.ref, s.sourceIndex)
 	if err != nil {
 		return err
 	}
