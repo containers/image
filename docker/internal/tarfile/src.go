@@ -11,6 +11,7 @@ import (
 	"path"
 	"sync"
 
+	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/compression"
@@ -22,7 +23,8 @@ import (
 // Source is a partial implementation of types.ImageSource for reading from tarPath.
 type Source struct {
 	archive      *Reader
-	closeArchive bool // .Close() the archive when the source is closed.
+	closeArchive bool                  // .Close() the archive when the source is closed.
+	ref          reference.NamedTagged // May be nil to indicate the only image in the archive
 	// The following data is only available after ensureCachedDataIsPresent() succeeds
 	tarManifest       *ManifestItem // nil if not available yet.
 	configBytes       []byte
@@ -40,17 +42,14 @@ type layerInfo struct {
 	size int64
 }
 
-// TODO: We could add support for multiple images in a single archive, so
-//       that people could use docker-archive:opensuse.tar:opensuse:leap as
-//       the source of an image.
-// 	To do for both the NewSourceFromFile and NewSourceFromStream functions
-
-// NewSource returns a tarfile.Source for the only image in the specified archive.
+// NewSource returns a tarfile.Source for an image in the specified archive matching ref
+// (or the only image if ref is nil).
 // The archive will be closed if closeArchive
-func NewSource(archive *Reader, closeArchive bool) *Source {
+func NewSource(archive *Reader, closeArchive bool, ref reference.NamedTagged) *Source {
 	return &Source{
 		archive:      archive,
 		closeArchive: closeArchive,
+		ref:          ref,
 	}
 }
 
@@ -66,11 +65,10 @@ func (s *Source) ensureCachedDataIsPresent() error {
 // ensureCachedDataIsPresentPrivate is a private implementation detail of ensureCachedDataIsPresent.
 // Call ensureCachedDataIsPresent instead.
 func (s *Source) ensureCachedDataIsPresentPrivate() error {
-	// Check to make sure length is 1
-	if len(s.archive.Manifest) != 1 {
-		return errors.Errorf("Unexpected tar manifest.json: expected 1 item, got %d", len(s.archive.Manifest))
+	tarManifest, err := s.archive.chooseManifestItem(s.ref)
+	if err != nil {
+		return err
 	}
-	tarManifest := &s.archive.Manifest[0]
 
 	// Read and parse config.
 	configBytes, err := s.archive.readTarComponent(tarManifest.Config, iolimits.MaxConfigBodySize)
