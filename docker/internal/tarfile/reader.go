@@ -18,7 +18,9 @@ import (
 
 // Reader is a ((docker save)-formatted) tar archive that allows random access to any component.
 type Reader struct {
-	path          string
+	// None of the fields below are modified after the archive is created, until .Close();
+	// this allows concurrent readers of the same archive.
+	path          string         // "" if the archive has already been closed.
 	removeOnClose bool           // Remove file on close if true
 	Manifest      []ManifestItem // Guaranteed to exist after the archive is created.
 }
@@ -120,8 +122,10 @@ func newReader(path string, removeOnClose bool) (*Reader, error) {
 
 // Close removes resources associated with an initialized Reader, if any.
 func (r *Reader) Close() error {
+	path := r.path
+	r.path = "" // Mark the archive as closed
 	if r.removeOnClose {
-		return os.Remove(r.path)
+		return os.Remove(path)
 	}
 	return nil
 }
@@ -177,8 +181,15 @@ func (t *tarReadCloser) Close() error {
 // openTarComponent returns a ReadCloser for the specific file within the archive.
 // This is linear scan; we assume that the tar file will have a fairly small amount of files (~layers),
 // and that filesystem caching will make the repeated seeking over the (uncompressed) tarPath cheap enough.
+// It is safe to call this method from multiple goroutines simultaneously.
 // The caller should call .Close() on the returned stream.
 func (r *Reader) openTarComponent(componentPath string) (io.ReadCloser, error) {
+	// This is only a sanity check; if anyone did concurrently close ra, this access is technically
+	// racy against the write in .Close().
+	if r.path == "" {
+		return nil, errors.New("Internal error: trying to read an already closed tarfile.Reader")
+	}
+
 	f, err := os.Open(r.path)
 	if err != nil {
 		return nil, err
@@ -241,6 +252,7 @@ func findTarComponent(inputFile io.Reader, componentPath string) (*tar.Reader, *
 }
 
 // readTarComponent returns full contents of componentPath.
+// It is safe to call this method from multiple goroutines simultaneously.
 func (r *Reader) readTarComponent(path string, limit int) ([]byte, error) {
 	file, err := r.openTarComponent(path)
 	if err != nil {
