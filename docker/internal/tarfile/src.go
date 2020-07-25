@@ -23,8 +23,10 @@ import (
 // Source is a partial implementation of types.ImageSource for reading from tarPath.
 type Source struct {
 	archive      *Reader
-	closeArchive bool                  // .Close() the archive when the source is closed.
-	ref          reference.NamedTagged // May be nil to indicate the only image in the archive
+	closeArchive bool // .Close() the archive when the source is closed.
+	// If ref is nil and sourceIndex is -1, indicates the only image in the archive.
+	ref         reference.NamedTagged // May be nil
+	sourceIndex int                   // May be -1
 	// The following data is only available after ensureCachedDataIsPresent() succeeds
 	tarManifest       *ManifestItem // nil if not available yet.
 	configBytes       []byte
@@ -43,13 +45,14 @@ type layerInfo struct {
 }
 
 // NewSource returns a tarfile.Source for an image in the specified archive matching ref
-// (or the only image if ref is nil).
+// and sourceIndex (or the only image if they are (nil, -1)).
 // The archive will be closed if closeArchive
-func NewSource(archive *Reader, closeArchive bool, ref reference.NamedTagged) *Source {
+func NewSource(archive *Reader, closeArchive bool, ref reference.NamedTagged, sourceIndex int) *Source {
 	return &Source{
 		archive:      archive,
 		closeArchive: closeArchive,
 		ref:          ref,
+		sourceIndex:  sourceIndex,
 	}
 }
 
@@ -99,26 +102,39 @@ func (s *Source) ensureCachedDataIsPresentPrivate() error {
 
 // chooseManifest selects a manifest item s.ref.
 func (s *Source) chooseManifest() (*ManifestItem, error) {
-	if s.ref == nil {
+	switch {
+	case s.ref != nil && s.sourceIndex != -1:
+		return nil, errors.Errorf("Internal error: Cannot have both ref %s and source index @%d",
+			s.ref.String(), s.sourceIndex)
+
+	case s.ref != nil:
+		refString := s.ref.String()
+		for i := range s.archive.Manifest {
+			for _, tag := range s.archive.Manifest[i].RepoTags {
+				parsedTag, err := reference.ParseNormalizedNamed(tag)
+				if err != nil {
+					return nil, errors.Wrapf(err, "Invalid tag %#v in manifest.json item @%d", tag, i)
+				}
+				if parsedTag.String() == refString {
+					return &s.archive.Manifest[i], nil
+				}
+			}
+		}
+		return nil, errors.Errorf("Tag %#v not found", refString)
+
+	case s.sourceIndex != -1:
+		if s.sourceIndex >= len(s.archive.Manifest) {
+			return nil, errors.Errorf("Invalid source index @%d, only %d manifest items available",
+				s.sourceIndex, len(s.archive.Manifest))
+		}
+		return &s.archive.Manifest[s.sourceIndex], nil
+
+	default:
 		if len(s.archive.Manifest) != 1 {
 			return nil, errors.Errorf("Unexpected tar manifest.json: expected 1 item, got %d", len(s.archive.Manifest))
 		}
 		return &s.archive.Manifest[0], nil
 	}
-
-	refString := s.ref.String()
-	for i := range s.archive.Manifest {
-		for _, tag := range s.archive.Manifest[i].RepoTags {
-			parsedTag, err := reference.ParseNormalizedNamed(tag)
-			if err != nil {
-				return nil, errors.Wrapf(err, "Invalid tag %#v in manifest.json item %d", tag, i+1)
-			}
-			if parsedTag.String() == refString {
-				return &s.archive.Manifest[i], nil
-			}
-		}
-	}
-	return nil, errors.Errorf("Tag %#v not found", refString)
 }
 
 // Close removes resources associated with an initialized Source, if any.

@@ -19,7 +19,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref archiveRe
 	if err != nil {
 		return nil, err
 	}
-	src := tarfile.NewSource(archive, true, ref.ref)
+	src := tarfile.NewSource(archive, true, ref.ref, ref.sourceIndex)
 	return &archiveImageSource{
 		Source: src,
 		ref:    ref,
