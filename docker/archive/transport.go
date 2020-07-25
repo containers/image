@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/containers/image/v5/docker/internal/tarfile"
 	"github.com/containers/image/v5/docker/reference"
 	ctrImage "github.com/containers/image/v5/image"
 	"github.com/containers/image/v5/transports"
@@ -48,6 +49,9 @@ type archiveReference struct {
 	// If not -1, a zero-based index of the image in the manifest. Valid only for sources.
 	// Must not be set if ref is set.
 	sourceIndex int
+	// If not nil, must have been created from path (but archiveReader.path may point at a temporary
+	// file, not necesarily path precisely).
+	archiveReader *tarfile.Reader
 }
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an Docker ImageReference.
@@ -86,21 +90,23 @@ func ParseReference(refString string) (types.ImageReference, error) {
 		}
 	}
 
-	return newReference(path, nt, sourceIndex)
+	return newReference(path, nt, sourceIndex, nil)
 }
 
 // NewReference returns a Docker archive reference for a path and an optional reference.
 func NewReference(path string, ref reference.NamedTagged) (types.ImageReference, error) {
-	return newReference(path, ref, -1)
+	return newReference(path, ref, -1, nil)
 }
 
 // NewIndexReference returns a Docker archive reference for a path and a zero-based source manifest index.
 func NewIndexReference(path string, sourceIndex int) (types.ImageReference, error) {
-	return newReference(path, nil, sourceIndex)
+	return newReference(path, nil, sourceIndex, nil)
 }
 
-// newReference returns a docker archive reference for a path and an optional reference or sourceIndex.
-func newReference(path string, ref reference.NamedTagged, sourceIndex int) (types.ImageReference, error) {
+// newReference returns a docker archive reference for a path, an optional reference or sourceIndex,
+// and optionally a tarfile.Reader matching path.
+func newReference(path string, ref reference.NamedTagged, sourceIndex int,
+	archiveReader *tarfile.Reader) (types.ImageReference, error) {
 	if strings.Contains(path, ":") {
 		return nil, errors.Errorf("Invalid docker-archive: reference: colon in path %q is not supported", path)
 	}
@@ -114,9 +120,10 @@ func newReference(path string, ref reference.NamedTagged, sourceIndex int) (type
 		return nil, errors.Errorf("Invalid docker-archive: reference: index @%d must not be negative", sourceIndex)
 	}
 	return archiveReference{
-		path:        path,
-		ref:         ref,
-		sourceIndex: sourceIndex,
+		path:          path,
+		ref:           ref,
+		sourceIndex:   sourceIndex,
+		archiveReader: archiveReader,
 	}, nil
 }
 

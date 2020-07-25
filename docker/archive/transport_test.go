@@ -134,7 +134,7 @@ func TestNewReference(t *testing.T) {
 
 	// Complete coverage testing of the private newReference here as well
 	ntRef := namedTaggedRef(t, "busybox:latest")
-	_, err = newReference("path", ntRef, 0)
+	_, err = newReference("path", ntRef, 0, nil)
 	assert.Error(t, err)
 }
 

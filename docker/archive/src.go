@@ -15,11 +15,20 @@ type archiveImageSource struct {
 // newImageSource returns a types.ImageSource for the specified image reference.
 // The caller must call .Close() on the returned ImageSource.
 func newImageSource(ctx context.Context, sys *types.SystemContext, ref archiveReference) (types.ImageSource, error) {
-	archive, err := tarfile.NewReaderFromFile(sys, ref.path)
-	if err != nil {
-		return nil, err
+	var archive *tarfile.Reader
+	var closeArchive bool
+	if ref.archiveReader != nil {
+		archive = ref.archiveReader
+		closeArchive = false
+	} else {
+		a, err := tarfile.NewReaderFromFile(sys, ref.path)
+		if err != nil {
+			return nil, err
+		}
+		archive = a
+		closeArchive = true
 	}
-	src := tarfile.NewSource(archive, true, ref.ref, ref.sourceIndex)
+	src := tarfile.NewSource(archive, closeArchive, ref.ref, ref.sourceIndex)
 	return &archiveImageSource{
 		Source: src,
 		ref:    ref,
