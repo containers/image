@@ -26,7 +26,8 @@ func TestSourcePrepareLayerData(t *testing.T) {
 		var tarfileBuffer bytes.Buffer
 		ctx := context.Background()
 
-		dest := NewDestinationWithContext(nil, &tarfileBuffer, nil)
+		writer := NewWriter(&tarfileBuffer)
+		dest := NewDestination(nil, writer, nil)
 		// No layers
 		configInfo, err := dest.PutBlob(ctx, bytes.NewBufferString(c.config),
 			types.BlobInfo{Size: -1}, cache, true)
@@ -40,7 +41,7 @@ func TestSourcePrepareLayerData(t *testing.T) {
 		require.NoError(t, err, c.config)
 		err = dest.PutManifest(ctx, manifest, nil)
 		require.NoError(t, err, c.config)
-		err = dest.Commit(ctx)
+		err = writer.Close()
 		require.NoError(t, err, c.config)
 
 		src, err := NewSourceFromStreamWithSystemContext(nil, &tarfileBuffer)
