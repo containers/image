@@ -67,10 +67,10 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 			require.True(t, ok, c.input)
 			assert.Equal(t, c.expectedPath, archiveRef.path, c.input)
 			if c.expectedRef == "" {
-				assert.Nil(t, archiveRef.destinationRef, c.input)
+				assert.Nil(t, archiveRef.ref, c.input)
 			} else {
-				require.NotNil(t, archiveRef.destinationRef, c.input)
-				assert.Equal(t, c.expectedRef, archiveRef.destinationRef.String(), c.input)
+				require.NotNil(t, archiveRef.ref, c.input)
+				assert.Equal(t, c.expectedRef, archiveRef.ref.String(), c.input)
 			}
 		}
 	}
@@ -104,10 +104,10 @@ func TestNewReference(t *testing.T) {
 				require.True(t, ok, c.ref)
 				assert.Equal(t, path, archiveRef.path)
 				if c.ref == "" {
-					assert.Nil(t, archiveRef.destinationRef, c.ref)
+					assert.Nil(t, archiveRef.ref, c.ref)
 				} else {
-					require.NotNil(t, archiveRef.destinationRef, c.ref)
-					assert.Equal(t, ntRef.String(), archiveRef.destinationRef.String(), c.ref)
+					require.NotNil(t, archiveRef.ref, c.ref)
+					assert.Equal(t, ntRef.String(), archiveRef.ref.String(), c.ref)
 				}
 			}
 
@@ -176,21 +176,21 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 }
 
 func TestReferenceNewImage(t *testing.T) {
-	for _, suffix := range []string{"", ":thisisignoredbutaccepted"} {
+	for _, suffix := range []string{"", ":emptyimage:latest"} {
 		ref, err := ParseReference(tarFixture + suffix)
 		require.NoError(t, err, suffix)
 		img, err := ref.NewImage(context.Background(), nil)
-		assert.NoError(t, err, suffix)
+		require.NoError(t, err, suffix)
 		defer img.Close()
 	}
 }
 
 func TestReferenceNewImageSource(t *testing.T) {
-	for _, suffix := range []string{"", ":thisisignoredbutaccepted"} {
+	for _, suffix := range []string{"", ":emptyimage:latest"} {
 		ref, err := ParseReference(tarFixture + suffix)
 		require.NoError(t, err, suffix)
 		src, err := ref.NewImageSource(context.Background(), nil)
-		assert.NoError(t, err, suffix)
+		require.NoError(t, err, suffix)
 		defer src.Close()
 	}
 }
@@ -218,7 +218,7 @@ func TestReferenceDeleteImage(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	for i, suffix := range []string{"", ":thisisignoredbutaccepted"} {
+	for i, suffix := range []string{"", ":some-reference"} {
 		testFile := filepath.Join(tmpDir, fmt.Sprintf("file%d.tar", i))
 		err := ioutil.WriteFile(testFile, []byte("nonempty"), 0644)
 		require.NoError(t, err, suffix)

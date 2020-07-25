@@ -42,9 +42,8 @@ func (t archiveTransport) ValidatePolicyConfigurationScope(scope string) error {
 // archiveReference is an ImageReference for Docker images.
 type archiveReference struct {
 	path string
-	// only used for destinations,
-	// archiveReference.destinationRef is optional and can be nil for destinations as well.
-	destinationRef reference.NamedTagged
+	// May be nil to read the only image in an archive, or to create an untagged image.
+	ref reference.NamedTagged
 }
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an Docker ImageReference.
@@ -55,10 +54,10 @@ func ParseReference(refString string) (types.ImageReference, error) {
 
 	parts := strings.SplitN(refString, ":", 2)
 	path := parts[0]
-	var destinationRef reference.NamedTagged
+	var nt reference.NamedTagged
 
-	// A :tag was specified, which is only necessary for destinations.
 	if len(parts) == 2 {
+		// A :tag was specified.
 		ref, err := reference.ParseNormalizedNamed(parts[1])
 		if err != nil {
 			return nil, errors.Wrapf(err, "docker-archive parsing reference")
@@ -68,23 +67,23 @@ func ParseReference(refString string) (types.ImageReference, error) {
 		if !isTagged { // If ref contains a digest, TagNameOnly does not change it
 			return nil, errors.Errorf("reference does not include a tag: %s", ref.String())
 		}
-		destinationRef = refTagged
+		nt = refTagged
 	}
 
-	return NewReference(path, destinationRef)
+	return NewReference(path, nt)
 }
 
-// NewReference rethrns a Docker archive reference for a path and an optional destination reference.
-func NewReference(path string, destinationRef reference.NamedTagged) (types.ImageReference, error) {
+// NewReference returns a Docker archive reference for a path and an optional reference.
+func NewReference(path string, ref reference.NamedTagged) (types.ImageReference, error) {
 	if strings.Contains(path, ":") {
 		return nil, errors.Errorf("Invalid docker-archive: reference: colon in path %q is not supported", path)
 	}
-	if _, isDigest := destinationRef.(reference.Canonical); isDigest {
-		return nil, errors.Errorf("docker-archive doesn't support digest references: %s", destinationRef.String())
+	if _, isDigest := ref.(reference.Canonical); isDigest {
+		return nil, errors.Errorf("docker-archive doesn't support digest references: %s", ref.String())
 	}
 	return archiveReference{
-		path:           path,
-		destinationRef: destinationRef,
+		path: path,
+		ref:  ref,
 	}, nil
 }
 
@@ -98,17 +97,17 @@ func (ref archiveReference) Transport() types.ImageTransport {
 // e.g. default attribute values omitted by the user may be filled in in the return value, or vice versa.
 // WARNING: Do not use the return value in the UI to describe an image, it does not contain the Transport().Name() prefix.
 func (ref archiveReference) StringWithinTransport() string {
-	if ref.destinationRef == nil {
+	if ref.ref == nil {
 		return ref.path
 	}
-	return fmt.Sprintf("%s:%s", ref.path, ref.destinationRef.String())
+	return fmt.Sprintf("%s:%s", ref.path, ref.ref.String())
 }
 
 // DockerReference returns a Docker reference associated with this reference
 // (fully explicit, i.e. !reference.IsNameOnly, but reflecting user intent,
 // not e.g. after redirect or alias processing), or nil if unknown/not applicable.
 func (ref archiveReference) DockerReference() reference.Named {
-	return ref.destinationRef
+	return ref.ref
 }
 
 // PolicyConfigurationIdentity returns a string representation of the reference, suitable for policy lookup.

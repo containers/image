@@ -44,7 +44,9 @@ If the first component of name is not recognized as a `hostname[:port]`, `name` 
 ### **docker-archive:**_path[:docker-reference]_
 
 An image is stored in the docker-save(1) formatted file.
-_docker-reference_ is only used when creating such a file, and it must not contain a digest.
+_docker-reference_ must not contain a digest.
+If _docker-reference_ is missing when reading an archive, the archive must contain exactly one image.
+
 It is further possible to copy data to stdin by specifying `docker-archive:/dev/stdin` but note that the used file must be seekable.
 
 ### **docker-daemon:**_docker-reference|algo:digest_
