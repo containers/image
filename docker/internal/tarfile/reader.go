@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/internal/tmpdir"
 	"github.com/containers/image/v5/pkg/compression"
@@ -123,6 +124,30 @@ func (r *Reader) Close() error {
 		return os.Remove(r.path)
 	}
 	return nil
+}
+
+// chooseManifestItem selects a manifest item from r.Manifest matching ref (which may be nil)
+func (r *Reader) chooseManifestItem(ref reference.NamedTagged) (*ManifestItem, error) {
+	if ref == nil {
+		if len(r.Manifest) != 1 {
+			return nil, errors.Errorf("Unexpected tar manifest.json: expected 1 item, got %d", len(r.Manifest))
+		}
+		return &r.Manifest[0], nil
+	}
+
+	refString := ref.String()
+	for i := range r.Manifest {
+		for _, tag := range r.Manifest[i].RepoTags {
+			parsedTag, err := reference.ParseNormalizedNamed(tag)
+			if err != nil {
+				return nil, errors.Wrapf(err, "Invalid tag %#v in manifest.json item %d", tag, i+1)
+			}
+			if parsedTag.String() == refString {
+				return &r.Manifest[i], nil
+			}
+		}
+	}
+	return nil, errors.Errorf("Tag %#v not found", refString)
 }
 
 // tarReadCloser is a way to close the backing file of a tar.Reader when the user no longer needs the tar component.
