@@ -89,7 +89,6 @@ func NewSourceFromStream(inputStream io.Reader) (*Source, error) {
 // which can be either compressed or uncompressed. The caller can close the
 // inputStream immediately after NewSourceFromFile returns.
 func NewSourceFromStreamWithSystemContext(sys *types.SystemContext, inputStream io.Reader) (*Source, error) {
-	// FIXME: use SystemContext here.
 	// Save inputStream to a temporary file
 	tarCopyFile, err := ioutil.TempFile(tmpdir.TemporaryDirectoryForBigFiles(sys), "docker-tar")
 	if err != nil {
