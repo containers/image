@@ -3,7 +3,7 @@ package archive
 import (
 	"context"
 
-	"github.com/containers/image/v5/docker/tarfile"
+	"github.com/containers/image/v5/docker/internal/tarfile"
 	"github.com/containers/image/v5/types"
 	"github.com/sirupsen/logrus"
 )
