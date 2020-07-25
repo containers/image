@@ -49,6 +49,9 @@ type archiveReference struct {
 	// If not -1, a zero-based index of the image in the manifest. Valid only for sources.
 	// Must not be set if ref is set.
 	sourceIndex int
+	// If not nil, must have been created from path (but archiveReader.path may point at a temporary
+	// file, not necesarily path precisely).
+	archiveReader *tarfile.Reader
 	// If not nil, must have been created for path
 	archiveWriter *tarfile.Writer
 }
@@ -89,22 +92,23 @@ func ParseReference(refString string) (types.ImageReference, error) {
 		}
 	}
 
-	return newReference(path, nt, sourceIndex, nil)
+	return newReference(path, nt, sourceIndex, nil, nil)
 }
 
 // NewReference returns a Docker archive reference for a path and an optional reference.
 func NewReference(path string, ref reference.NamedTagged) (types.ImageReference, error) {
-	return newReference(path, ref, -1, nil)
+	return newReference(path, ref, -1, nil, nil)
 }
 
 // NewIndexReference returns a Docker archive reference for a path and a zero-based source manifest index.
 func NewIndexReference(path string, sourceIndex int) (types.ImageReference, error) {
-	return newReference(path, nil, sourceIndex, nil)
+	return newReference(path, nil, sourceIndex, nil, nil)
 }
 
 // newReference returns a docker archive reference for a path, an optional reference or sourceIndex,
-// and optionally a tarfile.Writer matching path.
-func newReference(path string, ref reference.NamedTagged, sourceIndex int, archiveWriter *tarfile.Writer) (types.ImageReference, error) {
+// and optionally a tarfile.Reader and/or a tarfile.Writer matching path.
+func newReference(path string, ref reference.NamedTagged, sourceIndex int,
+	archiveReader *tarfile.Reader, archiveWriter *tarfile.Writer) (types.ImageReference, error) {
 	if strings.Contains(path, ":") {
 		return nil, errors.Errorf("Invalid docker-archive: reference: colon in path %q is not supported", path)
 	}
@@ -121,6 +125,7 @@ func newReference(path string, ref reference.NamedTagged, sourceIndex int, archi
 		path:          path,
 		ref:           ref,
 		sourceIndex:   sourceIndex,
+		archiveReader: archiveReader,
 		archiveWriter: archiveWriter,
 	}, nil
 }
