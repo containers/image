@@ -49,14 +49,14 @@ func (r *Reader) List() ([][]types.ImageReference, error) {
 			if !ok {
 				return nil, errors.Errorf("Invalid tag %s (%s): does not contain a tag", tag, parsedTag.String())
 			}
-			ref, err := NewReference(r.path, nt)
+			ref, err := newReference(r.path, nt, -1, r.archive, nil)
 			if err != nil {
 				return nil, errors.Wrapf(err, "Error creating a reference for tag %#v in manifest item @%d", tag, imageIndex)
 			}
 			refs = append(refs, ref)
 		}
 		if len(refs) == 0 {
-			ref, err := NewIndexReference(r.path, imageIndex)
+			ref, err := newReference(r.path, nil, imageIndex, r.archive, nil)
 			if err != nil {
 				return nil, errors.Wrapf(err, "Error creating a reference for manifest item @%d", imageIndex)
 			}

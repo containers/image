@@ -47,7 +47,7 @@ func (w *Writer) Close() error {
 // NewReference returns an ImageReference that allows adding an image to Writer,
 // with an optional reference.
 func (w *Writer) NewReference(destinationRef reference.NamedTagged) (types.ImageReference, error) {
-	return newReference(w.path, destinationRef, -1, w.archive)
+	return newReference(w.path, destinationRef, -1, nil, w.archive)
 }
 
 // openArchiveForWriting opens path for writing a tar archive,
