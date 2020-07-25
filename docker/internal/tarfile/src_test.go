@@ -44,7 +44,7 @@ func TestSourcePrepareLayerData(t *testing.T) {
 		err = writer.Close()
 		require.NoError(t, err, c.config)
 
-		src, err := NewSourceFromStreamWithSystemContext(nil, &tarfileBuffer)
+		src, err := NewSourceFromStream(nil, &tarfileBuffer)
 		require.NoError(t, err, c.config)
 		defer src.Close()
 		configStream, _, err := src.GetBlob(ctx, types.BlobInfo{

@@ -24,7 +24,7 @@ func NewSourceFromFile(path string) (*Source, error) {
 
 // NewSourceFromFileWithContext returns a tarfile.Source for the specified path.
 func NewSourceFromFileWithContext(sys *types.SystemContext, path string) (*Source, error) {
-	src, err := internal.NewSourceFromFileWithContext(sys, path)
+	src, err := internal.NewSourceFromFile(sys, path)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func NewSourceFromStream(inputStream io.Reader) (*Source, error) {
 // which can be either compressed or uncompressed. The caller can close the
 // inputStream immediately after NewSourceFromFile returns.
 func NewSourceFromStreamWithSystemContext(sys *types.SystemContext, inputStream io.Reader) (*Source, error) {
-	src, err := internal.NewSourceFromStreamWithSystemContext(sys, inputStream)
+	src, err := internal.NewSourceFromStream(sys, inputStream)
 	if err != nil {
 		return nil, err
 	}
