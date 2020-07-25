@@ -2,6 +2,7 @@ package tarfile
 
 import (
 	"archive/tar"
+	"encoding/json"
 	"io"
 	"io/ioutil"
 	"os"
@@ -17,7 +18,8 @@ import (
 // Reader is a ((docker save)-formatted) tar archive that allows random access to any component.
 type Reader struct {
 	path          string
-	removeOnClose bool // Remove file on close if true
+	removeOnClose bool           // Remove file on close if true
+	Manifest      []ManifestItem // Guaranteed to exist after the archive is created.
 }
 
 // NewReaderFromFile returns a Reader for the specified path.
@@ -37,9 +39,7 @@ func NewReaderFromFile(sys *types.SystemContext, path string) (*Reader, error) {
 	}
 	defer stream.Close()
 	if !isCompressed {
-		return &Reader{
-			path: path,
-		}, nil
+		return newReader(path, false)
 	}
 	return NewReaderFromStream(sys, stream)
 }
@@ -81,10 +81,40 @@ func NewReaderFromStream(sys *types.SystemContext, inputStream io.Reader) (*Read
 	}
 	succeeded = true
 
-	return &Reader{
-		path:          tarCopyFile.Name(),
-		removeOnClose: true,
-	}, nil
+	return newReader(tarCopyFile.Name(), true)
+}
+
+// newReader creates a Reader for the specified path and removeOnClose flag.
+// The caller should call .Close() on the returned archive when done.
+func newReader(path string, removeOnClose bool) (*Reader, error) {
+	// This is a valid enough archive, except Manifest is not yet filled.
+	r := Reader{
+		path:          path,
+		removeOnClose: removeOnClose,
+	}
+	succeeded := false
+	defer func() {
+		if !succeeded {
+			r.Close()
+		}
+	}()
+
+	// We initialize Manifest immediately when constructing the Reader instead
+	// of later on-demand because every caller will need the data, and because doing it now
+	// removes the need to synchronize the access/creation of the data if the archive is later
+	// used from multiple goroutines to access different images.
+
+	// FIXME? Do we need to deal with the legacy format?
+	bytes, err := r.readTarComponent(manifestFileName, iolimits.MaxTarFileManifestSize)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(bytes, &r.Manifest); err != nil {
+		return nil, errors.Wrap(err, "Error decoding tar manifest.json")
+	}
+
+	succeeded = true
+	return &r, nil
 }
 
 // Close removes resources associated with an initialized Reader, if any.
