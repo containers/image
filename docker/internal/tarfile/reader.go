@@ -1,0 +1,186 @@
+package tarfile
+
+import (
+	"archive/tar"
+	"io"
+	"io/ioutil"
+	"os"
+	"path"
+
+	"github.com/containers/image/v5/internal/iolimits"
+	"github.com/containers/image/v5/internal/tmpdir"
+	"github.com/containers/image/v5/pkg/compression"
+	"github.com/containers/image/v5/types"
+	"github.com/pkg/errors"
+)
+
+// Reader is a ((docker save)-formatted) tar archive that allows random access to any component.
+type Reader struct {
+	path          string
+	removeOnClose bool // Remove file on close if true
+}
+
+// NewReaderFromFile returns a Reader for the specified path.
+// The caller should call .Close() on the returned archive when done.
+func NewReaderFromFile(sys *types.SystemContext, path string) (*Reader, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error opening file %q", path)
+	}
+	defer file.Close()
+
+	// If the file is already not compressed we can just return the file itself
+	// as a source. Otherwise we pass the stream to NewReaderFromStream.
+	stream, isCompressed, err := compression.AutoDecompress(file)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error detecting compression for file %q", path)
+	}
+	defer stream.Close()
+	if !isCompressed {
+		return &Reader{
+			path: path,
+		}, nil
+	}
+	return NewReaderFromStream(sys, stream)
+}
+
+// NewReaderFromStream returns a Reader for the specified inputStream,
+// which can be either compressed or uncompressed. The caller can close the
+// inputStream immediately after NewReaderFromFile returns.
+// The caller should call .Close() on the returned archive when done.
+func NewReaderFromStream(sys *types.SystemContext, inputStream io.Reader) (*Reader, error) {
+	// Save inputStream to a temporary file
+	tarCopyFile, err := ioutil.TempFile(tmpdir.TemporaryDirectoryForBigFiles(sys), "docker-tar")
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating temporary file")
+	}
+	defer tarCopyFile.Close()
+
+	succeeded := false
+	defer func() {
+		if !succeeded {
+			os.Remove(tarCopyFile.Name())
+		}
+	}()
+
+	// In order to be compatible with docker-load, we need to support
+	// auto-decompression (it's also a nice quality-of-life thing to avoid
+	// giving users really confusing "invalid tar header" errors).
+	uncompressedStream, _, err := compression.AutoDecompress(inputStream)
+	if err != nil {
+		return nil, errors.Wrap(err, "Error auto-decompressing input")
+	}
+	defer uncompressedStream.Close()
+
+	// Copy the plain archive to the temporary file.
+	//
+	// TODO: This can take quite some time, and should ideally be cancellable
+	//       using a context.Context.
+	if _, err := io.Copy(tarCopyFile, uncompressedStream); err != nil {
+		return nil, errors.Wrapf(err, "error copying contents to temporary file %q", tarCopyFile.Name())
+	}
+	succeeded = true
+
+	return &Reader{
+		path:          tarCopyFile.Name(),
+		removeOnClose: true,
+	}, nil
+}
+
+// Close removes resources associated with an initialized Reader, if any.
+func (r *Reader) Close() error {
+	if r.removeOnClose {
+		return os.Remove(r.path)
+	}
+	return nil
+}
+
+// tarReadCloser is a way to close the backing file of a tar.Reader when the user no longer needs the tar component.
+type tarReadCloser struct {
+	*tar.Reader
+	backingFile *os.File
+}
+
+func (t *tarReadCloser) Close() error {
+	return t.backingFile.Close()
+}
+
+// openTarComponent returns a ReadCloser for the specific file within the archive.
+// This is linear scan; we assume that the tar file will have a fairly small amount of files (~layers),
+// and that filesystem caching will make the repeated seeking over the (uncompressed) tarPath cheap enough.
+// The caller should call .Close() on the returned stream.
+func (r *Reader) openTarComponent(componentPath string) (io.ReadCloser, error) {
+	f, err := os.Open(r.path)
+	if err != nil {
+		return nil, err
+	}
+	succeeded := false
+	defer func() {
+		if !succeeded {
+			f.Close()
+		}
+	}()
+
+	tarReader, header, err := findTarComponent(f, componentPath)
+	if err != nil {
+		return nil, err
+	}
+	if header == nil {
+		return nil, os.ErrNotExist
+	}
+	if header.FileInfo().Mode()&os.ModeType == os.ModeSymlink { // FIXME: untested
+		// We follow only one symlink; so no loops are possible.
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return nil, err
+		}
+		// The new path could easily point "outside" the archive, but we only compare it to existing tar headers without extracting the archive,
+		// so we don't care.
+		tarReader, header, err = findTarComponent(f, path.Join(path.Dir(componentPath), header.Linkname))
+		if err != nil {
+			return nil, err
+		}
+		if header == nil {
+			return nil, os.ErrNotExist
+		}
+	}
+
+	if !header.FileInfo().Mode().IsRegular() {
+		return nil, errors.Errorf("Error reading tar archive component %s: not a regular file", header.Name)
+	}
+	succeeded = true
+	return &tarReadCloser{Reader: tarReader, backingFile: f}, nil
+}
+
+// findTarComponent returns a header and a reader matching componentPath within inputFile,
+// or (nil, nil, nil) if not found.
+func findTarComponent(inputFile io.Reader, componentPath string) (*tar.Reader, *tar.Header, error) {
+	t := tar.NewReader(inputFile)
+	componentPath = path.Clean(componentPath)
+	for {
+		h, err := t.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		if path.Clean(h.Name) == componentPath {
+			return t, h, nil
+		}
+	}
+	return nil, nil, nil
+}
+
+// readTarComponent returns full contents of componentPath.
+func (r *Reader) readTarComponent(path string, limit int) ([]byte, error) {
+	file, err := r.openTarComponent(path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error loading tar component %s", path)
+	}
+	defer file.Close()
+	bytes, err := iolimits.ReadAtMost(file, limit)
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
+}
