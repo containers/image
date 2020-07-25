@@ -12,7 +12,6 @@ import (
 	"sync"
 
 	"github.com/containers/image/v5/internal/iolimits"
-	"github.com/containers/image/v5/internal/tmpdir"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/compression"
 	"github.com/containers/image/v5/types"
@@ -22,8 +21,7 @@ import (
 
 // Source is a partial implementation of types.ImageSource for reading from tarPath.
 type Source struct {
-	tarPath              string
-	removeTarPathOnClose bool // Remove temp file on close if true
+	archive *Reader
 	// The following data is only available after ensureCachedDataIsPresent() succeeds
 	tarManifest       *ManifestItem // nil if not available yet.
 	configBytes       []byte
@@ -48,157 +46,26 @@ type layerInfo struct {
 
 // NewSourceFromFile returns a tarfile.Source for the specified path.
 func NewSourceFromFile(sys *types.SystemContext, path string) (*Source, error) {
-	file, err := os.Open(path)
+	archive, err := NewReaderFromFile(sys, path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error opening file %q", path)
+		return nil, err
 	}
-	defer file.Close()
-
-	// If the file is already not compressed we can just return the file itself
-	// as a source. Otherwise we pass the stream to NewSourceFromStream.
-	stream, isCompressed, err := compression.AutoDecompress(file)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Error detecting compression for file %q", path)
-	}
-	defer stream.Close()
-	if !isCompressed {
-		return &Source{
-			tarPath: path,
-		}, nil
-	}
-	return NewSourceFromStream(sys, stream)
+	return &Source{
+		archive: archive,
+	}, nil
 }
 
 // NewSourceFromStream returns a tarfile.Source for the specified inputStream,
 // which can be either compressed or uncompressed. The caller can close the
 // inputStream immediately after NewSourceFromFile returns.
 func NewSourceFromStream(sys *types.SystemContext, inputStream io.Reader) (*Source, error) {
-	// Save inputStream to a temporary file
-	tarCopyFile, err := ioutil.TempFile(tmpdir.TemporaryDirectoryForBigFiles(sys), "docker-tar")
+	archive, err := NewReaderFromStream(sys, inputStream)
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating temporary file")
+		return nil, err
 	}
-	defer tarCopyFile.Close()
-
-	succeeded := false
-	defer func() {
-		if !succeeded {
-			os.Remove(tarCopyFile.Name())
-		}
-	}()
-
-	// In order to be compatible with docker-load, we need to support
-	// auto-decompression (it's also a nice quality-of-life thing to avoid
-	// giving users really confusing "invalid tar header" errors).
-	uncompressedStream, _, err := compression.AutoDecompress(inputStream)
-	if err != nil {
-		return nil, errors.Wrap(err, "Error auto-decompressing input")
-	}
-	defer uncompressedStream.Close()
-
-	// Copy the plain archive to the temporary file.
-	//
-	// TODO: This can take quite some time, and should ideally be cancellable
-	//       using a context.Context.
-	if _, err := io.Copy(tarCopyFile, uncompressedStream); err != nil {
-		return nil, errors.Wrapf(err, "error copying contents to temporary file %q", tarCopyFile.Name())
-	}
-	succeeded = true
-
 	return &Source{
-		tarPath:              tarCopyFile.Name(),
-		removeTarPathOnClose: true,
+		archive: archive,
 	}, nil
-}
-
-// tarReadCloser is a way to close the backing file of a tar.Reader when the user no longer needs the tar component.
-type tarReadCloser struct {
-	*tar.Reader
-	backingFile *os.File
-}
-
-func (t *tarReadCloser) Close() error {
-	return t.backingFile.Close()
-}
-
-// openTarComponent returns a ReadCloser for the specific file within the archive.
-// This is linear scan; we assume that the tar file will have a fairly small amount of files (~layers),
-// and that filesystem caching will make the repeated seeking over the (uncompressed) tarPath cheap enough.
-// The caller should call .Close() on the returned stream.
-func (s *Source) openTarComponent(componentPath string) (io.ReadCloser, error) {
-	f, err := os.Open(s.tarPath)
-	if err != nil {
-		return nil, err
-	}
-	succeeded := false
-	defer func() {
-		if !succeeded {
-			f.Close()
-		}
-	}()
-
-	tarReader, header, err := findTarComponent(f, componentPath)
-	if err != nil {
-		return nil, err
-	}
-	if header == nil {
-		return nil, os.ErrNotExist
-	}
-	if header.FileInfo().Mode()&os.ModeType == os.ModeSymlink { // FIXME: untested
-		// We follow only one symlink; so no loops are possible.
-		if _, err := f.Seek(0, io.SeekStart); err != nil {
-			return nil, err
-		}
-		// The new path could easily point "outside" the archive, but we only compare it to existing tar headers without extracting the archive,
-		// so we don't care.
-		tarReader, header, err = findTarComponent(f, path.Join(path.Dir(componentPath), header.Linkname))
-		if err != nil {
-			return nil, err
-		}
-		if header == nil {
-			return nil, os.ErrNotExist
-		}
-	}
-
-	if !header.FileInfo().Mode().IsRegular() {
-		return nil, errors.Errorf("Error reading tar archive component %s: not a regular file", header.Name)
-	}
-	succeeded = true
-	return &tarReadCloser{Reader: tarReader, backingFile: f}, nil
-}
-
-// findTarComponent returns a header and a reader matching componentPath within inputFile,
-// or (nil, nil, nil) if not found.
-func findTarComponent(inputFile io.Reader, componentPath string) (*tar.Reader, *tar.Header, error) {
-	t := tar.NewReader(inputFile)
-	componentPath = path.Clean(componentPath)
-	for {
-		h, err := t.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, nil, err
-		}
-		if path.Clean(h.Name) == componentPath {
-			return t, h, nil
-		}
-	}
-	return nil, nil, nil
-}
-
-// readTarComponent returns full contents of componentPath.
-func (s *Source) readTarComponent(path string, limit int) ([]byte, error) {
-	file, err := s.openTarComponent(path)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Error loading tar component %s", path)
-	}
-	defer file.Close()
-	bytes, err := iolimits.ReadAtMost(file, limit)
-	if err != nil {
-		return nil, err
-	}
-	return bytes, nil
 }
 
 // ensureCachedDataIsPresent loads data necessary for any of the public accessors.
@@ -225,7 +92,7 @@ func (s *Source) ensureCachedDataIsPresentPrivate() error {
 	}
 
 	// Read and parse config.
-	configBytes, err := s.readTarComponent(tarManifest[0].Config, iolimits.MaxConfigBodySize)
+	configBytes, err := s.archive.readTarComponent(tarManifest[0].Config, iolimits.MaxConfigBodySize)
 	if err != nil {
 		return err
 	}
@@ -254,7 +121,7 @@ func (s *Source) ensureCachedDataIsPresentPrivate() error {
 // loadTarManifest loads and decodes the manifest.json.
 func (s *Source) loadTarManifest() ([]ManifestItem, error) {
 	// FIXME? Do we need to deal with the legacy format?
-	bytes, err := s.readTarComponent(manifestFileName, iolimits.MaxTarFileManifestSize)
+	bytes, err := s.archive.readTarComponent(manifestFileName, iolimits.MaxTarFileManifestSize)
 	if err != nil {
 		return nil, err
 	}
@@ -267,10 +134,7 @@ func (s *Source) loadTarManifest() ([]ManifestItem, error) {
 
 // Close removes resources associated with an initialized Source, if any.
 func (s *Source) Close() error {
-	if s.removeTarPathOnClose {
-		return os.Remove(s.tarPath)
-	}
-	return nil
+	return s.archive.Close()
 }
 
 // LoadTarManifest loads and decodes the manifest.json
@@ -305,7 +169,7 @@ func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manif
 	}
 
 	// Scan the tar file to collect layer sizes.
-	file, err := os.Open(s.tarPath)
+	file, err := os.Open(s.archive.path)
 	if err != nil {
 		return nil, err
 	}
@@ -320,6 +184,7 @@ func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manif
 			return nil, err
 		}
 		layerPath := path.Clean(h.Name)
+		// FIXME: Cache this data across images in Reader.
 		if li, ok := unknownLayerSizes[layerPath]; ok {
 			// Since GetBlob will decompress layers that are compressed we need
 			// to do the decompression here as well, otherwise we will
@@ -431,7 +296,7 @@ func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo, cache types.B
 	}
 
 	if li, ok := s.knownLayers[info.Digest]; ok { // diffID is a digest of the uncompressed tarball,
-		underlyingStream, err := s.openTarComponent(li.path)
+		underlyingStream, err := s.archive.openTarComponent(li.path)
 		if err != nil {
 			return nil, 0, err
 		}
