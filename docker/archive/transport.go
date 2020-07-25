@@ -3,6 +3,7 @@ package archive
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/containers/image/v5/docker/internal/tarfile"
@@ -45,6 +46,9 @@ type archiveReference struct {
 	path string
 	// May be nil to read the only image in an archive, or to create an untagged image.
 	ref reference.NamedTagged
+	// If not -1, a zero-based index of the image in the manifest. Valid only for sources.
+	// Must not be set if ref is set.
+	sourceIndex int
 	// If not nil, must have been created for path
 	archiveWriter *tarfile.Writer
 }
@@ -58,41 +62,65 @@ func ParseReference(refString string) (types.ImageReference, error) {
 	parts := strings.SplitN(refString, ":", 2)
 	path := parts[0]
 	var nt reference.NamedTagged
+	sourceIndex := -1
 
 	if len(parts) == 2 {
-		// A :tag was specified.
-		ref, err := reference.ParseNormalizedNamed(parts[1])
-		if err != nil {
-			return nil, errors.Wrapf(err, "docker-archive parsing reference")
+		// A :tag or :@index was specified.
+		if len(parts[1]) > 0 && parts[1][0] == '@' {
+			i, err := strconv.Atoi(parts[1][1:])
+			if err != nil {
+				return nil, errors.Wrapf(err, "Invalid source index %s", parts[1])
+			}
+			if i < 0 {
+				return nil, errors.Errorf("Invalid source index @%d: must not be negative", i)
+			}
+			sourceIndex = i
+		} else {
+			ref, err := reference.ParseNormalizedNamed(parts[1])
+			if err != nil {
+				return nil, errors.Wrapf(err, "docker-archive parsing reference")
+			}
+			ref = reference.TagNameOnly(ref)
+			refTagged, isTagged := ref.(reference.NamedTagged)
+			if !isTagged { // If ref contains a digest, TagNameOnly does not change it
+				return nil, errors.Errorf("reference does not include a tag: %s", ref.String())
+			}
+			nt = refTagged
 		}
-		ref = reference.TagNameOnly(ref)
-		refTagged, isTagged := ref.(reference.NamedTagged)
-		if !isTagged { // If ref contains a digest, TagNameOnly does not change it
-			return nil, errors.Errorf("reference does not include a tag: %s", ref.String())
-		}
-		nt = refTagged
 	}
 
-	return NewReference(path, nt)
+	return newReference(path, nt, sourceIndex, nil)
 }
 
 // NewReference returns a Docker archive reference for a path and an optional reference.
 func NewReference(path string, ref reference.NamedTagged) (types.ImageReference, error) {
-	return newReference(path, ref, nil)
+	return newReference(path, ref, -1, nil)
+}
+
+// NewIndexReference returns a Docker archive reference for a path and a zero-based source manifest index.
+func NewIndexReference(path string, sourceIndex int) (types.ImageReference, error) {
+	return newReference(path, nil, sourceIndex, nil)
 }
 
 // newReference returns a docker archive reference for a path, an optional reference or sourceIndex,
 // and optionally a tarfile.Writer matching path.
-func newReference(path string, ref reference.NamedTagged, archiveWriter *tarfile.Writer) (types.ImageReference, error) {
+func newReference(path string, ref reference.NamedTagged, sourceIndex int, archiveWriter *tarfile.Writer) (types.ImageReference, error) {
 	if strings.Contains(path, ":") {
 		return nil, errors.Errorf("Invalid docker-archive: reference: colon in path %q is not supported", path)
+	}
+	if ref != nil && sourceIndex != -1 {
+		return nil, errors.Errorf("Invalid docker-archive: reference: cannot use both a tag and a source index")
 	}
 	if _, isDigest := ref.(reference.Canonical); isDigest {
 		return nil, errors.Errorf("docker-archive doesn't support digest references: %s", ref.String())
 	}
+	if sourceIndex != -1 && sourceIndex < 0 {
+		return nil, errors.Errorf("Invalid docker-archive: reference: index @%d must not be negative", sourceIndex)
+	}
 	return archiveReference{
 		path:          path,
 		ref:           ref,
+		sourceIndex:   sourceIndex,
 		archiveWriter: archiveWriter,
 	}, nil
 }
@@ -107,10 +135,14 @@ func (ref archiveReference) Transport() types.ImageTransport {
 // e.g. default attribute values omitted by the user may be filled in in the return value, or vice versa.
 // WARNING: Do not use the return value in the UI to describe an image, it does not contain the Transport().Name() prefix.
 func (ref archiveReference) StringWithinTransport() string {
-	if ref.ref == nil {
+	switch {
+	case ref.ref != nil:
+		return fmt.Sprintf("%s:%s", ref.path, ref.ref.String())
+	case ref.sourceIndex != -1:
+		return fmt.Sprintf("%s:@%d", ref.path, ref.sourceIndex)
+	default:
 		return ref.path
 	}
-	return fmt.Sprintf("%s:%s", ref.path, ref.ref.String())
 }
 
 // DockerReference returns a Docker reference associated with this reference

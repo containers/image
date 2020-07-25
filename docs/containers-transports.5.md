@@ -41,11 +41,13 @@ If `name` does not contain a slash, it is treated as `docker.io/library/name`.
 Otherwise, the component before the first slash is checked if it is recognized as a `hostname[:port]` (i.e., it contains either a . or a :, or the component is exactly localhost).
 If the first component of name is not recognized as a `hostname[:port]`, `name` is treated as `docker.io/name`.
 
-### **docker-archive:**_path[:docker-reference]_
+### **docker-archive:**_path[:{docker-reference|@source-index}]_
 
 An image is stored in the docker-save(1) formatted file.
 _docker-reference_ must not contain a digest.
-If _docker-reference_ is missing when reading an archive, the archive must contain exactly one image.
+Alternatively, for reading archives, @_source-index_ is a zero-based index in archive manifest
+(to access untagged images).
+If neither _docker-reference_ nor @_source_index is specified when reading an archive, the archive must contain exactly one image.
 
 It is further possible to copy data to stdin by specifying `docker-archive:/dev/stdin` but note that the used file must be seekable.
 

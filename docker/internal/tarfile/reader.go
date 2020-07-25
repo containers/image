@@ -126,28 +126,42 @@ func (r *Reader) Close() error {
 	return nil
 }
 
-// chooseManifestItem selects a manifest item from r.Manifest matching ref (which may be nil)
-func (r *Reader) chooseManifestItem(ref reference.NamedTagged) (*ManifestItem, error) {
-	if ref == nil {
+// chooseManifestItem selects a manifest item from r.Manifest matching (ref, sourceIndex), one or
+// both of which should be (nil, -1).
+func (r *Reader) chooseManifestItem(ref reference.NamedTagged, sourceIndex int) (*ManifestItem, error) {
+	switch {
+	case ref != nil && sourceIndex != -1:
+		return nil, errors.Errorf("Internal error: Cannot have both ref %s and source index @%d",
+			ref.String(), sourceIndex)
+
+	case ref != nil:
+		refString := ref.String()
+		for i := range r.Manifest {
+			for _, tag := range r.Manifest[i].RepoTags {
+				parsedTag, err := reference.ParseNormalizedNamed(tag)
+				if err != nil {
+					return nil, errors.Wrapf(err, "Invalid tag %#v in manifest.json item @%d", tag, i)
+				}
+				if parsedTag.String() == refString {
+					return &r.Manifest[i], nil
+				}
+			}
+		}
+		return nil, errors.Errorf("Tag %#v not found", refString)
+
+	case sourceIndex != -1:
+		if sourceIndex >= len(r.Manifest) {
+			return nil, errors.Errorf("Invalid source index @%d, only %d manifest items available",
+				sourceIndex, len(r.Manifest))
+		}
+		return &r.Manifest[sourceIndex], nil
+
+	default:
 		if len(r.Manifest) != 1 {
 			return nil, errors.Errorf("Unexpected tar manifest.json: expected 1 item, got %d", len(r.Manifest))
 		}
 		return &r.Manifest[0], nil
 	}
-
-	refString := ref.String()
-	for i := range r.Manifest {
-		for _, tag := range r.Manifest[i].RepoTags {
-			parsedTag, err := reference.ParseNormalizedNamed(tag)
-			if err != nil {
-				return nil, errors.Wrapf(err, "Invalid tag %#v in manifest.json item %d", tag, i+1)
-			}
-			if parsedTag.String() == refString {
-				return &r.Manifest[i], nil
-			}
-		}
-	}
-	return nil, errors.Errorf("Tag %#v not found", refString)
 }
 
 // tarReadCloser is a way to close the backing file of a tar.Reader when the user no longer needs the tar component.

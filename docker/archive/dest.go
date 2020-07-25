@@ -6,6 +6,7 @@ import (
 
 	"github.com/containers/image/v5/docker/internal/tarfile"
 	"github.com/containers/image/v5/types"
+	"github.com/pkg/errors"
 )
 
 type archiveImageDestination struct {
@@ -16,6 +17,10 @@ type archiveImageDestination struct {
 }
 
 func newImageDestination(sys *types.SystemContext, ref archiveReference) (types.ImageDestination, error) {
+	if ref.sourceIndex != -1 {
+		return nil, errors.Errorf("Destination reference must not contain a manifest index @%d", ref.sourceIndex)
+	}
+
 	var archive *tarfile.Writer
 	var writer io.Closer
 	if ref.archiveWriter != nil {

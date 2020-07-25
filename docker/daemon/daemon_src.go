@@ -39,7 +39,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref daemonRef
 	if err != nil {
 		return nil, err
 	}
-	src := tarfile.NewSource(archive, true, nil)
+	src := tarfile.NewSource(archive, true, nil, -1)
 	return &daemonImageSource{
 		ref:    ref,
 		Source: src,

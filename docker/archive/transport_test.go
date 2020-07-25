@@ -47,16 +47,26 @@ func TestParseReference(t *testing.T) {
 
 // testParseReference is a test shared for Transport.ParseReference and ParseReference.
 func testParseReference(t *testing.T, fn func(string) (types.ImageReference, error)) {
-	for _, c := range []struct{ input, expectedPath, expectedRef string }{
-		{"", "", ""}, // Empty input is explicitly rejected
-		{"/path", "/path", ""},
-		{"/path:busybox:notlatest", "/path", "docker.io/library/busybox:notlatest"}, // Explicit tag
-		{"/path:busybox" + sha256digest, "", ""},                                    // Digest references are forbidden
-		{"/path:busybox", "/path", "docker.io/library/busybox:latest"},              // Default tag
+	for _, c := range []struct {
+		input, expectedPath, expectedRef string
+		expectedSourceIndex              int
+	}{
+		{"", "", "", -1}, // Empty input is explicitly rejected
+		{"/path", "/path", "", -1},
+		{"/path:busybox:notlatest", "/path", "docker.io/library/busybox:notlatest", -1}, // Explicit tag
+		{"/path:busybox" + sha256digest, "", "", -1},                                    // Digest references are forbidden
+		{"/path:busybox", "/path", "docker.io/library/busybox:latest", -1},              // Default tag
 		// A github.com/distribution/reference value can have a tag and a digest at the same time!
-		{"/path:busybox:latest" + sha256digest, "", ""},                                         // Both tag and digest is rejected
-		{"/path:docker.io/library/busybox:latest", "/path", "docker.io/library/busybox:latest"}, // All implied values explicitly specified
-		{"/path:UPPERCASEISINVALID", "", ""},                                                    // Invalid input
+		{"/path:busybox:latest" + sha256digest, "", "", -1},                                         // Both tag and digest is rejected
+		{"/path:docker.io/library/busybox:latest", "/path", "docker.io/library/busybox:latest", -1}, // All implied reference parts explicitly specified
+		{"/path:UPPERCASEISINVALID", "", "", -1},                                                    // Invalid reference format
+		{"/path:@", "", "", -1},                                                                     // Missing source index
+		{"/path:@0", "/path", "", 0},                                                                // Valid source index
+		{"/path:@999999", "/path", "", 999999},                                                      // Valid source index
+		{"/path:@-2", "", "", -1},                                                                   // Negative source index
+		{"/path:@-1", "", "", -1},                                                                   // Negative source index, using the placeholder value
+		{"/path:busybox@0", "", "", -1},                                                             // References and source indices can’t be combined.
+		{"/path:@0:busybox", "", "", -1},                                                            // References and source indices can’t be combined.
 	} {
 		ref, err := fn(c.input)
 		if c.expectedPath == "" {
@@ -72,8 +82,18 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 				require.NotNil(t, archiveRef.ref, c.input)
 				assert.Equal(t, c.expectedRef, archiveRef.ref.String(), c.input)
 			}
+			assert.Equal(t, c.expectedSourceIndex, archiveRef.sourceIndex, c.input)
 		}
 	}
+}
+
+// namedTaggedRef returns a reference.NamedTagged for input
+func namedTaggedRef(t *testing.T, input string) reference.NamedTagged {
+	named, err := reference.ParseNormalizedNamed(input)
+	require.NoError(t, err, input)
+	nt, ok := named.(reference.NamedTagged)
+	require.True(t, ok, input)
+	return nt
 }
 
 func TestNewReference(t *testing.T) {
@@ -88,11 +108,7 @@ func TestNewReference(t *testing.T) {
 		} {
 			var ntRef reference.NamedTagged = nil
 			if c.ref != "" {
-				namedRef, err := reference.ParseNormalizedNamed(c.ref)
-				require.NoError(t, err, c.ref)
-				nt, ok := namedRef.(reference.NamedTagged)
-				require.True(t, ok, c.ref)
-				ntRef = nt
+				ntRef = namedTaggedRef(t, c.ref)
 			}
 
 			res, err := NewReference(path, ntRef)
@@ -109,8 +125,41 @@ func TestNewReference(t *testing.T) {
 					require.NotNil(t, archiveRef.ref, c.ref)
 					assert.Equal(t, ntRef.String(), archiveRef.ref.String(), c.ref)
 				}
+				assert.Equal(t, -1, archiveRef.sourceIndex, c.ref)
 			}
+		}
+	}
+	_, err := NewReference("with:colon", nil)
+	assert.Error(t, err)
 
+	// Complete coverage testing of the private newReference here as well
+	ntRef := namedTaggedRef(t, "busybox:latest")
+	_, err = newReference("path", ntRef, 0, nil)
+	assert.Error(t, err)
+}
+
+func TestNewIndexReference(t *testing.T) {
+	for _, path := range []string{"relative", "/absolute"} {
+		for _, c := range []struct {
+			index int
+			ok    bool
+		}{
+			{0, true},
+			{9999990, true},
+			{-1, true},
+			{-2, false},
+		} {
+			res, err := NewIndexReference(path, c.index)
+			if !c.ok {
+				assert.Error(t, err, c.index)
+			} else {
+				require.NoError(t, err, c.index)
+				archiveRef, ok := res.(archiveReference)
+				require.True(t, ok, c.index)
+				assert.Equal(t, path, archiveRef.path)
+				assert.Nil(t, archiveRef.ref, c.index)
+				assert.Equal(t, c.index, archiveRef.sourceIndex)
+			}
 		}
 	}
 	_, err := NewReference("with:colon", nil)
@@ -118,11 +167,17 @@ func TestNewReference(t *testing.T) {
 }
 
 // A common list of reference formats to test for the various ImageReference methods.
-var validReferenceTestCases = []struct{ input, dockerRef, stringWithinTransport string }{
-	{"/pathonly", "", "/pathonly"},
-	{"/path:busybox:notlatest", "docker.io/library/busybox:notlatest", "/path:docker.io/library/busybox:notlatest"},          // Explicit tag
-	{"/path:docker.io/library/busybox:latest", "docker.io/library/busybox:latest", "/path:docker.io/library/busybox:latest"}, // All implied values explicitly specified
-	{"/path:example.com/ns/foo:bar", "example.com/ns/foo:bar", "/path:example.com/ns/foo:bar"},                               // All values explicitly specified
+var validReferenceTestCases = []struct {
+	input, dockerRef      string
+	sourceIndex           int
+	stringWithinTransport string
+}{
+	{"/pathonly", "", -1, "/pathonly"},
+	{"/path:busybox:notlatest", "docker.io/library/busybox:notlatest", -1, "/path:docker.io/library/busybox:notlatest"},          // Explicit tag
+	{"/path:docker.io/library/busybox:latest", "docker.io/library/busybox:latest", -1, "/path:docker.io/library/busybox:latest"}, // All implied reference part explicitly specified
+	{"/path:example.com/ns/foo:bar", "example.com/ns/foo:bar", -1, "/path:example.com/ns/foo:bar"},                               // All values explicitly specified
+	{"/path:@0", "", 0, "/path:@0"},
+	{"/path:@999999", "", 999999, "/path:@999999"},
 }
 
 func TestReferenceTransport(t *testing.T) {
@@ -176,7 +231,7 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 }
 
 func TestReferenceNewImage(t *testing.T) {
-	for _, suffix := range []string{"", ":emptyimage:latest"} {
+	for _, suffix := range []string{"", ":emptyimage:latest", ":@0"} {
 		ref, err := ParseReference(tarFixture + suffix)
 		require.NoError(t, err, suffix)
 		img, err := ref.NewImage(context.Background(), nil)
@@ -186,7 +241,7 @@ func TestReferenceNewImage(t *testing.T) {
 }
 
 func TestReferenceNewImageSource(t *testing.T) {
-	for _, suffix := range []string{"", ":emptyimage:latest"} {
+	for _, suffix := range []string{"", ":emptyimage:latest", ":@0"} {
 		ref, err := ParseReference(tarFixture + suffix)
 		require.NoError(t, err, suffix)
 		src, err := ref.NewImageSource(context.Background(), nil)
@@ -218,7 +273,7 @@ func TestReferenceDeleteImage(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	for i, suffix := range []string{"", ":some-reference"} {
+	for i, suffix := range []string{"", ":some-reference", ":@0"} {
 		testFile := filepath.Join(tmpDir, fmt.Sprintf("file%d.tar", i))
 		err := ioutil.WriteFile(testFile, []byte("nonempty"), 0644)
 		require.NoError(t, err, suffix)
