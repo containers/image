@@ -21,7 +21,8 @@ import (
 
 // Source is a partial implementation of types.ImageSource for reading from tarPath.
 type Source struct {
-	archive *Reader
+	archive      *Reader
+	closeArchive bool // .Close() the archive when the source is closed.
 	// The following data is only available after ensureCachedDataIsPresent() succeeds
 	tarManifest       *ManifestItem // nil if not available yet.
 	configBytes       []byte
@@ -44,28 +45,13 @@ type layerInfo struct {
 //       the source of an image.
 // 	To do for both the NewSourceFromFile and NewSourceFromStream functions
 
-// NewSourceFromFile returns a tarfile.Source for the specified path.
-func NewSourceFromFile(sys *types.SystemContext, path string) (*Source, error) {
-	archive, err := NewReaderFromFile(sys, path)
-	if err != nil {
-		return nil, err
-	}
+// NewSource returns a tarfile.Source for the only image in the specified archive.
+// The archive will be closed if closeArchive
+func NewSource(archive *Reader, closeArchive bool) *Source {
 	return &Source{
-		archive: archive,
-	}, nil
-}
-
-// NewSourceFromStream returns a tarfile.Source for the specified inputStream,
-// which can be either compressed or uncompressed. The caller can close the
-// inputStream immediately after NewSourceFromFile returns.
-func NewSourceFromStream(sys *types.SystemContext, inputStream io.Reader) (*Source, error) {
-	archive, err := NewReaderFromStream(sys, inputStream)
-	if err != nil {
-		return nil, err
+		archive:      archive,
+		closeArchive: closeArchive,
 	}
-	return &Source{
-		archive: archive,
-	}, nil
 }
 
 // ensureCachedDataIsPresent loads data necessary for any of the public accessors.
@@ -134,7 +120,10 @@ func (s *Source) loadTarManifest() ([]ManifestItem, error) {
 
 // Close removes resources associated with an initialized Source, if any.
 func (s *Source) Close() error {
-	return s.archive.Close()
+	if s.closeArchive {
+		return s.archive.Close()
+	}
+	return nil
 }
 
 // LoadTarManifest loads and decodes the manifest.json
