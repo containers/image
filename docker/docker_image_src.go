@@ -235,6 +235,9 @@ func (s *dockerImageSource) getExternalBlob(ctx context.Context, urls []string) 
 		resp *http.Response
 		err  error
 	)
+	if len(urls) == 0 {
+		return nil, 0, errors.New("internal error: getExternalBlob called with no URLs")
+	}
 	for _, url := range urls {
 		resp, err = s.c.makeRequestToResolvedURL(ctx, "GET", url, nil, nil, -1, noAuth, nil)
 		if err == nil {
