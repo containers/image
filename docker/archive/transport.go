@@ -68,9 +68,8 @@ func ParseReference(refString string) (types.ImageReference, error) {
 		}
 		ref = reference.TagNameOnly(ref)
 		refTagged, isTagged := ref.(reference.NamedTagged)
-		if !isTagged {
-			// Really shouldn't be hit...
-			return nil, errors.Errorf("internal error: reference is not tagged even after reference.TagNameOnly: %s", refString)
+		if !isTagged { // If ref contains a digest, TagNameOnly does not change it
+			return nil, errors.Errorf("reference does not include a tag: %s", ref.String())
 		}
 		destinationRef = refTagged
 	}
