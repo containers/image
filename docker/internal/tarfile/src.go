@@ -107,9 +107,9 @@ func (s *Source) Close() error {
 	return nil
 }
 
-// LoadTarManifest loads and decodes the manifest.json
-func (s *Source) LoadTarManifest() ([]ManifestItem, error) {
-	return s.archive.Manifest, nil
+// TarManifest returns contents of manifest.json
+func (s *Source) TarManifest() []ManifestItem {
+	return s.archive.Manifest
 }
 
 func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manifest.Schema2Image) (map[digest.Digest]*layerInfo, error) {
