@@ -24,6 +24,8 @@ type Writer struct {
 	tar    *tar.Writer
 	// Other state.
 	blobs            map[digest.Digest]types.BlobInfo // list of already-sent blobs
+	repositories     map[string]map[string]string
+	legacyLayers     map[string]struct{} // A set of IDs of legacy layers that have been already sent.
 	manifest         []ManifestItem
 	manifestByConfig map[digest.Digest]int // A map from config digest to an entry index in manifest above.
 }
@@ -35,6 +37,8 @@ func NewWriter(dest io.Writer) *Writer {
 		writer:           dest,
 		tar:              tar.NewWriter(dest),
 		blobs:            make(map[digest.Digest]types.BlobInfo),
+		repositories:     map[string]map[string]string{},
+		legacyLayers:     map[string]struct{}{},
 		manifestByConfig: map[digest.Digest]int{},
 	}
 }
@@ -58,22 +62,26 @@ func (w *Writer) recordBlob(info types.BlobInfo) {
 	w.blobs[info.Digest] = info
 }
 
-// createSingleLegacyLayer writes legacy VERSION and configuration files for a single layer
-func (w *Writer) createSingleLegacyLayer(layerID string, layerDigest digest.Digest, configBytes []byte) error {
-	// Create a symlink for the legacy format, where there is one subdirectory per layer ("image").
-	// See also the comment in physicalLayerPath.
-	physicalLayerPath := w.physicalLayerPath(layerDigest)
-	if err := w.sendSymlink(filepath.Join(layerID, legacyLayerFileName), filepath.Join("..", physicalLayerPath)); err != nil {
-		return errors.Wrap(err, "Error creating layer symbolic link")
-	}
+// ensureSingleLegacyLayer writes legacy VERSION and configuration files for a single layer
+func (w *Writer) ensureSingleLegacyLayer(layerID string, layerDigest digest.Digest, configBytes []byte) error {
+	if _, ok := w.legacyLayers[layerID]; !ok {
+		// Create a symlink for the legacy format, where there is one subdirectory per layer ("image").
+		// See also the comment in physicalLayerPath.
+		physicalLayerPath := w.physicalLayerPath(layerDigest)
+		if err := w.sendSymlink(filepath.Join(layerID, legacyLayerFileName), filepath.Join("..", physicalLayerPath)); err != nil {
+			return errors.Wrap(err, "Error creating layer symbolic link")
+		}
 
-	b := []byte("1.0")
-	if err := w.sendBytes(filepath.Join(layerID, legacyVersionFileName), b); err != nil {
-		return errors.Wrap(err, "Error writing VERSION file")
-	}
+		b := []byte("1.0")
+		if err := w.sendBytes(filepath.Join(layerID, legacyVersionFileName), b); err != nil {
+			return errors.Wrap(err, "Error writing VERSION file")
+		}
 
-	if err := w.sendBytes(filepath.Join(layerID, legacyConfigFileName), configBytes); err != nil {
-		return errors.Wrap(err, "Error writing config json file")
+		if err := w.sendBytes(filepath.Join(layerID, legacyConfigFileName), configBytes); err != nil {
+			return errors.Wrap(err, "Error writing config json file")
+		}
+
+		w.legacyLayers[layerID] = struct{}{}
 	}
 	return nil
 }
@@ -108,16 +116,21 @@ func (w *Writer) writeLegacyMetadata(layerDescriptors []manifest.Schema2Descript
 		} else {
 			chainID = digest.Canonical.FromString(chainID.String() + " " + l.Digest.String())
 		}
-		// … but note that this image ID does not match docker/docker/image/v1.CreateID. At least recent
-		// versions allocate new IDs on load, as long as the IDs we use are unique / cannot loop.
+		// … but note that the image ID does not _exactly_ match docker/docker/image/v1.CreateID, primarily because
+		// we create the image configs differently in details. At least recent versions allocate new IDs on load,
+		// so this is fine as long as the IDs we use are unique / cannot loop.
 		//
-		// Overall, the goal of computing a digest dependent on the full history is to avoid reusing an image ID
-		// (and possibly creating a loop in the "parent" links) if a layer with the same DiffID appears two or more
-		// times in layersDescriptors.  The ChainID values are sufficient for this, the v1.CreateID computation
-		// which also mixes in the full image configuration seems unnecessary, at least as long as we are storing
-		// only a single image per tarball, i.e. all DiffID prefixes are unique (can’t differ only with
-		// configuration).
-		layerID := chainID.Hex()
+		// For intermediate images, we could just use the chainID as an image ID, but using a digest of ~the created
+		// config makes sure that everything uses the same “namespace”; a bit less efficient but clearer.
+		//
+		// Temporarily add the chainID to the config, only for the purpose of generating the image ID.
+		layerConfig["layer_id"] = chainID
+		b, err := json.Marshal(layerConfig) // Note that layerConfig["id"] is not set yet at this point.
+		if err != nil {
+			return errors.Wrap(err, "Error marshaling layer config")
+		}
+		delete(layerConfig, "layer_id")
+		layerID := digest.Canonical.FromBytes(b).Hex()
 		layerConfig["id"] = layerID
 
 		configBytes, err := json.Marshal(layerConfig)
@@ -125,30 +138,21 @@ func (w *Writer) writeLegacyMetadata(layerDescriptors []manifest.Schema2Descript
 			return errors.Wrap(err, "Error marshaling layer config")
 		}
 
-		if err := w.createSingleLegacyLayer(layerID, l.Digest, configBytes); err != nil {
+		if err := w.ensureSingleLegacyLayer(layerID, l.Digest, configBytes); err != nil {
 			return err
 		}
 
 		lastLayerID = layerID
 	}
 
-	repositories := map[string]map[string]string{}
 	if lastLayerID != "" {
 		for _, repoTag := range repoTags {
-			if val, ok := repositories[repoTag.Name()]; ok {
+			if val, ok := w.repositories[repoTag.Name()]; ok {
 				val[repoTag.Tag()] = lastLayerID
 			} else {
-				repositories[repoTag.Name()] = map[string]string{repoTag.Tag(): lastLayerID}
+				w.repositories[repoTag.Name()] = map[string]string{repoTag.Tag(): lastLayerID}
 			}
 		}
-	}
-
-	b, err := json.Marshal(repositories)
-	if err != nil {
-		return errors.Wrap(err, "Error marshaling repositories")
-	}
-	if err := w.sendBytes(legacyRepositoriesFileName, b); err != nil {
-		return errors.Wrap(err, "Error writing config json file")
 	}
 	return nil
 }
@@ -241,6 +245,14 @@ func (w *Writer) Close() error {
 	}
 	if err := w.sendBytes(manifestFileName, b); err != nil {
 		return err
+	}
+
+	b, err = json.Marshal(w.repositories)
+	if err != nil {
+		return errors.Wrap(err, "Error marshaling repositories")
+	}
+	if err := w.sendBytes(legacyRepositoriesFileName, b); err != nil {
+		return errors.Wrap(err, "Error writing config json file")
 	}
 
 	return w.tar.Close()
