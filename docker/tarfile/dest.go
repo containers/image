@@ -23,7 +23,7 @@ func NewDestination(dest io.Writer, ref reference.NamedTagged) *Destination {
 
 // NewDestinationWithContext returns a tarfile.Destination for the specified io.Writer.
 func NewDestinationWithContext(sys *types.SystemContext, dest io.Writer, ref reference.NamedTagged) *Destination {
-	return &Destination{internal: internal.NewDestinationWithContext(sys, dest, ref)}
+	return &Destination{internal: internal.NewDestination(sys, dest, ref)}
 }
 
 // AddRepoTags adds the specified tags to the destination's repoTags.

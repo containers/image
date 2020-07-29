@@ -33,14 +33,8 @@ type Destination struct {
 	sysCtx *types.SystemContext
 }
 
-// NewDestination returns a tarfile.Destination for the specified io.Writer.
-// Deprecated: please use NewDestinationWithContext instead
-func NewDestination(dest io.Writer, ref reference.NamedTagged) *Destination {
-	return NewDestinationWithContext(nil, dest, ref)
-}
-
 // NewDestinationWithContext returns a tarfile.Destination for the specified io.Writer.
-func NewDestinationWithContext(sys *types.SystemContext, dest io.Writer, ref reference.NamedTagged) *Destination {
+func NewDestination(sys *types.SystemContext, dest io.Writer, ref reference.NamedTagged) *Destination {
 	repoTags := []reference.NamedTagged{}
 	if ref != nil {
 		repoTags = append(repoTags, ref)
