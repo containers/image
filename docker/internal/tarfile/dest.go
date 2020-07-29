@@ -1,16 +1,12 @@
 package tarfile
 
 import (
-	"archive/tar"
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
-	"path/filepath"
-	"time"
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/iolimits"
@@ -24,26 +20,22 @@ import (
 
 // Destination is a partial implementation of types.ImageDestination for writing to an io.Writer.
 type Destination struct {
-	writer   io.Writer
-	tar      *tar.Writer
+	archive  *Writer
 	repoTags []reference.NamedTagged
 	// Other state.
-	blobs  map[digest.Digest]types.BlobInfo // list of already-sent blobs
 	config []byte
 	sysCtx *types.SystemContext
 }
 
-// NewDestinationWithContext returns a tarfile.Destination for the specified io.Writer.
+// NewDestination returns a tarfile.Destination for the specified io.Writer.
 func NewDestination(sys *types.SystemContext, dest io.Writer, ref reference.NamedTagged) *Destination {
 	repoTags := []reference.NamedTagged{}
 	if ref != nil {
 		repoTags = append(repoTags, ref)
 	}
 	return &Destination{
-		writer:   dest,
-		tar:      tar.NewWriter(dest),
+		archive:  NewWriter(dest),
 		repoTags: repoTags,
-		blobs:    make(map[digest.Digest]types.BlobInfo),
 		sysCtx:   sys,
 	}
 }
@@ -129,7 +121,7 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 	}
 
 	// Maybe the blob has been already sent
-	ok, reusedInfo, err := d.TryReusingBlob(ctx, inputInfo, cache, false)
+	ok, reusedInfo, err := d.archive.tryReusingBlob(inputInfo)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
@@ -143,7 +135,7 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 			return types.BlobInfo{}, errors.Wrap(err, "Error reading Config file stream")
 		}
 		d.config = buf
-		if err := d.sendFile(inputInfo.Digest.Hex()+".json", inputInfo.Size, bytes.NewReader(buf)); err != nil {
+		if err := d.archive.sendFile(inputInfo.Digest.Hex()+".json", inputInfo.Size, bytes.NewReader(buf)); err != nil {
 			return types.BlobInfo{}, errors.Wrap(err, "Error writing Config file")
 		}
 	} else {
@@ -152,11 +144,11 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 		// inside it), most of the layers would end up in subdirectories alone without any metadata; (docker load)
 		// tries to load every subdirectory as an image and fails if the config is missing.  So, keep the layers
 		// in the root of the tarball.
-		if err := d.sendFile(inputInfo.Digest.Hex()+".tar", inputInfo.Size, stream); err != nil {
+		if err := d.archive.sendFile(inputInfo.Digest.Hex()+".tar", inputInfo.Size, stream); err != nil {
 			return types.BlobInfo{}, err
 		}
 	}
-	d.blobs[inputInfo.Digest] = types.BlobInfo{Digest: inputInfo.Digest, Size: inputInfo.Size}
+	d.archive.recordBlob(types.BlobInfo{Digest: inputInfo.Digest, Size: inputInfo.Size})
 	return types.BlobInfo{Digest: inputInfo.Digest, Size: inputInfo.Size}, nil
 }
 
@@ -168,33 +160,7 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 // May use and/or update cache.
 func (d *Destination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
-	if info.Digest == "" {
-		return false, types.BlobInfo{}, errors.Errorf("Can not check for a blob with unknown digest")
-	}
-	if blob, ok := d.blobs[info.Digest]; ok {
-		return true, types.BlobInfo{Digest: info.Digest, Size: blob.Size}, nil
-	}
-	return false, types.BlobInfo{}, nil
-}
-
-func (d *Destination) createRepositoriesFile(rootLayerID string) error {
-	repositories := map[string]map[string]string{}
-	for _, repoTag := range d.repoTags {
-		if val, ok := repositories[repoTag.Name()]; ok {
-			val[repoTag.Tag()] = rootLayerID
-		} else {
-			repositories[repoTag.Name()] = map[string]string{repoTag.Tag(): rootLayerID}
-		}
-	}
-
-	b, err := json.Marshal(repositories)
-	if err != nil {
-		return errors.Wrap(err, "Error marshaling repositories")
-	}
-	if err := d.sendBytes(legacyRepositoriesFileName, b); err != nil {
-		return errors.Wrap(err, "Error writing config json file")
-	}
-	return nil
+	return d.archive.tryReusingBlob(info)
 }
 
 // PutManifest writes manifest to the destination.
@@ -217,184 +183,19 @@ func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest 
 		return errors.Errorf("Unsupported manifest type, need a Docker schema 2 manifest")
 	}
 
-	layerPaths, lastLayerID, err := d.writeLegacyLayerMetadata(man.LayersDescriptors)
+	layerPaths, lastLayerID, err := d.archive.writeLegacyLayerMetadata(man.LayersDescriptors, d.config)
 	if err != nil {
 		return err
 	}
 
 	if len(man.LayersDescriptors) > 0 {
-		if err := d.createRepositoriesFile(lastLayerID); err != nil {
-			return err
-		}
+		d.archive.addLegacyTags(lastLayerID, d.repoTags)
 	}
 
-	repoTags := []string{}
-	for _, tag := range d.repoTags {
-		// For github.com/docker/docker consumers, this works just as well as
-		//   refString := ref.String()
-		// because when reading the RepoTags strings, github.com/docker/docker/reference
-		// normalizes both of them to the same value.
-		//
-		// Doing it this way to include the normalized-out `docker.io[/library]` does make
-		// a difference for github.com/projectatomic/docker consumers, with the
-		// “Add --add-registry and --block-registry options to docker daemon” patch.
-		// These consumers treat reference strings which include a hostname and reference
-		// strings without a hostname differently.
-		//
-		// Using the host name here is more explicit about the intent, and it has the same
-		// effect as (docker pull) in projectatomic/docker, which tags the result using
-		// a hostname-qualified reference.
-		// See https://github.com/containers/image/issues/72 for a more detailed
-		// analysis and explanation.
-		refString := fmt.Sprintf("%s:%s", tag.Name(), tag.Tag())
-		repoTags = append(repoTags, refString)
-	}
-
-	items := []ManifestItem{{
-		Config:       man.ConfigDescriptor.Digest.Hex() + ".json",
-		RepoTags:     repoTags,
-		Layers:       layerPaths,
-		Parent:       "",
-		LayerSources: nil,
-	}}
-	itemsBytes, err := json.Marshal(&items)
-	if err != nil {
+	if err := d.archive.addManifestTags(man.ConfigDescriptor.Digest.Hex()+".json", layerPaths, d.repoTags); err != nil {
 		return err
 	}
 
-	// FIXME? Do we also need to support the legacy format?
-	return d.sendBytes(manifestFileName, itemsBytes)
-}
-
-// writeLegacyLayerMetadata writes legacy VERSION and configuration files for all layers
-func (d *Destination) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Descriptor) (layerPaths []string, lastLayerID string, err error) {
-	var chainID digest.Digest
-	lastLayerID = ""
-	for i, l := range layerDescriptors {
-		// This chainID value matches the computation in docker/docker/layer.CreateChainID …
-		if chainID == "" {
-			chainID = l.Digest
-		} else {
-			chainID = digest.Canonical.FromString(chainID.String() + " " + l.Digest.String())
-		}
-		// … but note that this image ID does not match docker/docker/image/v1.CreateID. At least recent
-		// versions allocate new IDs on load, as long as the IDs we use are unique / cannot loop.
-		//
-		// Overall, the goal of computing a digest dependent on the full history is to avoid reusing an image ID
-		// (and possibly creating a loop in the "parent" links) if a layer with the same DiffID appears two or more
-		// times in layersDescriptors.  The ChainID values are sufficient for this, the v1.CreateID computation
-		// which also mixes in the full image configuration seems unnecessary, at least as long as we are storing
-		// only a single image per tarball, i.e. all DiffID prefixes are unique (can’t differ only with
-		// configuration).
-		layerID := chainID.Hex()
-
-		physicalLayerPath := l.Digest.Hex() + ".tar"
-		// The layer itself has been stored into physicalLayerPath in PutManifest.
-		// So, use that path for layerPaths used in the non-legacy manifest
-		layerPaths = append(layerPaths, physicalLayerPath)
-		// ... and create a symlink for the legacy format;
-		if err := d.sendSymlink(filepath.Join(layerID, legacyLayerFileName), filepath.Join("..", physicalLayerPath)); err != nil {
-			return nil, "", errors.Wrap(err, "Error creating layer symbolic link")
-		}
-
-		b := []byte("1.0")
-		if err := d.sendBytes(filepath.Join(layerID, legacyVersionFileName), b); err != nil {
-			return nil, "", errors.Wrap(err, "Error writing VERSION file")
-		}
-
-		// The legacy format requires a config file per layer
-		layerConfig := make(map[string]interface{})
-		layerConfig["id"] = layerID
-
-		// The root layer doesn't have any parent
-		if lastLayerID != "" {
-			layerConfig["parent"] = lastLayerID
-		}
-		// The root layer configuration file is generated by using subpart of the image configuration
-		if i == len(layerDescriptors)-1 {
-			var config map[string]*json.RawMessage
-			err := json.Unmarshal(d.config, &config)
-			if err != nil {
-				return nil, "", errors.Wrap(err, "Error unmarshaling config")
-			}
-			for _, attr := range [7]string{"architecture", "config", "container", "container_config", "created", "docker_version", "os"} {
-				layerConfig[attr] = config[attr]
-			}
-		}
-		b, err := json.Marshal(layerConfig)
-		if err != nil {
-			return nil, "", errors.Wrap(err, "Error marshaling layer config")
-		}
-		if err := d.sendBytes(filepath.Join(layerID, legacyConfigFileName), b); err != nil {
-			return nil, "", errors.Wrap(err, "Error writing config json file")
-		}
-
-		lastLayerID = layerID
-	}
-	return layerPaths, lastLayerID, nil
-}
-
-type tarFI struct {
-	path      string
-	size      int64
-	isSymlink bool
-}
-
-func (t *tarFI) Name() string {
-	return t.path
-}
-func (t *tarFI) Size() int64 {
-	return t.size
-}
-func (t *tarFI) Mode() os.FileMode {
-	if t.isSymlink {
-		return os.ModeSymlink
-	}
-	return 0444
-}
-func (t *tarFI) ModTime() time.Time {
-	return time.Unix(0, 0)
-}
-func (t *tarFI) IsDir() bool {
-	return false
-}
-func (t *tarFI) Sys() interface{} {
-	return nil
-}
-
-// sendSymlink sends a symlink into the tar stream.
-func (d *Destination) sendSymlink(path string, target string) error {
-	hdr, err := tar.FileInfoHeader(&tarFI{path: path, size: 0, isSymlink: true}, target)
-	if err != nil {
-		return nil
-	}
-	logrus.Debugf("Sending as tar link %s -> %s", path, target)
-	return d.tar.WriteHeader(hdr)
-}
-
-// sendBytes sends a path into the tar stream.
-func (d *Destination) sendBytes(path string, b []byte) error {
-	return d.sendFile(path, int64(len(b)), bytes.NewReader(b))
-}
-
-// sendFile sends a file into the tar stream.
-func (d *Destination) sendFile(path string, expectedSize int64, stream io.Reader) error {
-	hdr, err := tar.FileInfoHeader(&tarFI{path: path, size: expectedSize}, "")
-	if err != nil {
-		return nil
-	}
-	logrus.Debugf("Sending as tar file %s", path)
-	if err := d.tar.WriteHeader(hdr); err != nil {
-		return err
-	}
-	// TODO: This can take quite some time, and should ideally be cancellable using a context.Context.
-	size, err := io.Copy(d.tar, stream)
-	if err != nil {
-		return err
-	}
-	if size != expectedSize {
-		return errors.Errorf("Size mismatch when copying %s, expected %d, got %d", path, expectedSize, size)
-	}
 	return nil
 }
 
@@ -414,5 +215,5 @@ func (d *Destination) PutSignatures(ctx context.Context, signatures [][]byte, in
 // Commit finishes writing data to the underlying io.Writer.
 // It is the caller's responsibility to close it, if necessary.
 func (d *Destination) Commit(ctx context.Context) error {
-	return d.tar.Close()
+	return d.archive.Finish()
 }
