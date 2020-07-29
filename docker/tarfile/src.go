@@ -60,7 +60,7 @@ func (s *Source) Close() error {
 
 // LoadTarManifest loads and decodes the manifest.json
 func (s *Source) LoadTarManifest() ([]ManifestItem, error) {
-	return s.internal.LoadTarManifest()
+	return s.internal.TarManifest(), nil
 }
 
 // GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).
