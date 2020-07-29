@@ -1,10 +1,54 @@
 package archive
 
 import (
+	"io"
 	"os"
 
+	"github.com/containers/image/v5/docker/internal/tarfile"
+	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/types"
 	"github.com/pkg/errors"
 )
+
+// Writer manages a single in-progress Docker archive and allows adding images to it.
+type Writer struct {
+	path    string // The original, user-specified path; not the maintained temporary file, if any
+	archive *tarfile.Writer
+	writer  io.Closer
+}
+
+// NewWriter returns a Writer for path.
+// The caller should call .Close() on the returned object.
+func NewWriter(sys *types.SystemContext, path string) (*Writer, error) {
+	fh, err := openArchiveForWriting(path)
+	if err != nil {
+		return nil, err
+	}
+	archive := tarfile.NewWriter(fh)
+
+	return &Writer{
+		path:    path,
+		archive: archive,
+		writer:  fh,
+	}, nil
+}
+
+// Close writes all outstanding data about images to the archive, and
+// releases state associated with the Writer, if any.
+// No more images can be added after this is called.
+func (w *Writer) Close() error {
+	err := w.archive.Close()
+	if err2 := w.writer.Close(); err2 != nil && err == nil {
+		err = err2
+	}
+	return err
+}
+
+// NewReference returns an ImageReference that allows adding an image to Writer,
+// with an optional reference.
+func (w *Writer) NewReference(destinationRef reference.NamedTagged) (types.ImageReference, error) {
+	return newReference(w.path, destinationRef, w.archive)
+}
 
 // openArchiveForWriting opens path for writing a tar archive,
 // making a few sanity checks.

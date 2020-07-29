@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/containers/image/v5/docker/internal/tarfile"
 	"github.com/containers/image/v5/docker/reference"
 	ctrImage "github.com/containers/image/v5/image"
 	"github.com/containers/image/v5/transports"
@@ -45,6 +46,8 @@ type archiveReference struct {
 	// only used for destinations,
 	// archiveReference.destinationRef is optional and can be nil for destinations as well.
 	destinationRef reference.NamedTagged
+	// If not nil, must have been created for path
+	archiveWriter *tarfile.Writer
 }
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an Docker ImageReference.
@@ -75,8 +78,14 @@ func ParseReference(refString string) (types.ImageReference, error) {
 	return NewReference(path, destinationRef)
 }
 
-// NewReference rethrns a Docker archive reference for a path and an optional destination reference.
+// NewReference returns a Docker archive reference for a path and an optional destination reference.
 func NewReference(path string, destinationRef reference.NamedTagged) (types.ImageReference, error) {
+	return newReference(path, destinationRef, nil)
+}
+
+// newReference returns a docker archive reference for a path, an optional reference or sourceIndex,
+// and optionally a tarfile.Writer matching path.
+func newReference(path string, destinationRef reference.NamedTagged, archiveWriter *tarfile.Writer) (types.ImageReference, error) {
 	if strings.Contains(path, ":") {
 		return nil, errors.Errorf("Invalid docker-archive: reference: colon in path %q is not supported", path)
 	}
@@ -86,6 +95,7 @@ func NewReference(path string, destinationRef reference.NamedTagged) (types.Imag
 	return archiveReference{
 		path:           path,
 		destinationRef: destinationRef,
+		archiveWriter:  archiveWriter,
 	}, nil
 }
 

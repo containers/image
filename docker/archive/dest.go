@@ -11,17 +11,25 @@ import (
 type archiveImageDestination struct {
 	*tarfile.Destination // Implements most of types.ImageDestination
 	ref                  archiveReference
-	archive              *tarfile.Writer
-	writer               io.Closer
+	archive              *tarfile.Writer // Should only be closed if writer != nil
+	writer               io.Closer       // May be nil if the archive is shared
 }
 
 func newImageDestination(sys *types.SystemContext, ref archiveReference) (types.ImageDestination, error) {
-	fh, err := openArchiveForWriting(ref.path)
-	if err != nil {
-		return nil, err
-	}
+	var archive *tarfile.Writer
+	var writer io.Closer
+	if ref.archiveWriter != nil {
+		archive = ref.archiveWriter
+		writer = nil
+	} else {
+		fh, err := openArchiveForWriting(ref.path)
+		if err != nil {
+			return nil, err
+		}
 
-	archive := tarfile.NewWriter(fh)
+		archive = tarfile.NewWriter(fh)
+		writer = fh
+	}
 	tarDest := tarfile.NewDestination(sys, archive, ref.destinationRef)
 	if sys != nil && sys.DockerArchiveAdditionalTags != nil {
 		tarDest.AddRepoTags(sys.DockerArchiveAdditionalTags)
@@ -30,7 +38,7 @@ func newImageDestination(sys *types.SystemContext, ref archiveReference) (types.
 		Destination: tarDest,
 		ref:         ref,
 		archive:     archive,
-		writer:      fh,
+		writer:      writer,
 	}, nil
 }
 
@@ -47,7 +55,10 @@ func (d *archiveImageDestination) Reference() types.ImageReference {
 
 // Close removes resources associated with an initialized ImageDestination, if any.
 func (d *archiveImageDestination) Close() error {
-	return d.writer.Close()
+	if d.writer != nil {
+		return d.writer.Close()
+	}
+	return nil
 }
 
 // Commit marks the process of storing the image as successful and asks for the image to be persisted.
@@ -55,5 +66,8 @@ func (d *archiveImageDestination) Close() error {
 // - Uploaded data MAY be visible to others before Commit() is called
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 func (d *archiveImageDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {
-	return d.archive.Close()
+	if d.writer != nil {
+		return d.archive.Close()
+	}
+	return nil
 }
