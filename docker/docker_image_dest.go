@@ -83,7 +83,7 @@ func (d *dockerImageDestination) SupportsSignatures(ctx context.Context) error {
 	case d.c.supportsSignatures:
 		return nil
 	default:
-		return errors.Errorf("X-Registry-Supports-Signatures extension not supported, and lookaside is not configured")
+		return errors.Errorf("X-Registry-Supports-Signatures extension not supported. Configure sigstore-staging path (view containers-registries.d.5.md)")
 	}
 }
 
@@ -484,7 +484,7 @@ func (d *dockerImageDestination) PutSignatures(ctx context.Context, signatures [
 	case d.c.supportsSignatures:
 		return d.putSignaturesToAPIExtension(ctx, signatures, *instanceDigest)
 	default:
-		return errors.Errorf("X-Registry-Supports-Signatures extension not supported, and lookaside is not configured")
+		return errors.Errorf("Cannot store signature: sigstore not configured for destination registry")
 	}
 }
 
