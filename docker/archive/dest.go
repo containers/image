@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/containers/image/v5/docker/tarfile"
+	"github.com/containers/image/v5/docker/internal/tarfile"
 	"github.com/containers/image/v5/types"
 	"github.com/pkg/errors"
 )
