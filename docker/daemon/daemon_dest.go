@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
+	"github.com/containers/image/v5/docker/internal/tarfile"
 	"github.com/containers/image/v5/docker/reference"
-	"github.com/containers/image/v5/docker/tarfile"
 	"github.com/containers/image/v5/types"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
