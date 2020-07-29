@@ -13,6 +13,7 @@ import (
 // Destination is a partial implementation of types.ImageDestination for writing to an io.Writer.
 type Destination struct {
 	internal *internal.Destination
+	archive  *internal.Writer
 }
 
 // NewDestination returns a tarfile.Destination for the specified io.Writer.
@@ -23,7 +24,11 @@ func NewDestination(dest io.Writer, ref reference.NamedTagged) *Destination {
 
 // NewDestinationWithContext returns a tarfile.Destination for the specified io.Writer.
 func NewDestinationWithContext(sys *types.SystemContext, dest io.Writer, ref reference.NamedTagged) *Destination {
-	return &Destination{internal: internal.NewDestination(sys, dest, ref)}
+	archive := internal.NewWriter(dest)
+	return &Destination{
+		internal: internal.NewDestination(sys, archive, ref),
+		archive:  archive,
+	}
 }
 
 // AddRepoTags adds the specified tags to the destination's repoTags.
@@ -108,5 +113,5 @@ func (d *Destination) PutSignatures(ctx context.Context, signatures [][]byte, in
 // Commit finishes writing data to the underlying io.Writer.
 // It is the caller's responsibility to close it, if necessary.
 func (d *Destination) Commit(ctx context.Context) error {
-	return d.internal.Commit(ctx)
+	return d.archive.Finish()
 }

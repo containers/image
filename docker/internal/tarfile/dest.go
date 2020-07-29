@@ -27,14 +27,14 @@ type Destination struct {
 	sysCtx *types.SystemContext
 }
 
-// NewDestination returns a tarfile.Destination for the specified io.Writer.
-func NewDestination(sys *types.SystemContext, dest io.Writer, ref reference.NamedTagged) *Destination {
+// NewDestination returns a tarfile.Destination adding images to the specified Writer.
+func NewDestination(sys *types.SystemContext, archive *Writer, ref reference.NamedTagged) *Destination {
 	repoTags := []reference.NamedTagged{}
 	if ref != nil {
 		repoTags = append(repoTags, ref)
 	}
 	return &Destination{
-		archive:  NewWriter(dest),
+		archive:  archive,
 		repoTags: repoTags,
 		sysCtx:   sys,
 	}
@@ -210,10 +210,4 @@ func (d *Destination) PutSignatures(ctx context.Context, signatures [][]byte, in
 		return errors.Errorf("Storing signatures for docker tar files is not supported")
 	}
 	return nil
-}
-
-// Commit finishes writing data to the underlying io.Writer.
-// It is the caller's responsibility to close it, if necessary.
-func (d *Destination) Commit(ctx context.Context) error {
-	return d.archive.Finish()
 }

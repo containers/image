@@ -13,6 +13,7 @@ import (
 type archiveImageDestination struct {
 	*tarfile.Destination // Implements most of types.ImageDestination
 	ref                  archiveReference
+	archive              *tarfile.Writer
 	writer               io.Closer
 }
 
@@ -36,13 +37,15 @@ func newImageDestination(sys *types.SystemContext, ref archiveReference) (types.
 		return nil, errors.New("docker-archive doesn't support modifying existing images")
 	}
 
-	tarDest := tarfile.NewDestination(sys, fh, ref.destinationRef)
+	archive := tarfile.NewWriter(fh)
+	tarDest := tarfile.NewDestination(sys, archive, ref.destinationRef)
 	if sys != nil && sys.DockerArchiveAdditionalTags != nil {
 		tarDest.AddRepoTags(sys.DockerArchiveAdditionalTags)
 	}
 	return &archiveImageDestination{
 		Destination: tarDest,
 		ref:         ref,
+		archive:     archive,
 		writer:      fh,
 	}, nil
 }
@@ -68,5 +71,5 @@ func (d *archiveImageDestination) Close() error {
 // - Uploaded data MAY be visible to others before Commit() is called
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 func (d *archiveImageDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {
-	return d.Destination.Commit(ctx)
+	return d.archive.Finish()
 }
