@@ -54,7 +54,7 @@ func newImageDestination(ctx context.Context, sys *types.SystemContext, ref daem
 	return &daemonImageDestination{
 		ref:                ref,
 		mustMatchRuntimeOS: mustMatchRuntimeOS,
-		Destination:        tarfile.NewDestinationWithContext(sys, writer, namedTaggedRef),
+		Destination:        tarfile.NewDestination(sys, writer, namedTaggedRef),
 		goroutineCancel:    goroutineCancel,
 		statusChannel:      statusChannel,
 		writer:             writer,
