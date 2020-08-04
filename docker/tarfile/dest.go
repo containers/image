@@ -268,7 +268,6 @@ func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest 
 		return err
 	}
 
-	// FIXME? Do we also need to support the legacy format?
 	return d.sendBytes(manifestFileName, itemsBytes)
 }
 
