@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -190,41 +189,7 @@ func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest 
 		}
 	}
 
-	repoTags := []string{}
-	for _, tag := range d.repoTags {
-		// For github.com/docker/docker consumers, this works just as well as
-		//   refString := ref.String()
-		// because when reading the RepoTags strings, github.com/docker/docker/reference
-		// normalizes both of them to the same value.
-		//
-		// Doing it this way to include the normalized-out `docker.io[/library]` does make
-		// a difference for github.com/projectatomic/docker consumers, with the
-		// “Add --add-registry and --block-registry options to docker daemon” patch.
-		// These consumers treat reference strings which include a hostname and reference
-		// strings without a hostname differently.
-		//
-		// Using the host name here is more explicit about the intent, and it has the same
-		// effect as (docker pull) in projectatomic/docker, which tags the result using
-		// a hostname-qualified reference.
-		// See https://github.com/containers/image/issues/72 for a more detailed
-		// analysis and explanation.
-		refString := fmt.Sprintf("%s:%s", tag.Name(), tag.Tag())
-		repoTags = append(repoTags, refString)
-	}
-
-	items := []ManifestItem{{
-		Config:       d.archive.configPath(man.ConfigDescriptor.Digest),
-		RepoTags:     repoTags,
-		Layers:       layerPaths,
-		Parent:       "",
-		LayerSources: nil,
-	}}
-	itemsBytes, err := json.Marshal(&items)
-	if err != nil {
-		return err
-	}
-
-	return d.archive.sendBytes(manifestFileName, itemsBytes)
+	return d.archive.createManifest(man.ConfigDescriptor.Digest, layerPaths, d.repoTags)
 }
 
 // PutSignatures would add the given signatures to the docker tarfile (currently not supported).
