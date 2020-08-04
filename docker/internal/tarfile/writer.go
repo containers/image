@@ -54,26 +54,6 @@ func (w *Writer) recordBlob(info types.BlobInfo) {
 	w.blobs[info.Digest] = info
 }
 
-func (w *Writer) createRepositoriesFile(rootLayerID string, repoTags []reference.NamedTagged) error {
-	repositories := map[string]map[string]string{}
-	for _, repoTag := range repoTags {
-		if val, ok := repositories[repoTag.Name()]; ok {
-			val[repoTag.Tag()] = rootLayerID
-		} else {
-			repositories[repoTag.Name()] = map[string]string{repoTag.Tag(): rootLayerID}
-		}
-	}
-
-	b, err := json.Marshal(repositories)
-	if err != nil {
-		return errors.Wrap(err, "Error marshaling repositories")
-	}
-	if err := w.sendBytes(legacyRepositoriesFileName, b); err != nil {
-		return errors.Wrap(err, "Error writing config json file")
-	}
-	return nil
-}
-
 // writeLegacyLayerMetadata writes legacy VERSION and configuration files for all layers
 func (w *Writer) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Descriptor, configBytes []byte) (layerPaths []string, lastLayerID string, err error) {
 	var chainID digest.Digest
@@ -140,6 +120,26 @@ func (w *Writer) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Des
 		lastLayerID = layerID
 	}
 	return layerPaths, lastLayerID, nil
+}
+
+func (w *Writer) createRepositoriesFile(rootLayerID string, repoTags []reference.NamedTagged) error {
+	repositories := map[string]map[string]string{}
+	for _, repoTag := range repoTags {
+		if val, ok := repositories[repoTag.Name()]; ok {
+			val[repoTag.Tag()] = rootLayerID
+		} else {
+			repositories[repoTag.Name()] = map[string]string{repoTag.Tag(): rootLayerID}
+		}
+	}
+
+	b, err := json.Marshal(repositories)
+	if err != nil {
+		return errors.Wrap(err, "Error marshaling repositories")
+	}
+	if err := w.sendBytes(legacyRepositoriesFileName, b); err != nil {
+		return errors.Wrap(err, "Error writing config json file")
+	}
+	return nil
 }
 
 // Close writes all outstanding data about images to the archive, and finishes writing data
