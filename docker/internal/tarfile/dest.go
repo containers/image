@@ -143,16 +143,11 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 			return types.BlobInfo{}, errors.Wrap(err, "Error reading Config file stream")
 		}
 		d.config = buf
-		if err := d.sendFile(inputInfo.Digest.Hex()+".json", inputInfo.Size, bytes.NewReader(buf)); err != nil {
+		if err := d.sendFile(d.configPath(inputInfo.Digest), inputInfo.Size, bytes.NewReader(buf)); err != nil {
 			return types.BlobInfo{}, errors.Wrap(err, "Error writing Config file")
 		}
 	} else {
-		// Note that this can't be e.g. filepath.Join(l.Digest.Hex(), legacyLayerFileName); due to the way
-		// writeLegacyLayerMetadata constructs layer IDs differently from inputinfo.Digest values (as described
-		// inside it), most of the layers would end up in subdirectories alone without any metadata; (docker load)
-		// tries to load every subdirectory as an image and fails if the config is missing.  So, keep the layers
-		// in the root of the tarball.
-		if err := d.sendFile(inputInfo.Digest.Hex()+".tar", inputInfo.Size, stream); err != nil {
+		if err := d.sendFile(d.physicalLayerPath(inputInfo.Digest), inputInfo.Size, stream); err != nil {
 			return types.BlobInfo{}, err
 		}
 	}
@@ -251,7 +246,7 @@ func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest 
 	}
 
 	items := []ManifestItem{{
-		Config:       man.ConfigDescriptor.Digest.Hex() + ".json",
+		Config:       d.configPath(man.ConfigDescriptor.Digest),
 		RepoTags:     repoTags,
 		Layers:       layerPaths,
 		Parent:       "",
@@ -287,7 +282,7 @@ func (d *Destination) writeLegacyLayerMetadata(layerDescriptors []manifest.Schem
 		// configuration).
 		layerID := chainID.Hex()
 
-		physicalLayerPath := l.Digest.Hex() + ".tar"
+		physicalLayerPath := d.physicalLayerPath(l.Digest)
 		// The layer itself has been stored into physicalLayerPath in PutManifest.
 		// So, use that path for layerPaths used in the non-legacy manifest
 		layerPaths = append(layerPaths, physicalLayerPath)
@@ -331,6 +326,26 @@ func (d *Destination) writeLegacyLayerMetadata(layerDescriptors []manifest.Schem
 		lastLayerID = layerID
 	}
 	return layerPaths, lastLayerID, nil
+}
+
+// configPath returns a path we choose for storing a config with the specified digest.
+// NOTE: This is an internal implementation detail, not a format property, and can change
+// any time.
+func (d *Destination) configPath(configDigest digest.Digest) string {
+	return configDigest.Hex() + ".json"
+}
+
+// physicalLayerPath returns a path we choose for storing a layer with the specified digest
+// (the actual path, i.e. a regular file, not a symlink that may be used in the legacy format).
+// NOTE: This is an internal implementation detail, not a format property, and can change
+// any time.
+func (d *Destination) physicalLayerPath(layerDigest digest.Digest) string {
+	// Note that this can't be e.g. filepath.Join(l.Digest.Hex(), legacyLayerFileName); due to the way
+	// writeLegacyLayerMetadata constructs layer IDs differently from inputinfo.Digest values (as described
+	// inside it), most of the layers would end up in subdirectories alone without any metadata; (docker load)
+	// tries to load every subdirectory as an image and fails if the config is missing.  So, keep the layers
+	// in the root of the tarball.
+	return layerDigest.Hex() + ".tar"
 }
 
 type tarFI struct {
