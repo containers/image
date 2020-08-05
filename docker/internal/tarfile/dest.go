@@ -189,7 +189,7 @@ func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest 
 		}
 	}
 
-	return d.archive.createManifest(man.LayersDescriptors, man.ConfigDescriptor.Digest, d.repoTags)
+	return d.archive.ensureManifestItem(man.LayersDescriptors, man.ConfigDescriptor.Digest, d.repoTags)
 }
 
 // PutSignatures would add the given signatures to the docker tarfile (currently not supported).

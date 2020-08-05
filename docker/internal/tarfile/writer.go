@@ -23,16 +23,19 @@ type Writer struct {
 	writer io.Writer
 	tar    *tar.Writer
 	// Other state.
-	blobs map[digest.Digest]types.BlobInfo // list of already-sent blobs
+	blobs            map[digest.Digest]types.BlobInfo // list of already-sent blobs
+	manifest         []ManifestItem
+	manifestByConfig map[digest.Digest]int // A map from config digest to an entry index in manifest above.
 }
 
 // NewWriter returns a Writer for the specified io.Writer.
 // The caller must eventually call .Close() on the returned object to create a valid archive.
 func NewWriter(dest io.Writer) *Writer {
 	return &Writer{
-		writer: dest,
-		tar:    tar.NewWriter(dest),
-		blobs:  make(map[digest.Digest]types.BlobInfo),
+		writer:           dest,
+		tar:              tar.NewWriter(dest),
+		blobs:            make(map[digest.Digest]types.BlobInfo),
+		manifestByConfig: map[digest.Digest]int{},
 	}
 }
 
@@ -141,20 +144,56 @@ func (w *Writer) createRepositoriesFile(rootLayerID string, repoTags []reference
 	return nil
 }
 
-func (w *Writer) createManifest(layerDescriptors []manifest.Schema2Descriptor, configDigest digest.Digest, repoTags []reference.NamedTagged) error {
+// checkManifestItemsMatch checks that a and b describe the same image,
+// and returns an error if that’s not the case (which should never happen).
+func checkManifestItemsMatch(a, b *ManifestItem) error {
+	if a.Config != b.Config {
+		return fmt.Errorf("Internal error: Trying to reuse ManifestItem values with configs %#v vs. %#v", a.Config, b.Config)
+	}
+	if len(a.Layers) != len(b.Layers) {
+		return fmt.Errorf("Internal error: Trying to reuse ManifestItem values with layers %#v vs. %#v", a.Layers, b.Layers)
+	}
+	for i := range a.Layers {
+		if a.Layers[i] != b.Layers[i] {
+			return fmt.Errorf("Internal error: Trying to reuse ManifestItem values with layers[i] %#v vs. %#v", a.Layers[i], b.Layers[i])
+		}
+	}
+	// Ignore RepoTags, that will be built later.
+	// Ignore Parent and LayerSources, which we don’t set to anything meaningful.
+	return nil
+}
+
+// ensureManifestItem ensures that there is a manifest item pointing to (layerDescriptors, configDigest) with repoTags
+func (w *Writer) ensureManifestItem(layerDescriptors []manifest.Schema2Descriptor, configDigest digest.Digest, repoTags []reference.NamedTagged) error {
 	layerPaths := []string{}
 	for _, l := range layerDescriptors {
 		layerPaths = append(layerPaths, w.physicalLayerPath(l.Digest))
 	}
 
-	item := ManifestItem{
+	var item *ManifestItem
+	newItem := ManifestItem{
 		Config:       w.configPath(configDigest),
 		RepoTags:     []string{},
 		Layers:       layerPaths,
-		Parent:       "",
+		Parent:       "", // We don’t have this information
 		LayerSources: nil,
 	}
+	if i, ok := w.manifestByConfig[configDigest]; ok {
+		item = &w.manifest[i]
+		if err := checkManifestItemsMatch(item, &newItem); err != nil {
+			return err
+		}
+	} else {
+		i := len(w.manifest)
+		w.manifestByConfig[configDigest] = i
+		w.manifest = append(w.manifest, newItem)
+		item = &w.manifest[i]
+	}
 
+	knownRepoTags := map[string]struct{}{}
+	for _, repoTag := range item.RepoTags {
+		knownRepoTags[repoTag] = struct{}{}
+	}
 	for _, tag := range repoTags {
 		// For github.com/docker/docker consumers, this works just as well as
 		//   refString := ref.String()
@@ -173,22 +212,28 @@ func (w *Writer) createManifest(layerDescriptors []manifest.Schema2Descriptor, c
 		// See https://github.com/containers/image/issues/72 for a more detailed
 		// analysis and explanation.
 		refString := fmt.Sprintf("%s:%s", tag.Name(), tag.Tag())
-		item.RepoTags = append(item.RepoTags, refString)
+
+		if _, ok := knownRepoTags[refString]; !ok {
+			item.RepoTags = append(item.RepoTags, refString)
+			knownRepoTags[refString] = struct{}{}
+		}
 	}
 
-	items := []ManifestItem{item}
-	itemsBytes, err := json.Marshal(&items)
-	if err != nil {
-		return err
-	}
-
-	return w.sendBytes(manifestFileName, itemsBytes)
+	return nil
 }
 
 // Close writes all outstanding data about images to the archive, and finishes writing data
 // to the underlying io.Writer.
 // No more images can be added after this is called.
 func (w *Writer) Close() error {
+	b, err := json.Marshal(&w.manifest)
+	if err != nil {
+		return err
+	}
+	if err := w.sendBytes(manifestFileName, b); err != nil {
+		return err
+	}
+
 	return w.tar.Close()
 }
 
