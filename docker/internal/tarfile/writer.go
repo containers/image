@@ -58,6 +58,26 @@ func (w *Writer) recordBlob(info types.BlobInfo) {
 	w.blobs[info.Digest] = info
 }
 
+// createSingleLegacyLayer writes legacy VERSION and configuration files for a single layer
+func (w *Writer) createSingleLegacyLayer(layerID string, layerDigest digest.Digest, configBytes []byte) error {
+	// Create a symlink for the legacy format, where there is one subdirectory per layer ("image").
+	// See also the comment in physicalLayerPath.
+	physicalLayerPath := w.physicalLayerPath(layerDigest)
+	if err := w.sendSymlink(filepath.Join(layerID, legacyLayerFileName), filepath.Join("..", physicalLayerPath)); err != nil {
+		return errors.Wrap(err, "Error creating layer symbolic link")
+	}
+
+	b := []byte("1.0")
+	if err := w.sendBytes(filepath.Join(layerID, legacyVersionFileName), b); err != nil {
+		return errors.Wrap(err, "Error writing VERSION file")
+	}
+
+	if err := w.sendBytes(filepath.Join(layerID, legacyConfigFileName), configBytes); err != nil {
+		return errors.Wrap(err, "Error writing config json file")
+	}
+	return nil
+}
+
 // writeLegacyLayerMetadata writes legacy VERSION and configuration files for all layers
 func (w *Writer) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Descriptor, configBytes []byte) (lastLayerID string, err error) {
 	var chainID digest.Digest
@@ -80,18 +100,6 @@ func (w *Writer) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Des
 		// configuration).
 		layerID := chainID.Hex()
 
-		physicalLayerPath := w.physicalLayerPath(l.Digest)
-		// Create a symlink for the legacy format, where there is one subdirectory per layer ("image").
-		// See also the comment in physicalLayerPath.
-		if err := w.sendSymlink(filepath.Join(layerID, legacyLayerFileName), filepath.Join("..", physicalLayerPath)); err != nil {
-			return "", errors.Wrap(err, "Error creating layer symbolic link")
-		}
-
-		b := []byte("1.0")
-		if err := w.sendBytes(filepath.Join(layerID, legacyVersionFileName), b); err != nil {
-			return "", errors.Wrap(err, "Error writing VERSION file")
-		}
-
 		// The legacy format requires a config file per layer
 		layerConfig := make(map[string]interface{})
 		layerConfig["id"] = layerID
@@ -111,12 +119,13 @@ func (w *Writer) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Des
 				layerConfig[attr] = config[attr]
 			}
 		}
-		b, err := json.Marshal(layerConfig)
+		configBytes, err := json.Marshal(layerConfig)
 		if err != nil {
 			return "", errors.Wrap(err, "Error marshaling layer config")
 		}
-		if err := w.sendBytes(filepath.Join(layerID, legacyConfigFileName), b); err != nil {
-			return "", errors.Wrap(err, "Error writing config json file")
+
+		if err := w.createSingleLegacyLayer(layerID, l.Digest, configBytes); err != nil {
+			return "", err
 		}
 
 		lastLayerID = layerID
