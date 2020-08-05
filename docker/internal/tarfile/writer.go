@@ -144,7 +144,14 @@ func (w *Writer) createRepositoriesFile(rootLayerID string, repoTags []reference
 }
 
 func (w *Writer) createManifest(configDigest digest.Digest, layerPaths []string, repoTags []reference.NamedTagged) error {
-	refStrings := []string{}
+	item := ManifestItem{
+		Config:       w.configPath(configDigest),
+		RepoTags:     []string{},
+		Layers:       layerPaths,
+		Parent:       "",
+		LayerSources: nil,
+	}
+
 	for _, tag := range repoTags {
 		// For github.com/docker/docker consumers, this works just as well as
 		//   refString := ref.String()
@@ -163,16 +170,10 @@ func (w *Writer) createManifest(configDigest digest.Digest, layerPaths []string,
 		// See https://github.com/containers/image/issues/72 for a more detailed
 		// analysis and explanation.
 		refString := fmt.Sprintf("%s:%s", tag.Name(), tag.Tag())
-		refStrings = append(refStrings, refString)
+		item.RepoTags = append(item.RepoTags, refString)
 	}
 
-	items := []ManifestItem{{
-		Config:       w.configPath(configDigest),
-		RepoTags:     refStrings,
-		Layers:       layerPaths,
-		Parent:       "",
-		LayerSources: nil,
-	}}
+	items := []ManifestItem{item}
 	itemsBytes, err := json.Marshal(&items)
 	if err != nil {
 		return err
