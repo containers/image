@@ -178,7 +178,7 @@ func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest 
 		return errors.Errorf("Unsupported manifest type, need a Docker schema 2 manifest")
 	}
 
-	layerPaths, lastLayerID, err := d.archive.writeLegacyLayerMetadata(man.LayersDescriptors, d.config)
+	lastLayerID, err := d.archive.writeLegacyLayerMetadata(man.LayersDescriptors, d.config)
 	if err != nil {
 		return err
 	}
@@ -189,7 +189,7 @@ func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest 
 		}
 	}
 
-	return d.archive.createManifest(man.ConfigDescriptor.Digest, layerPaths, d.repoTags)
+	return d.archive.createManifest(man.LayersDescriptors, man.ConfigDescriptor.Digest, d.repoTags)
 }
 
 // PutSignatures would add the given signatures to the docker tarfile (currently not supported).

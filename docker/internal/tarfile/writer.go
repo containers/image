@@ -56,7 +56,7 @@ func (w *Writer) recordBlob(info types.BlobInfo) {
 }
 
 // writeLegacyLayerMetadata writes legacy VERSION and configuration files for all layers
-func (w *Writer) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Descriptor, configBytes []byte) (layerPaths []string, lastLayerID string, err error) {
+func (w *Writer) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Descriptor, configBytes []byte) (lastLayerID string, err error) {
 	var chainID digest.Digest
 	lastLayerID = ""
 	for i, l := range layerDescriptors {
@@ -78,17 +78,15 @@ func (w *Writer) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Des
 		layerID := chainID.Hex()
 
 		physicalLayerPath := w.physicalLayerPath(l.Digest)
-		// The layer itself has been stored into physicalLayerPath in PutManifest.
-		// So, use that path for layerPaths used in the non-legacy manifest
-		layerPaths = append(layerPaths, physicalLayerPath)
-		// ... and create a symlink for the legacy format;
+		// Create a symlink for the legacy format, where there is one subdirectory per layer ("image").
+		// See also the comment in physicalLayerPath.
 		if err := w.sendSymlink(filepath.Join(layerID, legacyLayerFileName), filepath.Join("..", physicalLayerPath)); err != nil {
-			return nil, "", errors.Wrap(err, "Error creating layer symbolic link")
+			return "", errors.Wrap(err, "Error creating layer symbolic link")
 		}
 
 		b := []byte("1.0")
 		if err := w.sendBytes(filepath.Join(layerID, legacyVersionFileName), b); err != nil {
-			return nil, "", errors.Wrap(err, "Error writing VERSION file")
+			return "", errors.Wrap(err, "Error writing VERSION file")
 		}
 
 		// The legacy format requires a config file per layer
@@ -104,7 +102,7 @@ func (w *Writer) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Des
 			var config map[string]*json.RawMessage
 			err := json.Unmarshal(configBytes, &config)
 			if err != nil {
-				return nil, "", errors.Wrap(err, "Error unmarshaling config")
+				return "", errors.Wrap(err, "Error unmarshaling config")
 			}
 			for _, attr := range [7]string{"architecture", "config", "container", "container_config", "created", "docker_version", "os"} {
 				layerConfig[attr] = config[attr]
@@ -112,15 +110,15 @@ func (w *Writer) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Des
 		}
 		b, err := json.Marshal(layerConfig)
 		if err != nil {
-			return nil, "", errors.Wrap(err, "Error marshaling layer config")
+			return "", errors.Wrap(err, "Error marshaling layer config")
 		}
 		if err := w.sendBytes(filepath.Join(layerID, legacyConfigFileName), b); err != nil {
-			return nil, "", errors.Wrap(err, "Error writing config json file")
+			return "", errors.Wrap(err, "Error writing config json file")
 		}
 
 		lastLayerID = layerID
 	}
-	return layerPaths, lastLayerID, nil
+	return lastLayerID, nil
 }
 
 func (w *Writer) createRepositoriesFile(rootLayerID string, repoTags []reference.NamedTagged) error {
@@ -143,7 +141,12 @@ func (w *Writer) createRepositoriesFile(rootLayerID string, repoTags []reference
 	return nil
 }
 
-func (w *Writer) createManifest(configDigest digest.Digest, layerPaths []string, repoTags []reference.NamedTagged) error {
+func (w *Writer) createManifest(layerDescriptors []manifest.Schema2Descriptor, configDigest digest.Digest, repoTags []reference.NamedTagged) error {
+	layerPaths := []string{}
+	for _, l := range layerDescriptors {
+		layerPaths = append(layerPaths, w.physicalLayerPath(l.Digest))
+	}
+
 	item := ManifestItem{
 		Config:       w.configPath(configDigest),
 		RepoTags:     []string{},
