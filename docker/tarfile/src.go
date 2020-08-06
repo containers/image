@@ -184,10 +184,11 @@ func (s *Source) openTarComponent(componentPath string) (io.ReadCloser, error) {
 	return &tarReadCloser{Reader: tarReader, backingFile: f}, nil
 }
 
-// findTarComponent returns a header and a reader matching path within inputFile,
+// findTarComponent returns a header and a reader matching componentPath within inputFile,
 // or (nil, nil, nil) if not found.
-func findTarComponent(inputFile io.Reader, path string) (*tar.Reader, *tar.Header, error) {
+func findTarComponent(inputFile io.Reader, componentPath string) (*tar.Reader, *tar.Header, error) {
 	t := tar.NewReader(inputFile)
+	componentPath = path.Clean(componentPath)
 	for {
 		h, err := t.Next()
 		if err == io.EOF {
@@ -196,7 +197,7 @@ func findTarComponent(inputFile io.Reader, path string) (*tar.Reader, *tar.Heade
 		if err != nil {
 			return nil, nil, err
 		}
-		if h.Name == path {
+		if path.Clean(h.Name) == componentPath {
 			return t, h, nil
 		}
 	}
@@ -308,7 +309,7 @@ func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manif
 			// which of the tarManifest.Layers paths is used; (docker save) actually makes the duplicates symlinks to the original.
 			continue
 		}
-		layerPath := tarManifest.Layers[i]
+		layerPath := path.Clean(tarManifest.Layers[i])
 		if _, ok := unknownLayerSizes[layerPath]; ok {
 			return nil, errors.Errorf("Layer tarfile %s used for two different DiffID values", layerPath)
 		}
@@ -335,7 +336,8 @@ func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manif
 		if err != nil {
 			return nil, err
 		}
-		if li, ok := unknownLayerSizes[h.Name]; ok {
+		layerPath := path.Clean(h.Name)
+		if li, ok := unknownLayerSizes[layerPath]; ok {
 			// Since GetBlob will decompress layers that are compressed we need
 			// to do the decompression here as well, otherwise we will
 			// incorrectly report the size. Pretty critical, since tools like
@@ -343,7 +345,7 @@ func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manif
 			// the slower method of checking if it's compressed.
 			uncompressedStream, isCompressed, err := compression.AutoDecompress(t)
 			if err != nil {
-				return nil, errors.Wrapf(err, "Error auto-decompressing %s to determine its size", h.Name)
+				return nil, errors.Wrapf(err, "Error auto-decompressing %s to determine its size", layerPath)
 			}
 			defer uncompressedStream.Close()
 
@@ -351,11 +353,11 @@ func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manif
 			if isCompressed {
 				uncompressedSize, err = io.Copy(ioutil.Discard, uncompressedStream)
 				if err != nil {
-					return nil, errors.Wrapf(err, "Error reading %s to find its size", h.Name)
+					return nil, errors.Wrapf(err, "Error reading %s to find its size", layerPath)
 				}
 			}
 			li.size = uncompressedSize
-			delete(unknownLayerSizes, h.Name)
+			delete(unknownLayerSizes, layerPath)
 		}
 	}
 	if len(unknownLayerSizes) != 0 {
