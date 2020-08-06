@@ -79,6 +79,9 @@ func (d *Destination) IgnoresEmbeddedDockerReference() bool {
 
 // HasThreadSafePutBlob indicates whether PutBlob can be executed concurrently.
 func (d *Destination) HasThreadSafePutBlob() bool {
+	// The code _is_ actually thread-safe, but apart from computing sizes/digests of layers where
+	// this is unknown in advance, the actual copy is serialized by d.archive, so there probably isn’t
+	// much benefit from concurrency, mostly just extra CPU, memory and I/O contention.
 	return false
 }
 
@@ -120,8 +123,13 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 		logrus.Debugf("... streaming done")
 	}
 
+	if err := d.archive.lock(); err != nil {
+		return types.BlobInfo{}, err
+	}
+	defer d.archive.unlock()
+
 	// Maybe the blob has been already sent
-	ok, reusedInfo, err := d.archive.tryReusingBlob(inputInfo)
+	ok, reusedInfo, err := d.archive.tryReusingBlobLocked(inputInfo)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
@@ -135,15 +143,15 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 			return types.BlobInfo{}, errors.Wrap(err, "Error reading Config file stream")
 		}
 		d.config = buf
-		if err := d.archive.sendFile(d.archive.configPath(inputInfo.Digest), inputInfo.Size, bytes.NewReader(buf)); err != nil {
+		if err := d.archive.sendFileLocked(d.archive.configPath(inputInfo.Digest), inputInfo.Size, bytes.NewReader(buf)); err != nil {
 			return types.BlobInfo{}, errors.Wrap(err, "Error writing Config file")
 		}
 	} else {
-		if err := d.archive.sendFile(d.archive.physicalLayerPath(inputInfo.Digest), inputInfo.Size, stream); err != nil {
+		if err := d.archive.sendFileLocked(d.archive.physicalLayerPath(inputInfo.Digest), inputInfo.Size, stream); err != nil {
 			return types.BlobInfo{}, err
 		}
 	}
-	d.archive.recordBlob(types.BlobInfo{Digest: inputInfo.Digest, Size: inputInfo.Size})
+	d.archive.recordBlobLocked(types.BlobInfo{Digest: inputInfo.Digest, Size: inputInfo.Size})
 	return types.BlobInfo{Digest: inputInfo.Digest, Size: inputInfo.Size}, nil
 }
 
@@ -155,7 +163,12 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 // May use and/or update cache.
 func (d *Destination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
-	return d.archive.tryReusingBlob(info)
+	if err := d.archive.lock(); err != nil {
+		return false, types.BlobInfo{}, err
+	}
+	defer d.archive.unlock()
+
+	return d.archive.tryReusingBlobLocked(info)
 }
 
 // PutManifest writes manifest to the destination.
@@ -178,11 +191,16 @@ func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest 
 		return errors.Errorf("Unsupported manifest type, need a Docker schema 2 manifest")
 	}
 
-	if err := d.archive.writeLegacyMetadata(man.LayersDescriptors, d.config, d.repoTags); err != nil {
+	if err := d.archive.lock(); err != nil {
+		return err
+	}
+	defer d.archive.unlock()
+
+	if err := d.archive.writeLegacyMetadataLocked(man.LayersDescriptors, d.config, d.repoTags); err != nil {
 		return err
 	}
 
-	return d.archive.ensureManifestItem(man.LayersDescriptors, man.ConfigDescriptor.Digest, d.repoTags)
+	return d.archive.ensureManifestItemLocked(man.LayersDescriptors, man.ConfigDescriptor.Digest, d.repoTags)
 }
 
 // PutSignatures would add the given signatures to the docker tarfile (currently not supported).

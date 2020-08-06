@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/containers/image/v5/docker/reference"
@@ -20,8 +21,11 @@ import (
 
 // Writer allows creating a (docker save)-formatted tar archive containing one or more images.
 type Writer struct {
+	mutex sync.Mutex
+	// ALL of the following members can only be accessed with the mutex held.
+	// Use Writer.lock() to obtain the mutex.
 	writer io.Writer
-	tar    *tar.Writer
+	tar    *tar.Writer // nil if the Writer has already been closed.
 	// Other state.
 	blobs            map[digest.Digest]types.BlobInfo // list of already-sent blobs
 	repositories     map[string]map[string]string
@@ -43,11 +47,30 @@ func NewWriter(dest io.Writer) *Writer {
 	}
 }
 
-// tryReusingBlob checks whether the transport already contains, a blob, and if so, returns its metadata.
+// lock does some sanity checks and locks the Writer.
+// If this function suceeds, the caller must call w.unlock.
+// Do not use Writer.mutex directly.
+func (w *Writer) lock() error {
+	w.mutex.Lock()
+	if w.tar == nil {
+		w.mutex.Unlock()
+		return errors.New("Internal error: trying to use an already closed tarfile.Writer")
+	}
+	return nil
+}
+
+// unlock releases the lock obtained by Writer.lock
+// Do not use Writer.mutex directly.
+func (w *Writer) unlock() {
+	w.mutex.Unlock()
+}
+
+// tryReusingBlobLocked checks whether the transport already contains, a blob, and if so, returns its metadata.
 // info.Digest must not be empty.
 // If the blob has been succesfully reused, returns (true, info, nil); info must contain at least a digest and size.
 // If the transport can not reuse the requested blob, tryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
-func (w *Writer) tryReusingBlob(info types.BlobInfo) (bool, types.BlobInfo, error) {
+// The caller must have locked the Writer.
+func (w *Writer) tryReusingBlobLocked(info types.BlobInfo) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
 		return false, types.BlobInfo{}, errors.Errorf("Can not check for a blob with unknown digest")
 	}
@@ -58,26 +81,28 @@ func (w *Writer) tryReusingBlob(info types.BlobInfo) (bool, types.BlobInfo, erro
 }
 
 // recordBlob records metadata of a recorded blob, which must contain at least a digest and size.
-func (w *Writer) recordBlob(info types.BlobInfo) {
+// The caller must have locked the Writer.
+func (w *Writer) recordBlobLocked(info types.BlobInfo) {
 	w.blobs[info.Digest] = info
 }
 
-// ensureSingleLegacyLayer writes legacy VERSION and configuration files for a single layer
-func (w *Writer) ensureSingleLegacyLayer(layerID string, layerDigest digest.Digest, configBytes []byte) error {
+// ensureSingleLegacyLayerLocked writes legacy VERSION and configuration files for a single layer
+// The caller must have locked the Writer.
+func (w *Writer) ensureSingleLegacyLayerLocked(layerID string, layerDigest digest.Digest, configBytes []byte) error {
 	if _, ok := w.legacyLayers[layerID]; !ok {
 		// Create a symlink for the legacy format, where there is one subdirectory per layer ("image").
 		// See also the comment in physicalLayerPath.
 		physicalLayerPath := w.physicalLayerPath(layerDigest)
-		if err := w.sendSymlink(filepath.Join(layerID, legacyLayerFileName), filepath.Join("..", physicalLayerPath)); err != nil {
+		if err := w.sendSymlinkLocked(filepath.Join(layerID, legacyLayerFileName), filepath.Join("..", physicalLayerPath)); err != nil {
 			return errors.Wrap(err, "Error creating layer symbolic link")
 		}
 
 		b := []byte("1.0")
-		if err := w.sendBytes(filepath.Join(layerID, legacyVersionFileName), b); err != nil {
+		if err := w.sendBytesLocked(filepath.Join(layerID, legacyVersionFileName), b); err != nil {
 			return errors.Wrap(err, "Error writing VERSION file")
 		}
 
-		if err := w.sendBytes(filepath.Join(layerID, legacyConfigFileName), configBytes); err != nil {
+		if err := w.sendBytesLocked(filepath.Join(layerID, legacyConfigFileName), configBytes); err != nil {
 			return errors.Wrap(err, "Error writing config json file")
 		}
 
@@ -86,8 +111,8 @@ func (w *Writer) ensureSingleLegacyLayer(layerID string, layerDigest digest.Dige
 	return nil
 }
 
-// writeLegacyMetadata writes legacy layer metadata and records tags for a single image.
-func (w *Writer) writeLegacyMetadata(layerDescriptors []manifest.Schema2Descriptor, configBytes []byte, repoTags []reference.NamedTagged) error {
+// writeLegacyMetadataLocked writes legacy layer metadata and records tags for a single image.
+func (w *Writer) writeLegacyMetadataLocked(layerDescriptors []manifest.Schema2Descriptor, configBytes []byte, repoTags []reference.NamedTagged) error {
 	var chainID digest.Digest
 	lastLayerID := ""
 	for i, l := range layerDescriptors {
@@ -138,7 +163,7 @@ func (w *Writer) writeLegacyMetadata(layerDescriptors []manifest.Schema2Descript
 			return errors.Wrap(err, "Error marshaling layer config")
 		}
 
-		if err := w.ensureSingleLegacyLayer(layerID, l.Digest, configBytes); err != nil {
+		if err := w.ensureSingleLegacyLayerLocked(layerID, l.Digest, configBytes); err != nil {
 			return err
 		}
 
@@ -176,8 +201,9 @@ func checkManifestItemsMatch(a, b *ManifestItem) error {
 	return nil
 }
 
-// ensureManifestItem ensures that there is a manifest item pointing to (layerDescriptors, configDigest) with repoTags
-func (w *Writer) ensureManifestItem(layerDescriptors []manifest.Schema2Descriptor, configDigest digest.Digest, repoTags []reference.NamedTagged) error {
+// ensureManifestItemLocked ensures that there is a manifest item pointing to (layerDescriptors, configDigest) with repoTags
+// The caller must have locked the Writer.
+func (w *Writer) ensureManifestItemLocked(layerDescriptors []manifest.Schema2Descriptor, configDigest digest.Digest, repoTags []reference.NamedTagged) error {
 	layerPaths := []string{}
 	for _, l := range layerDescriptors {
 		layerPaths = append(layerPaths, w.physicalLayerPath(l.Digest))
@@ -239,11 +265,16 @@ func (w *Writer) ensureManifestItem(layerDescriptors []manifest.Schema2Descripto
 // to the underlying io.Writer.
 // No more images can be added after this is called.
 func (w *Writer) Close() error {
+	if err := w.lock(); err != nil {
+		return err
+	}
+	defer w.unlock()
+
 	b, err := json.Marshal(&w.manifest)
 	if err != nil {
 		return err
 	}
-	if err := w.sendBytes(manifestFileName, b); err != nil {
+	if err := w.sendBytesLocked(manifestFileName, b); err != nil {
 		return err
 	}
 
@@ -251,11 +282,15 @@ func (w *Writer) Close() error {
 	if err != nil {
 		return errors.Wrap(err, "Error marshaling repositories")
 	}
-	if err := w.sendBytes(legacyRepositoriesFileName, b); err != nil {
+	if err := w.sendBytesLocked(legacyRepositoriesFileName, b); err != nil {
 		return errors.Wrap(err, "Error writing config json file")
 	}
 
-	return w.tar.Close()
+	if err := w.tar.Close(); err != nil {
+		return err
+	}
+	w.tar = nil // Mark the Writer as closed.
+	return nil
 }
 
 // configPath returns a path we choose for storing a config with the specified digest.
@@ -306,8 +341,9 @@ func (t *tarFI) Sys() interface{} {
 	return nil
 }
 
-// sendSymlink sends a symlink into the tar stream.
-func (w *Writer) sendSymlink(path string, target string) error {
+// sendSymlinkLocked sends a symlink into the tar stream.
+// The caller must have locked the Writer.
+func (w *Writer) sendSymlinkLocked(path string, target string) error {
 	hdr, err := tar.FileInfoHeader(&tarFI{path: path, size: 0, isSymlink: true}, target)
 	if err != nil {
 		return nil
@@ -316,13 +352,15 @@ func (w *Writer) sendSymlink(path string, target string) error {
 	return w.tar.WriteHeader(hdr)
 }
 
-// sendBytes sends a path into the tar stream.
-func (w *Writer) sendBytes(path string, b []byte) error {
-	return w.sendFile(path, int64(len(b)), bytes.NewReader(b))
+// sendBytesLocked sends a path into the tar stream.
+// The caller must have locked the Writer.
+func (w *Writer) sendBytesLocked(path string, b []byte) error {
+	return w.sendFileLocked(path, int64(len(b)), bytes.NewReader(b))
 }
 
-// sendFile sends a file into the tar stream.
-func (w *Writer) sendFile(path string, expectedSize int64, stream io.Reader) error {
+// sendFileLocked sends a file into the tar stream.
+// The caller must have locked the Writer.
+func (w *Writer) sendFileLocked(path string, expectedSize int64, stream io.Reader) error {
 	hdr, err := tar.FileInfoHeader(&tarFI{path: path, size: expectedSize}, "")
 	if err != nil {
 		return nil
