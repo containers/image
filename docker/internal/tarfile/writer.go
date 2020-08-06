@@ -83,26 +83,8 @@ func (w *Writer) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Des
 	var chainID digest.Digest
 	lastLayerID = ""
 	for i, l := range layerDescriptors {
-		// This chainID value matches the computation in docker/docker/layer.CreateChainID …
-		if chainID == "" {
-			chainID = l.Digest
-		} else {
-			chainID = digest.Canonical.FromString(chainID.String() + " " + l.Digest.String())
-		}
-		// … but note that this image ID does not match docker/docker/image/v1.CreateID. At least recent
-		// versions allocate new IDs on load, as long as the IDs we use are unique / cannot loop.
-		//
-		// Overall, the goal of computing a digest dependent on the full history is to avoid reusing an image ID
-		// (and possibly creating a loop in the "parent" links) if a layer with the same DiffID appears two or more
-		// times in layersDescriptors.  The ChainID values are sufficient for this, the v1.CreateID computation
-		// which also mixes in the full image configuration seems unnecessary, at least as long as we are storing
-		// only a single image per tarball, i.e. all DiffID prefixes are unique (can’t differ only with
-		// configuration).
-		layerID := chainID.Hex()
-
 		// The legacy format requires a config file per layer
 		layerConfig := make(map[string]interface{})
-		layerConfig["id"] = layerID
 
 		// The root layer doesn't have any parent
 		if lastLayerID != "" {
@@ -119,6 +101,25 @@ func (w *Writer) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Des
 				layerConfig[attr] = config[attr]
 			}
 		}
+
+		// This chainID value matches the computation in docker/docker/layer.CreateChainID …
+		if chainID == "" {
+			chainID = l.Digest
+		} else {
+			chainID = digest.Canonical.FromString(chainID.String() + " " + l.Digest.String())
+		}
+		// … but note that this image ID does not match docker/docker/image/v1.CreateID. At least recent
+		// versions allocate new IDs on load, as long as the IDs we use are unique / cannot loop.
+		//
+		// Overall, the goal of computing a digest dependent on the full history is to avoid reusing an image ID
+		// (and possibly creating a loop in the "parent" links) if a layer with the same DiffID appears two or more
+		// times in layersDescriptors.  The ChainID values are sufficient for this, the v1.CreateID computation
+		// which also mixes in the full image configuration seems unnecessary, at least as long as we are storing
+		// only a single image per tarball, i.e. all DiffID prefixes are unique (can’t differ only with
+		// configuration).
+		layerID := chainID.Hex()
+		layerConfig["id"] = layerID
+
 		configBytes, err := json.Marshal(layerConfig)
 		if err != nil {
 			return "", errors.Wrap(err, "Error marshaling layer config")
