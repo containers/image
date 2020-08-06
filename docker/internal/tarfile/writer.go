@@ -78,10 +78,10 @@ func (w *Writer) createSingleLegacyLayer(layerID string, layerDigest digest.Dige
 	return nil
 }
 
-// writeLegacyLayerMetadata writes legacy VERSION and configuration files for all layers
-func (w *Writer) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Descriptor, configBytes []byte) (lastLayerID string, err error) {
+// writeLegacyMetadata writes legacy layer metadata and records tags for a single image.
+func (w *Writer) writeLegacyMetadata(layerDescriptors []manifest.Schema2Descriptor, configBytes []byte, repoTags []reference.NamedTagged) error {
 	var chainID digest.Digest
-	lastLayerID = ""
+	lastLayerID := ""
 	for i, l := range layerDescriptors {
 		// The legacy format requires a config file per layer
 		layerConfig := make(map[string]interface{})
@@ -95,7 +95,7 @@ func (w *Writer) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Des
 			var config map[string]*json.RawMessage
 			err := json.Unmarshal(configBytes, &config)
 			if err != nil {
-				return "", errors.Wrap(err, "Error unmarshaling config")
+				return errors.Wrap(err, "Error unmarshaling config")
 			}
 			for _, attr := range [7]string{"architecture", "config", "container", "container_config", "created", "docker_version", "os"} {
 				layerConfig[attr] = config[attr]
@@ -122,25 +122,24 @@ func (w *Writer) writeLegacyLayerMetadata(layerDescriptors []manifest.Schema2Des
 
 		configBytes, err := json.Marshal(layerConfig)
 		if err != nil {
-			return "", errors.Wrap(err, "Error marshaling layer config")
+			return errors.Wrap(err, "Error marshaling layer config")
 		}
 
 		if err := w.createSingleLegacyLayer(layerID, l.Digest, configBytes); err != nil {
-			return "", err
+			return err
 		}
 
 		lastLayerID = layerID
 	}
-	return lastLayerID, nil
-}
 
-func (w *Writer) createRepositoriesFile(rootLayerID string, repoTags []reference.NamedTagged) error {
 	repositories := map[string]map[string]string{}
-	for _, repoTag := range repoTags {
-		if val, ok := repositories[repoTag.Name()]; ok {
-			val[repoTag.Tag()] = rootLayerID
-		} else {
-			repositories[repoTag.Name()] = map[string]string{repoTag.Tag(): rootLayerID}
+	if lastLayerID != "" {
+		for _, repoTag := range repoTags {
+			if val, ok := repositories[repoTag.Name()]; ok {
+				val[repoTag.Tag()] = lastLayerID
+			} else {
+				repositories[repoTag.Name()] = map[string]string{repoTag.Tag(): lastLayerID}
+			}
 		}
 	}
 
@@ -260,7 +259,7 @@ func (w *Writer) configPath(configDigest digest.Digest) string {
 // any time.
 func (w *Writer) physicalLayerPath(layerDigest digest.Digest) string {
 	// Note that this can't be e.g. filepath.Join(l.Digest.Hex(), legacyLayerFileName); due to the way
-	// writeLegacyLayerMetadata constructs layer IDs differently from inputinfo.Digest values (as described
+	// writeLegacyMetadata constructs layer IDs differently from inputinfo.Digest values (as described
 	// inside it), most of the layers would end up in subdirectories alone without any metadata; (docker load)
 	// tries to load every subdirectory as an image and fails if the config is missing.  So, keep the layers
 	// in the root of the tarball.

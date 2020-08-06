@@ -178,15 +178,8 @@ func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest 
 		return errors.Errorf("Unsupported manifest type, need a Docker schema 2 manifest")
 	}
 
-	lastLayerID, err := d.archive.writeLegacyLayerMetadata(man.LayersDescriptors, d.config)
-	if err != nil {
+	if err := d.archive.writeLegacyMetadata(man.LayersDescriptors, d.config, d.repoTags); err != nil {
 		return err
-	}
-
-	if len(man.LayersDescriptors) > 0 {
-		if err := d.archive.createRepositoriesFile(lastLayerID, d.repoTags); err != nil {
-			return err
-		}
 	}
 
 	return d.archive.ensureManifestItem(man.LayersDescriptors, man.ConfigDescriptor.Digest, d.repoTags)
