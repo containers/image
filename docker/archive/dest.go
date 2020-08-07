@@ -17,6 +17,9 @@ type archiveImageDestination struct {
 }
 
 func newImageDestination(sys *types.SystemContext, ref archiveReference) (types.ImageDestination, error) {
+	if ref.sourceIndex != -1 {
+		return nil, errors.Errorf("Destination reference must not contain a manifest index @%d", ref.sourceIndex)
+	}
 	// ref.path can be either a pipe or a regular file
 	// in the case of a pipe, we require that we can open it for write
 	// in the case of a regular file, we don't want to overwrite any pre-existing file
@@ -36,7 +39,7 @@ func newImageDestination(sys *types.SystemContext, ref archiveReference) (types.
 		return nil, errors.New("docker-archive doesn't support modifying existing images")
 	}
 
-	tarDest := tarfile.NewDestinationWithContext(sys, fh, ref.destinationRef)
+	tarDest := tarfile.NewDestinationWithContext(sys, fh, ref.ref)
 	if sys != nil && sys.DockerArchiveAdditionalTags != nil {
 		tarDest.AddRepoTags(sys.DockerArchiveAdditionalTags)
 	}

@@ -1,8 +1,7 @@
 package tarfile
 
 import (
-	"github.com/containers/image/v5/manifest"
-	"github.com/opencontainers/go-digest"
+	internal "github.com/containers/image/v5/docker/internal/tarfile"
 )
 
 // Various data structures.
@@ -17,12 +16,4 @@ const (
 )
 
 // ManifestItem is an element of the array stored in the top-level manifest.json file.
-type ManifestItem struct {
-	Config       string
-	RepoTags     []string
-	Layers       []string
-	Parent       imageID                                      `json:",omitempty"`
-	LayerSources map[digest.Digest]manifest.Schema2Descriptor `json:",omitempty"`
-}
-
-type imageID string
+type ManifestItem = internal.ManifestItem // All public members from the internal package remain accessible.
