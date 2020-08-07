@@ -65,6 +65,9 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 		if !requiresOciEncryption || manifest.MIMETypeSupportsEncryption(t) {
 			supportedByDest[t] = struct{}{}
 		}
+		if ic.c.dest.Reference().Transport().Name() == "docker-archive" && !manifest.MIMETypeSupportsEncryption(t) {
+			return "", nil, errors.New("docker-archive does not support encryption")
+		}
 	}
 
 	// destSupportedManifestMIMETypes is a static guess; a particular registry may still only support a subset of the types.
