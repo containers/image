@@ -107,7 +107,7 @@ func TestDefaultPolicyPath(t *testing.T) {
 			os.Unsetenv("HOME")
 		}
 	}()
-	userDefaultPolicyPath := filepath.Join(tempHome, userPolicyFile)
+	userDefaultPolicyPath := filepath.Join(tempHome, defaultConfigHomeDir, userPolicyFile)
 
 	for _, c := range []struct {
 		sys             *types.SystemContext
