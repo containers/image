@@ -11,9 +11,9 @@ import (
 	"strings"
 
 	"github.com/containers/image/v5/types"
+	"github.com/containers/storage/pkg/homedir"
 	helperclient "github.com/docker/docker-credential-helpers/client"
 	"github.com/docker/docker-credential-helpers/credentials"
-	"github.com/docker/docker/pkg/homedir"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
