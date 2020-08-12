@@ -3,6 +3,7 @@ package archive
 import (
 	"github.com/containers/image/v5/docker/internal/tarfile"
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/transports"
 	"github.com/containers/image/v5/types"
 	"github.com/pkg/errors"
 )
@@ -31,6 +32,35 @@ func NewReader(sys *types.SystemContext, path string) (*Reader, error) {
 // Close deletes temporary files associated with the Reader, if any.
 func (r *Reader) Close() error {
 	return r.archive.Close()
+}
+
+// NewReaderForReference creates a Reader from a Reader-independent imageReference, which must be from docker/archive.Transport,
+// and a variant of imageReference that points at the same image within the reader.
+// The caller should call .Close() on the returned Reader.
+func NewReaderForReference(sys *types.SystemContext, ref types.ImageReference) (*Reader, types.ImageReference, error) {
+	standalone, ok := ref.(archiveReference)
+	if !ok {
+		return nil, nil, errors.Errorf("Internal error: NewReaderForReference called for a non-docker/archive ImageReference %s", transports.ImageName(ref))
+	}
+	if standalone.archiveReader != nil {
+		return nil, nil, errors.Errorf("Internal error: NewReaderForReference called for a reader-bound reference %s", standalone.StringWithinTransport())
+	}
+	reader, err := NewReader(sys, standalone.path)
+	if err != nil {
+		return nil, nil, err
+	}
+	succeeded := false
+	defer func() {
+		if !succeeded {
+			reader.Close()
+		}
+	}()
+	readerRef, err := newReference(standalone.path, standalone.ref, standalone.sourceIndex, reader.archive, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	succeeded = true
+	return reader, readerRef, nil
 }
 
 // List returns the a set of references for images in the Reader,
