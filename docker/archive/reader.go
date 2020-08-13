@@ -96,3 +96,25 @@ func (r *Reader) List() ([][]types.ImageReference, error) {
 	}
 	return res, nil
 }
+
+// ManifestTagsForReference returns the set of tags “matching” ref in reader, as strings
+// (i.e. exposing the short names before normalization).
+// The function reports an error if ref does not identify a single image.
+// If ref contains a NamedTagged reference, only a single tag “matching” ref is returned;
+// If ref contains a source index, or neither a NamedTagged nor a source index, all tags
+// matching the image are returned.
+// Almost all users should use List() or ImageReference.DockerReference() instead.
+func (r *Reader) ManifestTagsForReference(ref types.ImageReference) ([]string, error) {
+	archiveRef, ok := ref.(archiveReference)
+	if !ok {
+		return nil, errors.Errorf("Internal error: ManifestTagsForReference called for a non-docker/archive ImageReference %s", transports.ImageName(ref))
+	}
+	manifestItem, tagIndex, err := r.archive.ChooseManifestItem(archiveRef.ref, archiveRef.sourceIndex)
+	if err != nil {
+		return nil, err
+	}
+	if tagIndex != -1 {
+		return []string{manifestItem.RepoTags[tagIndex]}, nil
+	}
+	return manifestItem.RepoTags, nil
+}
