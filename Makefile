@@ -4,7 +4,7 @@ export GOPROXY=https://proxy.golang.org
 
 # Which github repository and branch to use for testing with skopeo
 SKOPEO_REPO = containers/skopeo
-SKOPEO_BRANCH = master
+SKOPEO_BRANCH = release-1.1
 # Set SUDO=sudo to run container integration tests using sudo.
 SUDO =
 
