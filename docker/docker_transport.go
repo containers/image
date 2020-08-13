@@ -77,7 +77,7 @@ func newReference(ref reference.Named) (dockerReference, error) {
 	_, isTagged := ref.(reference.NamedTagged)
 	_, isDigested := ref.(reference.Canonical)
 	if isTagged && isDigested {
-		return dockerReference{}, errors.Errorf("Docker references with both a tag and digest are currently not supported")
+		return dockerReference{ref: ref}, nil //..errors.Errorf("Docker references with both a tag and digest are currently not supported")
 	}
 
 	return dockerReference{
