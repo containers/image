@@ -68,7 +68,7 @@ func (s *Source) ensureCachedDataIsPresent() error {
 // ensureCachedDataIsPresentPrivate is a private implementation detail of ensureCachedDataIsPresent.
 // Call ensureCachedDataIsPresent instead.
 func (s *Source) ensureCachedDataIsPresentPrivate() error {
-	tarManifest, err := s.archive.chooseManifestItem(s.ref, s.sourceIndex)
+	tarManifest, _, err := s.archive.ChooseManifestItem(s.ref, s.sourceIndex)
 	if err != nil {
 		return err
 	}
