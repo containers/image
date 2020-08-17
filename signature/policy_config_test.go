@@ -1104,7 +1104,7 @@ func TestPRMExactReferenceUnmarshalJSON(t *testing.T) {
 			// Invalid "dockerReference" field
 			func(v mSI) { v["dockerReference"] = 1 },
 		},
-		duplicateFields: []string{"type", "baseLayerIdentity"},
+		duplicateFields: []string{"type", "dockerReference"},
 	}.run(t)
 }
 
@@ -1160,6 +1160,6 @@ func TestPRMExactRepositoryUnmarshalJSON(t *testing.T) {
 			// Invalid "dockerRepository" field
 			func(v mSI) { v["dockerRepository"] = 1 },
 		},
-		duplicateFields: []string{"type", "baseLayerIdentity"},
+		duplicateFields: []string{"type", "dockerRepository"},
 	}.run(t)
 }
