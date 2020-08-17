@@ -250,7 +250,7 @@ func testInvalidJSONInput(t *testing.T, dest json.Unmarshaler) {
 	assert.Error(t, err)
 }
 
-// addExtraJSONMember adds adds an additional member "$name": $extra,
+// addExtraJSONMember adds an additional member "$name": $extra,
 // possibly with a duplicate name, to encoded.
 // Errors, if any, are reported through t.
 func addExtraJSONMember(t *testing.T, encoded []byte, name string, extra interface{}) []byte {
@@ -260,7 +260,13 @@ func addExtraJSONMember(t *testing.T, encoded []byte, name string, extra interfa
 	require.True(t, bytes.HasSuffix(encoded, []byte("}")))
 	preservedLen := len(encoded) - 1
 
-	return bytes.Join([][]byte{encoded[:preservedLen], []byte(`,"`), []byte(name), []byte(`":`), extraJSON, []byte("}")}, nil)
+	res := bytes.Join([][]byte{encoded[:preservedLen], []byte(`,"`), []byte(name), []byte(`":`), extraJSON, []byte("}")}, nil)
+	// Verify that the result is valid JSON, as a sanity check that we are actually triggering
+	// the “duplicate member” case in the caller.
+	var raw map[string]interface{}
+	err = json.Unmarshal(res, &raw)
+	require.NoError(t, err)
+	return res
 }
 
 // policyJSONUnmarshallerTests formalizes the repeated structure of the JSON unmasrhaller
