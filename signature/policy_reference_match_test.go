@@ -412,3 +412,193 @@ func TestPRMExactRepositoryMatchesDockerReference(t *testing.T) {
 		testExactPRMAndSig(t, prmExactRepositoryFactory, test.refB, test.refA, test.result)
 	}
 }
+
+func TestPRMRemapIdentityRefMatchesPrefix(t *testing.T) {
+	for _, c := range []struct {
+		ref, prefix string
+		expected    bool
+	}{
+		// Prefix is a reference.Domain() value
+		{"docker.io/image", "docker.io", true},
+		{"docker.io/image", "example.com", false},
+		{"example.com:5000/image", "example.com:5000", true},
+		{"example.com:50000/image", "example.com:5000", false},
+		{"example.com:5000/image", "example.com", false},
+		{"example.com/foo", "example.com", true},
+		{"example.com/foo/bar", "example.com", true},
+		{"example.com/foo/bar:baz", "example.com", true},
+		{"example.com/foo/bar" + digestSuffix, "example.com", true},
+		// Prefix is a reference.Named.Name() value or a repo namespace
+		{"docker.io/ns/image", "docker.io/library", false},
+		{"example.com/library", "docker.io/library", false},
+		{"docker.io/libraryy/image", "docker.io/library", false},
+		{"docker.io/library/busybox", "docker.io/library", true},
+		{"example.com/ns/image", "example.com/ns", true},
+		{"example.com/ns2/image", "example.com/ns", false},
+		{"example.com/n2/image", "example.com/ns", false},
+		{"example.com", "example.com/library/busybox", false},
+		{"example.com:5000/ns/image", "example.com/ns", false},
+		{"example.com/ns/image", "example.com:5000/ns", false},
+		{"docker.io/library/busybox", "docker.io/library/busybox", true},
+		{"example.com/library/busybox", "docker.io/library/busybox", false},
+		{"docker.io/library/busybox2", "docker.io/library/busybox", false},
+		{"example.com/ns/image", "example.com/ns/image", true},
+		{"example.com/ns/imag2", "example.com/ns/image", false},
+		{"example.com/ns/imagee", "example.com/ns/image", false},
+		{"example.com:5000/ns/image", "example.com/ns/image", false},
+		{"example.com/ns/image", "example.com:5000/ns/image", false},
+		{"example.com/ns/image:tag", "example.com/ns/image", true},
+		{"example.com/ns/image" + digestSuffix, "example.com/ns/image", true},
+		{"example.com/ns/image:tag" + digestSuffix, "example.com/ns/image", true},
+	} {
+		prm, err := newPRMRemapIdentity(c.prefix, "docker.io/library/signed-prefix")
+		require.NoError(t, err, c.prefix)
+		ref, err := reference.ParseNormalizedNamed(c.ref)
+		require.NoError(t, err, c.ref)
+		res := prm.refMatchesPrefix(ref)
+		assert.Equal(t, c.expected, res, fmt.Sprintf("%s vs. %s", c.ref, c.prefix))
+	}
+}
+
+func TestPRMRemapIdentityRemapReferencePrefix(t *testing.T) {
+	for _, c := range []struct{ prefix, signedPrefix, ref, expected string }{
+		// Match sanity checking, primarily tested in TestPRMRefMatchesPrefix
+		{"mirror.example", "vendor.example", "mirror.example/ns/image:tag", "vendor.example/ns/image:tag"},
+		{"mirror.example", "vendor.example", "different.com/ns/image:tag", "different.com/ns/image:tag"},
+		{"mirror.example/ns", "vendor.example/vendor-ns", "mirror.example/different-ns/image:tag", "mirror.example/different-ns/image:tag"},
+		{"docker.io", "not-docker-signed.example/ns", "busybox", "not-docker-signed.example/ns/library/busybox"},
+		// Rewrites work as expected
+		{"mirror.example", "vendor.example", "mirror.example/ns/image:tag", "vendor.example/ns/image:tag"},
+		{"example.com/mirror", "example.com/vendor", "example.com/mirror/image:tag", "example.com/vendor/image:tag"},
+		{"example.com/ns/mirror", "example.com/ns/vendor", "example.com/ns/mirror:tag", "example.com/ns/vendor:tag"},
+		{"mirror.example", "vendor.example", "prefixmirror.example/ns/image:tag", "prefixmirror.example/ns/image:tag"},
+		{"docker.io", "not-docker-signed.example", "busybox", "not-docker-signed.example/library/busybox"},
+		{"docker.io/library", "not-docker-signed.example/ns", "busybox", "not-docker-signed.example/ns/busybox"},
+		{"docker.io/library/busybox", "not-docker-signed.example/ns/notbusybox", "busybox", "not-docker-signed.example/ns/notbusybox"},
+		// On match, tag/digest is preserved
+		{"mirror.example", "vendor.example", "mirror.example/image", "vendor.example/image"}, // This one should not actually happen, testing for completeness
+		{"mirror.example", "vendor.example", "mirror.example/image:tag", "vendor.example/image:tag"},
+		{"mirror.example", "vendor.example", "mirror.example/image" + digestSuffix, "vendor.example/image" + digestSuffix},
+		{"mirror.example", "vendor.example", "mirror.example/image:tag" + digestSuffix, "vendor.example/image:tag" + digestSuffix},
+		// Rewrite creating an invalid reference
+		{"mirror.example/ns/image", "vendor.example:5000", "mirror.example/ns/image:tag", ""},
+		// Rewrite creating a valid reference string in short format, which would imply a docker.io prefix and is rejected
+		{"mirror.example/ns/image", "vendor.example:5000", "mirror.example/ns/image" + digestSuffix, ""}, // vendor.example:5000@digest
+		{"mirror.example/ns/image", "notlocalhost", "mirror.example/ns/image:tag", ""},                   // notlocalhost:tag
+	} {
+		testName := fmt.Sprintf("%#v", c)
+		prm, err := newPRMRemapIdentity(c.prefix, c.signedPrefix)
+		require.NoError(t, err, testName)
+		ref, err := reference.ParseNormalizedNamed(c.ref)
+		require.NoError(t, err, testName)
+		res, err := prm.remapReferencePrefix(ref)
+		if c.expected == "" {
+			assert.Error(t, err, testName)
+		} else {
+			require.NoError(t, err, testName)
+			assert.Equal(t, c.expected, res.String(), testName)
+		}
+	}
+}
+
+// modifiedString returns some string that is different from the input,
+// consistent across calls with the same input;
+// in particular it just replaces the first letter.
+func modifiedString(t *testing.T, input string) string {
+	c := input[0]
+	switch {
+	case c >= 'a' && c <= 'y':
+		c = c + 1
+	case c == 'z':
+		c = 'a'
+	default:
+		require.Fail(t, "unimplemented leading character '%c'", c)
+	}
+	return string(c) + input[1:]
+}
+
+// prmRemapIdentityMRDOETestCase is a helper for TestPRMRemapIdentityMatchesDockerReference,
+// verifying that the behavior is consistent with prmMatchRepoDigestOrExact,
+// while still smoke-testing the rewriting behavior.
+// The test succeeds if imageRefString is invalid and ignoreInvalidImageRef.
+func prmRemapIdentityMRDOETestCase(t *testing.T, ignoreInvalidImageRef bool, imageRef, sigRef string, result bool) {
+	parsedImageRef, err := reference.ParseNormalizedNamed(imageRef)
+	if ignoreInvalidImageRef && err != nil {
+		return
+	}
+	require.NoError(t, err)
+
+	// No rewriting happens.
+	prm, err := NewPRMRemapIdentity("never-causes-a-rewrite.example", "never-causes-a-rewrite.example")
+	require.NoError(t, err)
+	testImageAndSig(t, prm, imageRef, sigRef, result)
+
+	// Rewrite imageRef
+	domain := reference.Domain(parsedImageRef)
+	prm, err = NewPRMRemapIdentity(modifiedString(t, domain), domain)
+	require.NoError(t, err)
+	modifiedImageRef, err := reference.ParseNormalizedNamed(modifiedString(t, parsedImageRef.String()))
+	require.NoError(t, err)
+	testImageAndSig(t, prm, modifiedImageRef.String(), sigRef, result)
+}
+
+func TestPRMRemapIdentityMatchesDockerReference(t *testing.T) {
+	// Basic sanity checks. More detailed testing is done in TestPRMRemapIdentityRemapReferencePrefix
+	// and TestMatchRepoDigestOrExactReferenceValues.
+	for _, c := range []struct {
+		prefix, signedPrefix, imageRef, sigRef string
+		result                                 bool
+	}{
+		// No match rewriting
+		{"does-not-match.com", "does-not-match.rewritten", "busybox:latest", "busybox:latest", true},
+		{"does-not-match.com", "does-not-match.rewritten", "busybox:latest", "notbusybox:latest", false},
+		// Match rewriting non-docker
+		{"mirror.example", "public.com", "mirror.example/busybox:1", "public.com/busybox:1", true},
+		{"mirror.example", "public.com", "mirror.example/busybox:1", "public.com/busybox:not1", false},
+		// Rewriting to docker.io
+		{"mirror.example", "docker.io/library", "mirror.example/busybox:latest", "busybox:latest", true},
+		{"mirror.example", "docker.io/library", "mirror.example/alpine:latest", "busybox:latest", false},
+		// Rewriting from docker.io
+		{"docker.io/library", "original.com", "copied:latest", "original.com/copied:latest", true},
+		{"docker.io/library", "original.com", "copied:latest", "original.com/ns/copied:latest", false},
+		// Invalid object: prefix is not a host name
+		{"busybox", "example.com/busybox", "busybox:latest", "example.com/busybox:latest", false},
+		// Invalid object: signedPrefix is not a host name
+		{"docker.io/library/busybox", "busybox", "docker.io/library/busybox:latest", "busybox:latest", false},
+		// Invalid object: invalid prefix
+		{"UPPERCASE", "example.com", "example.com/foo:latest", "example.com/foo:latest", true}, // Happens to work, not an API promise
+		{"example.com", "UPPERCASE", "example.com/foo:latest", "UPPERCASE/foo:latest", false},
+	} {
+		// Do not use NewPRMRemapIdentity, we want to also test the cases with invalid values,
+		// even though NewPRMExactReference should never let it happen.
+		prm := &prmRemapIdentity{Prefix: c.prefix, SignedPrefix: c.signedPrefix}
+		testImageAndSig(t, prm, c.imageRef, c.sigRef, c.result)
+	}
+	// Even if they are signed with an empty string as a reference, unidentified images are rejected.
+	prm, err := NewPRMRemapIdentity("docker.io", "docker.io")
+	require.NoError(t, err)
+	res := prm.matchesDockerReference(refImageMock{nil}, "")
+	assert.False(t, res, `unidentified vs. ""`)
+
+	// Verify that the behavior is otherwise the same as for prmMatchRepoDigestOrExact:
+	// prmMatchRepoDigestOrExact is a middle ground between prmMatchExact and prmMatchRepository:
+	// It accepts anything prmMatchExact accepts,…
+	for _, test := range prmExactMatchTestTable {
+		if test.result == true {
+			prmRemapIdentityMRDOETestCase(t, true, test.refA, test.refB, test.result)
+			prmRemapIdentityMRDOETestCase(t, true, test.refB, test.refA, test.result)
+		}
+	}
+	// … and it rejects everything prmMatchRepository rejects.
+	for _, test := range prmRepositoryMatchTestTable {
+		if test.result == false {
+			prmRemapIdentityMRDOETestCase(t, true, test.refA, test.refB, test.result)
+			prmRemapIdentityMRDOETestCase(t, true, test.refB, test.refA, test.result)
+		}
+	}
+
+	// The other cases, possibly asymmetrical:
+	for _, test := range matchRepoDigestOrExactTestTable {
+		prmRemapIdentityMRDOETestCase(t, false, test.imageRef, test.sigRef, test.result)
+	}
+}

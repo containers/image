@@ -200,6 +200,30 @@ One of the following alternatives are supported:
       "dockerRepository": docker_repository_value
   }
   ```
+- Prefix remapping:
+
+  If the image identity matches the specified prefix, that prefix is replaced by the specified “signed prefix”
+  (otherwise it is used as unchanged and no remapping takes place);
+  matching then follows the `matchRepoDigestOrExact` semantics documented above
+  (i.e. if the image identity carries a tag, the identity in the signature must exactly match,
+  if it uses a digest reference, the repository must match).
+
+  The `prefix` and `signedPrefix` values can be either host[:port] values
+  (matching exactly the same host[:port], string),
+  repository namespaces, or repositories (i.e. they must not contain tags/digests),
+  and match as prefixes *of the fully expanded form*.
+  For example, `docker.io/library/busybox` (*not* `busybox`) to specify that single repository,
+  or `docker.io/library` (not an empty string) to specify the parent namespace of `docker.io/library/busybox`==`busybox`).
+
+  The `prefix` value is usually the same as the scope containing the parent `signedBy` requirement.
+
+  ```js
+  {
+      "type": "remapIdentity",
+      "prefix": prefix,
+      "signedPrefix": prefix,
+  }
+  ```
 
 If the `signedIdentity` field is missing, it is treated as `matchRepoDigestOrExact`.
 
@@ -259,6 +283,21 @@ selectively allow individual transports and scopes as desired.
                     "type": "signedBy",
                     "keyType": "GPGKeys",
                     "keyPath": "/path/to/reviewer-pubkey.gpg"
+                }
+            ],
+            /* A way to mirror many repositories from a single vendor */
+            "private-mirror:5000/vendor-mirror": [
+                { /* Require the image to be signed by the original vendor, using the vendor's repository location.
+                     For example, private-mirror:5000/vendor-mirror/productA/image1:latest needs to be signed as
+                     vendor.example/productA/image1:latest . */
+                    "type": "signedBy",
+                    "keyType": "GPGKeys",
+                    "keyPath": "/path/to/vendor-pubkey.gpg",
+                    "signedIdentity": {
+                        "type": "remapIdentity",
+                        "prefix": "private-mirror:5000/vendor-mirror",
+                        "signedPrefix": "vendor.example.com",
+                    }
                 }
             ]
         }
