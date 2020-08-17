@@ -247,19 +247,82 @@ func addExtraJSONMember(t *testing.T, encoded []byte, name string, extra interfa
 	return bytes.Join([][]byte{encoded[:preservedLen], []byte(`,"`), []byte(name), []byte(`":`), extraJSON, []byte("}")}, nil)
 }
 
-// Return the result of modifying validJSON with fn and unmarshaling it into *p
-func tryUnmarshalModifiedPolicy(t *testing.T, p *Policy, validJSON []byte, modifyFn func(mSI)) error {
-	var tmp mSI
-	err := json.Unmarshal(validJSON, &tmp)
+// policyJSONUnmarshallerTests formalizes the repeated structure of the JSON unmasrhaller
+// tests in this file, and allows sharing the test implementation.
+type policyJSONUmarshallerTests struct {
+	newDest         func() json.Unmarshaler           // Create a new json.Unmarshaler to test against
+	newValidObject  func() (interface{}, error)       // A function that generates a valid object, used as a base for other tests
+	otherJSONParser func([]byte) (interface{}, error) // Another function that must accept the result of encoding validObject
+	invalidObjects  []mSI                             // mSI values that are invalid for this unmarshaller; a simpler alternative to breakFns
+	breakFns        []func(mSI)                       // Functions that edit a mSI from newValidObject() to make it invalid
+	duplicateFields []string                          // Names of fields in the return value of newValidObject() that should not be duplicated
+}
+
+// validObjectAndJSON returns an object created by d.newValidObject() and its JSON representation.
+func (d policyJSONUmarshallerTests) validObjectAndJSON(t *testing.T) (interface{}, []byte) {
+	validObject, err := d.newValidObject()
 	require.NoError(t, err)
-
-	modifyFn(tmp)
-
-	testJSON, err := json.Marshal(tmp)
+	validJSON, err := json.Marshal(validObject)
 	require.NoError(t, err)
+	return validObject, validJSON
+}
 
-	*p = Policy{}
-	return json.Unmarshal(testJSON, p)
+func (d policyJSONUmarshallerTests) run(t *testing.T) {
+	dest := d.newDest()
+	testInvalidJSONInput(t, dest)
+
+	validObject, validJSON := d.validObjectAndJSON(t)
+
+	// Success
+	dest = d.newDest()
+	err := json.Unmarshal(validJSON, dest)
+	require.NoError(t, err)
+	assert.Equal(t, validObject, dest)
+
+	// otherJSONParser recognizes this data
+	if d.otherJSONParser != nil {
+		other, err := d.otherJSONParser(validJSON)
+		require.NoError(t, err)
+		assert.Equal(t, validObject, other)
+	}
+
+	// Invalid JSON objects
+	for _, invalid := range d.invalidObjects {
+		testJSON, err := json.Marshal(invalid)
+		require.NoError(t, err)
+
+		dest := d.newDest()
+		err = json.Unmarshal(testJSON, dest)
+		assert.Error(t, err, string(testJSON))
+	}
+	// Various ways to corrupt the JSON
+	for _, fn := range d.breakFns {
+		var tmp mSI
+		err := json.Unmarshal(validJSON, &tmp)
+		require.NoError(t, err)
+
+		fn(tmp)
+
+		testJSON, err := json.Marshal(tmp)
+		require.NoError(t, err)
+
+		dest := d.newDest()
+		err = json.Unmarshal(testJSON, dest)
+		assert.Error(t, err)
+	}
+
+	// Duplicated fields
+	for _, field := range d.duplicateFields {
+		var tmp mSI
+		err := json.Unmarshal(validJSON, &tmp)
+		require.NoError(t, err)
+
+		testJSON := addExtraJSONMember(t, validJSON, field, tmp[field])
+
+		dest := d.newDest()
+		err = json.Unmarshal(testJSON, dest)
+		assert.Error(t, err)
+	}
 }
 
 // xNewPRSignedByKeyPath is like NewPRSignedByKeyPath, except it must not fail.
@@ -281,79 +344,56 @@ func xNewPRSignedByKeyData(keyType sbKeyType, keyData []byte, signedIdentity Pol
 }
 
 func TestPolicyUnmarshalJSON(t *testing.T) {
-	var p Policy
-
-	testInvalidJSONInput(t, &p)
-
-	// Start with a valid JSON.
-	validPolicy := Policy{
-		Default: []PolicyRequirement{
-			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("abc"), NewPRMMatchRepoDigestOrExact()),
+	tests := policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &Policy{} },
+		newValidObject: func() (interface{}, error) {
+			return &Policy{
+				Default: []PolicyRequirement{
+					xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("abc"), NewPRMMatchRepoDigestOrExact()),
+				},
+				Transports: map[string]PolicyTransportScopes{
+					"docker": {
+						"docker.io/library/busybox": []PolicyRequirement{
+							xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("def"), NewPRMMatchRepoDigestOrExact()),
+						},
+						"registry.access.redhat.com": []PolicyRequirement{
+							xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RH"), NewPRMMatchRepository()),
+						},
+					},
+					"atomic": {
+						"registry.access.redhat.com/rhel7": []PolicyRequirement{
+							xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RHatomic"), NewPRMMatchRepository()),
+						},
+					},
+					"unknown": {
+						"registry.access.redhat.com/rhel7": []PolicyRequirement{
+							xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RHatomic"), NewPRMMatchRepository()),
+						},
+					},
+				},
+			}, nil
 		},
-		Transports: map[string]PolicyTransportScopes{
-			"docker": {
-				"docker.io/library/busybox": []PolicyRequirement{
-					xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("def"), NewPRMMatchRepoDigestOrExact()),
-				},
-				"registry.access.redhat.com": []PolicyRequirement{
-					xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RH"), NewPRMMatchRepository()),
-				},
-			},
-			"atomic": {
-				"registry.access.redhat.com/rhel7": []PolicyRequirement{
-					xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RHatomic"), NewPRMMatchRepository()),
-				},
-			},
-			"unknown": {
-				"registry.access.redhat.com/rhel7": []PolicyRequirement{
-					xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RHatomic"), NewPRMMatchRepository()),
-				},
-			},
+		otherJSONParser: nil,
+		breakFns: []func(mSI){
+			// The "default" field is missing
+			func(v mSI) { delete(v, "default") },
+			// Extra top-level sub-object
+			func(v mSI) { v["unexpected"] = 1 },
+			// "default" not an array
+			func(v mSI) { v["default"] = 1 },
+			func(v mSI) { v["default"] = mSI{} },
+			// "transports" not an object
+			func(v mSI) { v["transports"] = 1 },
+			func(v mSI) { v["transports"] = []string{} },
+			// "default" is an invalid PolicyRequirements
+			func(v mSI) { v["default"] = PolicyRequirements{} },
 		},
+		duplicateFields: []string{"default", "transports"},
 	}
-	validJSON, err := json.Marshal(validPolicy)
-	require.NoError(t, err)
-
-	// Success
-	p = Policy{}
-	err = json.Unmarshal(validJSON, &p)
-	require.NoError(t, err)
-	assert.Equal(t, validPolicy, p)
-
-	// Various ways to corrupt the JSON
-	breakFns := []func(mSI){
-		// The "default" field is missing
-		func(v mSI) { delete(v, "default") },
-		// Extra top-level sub-object
-		func(v mSI) { v["unexpected"] = 1 },
-		// "default" not an array
-		func(v mSI) { v["default"] = 1 },
-		func(v mSI) { v["default"] = mSI{} },
-		// "transports" not an object
-		func(v mSI) { v["transports"] = 1 },
-		func(v mSI) { v["transports"] = []string{} },
-		// "default" is an invalid PolicyRequirements
-		func(v mSI) { v["default"] = PolicyRequirements{} },
-	}
-	for _, fn := range breakFns {
-		err = tryUnmarshalModifiedPolicy(t, &p, validJSON, fn)
-		assert.Error(t, err)
-	}
-
-	// Duplicated fields
-	for _, field := range []string{"default", "transports"} {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
-
-		testJSON := addExtraJSONMember(t, validJSON, field, tmp[field])
-
-		p = Policy{}
-		err = json.Unmarshal(testJSON, &p)
-		assert.Error(t, err)
-	}
+	tests.run(t)
 
 	// Various allowed modifications to the policy
+	_, validJSON := tests.validObjectAndJSON(t)
 	allowedModificationFns := []func(mSI){
 		// Delete the map of transport-specific scopes
 		func(v mSI) { delete(v, "transports") },
@@ -361,7 +401,17 @@ func TestPolicyUnmarshalJSON(t *testing.T) {
 		func(v mSI) { v["transports"] = map[string]PolicyTransportScopes{} },
 	}
 	for _, fn := range allowedModificationFns {
-		err = tryUnmarshalModifiedPolicy(t, &p, validJSON, fn)
+		var tmp mSI
+		err := json.Unmarshal(validJSON, &tmp)
+		require.NoError(t, err)
+
+		fn(tmp)
+
+		testJSON, err := json.Marshal(tmp)
+		require.NoError(t, err)
+
+		p := Policy{}
+		err = json.Unmarshal(testJSON, &p)
 		require.NoError(t, err)
 	}
 }
@@ -496,24 +546,19 @@ func TestPolicyTransportScopesWithTransportUnmarshalJSON(t *testing.T) {
 }
 
 func TestPolicyRequirementsUnmarshalJSON(t *testing.T) {
-	var reqs PolicyRequirements
+	policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &PolicyRequirements{} },
+		newValidObject: func() (interface{}, error) {
+			return &PolicyRequirements{
+				xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("def"), NewPRMMatchRepoDigestOrExact()),
+				xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RH"), NewPRMMatchRepository()),
+			}, nil
+		},
+		otherJSONParser: nil,
+	}.run(t)
 
-	testInvalidJSONInput(t, &reqs)
-
-	// Start with a valid JSON.
-	validReqs := PolicyRequirements{
-		xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("def"), NewPRMMatchRepoDigestOrExact()),
-		xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RH"), NewPRMMatchRepository()),
-	}
-	validJSON, err := json.Marshal(validReqs)
-	require.NoError(t, err)
-
-	// Success
-	reqs = PolicyRequirements{}
-	err = json.Unmarshal(validJSON, &reqs)
-	require.NoError(t, err)
-	assert.Equal(t, validReqs, reqs)
-
+	// This would be inconvenient to integrate into policyJSONUnmarshallerTests.invalidObjects
+	// because all other users are easier to express as mSI.
 	for _, invalid := range [][]interface{}{
 		// No requirements
 		{},
@@ -530,7 +575,7 @@ func TestPolicyRequirementsUnmarshalJSON(t *testing.T) {
 		testJSON, err := json.Marshal(invalid)
 		require.NoError(t, err)
 
-		reqs = PolicyRequirements{}
+		reqs := PolicyRequirements{}
 		err = json.Unmarshal(testJSON, &reqs)
 		assert.Error(t, err, string(testJSON))
 	}
@@ -575,58 +620,28 @@ func TestNewPRInsecureAcceptAnything(t *testing.T) {
 }
 
 func TestPRInsecureAcceptAnythingUnmarshalJSON(t *testing.T) {
-	var pr prInsecureAcceptAnything
-
-	testInvalidJSONInput(t, &pr)
-
-	// Start with a valid JSON.
-	validPR := NewPRInsecureAcceptAnything()
-	validJSON, err := json.Marshal(validPR)
-	require.NoError(t, err)
-
-	// Success
-	pr = prInsecureAcceptAnything{}
-	err = json.Unmarshal(validJSON, &pr)
-	require.NoError(t, err)
-	assert.Equal(t, validPR, &pr)
-
-	// newPolicyRequirementFromJSON recognizes this type
-	_pr, err := newPolicyRequirementFromJSON(validJSON)
-	require.NoError(t, err)
-	assert.Equal(t, validPR, _pr)
-
-	for _, invalid := range []mSI{
-		// Missing "type" field
-		{},
-		// Wrong "type" field
-		{"type": 1},
-		{"type": "this is invalid"},
-		// Extra fields
-		{
-			"type":    string(prTypeInsecureAcceptAnything),
-			"unknown": "foo",
+	policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prInsecureAcceptAnything{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRInsecureAcceptAnything(), nil
 		},
-	} {
-		testJSON, err := json.Marshal(invalid)
-		require.NoError(t, err)
-
-		pr = prInsecureAcceptAnything{}
-		err = json.Unmarshal(testJSON, &pr)
-		assert.Error(t, err, string(testJSON))
-	}
-
-	// Duplicated fields
-	for _, field := range []string{"type"} {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
-
-		testJSON := addExtraJSONMember(t, validJSON, field, tmp[field])
-
-		pr = prInsecureAcceptAnything{}
-		err = json.Unmarshal(testJSON, &pr)
-		assert.Error(t, err)
-	}
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyRequirementFromJSON(validJSON)
+		},
+		invalidObjects: []mSI{
+			// Missing "type" field
+			{},
+			// Wrong "type" field
+			{"type": 1},
+			{"type": "this is invalid"},
+			// Extra fields
+			{
+				"type":    string(prTypeInsecureAcceptAnything),
+				"unknown": "foo",
+			},
+		},
+		duplicateFields: []string{"type"},
+	}.run(t)
 }
 
 func TestNewPRReject(t *testing.T) {
@@ -637,58 +652,28 @@ func TestNewPRReject(t *testing.T) {
 }
 
 func TestPRRejectUnmarshalJSON(t *testing.T) {
-	var pr prReject
-
-	testInvalidJSONInput(t, &pr)
-
-	// Start with a valid JSON.
-	validPR := NewPRReject()
-	validJSON, err := json.Marshal(validPR)
-	require.NoError(t, err)
-
-	// Success
-	pr = prReject{}
-	err = json.Unmarshal(validJSON, &pr)
-	require.NoError(t, err)
-	assert.Equal(t, validPR, &pr)
-
-	// newPolicyRequirementFromJSON recognizes this type
-	_pr, err := newPolicyRequirementFromJSON(validJSON)
-	require.NoError(t, err)
-	assert.Equal(t, validPR, _pr)
-
-	for _, invalid := range []mSI{
-		// Missing "type" field
-		{},
-		// Wrong "type" field
-		{"type": 1},
-		{"type": "this is invalid"},
-		// Extra fields
-		{
-			"type":    string(prTypeReject),
-			"unknown": "foo",
+	policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prReject{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRReject(), nil
 		},
-	} {
-		testJSON, err := json.Marshal(invalid)
-		require.NoError(t, err)
-
-		pr = prReject{}
-		err = json.Unmarshal(testJSON, &pr)
-		assert.Error(t, err, string(testJSON))
-	}
-
-	// Duplicated fields
-	for _, field := range []string{"type"} {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
-
-		testJSON := addExtraJSONMember(t, validJSON, field, tmp[field])
-
-		pr = prReject{}
-		err = json.Unmarshal(testJSON, &pr)
-		assert.Error(t, err)
-	}
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyRequirementFromJSON(validJSON)
+		},
+		invalidObjects: []mSI{
+			// Missing "type" field
+			{},
+			// Wrong "type" field
+			{"type": 1},
+			{"type": "this is invalid"},
+			// Extra fields
+			{
+				"type":    string(prTypeReject),
+				"unknown": "foo",
+			},
+		},
+		duplicateFields: []string{"type"},
+	}.run(t)
 }
 
 func TestNewPRSignedBy(t *testing.T) {
@@ -767,91 +752,60 @@ func tryUnmarshalModifiedSignedBy(t *testing.T, pr *prSignedBy, validJSON []byte
 }
 
 func TestPRSignedByUnmarshalJSON(t *testing.T) {
+	keyDataTests := policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prSignedBy{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("abc"), NewPRMMatchRepoDigestOrExact())
+		},
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyRequirementFromJSON(validJSON)
+		},
+		breakFns: []func(mSI){
+			// The "type" field is missing
+			func(v mSI) { delete(v, "type") },
+			// Wrong "type" field
+			func(v mSI) { v["type"] = 1 },
+			func(v mSI) { v["type"] = "this is invalid" },
+			// Extra top-level sub-object
+			func(v mSI) { v["unexpected"] = 1 },
+			// The "keyType" field is missing
+			func(v mSI) { delete(v, "keyType") },
+			// Invalid "keyType" field
+			func(v mSI) { v["keyType"] = "this is invalid" },
+			// Both "keyPath" and "keyData" is missing
+			func(v mSI) { delete(v, "keyData") },
+			// Both "keyPath" and "keyData" is present
+			func(v mSI) { v["keyPath"] = "/foo/bar" },
+			// Invalid "keyPath" field
+			func(v mSI) { delete(v, "keyData"); v["keyPath"] = 1 },
+			func(v mSI) { v["type"] = "this is invalid" },
+			// Invalid "keyData" field
+			func(v mSI) { v["keyData"] = 1 },
+			func(v mSI) { v["keyData"] = "this is invalid base64" },
+			// Invalid "signedIdentity" field
+			func(v mSI) { v["signedIdentity"] = "this is invalid" },
+			// "signedIdentity" an explicit nil
+			func(v mSI) { v["signedIdentity"] = nil },
+		},
+		duplicateFields: []string{"type", "keyType", "keyData", "signedIdentity"},
+	}
+	keyDataTests.run(t)
+	// Test the keyPath-specific aspects
+	policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prSignedBy{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRSignedByKeyPath(SBKeyTypeGPGKeys, "/foo/bar", NewPRMMatchRepoDigestOrExact())
+		},
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyRequirementFromJSON(validJSON)
+		},
+		duplicateFields: []string{"type", "keyType", "keyPath", "signedIdentity"},
+	}.run(t)
+
 	var pr prSignedBy
 
-	testInvalidJSONInput(t, &pr)
-
 	// Start with a valid JSON.
-	validPR, err := NewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("abc"), NewPRMMatchRepoDigestOrExact())
-	require.NoError(t, err)
-	validJSON, err := json.Marshal(validPR)
-	require.NoError(t, err)
-
-	// Success with KeyData
-	pr = prSignedBy{}
-	err = json.Unmarshal(validJSON, &pr)
-	require.NoError(t, err)
-	assert.Equal(t, validPR, &pr)
-
-	// Success with KeyPath
-	kpPR, err := NewPRSignedByKeyPath(SBKeyTypeGPGKeys, "/foo/bar", NewPRMMatchRepoDigestOrExact())
-	require.NoError(t, err)
-	testJSON, err := json.Marshal(kpPR)
-	require.NoError(t, err)
-	pr = prSignedBy{}
-	err = json.Unmarshal(testJSON, &pr)
-	require.NoError(t, err)
-	assert.Equal(t, kpPR, &pr)
-
-	// newPolicyRequirementFromJSON recognizes this type
-	_pr, err := newPolicyRequirementFromJSON(validJSON)
-	require.NoError(t, err)
-	assert.Equal(t, validPR, _pr)
-
-	// Various ways to corrupt the JSON
-	breakFns := []func(mSI){
-		// The "type" field is missing
-		func(v mSI) { delete(v, "type") },
-		// Wrong "type" field
-		func(v mSI) { v["type"] = 1 },
-		func(v mSI) { v["type"] = "this is invalid" },
-		// Extra top-level sub-object
-		func(v mSI) { v["unexpected"] = 1 },
-		// The "keyType" field is missing
-		func(v mSI) { delete(v, "keyType") },
-		// Invalid "keyType" field
-		func(v mSI) { v["keyType"] = "this is invalid" },
-		// Both "keyPath" and "keyData" is missing
-		func(v mSI) { delete(v, "keyData") },
-		// Both "keyPath" and "keyData" is present
-		func(v mSI) { v["keyPath"] = "/foo/bar" },
-		// Invalid "keyPath" field
-		func(v mSI) { delete(v, "keyData"); v["keyPath"] = 1 },
-		func(v mSI) { v["type"] = "this is invalid" },
-		// Invalid "keyData" field
-		func(v mSI) { v["keyData"] = 1 },
-		func(v mSI) { v["keyData"] = "this is invalid base64" },
-		// Invalid "signedIdentity" field
-		func(v mSI) { v["signedIdentity"] = "this is invalid" },
-		// "signedIdentity" an explicit nil
-		func(v mSI) { v["signedIdentity"] = nil },
-	}
-	for _, fn := range breakFns {
-		err = tryUnmarshalModifiedSignedBy(t, &pr, validJSON, fn)
-		assert.Error(t, err, string(testJSON))
-	}
-
-	// Duplicated fields
-	for _, field := range []string{"type", "keyType", "keyData", "signedIdentity"} {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
-
-		testJSON := addExtraJSONMember(t, validJSON, field, tmp[field])
-
-		pr = prSignedBy{}
-		err = json.Unmarshal(testJSON, &pr)
-		assert.Error(t, err)
-	}
-	// Handle "keyPath", which is not in validJSON, specially
-	pathPR, err := NewPRSignedByKeyPath(SBKeyTypeGPGKeys, "/foo/bar", NewPRMMatchRepoDigestOrExact())
-	require.NoError(t, err)
-	testJSON, err = json.Marshal(pathPR)
-	require.NoError(t, err)
-	testJSON = addExtraJSONMember(t, testJSON, "keyPath", pr.KeyPath)
-	pr = prSignedBy{}
-	err = json.Unmarshal(testJSON, &pr)
-	assert.Error(t, err)
+	_, validJSON := keyDataTests.validObjectAndJSON(t)
 
 	// Various allowed modifications to the requirement
 	allowedModificationFns := []func(mSI){
@@ -859,7 +813,7 @@ func TestPRSignedByUnmarshalJSON(t *testing.T) {
 		func(v mSI) { delete(v, "signedIdentity") },
 	}
 	for _, fn := range allowedModificationFns {
-		err = tryUnmarshalModifiedSignedBy(t, &pr, validJSON, fn)
+		err := tryUnmarshalModifiedSignedBy(t, &pr, validJSON, fn)
 		require.NoError(t, err)
 	}
 
@@ -871,7 +825,7 @@ func TestPRSignedByUnmarshalJSON(t *testing.T) {
 		func(v mSI) { delete(v, "signedIdentity") },
 	}
 	for _, fn := range signedIdentityDefaultFns {
-		err = tryUnmarshalModifiedSignedBy(t, &pr, validJSON, fn)
+		err := tryUnmarshalModifiedSignedBy(t, &pr, validJSON, fn)
 		require.NoError(t, err)
 		assert.Equal(t, NewPRMMatchRepoDigestOrExact(), pr.SignedIdentity)
 	}
@@ -949,72 +903,33 @@ func TestNewPRSignedBaseLayer(t *testing.T) {
 }
 
 func TestPRSignedBaseLayerUnmarshalJSON(t *testing.T) {
-	var pr prSignedBaseLayer
-
-	testInvalidJSONInput(t, &pr)
-
-	// Start with a valid JSON.
-	baseIdentity, err := NewPRMExactReference("registry.access.redhat.com/rhel7/rhel:7.2.3")
-	require.NoError(t, err)
-	validPR, err := NewPRSignedBaseLayer(baseIdentity)
-	require.NoError(t, err)
-	validJSON, err := json.Marshal(validPR)
-	require.NoError(t, err)
-
-	// Success
-	pr = prSignedBaseLayer{}
-	err = json.Unmarshal(validJSON, &pr)
-	require.NoError(t, err)
-	assert.Equal(t, validPR, &pr)
-
-	// newPolicyRequirementFromJSON recognizes this type
-	_pr, err := newPolicyRequirementFromJSON(validJSON)
-	require.NoError(t, err)
-	assert.Equal(t, validPR, _pr)
-
-	// Various ways to corrupt the JSON
-	breakFns := []func(mSI){
-		// The "type" field is missing
-		func(v mSI) { delete(v, "type") },
-		// Wrong "type" field
-		func(v mSI) { v["type"] = 1 },
-		func(v mSI) { v["type"] = "this is invalid" },
-		// Extra top-level sub-object
-		func(v mSI) { v["unexpected"] = 1 },
-		// The "baseLayerIdentity" field is missing
-		func(v mSI) { delete(v, "baseLayerIdentity") },
-		// Invalid "baseLayerIdentity" field
-		func(v mSI) { v["baseLayerIdentity"] = "this is invalid" },
-		// Invalid "baseLayerIdentity" an explicit nil
-		func(v mSI) { v["baseLayerIdentity"] = nil },
-	}
-	for _, fn := range breakFns {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
-
-		fn(tmp)
-
-		testJSON, err := json.Marshal(tmp)
-		require.NoError(t, err)
-
-		pr = prSignedBaseLayer{}
-		err = json.Unmarshal(testJSON, &pr)
-		assert.Error(t, err)
-	}
-
-	// Duplicated fields
-	for _, field := range []string{"type", "baseLayerIdentity"} {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
-
-		testJSON := addExtraJSONMember(t, validJSON, field, tmp[field])
-
-		pr = prSignedBaseLayer{}
-		err = json.Unmarshal(testJSON, &pr)
-		assert.Error(t, err)
-	}
+	policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prSignedBaseLayer{} },
+		newValidObject: func() (interface{}, error) {
+			baseIdentity, err := NewPRMExactReference("registry.access.redhat.com/rhel7/rhel:7.2.3")
+			require.NoError(t, err)
+			return NewPRSignedBaseLayer(baseIdentity)
+		},
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyRequirementFromJSON(validJSON)
+		},
+		breakFns: []func(mSI){
+			// The "type" field is missing
+			func(v mSI) { delete(v, "type") },
+			// Wrong "type" field
+			func(v mSI) { v["type"] = 1 },
+			func(v mSI) { v["type"] = "this is invalid" },
+			// Extra top-level sub-object
+			func(v mSI) { v["unexpected"] = 1 },
+			// The "baseLayerIdentity" field is missing
+			func(v mSI) { delete(v, "baseLayerIdentity") },
+			// Invalid "baseLayerIdentity" field
+			func(v mSI) { v["baseLayerIdentity"] = "this is invalid" },
+			// Invalid "baseLayerIdentity" an explicit nil
+			func(v mSI) { v["baseLayerIdentity"] = nil },
+		},
+		duplicateFields: []string{"type", "baseLayerIdentity"},
+	}.run(t)
 }
 
 func TestNewPolicyReferenceMatchFromJSON(t *testing.T) {
@@ -1056,58 +971,28 @@ func TestNewPRMMatchExact(t *testing.T) {
 }
 
 func TestPRMMatchExactUnmarshalJSON(t *testing.T) {
-	var prm prmMatchExact
-
-	testInvalidJSONInput(t, &prm)
-
-	// Start with a valid JSON.
-	validPR := NewPRMMatchExact()
-	validJSON, err := json.Marshal(validPR)
-	require.NoError(t, err)
-
-	// Success
-	prm = prmMatchExact{}
-	err = json.Unmarshal(validJSON, &prm)
-	require.NoError(t, err)
-	assert.Equal(t, validPR, &prm)
-
-	// newPolicyReferenceMatchFromJSON recognizes this type
-	_pr, err := newPolicyReferenceMatchFromJSON(validJSON)
-	require.NoError(t, err)
-	assert.Equal(t, validPR, _pr)
-
-	for _, invalid := range []mSI{
-		// Missing "type" field
-		{},
-		// Wrong "type" field
-		{"type": 1},
-		{"type": "this is invalid"},
-		// Extra fields
-		{
-			"type":    string(prmTypeMatchExact),
-			"unknown": "foo",
+	policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prmMatchExact{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRMMatchExact(), nil
 		},
-	} {
-		testJSON, err := json.Marshal(invalid)
-		require.NoError(t, err)
-
-		prm = prmMatchExact{}
-		err = json.Unmarshal(testJSON, &prm)
-		assert.Error(t, err, string(testJSON))
-	}
-
-	// Duplicated fields
-	for _, field := range []string{"type"} {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
-
-		testJSON := addExtraJSONMember(t, validJSON, field, tmp[field])
-
-		prm = prmMatchExact{}
-		err = json.Unmarshal(testJSON, &prm)
-		assert.Error(t, err)
-	}
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyReferenceMatchFromJSON(validJSON)
+		},
+		invalidObjects: []mSI{
+			// Missing "type" field
+			{},
+			// Wrong "type" field
+			{"type": 1},
+			{"type": "this is invalid"},
+			// Extra fields
+			{
+				"type":    string(prmTypeMatchExact),
+				"unknown": "foo",
+			},
+		},
+		duplicateFields: []string{"type"},
+	}.run(t)
 }
 
 func TestNewPRMMatchRepoDigestOrExact(t *testing.T) {
@@ -1118,58 +1003,28 @@ func TestNewPRMMatchRepoDigestOrExact(t *testing.T) {
 }
 
 func TestPRMMatchRepoDigestOrExactUnmarshalJSON(t *testing.T) {
-	var prm prmMatchRepoDigestOrExact
-
-	testInvalidJSONInput(t, &prm)
-
-	// Start with a valid JSON.
-	validPR := NewPRMMatchRepoDigestOrExact()
-	validJSON, err := json.Marshal(validPR)
-	require.NoError(t, err)
-
-	// Success
-	prm = prmMatchRepoDigestOrExact{}
-	err = json.Unmarshal(validJSON, &prm)
-	require.NoError(t, err)
-	assert.Equal(t, validPR, &prm)
-
-	// newPolicyReferenceMatchFromJSON recognizes this type
-	_pr, err := newPolicyReferenceMatchFromJSON(validJSON)
-	require.NoError(t, err)
-	assert.Equal(t, validPR, _pr)
-
-	for _, invalid := range []mSI{
-		// Missing "type" field
-		{},
-		// Wrong "type" field
-		{"type": 1},
-		{"type": "this is invalid"},
-		// Extra fields
-		{
-			"type":    string(prmTypeMatchRepoDigestOrExact),
-			"unknown": "foo",
+	policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prmMatchRepoDigestOrExact{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRMMatchRepoDigestOrExact(), nil
 		},
-	} {
-		testJSON, err := json.Marshal(invalid)
-		require.NoError(t, err)
-
-		prm = prmMatchRepoDigestOrExact{}
-		err = json.Unmarshal(testJSON, &prm)
-		assert.Error(t, err, string(testJSON))
-	}
-
-	// Duplicated fields
-	for _, field := range []string{"type"} {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
-
-		testJSON := addExtraJSONMember(t, validJSON, field, tmp[field])
-
-		prm = prmMatchRepoDigestOrExact{}
-		err = json.Unmarshal(testJSON, &prm)
-		assert.Error(t, err)
-	}
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyReferenceMatchFromJSON(validJSON)
+		},
+		invalidObjects: []mSI{
+			// Missing "type" field
+			{},
+			// Wrong "type" field
+			{"type": 1},
+			{"type": "this is invalid"},
+			// Extra fields
+			{
+				"type":    string(prmTypeMatchRepoDigestOrExact),
+				"unknown": "foo",
+			},
+		},
+		duplicateFields: []string{"type"},
+	}.run(t)
 }
 
 func TestNewPRMMatchRepository(t *testing.T) {
@@ -1180,58 +1035,28 @@ func TestNewPRMMatchRepository(t *testing.T) {
 }
 
 func TestPRMMatchRepositoryUnmarshalJSON(t *testing.T) {
-	var prm prmMatchRepository
-
-	testInvalidJSONInput(t, &prm)
-
-	// Start with a valid JSON.
-	validPR := NewPRMMatchRepository()
-	validJSON, err := json.Marshal(validPR)
-	require.NoError(t, err)
-
-	// Success
-	prm = prmMatchRepository{}
-	err = json.Unmarshal(validJSON, &prm)
-	require.NoError(t, err)
-	assert.Equal(t, validPR, &prm)
-
-	// newPolicyReferenceMatchFromJSON recognizes this type
-	_pr, err := newPolicyReferenceMatchFromJSON(validJSON)
-	require.NoError(t, err)
-	assert.Equal(t, validPR, _pr)
-
-	for _, invalid := range []mSI{
-		// Missing "type" field
-		{},
-		// Wrong "type" field
-		{"type": 1},
-		{"type": "this is invalid"},
-		// Extra fields
-		{
-			"type":    string(prmTypeMatchRepository),
-			"unknown": "foo",
+	policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prmMatchRepository{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRMMatchRepository(), nil
 		},
-	} {
-		testJSON, err := json.Marshal(invalid)
-		require.NoError(t, err)
-
-		prm = prmMatchRepository{}
-		err = json.Unmarshal(testJSON, &prm)
-		assert.Error(t, err, string(testJSON))
-	}
-
-	// Duplicated fields
-	for _, field := range []string{"type"} {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
-
-		testJSON := addExtraJSONMember(t, validJSON, field, tmp[field])
-
-		prm = prmMatchRepository{}
-		err = json.Unmarshal(testJSON, &prm)
-		assert.Error(t, err)
-	}
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyReferenceMatchFromJSON(validJSON)
+		},
+		invalidObjects: []mSI{
+			// Missing "type" field
+			{},
+			// Wrong "type" field
+			{"type": 1},
+			{"type": "this is invalid"},
+			// Extra fields
+			{
+				"type":    string(prmTypeMatchRepository),
+				"unknown": "foo",
+			},
+		},
+		duplicateFields: []string{"type"},
+	}.run(t)
 }
 
 // xNewPRMExactReference is like NewPRMExactReference, except it must not fail.
@@ -1268,68 +1093,29 @@ func TestNewPRMExactReference(t *testing.T) {
 }
 
 func TestPRMExactReferenceUnmarshalJSON(t *testing.T) {
-	var prm prmExactReference
-
-	testInvalidJSONInput(t, &prm)
-
-	// Start with a valid JSON.
-	validPRM, err := NewPRMExactReference("library/buxybox:latest")
-	require.NoError(t, err)
-	validJSON, err := json.Marshal(validPRM)
-	require.NoError(t, err)
-
-	// Success
-	prm = prmExactReference{}
-	err = json.Unmarshal(validJSON, &prm)
-	require.NoError(t, err)
-	assert.Equal(t, validPRM, &prm)
-
-	// newPolicyReferenceMatchFromJSON recognizes this type
-	_prm, err := newPolicyReferenceMatchFromJSON(validJSON)
-	require.NoError(t, err)
-	assert.Equal(t, validPRM, _prm)
-
-	// Various ways to corrupt the JSON
-	breakFns := []func(mSI){
-		// The "type" field is missing
-		func(v mSI) { delete(v, "type") },
-		// Wrong "type" field
-		func(v mSI) { v["type"] = 1 },
-		func(v mSI) { v["type"] = "this is invalid" },
-		// Extra top-level sub-object
-		func(v mSI) { v["unexpected"] = 1 },
-		// The "dockerReference" field is missing
-		func(v mSI) { delete(v, "dockerReference") },
-		// Invalid "dockerReference" field
-		func(v mSI) { v["dockerReference"] = 1 },
-	}
-	for _, fn := range breakFns {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
-
-		fn(tmp)
-
-		testJSON, err := json.Marshal(tmp)
-		require.NoError(t, err)
-
-		prm = prmExactReference{}
-		err = json.Unmarshal(testJSON, &prm)
-		assert.Error(t, err)
-	}
-
-	// Duplicated fields
-	for _, field := range []string{"type", "baseLayerIdentity"} {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
-
-		testJSON := addExtraJSONMember(t, validJSON, field, tmp[field])
-
-		prm = prmExactReference{}
-		err = json.Unmarshal(testJSON, &prm)
-		assert.Error(t, err)
-	}
+	policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prmExactReference{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRMExactReference("library/buxybox:latest")
+		},
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyReferenceMatchFromJSON(validJSON)
+		},
+		breakFns: []func(mSI){
+			// The "type" field is missing
+			func(v mSI) { delete(v, "type") },
+			// Wrong "type" field
+			func(v mSI) { v["type"] = 1 },
+			func(v mSI) { v["type"] = "this is invalid" },
+			// Extra top-level sub-object
+			func(v mSI) { v["unexpected"] = 1 },
+			// The "dockerReference" field is missing
+			func(v mSI) { delete(v, "dockerReference") },
+			// Invalid "dockerReference" field
+			func(v mSI) { v["dockerReference"] = 1 },
+		},
+		duplicateFields: []string{"type", "baseLayerIdentity"},
+	}.run(t)
 }
 
 // xNewPRMExactRepository is like NewPRMExactRepository, except it must not fail.
@@ -1363,66 +1149,27 @@ func TestNewPRMExactRepository(t *testing.T) {
 }
 
 func TestPRMExactRepositoryUnmarshalJSON(t *testing.T) {
-	var prm prmExactRepository
-
-	testInvalidJSONInput(t, &prm)
-
-	// Start with a valid JSON.
-	validPRM, err := NewPRMExactRepository("library/buxybox:latest")
-	require.NoError(t, err)
-	validJSON, err := json.Marshal(validPRM)
-	require.NoError(t, err)
-
-	// Success
-	prm = prmExactRepository{}
-	err = json.Unmarshal(validJSON, &prm)
-	require.NoError(t, err)
-	assert.Equal(t, validPRM, &prm)
-
-	// newPolicyReferenceMatchFromJSON recognizes this type
-	_prm, err := newPolicyReferenceMatchFromJSON(validJSON)
-	require.NoError(t, err)
-	assert.Equal(t, validPRM, _prm)
-
-	// Various ways to corrupt the JSON
-	breakFns := []func(mSI){
-		// The "type" field is missing
-		func(v mSI) { delete(v, "type") },
-		// Wrong "type" field
-		func(v mSI) { v["type"] = 1 },
-		func(v mSI) { v["type"] = "this is invalid" },
-		// Extra top-level sub-object
-		func(v mSI) { v["unexpected"] = 1 },
-		// The "dockerRepository" field is missing
-		func(v mSI) { delete(v, "dockerRepository") },
-		// Invalid "dockerRepository" field
-		func(v mSI) { v["dockerRepository"] = 1 },
-	}
-	for _, fn := range breakFns {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
-
-		fn(tmp)
-
-		testJSON, err := json.Marshal(tmp)
-		require.NoError(t, err)
-
-		prm = prmExactRepository{}
-		err = json.Unmarshal(testJSON, &prm)
-		assert.Error(t, err)
-	}
-
-	// Duplicated fields
-	for _, field := range []string{"type", "baseLayerIdentity"} {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
-
-		testJSON := addExtraJSONMember(t, validJSON, field, tmp[field])
-
-		prm = prmExactRepository{}
-		err = json.Unmarshal(testJSON, &prm)
-		assert.Error(t, err)
-	}
+	policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prmExactRepository{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRMExactRepository("library/buxybox:latest")
+		},
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyReferenceMatchFromJSON(validJSON)
+		},
+		breakFns: []func(mSI){
+			// The "type" field is missing
+			func(v mSI) { delete(v, "type") },
+			// Wrong "type" field
+			func(v mSI) { v["type"] = 1 },
+			func(v mSI) { v["type"] = "this is invalid" },
+			// Extra top-level sub-object
+			func(v mSI) { v["unexpected"] = 1 },
+			// The "dockerRepository" field is missing
+			func(v mSI) { delete(v, "dockerRepository") },
+			// Invalid "dockerRepository" field
+			func(v mSI) { v["dockerRepository"] = 1 },
+		},
+		duplicateFields: []string{"type", "baseLayerIdentity"},
+	}.run(t)
 }
