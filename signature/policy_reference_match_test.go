@@ -250,6 +250,46 @@ func testPossiblyInvalidImageAndSig(t *testing.T, prm PolicyReferenceMatch, imag
 	testImageAndSig(t, prm, imageRef, sigRef, result)
 }
 
+func TestMatchRepoDigestOrExactReferenceValues(t *testing.T) {
+	// prmMatchRepoDigestOrExact is a middle ground between prmMatchExact and prmMatchRepository:
+	// It accepts anything prmMatchExact accepts,…
+	for _, test := range prmExactMatchTestTable {
+		if test.result == true {
+			refA, errA := reference.ParseNormalizedNamed(test.refA)
+			refB, errB := reference.ParseNormalizedNamed(test.refB)
+			if errA == nil && errB == nil {
+				res1 := matchRepoDigestOrExactReferenceValues(refA, refB)
+				assert.Equal(t, test.result, res1)
+				res2 := matchRepoDigestOrExactReferenceValues(refB, refA)
+				assert.Equal(t, test.result, res2)
+			}
+		}
+	}
+	// … and it rejects everything prmMatchRepository rejects.
+	for _, test := range prmRepositoryMatchTestTable {
+		if test.result == false {
+			refA, errA := reference.ParseNormalizedNamed(test.refA)
+			refB, errB := reference.ParseNormalizedNamed(test.refB)
+			if errA == nil && errB == nil {
+				res1 := matchRepoDigestOrExactReferenceValues(refA, refB)
+				assert.Equal(t, test.result, res1)
+				res2 := matchRepoDigestOrExactReferenceValues(refB, refA)
+				assert.Equal(t, test.result, res2)
+			}
+		}
+	}
+
+	// The other cases, possibly asymmetrical:
+	for _, test := range matchRepoDigestOrExactTestTable {
+		imageRef, err := reference.ParseNormalizedNamed(test.imageRef)
+		require.NoError(t, err)
+		sigRef, err := reference.ParseNormalizedNamed(test.sigRef)
+		require.NoError(t, err)
+		res := matchRepoDigestOrExactReferenceValues(imageRef, sigRef)
+		assert.Equal(t, test.result, res)
+	}
+}
+
 func TestPRMMatchExactMatchesDockerReference(t *testing.T) {
 	prm := NewPRMMatchExact()
 	for _, test := range prmExactMatchTestTable {
@@ -261,7 +301,7 @@ func TestPRMMatchExactMatchesDockerReference(t *testing.T) {
 	assert.False(t, res, `unidentified vs. ""`)
 }
 
-func TestPMMMatchRepoDigestOrExactMatchesDockerReference(t *testing.T) {
+func TestPRMMatchRepoDigestOrExactMatchesDockerReference(t *testing.T) {
 	prm := NewPRMMatchRepoDigestOrExact()
 
 	// prmMatchRepoDigestOrExact is a middle ground between prmMatchExact and prmMatchRepository:

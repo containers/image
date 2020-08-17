@@ -36,12 +36,9 @@ func (prm *prmMatchExact) matchesDockerReference(image types.UnparsedImage, sign
 	return signature.String() == intended.String()
 }
 
-func (prm *prmMatchRepoDigestOrExact) matchesDockerReference(image types.UnparsedImage, signatureDockerReference string) bool {
-	intended, signature, err := parseImageAndDockerReference(image, signatureDockerReference)
-	if err != nil {
-		return false
-	}
-
+// matchRepoDigestOrExactReferenceValues implements prmMatchRepoDigestOrExact.matchesDockerReference
+// using reference.Named values.
+func matchRepoDigestOrExactReferenceValues(intended, signature reference.Named) bool {
 	// Do not add default tags: image.Reference().DockerReference() should contain it already, and signatureDockerReference should be exact; so, verify that now.
 	if reference.IsNameOnly(signature) {
 		return false
@@ -57,6 +54,13 @@ func (prm *prmMatchRepoDigestOrExact) matchesDockerReference(image types.Unparse
 	default: // !reference.IsNameOnly(intended)
 		return false
 	}
+}
+func (prm *prmMatchRepoDigestOrExact) matchesDockerReference(image types.UnparsedImage, signatureDockerReference string) bool {
+	intended, signature, err := parseImageAndDockerReference(image, signatureDockerReference)
+	if err != nil {
+		return false
+	}
+	return matchRepoDigestOrExactReferenceValues(intended, signature)
 }
 
 func (prm *prmMatchRepository) matchesDockerReference(image types.UnparsedImage, signatureDockerReference string) bool {
