@@ -53,20 +53,36 @@ func TestRegistriesDirPath(t *testing.T) {
 	const nondefaultPath = "/this/is/not/the/default/registries.d"
 	const variableReference = "$HOME"
 	const rootPrefix = "/root/prefix"
-
+	oldHomeEnv, hasHomeEnv := os.LookupEnv("HOME")
+	tempHome, err := ioutil.TempDir("", "tempHome")
+	require.NoError(t, err)
+	err = os.Setenv("HOME", tempHome)
+	require.NoError(t, err)
+	defer func() {
+		os.RemoveAll(tempHome)
+		if hasHomeEnv {
+			os.Setenv("HOME", oldHomeEnv)
+		} else {
+			os.Unsetenv("HOME")
+		}
+	}()
+	var userRegistriesDir = filepath.FromSlash(".config/containers/registries.d")
+	userRegistriesDirPath := filepath.Join(tempHome, userRegistriesDir)
 	for _, c := range []struct {
-		sys      *types.SystemContext
-		expected string
+		sys             *types.SystemContext
+		userFilePresent bool
+		expected        string
 	}{
 		// The common case
-		{nil, systemRegistriesDirPath},
+		{nil, false, systemRegistriesDirPath},
 		// There is a context, but it does not override the path.
-		{&types.SystemContext{}, systemRegistriesDirPath},
+		{&types.SystemContext{}, false, systemRegistriesDirPath},
 		// Path overridden
-		{&types.SystemContext{RegistriesDirPath: nondefaultPath}, nondefaultPath},
+		{&types.SystemContext{RegistriesDirPath: nondefaultPath}, false, nondefaultPath},
 		// Root overridden
 		{
 			&types.SystemContext{RootForImplicitAbsolutePaths: rootPrefix},
+			false,
 			filepath.Join(rootPrefix, systemRegistriesDirPath),
 		},
 		// Root and path overrides present simultaneously,
@@ -75,11 +91,32 @@ func TestRegistriesDirPath(t *testing.T) {
 				RootForImplicitAbsolutePaths: rootPrefix,
 				RegistriesDirPath:            nondefaultPath,
 			},
+			false,
+			nondefaultPath,
+		},
+		// User registries.d present, not overridden
+		{&types.SystemContext{}, true, userRegistriesDirPath},
+		// Context and user User registries.d preset simultaneously
+		{&types.SystemContext{RegistriesDirPath: nondefaultPath}, true, nondefaultPath},
+		// Root and user registries.d overrides present simultaneously,
+		{
+			&types.SystemContext{
+				RootForImplicitAbsolutePaths: rootPrefix,
+				RegistriesDirPath:            nondefaultPath,
+			},
+			true,
 			nondefaultPath,
 		},
 		// No environment expansion happens in the overridden paths
-		{&types.SystemContext{RegistriesDirPath: variableReference}, variableReference},
+		{&types.SystemContext{RegistriesDirPath: variableReference}, false, variableReference},
 	} {
+		if c.userFilePresent {
+			err := os.MkdirAll(userRegistriesDirPath, 0700)
+			require.NoError(t, err)
+		} else {
+			err := os.RemoveAll(userRegistriesDirPath)
+			require.NoError(t, err)
+		}
 		path := registriesDirPath(c.sys)
 		assert.Equal(t, c.expected, path)
 	}

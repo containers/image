@@ -12,7 +12,7 @@ The registries configuration directory contains configuration for various regist
 so that the configuration does not have to be provided in command-line options over and over for every command,
 and so that it can be shared by all users of containers/image.
 
-By default (unless overridden at compile-time), the registries configuration directory is `/etc/containers/registries.d`;
+By default, the registries configuration directory is `$HOME/.config/containers/registries.d` if it exists, otherwise `/etc/containers/registries.d` (unless overridden at compile-time);
 applications may allow using a different directory instead.
 
 ## Directory Structure
