@@ -69,6 +69,13 @@ var policyFixtureContents = &Policy{
 	},
 }
 
+func TestInvalidPolicyFormatError(t *testing.T) {
+	// A stupid test just to keep code coverage
+	s := "test"
+	err := InvalidPolicyFormatError(s)
+	assert.Equal(t, s, err.Error())
+}
+
 func TestDefaultPolicy(t *testing.T) {
 	// We can't test the actual systemDefaultPolicyPath, so override.
 	// TestDefaultPolicyPath below tests that we handle the overrides and defaults
@@ -238,13 +245,6 @@ func addExtraJSONMember(t *testing.T, encoded []byte, name string, extra interfa
 	preservedLen := len(encoded) - 1
 
 	return bytes.Join([][]byte{encoded[:preservedLen], []byte(`,"`), []byte(name), []byte(`":`), extraJSON, []byte("}")}, nil)
-}
-
-func TestInvalidPolicyFormatError(t *testing.T) {
-	// A stupid test just to keep code coverage
-	s := "test"
-	err := InvalidPolicyFormatError(s)
-	assert.Equal(t, s, err.Error())
 }
 
 // Return the result of modifying validJSON with fn and unmarshaling it into *p
