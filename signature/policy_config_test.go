@@ -220,6 +220,22 @@ func TestNewPolicyFromBytes(t *testing.T) {
 
 // FIXME? There is quite a bit of duplication below. Factor some of it out?
 
+// jsonUnmarshalFromObject is like json.Unmarshal(), but the input is an arbitrary object
+// that is JSON-marshalled first (as a convenient way to create an invalid/unusual JSON input)
+func jsonUnmarshalFromObject(t *testing.T, object interface{}, dest interface{}) error {
+	testJSON, err := json.Marshal(object)
+	require.NoError(t, err)
+	return json.Unmarshal(testJSON, dest)
+}
+
+// assertJSONUnmarshalFromObjectFails checks that unmarshaling the JSON-marshaled version
+// of an arbitrary object (as a convenient way to create an invalid/unusual JSON input) into
+// into dest fails.
+func assertJSONUnmarshalFromObjectFails(t *testing.T, object interface{}, dest interface{}) {
+	err := jsonUnmarshalFromObject(t, object, dest)
+	assert.Error(t, err)
+}
+
 // testInvalidJSONInput verifies that obviously invalid input is rejected for dest.
 func testInvalidJSONInput(t *testing.T, dest json.Unmarshaler) {
 	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
@@ -288,12 +304,8 @@ func (d policyJSONUmarshallerTests) run(t *testing.T) {
 
 	// Invalid JSON objects
 	for _, invalid := range d.invalidObjects {
-		testJSON, err := json.Marshal(invalid)
-		require.NoError(t, err)
-
 		dest := d.newDest()
-		err = json.Unmarshal(testJSON, dest)
-		assert.Error(t, err, string(testJSON))
+		assertJSONUnmarshalFromObjectFails(t, invalid, dest)
 	}
 	// Various ways to corrupt the JSON
 	for _, fn := range d.breakFns {
@@ -303,12 +315,8 @@ func (d policyJSONUmarshallerTests) run(t *testing.T) {
 
 		fn(tmp)
 
-		testJSON, err := json.Marshal(tmp)
-		require.NoError(t, err)
-
 		dest := d.newDest()
-		err = json.Unmarshal(testJSON, dest)
-		assert.Error(t, err)
+		assertJSONUnmarshalFromObjectFails(t, tmp, dest)
 	}
 
 	// Duplicated fields
@@ -407,31 +415,23 @@ func TestPolicyUnmarshalJSON(t *testing.T) {
 
 		fn(tmp)
 
-		testJSON, err := json.Marshal(tmp)
-		require.NoError(t, err)
-
 		p := Policy{}
-		err = json.Unmarshal(testJSON, &p)
-		require.NoError(t, err)
+		err = jsonUnmarshalFromObject(t, tmp, &p)
+		assert.NoError(t, err)
 	}
 }
 
 func TestPolicyTransportScopesUnmarshalJSON(t *testing.T) {
-	var pts PolicyTransportScopes
-
 	// Start with a valid JSON.
 	validPTS := PolicyTransportScopes{
 		"": []PolicyRequirement{
 			xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("global"), NewPRMMatchRepoDigestOrExact()),
 		},
 	}
-	validJSON, err := json.Marshal(validPTS)
-	require.NoError(t, err)
 
 	// Nothing can be unmarshaled directly into PolicyTransportScopes
-	pts = PolicyTransportScopes{}
-	err = json.Unmarshal(validJSON, &pts)
-	assert.Error(t, err)
+	pts := PolicyTransportScopes{}
+	assertJSONUnmarshalFromObjectFails(t, validPTS, &pts)
 }
 
 // Return the result of modifying validJSON with fn and unmarshaling it into *pts
@@ -444,15 +444,12 @@ func tryUnmarshalModifiedPTS(t *testing.T, pts *PolicyTransportScopes, transport
 
 	modifyFn(tmp)
 
-	testJSON, err := json.Marshal(tmp)
-	require.NoError(t, err)
-
 	*pts = PolicyTransportScopes{}
 	dest := policyTransportScopesWithTransport{
 		transport: transport,
 		dest:      pts,
 	}
-	return json.Unmarshal(testJSON, &dest)
+	return jsonUnmarshalFromObject(t, tmp, &dest)
 }
 
 func TestPolicyTransportScopesWithTransportUnmarshalJSON(t *testing.T) {
@@ -572,12 +569,8 @@ func TestPolicyRequirementsUnmarshalJSON(t *testing.T) {
 			KeyType:  "this is invalid",
 		}},
 	} {
-		testJSON, err := json.Marshal(invalid)
-		require.NoError(t, err)
-
 		reqs := PolicyRequirements{}
-		err = json.Unmarshal(testJSON, &reqs)
-		assert.Error(t, err, string(testJSON))
+		assertJSONUnmarshalFromObjectFails(t, invalid, &reqs)
 	}
 }
 
@@ -744,11 +737,8 @@ func tryUnmarshalModifiedSignedBy(t *testing.T, pr *prSignedBy, validJSON []byte
 
 	modifyFn(tmp)
 
-	testJSON, err := json.Marshal(tmp)
-	require.NoError(t, err)
-
 	*pr = prSignedBy{}
-	return json.Unmarshal(testJSON, &pr)
+	return jsonUnmarshalFromObject(t, tmp, &pr)
 }
 
 func TestPRSignedByUnmarshalJSON(t *testing.T) {
