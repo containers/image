@@ -30,6 +30,9 @@ var (
 	// ErrMoreThanOneImage is an error returned when the manifest includes
 	// more than one image and the user should choose which one to use.
 	ErrMoreThanOneImage = errors.New("more than one image in oci, choose an image")
+
+	// ErrNotFoundDescriptor is an error when the reference cannot found in the manifests
+	ErrNotFoundDescriptor = errors.New("no descriptor found for the reference")
 )
 
 type ociTransport struct{}
@@ -209,7 +212,7 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 		}
 	}
 	if d == nil {
-		return imgspecv1.Descriptor{}, fmt.Errorf("no descriptor found for reference %q", ref.image)
+		return imgspecv1.Descriptor{}, errors.Wrap(ErrNotFoundDescriptor, ref.image)
 	}
 	return *d, nil
 }
