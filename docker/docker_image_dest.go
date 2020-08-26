@@ -78,12 +78,12 @@ func (d *dockerImageDestination) SupportsSignatures(ctx context.Context) error {
 		return err
 	}
 	switch {
-	case d.c.signatureBase != nil:
-		return nil
 	case d.c.supportsSignatures:
 		return nil
+	case d.c.signatureBase != nil:
+		return nil
 	default:
-		return errors.Errorf("X-Registry-Supports-Signatures extension not supported, and lookaside is not configured")
+		return errors.Errorf("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
 	}
 }
 
@@ -479,12 +479,12 @@ func (d *dockerImageDestination) PutSignatures(ctx context.Context, signatures [
 		return err
 	}
 	switch {
-	case d.c.signatureBase != nil:
-		return d.putSignaturesToLookaside(signatures, *instanceDigest)
 	case d.c.supportsSignatures:
 		return d.putSignaturesToAPIExtension(ctx, signatures, *instanceDigest)
+	case d.c.signatureBase != nil:
+		return d.putSignaturesToLookaside(signatures, *instanceDigest)
 	default:
-		return errors.Errorf("X-Registry-Supports-Signatures extension not supported, and lookaside is not configured")
+		return errors.Errorf("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
 	}
 }
 
@@ -502,9 +502,6 @@ func (d *dockerImageDestination) putSignaturesToLookaside(signatures [][]byte, m
 	// NOTE: Keep this in sync with docs/signature-protocols.md!
 	for i, signature := range signatures {
 		url := signatureStorageURL(d.c.signatureBase, manifestDigest, i)
-		if url == nil {
-			return errors.Errorf("Internal error: signatureStorageURL with non-nil base returned nil")
-		}
 		err := d.putOneSignature(url, signature)
 		if err != nil {
 			return err
@@ -517,9 +514,6 @@ func (d *dockerImageDestination) putSignaturesToLookaside(signatures [][]byte, m
 	// is sufficient.
 	for i := len(signatures); ; i++ {
 		url := signatureStorageURL(d.c.signatureBase, manifestDigest, i)
-		if url == nil {
-			return errors.Errorf("Internal error: signatureStorageURL with non-nil base returned nil")
-		}
 		missing, err := d.c.deleteOneSignature(url)
 		if err != nil {
 			return err

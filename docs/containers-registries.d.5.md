@@ -61,6 +61,11 @@ more general scopes is ignored.  For example, if _any_ configuration exists for
 `docker.io/library/busybox`, the configuration for `docker.io` is ignored
 (even if some element of the configuration is defined for `docker.io` and not for `docker.io/library/busybox`).
 
+### Built-in Defaults
+
+If no `docker` section can be found for the container image, and no `default-docker` section is configured,
+the default directory, `/var/lib/containers/sigstore` for root and `$HOME/.local/share/containers/sigstore` for unprivileged user,  will be used for reading and writing signatures.
+
 ## Individual Configuration Sections
 
 A single configuration section is selected for a container image using the process
@@ -76,6 +81,7 @@ described above.  The configuration section is a YAML mapping, with the followin
 
    This key is optional; if it is missing, no signature storage is defined (no signatures
    are download along with images, adding new signatures is possible only if `sigstore-staging` is defined).
+
 
 ## Examples
 

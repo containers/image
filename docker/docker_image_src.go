@@ -297,12 +297,12 @@ func (s *dockerImageSource) GetSignatures(ctx context.Context, instanceDigest *d
 		return nil, err
 	}
 	switch {
-	case s.c.signatureBase != nil:
-		return s.getSignaturesFromLookaside(ctx, instanceDigest)
 	case s.c.supportsSignatures:
 		return s.getSignaturesFromAPIExtension(ctx, instanceDigest)
+	case s.c.signatureBase != nil:
+		return s.getSignaturesFromLookaside(ctx, instanceDigest)
 	default:
-		return [][]byte{}, nil
+		return nil, errors.Errorf("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
 	}
 }
 
@@ -336,9 +336,6 @@ func (s *dockerImageSource) getSignaturesFromLookaside(ctx context.Context, inst
 	signatures := [][]byte{}
 	for i := 0; ; i++ {
 		url := signatureStorageURL(s.c.signatureBase, manifestDigest, i)
-		if url == nil {
-			return nil, errors.Errorf("Internal error: signatureStorageURL with non-nil base returned nil")
-		}
 		signature, missing, err := s.getOneSignature(ctx, url)
 		if err != nil {
 			return nil, err
@@ -474,24 +471,19 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 		return errors.Errorf("Failed to delete %v: %s (%v)", deletePath, string(body), delete.Status)
 	}
 
-	if c.signatureBase != nil {
-		manifestDigest, err := manifest.Digest(manifestBody)
+	manifestDigest, err := manifest.Digest(manifestBody)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; ; i++ {
+		url := signatureStorageURL(c.signatureBase, manifestDigest, i)
+		missing, err := c.deleteOneSignature(url)
 		if err != nil {
 			return err
 		}
-
-		for i := 0; ; i++ {
-			url := signatureStorageURL(c.signatureBase, manifestDigest, i)
-			if url == nil {
-				return errors.Errorf("Internal error: signatureStorageURL with non-nil base returned nil")
-			}
-			missing, err := c.deleteOneSignature(url)
-			if err != nil {
-				return err
-			}
-			if missing {
-				break
-			}
+		if missing {
+			break
 		}
 	}
 
