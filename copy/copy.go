@@ -194,6 +194,10 @@ type Options struct {
 	OciDecryptConfig *encconfig.DecryptConfig
 	// MaxParallelDownloads indicates the maximum layers to pull at the same time.  A reasonable default is used if this is left as 0.
 	MaxParallelDownloads uint
+	// When OptimizeDestinationImageAlreadyExists is set, optimize the copy assuming that the destination image already
+	// exists (and is equivalent). Making the eventual (no-op) copy more performant for this case. Enabling the option
+	// is slightly pessimistic if the destination image doesn't exist, or is not equivalent.
+	OptimizeDestinationImageAlreadyExists bool
 }
 
 // validateImageListSelection returns an error if the passed-in value is not one that we recognize as a valid ImageListSelection value
@@ -359,6 +363,45 @@ func supportsMultipleImages(dest types.ImageDestination) bool {
 		}
 	}
 	return false
+}
+
+// compareImageDestinationManifestEqual compares the `src` and `dest` image manifests (reading the manifest from the
+// (possibly remote) destination). Returning true and the destination's manifest, type and digest if they compare equal.
+func compareImageDestinationManifestEqual(ctx context.Context, options *Options, src types.Image, targetInstance *digest.Digest, dest types.ImageDestination) (bool, []byte, string, digest.Digest, error) {
+	srcManifest, _, err := src.Manifest(ctx)
+	if err != nil {
+		return false, nil, "", "", errors.Wrapf(err, "Error reading manifest from image")
+	}
+
+	srcManifestDigest, err := manifest.Digest(srcManifest)
+	if err != nil {
+		return false, nil, "", "", errors.Wrapf(err, "Error calculating manifest digest")
+	}
+
+	destImageSource, err := dest.Reference().NewImageSource(ctx, options.DestinationCtx)
+	if err != nil {
+		logrus.Debugf("Unable to create destination image %s source: %v", dest.Reference(), err)
+		return false, nil, "", "", nil
+	}
+
+	destManifest, destManifestType, err := destImageSource.GetManifest(ctx, targetInstance)
+	if err != nil {
+		logrus.Debugf("Unable to get destination image %s/%s manifest: %v", destImageSource, targetInstance, err)
+		return false, nil, "", "", nil
+	}
+
+	destManifestDigest, err := manifest.Digest(destManifest)
+	if err != nil {
+		return false, nil, "", "", errors.Wrapf(err, "Error calculating manifest digest")
+	}
+
+	logrus.Debugf("Comparing source and destination manifest digests: %v vs. %v", srcManifestDigest, destManifestDigest)
+	if srcManifestDigest != destManifestDigest {
+		return false, nil, "", "", nil
+	}
+
+	// Destination and source manifests, types and digests should all be equivalent
+	return true, destManifest, destManifestType, destManifestDigest, nil
 }
 
 // copyMultipleImages copies some or all of an image list's instances, using
@@ -646,6 +689,26 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 	// If encrypted and decryption keys provided, we should try to decrypt
 	ic.diffIDsAreNeeded = ic.diffIDsAreNeeded || (isEncrypted(src) && ic.c.ociDecryptConfig != nil) || ic.c.ociEncryptConfig != nil
 
+	// If enabled, fetch and compare the destination's manifest. And as an optimization skip updating the destination iff equal
+	if options.OptimizeDestinationImageAlreadyExists {
+		shouldUpdateSigs := len(sigs) > 0 || options.SignBy != "" // TODO: Consider allowing signatures updates only and skipping the image's layers/manifest copy if possible
+		noPendingManifestUpdates := ic.noPendingManifestUpdates()
+
+		logrus.Debugf("Checking if we can skip copying: has signatures=%t, OCI encryption=%t, no manifest updates=%t", shouldUpdateSigs, destRequiresOciEncryption, noPendingManifestUpdates)
+		if !shouldUpdateSigs && !destRequiresOciEncryption && noPendingManifestUpdates {
+			isSrcDestManifestEqual, retManifest, retManifestType, retManifestDigest, err := compareImageDestinationManifestEqual(ctx, options, src, targetInstance, c.dest)
+			if err != nil {
+				logrus.Warnf("Failed to compare destination image manifest: %v", err)
+				return nil, "", "", err
+			}
+
+			if isSrcDestManifestEqual {
+				c.Printf("Skipping: image already present at destination\n")
+				return retManifest, retManifestType, retManifestDigest, nil
+			}
+		}
+	}
+
 	if err := ic.copyLayers(ctx); err != nil {
 		return nil, "", "", err
 	}
@@ -784,6 +847,10 @@ func (ic *imageCopier) updateEmbeddedDockerReference() error {
 	return nil
 }
 
+func (ic *imageCopier) noPendingManifestUpdates() bool {
+	return reflect.DeepEqual(*ic.manifestUpdates, types.ManifestUpdateOptions{InformationOnly: ic.manifestUpdates.InformationOnly})
+}
+
 // isTTY returns true if the io.Writer is a file and a tty.
 func isTTY(w io.Writer) bool {
 	if f, ok := w.(*os.File); ok {
@@ -904,6 +971,8 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		diffIDs[i] = cld.diffID
 	}
 
+	// WARNING: If you are adding new reasons to change ic.manifestUpdates, also update the
+	// OptimizeDestinationImageAlreadyExists short-circuit conditions
 	ic.manifestUpdates.InformationOnly.LayerInfos = destInfos
 	if ic.diffIDsAreNeeded {
 		ic.manifestUpdates.InformationOnly.LayerDiffIDs = diffIDs
@@ -932,7 +1001,7 @@ func layerDigestsDiffer(a, b []types.BlobInfo) bool {
 // and its digest.
 func (ic *imageCopier) copyUpdatedConfigAndManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, digest.Digest, error) {
 	pendingImage := ic.src
-	if !reflect.DeepEqual(*ic.manifestUpdates, types.ManifestUpdateOptions{InformationOnly: ic.manifestUpdates.InformationOnly}) {
+	if !ic.noPendingManifestUpdates() {
 		if !ic.canModifyManifest {
 			return nil, "", errors.Errorf("Internal error: copy needs an updated manifest but that was known to be forbidden")
 		}
@@ -1283,6 +1352,8 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 	}
 
 	// === Deal with layer compression/decompression if necessary
+	// WARNING: If you are adding new reasons to change the blob, update also the OptimizeDestinationImageAlreadyExists
+	// short-circuit conditions
 	var inputInfo types.BlobInfo
 	var compressionOperation types.LayerCompression
 	uploadCompressionFormat := &c.compressionFormat
