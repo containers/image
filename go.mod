@@ -18,7 +18,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/imdario/mergo v0.3.11
-	github.com/klauspost/compress v1.10.11
+	github.com/klauspost/compress v1.11.0
 	github.com/klauspost/pgzip v1.2.4
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mtrmac/gpgme v0.1.2
