@@ -196,7 +196,7 @@ func (ns registryNamespace) signatureTopLevel(write bool) string {
 	return ""
 }
 
-// signatureStorageURL returns an URL usable for acessing signature index in base with known manifestDigest, or nil if not applicable.
+// signatureStorageURL returns an URL usable for accessing signature index in base with known manifestDigest, or nil if not applicable.
 // Returns nil iff base == nil.
 // NOTE: Keep this in sync with docs/signature-protocols.md!
 func signatureStorageURL(base signatureStorageBase, manifestDigest digest.Digest, index int) *url.URL {

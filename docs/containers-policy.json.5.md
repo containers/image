@@ -177,7 +177,7 @@ One of the following alternatives are supported:
   ```json
   {"type":"matchRepoDigestOrExact"}
   ```
-- The identity in the signature must be in the same repository as the image identity.  This is useful e.g. to pull an image using the `:latest` tag when the image is signed with a tag specifing an exact image version.
+- The identity in the signature must be in the same repository as the image identity.  This is useful e.g. to pull an image using the `:latest` tag when the image is signed with a tag specifying an exact image version.
 
   ```json
   {"type":"matchRepository"}

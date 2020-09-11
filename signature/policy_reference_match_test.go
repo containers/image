@@ -237,7 +237,7 @@ func TestPMMMatchRepoDigestOrExactMatchesDockerReference(t *testing.T) {
 		}
 	}
 
-	// The other cases, possibly assymetrical:
+	// The other cases, possibly asymmetrical:
 	for _, test := range []struct {
 		imageRef, sigRef string
 		result           bool

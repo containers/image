@@ -53,7 +53,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 	// contain the image, it will be used for all future pull actions.  Always try the
 	// non-mirror original location last; this both transparently handles the case
 	// of no mirrors configured, and ensures we return the error encountered when
-	// acessing the upstream location if all endpoints fail.
+	// accessing the upstream location if all endpoints fail.
 	pullSources, err := registry.PullSourcesFromReference(ref.ref)
 	if err != nil {
 		return nil, err

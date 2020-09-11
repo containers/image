@@ -117,7 +117,7 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 		}
 	}
 
-	// TODO(keyring): if we ever reenable the keyring support, we had to
+	// TODO(keyring): if we ever re-enable the keyring support, we had to
 	// query all credentials from the keyring here.
 
 	return authConfigs, nil
@@ -245,7 +245,7 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 	})
 }
 
-// getPathToAuth gets the path of the auth.json file used for reading and writting credentials
+// getPathToAuth gets the path of the auth.json file used for reading and writing credentials
 // returns the path, and a bool specifies whether the file is in legacy format
 func getPathToAuth(sys *types.SystemContext) (string, bool, error) {
 	if sys != nil {

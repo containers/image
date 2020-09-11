@@ -496,7 +496,7 @@ func assertSARRejected(t *testing.T, sar signatureAcceptanceResult, parsedSig *S
 	assert.Error(t, err)
 }
 
-// assertSARRejectedPolicyRequiremnt verifies that isSignatureAuthorAccepted returns a consistent sarRejected resul,
+// assertSARRejectedPolicyRequiremnt verifies that isSignatureAuthorAccepted returns a consistent sarRejected result,
 // and that the returned error is a PolicyRequirementError..
 func assertSARRejectedPolicyRequirement(t *testing.T, sar signatureAcceptanceResult, parsedSig *Signature, err error) {
 	assertSARRejected(t, sar, parsedSig, err)

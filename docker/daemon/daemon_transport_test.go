@@ -32,7 +32,7 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 		"registry.example.com/ns/stream",
 		"registry.example.com/ns",
 		"registry.example.com",
-		sha256digestHex, // Accept also unqualified hexdigest valies, they are in principle possible host names.
+		sha256digestHex, // Accept also unqualified hexdigest values, they are in principle possible host names.
 	} {
 		err := Transport.ValidatePolicyConfigurationScope(scope)
 		assert.NoError(t, err, scope)

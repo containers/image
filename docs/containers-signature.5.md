@@ -224,7 +224,7 @@ The contents of this string is not defined in detail; however each implementatio
 Consumers of container signatures MAY recognize specific values or sets of values of `optional.creator`
 (perhaps augmented with `optional.timestamp`),
 and MAY change their processing of the signature based on these values
-(usually to acommodate violations of this specification in past versions of the signing software which cannot be fixed retroactively),
+(usually to accommodate violations of this specification in past versions of the signing software which cannot be fixed retroactively),
 as long as the semantics of the invalid document, as created by such an implementation, is clear.
 
 If consumers of signatures do change their behavior based on the `optional.creator` value,
