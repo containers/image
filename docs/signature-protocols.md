@@ -48,7 +48,7 @@ where _digest-algo_`:`_digest-value_ is a manifest digest usable for referencing
 the signature storage is always disambiguated using digest references).
 Note that in the URLs used for signatures,
 _digest-algo_ and _digest-value_ are separated using the `=` character,
-not `:` like when acessing the manifest using the docker/distribution API.
+not `:` like when accessing the manifest using the docker/distribution API.
 
 Within the URL, _index_ is a decimal integer (in the canonical form), starting with 1.
 Signatures are stored at URLs with successive _index_ values; to read all of them, start with _index_=1,

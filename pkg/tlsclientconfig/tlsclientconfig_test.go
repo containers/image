@@ -93,7 +93,7 @@ func TestSetupCertificates(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, tlsc.RootCAs)
 
-	// Misssing key file
+	// Missing key file
 	tlsc = tls.Config{}
 	err = SetupCertificates("testdata/missing-key", &tlsc)
 	assert.Error(t, err)
