@@ -200,18 +200,29 @@ func testImageAndSig(t *testing.T, prm PolicyReferenceMatch, imageRef, sigRef st
 	// This assumes that all ways to obtain a reference.Named perform equivalent validation,
 	// and therefore values refused by reference.ParseNormalizedNamed can not happen in practice.
 	parsedImageRef, err := reference.ParseNormalizedNamed(imageRef)
+	require.NoError(t, err)
+	res := prm.matchesDockerReference(refImageMock{parsedImageRef}, sigRef)
+	assert.Equal(t, result, res, fmt.Sprintf("%s vs. %s", imageRef, sigRef))
+}
+
+// testPossiblyInvalidImageAndSig is a variant of testImageAndSig
+// that does not fail if the imageRef is invalid (which should never happen in practice,
+// but makes testing of symmetrical properties using shared tables easier)
+func testPossiblyInvalidImageAndSig(t *testing.T, prm PolicyReferenceMatch, imageRef, sigRef string, result bool) {
+	// This assumes that all ways to obtain a reference.Named perform equivalent validation,
+	// and therefore values refused by reference.ParseNormalizedNamed can not happen in practice.
+	_, err := reference.ParseNormalizedNamed(imageRef)
 	if err != nil {
 		return
 	}
-	res := prm.matchesDockerReference(refImageMock{parsedImageRef}, sigRef)
-	assert.Equal(t, result, res, fmt.Sprintf("%s vs. %s", imageRef, sigRef))
+	testImageAndSig(t, prm, imageRef, sigRef, result)
 }
 
 func TestPRMMatchExactMatchesDockerReference(t *testing.T) {
 	prm := NewPRMMatchExact()
 	for _, test := range prmExactMatchTestTable {
-		testImageAndSig(t, prm, test.refA, test.refB, test.result)
-		testImageAndSig(t, prm, test.refB, test.refA, test.result)
+		testPossiblyInvalidImageAndSig(t, prm, test.refA, test.refB, test.result)
+		testPossiblyInvalidImageAndSig(t, prm, test.refB, test.refA, test.result)
 	}
 	// Even if they are signed with an empty string as a reference, unidentified images are rejected.
 	res := prm.matchesDockerReference(refImageMock{nil}, "")
@@ -225,15 +236,15 @@ func TestPMMMatchRepoDigestOrExactMatchesDockerReference(t *testing.T) {
 	// It accepts anything prmMatchExact accepts,…
 	for _, test := range prmExactMatchTestTable {
 		if test.result == true {
-			testImageAndSig(t, prm, test.refA, test.refB, test.result)
-			testImageAndSig(t, prm, test.refB, test.refA, test.result)
+			testPossiblyInvalidImageAndSig(t, prm, test.refA, test.refB, test.result)
+			testPossiblyInvalidImageAndSig(t, prm, test.refB, test.refA, test.result)
 		}
 	}
 	// … and it rejects everything prmMatchRepository rejects.
 	for _, test := range prmRepositoryMatchTestTable {
 		if test.result == false {
-			testImageAndSig(t, prm, test.refA, test.refB, test.result)
-			testImageAndSig(t, prm, test.refB, test.refA, test.result)
+			testPossiblyInvalidImageAndSig(t, prm, test.refA, test.refB, test.result)
+			testPossiblyInvalidImageAndSig(t, prm, test.refB, test.refA, test.result)
 		}
 	}
 
@@ -275,8 +286,8 @@ func TestPMMMatchRepoDigestOrExactMatchesDockerReference(t *testing.T) {
 func TestPRMMatchRepositoryMatchesDockerReference(t *testing.T) {
 	prm := NewPRMMatchRepository()
 	for _, test := range prmRepositoryMatchTestTable {
-		testImageAndSig(t, prm, test.refA, test.refB, test.result)
-		testImageAndSig(t, prm, test.refB, test.refA, test.result)
+		testPossiblyInvalidImageAndSig(t, prm, test.refA, test.refB, test.result)
+		testPossiblyInvalidImageAndSig(t, prm, test.refB, test.refA, test.result)
 	}
 	// Even if they are signed with an empty string as a reference, unidentified images are rejected.
 	res := prm.matchesDockerReference(refImageMock{nil}, "")
