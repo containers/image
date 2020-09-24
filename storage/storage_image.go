@@ -409,7 +409,10 @@ func (s *storageImageDestination) HasBlob(ctx context.Context, blobinfo types.Bl
 	if err != nil && errors.Cause(err) != storage.ErrLayerUnknown {
 		return false, -1, errors.Wrapf(err, `Error looking for compressed layers with digest %q`, blobinfo.Digest)
 	}
-	if len(layers) > 0 {
+	// If we got a match, check the compressed digest: if it is not equal, we have a layer which matches the searched
+	// one only after decompression (this can happen only due to a bug in earlier c/storage versions).
+	// So, the CompressedSize value may not match blob info.Digest, and we can’t use it.
+	if len(layers) > 0 && blobinfo.Digest == layers[0].CompressedDigest {
 		// Record the uncompressed value so that we can use it to calculate layer IDs.
 		s.blobDiffIDs[blobinfo.Digest] = layers[0].UncompressedDigest
 		return true, layers[0].CompressedSize, nil
