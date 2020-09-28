@@ -82,7 +82,7 @@ fmt:
 
 validate: lint
 	@go vet $(PACKAGES)
-	@test -z "$$(gofmt -s -l . | grep -ve '^vendor' | tee /dev/stderr)"
+	@test -z "$$(gofmt -s -l . | grep -ve '^vendor' | grep -ve docker/tarfile/src.go | tee /dev/stderr)"
 
 lint:
 	@out="$$(golint $(PACKAGES))"; \
