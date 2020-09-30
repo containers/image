@@ -19,4 +19,4 @@ subjectAltName=DNS:localhost,email:b@b.com
 O=Acme Co
 EOF
 serial=$(dd if=/dev/random bs=1 count=16 status=none | hexdump -e '"%x1"')
-openssl req -new -set_serial 0x"$serial" -x509 -sha512 -days 365 -key cert.key -config "$config" -out cert.cert
+openssl req -new -set_serial 0x"$serial" -x509 -sha512 -days 3650 -key cert.key -config "$config" -out cert.cert
