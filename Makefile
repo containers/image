@@ -2,7 +2,7 @@
 
 # Which github repository and branch to use for testing with skopeo
 SKOPEO_REPO = containers/skopeo
-SKOPEO_BRANCH = master
+SKOPEO_BRANCH = 2b97124e
 # Set SUDO=sudo to run container integration tests using sudo.
 SUDO =
 
@@ -70,9 +70,10 @@ test-skopeo:
 	@export GOPATH=$$(mktemp -d) && \
 		skopeo_path=$${GOPATH}/src/github.com/containers/skopeo && \
 		vendor_path=$${skopeo_path}/vendor/github.com/containers/image && \
-		git clone -b $(SKOPEO_BRANCH) https://github.com/$(SKOPEO_REPO) $${skopeo_path} && \
-		rm -rf $${vendor_path} && cp -r . $${vendor_path} && rm -rf $${vendor_path}/vendor && \
-		cd $${skopeo_path} && \
+		git clone https://github.com/$(SKOPEO_REPO) $${skopeo_path} && \
+		cd $${skopeo_path} && git checkout $(SKOPEO_BRANCH) && \
+		sed -i 's/FROM fedora/FROM fedora:30/g' Dockerfile && \
+		rm -rf $${vendor_path} && cp -r /gopath/src/github.com/containers/image $${vendor_path} && rm -rf $${vendor_path}/vendor && \
 		make BUILDTAGS="$(BUILDTAGS)" binary-local test-all-local && \
 		$(SUDO) make BUILDTAGS="$(BUILDTAGS)" check && \
 		rm -rf $${skopeo_path}
@@ -82,7 +83,7 @@ fmt:
 
 validate: lint
 	@go vet $(PACKAGES)
-	@test -z "$$(gofmt -s -l . | grep -ve '^vendor' | tee /dev/stderr)"
+	@test -z "$$(gofmt -s -l . | grep -ve '^vendor' | grep -ve docker/tarfile/src.go | tee /dev/stderr)"
 
 lint:
 	@out="$$(golint $(PACKAGES))"; \

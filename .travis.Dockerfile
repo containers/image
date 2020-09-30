@@ -1,4 +1,4 @@
-FROM ubuntu:artful
+FROM ubuntu:18.04
 
 RUN apt-get -qq update && \
     apt-get install -y sudo docker.io git make btrfs-tools libdevmapper-dev libgpgme-dev libostree-dev
