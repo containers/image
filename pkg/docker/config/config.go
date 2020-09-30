@@ -136,8 +136,16 @@ func getAuthFilePaths(sys *types.SystemContext) []authPath {
 		// Logging the error as a warning instead and moving on to pulling the image
 		logrus.Warnf("%v: Trying to pull image in the event that it is a public image.", err)
 	}
+	if dockerConfig := os.Getenv("DOCKER_CONFIG"); dockerConfig != "" {
+		paths = append(paths,
+			authPath{path: filepath.Join(dockerConfig, "config.json"), legacyFormat: false},
+		)
+	} else {
+		paths = append(paths,
+			authPath{path: filepath.Join(homedir.Get(), dockerHomePath), legacyFormat: false},
+		)
+	}
 	paths = append(paths,
-		authPath{path: filepath.Join(homedir.Get(), dockerHomePath), legacyFormat: false},
 		authPath{path: filepath.Join(homedir.Get(), dockerLegacyHomePath), legacyFormat: true},
 	)
 	return paths
