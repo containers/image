@@ -6,8 +6,15 @@ containers-auth.json - syntax for the registry authentication file
 # DESCRIPTION
 
 A credentials file in JSON format used to authenticate against container image registries.
-On Linux it is stored at `${XDG_RUNTIME_DIR}/containers/auth.json`;
-on Windows and macOS, at `$HOME/.config/containers/auth.json`
+The primary (read/write) file is stored at `${XDG_RUNTIME_DIR}/containers/auth.json` on Linux;
+on Windows and macOS, at `$HOME/.config/containers/auth.json`.
+
+When searching for the credential for a registry, the following files will be read in sequence until the valid credential is found:
+first reading the primary (read/write) file, or the explicit override using an option of the calling application.
+If credentials are not present, search in `${XDG\_CONFIG\_HOME}/containers/auth.json`, `$HOME/.docker/config.json`, `$HOME/.dockercfg`.
+
+Except the primary (read/write) file, other files are read-only, unless the user use an option of the calling application explicitly points at it as an override.
+
 
 ## FORMAT
 
