@@ -271,9 +271,10 @@ func TestFindUnqualifiedSearchRegistries(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
 
-	unqRegs, err := UnqualifiedSearchRegistries(sys)
+	unqRegs, origin, err := UnqualifiedSearchRegistriesWithOrigin(sys)
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, unqRegs)
+	assert.Equal(t, "testdata/unqualified-search.conf", origin)
 
 	_, err = UnqualifiedSearchRegistries(&types.SystemContext{
 		SystemRegistriesConfPath:    "testdata/invalid-search.conf",
@@ -557,4 +558,76 @@ func TestRegistriesConfDirectory(t *testing.T) {
 	reg, err := FindRegistry(ctx, "base.com/test:latest")
 	require.NoError(t, err)
 	assert.True(t, reg.Blocked)
+
+	usrs, origin, err := UnqualifiedSearchRegistriesWithOrigin(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"example-overwrite.com"}, usrs)
+	assert.Equal(t, "testdata/registries.conf.d/config-1.conf", origin)
+}
+
+func TestParseShortNameMode(t *testing.T) {
+	tests := []struct {
+		input    string
+		result   types.ShortNameMode
+		mustFail bool
+	}{
+		{"disabled", types.ShortNameModeDisabled, false},
+		{"enforcing", types.ShortNameModeEnforcing, false},
+		{"permissive", types.ShortNameModePermissive, false},
+		{"", types.ShortNameModePermissive, true},
+		{"xxx", -1, true},
+	}
+
+	for _, test := range tests {
+		shortName, err := parseShortNameMode(test.input)
+		if test.mustFail {
+			assert.Error(t, err)
+			continue
+		}
+		require.NoError(t, err)
+		assert.Equal(t, test.result, shortName)
+	}
+}
+
+func TestGetShortNameMode(t *testing.T) {
+	tests := []struct {
+		path     string
+		mode     types.ShortNameMode
+		mustFail bool
+	}{
+		{
+			"testdata/aliases.conf",
+			types.ShortNameModeEnforcing,
+			false,
+		},
+		{
+			"testdata/registries.conf.d/config-2.conf",
+			types.ShortNameModePermissive,
+			false,
+		},
+		{
+			"testdata/registries.conf.d/config-3.conf",
+			types.ShortNameModePermissive, // empty -> default to permissive
+			false,
+		},
+		{
+			"testdata/invalid-short-name-mode.conf",
+			-1,
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		sys := &types.SystemContext{
+			SystemRegistriesConfPath:    test.path,
+			SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+		}
+		mode, err := GetShortNameMode(sys)
+		if test.mustFail {
+			assert.Error(t, err)
+			continue
+		}
+		require.NoError(t, err)
+		assert.Equal(t, test.mode, mode, "%s", test.path)
+	}
 }
