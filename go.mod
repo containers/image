@@ -8,7 +8,7 @@ require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
 	github.com/containers/ocicrypt v1.0.3
-	github.com/containers/storage v1.23.5
+	github.com/containers/storage v1.23.6
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v1.4.2-0.20191219165747-a9416c67da9f
 	github.com/docker/docker-credential-helpers v0.6.3
@@ -39,7 +39,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
-	golang.org/x/sys v0.0.0-20200810151505-1b9f1253b3ed
+	golang.org/x/sys v0.0.0-20200909081042-eff7692f9009
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )
