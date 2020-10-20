@@ -108,19 +108,20 @@ func (d *digestingReader) Read(p []byte) (int, error) {
 // copier allows us to keep track of diffID values for blobs, and other
 // data shared across one or more images in a possible manifest list.
 type copier struct {
-	dest                 types.ImageDestination
-	rawSource            types.ImageSource
-	reportWriter         io.Writer
-	progressOutput       io.Writer
-	progressInterval     time.Duration
-	progress             chan types.ProgressProperties
-	blobInfoCache        internalblobinfocache.BlobInfoCache2
-	copyInParallel       bool
-	compressionFormat    compression.Algorithm
-	compressionLevel     *int
-	ociDecryptConfig     *encconfig.DecryptConfig
-	ociEncryptConfig     *encconfig.EncryptConfig
-	maxParallelDownloads uint
+	dest                  types.ImageDestination
+	rawSource             types.ImageSource
+	reportWriter          io.Writer
+	progressOutput        io.Writer
+	progressInterval      time.Duration
+	progress              chan types.ProgressProperties
+	blobInfoCache         internalblobinfocache.BlobInfoCache2
+	copyInParallel        bool
+	compressionFormat     compression.Algorithm
+	compressionLevel      *int
+	ociDecryptConfig      *encconfig.DecryptConfig
+	ociEncryptConfig      *encconfig.EncryptConfig
+	maxParallelDownloads  uint
+	downloadForeignLayers bool
 }
 
 // imageCopier tracks state specific to a single image (possibly an item of a manifest list)
@@ -198,6 +199,9 @@ type Options struct {
 	// exists (and is equivalent). Making the eventual (no-op) copy more performant for this case. Enabling the option
 	// is slightly pessimistic if the destination image doesn't exist, or is not equivalent.
 	OptimizeDestinationImageAlreadyExists bool
+	// Download layer contents with "nondistributable" media types ("foreign" layers) and translate the layer media type
+	// to not indicate "nondistributable".
+	DownloadForeignLayers bool
 }
 
 // validateImageListSelection returns an error if the passed-in value is not one that we recognize as a valid ImageListSelection value
@@ -273,10 +277,11 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		// FIXME? The cache is used for sources and destinations equally, but we only have a SourceCtx and DestinationCtx.
 		// For now, use DestinationCtx (because blob reuse changes the behavior of the destination side more); eventually
 		// we might want to add a separate CommonCtx — or would that be too confusing?
-		blobInfoCache:        internalblobinfocache.FromBlobInfoCache(blobinfocache.DefaultCache(options.DestinationCtx)),
-		ociDecryptConfig:     options.OciDecryptConfig,
-		ociEncryptConfig:     options.OciEncryptConfig,
-		maxParallelDownloads: options.MaxParallelDownloads,
+		blobInfoCache:         internalblobinfocache.FromBlobInfoCache(blobinfocache.DefaultCache(options.DestinationCtx)),
+		ociDecryptConfig:      options.OciDecryptConfig,
+		ociEncryptConfig:      options.OciEncryptConfig,
+		maxParallelDownloads:  options.MaxParallelDownloads,
+		downloadForeignLayers: options.DownloadForeignLayers,
 	}
 	// Default to using gzip compression unless specified otherwise.
 	if options.DestinationCtx == nil || options.DestinationCtx.CompressionFormat == nil {
@@ -904,7 +909,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		defer copySemaphore.Release(1)
 		defer copyGroup.Done()
 		cld := copyLayerData{}
-		if ic.c.dest.AcceptsForeignLayerURLs() && len(srcLayer.URLs) != 0 {
+		if !ic.c.downloadForeignLayers && ic.c.dest.AcceptsForeignLayerURLs() && len(srcLayer.URLs) != 0 {
 			// DiffIDs are, currently, needed only when converting from schema1.
 			// In which case src.LayerInfos will not have URLs because schema1
 			// does not support them.
