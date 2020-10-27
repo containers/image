@@ -9,7 +9,7 @@ or trivially; for others, the protocol extensions described below are necessary.
 ### Usage
 
 Any existing docker/distribution registry, whether or not it natively supports signatures,
-can be augmented with separate signature storage by configuring a signature storage URL in [`registries.d`](registries.d.md).
+can be augmented with separate signature storage by configuring a signature storage URL in [`registries.d`](containers-registries.d.md).
 `registries.d` can be configured to use one storage URL for a whole docker/distribution server,
 or also separate URLs for smaller namespaces or individual repositories within the server
 (which e.g. allows image authors to manage their own signature storage while publishing
