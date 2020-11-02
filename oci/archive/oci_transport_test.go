@@ -60,11 +60,18 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 		"relativepath",
 		tmpDir + "/thisdoesnotexist",
 	} {
-		for _, image := range []struct{ suffix, image string }{
-			{":notlatest:image", "notlatest:image"},
-			{":latestimage", "latestimage"},
-			{":", ""},
-			{"", ""},
+		for _, image := range []struct {
+			suffix, image       string
+			expectedSourceIndex int
+		}{
+			{":notlatest:image", "notlatest:image", -1},
+			{":latestimage", "latestimage", -1},
+			{":", "", -1},
+			{"", "", -1},
+			{":@0", "", 0},
+			{":@10", "", 10},
+			{":@999999", "", 999999},
+			{":busybox@0", "busybox@0", -1},
 		} {
 			input := path + image.suffix
 			ref, err := fn(input)
@@ -73,11 +80,23 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 			require.True(t, ok)
 			assert.Equal(t, path, ociArchRef.file, input)
 			assert.Equal(t, image.image, ociArchRef.image, input)
+			assert.Equal(t, ociArchRef.sourceIndex, image.expectedSourceIndex, input)
 		}
 	}
 
-	_, err = fn(tmpDir + ":invalid'image!value@")
-	assert.Error(t, err)
+	for _, imageSuffix := range []string{
+		":invalid'image!value@",
+		":@",
+		":@-1",
+		":@-2",
+		":@busybox",
+		":@0:buxybox",
+	} {
+		input := tmpDir + imageSuffix
+		ref, err := fn(input)
+		assert.Equal(t, ref, nil)
+		assert.Error(t, err)
+	}
 }
 
 func TestNewReference(t *testing.T) {
@@ -193,7 +212,8 @@ func TestReferenceStringWithinTransport(t *testing.T) {
 
 	for _, c := range []struct{ input, result string }{
 		{"/dir1:notlatest:notlatest", "/dir1:notlatest:notlatest"}, // Explicit image
-		{"/dir3:", "/dir3:"}, // No image
+		{"/dir3:", "/dir3:"},     // No image
+		{"/dir1:@1", "/dir1:@1"}, // Explicit sourceIndex of image
 	} {
 		ref, err := ParseReference(tmpDir + c.input)
 		require.NoError(t, err, c.input)

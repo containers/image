@@ -23,6 +23,18 @@ func TestGetManifestDescriptor(t *testing.T) {
 
 	_, err = imageRef.(ociReference).getManifestDescriptor()
 	assert.EqualError(t, err, ErrMoreThanOneImage.Error())
+
+	imageRef, err = NewReferenceWithIndex("fixtures/two_names_manifest", "imageValue0", -1)
+	require.NoError(t, err)
+	manDescriptor, err := imageRef.(ociReference).getManifestDescriptor()
+	require.NoError(t, err)
+	assert.Equal(t, manDescriptor.Annotations["org.opencontainers.image.ref.name"], "imageValue0")
+
+	imageRef, err = NewReferenceWithIndex("fixtures/two_names_manifest", "", 1)
+	require.NoError(t, err)
+	manDescriptor, err = imageRef.(ociReference).getManifestDescriptor()
+	require.NoError(t, err)
+	assert.Equal(t, manDescriptor.Annotations["org.opencontainers.image.ref.name"], "imageValue1")
 }
 
 func TestTransportName(t *testing.T) {
@@ -170,7 +182,8 @@ func TestReferenceStringWithinTransport(t *testing.T) {
 
 	for _, c := range []struct{ input, result string }{
 		{"/dir1:notlatest:notlatest", "/dir1:notlatest:notlatest"}, // Explicit image
-		{"/dir3:", "/dir3:"}, // No image
+		{"/dir3:", "/dir3:"},     // No image
+		{"/dir1:@1", "/dir1:@1"}, // Explicit sourceIndex of image
 	} {
 		ref, err := ParseReference(tmpDir + c.input)
 		require.NoError(t, err, c.input)

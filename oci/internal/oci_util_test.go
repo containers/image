@@ -2,8 +2,9 @@ package internal
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type testDataSplitReference struct {
@@ -59,4 +60,22 @@ func TestValidateScopeWindows(t *testing.T) {
 			assert.EqualError(t, err, test.errMessage, fmt.Sprintf("No error for scope '%s'", test.scope))
 		}
 	}
+}
+
+func TestParseOCIReferenceName(t *testing.T) {
+	image, idx, err := ParseOCIReferenceName("@0")
+	assert.NoError(t, err)
+	assert.Equal(t, image, "")
+	assert.Equal(t, idx, 0)
+
+	image, idx, err = ParseOCIReferenceName("notlatest@1")
+	assert.NoError(t, err)
+	assert.Equal(t, image, "notlatest@1")
+	assert.Equal(t, idx, -1)
+
+	_, _, err = ParseOCIReferenceName("@-5")
+	assert.NotEmpty(t, err)
+
+	_, _, err = ParseOCIReferenceName("@invalidIndex")
+	assert.NotEmpty(t, err)
 }

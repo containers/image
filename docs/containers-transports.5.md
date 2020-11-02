@@ -57,14 +57,16 @@ An image stored in the docker daemon's internal storage.
 The image must be specified as a _docker-reference_ or in an alternative _algo:digest_ format when being used as an image source.
 The _algo:digest_ refers to the image ID reported by docker-inspect(1).
 
-### **oci:**_path[:tag]_
+### **oci:**_path[:tag|@source-index]_
 
 An image compliant with the "Open Container Image Layout Specification" at _path_.
 Using a _tag_ is optional and allows for storing multiple images at the same _path_.
+@_source-index_ is a zero-based index in manifest (to access untagged images).
+If neither tag nor @_source_index is specified when reading an image, the path must contain exactly one image.
 
-### **oci-archive:**_path[:tag]_
+### **oci-archive:**_path[:{tag|@source-index}]_
 
-An image compliant with the "Open Container Image Layout Specification" stored as a tar(1) archive at _path_.
+An image compliant with the "Open Container Image Layout Specification" stored as a tar(1) archive at _path_.  For reading archives, @_source-index_ is a zero-based index in archive manifest (to access untagged images).  If neither tag nor @_source_index is specified when reading an archive, the archive must contain exactly one image.
 
 ### **ostree:**_docker-reference[@/absolute/repo/path]_
 
