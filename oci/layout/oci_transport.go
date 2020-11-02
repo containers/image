@@ -62,22 +62,31 @@ type ociReference struct {
 	// (But in general, we make no attempt to be completely safe against concurrent hostile filesystem modifications.)
 	dir         string // As specified by the user. May be relative, contain symlinks, etc.
 	resolvedDir string // Absolute path with no symlinks, at least at the time of its creation. Primarily used for policy namespaces.
-	// If image=="", it means the "only image" in the index.json is used in the case it is a source
-	// for destinations, the image name annotation "image.ref.name" is not added to the index.json
+	// If image=="" && sourceIndex==-1, it means the "only image" in the index.json is used in the case it is a source
+	// for destinations, the image name annotation "image.ref.name" is not added to the index.json.
+	//
+	// Must not be set if sourceIndex is set (the value is not -1).
 	image string
+	// If not -1, a zero-based index of an image in the manifest index. Valid only for sources.
+	// Must not be set if image is set.
+	sourceIndex int
 }
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an OCI ImageReference.
 func ParseReference(reference string) (types.ImageReference, error) {
-	dir, image := internal.SplitPathAndImage(reference)
-	return NewReference(dir, image)
+	dir, image, index, err := internal.ParseReferenceIntoElements(reference)
+	if err != nil {
+		return nil, err
+	}
+	return newReference(dir, image, index)
 }
 
-// NewReference returns an OCI reference for a directory and a image.
+// newReference returns an OCI reference for a directory, and an image name annotation or sourceIndex.
 //
+// If sourceIndex==-1, the index will not be valid to point out the source image, only image will be used.
 // We do not expose an API supplying the resolvedDir; we could, but recomputing it
 // is generally cheap enough that we prefer being confident about the properties of resolvedDir.
-func NewReference(dir, image string) (types.ImageReference, error) {
+func newReference(dir, image string, sourceIndex int) (types.ImageReference, error) {
 	resolved, err := explicitfilepath.ResolvePathToFullyExplicit(dir)
 	if err != nil {
 		return nil, err
@@ -91,7 +100,26 @@ func NewReference(dir, image string) (types.ImageReference, error) {
 		return nil, err
 	}
 
-	return ociReference{dir: dir, resolvedDir: resolved, image: image}, nil
+	if sourceIndex != -1 && sourceIndex < 0 {
+		return nil, fmt.Errorf("Invalid oci: layout reference: index @%d must not be negative", sourceIndex)
+	}
+	if sourceIndex != -1 && image != "" {
+		return nil, fmt.Errorf("Invalid oci: layout reference: cannot use both an image %s and a source index @%d", image, sourceIndex)
+	}
+	return ociReference{dir: dir, resolvedDir: resolved, image: image, sourceIndex: sourceIndex}, nil
+}
+
+// NewIndexReference returns an OCI reference for a path and a zero-based source manifest index.
+func NewIndexReference(dir string, sourceIndex int) (types.ImageReference, error) {
+	return newReference(dir, "", sourceIndex)
+}
+
+// NewReference returns an OCI reference for a directory and a image.
+//
+// We do not expose an API supplying the resolvedDir; we could, but recomputing it
+// is generally cheap enough that we prefer being confident about the properties of resolvedDir.
+func NewReference(dir, image string) (types.ImageReference, error) {
+	return newReference(dir, image, -1)
 }
 
 func (ref ociReference) Transport() types.ImageTransport {
@@ -104,7 +132,11 @@ func (ref ociReference) Transport() types.ImageTransport {
 // e.g. default attribute values omitted by the user may be filled in in the return value, or vice versa.
 // WARNING: Do not use the return value in the UI to describe an image, it does not contain the Transport().Name() prefix.
 func (ref ociReference) StringWithinTransport() string {
-	return fmt.Sprintf("%s:%s", ref.dir, ref.image)
+	if ref.sourceIndex == -1 {
+		return fmt.Sprintf("%s:%s", ref.dir, ref.image)
+	}
+	return fmt.Sprintf("%s:@%d", ref.dir, ref.sourceIndex)
+
 }
 
 // DockerReference returns a Docker reference associated with this reference
@@ -179,8 +211,16 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 	if err != nil {
 		return imgspecv1.Descriptor{}, err
 	}
-
 	var d *imgspecv1.Descriptor
+
+	if ref.sourceIndex != -1 {
+		if ref.sourceIndex < len(index.Manifests) {
+			d = &index.Manifests[ref.sourceIndex]
+			return *d, nil
+		} else {
+			return imgspecv1.Descriptor{}, fmt.Errorf("index %d is too large, only %d entries available", ref.sourceIndex, len(index.Manifests))
+		}
+	}
 	if ref.image == "" {
 		// return manifest if only one image is in the oci directory
 		if len(index.Manifests) == 1 {
@@ -195,8 +235,8 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 			if md.MediaType != imgspecv1.MediaTypeImageManifest && md.MediaType != imgspecv1.MediaTypeImageIndex {
 				continue
 			}
-			refName, ok := md.Annotations[imgspecv1.AnnotationRefName]
-			if !ok {
+			refName := internal.NameFromAnnotations(md.Annotations)
+			if refName == "" {
 				continue
 			}
 			if refName == ref.image {

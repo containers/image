@@ -32,7 +32,8 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	const digestErrorString = "Simulated digest error"
 	const blobDigest = "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f"
 
-	ref, _ := refToTempOCI(t)
+	ref, tmpDir := refToTempOCI(t, false)
+	defer os.RemoveAll(tmpDir)
 	dirRef, ok := ref.(ociReference)
 	require.True(t, ok)
 	blobPath, err := dirRef.blobPath(blobDigest, "")
@@ -71,7 +72,8 @@ func TestPutBlobDigestFailure(t *testing.T) {
 
 // TestPutManifestAppendsToExistingManifest tests that new manifests are getting added to existing index.
 func TestPutManifestAppendsToExistingManifest(t *testing.T) {
-	ref, tmpDir := refToTempOCI(t)
+	ref, tmpDir := refToTempOCI(t, false)
+	defer os.RemoveAll(tmpDir)
 
 	ociRef, ok := ref.(ociReference)
 	require.True(t, ok)
@@ -94,7 +96,8 @@ func TestPutManifestAppendsToExistingManifest(t *testing.T) {
 
 // TestPutManifestTwice tests that existing manifest gets updated and not appended.
 func TestPutManifestTwice(t *testing.T) {
-	ref, tmpDir := refToTempOCI(t)
+	ref, tmpDir := refToTempOCI(t, false)
+	defer os.RemoveAll(tmpDir)
 
 	ociRef, ok := ref.(ociReference)
 	require.True(t, ok)
@@ -109,7 +112,8 @@ func TestPutManifestTwice(t *testing.T) {
 }
 
 func TestPutTwoDifferentTags(t *testing.T) {
-	ref, tmpDir := refToTempOCI(t)
+	ref, tmpDir := refToTempOCI(t, false)
+	defer os.RemoveAll(tmpDir)
 
 	ociRef, ok := ref.(ociReference)
 	require.True(t, ok)

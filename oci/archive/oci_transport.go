@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 
@@ -23,6 +24,8 @@ func init() {
 	transports.Register(Transport)
 }
 
+var invalidOciArchiveErr error = errors.New("Invalid oci-archive: reference")
+
 // Transport is an ImageTransport for OCI archive
 // it creates an oci-archive tar file by calling into the OCI transport
 // tarring the directory created by oci and deleting the directory
@@ -32,9 +35,12 @@ type ociArchiveTransport struct{}
 
 // ociArchiveReference is an ImageReference for OCI Archive paths
 type ociArchiveReference struct {
-	file         string
-	resolvedFile string
-	image        string
+	file          string
+	resolvedFile  string
+	image         string
+	sourceIndex   int
+	archiveReader *Reader
+	archiveWriter *Writer
 }
 
 func (t ociArchiveTransport) Name() string {
@@ -54,12 +60,24 @@ func (t ociArchiveTransport) ValidatePolicyConfigurationScope(scope string) erro
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an OCI ImageReference.
 func ParseReference(reference string) (types.ImageReference, error) {
-	file, image := internal.SplitPathAndImage(reference)
-	return NewReference(file, image)
+	file, image, index, err := internal.ParseReferenceIntoElements(reference)
+	if err != nil {
+		return nil, err
+	}
+	return newReference(file, image, index, nil, nil)
 }
 
-// NewReference returns an OCI reference for a file and a image.
+// NewReference returns an OCI reference for a file and an image.
 func NewReference(file, image string) (types.ImageReference, error) {
+	return newReference(file, image, -1, nil, nil)
+}
+
+// NewIndexReference returns an OCI reference for a file and a zero-based source manifest index.
+func NewIndexReference(file string, sourceIndex int) (types.ImageReference, error) {
+	return newReference(file, "", sourceIndex, nil, nil)
+}
+
+func newReference(file, image string, sourceIndex int, archiveReader *Reader, archiveWriter *Writer) (types.ImageReference, error) {
 	resolved, err := explicitfilepath.ResolvePathToFullyExplicit(file)
 	if err != nil {
 		return nil, err
@@ -73,7 +91,20 @@ func NewReference(file, image string) (types.ImageReference, error) {
 		return nil, err
 	}
 
-	return ociArchiveReference{file: file, resolvedFile: resolved, image: image}, nil
+	if sourceIndex != -1 && sourceIndex < 0 {
+		return nil, fmt.Errorf("index @%d must not be negative: %w", sourceIndex, invalidOciArchiveErr)
+	}
+	if sourceIndex != -1 && image != "" {
+		return nil, fmt.Errorf("cannot set image %s and index @%d at the same time: %w", image, sourceIndex, invalidOciArchiveErr)
+	}
+	return ociArchiveReference{
+		file:          file,
+		resolvedFile:  resolved,
+		image:         image,
+		sourceIndex:   sourceIndex,
+		archiveReader: archiveReader,
+		archiveWriter: archiveWriter,
+	}, nil
 }
 
 func (ref ociArchiveReference) Transport() types.ImageTransport {
@@ -83,7 +114,10 @@ func (ref ociArchiveReference) Transport() types.ImageTransport {
 // StringWithinTransport returns a string representation of the reference, which MUST be such that
 // reference.Transport().ParseReference(reference.StringWithinTransport()) returns an equivalent reference.
 func (ref ociArchiveReference) StringWithinTransport() string {
-	return fmt.Sprintf("%s:%s", ref.file, ref.image)
+	if ref.sourceIndex == -1 {
+		return fmt.Sprintf("%s:%s", ref.file, ref.image)
+	}
+	return fmt.Sprintf("%s:@%d", ref.file, ref.sourceIndex)
 }
 
 // DockerReference returns a Docker reference associated with this reference
@@ -156,14 +190,20 @@ func (t *tempDirOCIRef) deleteTempDir() error {
 
 // createOCIRef creates the oci reference of the image
 // If SystemContext.BigFilesTemporaryDir not "", overrides the temporary directory to use for storing big files
-func createOCIRef(sys *types.SystemContext, image string) (tempDirOCIRef, error) {
-	dir, err := os.MkdirTemp(tmpdir.TemporaryDirectoryForBigFiles(sys), "oci")
+func createOCIRef(sys *types.SystemContext, image string, sourceIndex int) (tempDirOCIRef, error) {
+	dir, err := ioutil.TempDir(tmpdir.TemporaryDirectoryForBigFiles(sys), "oci")
 	if err != nil {
 		return tempDirOCIRef{}, perrors.Wrapf(err, "creating temp directory")
 	}
-	ociRef, err := ocilayout.NewReference(dir, image)
-	if err != nil {
-		return tempDirOCIRef{}, err
+	var ociRef types.ImageReference
+	if sourceIndex > -1 {
+		if ociRef, err = ocilayout.NewIndexReference(dir, sourceIndex); err != nil {
+			return tempDirOCIRef{}, err
+		}
+	} else {
+		if ociRef, err = ocilayout.NewReference(dir, image); err != nil {
+			return tempDirOCIRef{}, err
+		}
 	}
 
 	tempDirRef := tempDirOCIRef{tempDirectory: dir, ociRefExtracted: ociRef}
@@ -172,7 +212,7 @@ func createOCIRef(sys *types.SystemContext, image string) (tempDirOCIRef, error)
 
 // creates the temporary directory and copies the tarred content to it
 func createUntarTempDir(sys *types.SystemContext, ref ociArchiveReference) (tempDirOCIRef, error) {
-	tempDirRef, err := createOCIRef(sys, ref.image)
+	tempDirRef, err := createOCIRef(sys, ref.image, ref.sourceIndex)
 	if err != nil {
 		return tempDirOCIRef{}, perrors.Wrap(err, "creating oci reference")
 	}

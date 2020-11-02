@@ -3,45 +3,62 @@ package archive
 import (
 	"context"
 	"io"
-	"os"
 
 	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/imagedestination"
 	"github.com/containers/image/v5/internal/imagedestination/impl"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/signature"
+	"github.com/containers/image/v5/oci/layout"
 	"github.com/containers/image/v5/types"
-	"github.com/containers/storage/pkg/archive"
 	digest "github.com/opencontainers/go-digest"
 	perrors "github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type ociArchiveImageDestination struct {
 	impl.Compat
 
-	ref          ociArchiveReference
-	unpackedDest private.ImageDestination
-	tempDirRef   tempDirOCIRef
+	ref                   ociArchiveReference
+	individualWriterOrNil *Writer
+	unpackedDest          private.ImageDestination
 }
 
 // newImageDestination returns an ImageDestination for writing to an existing directory.
-func newImageDestination(ctx context.Context, sys *types.SystemContext, ref ociArchiveReference) (private.ImageDestination, error) {
-	tempDirRef, err := createOCIRef(sys, ref.image)
-	if err != nil {
-		return nil, perrors.Wrapf(err, "creating oci reference")
+func newImageDestination(ctx context.Context, sys *types.SystemContext, ref ociArchiveReference) (types.ImageDestination, error) {
+	var (
+		archive, individualWriterOrNil *Writer
+		err                            error
+	)
+
+	if ref.sourceIndex != -1 {
+		return nil, perrors.Wrapf(invalidOciArchiveErr, "destination reference must not contain a manifest index @%d", ref.sourceIndex)
 	}
-	unpackedDest, err := tempDirRef.ociRefExtracted.NewImageDestination(ctx, sys)
-	if err != nil {
-		if err := tempDirRef.deleteTempDir(); err != nil {
-			return nil, perrors.Wrapf(err, "deleting temp directory %q", tempDirRef.tempDirectory)
+
+	if ref.archiveWriter != nil {
+		archive = ref.archiveWriter
+		individualWriterOrNil = nil
+	} else {
+		archive, err = NewWriter(ctx, sys, ref.resolvedFile)
+		if err != nil {
+			return nil, err
 		}
+		individualWriterOrNil = archive
+	}
+	layoutRef, err := layout.NewReference(archive.tempDir, ref.image)
+	if err != nil {
+		archive.Close()
 		return nil, err
 	}
+	dst, err := layoutRef.NewImageDestination(ctx, sys)
+	if err != nil {
+		archive.Close()
+		return nil, err
+	}
+
 	d := &ociArchiveImageDestination{
-		ref:          ref,
-		unpackedDest: imagedestination.FromPublic(unpackedDest),
-		tempDirRef:   tempDirRef,
+		ref:                   ref,
+		individualWriterOrNil: individualWriterOrNil,
+		unpackedDest:          imagedestination.FromPublic(dst),
 	}
 	d.Compat = impl.AddCompat(d)
 	return d, nil
@@ -53,13 +70,14 @@ func (d *ociArchiveImageDestination) Reference() types.ImageReference {
 }
 
 // Close removes resources associated with an initialized ImageDestination, if any
-// Close deletes the temp directory of the oci-archive image
 func (d *ociArchiveImageDestination) Close() error {
-	defer func() {
-		err := d.tempDirRef.deleteTempDir()
-		logrus.Debugf("Error deleting temporary directory: %v", err)
-	}()
-	return d.unpackedDest.Close()
+	if err := d.unpackedDest.Close(); err != nil {
+		return err
+	}
+	if d.individualWriterOrNil == nil {
+		return nil
+	}
+	return d.individualWriterOrNil.Close()
 }
 
 func (d *ociArchiveImageDestination) SupportedManifestMIMETypes() []string {
@@ -160,32 +178,5 @@ func (d *ociArchiveImageDestination) Commit(ctx context.Context, unparsedTopleve
 	if err := d.unpackedDest.Commit(ctx, unparsedToplevel); err != nil {
 		return perrors.Wrapf(err, "storing image %q", d.ref.image)
 	}
-
-	// path of directory to tar up
-	src := d.tempDirRef.tempDirectory
-	// path to save tarred up file
-	dst := d.ref.resolvedFile
-	return tarDirectory(src, dst)
-}
-
-// tar converts the directory at src and saves it to dst
-func tarDirectory(src, dst string) error {
-	// input is a stream of bytes from the archive of the directory at path
-	input, err := archive.Tar(src, archive.Uncompressed)
-	if err != nil {
-		return perrors.Wrapf(err, "retrieving stream of bytes from %q", src)
-	}
-
-	// creates the tar file
-	outFile, err := os.Create(dst)
-	if err != nil {
-		return perrors.Wrapf(err, "creating tar file %q", dst)
-	}
-	defer outFile.Close()
-
-	// copies the contents of the directory to the tar file
-	// TODO: This can take quite some time, and should ideally be cancellable using a context.Context.
-	_, err = io.Copy(outFile, input)
-
-	return err
+	return nil
 }
