@@ -725,7 +725,7 @@ func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) error {
 	}
 
 	// Post process registries, set the correct prefixes, sanity checks, etc.
-	if err := combinedTOML.postProcessRegistries(); err != nil {
+	if err := combinedTOML.V2RegistriesConf.postProcessRegistries(); err != nil {
 		return err
 	}
 
