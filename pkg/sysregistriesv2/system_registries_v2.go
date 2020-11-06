@@ -349,16 +349,25 @@ func (config *V2RegistriesConf) postProcessRegistries() error {
 	// rendering later items with the same prefix non-existent. We cannot error
 	// out anymore as this might break existing users, so let's just ignore them
 	// to guarantee that the same prefix exists only once.
-	knownPrefixes := make(map[string]bool)
-	uniqueRegistries := []Registry{}
+	//
+	// As a side effect of parsedConfig.updateWithConfigurationFrom, the Registries slice
+	// is always sorted. To be consistent in situations where it is not called (no drop-ins),
+	// sort it here as well.
+	prefixes := []string{}
+	uniqueRegistries := make(map[string]Registry)
 	for i := range config.Registries {
 		// TODO: should we warn if we see the same prefix being used multiple times?
-		if _, exists := knownPrefixes[config.Registries[i].Prefix]; !exists {
-			knownPrefixes[config.Registries[i].Prefix] = true
-			uniqueRegistries = append(uniqueRegistries, config.Registries[i])
+		prefix := config.Registries[i].Prefix
+		if _, exists := uniqueRegistries[prefix]; !exists {
+			uniqueRegistries[prefix] = config.Registries[i]
+			prefixes = append(prefixes, prefix)
 		}
 	}
-	config.Registries = uniqueRegistries
+	sort.Strings(prefixes)
+	config.Registries = []Registry{}
+	for _, prefix := range prefixes {
+		config.Registries = append(config.Registries, uniqueRegistries[prefix])
+	}
 
 	return nil
 }
