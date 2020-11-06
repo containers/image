@@ -176,7 +176,6 @@ type V2RegistriesConf struct {
 	shortNameMode types.ShortNameMode
 
 	shortNameAliasConf
-	aliasCache *shortNameAliasCache
 }
 
 // Nonempty returns true if config contains at least one configuration entry.
@@ -191,7 +190,8 @@ func (config *V2RegistriesConf) Nonempty() bool {
 type parsedConfig struct {
 	// For now, just embed an unprocessed configuration. Later we may add data structures to
 	// amortize parsing cost or speed up lookups.
-	v2 V2RegistriesConf
+	v2         V2RegistriesConf
+	aliasCache *shortNameAliasCache
 }
 
 // InvalidRegistries represents an invalid registry configurations.  An example
@@ -747,7 +747,7 @@ func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) (*parsedCon
 	if err != nil {
 		return nil, errors.Wrap(err, "error validating short-name aliases")
 	}
-	res.v2.aliasCache = cache
+	res.aliasCache = cache
 	// Nil conf.v2.Aliases to make it available for garbage collection and
 	// reduce memory consumption.  We're consulting aliasCache for lookups.
 	res.v2.Aliases = nil
@@ -769,13 +769,6 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 		registryMap[c.v2.Registries[i].Prefix] = c.v2.Registries[i]
 	}
 
-	prevAliases := c.v2.aliasCache // store the aliases so they're not overridden
-	if prevAliases == nil {
-		prevAliases = &shortNameAliasCache{
-			namedAliases: make(map[string]alias),
-		}
-	}
-
 	// Initialize the USR origin.
 	if len(c.v2.unqualifiedSearchRegistriesOrigin) == 0 {
 		c.v2.unqualifiedSearchRegistriesOrigin = path
@@ -789,7 +782,7 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 	// Load the new config file. Note that loadConfigFile will overwrite set fields.
 	c.v2.Registries = nil // important to clear the memory to prevent us from overlapping fields
 	c.v2.Aliases = nil
-	_, err := loadConfigFile(&c.v2, path, forceV2)
+	updates, err := loadConfigFile(&c.v2, path, forceV2)
 	if err != nil {
 		return err
 	}
@@ -825,9 +818,12 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 	}
 
 	// Merge the alias maps.  New configs override previous entries.
-	newAliases := c.v2.aliasCache
-	c.v2.aliasCache = prevAliases
-	c.v2.aliasCache.updateWithConfigurationFrom(newAliases)
+	if c.aliasCache == nil {
+		c.aliasCache = &shortNameAliasCache{
+			namedAliases: make(map[string]alias),
+		}
+	}
+	c.aliasCache.updateWithConfigurationFrom(updates.aliasCache)
 
 	// If set, parse & store the specified short-name mode.
 	if len(c.v2.ShortNameMode) > 0 {
