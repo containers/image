@@ -528,7 +528,7 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedC
 	defer configMutex.Unlock()
 
 	// load the config
-	config := &tomlConfig{}
+	config := &parsedConfig{}
 	if err := config.loadConfig(wrapper.configPath, false); err != nil {
 		// Continue with an empty []Registry if we use the default config, which
 		// implies that the config path of the SystemContext isn't set.
@@ -536,8 +536,8 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedC
 		// Note: if ctx.SystemRegistriesConfPath points to the default config,
 		// we will still return an error.
 		if os.IsNotExist(err) && (ctx == nil || ctx.SystemRegistriesConfPath == "") {
-			config = &tomlConfig{}
-			config.V2RegistriesConf = V2RegistriesConf{Registries: []Registry{}}
+			config = &parsedConfig{}
+			config.v2 = V2RegistriesConf{Registries: []Registry{}}
 		} else {
 			return nil, errors.Wrapf(err, "error loading registries configuration %q", wrapper.configPath)
 		}
@@ -555,11 +555,9 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedC
 		}
 	}
 
-	parsedConfig := &parsedConfig{v2: config.V2RegistriesConf}
-
 	// populate the cache
-	configCache[wrapper] = parsedConfig
-	return parsedConfig, nil
+	configCache[wrapper] = config
+	return config, nil
 }
 
 // GetRegistries loads and returns the registries specified in the config.
@@ -637,55 +635,59 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 	return nil, nil
 }
 
-// loadConfig loads and unmarshals the configuration at the specified path. Note
-// that v1 configs are translated into v2 and are cleared.  Use forceV2 if the
-// config must in the v2 format.
+// loadConfig loads and unmarshals the configuration at the specified path.
+// Use forceV2 if the config must in the v2 format.
 //
 // Note that specified fields in path will replace already set fields in the
-// tomlConfig.  Only the [[registry]] tables are merged by prefix.
-func (c *tomlConfig) loadConfig(path string, forceV2 bool) error {
+// parsedConfig.  Only the [[registry]] tables are merged by prefix.
+func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 	logrus.Debugf("Loading registries configuration %q", path)
 
 	// Save the registries before decoding the file where they could be lost.
 	// We merge them later again.
 	registryMap := make(map[string]Registry)
-	for i := range c.Registries {
-		registryMap[c.Registries[i].Prefix] = c.Registries[i]
+	for i := range c.v2.Registries {
+		registryMap[c.v2.Registries[i].Prefix] = c.v2.Registries[i]
 	}
 
 	// Load the tomlConfig. Note that `DecodeFile` will overwrite set fields.
-	c.Registries = nil // important to clear the memory to prevent us from overlapping fields
-	_, err := toml.DecodeFile(path, c)
+	c.v2.Registries = nil // important to clear the memory to prevent us from overlapping fields
+	combinedTOML := tomlConfig{
+		V2RegistriesConf: c.v2,
+	}
+	_, err := toml.DecodeFile(path, &combinedTOML)
 	if err != nil {
 		return err
 	}
 
-	if c.V1RegistriesConf.Nonempty() {
+	if combinedTOML.V1RegistriesConf.Nonempty() {
 		// Enforce the v2 format if requested.
 		if forceV2 {
 			return &InvalidRegistries{s: "registry must be in v2 format but is in v1"}
 		}
 
 		// Convert a v1 config into a v2 config.
-		if c.V2RegistriesConf.Nonempty() {
+		if combinedTOML.V2RegistriesConf.Nonempty() {
 			return &InvalidRegistries{s: "mixing sysregistry v1/v2 is not supported"}
 		}
-		v2, err := c.V1RegistriesConf.ConvertToV2()
+		v2, err := combinedTOML.V1RegistriesConf.ConvertToV2()
 		if err != nil {
 			return err
 		}
-		c.V1RegistriesConf = V1RegistriesConf{}
-		c.V2RegistriesConf = *v2
+		combinedTOML.V1RegistriesConf = V1RegistriesConf{}
+		combinedTOML.V2RegistriesConf = *v2
 	}
 
 	// Post process registries, set the correct prefixes, sanity checks, etc.
-	if err := c.postProcess(); err != nil {
+	if err := combinedTOML.postProcess(); err != nil {
 		return err
 	}
 
+	c.v2 = combinedTOML.V2RegistriesConf
+
 	// Merge the freshly loaded registries.
-	for i := range c.Registries {
-		registryMap[c.Registries[i].Prefix] = c.Registries[i]
+	for i := range c.v2.Registries {
+		registryMap[c.v2.Registries[i].Prefix] = c.v2.Registries[i]
 	}
 
 	// Go maps have a non-deterministic order when iterating the keys, so
@@ -699,9 +701,9 @@ func (c *tomlConfig) loadConfig(path string, forceV2 bool) error {
 	}
 	sort.Strings(prefixes)
 
-	c.Registries = []Registry{}
+	c.v2.Registries = []Registry{}
 	for _, prefix := range prefixes {
-		c.Registries = append(c.Registries, registryMap[prefix])
+		c.v2.Registries = append(c.v2.Registries, registryMap[prefix])
 	}
 
 	return nil
