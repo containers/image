@@ -696,9 +696,10 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 	return nil, nil
 }
 
-// loadConfigFile loads and unmarshals a single config file, updating *v2.
+// loadConfigFile loads and unmarshals a single config file, updating *v2 and also returning
+// some parsed data in the return value.
 // Use forceV2 if the config must in the v2 format.
-func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) error {
+func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) (*parsedConfig, error) {
 	logrus.Debugf("Loading registries configuration %q", path)
 
 	// tomlConfig allows us to unmarshal either V1 or V2 simultaneously.
@@ -713,44 +714,46 @@ func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) error {
 	}
 	_, err := toml.DecodeFile(path, &combinedTOML)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if combinedTOML.V1RegistriesConf.Nonempty() {
 		// Enforce the v2 format if requested.
 		if forceV2 {
-			return &InvalidRegistries{s: "registry must be in v2 format but is in v1"}
+			return nil, &InvalidRegistries{s: "registry must be in v2 format but is in v1"}
 		}
 
 		// Convert a v1 config into a v2 config.
 		if combinedTOML.V2RegistriesConf.Nonempty() {
-			return &InvalidRegistries{s: "mixing sysregistry v1/v2 is not supported"}
+			return nil, &InvalidRegistries{s: "mixing sysregistry v1/v2 is not supported"}
 		}
 		converted, err := combinedTOML.V1RegistriesConf.ConvertToV2()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		combinedTOML.V1RegistriesConf = V1RegistriesConf{}
 		combinedTOML.V2RegistriesConf = *converted
 	}
 
+	res := parsedConfig{v2: combinedTOML.V2RegistriesConf}
+
 	// Post process registries, set the correct prefixes, sanity checks, etc.
-	if err := combinedTOML.V2RegistriesConf.postProcessRegistries(); err != nil {
-		return err
+	if err := res.v2.postProcessRegistries(); err != nil {
+		return nil, err
 	}
 
 	// Parse and validate short-name aliases.
-	cache, err := newShortNameAliasCache(path, &combinedTOML.V2RegistriesConf.shortNameAliasConf)
+	cache, err := newShortNameAliasCache(path, &res.v2.shortNameAliasConf)
 	if err != nil {
-		return errors.Wrap(err, "error validating short-name aliases")
+		return nil, errors.Wrap(err, "error validating short-name aliases")
 	}
-	combinedTOML.V2RegistriesConf.aliasCache = cache
+	res.v2.aliasCache = cache
 	// Nil conf.v2.Aliases to make it available for garbage collection and
 	// reduce memory consumption.  We're consulting aliasCache for lookups.
-	combinedTOML.V2RegistriesConf.Aliases = nil
+	res.v2.Aliases = nil
 
-	*v2 = combinedTOML.V2RegistriesConf
-	return nil
+	*v2 = res.v2
+	return &res, nil
 }
 
 // loadConfig loads and unmarshals the configuration at the specified path.
@@ -786,7 +789,8 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 	// Load the new config file. Note that loadConfigFile will overwrite set fields.
 	c.v2.Registries = nil // important to clear the memory to prevent us from overlapping fields
 	c.v2.Aliases = nil
-	if err := loadConfigFile(&c.v2, path, forceV2); err != nil {
+	_, err := loadConfigFile(&c.v2, path, forceV2)
+	if err != nil {
 		return err
 	}
 
