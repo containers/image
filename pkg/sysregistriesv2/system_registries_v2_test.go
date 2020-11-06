@@ -557,4 +557,19 @@ func TestRegistriesConfDirectory(t *testing.T) {
 	reg, err := FindRegistry(ctx, "base.com/test:latest")
 	require.NoError(t, err)
 	assert.True(t, reg.Blocked)
+
+	// Test that unqualified-search-registries is merged correctly
+	usr, err := UnqualifiedSearchRegistries(&types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/unqualified-search.conf",
+		SystemRegistriesConfDirPath: "testdata/registries.conf.d-usr1",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, usr) // Nothing overrides the base file
+
+	usr, err = UnqualifiedSearchRegistries(&types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/unqualified-search.conf",
+		SystemRegistriesConfDirPath: "testdata/registries.conf.d-usr2",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{}, usr) // Search overridden with an empty array
 }
