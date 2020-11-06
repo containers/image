@@ -271,15 +271,14 @@ func (conf *shortNameAliasConf) parseAndValidate(path string) error {
 			conf.namedAliases[name] = alias{named, path}
 		}
 	}
-	var err error // nil if no errors
-	for _, e := range errs {
-		if err == nil {
-			err = e
-		} else {
-			err = errors.Wrapf(err, "%v\n", e)
+	if len(errs) > 0 {
+		err := errs[0]
+		for i := 1; i < len(errs); i++ {
+			err = errors.Wrapf(err, "%v\n", errs[i])
 		}
+		return err
 	}
-	return err
+	return nil
 }
 
 func loadShortNameAliasConf(confPath string) (*shortNameAliasConf, error) {
