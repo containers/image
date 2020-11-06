@@ -798,15 +798,6 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 		return err
 	}
 
-	// Now check if the newly loaded config set the USRs.
-	if c.partialV2.UnqualifiedSearchRegistries != nil {
-		// USRs set -> record it as the new origin.
-		c.unqualifiedSearchRegistriesOrigin = updates.unqualifiedSearchRegistriesOrigin
-	} else {
-		// USRs not set -> restore the previous USRs
-		c.partialV2.UnqualifiedSearchRegistries = prevUSRs
-	}
-
 	// Merge the freshly loaded registries.
 	for i := range c.partialV2.Registries {
 		registryMap[c.partialV2.Registries[i].Prefix] = c.partialV2.Registries[i]
@@ -828,6 +819,20 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 		c.partialV2.Registries = append(c.partialV2.Registries, registryMap[prefix])
 	}
 
+	// Now check if the newly loaded config set the USRs.
+	if c.partialV2.UnqualifiedSearchRegistries != nil {
+		// USRs set -> record it as the new origin.
+		c.unqualifiedSearchRegistriesOrigin = updates.unqualifiedSearchRegistriesOrigin
+	} else {
+		// USRs not set -> restore the previous USRs
+		c.partialV2.UnqualifiedSearchRegistries = prevUSRs
+	}
+
+	// If set, parse & store the specified short-name mode.
+	if updates.shortNameMode != types.ShortNameModeInvalid {
+		c.shortNameMode = updates.shortNameMode
+	}
+
 	// Merge the alias maps.  New configs override previous entries.
 	if c.aliasCache == nil {
 		c.aliasCache = &shortNameAliasCache{
@@ -835,11 +840,6 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 		}
 	}
 	c.aliasCache.updateWithConfigurationFrom(updates.aliasCache)
-
-	// If set, parse & store the specified short-name mode.
-	if updates.shortNameMode != types.ShortNameModeInvalid {
-		c.shortNameMode = updates.shortNameMode
-	}
 
 	return nil
 }
