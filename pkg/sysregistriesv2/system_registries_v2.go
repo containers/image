@@ -155,9 +155,6 @@ type V2RegistriesConf struct {
 	// An array of host[:port] (not prefix!) entries to use for resolving unqualified image references
 	UnqualifiedSearchRegistries []string `toml:"unqualified-search-registries"`
 
-	// Absolut path to the configuration file that set the UnqualifiedSearchRegistries.
-	unqualifiedSearchRegistriesOrigin string
-
 	// ShortNameMode defines how short-name resolution should be handled by
 	// _consumers_ of this package.  Depending on the mode, the user should
 	// be prompted with a choice of using one of the unqualified-search
@@ -191,8 +188,10 @@ type parsedConfig struct {
 	// partialV2 must continue to exist to maintain the return value of TryUpdatingCache
 	// for compatibility with existing callers.
 	// We store the authoritative Registries and UnqualifiedSearchRegistries values there as well.
-	partialV2  V2RegistriesConf
-	aliasCache *shortNameAliasCache
+	partialV2 V2RegistriesConf
+	// Absolute path to the configuration file that set the UnqualifiedSearchRegistries.
+	unqualifiedSearchRegistriesOrigin string
+	aliasCache                        *shortNameAliasCache
 }
 
 // InvalidRegistries represents an invalid registry configurations.  An example
@@ -618,7 +617,7 @@ func UnqualifiedSearchRegistriesWithOrigin(ctx *types.SystemContext) ([]string, 
 	if err != nil {
 		return nil, "", err
 	}
-	return config.partialV2.UnqualifiedSearchRegistries, config.partialV2.unqualifiedSearchRegistriesOrigin, nil
+	return config.partialV2.UnqualifiedSearchRegistries, config.unqualifiedSearchRegistriesOrigin, nil
 }
 
 // parseShortNameMode translates the string into well-typed
@@ -745,6 +744,8 @@ func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) (*parsedCon
 		return nil, err
 	}
 
+	res.unqualifiedSearchRegistriesOrigin = path
+
 	// Parse and validate short-name aliases.
 	cache, err := newShortNameAliasCache(path, &res.partialV2.shortNameAliasConf)
 	if err != nil {
@@ -772,11 +773,6 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 		registryMap[c.partialV2.Registries[i].Prefix] = c.partialV2.Registries[i]
 	}
 
-	// Initialize the USR origin.
-	if len(c.partialV2.unqualifiedSearchRegistriesOrigin) == 0 {
-		c.partialV2.unqualifiedSearchRegistriesOrigin = path
-	}
-
 	// Store the current USRs so we can determine _after_ loading if they
 	// changed.
 	prevUSRs := c.partialV2.UnqualifiedSearchRegistries
@@ -793,7 +789,7 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 	// Now check if the newly loaded config set the USRs.
 	if c.partialV2.UnqualifiedSearchRegistries != nil {
 		// USRs set -> record it as the new origin.
-		c.partialV2.unqualifiedSearchRegistriesOrigin = path
+		c.unqualifiedSearchRegistriesOrigin = updates.unqualifiedSearchRegistriesOrigin
 	} else {
 		// USRs not set -> restore the previous USRs
 		c.partialV2.UnqualifiedSearchRegistries = prevUSRs
