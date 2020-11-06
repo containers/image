@@ -98,7 +98,7 @@ func ResolveShortNameAlias(ctx *types.SystemContext, name string) (reference.Nam
 	if err != nil {
 		return nil, "", err
 	}
-	alias, resolved = config.namedAliases[name]
+	alias, resolved = config.v2.namedAliases[name]
 	if resolved {
 		return alias.value, alias.configOrigin, nil
 	}

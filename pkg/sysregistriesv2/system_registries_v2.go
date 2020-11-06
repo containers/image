@@ -190,6 +190,15 @@ type tomlConfig struct {
 	V1RegistriesConf // for backwards compatibility with sysregistries v1
 }
 
+// parsedConfig is the result of parsing, and possibly merging, configuration files;
+// it is the boundary between the process of reading+ingesting the files, and
+// later interpreting the configuraiton based on caller’s requests.
+type parsedConfig struct {
+	// For now, just embed an unprocessed configuration. Later we may add data structures to
+	// amortize parsing cost or speed up lookups.
+	v2 V2RegistriesConf
+}
+
 // InvalidRegistries represents an invalid registry configurations.  An example
 // is when "registry.com" is defined multiple times in the configuration but
 // with conflicting security settings.
@@ -450,7 +459,7 @@ var configMutex = sync.Mutex{}
 // configCache caches already loaded configs with config paths as keys and is
 // used to avoid redundantly parsing configs. Concurrent accesses to the cache
 // are synchronized via configMutex.
-var configCache = make(map[configWrapper]*V2RegistriesConf)
+var configCache = make(map[configWrapper]*parsedConfig)
 
 // InvalidateCache invalidates the registry cache.  This function is meant to be
 // used for long-running processes that need to reload potential changes made to
@@ -458,11 +467,11 @@ var configCache = make(map[configWrapper]*V2RegistriesConf)
 func InvalidateCache() {
 	configMutex.Lock()
 	defer configMutex.Unlock()
-	configCache = make(map[configWrapper]*V2RegistriesConf)
+	configCache = make(map[configWrapper]*parsedConfig)
 }
 
 // getConfig returns the config object corresponding to ctx, loading it if it is not yet cached.
-func getConfig(ctx *types.SystemContext) (*V2RegistriesConf, error) {
+func getConfig(ctx *types.SystemContext) (*parsedConfig, error) {
 	wrapper := newConfigWrapper(ctx)
 	configMutex.Lock()
 	if config, inCache := configCache[wrapper]; inCache {
@@ -529,12 +538,16 @@ func dropInConfigs(wrapper configWrapper) ([]string, error) {
 // without using the internal cache. On success, the loaded configuration will
 // be added into the internal registry cache.
 func TryUpdatingCache(ctx *types.SystemContext) (*V2RegistriesConf, error) {
-	return tryUpdatingCache(ctx, newConfigWrapper(ctx))
+	config, err := tryUpdatingCache(ctx, newConfigWrapper(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return &config.v2, err
 }
 
 // tryUpdatingCache implements TryUpdatingCache with an additional configWrapper
 // argument to avoid redundantly calculating the config paths.
-func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*V2RegistriesConf, error) {
+func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedConfig, error) {
 	configMutex.Lock()
 	defer configMutex.Unlock()
 
@@ -566,11 +579,11 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*V2Regis
 		}
 	}
 
-	v2Config := &config.V2RegistriesConf
+	parsedConfig := &parsedConfig{v2: config.V2RegistriesConf}
 
 	// populate the cache
-	configCache[wrapper] = v2Config
-	return v2Config, nil
+	configCache[wrapper] = parsedConfig
+	return parsedConfig, nil
 }
 
 // GetRegistries loads and returns the registries specified in the config.
@@ -581,7 +594,7 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 	if err != nil {
 		return nil, err
 	}
-	return config.Registries, nil
+	return config.v2.Registries, nil
 }
 
 // UnqualifiedSearchRegistries returns a list of host[:port] entries to try
@@ -600,7 +613,7 @@ func UnqualifiedSearchRegistriesWithOrigin(ctx *types.SystemContext) ([]string, 
 	if err != nil {
 		return nil, "", err
 	}
-	return config.UnqualifiedSearchRegistries, config.unqualifiedSearchRegistriesOrigin, nil
+	return config.v2.UnqualifiedSearchRegistries, config.v2.unqualifiedSearchRegistriesOrigin, nil
 }
 
 // parseShortNameMode translates the string into well-typed
@@ -624,7 +637,7 @@ func GetShortNameMode(ctx *types.SystemContext) (types.ShortNameMode, error) {
 	if err != nil {
 		return -1, err
 	}
-	return config.shortNameMode, err
+	return config.v2.shortNameMode, err
 }
 
 // refMatchesPrefix returns true iff ref,
@@ -666,7 +679,7 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 
 	reg := Registry{}
 	prefixLen := 0
-	for _, r := range config.Registries {
+	for _, r := range config.v2.Registries {
 		if refMatchesPrefix(ref, r.Prefix) {
 			length := len(r.Prefix)
 			if length > prefixLen {
