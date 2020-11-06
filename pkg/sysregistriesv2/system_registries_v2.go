@@ -552,7 +552,7 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedC
 	defer configMutex.Unlock()
 
 	// load the config
-	config := &tomlConfig{}
+	config := &parsedConfig{}
 	if err := config.loadConfig(wrapper.configPath, false); err != nil {
 		// Continue with an empty []Registry if we use the default config, which
 		// implies that the config path of the SystemContext isn't set.
@@ -560,8 +560,8 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedC
 		// Note: if ctx.SystemRegistriesConfPath points to the default config,
 		// we will still return an error.
 		if os.IsNotExist(err) && (ctx == nil || ctx.SystemRegistriesConfPath == "") {
-			config = &tomlConfig{}
-			config.V2RegistriesConf = V2RegistriesConf{Registries: []Registry{}}
+			config = &parsedConfig{}
+			config.v2 = V2RegistriesConf{Registries: []Registry{}}
 		} else {
 			return nil, errors.Wrapf(err, "error loading registries configuration %q", wrapper.configPath)
 		}
@@ -579,11 +579,9 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedC
 		}
 	}
 
-	parsedConfig := &parsedConfig{v2: config.V2RegistriesConf}
-
 	// populate the cache
-	configCache[wrapper] = parsedConfig
-	return parsedConfig, nil
+	configCache[wrapper] = config
+	return config, nil
 }
 
 // GetRegistries loads and returns the registries specified in the config.
@@ -694,92 +692,93 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 	return nil, nil
 }
 
-// loadConfig loads and unmarshals the configuration at the specified path. Note
-// that v1 configs are translated into v2 and are cleared.  Use forceV2 if the
-// config must in the v2 format.
+// loadConfig loads and unmarshals the configuration at the specified path.
+// Use forceV2 if the config must in the v2 format.
 //
 // Note that specified fields in path will replace already set fields in the
-// tomlConfig.  Only the [[registry]] tables are merged by prefix.
-func (c *tomlConfig) loadConfig(path string, forceV2 bool) error {
-	// TODO: the code became hard to brain-parse and maintain. The function
-	// should separate the loadding, converting and merging steps more
-	// clearly.
+// parsedConfig.  Only the [[registry]] tables are merged by prefix.
+func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 	logrus.Debugf("Loading registries configuration %q", path)
 
 	// Save the registries before decoding the file where they could be lost.
 	// We merge them later again.
 	registryMap := make(map[string]Registry)
-	for i := range c.Registries {
-		registryMap[c.Registries[i].Prefix] = c.Registries[i]
+	for i := range c.v2.Registries {
+		registryMap[c.v2.Registries[i].Prefix] = c.v2.Registries[i]
 	}
 
-	prevAliases := c.namedAliases // store the aliases so they're not overridden
+	prevAliases := c.v2.namedAliases // store the aliases so they're not overridden
 	if prevAliases == nil {
 		prevAliases = make(map[string]alias)
 	}
 
 	// Initialize the USR origin.
-	if len(c.unqualifiedSearchRegistriesOrigin) == 0 {
-		c.unqualifiedSearchRegistriesOrigin = path
+	if len(c.v2.unqualifiedSearchRegistriesOrigin) == 0 {
+		c.v2.unqualifiedSearchRegistriesOrigin = path
 	}
 
 	// Store the current USRs so we can determine _after_ loading if they
 	// changed.
-	prevUSRs := c.UnqualifiedSearchRegistries
-	c.UnqualifiedSearchRegistries = nil
+	prevUSRs := c.v2.UnqualifiedSearchRegistries
+	c.v2.UnqualifiedSearchRegistries = nil
 
 	// Load the tomlConfig. Note that `DecodeFile` will overwrite set fields.
-	c.Registries = nil // important to clear the memory to prevent us from overlapping fields
-	c.Aliases = nil
-	_, err := toml.DecodeFile(path, c)
+	c.v2.Registries = nil // important to clear the memory to prevent us from overlapping fields
+	c.v2.Aliases = nil
+	combinedTOML := tomlConfig{
+		V2RegistriesConf: c.v2,
+	}
+	_, err := toml.DecodeFile(path, &combinedTOML)
 	if err != nil {
 		return err
 	}
 
-	if c.V1RegistriesConf.Nonempty() {
+	if combinedTOML.V1RegistriesConf.Nonempty() {
 		// Enforce the v2 format if requested.
 		if forceV2 {
 			return &InvalidRegistries{s: "registry must be in v2 format but is in v1"}
 		}
 
 		// Convert a v1 config into a v2 config.
-		if c.V2RegistriesConf.Nonempty() {
+		if combinedTOML.V2RegistriesConf.Nonempty() {
 			return &InvalidRegistries{s: "mixing sysregistry v1/v2 is not supported"}
 		}
-		v2, err := c.V1RegistriesConf.ConvertToV2()
+		v2, err := combinedTOML.V1RegistriesConf.ConvertToV2()
 		if err != nil {
 			return err
 		}
-		c.V1RegistriesConf = V1RegistriesConf{}
-		c.V2RegistriesConf = *v2
-	}
-
-	// Now check if the newly loaded config set the USRs.
-	if c.UnqualifiedSearchRegistries != nil {
-		// USRs set -> record it as the new origin.
-		c.unqualifiedSearchRegistriesOrigin = path
-	} else {
-		// USRs not set -> restore the previous USRs
-		c.UnqualifiedSearchRegistries = prevUSRs
+		combinedTOML.V1RegistriesConf = V1RegistriesConf{}
+		combinedTOML.V2RegistriesConf = *v2
 	}
 
 	// Post process registries, set the correct prefixes, sanity checks, etc.
-	if err := c.postProcessRegistries(); err != nil {
+	if err := combinedTOML.postProcessRegistries(); err != nil {
 		return err
 	}
 
+	c.v2 = combinedTOML.V2RegistriesConf
+
+	// Now check if the newly loaded config set the USRs.
+	if c.v2.UnqualifiedSearchRegistries != nil {
+		// USRs set -> record it as the new origin.
+		c.v2.unqualifiedSearchRegistriesOrigin = path
+	} else {
+		// USRs not set -> restore the previous USRs
+		c.v2.UnqualifiedSearchRegistries = prevUSRs
+	}
+
 	// Parse and validate short-name aliases.
-	if err := c.shortNameAliasConf.parseAndValidate(path); err != nil {
+	if err := c.v2.shortNameAliasConf.parseAndValidate(path); err != nil {
 		return errors.Wrap(err, "error validating short-name aliases")
 	}
-	// Nil conf.Aliases to make it available for garbage collection and
+	// Nil conf.v2.Aliases to make it available for garbage collection and
 	// reduce memory consumption.  We're consulting conf.namedAliases for
 	// look ups.
-	c.Aliases = nil
+	c.v2.Aliases = nil
 
 	// Merge the freshly loaded registries.
-	for i := range c.Registries {
-		registryMap[c.Registries[i].Prefix] = c.Registries[i]
+	for i := range c.v2.Registries {
+		registryMap[c.v2.Registries[i].Prefix] = c.v2.Registries[i]
 	}
 
 	// Go maps have a non-deterministic order when iterating the keys, so
@@ -793,26 +792,26 @@ func (c *tomlConfig) loadConfig(path string, forceV2 bool) error {
 	}
 	sort.Strings(prefixes)
 
-	c.Registries = []Registry{}
+	c.v2.Registries = []Registry{}
 	for _, prefix := range prefixes {
-		c.Registries = append(c.Registries, registryMap[prefix])
+		c.v2.Registries = append(c.v2.Registries, registryMap[prefix])
 	}
 
 	// Merge the alias maps.  New configs override previous entries.
-	newAliases := c.namedAliases
-	c.namedAliases = prevAliases // point back to the previous map and override
+	newAliases := c.v2.namedAliases
+	c.v2.namedAliases = prevAliases // point back to the previous map and override
 	for name, value := range newAliases {
-		c.namedAliases[name] = value
+		c.v2.namedAliases[name] = value
 	}
 
 	// If set, parse & store the specified short-name mode.
-	if len(c.ShortNameMode) > 0 {
-		c.shortNameMode, err = parseShortNameMode(c.ShortNameMode)
+	if len(c.v2.ShortNameMode) > 0 {
+		c.v2.shortNameMode, err = parseShortNameMode(c.v2.ShortNameMode)
 		if err != nil {
 			return err
 		}
 	} else {
-		c.shortNameMode = defaultShortNameMode
+		c.v2.shortNameMode = defaultShortNameMode
 	}
 
 	return nil
