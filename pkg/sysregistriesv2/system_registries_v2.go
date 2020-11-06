@@ -739,6 +739,17 @@ func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) error {
 		return err
 	}
 
+	// Parse and validate short-name aliases.
+	cache, err := newShortNameAliasCache(path, &combinedTOML.V2RegistriesConf.shortNameAliasConf)
+	if err != nil {
+		return errors.Wrap(err, "error validating short-name aliases")
+	}
+	combinedTOML.V2RegistriesConf.aliasCache = cache
+	// Nil conf.v2.Aliases to make it available for garbage collection and
+	// reduce memory consumption.  We're consulting conf.namedAliases for
+	// look ups.
+	combinedTOML.V2RegistriesConf.Aliases = nil
+
 	*v2 = combinedTOML.V2RegistriesConf
 	return nil
 }
@@ -788,17 +799,6 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 		// USRs not set -> restore the previous USRs
 		c.v2.UnqualifiedSearchRegistries = prevUSRs
 	}
-
-	// Parse and validate short-name aliases.
-	cache, err := newShortNameAliasCache(path, &c.v2.shortNameAliasConf)
-	if err != nil {
-		return errors.Wrap(err, "error validating short-name aliases")
-	}
-	c.v2.aliasCache = cache
-	// Nil conf.v2.Aliases to make it available for garbage collection and
-	// reduce memory consumption.  We're consulting conf.namedAliases for
-	// look ups.
-	c.v2.Aliases = nil
 
 	// Merge the freshly loaded registries.
 	for i := range c.v2.Registries {
