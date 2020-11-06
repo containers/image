@@ -94,7 +94,7 @@ func TestResolveShortNameAlias(t *testing.T) {
 		UserShortNameAliasConfPath:  tmp.Name(),
 	}
 
-	configCache = make(map[configWrapper]*V2RegistriesConf)
+	InvalidateCache()
 	conf, err := TryUpdatingCache(sys)
 	require.NoError(t, err)
 	assert.Len(t, conf.namedAliases, 4)
@@ -149,7 +149,7 @@ func TestAliasesWithDropInConfigs(t *testing.T) {
 		UserShortNameAliasConfPath:  tmp.Name(),
 	}
 
-	configCache = make(map[configWrapper]*V2RegistriesConf)
+	InvalidateCache()
 	conf, err := TryUpdatingCache(sys)
 	require.NoError(t, err)
 	assert.Len(t, conf.namedAliases, 8)
@@ -261,7 +261,7 @@ func TestInvalidAliases(t *testing.T) {
 		UserShortNameAliasConfPath:  tmp.Name(),
 	}
 
-	configCache = make(map[configWrapper]*V2RegistriesConf)
+	InvalidateCache()
 	_, err = TryUpdatingCache(sys)
 	require.Error(t, err)
 
