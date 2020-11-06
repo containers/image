@@ -151,6 +151,8 @@ func (config *V1RegistriesConf) Nonempty() bool {
 
 // V2RegistriesConf is the sysregistries v2 configuration format.
 type V2RegistriesConf struct {
+	// NOTE: Update also parsedConfig.updateWithConfigurationFrom!
+
 	Registries []Registry `toml:"registry"`
 	// An array of host[:port] (not prefix!) entries to use for resolving unqualified image references
 	UnqualifiedSearchRegistries []string `toml:"unqualified-search-registries"`
@@ -531,8 +533,8 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedC
 	defer configMutex.Unlock()
 
 	// load the config
-	config := &parsedConfig{}
-	if err := config.loadConfig(wrapper.configPath, false); err != nil {
+	config, err := loadConfigFile(wrapper.configPath, false)
+	if err != nil {
 		// Continue with an empty []Registry if we use the default config, which
 		// implies that the config path of the SystemContext isn't set.
 		//
@@ -553,9 +555,11 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedC
 	}
 	for _, path := range dinConfigs {
 		// Enforce v2 format for drop-in-configs.
-		if err := config.loadConfig(path, true); err != nil {
+		dropIn, err := loadConfigFile(path, true)
+		if err != nil {
 			return nil, errors.Wrapf(err, "error loading drop-in registries configuration %q", path)
 		}
+		config.updateWithConfigurationFrom(dropIn)
 	}
 
 	// populate the cache
@@ -638,9 +642,9 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 	return nil, nil
 }
 
-// loadConfigFile loads and unmarshals a single config file, updating *v2.
+// loadConfigFile loads and unmarshals a single config file.
 // Use forceV2 if the config must in the v2 format.
-func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) error {
+func loadConfigFile(path string, forceV2 bool) (*parsedConfig, error) {
 	logrus.Debugf("Loading registries configuration %q", path)
 
 	// tomlConfig allows us to unmarshal either V1 or V2 simultaneously.
@@ -650,27 +654,25 @@ func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) error {
 	}
 
 	// Load the tomlConfig. Note that `DecodeFile` will overwrite set fields.
-	combinedTOML := tomlConfig{
-		V2RegistriesConf: *v2,
-	}
+	var combinedTOML tomlConfig
 	_, err := toml.DecodeFile(path, &combinedTOML)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if combinedTOML.V1RegistriesConf.Nonempty() {
 		// Enforce the v2 format if requested.
 		if forceV2 {
-			return &InvalidRegistries{s: "registry must be in v2 format but is in v1"}
+			return nil, &InvalidRegistries{s: "registry must be in v2 format but is in v1"}
 		}
 
 		// Convert a v1 config into a v2 config.
 		if combinedTOML.V2RegistriesConf.Nonempty() {
-			return &InvalidRegistries{s: "mixing sysregistry v1/v2 is not supported"}
+			return nil, &InvalidRegistries{s: "mixing sysregistry v1/v2 is not supported"}
 		}
 		converted, err := combinedTOML.V1RegistriesConf.ConvertToV2()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		combinedTOML.V1RegistriesConf = V1RegistriesConf{}
 		combinedTOML.V2RegistriesConf = *converted
@@ -678,35 +680,25 @@ func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) error {
 
 	// Post process registries, set the correct prefixes, sanity checks, etc.
 	if err := combinedTOML.V2RegistriesConf.postProcess(); err != nil {
-		return err
+		return nil, err
 	}
 
-	*v2 = combinedTOML.V2RegistriesConf
-	return nil
+	return &parsedConfig{v2: combinedTOML.V2RegistriesConf}, nil
 }
 
-// loadConfig loads and unmarshals the configuration at the specified path.
-// Use forceV2 if the config must in the v2 format.
+// updateWithConfigurationFrom updates c with configuration from updates.
 //
-// Note that specified fields in path will replace already set fields in the
-// parsedConfig.  Only the [[registry]] tables are merged by prefix.
-func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
-	// Save the registries before decoding the file where they could be lost.
-	// We merge them later again.
+// Fields present in updates will typically replace already set fields in c.
+// Only the [[registry]] tables are merged by prefix.
+func (c *parsedConfig) updateWithConfigurationFrom(updates *parsedConfig) {
+	// == Merge Registries:
 	registryMap := make(map[string]Registry)
 	for i := range c.v2.Registries {
 		registryMap[c.v2.Registries[i].Prefix] = c.v2.Registries[i]
 	}
-
-	// Load the new config file. Note that loadConfigFile will overwrite set fields.
-	c.v2.Registries = nil // important to clear the memory to prevent us from overlapping fields
-	if err := loadConfigFile(&c.v2, path, forceV2); err != nil {
-		return err
-	}
-
 	// Merge the freshly loaded registries.
-	for i := range c.v2.Registries {
-		registryMap[c.v2.Registries[i].Prefix] = c.v2.Registries[i]
+	for i := range updates.v2.Registries {
+		registryMap[updates.v2.Registries[i].Prefix] = updates.v2.Registries[i]
 	}
 
 	// Go maps have a non-deterministic order when iterating the keys, so
@@ -725,5 +717,11 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 		c.v2.Registries = append(c.v2.Registries, registryMap[prefix])
 	}
 
-	return nil
+	// == Merge UnqualifiedSearchRegistries:
+	// This depends on an subtlety of the behavior of the TOML decoder, where a missing array field
+	// is not modified while unmarshaling (in our case remains to nil), while an [] is unmarshaled
+	// as a non-nil []string{}.
+	if updates.v2.UnqualifiedSearchRegistries != nil {
+		c.v2.UnqualifiedSearchRegistries = updates.v2.UnqualifiedSearchRegistries
+	}
 }
