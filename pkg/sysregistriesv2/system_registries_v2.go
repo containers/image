@@ -179,6 +179,8 @@ func (config *V2RegistriesConf) Nonempty() bool {
 // it is the boundary between the process of reading+ingesting the files, and
 // later interpreting the configuraiton based on caller’s requests.
 type parsedConfig struct {
+	// NOTE: Update also parsedConfig.updateWithConfigurationFrom!
+
 	// partialV2 must continue to exist to maintain the return value of TryUpdatingCache
 	// for compatibility with existing callers.
 	// We store the authoritative Registries and UnqualifiedSearchRegistries values there as well.
@@ -556,8 +558,8 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedC
 	defer configMutex.Unlock()
 
 	// load the config
-	config := &parsedConfig{}
-	if err := config.loadConfig(wrapper.configPath, false); err != nil {
+	config, err := loadConfigFile(wrapper.configPath, false)
+	if err != nil {
 		// Continue with an empty []Registry if we use the default config, which
 		// implies that the config path of the SystemContext isn't set.
 		//
@@ -566,6 +568,10 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedC
 		if os.IsNotExist(err) && (ctx == nil || ctx.SystemRegistriesConfPath == "") {
 			config = &parsedConfig{}
 			config.partialV2 = V2RegistriesConf{Registries: []Registry{}}
+			config.aliasCache, err = newShortNameAliasCache("", &shortNameAliasConf{})
+			if err != nil {
+				return nil, err // Should never happen
+			}
 		} else {
 			return nil, errors.Wrapf(err, "error loading registries configuration %q", wrapper.configPath)
 		}
@@ -578,9 +584,11 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedC
 	}
 	for _, path := range dinConfigs {
 		// Enforce v2 format for drop-in-configs.
-		if err := config.loadConfig(path, true); err != nil {
+		dropIn, err := loadConfigFile(path, true)
+		if err != nil {
 			return nil, errors.Wrapf(err, "error loading drop-in registries configuration %q", path)
 		}
+		config.updateWithConfigurationFrom(dropIn)
 	}
 
 	if config.shortNameMode == types.ShortNameModeInvalid {
@@ -700,10 +708,9 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 	return nil, nil
 }
 
-// loadConfigFile loads and unmarshals a single config file, updating *v2 and also returning
-// some parsed data in the return value.
+// loadConfigFile loads and unmarshals a single config file.
 // Use forceV2 if the config must in the v2 format.
-func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) (*parsedConfig, error) {
+func loadConfigFile(path string, forceV2 bool) (*parsedConfig, error) {
 	logrus.Debugf("Loading registries configuration %q", path)
 
 	// tomlConfig allows us to unmarshal either V1 or V2 simultaneously.
@@ -713,9 +720,7 @@ func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) (*parsedCon
 	}
 
 	// Load the tomlConfig. Note that `DecodeFile` will overwrite set fields.
-	combinedTOML := tomlConfig{
-		V2RegistriesConf: *v2,
-	}
+	var combinedTOML tomlConfig
 	_, err := toml.DecodeFile(path, &combinedTOML)
 	if err != nil {
 		return nil, err
@@ -768,39 +773,22 @@ func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) (*parsedCon
 	// reduce memory consumption.  We're consulting aliasCache for lookups.
 	res.partialV2.shortNameAliasConf = shortNameAliasConf{}
 
-	*v2 = res.partialV2
 	return &res, nil
 }
 
-// loadConfig loads and unmarshals the configuration at the specified path.
-// Use forceV2 if the config must in the v2 format.
+// updateWithConfigurationFrom updates c with configuration from updates.
 //
-// Note that specified fields in path will replace already set fields in the
-// parsedConfig.  Only the [[registry]] tables are merged by prefix.
-func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
-	// Save the registries before decoding the file where they could be lost.
-	// We merge them later again.
+// Fields present in updates will typically replace already set fields in c.
+// The [[registry]] and alias tables are merged.
+func (c *parsedConfig) updateWithConfigurationFrom(updates *parsedConfig) {
+	// == Merge Registries:
 	registryMap := make(map[string]Registry)
 	for i := range c.partialV2.Registries {
 		registryMap[c.partialV2.Registries[i].Prefix] = c.partialV2.Registries[i]
 	}
-
-	// Store the current USRs so we can determine _after_ loading if they
-	// changed.
-	prevUSRs := c.partialV2.UnqualifiedSearchRegistries
-	c.partialV2.UnqualifiedSearchRegistries = nil
-
-	// Load the new config file. Note that loadConfigFile will overwrite set fields.
-	c.partialV2.Registries = nil // important to clear the memory to prevent us from overlapping fields
-	c.partialV2.Aliases = nil
-	updates, err := loadConfigFile(&c.partialV2, path, forceV2)
-	if err != nil {
-		return err
-	}
-
 	// Merge the freshly loaded registries.
-	for i := range c.partialV2.Registries {
-		registryMap[c.partialV2.Registries[i].Prefix] = c.partialV2.Registries[i]
+	for i := range updates.partialV2.Registries {
+		registryMap[updates.partialV2.Registries[i].Prefix] = updates.partialV2.Registries[i]
 	}
 
 	// Go maps have a non-deterministic order when iterating the keys, so
@@ -819,27 +807,22 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 		c.partialV2.Registries = append(c.partialV2.Registries, registryMap[prefix])
 	}
 
-	// Now check if the newly loaded config set the USRs.
-	if c.partialV2.UnqualifiedSearchRegistries != nil {
-		// USRs set -> record it as the new origin.
+	// == Merge UnqualifiedSearchRegistries:
+	// This depends on an subtlety of the behavior of the TOML decoder, where a missing array field
+	// is not modified while unmarshaling (in our case remains to nil), while an [] is unmarshaled
+	// as a non-nil []string{}.
+	if updates.partialV2.UnqualifiedSearchRegistries != nil {
+		c.partialV2.UnqualifiedSearchRegistries = updates.partialV2.UnqualifiedSearchRegistries
 		c.unqualifiedSearchRegistriesOrigin = updates.unqualifiedSearchRegistriesOrigin
-	} else {
-		// USRs not set -> restore the previous USRs
-		c.partialV2.UnqualifiedSearchRegistries = prevUSRs
 	}
 
-	// If set, parse & store the specified short-name mode.
+	// == Merge shortNameMode:
+	// We don’t maintain c.partialV2.ShortNameMode.
 	if updates.shortNameMode != types.ShortNameModeInvalid {
 		c.shortNameMode = updates.shortNameMode
 	}
 
-	// Merge the alias maps.  New configs override previous entries.
-	if c.aliasCache == nil {
-		c.aliasCache = &shortNameAliasCache{
-			namedAliases: make(map[string]alias),
-		}
-	}
+	// == Merge aliasCache:
+	// We don’t maintain (in fact we actively clear) c.partialV2.shortNameAliasConf.
 	c.aliasCache.updateWithConfigurationFrom(updates.aliasCache)
-
-	return nil
 }
