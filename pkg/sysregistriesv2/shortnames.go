@@ -138,6 +138,9 @@ func editShortNameAlias(ctx *types.SystemContext, name string, value *string) er
 		return err
 	}
 
+	if conf.Aliases == nil { // Ensure we have a map to update.
+		conf.Aliases = make(map[string]string)
+	}
 	if value != nil {
 		conf.Aliases[name] = *value
 	} else {
@@ -246,9 +249,6 @@ func validateShortName(name string) error {
 // a corresponding shortNameAliasCache.
 // the results in conf.namedAliases.
 func (conf *shortNameAliasConf) parseAndValidate(path string) (*shortNameAliasCache, error) {
-	if conf.Aliases == nil {
-		conf.Aliases = make(map[string]string)
-	}
 	res := shortNameAliasCache{
 		namedAliases: make(map[string]alias),
 	}
