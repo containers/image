@@ -166,9 +166,6 @@ type V2RegistriesConf struct {
 	// potentially use all unqualified-search registries
 	ShortNameMode string `toml:"short-name-mode"`
 
-	// TODO: separate upper format from internal data below:
-	// https://github.com/containers/image/pull/1060#discussion_r503386541
-
 	shortNameAliasConf
 }
 
