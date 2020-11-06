@@ -635,25 +635,14 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 	return nil, nil
 }
 
-// loadConfig loads and unmarshals the configuration at the specified path.
+// loadConfigFile loads and unmarshals a single config file, updating *v2.
 // Use forceV2 if the config must in the v2 format.
-//
-// Note that specified fields in path will replace already set fields in the
-// parsedConfig.  Only the [[registry]] tables are merged by prefix.
-func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
+func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) error {
 	logrus.Debugf("Loading registries configuration %q", path)
 
-	// Save the registries before decoding the file where they could be lost.
-	// We merge them later again.
-	registryMap := make(map[string]Registry)
-	for i := range c.v2.Registries {
-		registryMap[c.v2.Registries[i].Prefix] = c.v2.Registries[i]
-	}
-
 	// Load the tomlConfig. Note that `DecodeFile` will overwrite set fields.
-	c.v2.Registries = nil // important to clear the memory to prevent us from overlapping fields
 	combinedTOML := tomlConfig{
-		V2RegistriesConf: c.v2,
+		V2RegistriesConf: *v2,
 	}
 	_, err := toml.DecodeFile(path, &combinedTOML)
 	if err != nil {
@@ -670,12 +659,12 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 		if combinedTOML.V2RegistriesConf.Nonempty() {
 			return &InvalidRegistries{s: "mixing sysregistry v1/v2 is not supported"}
 		}
-		v2, err := combinedTOML.V1RegistriesConf.ConvertToV2()
+		converted, err := combinedTOML.V1RegistriesConf.ConvertToV2()
 		if err != nil {
 			return err
 		}
 		combinedTOML.V1RegistriesConf = V1RegistriesConf{}
-		combinedTOML.V2RegistriesConf = *v2
+		combinedTOML.V2RegistriesConf = *converted
 	}
 
 	// Post process registries, set the correct prefixes, sanity checks, etc.
@@ -683,7 +672,28 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 		return err
 	}
 
-	c.v2 = combinedTOML.V2RegistriesConf
+	*v2 = combinedTOML.V2RegistriesConf
+	return nil
+}
+
+// loadConfig loads and unmarshals the configuration at the specified path.
+// Use forceV2 if the config must in the v2 format.
+//
+// Note that specified fields in path will replace already set fields in the
+// parsedConfig.  Only the [[registry]] tables are merged by prefix.
+func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
+	// Save the registries before decoding the file where they could be lost.
+	// We merge them later again.
+	registryMap := make(map[string]Registry)
+	for i := range c.v2.Registries {
+		registryMap[c.v2.Registries[i].Prefix] = c.v2.Registries[i]
+	}
+
+	// Load the new config file. Note that loadConfigFile will overwrite set fields.
+	c.v2.Registries = nil // important to clear the memory to prevent us from overlapping fields
+	if err := loadConfigFile(&c.v2, path, forceV2); err != nil {
+		return err
+	}
 
 	// Merge the freshly loaded registries.
 	for i := range c.v2.Registries {
