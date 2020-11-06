@@ -169,9 +169,6 @@ type V2RegistriesConf struct {
 	// TODO: separate upper format from internal data below:
 	// https://github.com/containers/image/pull/1060#discussion_r503386541
 
-	// shortNameMode is stored _once_ when loading the config.
-	shortNameMode types.ShortNameMode
-
 	shortNameAliasConf
 }
 
@@ -191,7 +188,11 @@ type parsedConfig struct {
 	partialV2 V2RegistriesConf
 	// Absolute path to the configuration file that set the UnqualifiedSearchRegistries.
 	unqualifiedSearchRegistriesOrigin string
-	aliasCache                        *shortNameAliasCache
+	// Result of parsing of partialV2.ShortNameMode.
+	// NOTE: May be ShortNameModeInvalid to represent ShortNameMode == "" in intermediate values;
+	// the full configuration in configCache / getConfig() always contains a valid value.
+	shortNameMode types.ShortNameMode
+	aliasCache    *shortNameAliasCache
 }
 
 // InvalidRegistries represents an invalid registry configurations.  An example
@@ -585,6 +586,10 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedC
 		}
 	}
 
+	if config.shortNameMode == types.ShortNameModeInvalid {
+		config.shortNameMode = defaultShortNameMode
+	}
+
 	// populate the cache
 	configCache[wrapper] = config
 	return config, nil
@@ -641,7 +646,7 @@ func GetShortNameMode(ctx *types.SystemContext) (types.ShortNameMode, error) {
 	if err != nil {
 		return -1, err
 	}
-	return config.partialV2.shortNameMode, err
+	return config.shortNameMode, err
 }
 
 // refMatchesPrefix returns true iff ref,
@@ -746,6 +751,16 @@ func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) (*parsedCon
 
 	res.unqualifiedSearchRegistriesOrigin = path
 
+	if len(res.partialV2.ShortNameMode) > 0 {
+		mode, err := parseShortNameMode(res.partialV2.ShortNameMode)
+		if err != nil {
+			return nil, err
+		}
+		res.shortNameMode = mode
+	} else {
+		res.shortNameMode = types.ShortNameModeInvalid
+	}
+
 	// Parse and validate short-name aliases.
 	cache, err := newShortNameAliasCache(path, &res.partialV2.shortNameAliasConf)
 	if err != nil {
@@ -825,14 +840,8 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 	c.aliasCache.updateWithConfigurationFrom(updates.aliasCache)
 
 	// If set, parse & store the specified short-name mode.
-	if len(c.partialV2.ShortNameMode) > 0 {
-		mode, err := parseShortNameMode(c.partialV2.ShortNameMode)
-		if err != nil {
-			return err
-		}
-		c.partialV2.shortNameMode = mode
-	} else {
-		c.partialV2.shortNameMode = defaultShortNameMode
+	if updates.shortNameMode != types.ShortNameModeInvalid {
+		c.shortNameMode = updates.shortNameMode
 	}
 
 	return nil
