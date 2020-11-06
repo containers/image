@@ -35,6 +35,15 @@ func shortNameAliasesConfPath(ctx *types.SystemContext) (string, error) {
 	return filepath.Join(configHome, userShortNamesFile), nil
 }
 
+// shortNameAliasConf is a subset of the `V2RegistriesConf` format.  It's used in the
+// software-maintained `userShortNamesFile`.
+type shortNameAliasConf struct {
+	// A map for aliasing short names to their fully-qualified image
+	// reference counter parts.
+	// Note that Aliases is niled after being loaded from a file.
+	Aliases map[string]string `toml:"aliases"`
+}
+
 // alias combines the parsed value of an alias with the config file it has been
 // specified in.  The config file is crucial for an improved user experience
 // such that users are able to resolve potential pull errors.
@@ -45,14 +54,9 @@ type alias struct {
 	configOrigin string
 }
 
-// shortNameAliasConf is a subset of the `V2RegistriesConf` format.  It's used in the
-// software-maintained `userShortNamesFile`.
-type shortNameAliasConf struct {
-	// A map for aliasing short names to their fully-qualified image
-	// reference counter parts.
-	// Note that Aliases is niled after being loaded from a file.
-	Aliases map[string]string `toml:"aliases"`
-
+// shortNameAliasCache is the result of parsing shortNameAliasConf,
+// pre-processed for faster usage.
+type shortNameAliasCache struct {
 	// Note that an alias value may be nil iff it's set as an empty string
 	// in the config.
 	namedAliases map[string]alias
@@ -82,14 +86,14 @@ func ResolveShortNameAlias(ctx *types.SystemContext, name string) (reference.Nam
 	lock.RLock()
 	defer lock.Unlock()
 
-	aliasConf, err := loadShortNameAliasConf(confPath)
+	_, aliasCache, err := loadShortNameAliasConf(confPath)
 	if err != nil {
 		return nil, "", err
 	}
 
 	// First look up the short-name-aliases.conf.  Note that a value may be
 	// nil iff it's set as an empty string in the config.
-	alias, resolved := aliasConf.namedAliases[name]
+	alias, resolved := aliasCache.namedAliases[name]
 	if resolved {
 		return alias.value, alias.configOrigin, nil
 	}
@@ -98,7 +102,7 @@ func ResolveShortNameAlias(ctx *types.SystemContext, name string) (reference.Nam
 	if err != nil {
 		return nil, "", err
 	}
-	alias, resolved = config.v2.namedAliases[name]
+	alias, resolved = config.v2.aliasCache.namedAliases[name]
 	if resolved {
 		return alias.value, alias.configOrigin, nil
 	}
@@ -129,7 +133,7 @@ func editShortNameAlias(ctx *types.SystemContext, name string, value *string) er
 
 	// Load the short-name-alias.conf, add the specified name-value pair,
 	// and write it back to the file.
-	conf, err := loadShortNameAliasConf(confPath)
+	conf, _, err := loadShortNameAliasConf(confPath)
 	if err != nil {
 		return err
 	}
@@ -238,14 +242,15 @@ func validateShortName(name string) error {
 	return nil
 }
 
-// parseAndValidate parses and validates all entries in conf.Aliases and stores
+// parseAndValidate parses and validates all entries in conf.Aliases, and returns
+// a corresponding shortNameAliasCache.
 // the results in conf.namedAliases.
-func (conf *shortNameAliasConf) parseAndValidate(path string) error {
+func (conf *shortNameAliasConf) parseAndValidate(path string) (*shortNameAliasCache, error) {
 	if conf.Aliases == nil {
 		conf.Aliases = make(map[string]string)
 	}
-	if conf.namedAliases == nil {
-		conf.namedAliases = make(map[string]alias)
+	res := shortNameAliasCache{
+		namedAliases: make(map[string]alias),
 	}
 	errs := []error{}
 	for name, value := range conf.Aliases {
@@ -258,7 +263,7 @@ func (conf *shortNameAliasConf) parseAndValidate(path string) error {
 		// config files from registries.conf.d can reset potentially
 		// malconfigured aliases.
 		if value == "" {
-			conf.namedAliases[name] = alias{nil, path}
+			res.namedAliases[name] = alias{nil, path}
 			continue
 		}
 
@@ -268,7 +273,7 @@ func (conf *shortNameAliasConf) parseAndValidate(path string) error {
 			// whack-a-mole for the user.
 			errs = append(errs, err)
 		} else {
-			conf.namedAliases[name] = alias{named, path}
+			res.namedAliases[name] = alias{named, path}
 		}
 	}
 	if len(errs) > 0 {
@@ -276,27 +281,28 @@ func (conf *shortNameAliasConf) parseAndValidate(path string) error {
 		for i := 1; i < len(errs); i++ {
 			err = errors.Wrapf(err, "%v\n", errs[i])
 		}
-		return err
+		return nil, err
 	}
-	return nil
+	return &res, nil
 }
 
-func loadShortNameAliasConf(confPath string) (*shortNameAliasConf, error) {
+func loadShortNameAliasConf(confPath string) (*shortNameAliasConf, *shortNameAliasCache, error) {
 	conf := shortNameAliasConf{}
 
 	_, err := toml.DecodeFile(confPath, &conf)
 	if err != nil && !os.IsNotExist(err) {
 		// It's okay if the config doesn't exist.  Other errors are not.
-		return nil, errors.Wrapf(err, "error loading short-name aliases config file %q", confPath)
+		return nil, nil, errors.Wrapf(err, "error loading short-name aliases config file %q", confPath)
 	}
 
 	// Better safe than sorry: validate the machine-generated config.  The
 	// file could still be corrupted by another process or user.
-	if err := conf.parseAndValidate(confPath); err != nil {
-		return nil, errors.Wrapf(err, "error loading short-name aliases config file %q", confPath)
+	cache, err := conf.parseAndValidate(confPath)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "error loading short-name aliases config file %q", confPath)
 	}
 
-	return &conf, nil
+	return &conf, cache, nil
 }
 
 func shortNameAliasesConfPathAndLock(ctx *types.SystemContext) (string, lockfile.Locker, error) {

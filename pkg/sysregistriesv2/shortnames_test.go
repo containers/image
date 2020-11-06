@@ -97,7 +97,7 @@ func TestResolveShortNameAlias(t *testing.T) {
 	InvalidateCache()
 	conf, err := TryUpdatingCache(sys)
 	require.NoError(t, err)
-	assert.Len(t, conf.namedAliases, 4)
+	assert.Len(t, conf.aliasCache.namedAliases, 4)
 	assert.Len(t, conf.Aliases, 0)
 
 	aliases := []struct {
@@ -152,7 +152,7 @@ func TestAliasesWithDropInConfigs(t *testing.T) {
 	InvalidateCache()
 	conf, err := TryUpdatingCache(sys)
 	require.NoError(t, err)
-	assert.Len(t, conf.namedAliases, 8)
+	assert.Len(t, conf.aliasCache.namedAliases, 8)
 	assert.Len(t, conf.Aliases, 0)
 
 	aliases := []struct {

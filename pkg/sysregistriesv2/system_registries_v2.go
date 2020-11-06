@@ -176,6 +176,7 @@ type V2RegistriesConf struct {
 	shortNameMode types.ShortNameMode
 
 	shortNameAliasConf
+	aliasCache *shortNameAliasCache
 }
 
 // Nonempty returns true if config contains at least one configuration entry.
@@ -755,9 +756,11 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 		registryMap[c.v2.Registries[i].Prefix] = c.v2.Registries[i]
 	}
 
-	prevAliases := c.v2.namedAliases // store the aliases so they're not overridden
+	prevAliases := c.v2.aliasCache // store the aliases so they're not overridden
 	if prevAliases == nil {
-		prevAliases = make(map[string]alias)
+		prevAliases = &shortNameAliasCache{
+			namedAliases: make(map[string]alias),
+		}
 	}
 
 	// Initialize the USR origin.
@@ -787,9 +790,11 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 	}
 
 	// Parse and validate short-name aliases.
-	if err := c.v2.shortNameAliasConf.parseAndValidate(path); err != nil {
+	cache, err := c.v2.shortNameAliasConf.parseAndValidate(path)
+	if err != nil {
 		return errors.Wrap(err, "error validating short-name aliases")
 	}
+	c.v2.aliasCache = cache
 	// Nil conf.v2.Aliases to make it available for garbage collection and
 	// reduce memory consumption.  We're consulting conf.namedAliases for
 	// look ups.
@@ -817,10 +822,10 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 	}
 
 	// Merge the alias maps.  New configs override previous entries.
-	newAliases := c.v2.namedAliases
-	c.v2.namedAliases = prevAliases // point back to the previous map and override
-	for name, value := range newAliases {
-		c.v2.namedAliases[name] = value
+	newAliases := c.v2.aliasCache
+	c.v2.aliasCache = prevAliases // point back to the previous map and override
+	for name, value := range newAliases.namedAliases {
+		c.v2.aliasCache.namedAliases[name] = value
 	}
 
 	// If set, parse & store the specified short-name mode.
