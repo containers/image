@@ -790,7 +790,7 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 	}
 
 	// Parse and validate short-name aliases.
-	cache, err := c.v2.shortNameAliasConf.parseAndValidate(path)
+	cache, err := newShortNameAliasCache(path, &c.v2.shortNameAliasConf)
 	if err != nil {
 		return errors.Wrap(err, "error validating short-name aliases")
 	}

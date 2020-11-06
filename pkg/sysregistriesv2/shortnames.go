@@ -245,10 +245,9 @@ func validateShortName(name string) error {
 	return nil
 }
 
-// parseAndValidate parses and validates all entries in conf.Aliases, and returns
-// a corresponding shortNameAliasCache.
-// the results in conf.namedAliases.
-func (conf *shortNameAliasConf) parseAndValidate(path string) (*shortNameAliasCache, error) {
+// newShortNameAliasCache parses shortNameAliasConf and returns the corresponding internal
+// representation.
+func newShortNameAliasCache(path string, conf *shortNameAliasConf) (*shortNameAliasCache, error) {
 	res := shortNameAliasCache{
 		namedAliases: make(map[string]alias),
 	}
@@ -295,9 +294,9 @@ func loadShortNameAliasConf(confPath string) (*shortNameAliasConf, *shortNameAli
 		return nil, nil, errors.Wrapf(err, "error loading short-name aliases config file %q", confPath)
 	}
 
-	// Better safe than sorry: validate the machine-generated config.  The
+	// Even if we don’t always need the cache, doing so validates the machine-generated config.  The
 	// file could still be corrupted by another process or user.
-	cache, err := conf.parseAndValidate(confPath)
+	cache, err := newShortNameAliasCache(confPath, &conf)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "error loading short-name aliases config file %q", confPath)
 	}
