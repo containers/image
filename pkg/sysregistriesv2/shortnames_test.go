@@ -98,7 +98,7 @@ func TestResolveShortNameAlias(t *testing.T) {
 	conf, err := tryUpdatingCache(sys, newConfigWrapper(sys))
 	require.NoError(t, err)
 	assert.Len(t, conf.aliasCache.namedAliases, 4)
-	assert.Len(t, conf.v2.Aliases, 0)
+	assert.Len(t, conf.partialV2.Aliases, 0) // This is an implementation detail, not an API guarantee.
 
 	aliases := []struct {
 		name, value string
@@ -153,7 +153,7 @@ func TestAliasesWithDropInConfigs(t *testing.T) {
 	conf, err := tryUpdatingCache(sys, newConfigWrapper(sys))
 	require.NoError(t, err)
 	assert.Len(t, conf.aliasCache.namedAliases, 8)
-	assert.Len(t, conf.v2.Aliases, 0)
+	assert.Len(t, conf.partialV2.Aliases, 0) // This is an implementation detail, not an API guarantee.
 
 	aliases := []struct {
 		name, value, config string
