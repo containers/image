@@ -285,6 +285,14 @@ func newShortNameAliasCache(path string, conf *shortNameAliasConf) (*shortNameAl
 	return &res, nil
 }
 
+// updateWithConfigurationFrom updates c with configuration from updates.
+// In case of conflict, updates is preferred.
+func (c *shortNameAliasCache) updateWithConfigurationFrom(updates *shortNameAliasCache) {
+	for name, value := range updates.namedAliases {
+		c.namedAliases[name] = value
+	}
+}
+
 func loadShortNameAliasConf(confPath string) (*shortNameAliasConf, *shortNameAliasCache, error) {
 	conf := shortNameAliasConf{}
 

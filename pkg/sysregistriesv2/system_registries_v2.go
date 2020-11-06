@@ -746,8 +746,7 @@ func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) error {
 	}
 	combinedTOML.V2RegistriesConf.aliasCache = cache
 	// Nil conf.v2.Aliases to make it available for garbage collection and
-	// reduce memory consumption.  We're consulting conf.namedAliases for
-	// look ups.
+	// reduce memory consumption.  We're consulting aliasCache for lookups.
 	combinedTOML.V2RegistriesConf.Aliases = nil
 
 	*v2 = combinedTOML.V2RegistriesConf
@@ -823,10 +822,8 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 
 	// Merge the alias maps.  New configs override previous entries.
 	newAliases := c.v2.aliasCache
-	c.v2.aliasCache = prevAliases // point back to the previous map and override
-	for name, value := range newAliases.namedAliases {
-		c.v2.aliasCache.namedAliases[name] = value
-	}
+	c.v2.aliasCache = prevAliases
+	c.v2.aliasCache.updateWithConfigurationFrom(newAliases)
 
 	// If set, parse & store the specified short-name mode.
 	if len(c.v2.ShortNameMode) > 0 {
