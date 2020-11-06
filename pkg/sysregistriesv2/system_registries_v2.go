@@ -692,14 +692,53 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 	return nil, nil
 }
 
+// loadConfigFile loads and unmarshals a single config file, updating *v2.
+// Use forceV2 if the config must in the v2 format.
+func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) error {
+	logrus.Debugf("Loading registries configuration %q", path)
+
+	// Load the tomlConfig. Note that `DecodeFile` will overwrite set fields.
+	combinedTOML := tomlConfig{
+		V2RegistriesConf: *v2,
+	}
+	_, err := toml.DecodeFile(path, &combinedTOML)
+	if err != nil {
+		return err
+	}
+
+	if combinedTOML.V1RegistriesConf.Nonempty() {
+		// Enforce the v2 format if requested.
+		if forceV2 {
+			return &InvalidRegistries{s: "registry must be in v2 format but is in v1"}
+		}
+
+		// Convert a v1 config into a v2 config.
+		if combinedTOML.V2RegistriesConf.Nonempty() {
+			return &InvalidRegistries{s: "mixing sysregistry v1/v2 is not supported"}
+		}
+		converted, err := combinedTOML.V1RegistriesConf.ConvertToV2()
+		if err != nil {
+			return err
+		}
+		combinedTOML.V1RegistriesConf = V1RegistriesConf{}
+		combinedTOML.V2RegistriesConf = *converted
+	}
+
+	// Post process registries, set the correct prefixes, sanity checks, etc.
+	if err := combinedTOML.postProcessRegistries(); err != nil {
+		return err
+	}
+
+	*v2 = combinedTOML.V2RegistriesConf
+	return nil
+}
+
 // loadConfig loads and unmarshals the configuration at the specified path.
 // Use forceV2 if the config must in the v2 format.
 //
 // Note that specified fields in path will replace already set fields in the
 // parsedConfig.  Only the [[registry]] tables are merged by prefix.
 func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
-	logrus.Debugf("Loading registries configuration %q", path)
-
 	// Save the registries before decoding the file where they could be lost.
 	// We merge them later again.
 	registryMap := make(map[string]Registry)
@@ -722,41 +761,12 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 	prevUSRs := c.v2.UnqualifiedSearchRegistries
 	c.v2.UnqualifiedSearchRegistries = nil
 
-	// Load the tomlConfig. Note that `DecodeFile` will overwrite set fields.
+	// Load the new config file. Note that loadConfigFile will overwrite set fields.
 	c.v2.Registries = nil // important to clear the memory to prevent us from overlapping fields
 	c.v2.Aliases = nil
-	combinedTOML := tomlConfig{
-		V2RegistriesConf: c.v2,
-	}
-	_, err := toml.DecodeFile(path, &combinedTOML)
-	if err != nil {
+	if err := loadConfigFile(&c.v2, path, forceV2); err != nil {
 		return err
 	}
-
-	if combinedTOML.V1RegistriesConf.Nonempty() {
-		// Enforce the v2 format if requested.
-		if forceV2 {
-			return &InvalidRegistries{s: "registry must be in v2 format but is in v1"}
-		}
-
-		// Convert a v1 config into a v2 config.
-		if combinedTOML.V2RegistriesConf.Nonempty() {
-			return &InvalidRegistries{s: "mixing sysregistry v1/v2 is not supported"}
-		}
-		v2, err := combinedTOML.V1RegistriesConf.ConvertToV2()
-		if err != nil {
-			return err
-		}
-		combinedTOML.V1RegistriesConf = V1RegistriesConf{}
-		combinedTOML.V2RegistriesConf = *v2
-	}
-
-	// Post process registries, set the correct prefixes, sanity checks, etc.
-	if err := combinedTOML.postProcessRegistries(); err != nil {
-		return err
-	}
-
-	c.v2 = combinedTOML.V2RegistriesConf
 
 	// Now check if the newly loaded config set the USRs.
 	if c.v2.UnqualifiedSearchRegistries != nil {
@@ -806,10 +816,11 @@ func (c *parsedConfig) loadConfig(path string, forceV2 bool) error {
 
 	// If set, parse & store the specified short-name mode.
 	if len(c.v2.ShortNameMode) > 0 {
-		c.v2.shortNameMode, err = parseShortNameMode(c.v2.ShortNameMode)
+		mode, err := parseShortNameMode(c.v2.ShortNameMode)
 		if err != nil {
 			return err
 		}
+		c.v2.shortNameMode = mode
 	} else {
 		c.v2.shortNameMode = defaultShortNameMode
 	}
