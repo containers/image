@@ -184,12 +184,6 @@ func (config *V2RegistriesConf) Nonempty() bool {
 		len(config.UnqualifiedSearchRegistries) != 0)
 }
 
-// tomlConfig is the data type used to unmarshal the toml config.
-type tomlConfig struct {
-	V2RegistriesConf
-	V1RegistriesConf // for backwards compatibility with sysregistries v1
-}
-
 // parsedConfig is the result of parsing, and possibly merging, configuration files;
 // it is the boundary between the process of reading+ingesting the files, and
 // later interpreting the configuraiton based on caller’s requests.
@@ -696,6 +690,12 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 // Use forceV2 if the config must in the v2 format.
 func loadConfigFile(v2 *V2RegistriesConf, path string, forceV2 bool) error {
 	logrus.Debugf("Loading registries configuration %q", path)
+
+	// tomlConfig allows us to unmarshal either V1 or V2 simultaneously.
+	type tomlConfig struct {
+		V2RegistriesConf
+		V1RegistriesConf // for backwards compatibility with sysregistries v1
+	}
 
 	// Load the tomlConfig. Note that `DecodeFile` will overwrite set fields.
 	combinedTOML := tomlConfig{
