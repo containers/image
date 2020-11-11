@@ -123,8 +123,9 @@ type dockerClient struct {
 }
 
 type authScope struct {
-	remoteName string
-	actions    string
+	resourceType string
+	remoteName   string
+	actions      string
 }
 
 // sendAuth determines whether we need authentication for v2 or v1 endpoint.
@@ -233,6 +234,7 @@ func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write
 		client.registryToken = sys.DockerBearerRegistryToken
 	}
 	client.signatureBase = sigBase
+	client.scope.resourceType = "repository"
 	client.scope.actions = actions
 	client.scope.remoteName = reference.Path(ref.ref)
 	return client, nil
@@ -455,7 +457,53 @@ func (c *dockerClient) makeRequest(ctx context.Context, method, path string, hea
 	}
 
 	url := fmt.Sprintf("%s://%s%s", c.scheme, c.registry, path)
-	return c.makeRequestToResolvedURL(ctx, method, url, headers, stream, -1, auth, extraScope)
+	resp, err := c.makeRequestToResolvedURL(ctx, method, url, headers, stream, -1, auth, extraScope)
+
+	// As by default the challenges from the /v2/ "ping" response were used for fetching the
+	// auth token, we might be getting a error back indicating that the auth scope was insufficient
+	// check for that and update the client challenges to retry with requesting a new token
+	if retry, newScope := needsRetryWithUpdatedScope(err, resp); retry {
+		logrus.Debug("Detected insufficent_scope error, retrying request with updated scope")
+		resp, err = c.makeRequestToResolvedURL(ctx, method, url, headers, stream, -1, auth, newScope)
+	}
+	return resp, err
+}
+
+// Checks if the auth headers in the response contain an indication of a failed
+// authorizdation because of an "inssufficient_scope" error. If that's the case,
+// returns the required Scope to be used for fetching a new token.
+func needsRetryWithUpdatedScope(err error, res *http.Response) (bool, *authScope) {
+	newScope := &authScope{}
+	if err == nil && res.StatusCode == http.StatusUnauthorized {
+		challenges := parseAuthHeader(res.Header)
+		for _, challenge := range challenges {
+			if challenge.Scheme == "bearer" {
+				if errmsg, ok := challenge.Parameters["error"]; ok && errmsg == "insufficient_scope" {
+					if scope, ok := challenge.Parameters["scope"]; ok && scope != "" {
+						if newScope, err = parseAuthScope(scope); err == nil {
+							return true, newScope
+						} else {
+							logrus.Error(err)
+						}
+					}
+				}
+			}
+		}
+	}
+	return false, newScope
+}
+
+func parseAuthScope(scopeStr string) (*authScope, error) {
+	parts := strings.Split(scopeStr, ":")
+	if len(parts) == 3 {
+		scope := &authScope{
+			resourceType: parts[0],
+			remoteName:   parts[1],
+			actions:      parts[2],
+		}
+		return scope, nil
+	}
+	return nil, errors.New("error parsing auth scope")
 }
 
 // parseRetryAfter determines the delay required by the "Retry-After" header in res and returns it,
@@ -577,8 +625,10 @@ func (c *dockerClient) setupRequestAuth(req *http.Request, extraScope *authScope
 				cacheKey := ""
 				scopes := []authScope{c.scope}
 				if extraScope != nil {
-					// Using ':' as a separator here is unambiguous because getBearerToken below uses the same separator when formatting a remote request (and because repository names can't contain colons).
-					cacheKey = fmt.Sprintf("%s:%s", extraScope.remoteName, extraScope.actions)
+					// Using ':' as a separator here is unambiguous because getBearerToken below
+					// uses the same separator when formatting a remote request (and because
+					// repository names can't contain colons).
+					cacheKey = fmt.Sprintf("%s:%s:%s", extraScope.resourceType, extraScope.remoteName, extraScope.actions)
 					scopes = append(scopes, *extraScope)
 				}
 				var token bearerToken
@@ -635,9 +685,10 @@ func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge chall
 	if service, ok := challenge.Parameters["service"]; ok && service != "" {
 		params.Add("service", service)
 	}
+
 	for _, scope := range scopes {
-		if scope.remoteName != "" && scope.actions != "" {
-			params.Add("scope", fmt.Sprintf("repository:%s:%s", scope.remoteName, scope.actions))
+		if scope.resourceType != "" && scope.remoteName != "" && scope.actions != "" {
+			params.Add("scope", fmt.Sprintf("%s:%s:%s", scope.resourceType, scope.remoteName, scope.actions))
 		}
 	}
 	params.Add("grant_type", "refresh_token")
@@ -688,8 +739,8 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
 	}
 
 	for _, scope := range scopes {
-		if scope.remoteName != "" && scope.actions != "" {
-			params.Add("scope", fmt.Sprintf("repository:%s:%s", scope.remoteName, scope.actions))
+		if scope.resourceType != "" && scope.remoteName != "" && scope.actions != "" {
+			params.Add("scope", fmt.Sprintf("%s:%s:%s", scope.resourceType, scope.remoteName, scope.actions))
 		}
 	}
 
