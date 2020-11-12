@@ -154,6 +154,28 @@ type V2RegistriesConf struct {
 	Registries []Registry `toml:"registry"`
 	// An array of host[:port] (not prefix!) entries to use for resolving unqualified image references
 	UnqualifiedSearchRegistries []string `toml:"unqualified-search-registries"`
+
+	// Absolut path to the configuration file that set the UnqualifiedSearchRegistries.
+	unqualifiedSearchRegistriesOrigin string
+
+	// ShortNameMode defines how short-name resolution should be handled by
+	// _consumers_ of this package.  Depending on the mode, the user should
+	// be prompted with a choice of using one of the unqualified-search
+	// registries when referring to a short name.
+	//
+	// Valid modes are: * "prompt": prompt if stdout is a TTY, otherwise
+	// use all unqualified-search registries * "enforcing": always prompt
+	// and error if stdout is not a TTY * "disabled": do not prompt and
+	// potentially use all unqualified-search registries
+	ShortNameMode string `toml:"short-name-mode"`
+
+	// TODO: separate upper format from internal data below:
+	// https://github.com/containers/image/pull/1060#discussion_r503386541
+
+	// shortNameMode is stored _once_ when loading the config.
+	shortNameMode types.ShortNameMode
+
+	shortNameAliasConf
 }
 
 // Nonempty returns true if config contains at least one configuration entry.
@@ -254,7 +276,7 @@ var anchoredDomainRegexp = regexp.MustCompile("^" + reference.DomainRegexp.Strin
 
 // postProcess checks the consistency of all the configuration, looks for conflicts,
 // and normalizes the configuration (e.g., sets the Prefix to Location if not set).
-func (config *V2RegistriesConf) postProcess() error {
+func (config *V2RegistriesConf) postProcessRegistries() error {
 	regMap := make(map[string][]*Registry)
 
 	for i := range config.Registries {
@@ -301,6 +323,7 @@ func (config *V2RegistriesConf) postProcess() error {
 				msg := fmt.Sprintf("registry '%s' is defined multiple times with conflicting 'insecure' setting", reg.Location)
 				return &InvalidRegistries{s: msg}
 			}
+
 			if reg.Blocked != other.Blocked {
 				msg := fmt.Sprintf("registry '%s' is defined multiple times with conflicting 'blocked' setting", reg.Location)
 				return &InvalidRegistries{s: msg}
@@ -385,6 +408,7 @@ func newConfigWrapper(ctx *types.SystemContext) configWrapper {
 		} else {
 			wrapper.userConfigDirPath = userRegistriesDirPath
 		}
+
 		return wrapper
 	} else if ctx != nil && ctx.RootForImplicitAbsolutePaths != "" {
 		wrapper.configPath = filepath.Join(ctx.RootForImplicitAbsolutePaths, systemRegistriesConfPath)
@@ -563,11 +587,44 @@ func GetRegistries(ctx *types.SystemContext) ([]Registry, error) {
 // UnqualifiedSearchRegistries returns a list of host[:port] entries to try
 // for unqualified image search, in the returned order)
 func UnqualifiedSearchRegistries(ctx *types.SystemContext) ([]string, error) {
+	registries, _, err := UnqualifiedSearchRegistriesWithOrigin(ctx)
+	return registries, err
+}
+
+// UnqualifiedSearchRegistriesWithOrigin returns a list of host[:port] entries
+// to try for unqualified image search, in the returned order.  It also returns
+// a human-readable description of where these entries are specified (e.g., a
+// registries.conf file).
+func UnqualifiedSearchRegistriesWithOrigin(ctx *types.SystemContext) ([]string, string, error) {
 	config, err := getConfig(ctx)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return config.UnqualifiedSearchRegistries, nil
+	return config.UnqualifiedSearchRegistries, config.unqualifiedSearchRegistriesOrigin, nil
+}
+
+// parseShortNameMode translates the string into well-typed
+// types.ShortNameMode.
+func parseShortNameMode(mode string) (types.ShortNameMode, error) {
+	switch mode {
+	case "disabled":
+		return types.ShortNameModeDisabled, nil
+	case "enforcing":
+		return types.ShortNameModeEnforcing, nil
+	case "permissive":
+		return types.ShortNameModePermissive, nil
+	default:
+		return types.ShortNameModeInvalid, errors.Errorf("invalid short-name mode: %q", mode)
+	}
+}
+
+// GetShortNameMode returns the configured types.ShortNameMode.
+func GetShortNameMode(ctx *types.SystemContext) (types.ShortNameMode, error) {
+	config, err := getConfig(ctx)
+	if err != nil {
+		return -1, err
+	}
+	return config.shortNameMode, err
 }
 
 // refMatchesPrefix returns true iff ref,
@@ -631,6 +688,9 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 // Note that specified fields in path will replace already set fields in the
 // tomlConfig.  Only the [[registry]] tables are merged by prefix.
 func (c *tomlConfig) loadConfig(path string, forceV2 bool) error {
+	// TODO: the code became hard to brain-parse and maintain. The function
+	// should separate the loadding, converting and merging steps more
+	// clearly.
 	logrus.Debugf("Loading registries configuration %q", path)
 
 	// Save the registries before decoding the file where they could be lost.
@@ -640,8 +700,24 @@ func (c *tomlConfig) loadConfig(path string, forceV2 bool) error {
 		registryMap[c.Registries[i].Prefix] = c.Registries[i]
 	}
 
+	prevAliases := c.namedAliases // store the aliases so they're not overridden
+	if prevAliases == nil {
+		prevAliases = make(map[string]alias)
+	}
+
+	// Initialize the USR origin.
+	if len(c.unqualifiedSearchRegistriesOrigin) == 0 {
+		c.unqualifiedSearchRegistriesOrigin = path
+	}
+
+	// Store the current USRs so we can determine _after_ loading if they
+	// changed.
+	prevUSRs := c.UnqualifiedSearchRegistries
+	c.UnqualifiedSearchRegistries = nil
+
 	// Load the tomlConfig. Note that `DecodeFile` will overwrite set fields.
 	c.Registries = nil // important to clear the memory to prevent us from overlapping fields
+	c.Aliases = nil
 	_, err := toml.DecodeFile(path, c)
 	if err != nil {
 		return err
@@ -665,10 +741,28 @@ func (c *tomlConfig) loadConfig(path string, forceV2 bool) error {
 		c.V2RegistriesConf = *v2
 	}
 
+	// Now check if the newly loaded config set the USRs.
+	if c.UnqualifiedSearchRegistries != nil {
+		// USRs set -> record it as the new origin.
+		c.unqualifiedSearchRegistriesOrigin = path
+	} else {
+		// USRs not set -> restore the previous USRs
+		c.UnqualifiedSearchRegistries = prevUSRs
+	}
+
 	// Post process registries, set the correct prefixes, sanity checks, etc.
-	if err := c.postProcess(); err != nil {
+	if err := c.postProcessRegistries(); err != nil {
 		return err
 	}
+
+	// Parse and validate short-name aliases.
+	if err := c.shortNameAliasConf.parseAndValidate(path); err != nil {
+		return errors.Wrap(err, "error validating short-name aliases")
+	}
+	// Nil conf.Aliases to make it available for garbage collection and
+	// reduce memory consumption.  We're consulting conf.namedAliases for
+	// look ups.
+	c.Aliases = nil
 
 	// Merge the freshly loaded registries.
 	for i := range c.Registries {
@@ -689,6 +783,23 @@ func (c *tomlConfig) loadConfig(path string, forceV2 bool) error {
 	c.Registries = []Registry{}
 	for _, prefix := range prefixes {
 		c.Registries = append(c.Registries, registryMap[prefix])
+	}
+
+	// Merge the alias maps.  New configs override previous entries.
+	newAliases := c.namedAliases
+	c.namedAliases = prevAliases // point back to the previous map and override
+	for name, value := range newAliases {
+		c.namedAliases[name] = value
+	}
+
+	// If set, parse & store the specified short-name mode.
+	if len(c.ShortNameMode) > 0 {
+		c.shortNameMode, err = parseShortNameMode(c.ShortNameMode)
+		if err != nil {
+			return err
+		}
+	} else {
+		c.shortNameMode = defaultShortNameMode
 	}
 
 	return nil
