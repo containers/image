@@ -382,7 +382,7 @@ insecure = true`), 0600)
 
 	ctx := &types.SystemContext{SystemRegistriesConfPath: configFile.Name()}
 
-	configCache = make(map[configWrapper]*V2RegistriesConf)
+	InvalidateCache()
 	registries, err := GetRegistries(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
@@ -399,7 +399,7 @@ insecure = true`), 0600)
 func TestInvalidateCache(t *testing.T) {
 	ctx := &types.SystemContext{SystemRegistriesConfPath: "testdata/invalidate-cache.conf"}
 
-	configCache = make(map[configWrapper]*V2RegistriesConf)
+	InvalidateCache()
 	registries, err := GetRegistries(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, 4, len(registries))
@@ -524,7 +524,7 @@ func TestTryUpdatingCache(t *testing.T) {
 		SystemRegistriesConfPath:    "testdata/try-update-cache-valid.conf",
 		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
 	}
-	configCache = make(map[configWrapper]*V2RegistriesConf)
+	InvalidateCache()
 	registries, err := TryUpdatingCache(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(registries.Registries))
@@ -546,7 +546,7 @@ func TestRegistriesConfDirectory(t *testing.T) {
 		SystemRegistriesConfDirPath: "testdata/registries.conf.d",
 	}
 
-	configCache = make(map[configWrapper]*V2RegistriesConf)
+	InvalidateCache()
 	registries, err := TryUpdatingCache(ctx)
 	require.NoError(t, err)
 	assert.NotNil(t, registries)
@@ -563,6 +563,21 @@ func TestRegistriesConfDirectory(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"example-overwrite.com"}, usrs)
 	assert.Equal(t, "testdata/registries.conf.d/config-1.conf", origin)
+
+	// Test that unqualified-search-registries is merged correctly
+	usr, err := UnqualifiedSearchRegistries(&types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/unqualified-search.conf",
+		SystemRegistriesConfDirPath: "testdata/registries.conf.d-usr1",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"registry-a.com", "registry-c.com", "registry-d.com"}, usr) // Nothing overrides the base file
+
+	usr, err = UnqualifiedSearchRegistries(&types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/unqualified-search.conf",
+		SystemRegistriesConfDirPath: "testdata/registries.conf.d-usr2",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{}, usr) // Search overridden with an empty array
 }
 
 func TestParseShortNameMode(t *testing.T) {

@@ -94,11 +94,11 @@ func TestResolveShortNameAlias(t *testing.T) {
 		UserShortNameAliasConfPath:  tmp.Name(),
 	}
 
-	configCache = make(map[configWrapper]*V2RegistriesConf)
-	conf, err := TryUpdatingCache(sys)
+	InvalidateCache()
+	conf, err := tryUpdatingCache(sys, newConfigWrapper(sys))
 	require.NoError(t, err)
-	assert.Len(t, conf.namedAliases, 4)
-	assert.Len(t, conf.Aliases, 0)
+	assert.Len(t, conf.aliasCache.namedAliases, 4)
+	assert.Len(t, conf.partialV2.Aliases, 0) // This is an implementation detail, not an API guarantee.
 
 	aliases := []struct {
 		name, value string
@@ -149,11 +149,11 @@ func TestAliasesWithDropInConfigs(t *testing.T) {
 		UserShortNameAliasConfPath:  tmp.Name(),
 	}
 
-	configCache = make(map[configWrapper]*V2RegistriesConf)
-	conf, err := TryUpdatingCache(sys)
+	InvalidateCache()
+	conf, err := tryUpdatingCache(sys, newConfigWrapper(sys))
 	require.NoError(t, err)
-	assert.Len(t, conf.namedAliases, 8)
-	assert.Len(t, conf.Aliases, 0)
+	assert.Len(t, conf.aliasCache.namedAliases, 8)
+	assert.Len(t, conf.partialV2.Aliases, 0) // This is an implementation detail, not an API guarantee.
 
 	aliases := []struct {
 		name, value, config string
@@ -261,7 +261,7 @@ func TestInvalidAliases(t *testing.T) {
 		UserShortNameAliasConfPath:  tmp.Name(),
 	}
 
-	configCache = make(map[configWrapper]*V2RegistriesConf)
+	InvalidateCache()
 	_, err = TryUpdatingCache(sys)
 	require.Error(t, err)
 
