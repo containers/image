@@ -1,0 +1,7 @@
+unqualified-search-registries = ["ignore-example-overwrite.com"]
+
+[[registry]]
+location = "ignore-me-because-i-have-a-wrong-suffix.com"
+
+[aliases]
+ignore="me because i have a wrong suffix"

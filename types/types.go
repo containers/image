@@ -500,13 +500,19 @@ const (
 	// Use all configured unqualified-search registries without prompting
 	// the user.
 	ShortNameModeDisabled
-	// If stdout is a TTY, prompt the user to select a configured
+	// If stdout and stdin are a TTY, prompt the user to select a configured
 	// unqualified-search registry. Otherwise, use all configured
 	// unqualified-search registries.
+	//
+	// Note that if only one unqualified-search registry is set, it will be
+	// used without prompting.
 	ShortNameModePermissive
-	// Always prompt the user to select a configured unqualified-serach
-	// registry.  Throw an error if stdout is not a TTY as prompting
-	// isn't possible.
+	// Always prompt the user to select a configured unqualified-search
+	// registry.  Throw an error if stdout or stdin is not a TTY as
+	// prompting isn't possible.
+	//
+	// Note that if only one unqualified-search registry is set, it will be
+	// used without prompting.
 	ShortNameModeEnforcing
 )
 
@@ -535,6 +541,8 @@ type SystemContext struct {
 	SystemRegistriesConfDirPath string
 	// Path to the user-specific short-names configuration file
 	UserShortNameAliasConfPath string
+	// If set, short-name resolution in pkg/shortnames must follow the specified mode
+	ShortNameMode *ShortNameMode
 	// If not "", overrides the default path for the authentication file, but only new format files
 	AuthFilePath string
 	// if not "", overrides the default path for the authentication file, but with the legacy format;
