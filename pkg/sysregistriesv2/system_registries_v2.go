@@ -647,6 +647,9 @@ func parseShortNameMode(mode string) (types.ShortNameMode, error) {
 
 // GetShortNameMode returns the configured types.ShortNameMode.
 func GetShortNameMode(ctx *types.SystemContext) (types.ShortNameMode, error) {
+	if ctx != nil && ctx.ShortNameMode != nil {
+		return *ctx.ShortNameMode, nil
+	}
 	config, err := getConfig(ctx)
 	if err != nil {
 		return -1, err

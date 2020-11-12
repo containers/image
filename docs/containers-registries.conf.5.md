@@ -102,6 +102,75 @@ internet without having to change `Dockerfile`s, or to add redundancy).
 *Note*: Redirection and mirrors are currently processed only when reading images, not when pushing
 to a registry; that may change in the future.
 
+#### Short-Name Aliasing
+The use of unqualified-search registries entails an ambiguity as it is
+unclear from which registry a given image, referenced by a short name,
+may be pulled from.
+
+As mentioned in the note at the end of this man page, using short names is
+subject to the risk of hitting squatted registry namespaces.  If the
+unqualified-search registries are set to `["registry1.com", "registry2.com"]`
+an attacker may take over a namespace of registry1.com such that an image may
+be pulled from registry1.com instead of the intended source registry2.com.
+
+While it is highly recommended to always use fully-qualified image references,
+existing deployments using short names may not be easily changed.  To
+circumvent the aforementioned ambiguity, so called short-name aliases can be
+configured that point to a fully-qualified image
+reference.
+
+Short-name aliases can be configured in the `[aliases]` table in the form of
+`"name"="value"` with the left-hand `name` being the short name (e.g., "image")
+and the right-hand `value` being the fully-qualified image reference (e.g.,
+"registry.com/namespace/image").  Note that neither "name" nor "value" can
+include a tag or digest.  Moreover, "name" must be a short name and hence
+cannot include a registry domain or refer to localhost.
+
+When pulling a short name, the configured aliases table will be used for
+resolving the short name.  If a matching alias is found, it will be used
+without further consulting the unqualified-search registries list.  If no
+matching alias is found, the behavior can be controlled via the
+`short-name-mode` option as described below.
+
+Note that tags and digests are stripped off a user-specified short name for
+alias resolution.  Hence, "image", "image:tag" and "image@digest" all resolve
+to the same alias (i.e., "image").  Stripped off tags and digests are later
+appended to the resolved alias.
+
+Further note that drop-in configuration files (see containers-registries.conf.d(5))
+can override aliases in the specific loading order of the files.  If the "value" of
+an alias is empty (i.e., ""), the alias will be erased.  However, a given
+"name" may only be specified once in a single config file.
+
+
+#### Short-Name Aliasing: Modes
+
+The `short-name-mode` option supports three modes to control the behaviour of
+short-name resolution.
+
+* `enforcing`: If only one unqualified-search registry is set, use it as there
+  is no ambiguity.  If there is more than one registry and the user program is
+  running in a terminal (i.e., stdout & stdin are a TTY), prompt the user to
+  select one of the specified search registries.  If the program is not running
+  in a terminal, the ambiguity cannot be resolved which will lead to an error.
+
+* `permissive`: Behaves as enforcing but does not lead to an error if the
+  program is not running in a terminal.  Instead, fallback to using all
+  unqualified-search registries.
+
+* `disabled`: Use all unqualified-search registries without prompting.
+
+If `short-name-mode` is not specified at all or left empty, default to the
+`permissive` mode.  If the user-specified short name was not aliased already,
+the `enforcing` and `permissive` mode if prompted, will record a new alias
+after a successful pull.  Note that the recorded alias will be written to
+`$XDG_CONFIG_HOME/containers/short-name-aliases.conf` to have a clear
+separation between possibly human-edited registries.conf files and the
+machine-generated `short-name-aliases-conf`.  Note that `$HOME/.config` is used
+if `$XDG_CONFIG_HOME` is not set.  If an alias is specified in a
+`registries.conf` file and also the machine-generated
+`short-name-aliases.conf`, the `short-name-aliases.conf` file has precedence.
+
 #### Normalization of docker.io references
 
 The Docker Hub `docker.io` is handled in a special way: every push and pull
