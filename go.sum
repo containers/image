@@ -88,6 +88,7 @@ github.com/containers/storage v1.23.6 h1:3rcZ1KTNv8q7SkZ75gcrFGYqTeiuI04Zg7m9X1s
 github.com/containers/storage v1.23.6/go.mod h1:haFs0HRowKwyzvWEx9EgI3WsL8XCSnBDb5f8P5CAxJY=
 github.com/containers/storage v1.23.7 h1:43ImvG/npvQSZXRjaudVvKISIuZSfI6qvtSNQQSGO/A=
 github.com/containers/storage v1.23.7/go.mod h1:cUT2zHjtx+WlVri30obWmM2gpqpi8jfPsmIzP1TVpEI=
+github.com/containers/storage v1.23.9/go.mod h1:3b2ktpB6pw53SEeIoFfO0sQfP9+IoJJKPq5iJk74gxE=
 github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e/go.mod h1:F5haX7vjVVG0kc13fIWeqUViNPyEJxv/OmvnBo0Yme4=
 github.com/coreos/go-systemd/v22 v22.0.0/go.mod h1:xO0FLkIi5MaZafQlIrOotqXZ90ih+1atmu1JpKERPPk=
 github.com/coreos/go-systemd/v22 v22.1.0/go.mod h1:xO0FLkIi5MaZafQlIrOotqXZ90ih+1atmu1JpKERPPk=
