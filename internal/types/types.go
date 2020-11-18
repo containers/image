@@ -58,3 +58,17 @@ type TryReusingBlobOptions struct {
 	// The reference of the image that contains the target blob.
 	SrcRef reference.Named
 }
+
+// ImageSourceChunk is a portion of a blob.
+// This API is experimental and can be changed without bumping the major version number.
+type ImageSourceChunk struct {
+	Offset uint64
+	Length uint64
+}
+
+// ImageSourceSeekable is an image source that permits to fetch chunks of the entire blob.
+// This API is experimental and can be changed without bumping the major version number.
+type ImageSourceSeekable interface {
+	// GetBlobAt returns a stream for the specified blob.
+	GetBlobAt(context.Context, publicTypes.BlobInfo, []ImageSourceChunk) (chan io.ReadCloser, chan error, error)
+}
