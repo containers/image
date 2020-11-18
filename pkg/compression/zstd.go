@@ -40,7 +40,7 @@ func zstdWriter(dest io.Writer) (io.WriteCloser, error) {
 	return zstd.NewWriter(dest)
 }
 
-func zstdWriterWithLevel(dest io.Writer, level int) (io.WriteCloser, error) {
+func zstdWriterWithLevel(dest io.Writer, level int) (*zstd.Encoder, error) {
 	el := zstd.EncoderLevelFromZstd(level)
 	return zstd.NewWriter(dest, zstd.WithEncoderLevel(el))
 }
