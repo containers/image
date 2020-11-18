@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containers/image/v5/internal/blobinfocache"
+	"github.com/containers/image/v5/pkg/compression"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
@@ -21,28 +23,28 @@ var (
 	// cssLiteral contains a non-trivial candidateSortState shared among several tests below.
 	cssLiteral = candidateSortState{
 		cs: []CandidateWithTime{
-			{types.BICReplacementCandidate{Digest: digestCompressedA, Location: types.BICLocationReference{Opaque: "A1"}}, time.Unix(1, 0)},
-			{types.BICReplacementCandidate{Digest: digestUncompressed, Location: types.BICLocationReference{Opaque: "U2"}}, time.Unix(1, 1)},
-			{types.BICReplacementCandidate{Digest: digestCompressedA, Location: types.BICLocationReference{Opaque: "A2"}}, time.Unix(1, 1)},
-			{types.BICReplacementCandidate{Digest: digestCompressedPrimary, Location: types.BICLocationReference{Opaque: "P1"}}, time.Unix(1, 0)},
-			{types.BICReplacementCandidate{Digest: digestCompressedB, Location: types.BICLocationReference{Opaque: "B1"}}, time.Unix(1, 1)},
-			{types.BICReplacementCandidate{Digest: digestCompressedPrimary, Location: types.BICLocationReference{Opaque: "P2"}}, time.Unix(1, 1)},
-			{types.BICReplacementCandidate{Digest: digestCompressedB, Location: types.BICLocationReference{Opaque: "B2"}}, time.Unix(2, 0)},
-			{types.BICReplacementCandidate{Digest: digestUncompressed, Location: types.BICLocationReference{Opaque: "U1"}}, time.Unix(1, 0)},
+			{blobinfocache.BICReplacementCandidate2{Digest: digestCompressedA, Location: types.BICLocationReference{Opaque: "A1"}, CompressorName: compression.Xz.Name()}, time.Unix(1, 0)},
+			{blobinfocache.BICReplacementCandidate2{Digest: digestUncompressed, Location: types.BICLocationReference{Opaque: "U2"}, CompressorName: compression.Gzip.Name()}, time.Unix(1, 1)},
+			{blobinfocache.BICReplacementCandidate2{Digest: digestCompressedA, Location: types.BICLocationReference{Opaque: "A2"}, CompressorName: blobinfocache.Uncompressed}, time.Unix(1, 1)},
+			{blobinfocache.BICReplacementCandidate2{Digest: digestCompressedPrimary, Location: types.BICLocationReference{Opaque: "P1"}, CompressorName: blobinfocache.UnknownCompression}, time.Unix(1, 0)},
+			{blobinfocache.BICReplacementCandidate2{Digest: digestCompressedB, Location: types.BICLocationReference{Opaque: "B1"}, CompressorName: compression.Bzip2.Name()}, time.Unix(1, 1)},
+			{blobinfocache.BICReplacementCandidate2{Digest: digestCompressedPrimary, Location: types.BICLocationReference{Opaque: "P2"}, CompressorName: compression.Gzip.Name()}, time.Unix(1, 1)},
+			{blobinfocache.BICReplacementCandidate2{Digest: digestCompressedB, Location: types.BICLocationReference{Opaque: "B2"}, CompressorName: blobinfocache.Uncompressed}, time.Unix(2, 0)},
+			{blobinfocache.BICReplacementCandidate2{Digest: digestUncompressed, Location: types.BICLocationReference{Opaque: "U1"}, CompressorName: blobinfocache.UnknownCompression}, time.Unix(1, 0)},
 		},
 		primaryDigest:      digestCompressedPrimary,
 		uncompressedDigest: digestUncompressed,
 	}
 	// cssExpectedReplacementCandidates is the fully-sorted, unlimited, result of prioritizing cssLiteral.
-	cssExpectedReplacementCandidates = []types.BICReplacementCandidate{
-		{Digest: digestCompressedPrimary, Location: types.BICLocationReference{Opaque: "P2"}},
-		{Digest: digestCompressedPrimary, Location: types.BICLocationReference{Opaque: "P1"}},
-		{Digest: digestCompressedB, Location: types.BICLocationReference{Opaque: "B2"}},
-		{Digest: digestCompressedA, Location: types.BICLocationReference{Opaque: "A2"}},
-		{Digest: digestCompressedB, Location: types.BICLocationReference{Opaque: "B1"}},
-		{Digest: digestCompressedA, Location: types.BICLocationReference{Opaque: "A1"}},
-		{Digest: digestUncompressed, Location: types.BICLocationReference{Opaque: "U2"}},
-		{Digest: digestUncompressed, Location: types.BICLocationReference{Opaque: "U1"}},
+	cssExpectedReplacementCandidates = []blobinfocache.BICReplacementCandidate2{
+		{Digest: digestCompressedPrimary, Location: types.BICLocationReference{Opaque: "P2"}, CompressorName: compression.Gzip.Name()},
+		{Digest: digestCompressedPrimary, Location: types.BICLocationReference{Opaque: "P1"}, CompressorName: blobinfocache.UnknownCompression},
+		{Digest: digestCompressedB, Location: types.BICLocationReference{Opaque: "B2"}, CompressorName: blobinfocache.Uncompressed},
+		{Digest: digestCompressedA, Location: types.BICLocationReference{Opaque: "A2"}, CompressorName: blobinfocache.Uncompressed},
+		{Digest: digestCompressedB, Location: types.BICLocationReference{Opaque: "B1"}, CompressorName: compression.Bzip2.Name()},
+		{Digest: digestCompressedA, Location: types.BICLocationReference{Opaque: "A1"}, CompressorName: compression.Xz.Name()},
+		{Digest: digestUncompressed, Location: types.BICLocationReference{Opaque: "U2"}, CompressorName: compression.Gzip.Name()},
+		{Digest: digestUncompressed, Location: types.BICLocationReference{Opaque: "U1"}, CompressorName: blobinfocache.UnknownCompression},
 	}
 )
 
@@ -74,8 +76,8 @@ func TestCandidateSortStateLess(t *testing.T) {
 			caseName := fmt.Sprintf("%s %v", c.name, tms)
 			css := candidateSortState{
 				cs: []CandidateWithTime{
-					{types.BICReplacementCandidate{Digest: c.d0, Location: types.BICLocationReference{Opaque: "L0"}}, time.Unix(tms[0], 0)},
-					{types.BICReplacementCandidate{Digest: c.d1, Location: types.BICLocationReference{Opaque: "L1"}}, time.Unix(tms[1], 0)},
+					{blobinfocache.BICReplacementCandidate2{Digest: c.d0, Location: types.BICLocationReference{Opaque: "L0"}, CompressorName: compression.Gzip.Name()}, time.Unix(tms[0], 0)},
+					{blobinfocache.BICReplacementCandidate2{Digest: c.d1, Location: types.BICLocationReference{Opaque: "L1"}, CompressorName: compression.Zstd.Name()}, time.Unix(tms[1], 0)},
 				},
 				primaryDigest:      digestCompressedPrimary,
 				uncompressedDigest: digestUncompressed,
@@ -113,8 +115,8 @@ func TestCandidateSortStateLess(t *testing.T) {
 	} {
 		css := candidateSortState{
 			cs: []CandidateWithTime{
-				{types.BICReplacementCandidate{Digest: c.p0.d, Location: types.BICLocationReference{Opaque: "L0"}}, time.Unix(c.p0.t, 0)},
-				{types.BICReplacementCandidate{Digest: c.p1.d, Location: types.BICLocationReference{Opaque: "L1"}}, time.Unix(c.p1.t, 0)},
+				{blobinfocache.BICReplacementCandidate2{Digest: c.p0.d, Location: types.BICLocationReference{Opaque: "L0"}, CompressorName: compression.Gzip.Name()}, time.Unix(c.p0.t, 0)},
+				{blobinfocache.BICReplacementCandidate2{Digest: c.p1.d, Location: types.BICLocationReference{Opaque: "L1"}, CompressorName: compression.Zstd.Name()}, time.Unix(c.p1.t, 0)},
 			},
 			primaryDigest:      digestCompressedPrimary,
 			uncompressedDigest: digestUncompressed,

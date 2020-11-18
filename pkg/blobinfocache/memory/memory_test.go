@@ -3,12 +3,14 @@ package memory
 import (
 	"testing"
 
+	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/pkg/blobinfocache/internal/test"
-	"github.com/containers/image/v5/types"
 )
 
-func newTestCache(t *testing.T) (types.BlobInfoCache, func(t *testing.T)) {
-	return New(), func(t *testing.T) {}
+var _ blobinfocache.BlobInfoCache2 = &cache{}
+
+func newTestCache(t *testing.T) (blobinfocache.BlobInfoCache2, func(t *testing.T)) {
+	return new2(), func(t *testing.T) {}
 }
 
 func TestNew(t *testing.T) {
