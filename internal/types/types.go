@@ -79,3 +79,12 @@ type ImageDestinationPartial interface {
 	// PutBlobPartial writes contents of stream and returns data representing the result.
 	PutBlobPartial(ctx context.Context, stream ImageSourceSeekable, srcInfo publicTypes.BlobInfo, cache publicTypes.BlobInfoCache) (publicTypes.BlobInfo, error)
 }
+
+// BadPartialRequestError is returned by ImageSourceSeekable.GetBlobAt on an invalid request.
+type BadPartialRequestError struct {
+	Status string
+}
+
+func (e BadPartialRequestError) Error() string {
+	return e.Status
+}
