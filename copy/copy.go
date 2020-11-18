@@ -1244,6 +1244,48 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 		}
 	}
 
+	// A partial pull is managed by the destination storage, that decides what portions
+	// of the source file are not known yet and must be fetched.
+	// Attempt a partial only when the source allows to retrieve a blob partially and
+	// the destination has support for it.
+	imgSource, okSource := ic.c.rawSource.(internalTypes.ImageSourceSeekable)
+	imgDest, okDest := ic.c.dest.(internalTypes.ImageDestinationPartial)
+	if okSource && okDest && !diffIDIsNeeded {
+		bar := ic.c.createProgressBar(pool, srcInfo, "blob", "done")
+
+		progress := make(chan int64)
+		terminate := make(chan interface{})
+
+		defer close(terminate)
+		defer close(progress)
+
+		proxy := imageSourceSeekableProxy{
+			source:   imgSource,
+			progress: progress,
+		}
+		go func() {
+			for {
+				select {
+				case written := <-progress:
+					bar.IncrInt64(written)
+				case <-terminate:
+					return
+				}
+			}
+
+		}()
+
+		bar.SetTotal(srcInfo.Size, false)
+		info, err := imgDest.PutBlobPartial(ctx, proxy, srcInfo, ic.c.blobInfoCache)
+		if err == nil {
+			bar.SetRefill(srcInfo.Size - bar.Current())
+			bar.SetTotal(srcInfo.Size, true)
+			logrus.Debugf("Retrieved partial blob %v", srcInfo.Digest)
+			return info, cachedDiffID, nil
+		}
+		logrus.Errorf("Failed to retrieve partial blob: %v", err)
+	}
+
 	// Fallback: copy the layer, computing the diffID if we need to do so
 	srcStream, srcBlobSize, err := ic.c.rawSource.GetBlob(ctx, srcInfo, ic.c.blobInfoCache)
 	if err != nil {
