@@ -9,6 +9,7 @@ import (
 
 	"github.com/containers/image/v5/pkg/compression/internal"
 	"github.com/containers/image/v5/pkg/compression/types"
+	"github.com/containers/storage/pkg/chunked"
 	"github.com/klauspost/pgzip"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -27,12 +28,15 @@ var (
 	Xz = internal.NewAlgorithm("Xz", "xz", []byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}, XzDecompressor, xzCompressor)
 	// Zstd compression.
 	Zstd = internal.NewAlgorithm("zstd", "zstd", []byte{0x28, 0xb5, 0x2f, 0xfd}, ZstdDecompressor, zstdCompressor)
+	// Zstd:chunked compression.
+	ZstdChunked = internal.NewAlgorithm("zstd:chunked", "zstd", []byte{0x28, 0xb5, 0x2f, 0xfd}, ZstdDecompressor, chunked.ZstdCompressor)
 
 	compressionAlgorithms = map[string]Algorithm{
-		Gzip.Name():  Gzip,
-		Bzip2.Name(): Bzip2,
-		Xz.Name():    Xz,
-		Zstd.Name():  Zstd,
+		Gzip.Name():        Gzip,
+		Bzip2.Name():       Bzip2,
+		Xz.Name():          Xz,
+		Zstd.Name():        Zstd,
+		ZstdChunked.Name(): ZstdChunked,
 	}
 )
 
