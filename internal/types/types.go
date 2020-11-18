@@ -72,3 +72,10 @@ type ImageSourceSeekable interface {
 	// GetBlobAt returns a stream for the specified blob.
 	GetBlobAt(context.Context, publicTypes.BlobInfo, []ImageSourceChunk) (chan io.ReadCloser, chan error, error)
 }
+
+// ImageDestinationPartial is a service to store a blob by requesting the missing chunks to a ImageSourceSeekable.
+// This API is experimental and can be changed without bumping the major version number.
+type ImageDestinationPartial interface {
+	// PutBlobPartial writes contents of stream and returns data representing the result.
+	PutBlobPartial(ctx context.Context, stream ImageSourceSeekable, srcInfo publicTypes.BlobInfo, cache publicTypes.BlobInfoCache) (publicTypes.BlobInfo, error)
+}
