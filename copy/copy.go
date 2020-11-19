@@ -123,6 +123,7 @@ type copier struct {
 	ociEncryptConfig      *encconfig.EncryptConfig
 	maxParallelDownloads  uint
 	downloadForeignLayers bool
+	fetchPartialBlobs     bool
 }
 
 // imageCopier tracks state specific to a single image (possibly an item of a manifest list)
@@ -194,15 +195,21 @@ type Options struct {
 	// OciDecryptConfig contains the config that can be used to decrypt an image if it is
 	// encrypted if non-nil. If nil, it does not attempt to decrypt an image.
 	OciDecryptConfig *encconfig.DecryptConfig
+
 	// MaxParallelDownloads indicates the maximum layers to pull at the same time.  A reasonable default is used if this is left as 0.
 	MaxParallelDownloads uint
+
 	// When OptimizeDestinationImageAlreadyExists is set, optimize the copy assuming that the destination image already
 	// exists (and is equivalent). Making the eventual (no-op) copy more performant for this case. Enabling the option
 	// is slightly pessimistic if the destination image doesn't exist, or is not equivalent.
 	OptimizeDestinationImageAlreadyExists bool
+
 	// Download layer contents with "nondistributable" media types ("foreign" layers) and translate the layer media type
 	// to not indicate "nondistributable".
 	DownloadForeignLayers bool
+
+	// FetchPartialBlobs indicates whether to attempt to fetch the blob partially.  Experimental.
+	FetchPartialBlobs bool
 }
 
 // validateImageListSelection returns an error if the passed-in value is not one that we recognize as a valid ImageListSelection value
@@ -283,6 +290,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		ociEncryptConfig:      options.OciEncryptConfig,
 		maxParallelDownloads:  options.MaxParallelDownloads,
 		downloadForeignLayers: options.DownloadForeignLayers,
+		fetchPartialBlobs:     options.FetchPartialBlobs,
 	}
 	// Default to using gzip compression unless specified otherwise.
 	if options.DestinationCtx == nil || options.DestinationCtx.CompressionFormat == nil {
@@ -1278,7 +1286,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 	// the destination has support for it.
 	imgSource, okSource := ic.c.rawSource.(internalTypes.ImageSourceSeekable)
 	imgDest, okDest := ic.c.dest.(internalTypes.ImageDestinationPartial)
-	if okSource && okDest && !diffIDIsNeeded {
+	if ic.c.fetchPartialBlobs && okSource && okDest && !diffIDIsNeeded {
 		bar := ic.c.createProgressBar(pool, true, srcInfo, "blob", "done")
 
 		progress := make(chan int64)
