@@ -1072,9 +1072,25 @@ func (c *copier) newProgressPool(ctx context.Context) (*mpb.Progress, func()) {
 	}
 }
 
+// customPartialBlobCounter provides a decorator function for the partial blobs retrieval progress bar
+func customPartialBlobCounter(filler interface{}, wcc ...decor.WC) decor.Decorator {
+	producer := func(filler interface{}) decor.DecorFunc {
+		return func(s decor.Statistics) string {
+			if s.Total == 0 {
+				pairFmt := "%.1f / %.1f (skipped: %.1f)"
+				return fmt.Sprintf(pairFmt, decor.SizeB1024(s.Current), decor.SizeB1024(s.Total), decor.SizeB1024(s.Refill))
+			}
+			pairFmt := "%.1f / %.1f (skipped: %.1f = %.2f%%)"
+			percentage := 100.0 * float64(s.Refill) / float64(s.Total)
+			return fmt.Sprintf(pairFmt, decor.SizeB1024(s.Current), decor.SizeB1024(s.Total), decor.SizeB1024(s.Refill), percentage)
+		}
+	}
+	return decor.Any(producer(filler), wcc...)
+}
+
 // createProgressBar creates a mpb.Bar in pool.  Note that if the copier's reportWriter
 // is ioutil.Discard, the progress bar's output will be discarded
-func (c *copier) createProgressBar(pool *mpb.Progress, info types.BlobInfo, kind string, onComplete string) *mpb.Bar {
+func (c *copier) createProgressBar(pool *mpb.Progress, partial bool, info types.BlobInfo, kind string, onComplete string) *mpb.Bar {
 	// shortDigestLen is the length of the digest used for blobs.
 	const shortDigestLen = 12
 
@@ -1091,18 +1107,30 @@ func (c *copier) createProgressBar(pool *mpb.Progress, info types.BlobInfo, kind
 	// Use a normal progress bar when we know the size (i.e., size > 0).
 	// Otherwise, use a spinner to indicate that something's happening.
 	var bar *mpb.Bar
+	sstyle := mpb.SpinnerStyle(".", "..", "...", "....", "").PositionLeft()
 	if info.Size > 0 {
-		bar = pool.AddBar(info.Size,
-			mpb.BarFillerClearOnComplete(),
-			mpb.PrependDecorators(
-				decor.OnComplete(decor.Name(prefix), onComplete),
-			),
-			mpb.AppendDecorators(
-				decor.OnComplete(decor.CountersKibiByte("%.1f / %.1f"), ""),
-			),
-		)
+		if partial {
+			bar = pool.AddBar(info.Size,
+				mpb.BarFillerClearOnComplete(),
+				mpb.PrependDecorators(
+					decor.OnComplete(decor.Name(prefix), onComplete),
+				),
+				mpb.AppendDecorators(
+					customPartialBlobCounter(sstyle.Build()),
+				),
+			)
+		} else {
+			bar = pool.AddBar(info.Size,
+				mpb.BarFillerClearOnComplete(),
+				mpb.PrependDecorators(
+					decor.OnComplete(decor.Name(prefix), onComplete),
+				),
+				mpb.AppendDecorators(
+					decor.OnComplete(decor.CountersKibiByte("%.1f / %.1f"), ""),
+				),
+			)
+		}
 	} else {
-		sstyle := mpb.SpinnerStyle(".", "..", "...", "....", "").PositionLeft()
 		bar = pool.Add(0,
 			sstyle.Build(),
 			mpb.BarFillerClearOnComplete(),
@@ -1129,7 +1157,7 @@ func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 		destInfo, err := func() (types.BlobInfo, error) { // A scope for defer
 			progressPool, progressCleanup := c.newProgressPool(ctx)
 			defer progressCleanup()
-			bar := c.createProgressBar(progressPool, srcInfo, "config", "done")
+			bar := c.createProgressBar(progressPool, false, srcInfo, "config", "done")
 			destInfo, err := c.copyBlobFromStream(ctx, bytes.NewReader(configBlob), srcInfo, nil, false, true, false, bar, -1, false)
 			if err != nil {
 				return types.BlobInfo{}, err
@@ -1217,7 +1245,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 		}
 		if reused {
 			logrus.Debugf("Skipping blob %s (already present):", srcInfo.Digest)
-			bar := ic.c.createProgressBar(pool, srcInfo, "blob", "skipped: already exists")
+			bar := ic.c.createProgressBar(pool, false, srcInfo, "blob", "skipped: already exists")
 			bar.SetTotal(0, true)
 
 			// Throw an event that the layer has been skipped
@@ -1251,7 +1279,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 	imgSource, okSource := ic.c.rawSource.(internalTypes.ImageSourceSeekable)
 	imgDest, okDest := ic.c.dest.(internalTypes.ImageDestinationPartial)
 	if okSource && okDest && !diffIDIsNeeded {
-		bar := ic.c.createProgressBar(pool, srcInfo, "blob", "done")
+		bar := ic.c.createProgressBar(pool, true, srcInfo, "blob", "done")
 
 		progress := make(chan int64)
 		terminate := make(chan interface{})
@@ -1272,17 +1300,18 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 					return
 				}
 			}
-
 		}()
 
 		bar.SetTotal(srcInfo.Size, false)
 		info, err := imgDest.PutBlobPartial(ctx, proxy, srcInfo, ic.c.blobInfoCache)
 		if err == nil {
 			bar.SetRefill(srcInfo.Size - bar.Current())
+			bar.SetCurrent(srcInfo.Size)
 			bar.SetTotal(srcInfo.Size, true)
 			logrus.Debugf("Retrieved partial blob %v", srcInfo.Digest)
 			return info, cachedDiffID, nil
 		}
+		bar.Abort(true)
 		logrus.Errorf("Failed to retrieve partial blob: %v", err)
 	}
 
@@ -1293,7 +1322,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 	}
 	defer srcStream.Close()
 
-	bar := ic.c.createProgressBar(pool, srcInfo, "blob", "done")
+	bar := ic.c.createProgressBar(pool, false, srcInfo, "blob", "done")
 
 	blobInfo, diffIDChan, err := ic.copyLayerFromStream(ctx, srcStream, types.BlobInfo{Digest: srcInfo.Digest, Size: srcBlobSize, MediaType: srcInfo.MediaType, Annotations: srcInfo.Annotations}, diffIDIsNeeded, toEncrypt, bar, layerIndex, emptyLayer)
 	if err != nil {
