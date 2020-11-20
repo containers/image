@@ -5,6 +5,7 @@ import (
 
 	"github.com/containers/image/v5/pkg/compression"
 	"github.com/containers/image/v5/types"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -86,4 +87,208 @@ func TestCompressionVariantMIMEType(t *testing.T) {
 			assert.Equal(t, c.expected, res, c.input)
 		}
 	}
+}
+
+func TestUpdatedMIMEType(t *testing.T) {
+	// all known types, PreserveOriginal
+	preserve := []struct {
+		compression []compressionMIMETypeSet
+		mimeType    string
+	}{
+		{schema2CompressionMIMETypeSets, DockerV2Schema1MediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema1SignedMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2MediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2ConfigMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2LayerMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2SchemaLayerMediaTypeUncompressed},
+		{schema2CompressionMIMETypeSets, DockerV2ListMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2ForeignLayerMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2ForeignLayerMediaTypeGzip},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeDescriptor},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeLayoutHeader},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageManifest},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageIndex},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayer},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerGzip},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerZstd},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributable},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableGzip},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableZstd},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageConfig},
+	}
+	for i, c := range preserve {
+		update := types.BlobInfo{
+			MediaType:            c.mimeType,
+			CompressionOperation: types.PreserveOriginal,
+		}
+		updatedType, err := updatedMIMEType(c.compression, c.mimeType, update)
+		require.NoErrorf(t, err, "%d: updatedMIMEType(%q, %+v) failed unexpectedly", i, c.mimeType, update)
+		assert.Equalf(t, c.mimeType, updatedType, "%d: updatedMIMEType(%q, %+v)", i, c.mimeType, update)
+	}
+
+	// known types where Decompress is expected to succeed
+	decompressSuccess := []struct {
+		compression []compressionMIMETypeSet
+		mimeType    string
+		updatedType string
+	}{
+		{schema2CompressionMIMETypeSets, DockerV2SchemaLayerMediaTypeUncompressed, DockerV2SchemaLayerMediaTypeUncompressed},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2ForeignLayerMediaTypeGzip, DockerV2Schema2ForeignLayerMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2LayerMediaType, DockerV2SchemaLayerMediaTypeUncompressed},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2ForeignLayerMediaType, DockerV2Schema2ForeignLayerMediaType},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayer, imgspecv1.MediaTypeImageLayer},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerGzip, imgspecv1.MediaTypeImageLayer},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerZstd, imgspecv1.MediaTypeImageLayer},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributable},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributable},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableZstd, imgspecv1.MediaTypeImageLayerNonDistributable},
+	}
+	for i, c := range decompressSuccess {
+		update := types.BlobInfo{
+			MediaType:            c.mimeType,
+			CompressionOperation: types.Decompress,
+		}
+		updatedType, err := updatedMIMEType(c.compression, c.mimeType, update)
+		require.NoErrorf(t, err, "%d: updatedMIMEType(%q, %+v) failed unexpectedly", i, c.mimeType, update)
+		assert.Equalf(t, c.updatedType, updatedType, "%d: updatedMIMEType(%q, %+v)", i, c.mimeType, update)
+	}
+
+	// known types where Decompress is expected to fail
+	decompressFailure := []struct {
+		compression []compressionMIMETypeSet
+		mimeType    string
+	}{
+		{schema2CompressionMIMETypeSets, DockerV2Schema1MediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema1SignedMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2MediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2ConfigMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2ListMediaType},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeDescriptor},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeLayoutHeader},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageManifest},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageIndex},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageConfig},
+	}
+	for i, c := range decompressFailure {
+		update := types.BlobInfo{
+			MediaType:            c.mimeType,
+			CompressionOperation: types.Decompress,
+		}
+		_, err := updatedMIMEType(c.compression, c.mimeType, update)
+		require.Errorf(t, err, "%d: updatedMIMEType(%q, %+v) should have failed", i, c.mimeType, update)
+	}
+
+	require.Equalf(t, len(preserve), len(decompressSuccess)+len(decompressFailure), "missing some decompression tests")
+
+	// all known types where Compress with gzip should succeed
+	compressGzipSuccess := []struct {
+		compression []compressionMIMETypeSet
+		mimeType    string
+		updatedType string
+	}{
+		{schema2CompressionMIMETypeSets, DockerV2Schema2LayerMediaType, DockerV2Schema2LayerMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2SchemaLayerMediaTypeUncompressed, DockerV2Schema2LayerMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2ForeignLayerMediaType, DockerV2Schema2ForeignLayerMediaTypeGzip},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2ForeignLayerMediaTypeGzip, DockerV2Schema2ForeignLayerMediaTypeGzip},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayer, imgspecv1.MediaTypeImageLayerGzip},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerGzip, imgspecv1.MediaTypeImageLayerGzip},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerZstd, imgspecv1.MediaTypeImageLayerGzip},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributableGzip},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributableGzip},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableZstd, imgspecv1.MediaTypeImageLayerNonDistributableGzip},
+	}
+	for i, c := range compressGzipSuccess {
+		update := types.BlobInfo{
+			MediaType:            c.mimeType,
+			CompressionOperation: types.Compress,
+			CompressionAlgorithm: &compression.Gzip,
+		}
+		updatedType, err := updatedMIMEType(c.compression, c.mimeType, update)
+		require.NoErrorf(t, err, "%d: updatedMIMEType(%q, %+v) failed unexpectedly", i, c.mimeType, update)
+		assert.Equalf(t, c.updatedType, updatedType, "%d: updatedMIMEType(%q, %+v)", i, c.mimeType, update)
+	}
+
+	// known types where Compress with gzip is expected to fail
+	compressGzipFailure := []struct {
+		compression []compressionMIMETypeSet
+		mimeType    string
+	}{
+		{schema2CompressionMIMETypeSets, DockerV2Schema1MediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema1SignedMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2MediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2ConfigMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2ListMediaType},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeDescriptor},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeLayoutHeader},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageManifest},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageIndex},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageConfig},
+	}
+	for i, c := range compressGzipFailure {
+		update := types.BlobInfo{
+			MediaType:            c.mimeType,
+			CompressionOperation: types.Compress,
+			CompressionAlgorithm: &compression.Gzip,
+		}
+		_, err := updatedMIMEType(c.compression, c.mimeType, update)
+		require.Errorf(t, err, "%d: updatedMIMEType(%q, %+v) should have failed", i, c.mimeType, update)
+	}
+
+	require.Equalf(t, len(preserve), len(compressGzipSuccess)+len(compressGzipFailure), "missing some gzip compression tests")
+
+	// known types where Compress with zstd is expected to succeed
+	compressZstdSuccess := []struct {
+		compression []compressionMIMETypeSet
+		mimeType    string
+		updatedType string
+	}{
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayer, imgspecv1.MediaTypeImageLayerZstd},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerGzip, imgspecv1.MediaTypeImageLayerZstd},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerZstd, imgspecv1.MediaTypeImageLayerZstd},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributableZstd},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributableZstd},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableZstd, imgspecv1.MediaTypeImageLayerNonDistributableZstd},
+	}
+	for i, c := range compressZstdSuccess {
+		update := types.BlobInfo{
+			MediaType:            c.mimeType,
+			CompressionOperation: types.Compress,
+			CompressionAlgorithm: &compression.Zstd,
+		}
+		updatedType, err := updatedMIMEType(c.compression, c.mimeType, update)
+		require.NoErrorf(t, err, "%d: updatedMIMEType(%q, %+v) failed unexpectedly", i, c.mimeType, update)
+		assert.Equalf(t, c.updatedType, updatedType, "%d: updatedMIMEType(%q, %+v)", i, c.mimeType, update)
+	}
+
+	// known types where Compress with zstd is expected to fail
+	compressZstdFailure := []struct {
+		compression []compressionMIMETypeSet
+		mimeType    string
+	}{
+		{schema2CompressionMIMETypeSets, DockerV2SchemaLayerMediaTypeUncompressed},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2LayerMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2ForeignLayerMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2ForeignLayerMediaTypeGzip},
+		{schema2CompressionMIMETypeSets, DockerV2Schema1MediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema1SignedMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2MediaType},
+		{schema2CompressionMIMETypeSets, DockerV2Schema2ConfigMediaType},
+		{schema2CompressionMIMETypeSets, DockerV2ListMediaType},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeDescriptor},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeLayoutHeader},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageManifest},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageIndex},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageConfig},
+	}
+	for i, c := range compressZstdFailure {
+		update := types.BlobInfo{
+			MediaType:            c.mimeType,
+			CompressionOperation: types.Compress,
+			CompressionAlgorithm: &compression.Zstd,
+		}
+		_, err := updatedMIMEType(c.compression, c.mimeType, update)
+		require.Errorf(t, err, "%d: updatedMIMEType(%q, %+v) should have failed", i, c.mimeType, update)
+	}
+
+	require.Equalf(t, len(preserve), len(compressZstdSuccess)+len(compressZstdFailure), "missing some zstd compression tests")
 }
