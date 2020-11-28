@@ -69,7 +69,7 @@ func XzDecompressor(r io.Reader) (io.ReadCloser, error) {
 }
 
 // gzipCompressor is a CompressorFunc for the gzip compression algorithm.
-func gzipCompressor(r io.Writer, level *int) (io.WriteCloser, error) {
+func gzipCompressor(r io.Writer, metadata map[string]string, level *int) (io.WriteCloser, error) {
 	if level != nil {
 		return pgzip.NewWriterLevel(r, *level)
 	}
@@ -77,18 +77,25 @@ func gzipCompressor(r io.Writer, level *int) (io.WriteCloser, error) {
 }
 
 // bzip2Compressor is a CompressorFunc for the bzip2 compression algorithm.
-func bzip2Compressor(r io.Writer, level *int) (io.WriteCloser, error) {
+func bzip2Compressor(r io.Writer, metadata map[string]string, level *int) (io.WriteCloser, error) {
 	return nil, fmt.Errorf("bzip2 compression not supported")
 }
 
 // xzCompressor is a CompressorFunc for the xz compression algorithm.
-func xzCompressor(r io.Writer, level *int) (io.WriteCloser, error) {
+func xzCompressor(r io.Writer, metadata map[string]string, level *int) (io.WriteCloser, error) {
 	return xz.NewWriter(r)
 }
 
 // CompressStream returns the compressor by its name
 func CompressStream(dest io.Writer, algo Algorithm, level *int) (io.WriteCloser, error) {
-	return internal.AlgorithmCompressor(algo)(dest, level)
+	m := map[string]string{}
+	return internal.AlgorithmCompressor(algo)(dest, m, level)
+}
+
+// CompressStreamWithMetadata returns the compressor by its name.  If the compression
+// generates any metadata, it is written to the provided metadata map.
+func CompressStreamWithMetadata(dest io.Writer, metadata map[string]string, algo Algorithm, level *int) (io.WriteCloser, error) {
+	return internal.AlgorithmCompressor(algo)(dest, metadata, level)
 }
 
 // DetectCompressionFormat returns an Algorithm and DecompressorFunc if the input is recognized as a compressed format, an invalid

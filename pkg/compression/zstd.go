@@ -46,7 +46,7 @@ func zstdWriterWithLevel(dest io.Writer, level int) (*zstd.Encoder, error) {
 }
 
 // zstdCompressor is a CompressorFunc for the zstd compression algorithm.
-func zstdCompressor(r io.Writer, level *int) (io.WriteCloser, error) {
+func zstdCompressor(r io.Writer, metadata map[string]string, level *int) (io.WriteCloser, error) {
 	if level == nil {
 		return zstdWriter(r)
 	}

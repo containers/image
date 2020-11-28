@@ -4,7 +4,7 @@ import "io"
 
 // CompressorFunc writes the compressed stream to the given writer using the specified compression level.
 // The caller must call Close() on the stream (even if the input stream does not need closing!).
-type CompressorFunc func(io.Writer, *int) (io.WriteCloser, error)
+type CompressorFunc func(io.Writer, map[string]string, *int) (io.WriteCloser, error)
 
 // DecompressorFunc returns the decompressed stream, given a compressed stream.
 // The caller must call Close() on the decompressed stream (even if the compressed input stream does not need closing!).
