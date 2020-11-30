@@ -13,6 +13,7 @@ type DecompressorFunc func(io.Reader) (io.ReadCloser, error)
 // Algorithm is a compression algorithm that can be used for CompressStream.
 type Algorithm struct {
 	name         string
+	mime         string
 	prefix       []byte
 	decompressor DecompressorFunc
 	compressor   CompressorFunc
@@ -21,9 +22,10 @@ type Algorithm struct {
 // NewAlgorithm creates an Algorithm instance.
 // This function exists so that Algorithm instances can only be created by code that
 // is allowed to import this internal subpackage.
-func NewAlgorithm(name string, prefix []byte, decompressor DecompressorFunc, compressor CompressorFunc) Algorithm {
+func NewAlgorithm(name, mime string, prefix []byte, decompressor DecompressorFunc, compressor CompressorFunc) Algorithm {
 	return Algorithm{
 		name:         name,
+		mime:         mime,
 		prefix:       prefix,
 		decompressor: decompressor,
 		compressor:   compressor,
@@ -33,6 +35,11 @@ func NewAlgorithm(name string, prefix []byte, decompressor DecompressorFunc, com
 // Name returns the name for the compression algorithm.
 func (c Algorithm) Name() string {
 	return c.name
+}
+
+// Name returns the MIME type to use for the compression algorithm.
+func (c Algorithm) MIME() string {
+	return c.mime
 }
 
 // AlgorithmCompressor returns the compressor field of algo.
