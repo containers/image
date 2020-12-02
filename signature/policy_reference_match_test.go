@@ -196,6 +196,38 @@ var prmRepositoryMatchTestTable = []prmSymmetricTableTest{
 	{"INVALID", "INVALID", false},
 }
 
+// Test cases for matchRepoDigestOrExact
+var matchRepoDigestOrExactTestTable = []struct {
+	imageRef, sigRef string
+	result           bool
+}{
+	// Tag mismatch
+	{"busybox:latest", "busybox:notlatest", false},
+	{fullRHELRef + "tagsuffix", fullRHELRef, false},
+	{"library/busybox:latest", "busybox:notlatest", false},
+	{"busybox:latest", "library/busybox:notlatest", false},
+	{"docker.io/library/busybox:notlatest", "busybox:latest", false},
+	{"busybox:notlatest", "docker.io/library/busybox:latest", false},
+	// NameOnly references
+	{"busybox", "busybox:latest", false},
+	{"busybox:latest", "busybox", false},
+	{"busybox", "busybox" + digestSuffix, false},
+	{"busybox" + digestSuffix, "busybox", false},
+	{fullRHELRef, untaggedRHELRef, false},
+	{"busybox", "busybox", false},
+	// Tag references only accept signatures with matching tags.
+	{"busybox:latest", "busybox" + digestSuffix, false},
+	// Digest references accept any signature with matching repository.
+	{"busybox" + digestSuffix, "busybox:latest", true},
+	{"busybox" + digestSuffix, "busybox" + digestSuffixOther, true}, // Even this is accepted here. (This could more reasonably happen with two different digest algorithms.)
+	// References with both tags and digests: We match them exactly (requiring BOTH to match).
+	{"busybox:latest" + digestSuffix, "busybox:latest", false},
+	{"busybox:latest" + digestSuffix, "busybox:notlatest", false},
+	{"busybox:latest", "busybox:latest" + digestSuffix, false},
+	{"busybox:latest" + digestSuffix, "busybox:latest" + digestSuffixOther, false},
+	{"busybox:latest" + digestSuffix, "busybox:notlatest" + digestSuffixOther, false},
+}
+
 func testImageAndSig(t *testing.T, prm PolicyReferenceMatch, imageRef, sigRef string, result bool) {
 	// This assumes that all ways to obtain a reference.Named perform equivalent validation,
 	// and therefore values refused by reference.ParseNormalizedNamed can not happen in practice.
@@ -249,36 +281,7 @@ func TestPMMMatchRepoDigestOrExactMatchesDockerReference(t *testing.T) {
 	}
 
 	// The other cases, possibly asymmetrical:
-	for _, test := range []struct {
-		imageRef, sigRef string
-		result           bool
-	}{
-		// Tag mismatch
-		{"busybox:latest", "busybox:notlatest", false},
-		{fullRHELRef + "tagsuffix", fullRHELRef, false},
-		{"library/busybox:latest", "busybox:notlatest", false},
-		{"busybox:latest", "library/busybox:notlatest", false},
-		{"docker.io/library/busybox:notlatest", "busybox:latest", false},
-		{"busybox:notlatest", "docker.io/library/busybox:latest", false},
-		// NameOnly references
-		{"busybox", "busybox:latest", false},
-		{"busybox:latest", "busybox", false},
-		{"busybox", "busybox" + digestSuffix, false},
-		{"busybox" + digestSuffix, "busybox", false},
-		{fullRHELRef, untaggedRHELRef, false},
-		{"busybox", "busybox", false},
-		// Tag references only accept signatures with matching tags.
-		{"busybox:latest", "busybox" + digestSuffix, false},
-		// Digest references accept any signature with matching repository.
-		{"busybox" + digestSuffix, "busybox:latest", true},
-		{"busybox" + digestSuffix, "busybox" + digestSuffixOther, true}, // Even this is accepted here. (This could more reasonably happen with two different digest algorithms.)
-		// References with both tags and digests: We match them exactly (requiring BOTH to match).
-		{"busybox:latest" + digestSuffix, "busybox:latest", false},
-		{"busybox:latest" + digestSuffix, "busybox:notlatest", false},
-		{"busybox:latest", "busybox:latest" + digestSuffix, false},
-		{"busybox:latest" + digestSuffix, "busybox:latest" + digestSuffixOther, false},
-		{"busybox:latest" + digestSuffix, "busybox:notlatest" + digestSuffixOther, false},
-	} {
+	for _, test := range matchRepoDigestOrExactTestTable {
 		testImageAndSig(t, prm, test.imageRef, test.sigRef, test.result)
 	}
 }
