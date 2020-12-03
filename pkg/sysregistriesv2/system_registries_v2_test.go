@@ -589,7 +589,7 @@ func TestParseShortNameMode(t *testing.T) {
 		{"disabled", types.ShortNameModeDisabled, false},
 		{"enforcing", types.ShortNameModeEnforcing, false},
 		{"permissive", types.ShortNameModePermissive, false},
-		{"", types.ShortNameModePermissive, true},
+		{"", -1, true},
 		{"xxx", -1, true},
 	}
 
