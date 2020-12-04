@@ -57,6 +57,11 @@ var policyFixtureContents = &Policy{
 					"/keys/RH-key-signing-key-gpg-keyring",
 					NewPRMMatchRepoDigestOrExact()),
 			},
+			"private-mirror:5000/vendor-mirror": {
+				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys,
+					"/keys/vendor-gpg-keyring",
+					xNewPRMRemapIdentity("private-mirror:5000/vendor-mirror", "vendor.example.com")),
+			},
 			"bogus/key-data-example": {
 				xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys,
 					[]byte("nonsense"),
@@ -250,7 +255,7 @@ func testInvalidJSONInput(t *testing.T, dest json.Unmarshaler) {
 	assert.Error(t, err)
 }
 
-// addExtraJSONMember adds adds an additional member "$name": $extra,
+// addExtraJSONMember adds an additional member "$name": $extra,
 // possibly with a duplicate name, to encoded.
 // Errors, if any, are reported through t.
 func addExtraJSONMember(t *testing.T, encoded []byte, name string, extra interface{}) []byte {
@@ -260,7 +265,13 @@ func addExtraJSONMember(t *testing.T, encoded []byte, name string, extra interfa
 	require.True(t, bytes.HasSuffix(encoded, []byte("}")))
 	preservedLen := len(encoded) - 1
 
-	return bytes.Join([][]byte{encoded[:preservedLen], []byte(`,"`), []byte(name), []byte(`":`), extraJSON, []byte("}")}, nil)
+	res := bytes.Join([][]byte{encoded[:preservedLen], []byte(`,"`), []byte(name), []byte(`":`), extraJSON, []byte("}")}, nil)
+	// Verify that the result is valid JSON, as a sanity check that we are actually triggering
+	// the “duplicate member” case in the caller.
+	var raw map[string]interface{}
+	err = json.Unmarshal(res, &raw)
+	require.NoError(t, err)
+	return res
 }
 
 // policyJSONUnmarshallerTests formalizes the repeated structure of the JSON unmasrhaller
@@ -1104,7 +1115,7 @@ func TestPRMExactReferenceUnmarshalJSON(t *testing.T) {
 			// Invalid "dockerReference" field
 			func(v mSI) { v["dockerReference"] = 1 },
 		},
-		duplicateFields: []string{"type", "baseLayerIdentity"},
+		duplicateFields: []string{"type", "dockerReference"},
 	}.run(t)
 }
 
@@ -1160,6 +1171,106 @@ func TestPRMExactRepositoryUnmarshalJSON(t *testing.T) {
 			// Invalid "dockerRepository" field
 			func(v mSI) { v["dockerRepository"] = 1 },
 		},
-		duplicateFields: []string{"type", "baseLayerIdentity"},
+		duplicateFields: []string{"type", "dockerRepository"},
+	}.run(t)
+}
+
+func TestValidateIdentityRemappingPrefix(t *testing.T) {
+	for _, s := range []string{
+		"localhost",
+		"example.com",
+		"example.com:80",
+		"example.com/repo",
+		"example.com/ns1/ns2/ns3/repo.with.dots-dashes_underscores",
+		"example.com:80/ns1/ns2/ns3/repo.with.dots-dashes_underscores",
+		// NOTE: These values are invalid, do not actually work, and may be rejected by this function
+		// and in NewPRMRemapIdentity in the future.
+		"shortname",
+		"ns/shortname",
+	} {
+		err := validateIdentityRemappingPrefix(s)
+		assert.NoError(t, err, s)
+	}
+
+	for _, s := range []string{
+		"",
+		"repo_with_underscores", // Not a valid DNS name, at least per docker/reference
+		"example.com/",
+		"example.com/UPPERCASEISINVALID",
+		"example.com/repo/",
+		"example.com/repo:tag",
+		"example.com/repo@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"example.com/repo:tag@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+	} {
+		err := validateIdentityRemappingPrefix(s)
+		assert.Error(t, err, s)
+	}
+}
+
+// xNewPRMRemapIdentity is like NewPRMRemapIdentity, except it must not fail.
+func xNewPRMRemapIdentity(prefix, signedPrefix string) PolicyReferenceMatch {
+	pr, err := NewPRMRemapIdentity(prefix, signedPrefix)
+	if err != nil {
+		panic("xNewPRMRemapIdentity failed")
+	}
+	return pr
+}
+
+func TestNewPRMRemapIdentity(t *testing.T) {
+	const testPrefix = "example.com/docker-library"
+	const testSignedPrefix = "docker.io/library"
+
+	// Success
+	_prm, err := NewPRMRemapIdentity(testPrefix, testSignedPrefix)
+	require.NoError(t, err)
+	prm, ok := _prm.(*prmRemapIdentity)
+	require.True(t, ok)
+	assert.Equal(t, &prmRemapIdentity{
+		prmCommon:    prmCommon{prmTypeRemapIdentity},
+		Prefix:       testPrefix,
+		SignedPrefix: testSignedPrefix,
+	}, prm)
+
+	// Invalid prefix
+	_, err = NewPRMRemapIdentity("", testSignedPrefix)
+	assert.Error(t, err)
+	_, err = NewPRMRemapIdentity("example.com/UPPERCASEISINVALID", testSignedPrefix)
+	assert.Error(t, err)
+	// Invalid signedPrefix
+	_, err = NewPRMRemapIdentity(testPrefix, "")
+	assert.Error(t, err)
+	_, err = NewPRMRemapIdentity(testPrefix, "example.com/UPPERCASEISINVALID")
+	assert.Error(t, err)
+}
+
+func TestPRMRemapIdentityUnmarshalJSON(t *testing.T) {
+	policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prmRemapIdentity{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRMRemapIdentity("example.com/docker-library", "docker.io/library")
+		},
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyReferenceMatchFromJSON(validJSON)
+		},
+		breakFns: []func(mSI){
+			// The "type" field is missing
+			func(v mSI) { delete(v, "type") },
+			// Wrong "type" field
+			func(v mSI) { v["type"] = 1 },
+			func(v mSI) { v["type"] = "this is invalid" },
+			// Extra top-level sub-object
+			func(v mSI) { v["unexpected"] = 1 },
+			// The "prefix" field is missing
+			func(v mSI) { delete(v, "prefix") },
+			// Invalid "prefix" field
+			func(v mSI) { v["prefix"] = 1 },
+			func(v mSI) { v["prefix"] = "this is invalid" },
+			// The "signedPrefix" field is missing
+			func(v mSI) { delete(v, "signedPrefix") },
+			// Invalid "signedPrefix" field
+			func(v mSI) { v["signedPrefix"] = 1 },
+			func(v mSI) { v["signedPrefix"] = "this is invalid" },
+		},
+		duplicateFields: []string{"type", "prefix", "signedPrefix"},
 	}.run(t)
 }

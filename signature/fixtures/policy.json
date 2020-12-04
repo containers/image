@@ -75,6 +75,18 @@
                     }
                 }
             ],
+            "private-mirror:5000/vendor-mirror": [
+                {
+                    "type": "signedBy",
+                    "keyType": "GPGKeys",
+                    "keyPath": "/keys/vendor-gpg-keyring",
+                    "signedIdentity": {
+                        "type": "remapIdentity",
+                        "prefix": "private-mirror:5000/vendor-mirror",
+                        "signedPrefix": "vendor.example.com"
+                    }
+                }
+            ],
             "bogus/key-data-example": [
                 {
                     "type": "signedBy",
