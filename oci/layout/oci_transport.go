@@ -61,29 +61,31 @@ type ociReference struct {
 	// (But in general, we make no attempt to be completely safe against concurrent hostile filesystem modifications.)
 	dir         string // As specified by the user. May be relative, contain symlinks, etc.
 	resolvedDir string // Absolute path with no symlinks, at least at the time of its creation. Primarily used for policy namespaces.
-	// If image=="", it means the "only image" in the index.json is used in the case it is a source
-	// for destinations, the image name annotation "image.ref.name" is not added to the index.json
+	// If image=="" && sourceIndex==-1, it means the "only image" in the index.json is used in the case it is a source
+	// for destinations, the image name annotation "image.ref.name" is not added to the index.json.
+	//
+	// Must not be set if sourceIndex is set (the value is not -1).
 	image string
-	// Zero-based source manifest index. If sourceIndex==-1, the index will not be valid to point out the source image, only image field will be used.
+	// If not -1, a zero-based index of an image in the manifest index. Valid only for sources.
+	// Must not be set if image is set.
 	sourceIndex int
 }
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an OCI ImageReference.
 func ParseReference(reference string) (types.ImageReference, error) {
-	dir, image := internal.SplitPathAndImage(reference)
-	image, index, err := internal.ParseOCIReferenceName(image)
+	dir, image, index, err := internal.ParseReferenceIntoElements(reference)
 	if err != nil {
 		return nil, err
 	}
-	return NewReferenceWithIndex(dir, image, index)
+	return newReference(dir, image, index)
 }
 
-// NewReferenceWithIndex returns an OCI reference for a directory and a image， sourceIndex points to an image.
+// newReference returns an OCI reference for a directory and a image， sourceIndex points to an image.
 //
 // If sourceIndex==-1, the index will not be valid to point out the source image, only image will be used.
 // We do not expose an API supplying the resolvedDir; we could, but recomputing it
 // is generally cheap enough that we prefer being confident about the properties of resolvedDir.
-func NewReferenceWithIndex(dir, image string, sourceIndex int) (types.ImageReference, error) {
+func newReference(dir, image string, sourceIndex int) (types.ImageReference, error) {
 	resolved, err := explicitfilepath.ResolvePathToFullyExplicit(dir)
 	if err != nil {
 		return nil, err
@@ -100,12 +102,15 @@ func NewReferenceWithIndex(dir, image string, sourceIndex int) (types.ImageRefer
 	if sourceIndex != -1 && sourceIndex < 0 {
 		return nil, errors.Errorf("Invalid oci layout: reference: index @%d must not be negative", sourceIndex)
 	}
+	if sourceIndex != -1 && image != "" {
+		return nil, errors.Errorf("Invalid oci layout: reference: cannot use both an image %s and a source index @%d", image, sourceIndex)
+	}
 	return ociReference{dir: dir, resolvedDir: resolved, image: image, sourceIndex: sourceIndex}, nil
 }
 
 // NewIndexReference returns an OCI reference for a path and a zero-based source manifest index.
 func NewIndexReference(dir string, sourceIndex int) (types.ImageReference, error) {
-	return NewReferenceWithIndex(dir, "", sourceIndex)
+	return newReference(dir, "", sourceIndex)
 }
 
 // NewReference returns an OCI reference for a directory and a image.
@@ -113,7 +118,7 @@ func NewIndexReference(dir string, sourceIndex int) (types.ImageReference, error
 // We do not expose an API supplying the resolvedDir; we could, but recomputing it
 // is generally cheap enough that we prefer being confident about the properties of resolvedDir.
 func NewReference(dir, image string) (types.ImageReference, error) {
-	return NewReferenceWithIndex(dir, image, -1)
+	return newReference(dir, image, -1)
 }
 
 func (ref ociReference) Transport() types.ImageTransport {
@@ -210,11 +215,12 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 		return imgspecv1.Descriptor{}, err
 	}
 	var d *imgspecv1.Descriptor
-	if ref.sourceIndex != -1 {
-		if len(index.Manifests) > ref.sourceIndex {
+	if ref.sourceIndex < len(index.Manifests) {
+		if ref.sourceIndex != -1 {
 			d = &index.Manifests[ref.sourceIndex]
 			return *d, nil
 		}
+	} else {
 		return imgspecv1.Descriptor{}, fmt.Errorf("index %d is too large, only %d entries available", ref.sourceIndex, len(index.Manifests))
 	}
 	if ref.image == "" {

@@ -144,3 +144,13 @@ func ParseOCIReferenceName(image string) (img string, index int, err error) {
 	}
 	return img, index, nil
 }
+
+// ParseReferenceIntoElements splits the oci reference into location, image name and source index if exists
+func ParseReferenceIntoElements(reference string) (string, string, int, error) {
+	dir, image := SplitPathAndImage(reference)
+	image, index, err := ParseOCIReferenceName(image)
+	if err != nil {
+		return "", "", -1, err
+	}
+	return dir, image, index, nil
+}

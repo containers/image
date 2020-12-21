@@ -1,10 +1,10 @@
 package archive
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 
-	"github.com/containers/image/v5/directory/explicitfilepath"
 	"github.com/containers/image/v5/internal/tmpdir"
 	"github.com/containers/image/v5/oci/layout"
 	"github.com/containers/image/v5/types"
@@ -21,18 +21,14 @@ type Writer struct {
 
 // NewWriter creates a temp directory will be tarred to oci-archive.
 // The caller should call .Close() on the returned object.
-func NewWriter(sys *types.SystemContext, file string) (*Writer, error) {
+func NewWriter(ctx context.Context, sys *types.SystemContext, file string) (*Writer, error) {
 	dir, err := ioutil.TempDir(tmpdir.TemporaryDirectoryForBigFiles(sys), "oci")
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating temp directory")
 	}
-	dst, err := explicitfilepath.ResolvePathToFullyExplicit(file)
-	if err != nil {
-		return nil, err
-	}
 	ociWriter := &Writer{
 		tempDir: dir,
-		path:    dst,
+		path:    file,
 	}
 	return ociWriter, nil
 }
@@ -40,7 +36,19 @@ func NewWriter(sys *types.SystemContext, file string) (*Writer, error) {
 // NewReference returns an ImageReference that allows adding an image to Writer,
 // with an optional image name
 func (w *Writer) NewReference(name string) (types.ImageReference, error) {
-	return layout.NewReference(w.tempDir, name)
+	ref, err := layout.NewReference(w.tempDir, name)
+	if err != nil {
+		return nil, errors.Errorf("error creating image reference: %v", err)
+	}
+	archiveWriterRef := &tempDirOCIRef{
+		tempDirectory:   w.tempDir,
+		ociRefExtracted: ref,
+	}
+	archiveRef, err := newReference(w.path, "", -1, nil, archiveWriterRef)
+	if err != nil {
+		return nil, errors.Errorf("error creating image reference: %v", err)
+	}
+	return archiveRef, nil
 }
 
 // Close converts the data about images in the temp directory to the archive and

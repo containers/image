@@ -13,24 +13,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestGetManifestDescriptor is testing a regression issue where a nil error was being wrapped,
-// this causes the returned error to be nil as well and the user wasn't getting a proper error output.
-//
-// More info: https://github.com/containers/skopeo/issues/496
 func TestGetManifestDescriptor(t *testing.T) {
 	imageRef, err := NewReference("fixtures/two_images_manifest", "")
 	require.NoError(t, err)
 
+	// test a regression issue where a nil error was being wrapped,
+	// this causes the returned error to be nil as well and the user wasn't getting a proper error output.
+	//
+	// More info: https://github.com/containers/skopeo/issues/496
 	_, err = imageRef.(ociReference).getManifestDescriptor()
 	assert.EqualError(t, err, ErrMoreThanOneImage.Error())
 
-	imageRef, err = NewReferenceWithIndex("fixtures/two_names_manifest", "imageValue0", -1)
+	imageRef, err = NewReference("fixtures/two_names_manifest", "imageValue0")
 	require.NoError(t, err)
 	manDescriptor, err := imageRef.(ociReference).getManifestDescriptor()
 	require.NoError(t, err)
 	assert.Equal(t, manDescriptor.Annotations["org.opencontainers.image.ref.name"], "imageValue0")
 
-	imageRef, err = NewReferenceWithIndex("fixtures/two_names_manifest", "", 1)
+	imageRef, err = NewIndexReference("fixtures/two_names_manifest", 1)
 	require.NoError(t, err)
 	manDescriptor, err = imageRef.(ociReference).getManifestDescriptor()
 	require.NoError(t, err)
@@ -135,6 +135,10 @@ func TestNewReference(t *testing.T) {
 	assert.Error(t, err)
 
 	_, err = NewReference(tmpDir+"/has:colon", imageValue)
+	assert.Error(t, err)
+
+	// Test private newReference
+	_, err = newReference(tmpDir, imageValue, 1)
 	assert.Error(t, err)
 }
 

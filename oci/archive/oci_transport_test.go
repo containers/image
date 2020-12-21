@@ -66,12 +66,12 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 		}{
 			{":notlatest:image", "notlatest:image", -1},
 			{":latestimage", "latestimage", -1},
-			{":", "", -1},
+			{":busybox@0", "busybox@0", -1},
+			{":", "", -1}, // No Image
 			{"", "", -1},
-			{":@0", "", 0},
+			{":@0", "", 0}, // Explicit sourceIndex of image
 			{":@10", "", 10},
 			{":@999999", "", 999999},
-			{":busybox@0", "busybox@0", -1},
 		} {
 			input := path + image.suffix
 			ref, err := fn(input)
@@ -130,6 +130,10 @@ func TestNewReference(t *testing.T) {
 	assert.Error(t, err)
 
 	_, err = NewReference(tmpDir+"/has:colon", imageValue)
+	assert.Error(t, err)
+
+	// Test private newReference
+	_, err = newReference(tmpDir, "imageName", 1, nil, nil) // Both image and sourceIndex specified
 	assert.Error(t, err)
 }
 

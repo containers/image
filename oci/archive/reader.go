@@ -19,11 +19,12 @@ import (
 type Reader struct {
 	manifest      *imgspecv1.Index
 	tempDirectory string
+	path          string // The original, user-specified path; not the maintained temporary file, if any
 }
 
 // NewReader creates the temp directory that keeps the untarred archive from src.
 // The caller should call .Close() on the returned object.
-func NewReader(ctx context.Context, src string, sys *types.SystemContext) (*Reader, error) {
+func NewReader(ctx context.Context, sys *types.SystemContext, src string) (*Reader, error) {
 	// TODO: This can take quite some time, and should ideally be cancellable using a context.Context.
 	arch, err := os.Open(src)
 	if err != nil {
@@ -38,12 +39,16 @@ func NewReader(ctx context.Context, src string, sys *types.SystemContext) (*Read
 
 	reader := Reader{
 		tempDirectory: dst,
+		path:          src,
 	}
 
-	if err := archive.NewDefaultArchiver().Untar(arch, dst, &archive.TarOptions{NoLchown: true}); err != nil {
-		if err := reader.Close(); err != nil {
-			return nil, errors.Wrapf(err, "error deleting temp directory %q", dst)
+	succeeded := false
+	defer func() {
+		if !succeeded {
+			reader.Close()
 		}
+	}()
+	if err := archive.NewDefaultArchiver().Untar(arch, dst, &archive.TarOptions{NoLchown: true}); err != nil {
 		return nil, errors.Wrapf(err, "error untarring file %q", dst)
 	}
 
@@ -56,16 +61,21 @@ func NewReader(ctx context.Context, src string, sys *types.SystemContext) (*Read
 	if err := json.NewDecoder(indexJSON).Decode(reader.manifest); err != nil {
 		return nil, err
 	}
-
+	succeeded = true
 	return &reader, nil
 }
 
-// List returns a (name, reference) map for images in the reader
-// the name will be used to determin reference name of the dest image.
+// Reference wraps the image reference and the manifest for loading
+type Reference struct {
+	FullImageReference types.ImageReference
+	ManifestDescriptor imgspecv1.Descriptor
+}
+
+// List returns a list of Reference for images in the reader
 // the ImageReferences are valid only until the Reader is closed.
-func (r *Reader) List() (map[string]types.ImageReference, error) {
-	res := make(map[string]types.ImageReference)
+func (r *Reader) List() ([]Reference, error) {
 	var (
+		res []Reference
 		ref types.ImageReference
 		err error
 	)
@@ -75,7 +85,6 @@ func (r *Reader) List() (map[string]types.ImageReference, error) {
 		}
 		refName, ok := md.Annotations[imgspecv1.AnnotationRefName]
 		if !ok {
-			refName = "@" + md.Digest.Encoded()
 			if ref, err = layout.NewIndexReference(r.tempDirectory, i); err != nil {
 				return nil, err
 			}
@@ -84,10 +93,19 @@ func (r *Reader) List() (map[string]types.ImageReference, error) {
 				return nil, err
 			}
 		}
-		if _, ok := res[refName]; ok {
-			return nil, errors.Errorf("image descriptor %s conflict", refName)
+		archiveReaderRef := &tempDirOCIRef{
+			tempDirectory:   r.tempDirectory,
+			ociRefExtracted: ref,
 		}
-		res[refName] = ref
+		archiveRef, err := newReference(r.path, "", -1, archiveReaderRef, nil)
+		if err != nil {
+			return nil, errors.Errorf("error creating image reference: %v", err)
+		}
+		reference := Reference{
+			FullImageReference: archiveRef,
+			ManifestDescriptor: md,
+		}
+		res = append(res, reference)
 	}
 	return res, nil
 }

@@ -61,7 +61,7 @@ The _algo:digest_ refers to the image ID reported by docker-inspect(1).
 
 An image compliant with the "Open Container Image Layout Specification" at _path_.
 Using a _tag_ is optional and allows for storing multiple images at the same _path_.
-@_source-index_ is a zero-based index in manifest (to access untagged images).
+For reading images, @_source-index_ is a zero-based index in manifest (to access untagged images).
 If neither tag nor @_source_index is specified when reading an image, the path must contain exactly one image.
 
 ### **oci-archive:**_path[:{tag|@source-index}]_
