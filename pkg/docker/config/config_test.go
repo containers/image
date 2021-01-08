@@ -21,6 +21,9 @@ func TestGetPathToAuth(t *testing.T) {
 	const darwin = "darwin"
 
 	uid := fmt.Sprintf("%d", os.Getuid())
+	// We don’t have to override the home directory for this because use of this path does not depend
+	// on any state of the filesystem.
+	darwinDefault := filepath.Join(os.Getenv("HOME"), ".config", "containers", "auth.json")
 
 	tmpDir, err := ioutil.TempDir("", "TestGetPathToAuth")
 	require.NoError(t, err)
@@ -46,14 +49,21 @@ func TestGetPathToAuth(t *testing.T) {
 	}{
 		// Default paths
 		{&types.SystemContext{}, linux, "", "/run/containers/" + uid + "/auth.json", false},
+		{&types.SystemContext{}, darwin, "", darwinDefault, false},
 		{nil, linux, "", "/run/containers/" + uid + "/auth.json", false},
+		{nil, darwin, "", darwinDefault, false},
 		// SystemContext overrides
 		{&types.SystemContext{AuthFilePath: "/absolute/path"}, linux, "", "/absolute/path", false},
+		{&types.SystemContext{AuthFilePath: "/absolute/path"}, darwin, "", "/absolute/path", false},
 		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, linux, "", "/absolute/path", true},
+		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, darwin, "", "/absolute/path", true},
 		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, linux, "", "/prefix/run/containers/" + uid + "/auth.json", false},
+		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, darwin, "", "/prefix/run/containers/" + uid + "/auth.json", false},
 		// XDG_RUNTIME_DIR defined
 		{nil, linux, tmpDir, tmpDir + "/containers/auth.json", false},
+		{nil, darwin, tmpDir, darwinDefault, false},
 		{nil, linux, tmpDir + "/thisdoesnotexist", "", false},
+		{nil, darwin, tmpDir + "/thisdoesnotexist", darwinDefault, false},
 	} {
 		if c.xrd != "" {
 			os.Setenv("XDG_RUNTIME_DIR", c.xrd)
