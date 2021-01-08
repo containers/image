@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/containers/image/v5/types"
-	"github.com/containers/storage/pkg/homedir"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -98,20 +97,16 @@ func TestGetAuth(t *testing.T) {
 		os.Setenv("XDG_RUNTIME_DIR", origXDG)
 	}()
 
-	origHomeDir := homedir.Get()
 	tmpHomeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("using temporary home directory: %q", tmpHomeDir)
-	//override homedir
-	os.Setenv(homedir.Key(), tmpHomeDir)
 	defer func() {
 		err := os.RemoveAll(tmpHomeDir)
 		if err != nil {
 			t.Logf("failed to cleanup temporary home directory %q: %v", tmpHomeDir, err)
 		}
-		os.Setenv(homedir.Key(), origHomeDir)
 	}()
 
 	configDir1 := filepath.Join(tmpXDGRuntimeDir, "containers")
@@ -263,12 +258,12 @@ func TestGetAuth(t *testing.T) {
 				if tc.sys != nil {
 					sys = tc.sys
 				}
-				auth, err := GetCredentials(sys, tc.hostname)
+				auth, err := getCredentialsWithHomeDir(sys, tc.hostname, tmpHomeDir)
 				assert.Equal(t, tc.expectedError, err)
 				assert.Equal(t, tc.expected, auth)
 
 				// Test for the previous APIs.
-				username, password, err := GetAuthentication(sys, tc.hostname)
+				username, password, err := getAuthenticationWithHomeDir(sys, tc.hostname, tmpHomeDir)
 				if tc.expected.IdentityToken != "" {
 					assert.Equal(t, "", username)
 					assert.Equal(t, "", password)
@@ -286,20 +281,16 @@ func TestGetAuth(t *testing.T) {
 }
 
 func TestGetAuthFromLegacyFile(t *testing.T) {
-	origHomeDir := homedir.Get()
 	tmpDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("using temporary home directory: %q", tmpDir)
-	// override homedir
-	os.Setenv(homedir.Key(), tmpDir)
 	defer func() {
 		err := os.RemoveAll(tmpDir)
 		if err != nil {
 			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir, err)
 		}
-		os.Setenv(homedir.Key(), origHomeDir)
 	}()
 
 	configPath := filepath.Join(tmpDir, ".dockercfg")
@@ -336,12 +327,12 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			auth, err := GetCredentials(nil, tc.hostname)
+			auth, err := getCredentialsWithHomeDir(nil, tc.hostname, tmpDir)
 			assert.Equal(t, tc.expectedError, err)
 			assert.Equal(t, tc.expected, auth)
 
 			// Testing for previous APIs
-			username, password, err := GetAuthentication(nil, tc.hostname)
+			username, password, err := getAuthenticationWithHomeDir(nil, tc.hostname, tmpDir)
 			assert.Equal(t, tc.expectedError, err)
 			assert.Equal(t, tc.expected.Username, username)
 			assert.Equal(t, tc.expected.Password, password)
@@ -350,20 +341,16 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 }
 
 func TestGetAuthPreferNewConfig(t *testing.T) {
-	origHomeDir := homedir.Get()
 	tmpDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("using temporary home directory: %q", tmpDir)
-	// override homedir
-	os.Setenv(homedir.Key(), tmpDir)
 	defer func() {
 		err := os.RemoveAll(tmpDir)
 		if err != nil {
 			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir, err)
 		}
-		os.Setenv(homedir.Key(), origHomeDir)
 	}()
 
 	configDir := filepath.Join(tmpDir, ".docker")
@@ -394,7 +381,7 @@ func TestGetAuthPreferNewConfig(t *testing.T) {
 		}
 	}
 
-	auth, err := GetCredentials(nil, "docker.io")
+	auth, err := getCredentialsWithHomeDir(nil, "docker.io", tmpDir)
 	assert.NoError(t, err)
 	assert.Equal(t, "docker", auth.Username)
 	assert.Equal(t, "io", auth.Password)
@@ -407,7 +394,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("using temporary XDG_RUNTIME_DIR directory: %q", tmpXDGRuntimeDir)
-	// override homedir
+	// override XDG_RUNTIME_DIR
 	os.Setenv("XDG_RUNTIME_DIR", tmpXDGRuntimeDir)
 	defer func() {
 		err := os.RemoveAll(tmpXDGRuntimeDir)
@@ -417,20 +404,16 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 		os.Setenv("XDG_RUNTIME_DIR", origXDG)
 	}()
 
-	origHomeDir := homedir.Get()
 	tmpHomeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("using temporary home directory: %q", tmpHomeDir)
-	// override homedir
-	os.Setenv(homedir.Key(), tmpHomeDir)
 	defer func() {
 		err := os.RemoveAll(tmpHomeDir)
 		if err != nil {
 			t.Logf("failed to cleanup temporary home directory %q: %v", tmpHomeDir, err)
 		}
-		os.Setenv(homedir.Key(), origHomeDir)
 	}()
 
 	configDir := filepath.Join(tmpXDGRuntimeDir, "containers")
@@ -443,7 +426,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	configPath := filepath.Join(configDir, "auth.json")
 
 	// no config file present
-	auth, err := GetCredentials(nil, "index.docker.io")
+	auth, err := getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err != nil {
 		t.Fatalf("got unexpected error: %#+v", err)
 	}
@@ -452,7 +435,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if err := ioutil.WriteFile(configPath, []byte("Json rocks! Unless it doesn't."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
-	auth, err = GetCredentials(nil, "index.docker.io")
+	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err == nil {
 		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}
@@ -463,7 +446,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	// remove the invalid config file
 	os.RemoveAll(configPath)
 	// no config file present
-	auth, err = GetCredentials(nil, "index.docker.io")
+	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err != nil {
 		t.Fatalf("got unexpected error: %#+v", err)
 	}
@@ -473,7 +456,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if err := ioutil.WriteFile(configPath, []byte("I'm certainly not a json string."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
-	auth, err = GetCredentials(nil, "index.docker.io")
+	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err == nil {
 		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}
