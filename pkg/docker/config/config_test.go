@@ -68,42 +68,42 @@ func TestGetPathToAuth(t *testing.T) {
 
 func TestGetAuth(t *testing.T) {
 	origXDG := os.Getenv("XDG_RUNTIME_DIR")
-	tmpDir1, err := ioutil.TempDir("", "test_docker_client_get_auth")
+	tmpXDGRuntimeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("using temporary XDG_RUNTIME_DIR directory: %q", tmpDir1)
+	t.Logf("using temporary XDG_RUNTIME_DIR directory: %q", tmpXDGRuntimeDir)
 	// override XDG_RUNTIME_DIR
-	os.Setenv("XDG_RUNTIME_DIR", tmpDir1)
+	os.Setenv("XDG_RUNTIME_DIR", tmpXDGRuntimeDir)
 	defer func() {
-		err := os.RemoveAll(tmpDir1)
+		err := os.RemoveAll(tmpXDGRuntimeDir)
 		if err != nil {
-			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir1, err)
+			t.Logf("failed to cleanup temporary home directory %q: %v", tmpXDGRuntimeDir, err)
 		}
 		os.Setenv("XDG_RUNTIME_DIR", origXDG)
 	}()
 
 	origHomeDir := homedir.Get()
-	tmpDir2, err := ioutil.TempDir("", "test_docker_client_get_auth")
+	tmpHomeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("using temporary home directory: %q", tmpDir2)
+	t.Logf("using temporary home directory: %q", tmpHomeDir)
 	//override homedir
-	os.Setenv(homedir.Key(), tmpDir2)
+	os.Setenv(homedir.Key(), tmpHomeDir)
 	defer func() {
-		err := os.RemoveAll(tmpDir2)
+		err := os.RemoveAll(tmpHomeDir)
 		if err != nil {
-			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir2, err)
+			t.Logf("failed to cleanup temporary home directory %q: %v", tmpHomeDir, err)
 		}
 		os.Setenv(homedir.Key(), origHomeDir)
 	}()
 
-	configDir1 := filepath.Join(tmpDir1, "containers")
+	configDir1 := filepath.Join(tmpXDGRuntimeDir, "containers")
 	if err := os.MkdirAll(configDir1, 0700); err != nil {
 		t.Fatal(err)
 	}
-	configDir2 := filepath.Join(tmpDir2, ".docker")
+	configDir2 := filepath.Join(tmpHomeDir, ".docker")
 	if err := os.MkdirAll(configDir2, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -384,38 +384,38 @@ func TestGetAuthPreferNewConfig(t *testing.T) {
 
 func TestGetAuthFailsOnBadInput(t *testing.T) {
 	origXDG := os.Getenv("XDG_RUNTIME_DIR")
-	tmpDir1, err := ioutil.TempDir("", "test_docker_client_get_auth")
+	tmpXDGRuntimeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("using temporary XDG_RUNTIME_DIR directory: %q", tmpDir1)
+	t.Logf("using temporary XDG_RUNTIME_DIR directory: %q", tmpXDGRuntimeDir)
 	// override homedir
-	os.Setenv("XDG_RUNTIME_DIR", tmpDir1)
+	os.Setenv("XDG_RUNTIME_DIR", tmpXDGRuntimeDir)
 	defer func() {
-		err := os.RemoveAll(tmpDir1)
+		err := os.RemoveAll(tmpXDGRuntimeDir)
 		if err != nil {
-			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir1, err)
+			t.Logf("failed to cleanup temporary home directory %q: %v", tmpXDGRuntimeDir, err)
 		}
 		os.Setenv("XDG_RUNTIME_DIR", origXDG)
 	}()
 
 	origHomeDir := homedir.Get()
-	tmpDir2, err := ioutil.TempDir("", "test_docker_client_get_auth")
+	tmpHomeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("using temporary home directory: %q", tmpDir2)
+	t.Logf("using temporary home directory: %q", tmpHomeDir)
 	// override homedir
-	os.Setenv(homedir.Key(), tmpDir2)
+	os.Setenv(homedir.Key(), tmpHomeDir)
 	defer func() {
-		err := os.RemoveAll(tmpDir2)
+		err := os.RemoveAll(tmpHomeDir)
 		if err != nil {
-			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir2, err)
+			t.Logf("failed to cleanup temporary home directory %q: %v", tmpHomeDir, err)
 		}
 		os.Setenv(homedir.Key(), origHomeDir)
 	}()
 
-	configDir := filepath.Join(tmpDir1, "containers")
+	configDir := filepath.Join(tmpXDGRuntimeDir, "containers")
 	if err := os.Mkdir(configDir, 0750); err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +448,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	}
 	assert.Equal(t, types.DockerAuthConfig{}, auth)
 
-	configPath = filepath.Join(tmpDir2, ".dockercfg")
+	configPath = filepath.Join(tmpHomeDir, ".dockercfg")
 	if err := ioutil.WriteFile(configPath, []byte("I'm certainly not a json string."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
