@@ -262,6 +262,12 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 // getPathToAuth gets the path of the auth.json file used for reading and writing credentials
 // returns the path, and a bool specifies whether the file is in legacy format
 func getPathToAuth(sys *types.SystemContext) (string, bool, error) {
+	return getPathToAuthWithOS(sys, runtime.GOOS)
+}
+
+// getPathToAuthWithOS is an internal implementation detail of getPathToAuth,
+// it exists only to allow testing it with an artificial runtime.GOOS.
+func getPathToAuthWithOS(sys *types.SystemContext, goOS string) (string, bool, error) {
 	if sys != nil {
 		if sys.AuthFilePath != "" {
 			return sys.AuthFilePath, false, nil
@@ -273,7 +279,7 @@ func getPathToAuth(sys *types.SystemContext) (string, bool, error) {
 			return filepath.Join(sys.RootForImplicitAbsolutePaths, fmt.Sprintf(defaultPerUIDPathFormat, os.Getuid())), false, nil
 		}
 	}
-	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+	if goOS == "windows" || goOS == "darwin" {
 		return filepath.Join(homedir.Get(), nonLinuxAuthFilePath), false, nil
 	}
 

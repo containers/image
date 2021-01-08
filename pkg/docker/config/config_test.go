@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/containers/image/v5/types"
@@ -16,6 +17,9 @@ import (
 )
 
 func TestGetPathToAuth(t *testing.T) {
+	const linux = "linux"
+	const darwin = "darwin"
+
 	uid := fmt.Sprintf("%d", os.Getuid())
 
 	tmpDir, err := ioutil.TempDir("", "TestGetPathToAuth")
@@ -35,27 +39,28 @@ func TestGetPathToAuth(t *testing.T) {
 
 	for _, c := range []struct {
 		sys          *types.SystemContext
+		os           string
 		xrd          string
 		expected     string
 		legacyFormat bool
 	}{
 		// Default paths
-		{&types.SystemContext{}, "", "/run/containers/" + uid + "/auth.json", false},
-		{nil, "", "/run/containers/" + uid + "/auth.json", false},
+		{&types.SystemContext{}, linux, "", "/run/containers/" + uid + "/auth.json", false},
+		{nil, linux, "", "/run/containers/" + uid + "/auth.json", false},
 		// SystemContext overrides
-		{&types.SystemContext{AuthFilePath: "/absolute/path"}, "", "/absolute/path", false},
-		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, "", "/absolute/path", true},
-		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, "", "/prefix/run/containers/" + uid + "/auth.json", false},
+		{&types.SystemContext{AuthFilePath: "/absolute/path"}, linux, "", "/absolute/path", false},
+		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, linux, "", "/absolute/path", true},
+		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, linux, "", "/prefix/run/containers/" + uid + "/auth.json", false},
 		// XDG_RUNTIME_DIR defined
-		{nil, tmpDir, tmpDir + "/containers/auth.json", false},
-		{nil, tmpDir + "/thisdoesnotexist", "", false},
+		{nil, linux, tmpDir, tmpDir + "/containers/auth.json", false},
+		{nil, linux, tmpDir + "/thisdoesnotexist", "", false},
 	} {
 		if c.xrd != "" {
 			os.Setenv("XDG_RUNTIME_DIR", c.xrd)
 		} else {
 			os.Unsetenv("XDG_RUNTIME_DIR")
 		}
-		res, lf, err := getPathToAuth(c.sys)
+		res, lf, err := getPathToAuthWithOS(c.sys, c.os)
 		if c.expected == "" {
 			assert.Error(t, err)
 		} else {
@@ -100,6 +105,9 @@ func TestGetAuth(t *testing.T) {
 	}()
 
 	configDir1 := filepath.Join(tmpXDGRuntimeDir, "containers")
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		configDir1 = filepath.Join(tmpHomeDir, ".config", "containers")
+	}
 	if err := os.MkdirAll(configDir1, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -416,7 +424,10 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	}()
 
 	configDir := filepath.Join(tmpXDGRuntimeDir, "containers")
-	if err := os.Mkdir(configDir, 0750); err != nil {
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		configDir = filepath.Join(tmpHomeDir, ".config", "containers")
+	}
+	if err := os.MkdirAll(configDir, 0750); err != nil {
 		t.Fatal(err)
 	}
 	configPath := filepath.Join(configDir, "auth.json")
