@@ -33,14 +33,14 @@ require (
 	github.com/stretchr/testify v1.6.1
 	github.com/ulikunitz/xz v0.5.9
 	github.com/vbatts/tar-split v0.11.1
-	github.com/vbauerster/mpb/v5 v5.3.0
+	github.com/vbauerster/mpb/v5 v5.4.0
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190809123943-df4f5c81cb3b // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.5
 	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
-	golang.org/x/sys v0.0.0-20200909081042-eff7692f9009
+	golang.org/x/sys v0.0.0-20201218084310-7d0127a74742
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )
