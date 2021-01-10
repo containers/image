@@ -38,7 +38,7 @@ var systemDefaultPolicyPath = builtinDefaultPolicyPath
 const builtinDefaultPolicyPath = "/etc/containers/policy.json"
 
 // userPolicyFile is the path to the per user policy path.
-var userPolicyFile = filepath.FromSlash(".config/containers/policy.json")
+var userPolicyFile = filepath.FromSlash("containers/policy.json")
 
 // InvalidPolicyFormatError is returned when parsing an invalid policy configuration.
 type InvalidPolicyFormatError string
@@ -62,9 +62,12 @@ func defaultPolicyPath(sys *types.SystemContext) string {
 	if sys != nil && sys.SignaturePolicyPath != "" {
 		return sys.SignaturePolicyPath
 	}
-	userPolicyFilePath := filepath.Join(homedir.Get(), userPolicyFile)
-	if _, err := os.Stat(userPolicyFilePath); err == nil {
-		return userPolicyFilePath
+	configHomeDir, err := homedir.GetConfigHome()
+	if err == nil {
+		userPolicyFilePath := filepath.Join(configHomeDir, userPolicyFile)
+		if _, err := os.Stat(userPolicyFilePath); err == nil {
+			return userPolicyFilePath
+		}
 	}
 	if sys != nil && sys.RootForImplicitAbsolutePaths != "" {
 		return filepath.Join(sys.RootForImplicitAbsolutePaths, systemDefaultPolicyPath)
