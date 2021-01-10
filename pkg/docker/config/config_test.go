@@ -6,17 +6,23 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/containers/image/v5/types"
-	"github.com/containers/storage/pkg/homedir"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGetPathToAuth(t *testing.T) {
+	const linux = "linux"
+	const darwin = "darwin"
+
 	uid := fmt.Sprintf("%d", os.Getuid())
+	// We don’t have to override the home directory for this because use of this path does not depend
+	// on any state of the filesystem.
+	darwinDefault := filepath.Join(os.Getenv("HOME"), ".config", "containers", "auth.json")
 
 	tmpDir, err := ioutil.TempDir("", "TestGetPathToAuth")
 	require.NoError(t, err)
@@ -35,27 +41,35 @@ func TestGetPathToAuth(t *testing.T) {
 
 	for _, c := range []struct {
 		sys          *types.SystemContext
+		os           string
 		xrd          string
 		expected     string
 		legacyFormat bool
 	}{
 		// Default paths
-		{&types.SystemContext{}, "", "/run/containers/" + uid + "/auth.json", false},
-		{nil, "", "/run/containers/" + uid + "/auth.json", false},
+		{&types.SystemContext{}, linux, "", "/run/containers/" + uid + "/auth.json", false},
+		{&types.SystemContext{}, darwin, "", darwinDefault, false},
+		{nil, linux, "", "/run/containers/" + uid + "/auth.json", false},
+		{nil, darwin, "", darwinDefault, false},
 		// SystemContext overrides
-		{&types.SystemContext{AuthFilePath: "/absolute/path"}, "", "/absolute/path", false},
-		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, "", "/absolute/path", true},
-		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, "", "/prefix/run/containers/" + uid + "/auth.json", false},
+		{&types.SystemContext{AuthFilePath: "/absolute/path"}, linux, "", "/absolute/path", false},
+		{&types.SystemContext{AuthFilePath: "/absolute/path"}, darwin, "", "/absolute/path", false},
+		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, linux, "", "/absolute/path", true},
+		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, darwin, "", "/absolute/path", true},
+		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, linux, "", "/prefix/run/containers/" + uid + "/auth.json", false},
+		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, darwin, "", "/prefix/run/containers/" + uid + "/auth.json", false},
 		// XDG_RUNTIME_DIR defined
-		{nil, tmpDir, tmpDir + "/containers/auth.json", false},
-		{nil, tmpDir + "/thisdoesnotexist", "", false},
+		{nil, linux, tmpDir, tmpDir + "/containers/auth.json", false},
+		{nil, darwin, tmpDir, darwinDefault, false},
+		{nil, linux, tmpDir + "/thisdoesnotexist", "", false},
+		{nil, darwin, tmpDir + "/thisdoesnotexist", darwinDefault, false},
 	} {
 		if c.xrd != "" {
 			os.Setenv("XDG_RUNTIME_DIR", c.xrd)
 		} else {
 			os.Unsetenv("XDG_RUNTIME_DIR")
 		}
-		res, lf, err := getPathToAuth(c.sys)
+		res, lf, err := getPathToAuthWithOS(c.sys, c.os)
 		if c.expected == "" {
 			assert.Error(t, err)
 		} else {
@@ -68,42 +82,41 @@ func TestGetPathToAuth(t *testing.T) {
 
 func TestGetAuth(t *testing.T) {
 	origXDG := os.Getenv("XDG_RUNTIME_DIR")
-	tmpDir1, err := ioutil.TempDir("", "test_docker_client_get_auth")
+	tmpXDGRuntimeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("using temporary XDG_RUNTIME_DIR directory: %q", tmpDir1)
+	t.Logf("using temporary XDG_RUNTIME_DIR directory: %q", tmpXDGRuntimeDir)
 	// override XDG_RUNTIME_DIR
-	os.Setenv("XDG_RUNTIME_DIR", tmpDir1)
+	os.Setenv("XDG_RUNTIME_DIR", tmpXDGRuntimeDir)
 	defer func() {
-		err := os.RemoveAll(tmpDir1)
+		err := os.RemoveAll(tmpXDGRuntimeDir)
 		if err != nil {
-			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir1, err)
+			t.Logf("failed to cleanup temporary home directory %q: %v", tmpXDGRuntimeDir, err)
 		}
 		os.Setenv("XDG_RUNTIME_DIR", origXDG)
 	}()
 
-	origHomeDir := homedir.Get()
-	tmpDir2, err := ioutil.TempDir("", "test_docker_client_get_auth")
+	tmpHomeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("using temporary home directory: %q", tmpDir2)
-	//override homedir
-	os.Setenv(homedir.Key(), tmpDir2)
+	t.Logf("using temporary home directory: %q", tmpHomeDir)
 	defer func() {
-		err := os.RemoveAll(tmpDir2)
+		err := os.RemoveAll(tmpHomeDir)
 		if err != nil {
-			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir2, err)
+			t.Logf("failed to cleanup temporary home directory %q: %v", tmpHomeDir, err)
 		}
-		os.Setenv(homedir.Key(), origHomeDir)
 	}()
 
-	configDir1 := filepath.Join(tmpDir1, "containers")
+	configDir1 := filepath.Join(tmpXDGRuntimeDir, "containers")
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		configDir1 = filepath.Join(tmpHomeDir, ".config", "containers")
+	}
 	if err := os.MkdirAll(configDir1, 0700); err != nil {
 		t.Fatal(err)
 	}
-	configDir2 := filepath.Join(tmpDir2, ".docker")
+	configDir2 := filepath.Join(tmpHomeDir, ".docker")
 	if err := os.MkdirAll(configDir2, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -245,12 +258,12 @@ func TestGetAuth(t *testing.T) {
 				if tc.sys != nil {
 					sys = tc.sys
 				}
-				auth, err := GetCredentials(sys, tc.hostname)
+				auth, err := getCredentialsWithHomeDir(sys, tc.hostname, tmpHomeDir)
 				assert.Equal(t, tc.expectedError, err)
 				assert.Equal(t, tc.expected, auth)
 
 				// Test for the previous APIs.
-				username, password, err := GetAuthentication(sys, tc.hostname)
+				username, password, err := getAuthenticationWithHomeDir(sys, tc.hostname, tmpHomeDir)
 				if tc.expected.IdentityToken != "" {
 					assert.Equal(t, "", username)
 					assert.Equal(t, "", password)
@@ -268,20 +281,16 @@ func TestGetAuth(t *testing.T) {
 }
 
 func TestGetAuthFromLegacyFile(t *testing.T) {
-	origHomeDir := homedir.Get()
 	tmpDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("using temporary home directory: %q", tmpDir)
-	// override homedir
-	os.Setenv(homedir.Key(), tmpDir)
 	defer func() {
 		err := os.RemoveAll(tmpDir)
 		if err != nil {
 			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir, err)
 		}
-		os.Setenv(homedir.Key(), origHomeDir)
 	}()
 
 	configPath := filepath.Join(tmpDir, ".dockercfg")
@@ -318,12 +327,12 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			auth, err := GetCredentials(nil, tc.hostname)
+			auth, err := getCredentialsWithHomeDir(nil, tc.hostname, tmpDir)
 			assert.Equal(t, tc.expectedError, err)
 			assert.Equal(t, tc.expected, auth)
 
 			// Testing for previous APIs
-			username, password, err := GetAuthentication(nil, tc.hostname)
+			username, password, err := getAuthenticationWithHomeDir(nil, tc.hostname, tmpDir)
 			assert.Equal(t, tc.expectedError, err)
 			assert.Equal(t, tc.expected.Username, username)
 			assert.Equal(t, tc.expected.Password, password)
@@ -332,20 +341,16 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 }
 
 func TestGetAuthPreferNewConfig(t *testing.T) {
-	origHomeDir := homedir.Get()
 	tmpDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("using temporary home directory: %q", tmpDir)
-	// override homedir
-	os.Setenv(homedir.Key(), tmpDir)
 	defer func() {
 		err := os.RemoveAll(tmpDir)
 		if err != nil {
 			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir, err)
 		}
-		os.Setenv(homedir.Key(), origHomeDir)
 	}()
 
 	configDir := filepath.Join(tmpDir, ".docker")
@@ -376,7 +381,7 @@ func TestGetAuthPreferNewConfig(t *testing.T) {
 		}
 	}
 
-	auth, err := GetCredentials(nil, "docker.io")
+	auth, err := getCredentialsWithHomeDir(nil, "docker.io", tmpDir)
 	assert.NoError(t, err)
 	assert.Equal(t, "docker", auth.Username)
 	assert.Equal(t, "io", auth.Password)
@@ -384,45 +389,44 @@ func TestGetAuthPreferNewConfig(t *testing.T) {
 
 func TestGetAuthFailsOnBadInput(t *testing.T) {
 	origXDG := os.Getenv("XDG_RUNTIME_DIR")
-	tmpDir1, err := ioutil.TempDir("", "test_docker_client_get_auth")
+	tmpXDGRuntimeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("using temporary XDG_RUNTIME_DIR directory: %q", tmpDir1)
-	// override homedir
-	os.Setenv("XDG_RUNTIME_DIR", tmpDir1)
+	t.Logf("using temporary XDG_RUNTIME_DIR directory: %q", tmpXDGRuntimeDir)
+	// override XDG_RUNTIME_DIR
+	os.Setenv("XDG_RUNTIME_DIR", tmpXDGRuntimeDir)
 	defer func() {
-		err := os.RemoveAll(tmpDir1)
+		err := os.RemoveAll(tmpXDGRuntimeDir)
 		if err != nil {
-			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir1, err)
+			t.Logf("failed to cleanup temporary home directory %q: %v", tmpXDGRuntimeDir, err)
 		}
 		os.Setenv("XDG_RUNTIME_DIR", origXDG)
 	}()
 
-	origHomeDir := homedir.Get()
-	tmpDir2, err := ioutil.TempDir("", "test_docker_client_get_auth")
+	tmpHomeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("using temporary home directory: %q", tmpDir2)
-	// override homedir
-	os.Setenv(homedir.Key(), tmpDir2)
+	t.Logf("using temporary home directory: %q", tmpHomeDir)
 	defer func() {
-		err := os.RemoveAll(tmpDir2)
+		err := os.RemoveAll(tmpHomeDir)
 		if err != nil {
-			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir2, err)
+			t.Logf("failed to cleanup temporary home directory %q: %v", tmpHomeDir, err)
 		}
-		os.Setenv(homedir.Key(), origHomeDir)
 	}()
 
-	configDir := filepath.Join(tmpDir1, "containers")
-	if err := os.Mkdir(configDir, 0750); err != nil {
+	configDir := filepath.Join(tmpXDGRuntimeDir, "containers")
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		configDir = filepath.Join(tmpHomeDir, ".config", "containers")
+	}
+	if err := os.MkdirAll(configDir, 0750); err != nil {
 		t.Fatal(err)
 	}
 	configPath := filepath.Join(configDir, "auth.json")
 
 	// no config file present
-	auth, err := GetCredentials(nil, "index.docker.io")
+	auth, err := getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err != nil {
 		t.Fatalf("got unexpected error: %#+v", err)
 	}
@@ -431,7 +435,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if err := ioutil.WriteFile(configPath, []byte("Json rocks! Unless it doesn't."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
-	auth, err = GetCredentials(nil, "index.docker.io")
+	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err == nil {
 		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}
@@ -442,17 +446,17 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	// remove the invalid config file
 	os.RemoveAll(configPath)
 	// no config file present
-	auth, err = GetCredentials(nil, "index.docker.io")
+	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err != nil {
 		t.Fatalf("got unexpected error: %#+v", err)
 	}
 	assert.Equal(t, types.DockerAuthConfig{}, auth)
 
-	configPath = filepath.Join(tmpDir2, ".dockercfg")
+	configPath = filepath.Join(tmpHomeDir, ".dockercfg")
 	if err := ioutil.WriteFile(configPath, []byte("I'm certainly not a json string."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
-	auth, err = GetCredentials(nil, "index.docker.io")
+	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err == nil {
 		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}

@@ -102,23 +102,12 @@ func TestDefaultPolicy(t *testing.T) {
 }
 
 func TestDefaultPolicyPath(t *testing.T) {
-
 	const nondefaultPath = "/this/is/not/the/default/path.json"
 	const variableReference = "$HOME"
 	const rootPrefix = "/root/prefix"
-	oldHomeEnv, hasHomeEnv := os.LookupEnv("HOME")
 	tempHome, err := ioutil.TempDir("", "tempHome")
 	require.NoError(t, err)
-	err = os.Setenv("HOME", tempHome)
-	require.NoError(t, err)
-	defer func() {
-		os.RemoveAll(tempHome)
-		if hasHomeEnv {
-			os.Setenv("HOME", oldHomeEnv)
-		} else {
-			os.Unsetenv("HOME")
-		}
-	}()
+	defer os.RemoveAll(tempHome)
 	userDefaultPolicyPath := filepath.Join(tempHome, userPolicyFile)
 
 	for _, c := range []struct {
@@ -188,7 +177,7 @@ func TestDefaultPolicyPath(t *testing.T) {
 		} else {
 			os.Remove(userDefaultPolicyPath)
 		}
-		path := defaultPolicyPath(c.sys)
+		path := defaultPolicyPathWithHomeDir(c.sys, tempHome)
 		assert.Equal(t, c.expected, path)
 	}
 }

@@ -123,23 +123,13 @@ func TestRefMatchesPrefix(t *testing.T) {
 	}
 }
 
-func TestConfigPath(t *testing.T) {
+func TestNewConfigWrapper(t *testing.T) {
 	const nondefaultPath = "/this/is/not/the/default/registries.conf"
 	const variableReference = "$HOME"
 	const rootPrefix = "/root/prefix"
-	oldHomeEnv, hasHomeEnv := os.LookupEnv("HOME")
 	tempHome, err := ioutil.TempDir("", "tempHome")
 	require.NoError(t, err)
-	err = os.Setenv("HOME", tempHome)
-	require.NoError(t, err)
-	defer func() {
-		os.RemoveAll(tempHome)
-		if hasHomeEnv {
-			os.Setenv("HOME", oldHomeEnv)
-		} else {
-			os.Unsetenv("HOME")
-		}
-	}()
+	defer os.RemoveAll(tempHome)
 	var userRegistriesFile = filepath.FromSlash(".config/containers/registries.conf")
 	userRegistriesFilePath := filepath.Join(tempHome, userRegistriesFile)
 
@@ -194,7 +184,7 @@ func TestConfigPath(t *testing.T) {
 		} else {
 			os.Remove(userRegistriesFilePath)
 		}
-		path := ConfigPath(c.sys)
+		path := newConfigWrapperWithHomeDir(c.sys, tempHome).configPath
 		assert.Equal(t, c.expected, path)
 	}
 }
