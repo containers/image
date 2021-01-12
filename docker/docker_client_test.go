@@ -1,8 +1,12 @@
 package docker
 
 import (
+	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -149,5 +153,37 @@ func assertBearerTokensEqual(t *testing.T, expected, subject *bearerToken) {
 	}
 	if !expected.IssuedAt.Equal(subject.IssuedAt) {
 		t.Fatalf("expected [%s] to equal [%s], it did not", subject.IssuedAt, expected.IssuedAt)
+	}
+}
+
+func TestUserAgent(t *testing.T) {
+	const sentinelUA = "sentinel/1.0"
+
+	var expectedUA string
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got := r.Header.Get("User-Agent")
+		assert.Equal(t, expectedUA, got)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer s.Close()
+
+	for _, tc := range []struct {
+		sys      *types.SystemContext
+		expected string
+	}{
+		// Can't both test nil and set DockerInsecureSkipTLSVerify :(
+		// {nil, defaultUA},
+		{&types.SystemContext{}, defaultUserAgent},
+		{&types.SystemContext{DockerRegistryUserAgent: sentinelUA}, sentinelUA},
+	} {
+		// For this test against localhost, we don't care.
+		tc.sys.DockerInsecureSkipTLSVerify = types.OptionalBoolTrue
+
+		registry := strings.TrimPrefix(s.URL, "http://")
+
+		expectedUA = tc.expected
+		if err := CheckAuth(context.Background(), tc.sys, "", "", registry); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 	}
 }
