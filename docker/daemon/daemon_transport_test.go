@@ -32,6 +32,8 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 		"registry.example.com/ns/stream",
 		"registry.example.com/ns",
 		"registry.example.com",
+		"*.example.com",
+		"*.com",
 		sha256digestHex, // Accept also unqualified hexdigest values, they are in principle possible host names.
 	} {
 		err := Transport.ValidatePolicyConfigurationScope(scope)
@@ -218,6 +220,7 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 		"docker.io/library/busybox",
 		"docker.io/library",
 		"docker.io",
+		"*.io",
 	}, ref.PolicyConfigurationNamespaces())
 }
 

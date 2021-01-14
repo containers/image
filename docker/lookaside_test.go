@@ -212,7 +212,7 @@ func TestLoadAndMergeConfig(t *testing.T) {
 	}, config)
 }
 
-func TestRegistryConfigurationSignaureTopLevel(t *testing.T) {
+func TestRegistryConfigurationSignatureTopLevel(t *testing.T) {
 	config := registryConfiguration{
 		DefaultDocker: &registryNamespace{SigStore: "=default", SigStoreStaging: "=default+w"},
 		Docker:        map[string]registryNamespace{},
