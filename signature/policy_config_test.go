@@ -62,6 +62,21 @@ var policyFixtureContents = &Policy{
 					"/keys/vendor-gpg-keyring",
 					xNewPRMRemapIdentity("private-mirror:5000/vendor-mirror", "vendor.example.com")),
 			},
+			"*.access.redhat.com": {
+				xNewPRSignedByKeyPath(SBKeyTypeSignedByGPGKeys,
+					"/keys/RH-key-signing-key-gpg-keyring",
+					NewPRMMatchRepoDigestOrExact()),
+			},
+			"*.redhat.com": {
+				xNewPRSignedByKeyPath(SBKeyTypeSignedByGPGKeys,
+					"/keys/RH-key-signing-key-gpg-keyring",
+					NewPRMMatchRepoDigestOrExact()),
+			},
+			"*.com": {
+				xNewPRSignedByKeyPath(SBKeyTypeSignedByGPGKeys,
+					"/keys/RH-key-signing-key-gpg-keyring",
+					NewPRMMatchRepoDigestOrExact()),
+			},
 			"bogus/key-data-example": {
 				xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys,
 					[]byte("nonsense"),

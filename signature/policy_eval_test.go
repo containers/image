@@ -155,6 +155,8 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 		{"docker", ""},
 		{"docker", "unmatched"},
 		{"docker", "deep.com"},
+		{"docker", "*.very.deep.com"},
+		{"docker", "*.deep.com"},
 		{"docker", "deep.com/n1"},
 		{"docker", "deep.com/n1/n2"},
 		{"docker", "deep.com/n1/n2/n3"},
@@ -181,6 +183,9 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 		{"docker", "deep.com/n1/notn2/n3/repo:tag2", "docker", "deep.com/n1"},
 		// Host name match
 		{"docker", "deep.com/notn1/n2/n3/repo:tag2", "docker", "deep.com"},
+		// Sub domain match
+		{"docker", "very.deep.com/n1/n2/n3/repo:tag2", "docker", "*.deep.com"},
+		{"docker", "not.very.deep.com/n1/n2/n3/repo:tag2", "docker", "*.very.deep.com"},
 		// Default
 		{"docker", "this.doesnt/match:anything", "docker", ""},
 		// No match within a matched transport which doesn't have a "" scope

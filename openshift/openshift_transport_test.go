@@ -25,6 +25,8 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 		"registry.example.com/ns/stream",
 		"registry.example.com/ns",
 		"registry.example.com",
+		"*.example.com",
+		"*.com",
 	} {
 		err := Transport.ValidatePolicyConfigurationScope(scope)
 		assert.NoError(t, err, scope)
@@ -112,6 +114,8 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 		"registry.example.com:8443/ns/stream",
 		"registry.example.com:8443/ns",
 		"registry.example.com:8443",
+		"*.example.com",
+		"*.com",
 	}, ref.PolicyConfigurationNamespaces())
 }
 

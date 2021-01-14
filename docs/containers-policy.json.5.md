@@ -65,7 +65,8 @@ The `atomic:` transport refers to images in an Atomic Registry.
 
 Supported scopes use the form _hostname_[`:`_port_][`/`_namespace_[`/`_imagestream_ [`:`_tag_]]],
 i.e. either specifying a complete name of a tagged image, or prefix denoting
-a host/namespace/image stream.
+a host/namespace/image stream or a wildcarded expression for matching all
+subdomains. For wildcarded subdomain matching, `*.example.com` is a valid case, but `example*.*.com` is not.
 
 *Note:* The _hostname_ and _port_ refer to the Docker registry host and port (the one used
 e.g. for `docker pull`), _not_ to the OpenShift API host and port.
@@ -90,7 +91,9 @@ Scopes matching individual images are named Docker references *in the fully expa
 using a tag or digest. For example, `docker.io/library/busybox:latest` (*not* `busybox:latest`).
 
 More general scopes are prefixes of individual-image scopes, and specify a repository (by omitting the tag or digest),
-a repository namespace, or a registry host (by only specifying the host name).
+a repository namespace, or a registry host (by only specifying the host name)
+or a wildcarded expression for matching all subdomains. For wildcarded subdomain
+matching, `*.example.com` is a valid case, but `example*.*.com` is not.
 
 ### `oci:`
 
@@ -253,6 +256,8 @@ selectively allow individual transports and scopes as desired.
             /* Similarly, allow installing the “official” busybox images.  Note how the fully expanded
                form, with the explicit /library/, must be used. */
             "docker.io/library/busybox": [{"type": "insecureAcceptAnything"}]
+            /* Allow installing images from all subdomains */
+            "*.temporary-project.example.com": [{"type": "insecureAcceptAnything"}]
             /* Other docker: images use the global default policy and are rejected */
         },
         "dir": {

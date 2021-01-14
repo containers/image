@@ -30,6 +30,7 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 		"docker.io/library/busybox",
 		"docker.io/library",
 		"docker.io",
+		"*.io",
 	} {
 		err := Transport.ValidatePolicyConfigurationScope(scope)
 		assert.NoError(t, err, scope)
@@ -147,6 +148,7 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 		"docker.io/library/busybox",
 		"docker.io/library",
 		"docker.io",
+		"*.io",
 	}, ref.PolicyConfigurationNamespaces())
 }
 
