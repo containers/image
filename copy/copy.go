@@ -1056,7 +1056,7 @@ type diffIDResult struct {
 	err    error
 }
 
-// copyLayer copies a layer with srcInfo (with known Digest and Annotations and possibly known Size) in src to dest, perhaps compressing it if canCompress,
+// copyLayer copies a layer with srcInfo (with known Digest and Annotations and possibly known Size) in src to dest, perhaps (de/re/)compressing it,
 // and returns a complete blobInfo of the copied layer, and a value for LayerDiffIDs if diffIDIsNeeded
 func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, toEncrypt bool, pool *mpb.Progress) (types.BlobInfo, digest.Digest, error) {
 	cachedDiffID := ic.c.blobInfoCache.UncompressedDigest(srcInfo.Digest) // May be ""
@@ -1128,7 +1128,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 
 // copyLayerFromStream is an implementation detail of copyLayer; mostly providing a separate “defer” scope.
 // it copies a blob with srcInfo (with known Digest and Annotations and possibly known Size) from srcStream to dest,
-// perhaps compressing the stream if canCompress,
+// perhaps (de/re/)compressing the stream,
 // and returns a complete blobInfo of the copied blob and perhaps a <-chan diffIDResult if diffIDIsNeeded, to be read by the caller.
 func (ic *imageCopier) copyLayerFromStream(ctx context.Context, srcStream io.Reader, srcInfo types.BlobInfo,
 	diffIDIsNeeded bool, toEncrypt bool, bar *mpb.Bar) (types.BlobInfo, <-chan diffIDResult, error) {
@@ -1204,11 +1204,15 @@ func (r errorAnnotationReader) Read(b []byte) (n int, err error) {
 
 // copyBlobFromStream copies a blob with srcInfo (with known Digest and Annotations and possibly known Size) from srcStream to dest,
 // perhaps sending a copy to an io.Writer if getOriginalLayerCopyWriter != nil,
-// perhaps compressing it if canCompress,
+// perhaps (de/re/)compressing it if canModifyBlob,
 // and returns a complete blobInfo of the copied blob.
 func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, srcInfo types.BlobInfo,
 	getOriginalLayerCopyWriter func(decompressor compression.DecompressorFunc) io.Writer,
 	canModifyBlob bool, isConfig bool, toEncrypt bool, bar *mpb.Bar) (types.BlobInfo, error) {
+	if isConfig { // This is guaranteed by the caller, but set it here to be explicit.
+		canModifyBlob = false
+	}
+
 	// The copying happens through a pipeline of connected io.Readers.
 	// === Input: srcStream
 
