@@ -149,9 +149,9 @@ const (
 func (r *Resolved) Description() string {
 	switch r.rationale {
 	case rationaleAlias:
-		return fmt.Sprintf("Resolved short name %q to a recorded short-name alias (origin: %s)", r.userInput, r.originDescription)
+		return fmt.Sprintf("Resolved %q as an alias (%s)", r.userInput, r.originDescription)
 	case rationaleUSR:
-		return fmt.Sprintf("Completed short name %q with unqualified-search registries (origin: %s)", r.userInput, r.originDescription)
+		return fmt.Sprintf("Resolving %q using unqualified-search registries (%s)", r.userInput, r.originDescription)
 	case rationaleUserSelection, rationaleNone:
 		fallthrough
 	default:
