@@ -107,6 +107,13 @@ func (d *dirImageDestination) DesiredLayerCompression() types.LayerCompression {
 	return types.PreserveOriginal
 }
 
+func (d *dirImageDestination) DesiredBlobCompression(info types.BlobInfo) types.LayerCompression {
+	if d.compress {
+		return types.Compress
+	}
+	return types.PreserveOriginal
+}
+
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
 // uploaded to the image destination, true otherwise.
 func (d *dirImageDestination) AcceptsForeignLayerURLs() bool {

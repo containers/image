@@ -68,8 +68,9 @@ func TestGetPutBlob(t *testing.T) {
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	require.NoError(t, err)
 	defer dest.Close()
-	assert.Equal(t, types.PreserveOriginal, dest.DesiredLayerCompression())
-	info, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{Digest: digest.Digest("sha256:digest-test"), Size: int64(9)}, cache, false)
+	blobInfo := types.BlobInfo{Digest: digest.Digest("sha256:digest-test"), Size: int64(9)}
+	assert.Equal(t, types.PreserveOriginal, dest.DesiredBlobCompression(blobInfo))
+	info, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), blobInfo, cache, false)
 	assert.NoError(t, err)
 	err = dest.Commit(context.Background(), nil)
 	assert.NoError(t, err)

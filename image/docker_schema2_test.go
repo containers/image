@@ -403,6 +403,9 @@ func (d *memoryImageDest) SupportsSignatures(ctx context.Context) error {
 func (d *memoryImageDest) DesiredLayerCompression() types.LayerCompression {
 	panic("Unexpected call to a mock function")
 }
+func (d *memoryImageDest) DesiredBlobCompression(info types.BlobInfo) types.LayerCompression {
+	panic("Unexpected call to a mock function")
+}
 func (d *memoryImageDest) AcceptsForeignLayerURLs() bool {
 	panic("Unexpected call to a mock function")
 }

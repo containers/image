@@ -61,7 +61,11 @@ func (d *ociArchiveImageDestination) SupportsSignatures(ctx context.Context) err
 }
 
 func (d *ociArchiveImageDestination) DesiredLayerCompression() types.LayerCompression {
-	return d.unpackedDest.DesiredLayerCompression()
+	return d.unpackedDest.DesiredBlobCompression(types.BlobInfo{})
+}
+
+func (d *ociArchiveImageDestination) DesiredBlobCompression(info types.BlobInfo) types.LayerCompression {
+	return d.unpackedDest.DesiredBlobCompression(info)
 }
 
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually

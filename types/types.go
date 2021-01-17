@@ -280,7 +280,13 @@ type ImageDestination interface {
 	// Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
 	SupportsSignatures(ctx context.Context) error
 	// DesiredLayerCompression indicates the kind of compression to apply on layers
+	//
+	// Deprecated: DesiredLayerCompression can vary by layer media type (in
+	// particular, destinations probably shouldn't mess with media types
+	// they don't understand). Use DesiredBlobCompression() instead.
 	DesiredLayerCompression() LayerCompression
+	// DesiredBlobCompression indicates the kind of compression to apply on layers
+	DesiredBlobCompression(info BlobInfo) LayerCompression
 	// AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
 	// uploaded to the image destination, true otherwise.
 	AcceptsForeignLayerURLs() bool
