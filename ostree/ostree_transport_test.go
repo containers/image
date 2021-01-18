@@ -315,6 +315,6 @@ func TestReferenceSignaturePath(t *testing.T) {
 		{0, "-1"},
 		{42, "-43"},
 	} {
-		assert.Equal(t, fmt.Sprintf("manifest%csignature%s", filepath.Separator, c.suffix), ostreeRef.signaturePath(c.input), string(c.input))
+		assert.Equal(t, fmt.Sprintf("manifest%csignature%s", filepath.Separator, c.suffix), ostreeRef.signaturePath(c.input), fmt.Sprintf("%d", c.input))
 	}
 }
