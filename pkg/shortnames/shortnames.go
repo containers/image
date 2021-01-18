@@ -242,7 +242,8 @@ func Resolve(ctx *types.SystemContext, name string) (*Resolved, error) {
 	// function call.
 	var sys *types.SystemContext
 	if ctx != nil {
-		sys = &(*ctx)
+		copy := *ctx
+		sys = &copy
 	}
 	resolved.systemContext = ctx
 
