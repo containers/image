@@ -27,7 +27,7 @@ type Image struct {
 // a client to the registry hosting the given image.
 // The caller must call .Close() on the returned Image.
 func newImage(ctx context.Context, sys *types.SystemContext, ref dockerReference) (types.ImageCloser, error) {
-	s, err := newImageSource(ctx, sys, ref)
+	s, err := newImageSource(ctx, sys, ref, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func GetRepositoryTags(ctx context.Context, sys *types.SystemContext, ref types.
 	}
 
 	path := fmt.Sprintf(tagsPath, reference.Path(dr.ref))
-	client, err := newDockerClientFromRef(sys, dr, false, "pull")
+	client, err := newDockerClientFromRef(sys, dr, false, "pull", nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create client")
 	}
@@ -124,7 +124,7 @@ func GetDigest(ctx context.Context, sys *types.SystemContext, ref types.ImageRef
 		return "", err
 	}
 
-	client, err := newDockerClientFromRef(sys, dr, false, "pull")
+	client, err := newDockerClientFromRef(sys, dr, false, "pull", nil)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to create client")
 	}

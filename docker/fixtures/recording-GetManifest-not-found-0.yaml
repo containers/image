@@ -1,0 +1,82 @@
+---
+version: 1
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Docker-Distribution-Api-Version:
+      - registry/2.0
+    url: https://registry-1.docker.io/v2/
+    method: GET
+  response:
+    body: |
+      {"errors":[{"code":"UNAUTHORIZED","message":"authentication required","detail":null}]}
+    headers:
+      Content-Length:
+      - "87"
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 11 Dec 2019 14:32:22 GMT
+      Docker-Distribution-Api-Version:
+      - registry/2.0
+      Strict-Transport-Security:
+      - max-age=31536000
+      Www-Authenticate:
+      - Bearer realm="https://auth.docker.io/token",service="registry.docker.io"
+    status: 401 Unauthorized
+    code: 401
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers: {}
+    url: https://auth.docker.io/token?scope=repository%3Alibrary%2Fbusybox%3Apull&service=registry.docker.io
+    method: GET
+  response:
+    body: |
+      {"token":"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsIng1YyI6WyJNSUlDK2pDQ0FwK2dBd0lCQWdJQkFEQUtCZ2dxaGtqT1BRUURBakJHTVVRd1FnWURWUVFERXpzeVYwNVpPbFZMUzFJNlJFMUVVanBTU1U5Rk9reEhOa0U2UTFWWVZEcE5SbFZNT2tZelNFVTZOVkF5VlRwTFNqTkdPa05CTmxrNlNrbEVVVEFlRncweE9UQXhNVEl3TURJeU5EVmFGdzB5TURBeE1USXdNREl5TkRWYU1FWXhSREJDQmdOVkJBTVRPMUpMTkZNNlMwRkxVVHBEV0RWRk9rRTJSMVE2VTBwTVR6cFFNbEpMT2tOWlZVUTZTMEpEU0RwWFNVeE1Pa3hUU2xrNldscFFVVHBaVWxsRU1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBcjY2bXkveXpHN21VUzF3eFQ3dFplS2pqRzcvNnBwZFNMY3JCcko5VytwcndzMGtIUDVwUHRkMUpkcFdEWU1OZWdqQXhpUWtRUUNvd25IUnN2ODVUalBUdE5wUkdKVTRkeHJkeXBvWGc4TVhYUEUzL2lRbHhPS2VNU0prNlRKbG5wNGFtWVBHQlhuQXRoQzJtTlR5ak1zdFh2ZmNWN3VFYWpRcnlOVUcyUVdXQ1k1Ujl0a2k5ZG54Z3dCSEF6bG8wTzJCczFmcm5JbmJxaCtic3ZSZ1FxU3BrMWhxYnhSU3AyRlNrL2tBL1gyeUFxZzJQSUJxWFFMaTVQQ3krWERYZElJczV6VG9ZbWJUK0pmbnZaMzRLcG5mSkpNalpIRW4xUVJtQldOZXJZcVdtNVhkQVhUMUJrQU9aditMNFVwSTk3NFZFZ2ppY1JINVdBeWV4b1BFclRRSURBUUFCbzRHeU1JR3ZNQTRHQTFVZER3RUIvd1FFQXdJSGdEQVBCZ05WSFNVRUNEQUdCZ1JWSFNVQU1FUUdBMVVkRGdROUJEdFNTelJUT2t0QlMxRTZRMWcxUlRwQk5rZFVPbE5LVEU4NlVESlNTenBEV1ZWRU9rdENRMGc2VjBsTVREcE1VMHBaT2xwYVVGRTZXVkpaUkRCR0JnTlZIU01FUHpBOWdEc3lWMDVaT2xWTFMxSTZSRTFFVWpwU1NVOUZPa3hITmtFNlExVllWRHBOUmxWTU9rWXpTRVU2TlZBeVZUcExTak5HT2tOQk5sazZTa2xFVVRBS0JnZ3Foa2pPUFFRREFnTkpBREJHQWlFQXFOSXEwMFdZTmM5Z2tDZGdSUzRSWUhtNTRZcDBTa05Rd2lyMm5hSWtGd3dDSVFEMjlYdUl5TmpTa1cvWmpQaFlWWFB6QW9TNFVkRXNvUUhyUVZHMDd1N3ZsUT09Il19.eyJhY2Nlc3MiOlt7InR5cGUiOiJyZXBvc2l0b3J5IiwibmFtZSI6ImxpYnJhcnkvYnVzeWJveCIsImFjdGlvbnMiOlsicHVsbCJdfV0sImF1ZCI6InJlZ2lzdHJ5LmRvY2tlci5pbyIsImV4cCI6MTU3NjA3NTA0MiwiaWF0IjoxNTc2MDc0NzQyLCJpc3MiOiJhdXRoLmRvY2tlci5pbyIsImp0aSI6Imh2R3g1YlYzTTBfYnNaaEVrcS1UIiwibmJmIjoxNTc2MDc0NDQyLCJzdWIiOiIifQ.HYzG_ir5aYQAZlXrgaxCOOw9sGFNwzuunyO_7qEUbxWkM8V_3PnZxQypAYU9cnS66n293A-N1LbYBHRmiKq87LHq8MAdjvhfeTnqC-d0GV5WJOksN98x_T-eIBmdpFuAykTH1ZBsUA6OzAvuQqJ6zHy3GwgBpbFXVI0EZQHUELruNEkv8sgjWQeqG_U3sGbhN2wxWG51w9Mvp-9WvM_o4EcbUnzvYKVjJVQI-LjvVvI0b39SfZyKJkXDMGf-Op4SFo8MZw6edTUXyoIijQP1d7_Zfv3_i5nv-exUX9Ju4QPixlpSi2JwE5_2SJxIhddPRiGq9s6n-bFIdTN4WB0Rbw","access_token":"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsIng1YyI6WyJNSUlDK2pDQ0FwK2dBd0lCQWdJQkFEQUtCZ2dxaGtqT1BRUURBakJHTVVRd1FnWURWUVFERXpzeVYwNVpPbFZMUzFJNlJFMUVVanBTU1U5Rk9reEhOa0U2UTFWWVZEcE5SbFZNT2tZelNFVTZOVkF5VlRwTFNqTkdPa05CTmxrNlNrbEVVVEFlRncweE9UQXhNVEl3TURJeU5EVmFGdzB5TURBeE1USXdNREl5TkRWYU1FWXhSREJDQmdOVkJBTVRPMUpMTkZNNlMwRkxVVHBEV0RWRk9rRTJSMVE2VTBwTVR6cFFNbEpMT2tOWlZVUTZTMEpEU0RwWFNVeE1Pa3hUU2xrNldscFFVVHBaVWxsRU1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBcjY2bXkveXpHN21VUzF3eFQ3dFplS2pqRzcvNnBwZFNMY3JCcko5VytwcndzMGtIUDVwUHRkMUpkcFdEWU1OZWdqQXhpUWtRUUNvd25IUnN2ODVUalBUdE5wUkdKVTRkeHJkeXBvWGc4TVhYUEUzL2lRbHhPS2VNU0prNlRKbG5wNGFtWVBHQlhuQXRoQzJtTlR5ak1zdFh2ZmNWN3VFYWpRcnlOVUcyUVdXQ1k1Ujl0a2k5ZG54Z3dCSEF6bG8wTzJCczFmcm5JbmJxaCtic3ZSZ1FxU3BrMWhxYnhSU3AyRlNrL2tBL1gyeUFxZzJQSUJxWFFMaTVQQ3krWERYZElJczV6VG9ZbWJUK0pmbnZaMzRLcG5mSkpNalpIRW4xUVJtQldOZXJZcVdtNVhkQVhUMUJrQU9aditMNFVwSTk3NFZFZ2ppY1JINVdBeWV4b1BFclRRSURBUUFCbzRHeU1JR3ZNQTRHQTFVZER3RUIvd1FFQXdJSGdEQVBCZ05WSFNVRUNEQUdCZ1JWSFNVQU1FUUdBMVVkRGdROUJEdFNTelJUT2t0QlMxRTZRMWcxUlRwQk5rZFVPbE5LVEU4NlVESlNTenBEV1ZWRU9rdENRMGc2VjBsTVREcE1VMHBaT2xwYVVGRTZXVkpaUkRCR0JnTlZIU01FUHpBOWdEc3lWMDVaT2xWTFMxSTZSRTFFVWpwU1NVOUZPa3hITmtFNlExVllWRHBOUmxWTU9rWXpTRVU2TlZBeVZUcExTak5HT2tOQk5sazZTa2xFVVRBS0JnZ3Foa2pPUFFRREFnTkpBREJHQWlFQXFOSXEwMFdZTmM5Z2tDZGdSUzRSWUhtNTRZcDBTa05Rd2lyMm5hSWtGd3dDSVFEMjlYdUl5TmpTa1cvWmpQaFlWWFB6QW9TNFVkRXNvUUhyUVZHMDd1N3ZsUT09Il19.eyJhY2Nlc3MiOlt7InR5cGUiOiJyZXBvc2l0b3J5IiwibmFtZSI6ImxpYnJhcnkvYnVzeWJveCIsImFjdGlvbnMiOlsicHVsbCJdfV0sImF1ZCI6InJlZ2lzdHJ5LmRvY2tlci5pbyIsImV4cCI6MTU3NjA3NTA0MiwiaWF0IjoxNTc2MDc0NzQyLCJpc3MiOiJhdXRoLmRvY2tlci5pbyIsImp0aSI6Imh2R3g1YlYzTTBfYnNaaEVrcS1UIiwibmJmIjoxNTc2MDc0NDQyLCJzdWIiOiIifQ.HYzG_ir5aYQAZlXrgaxCOOw9sGFNwzuunyO_7qEUbxWkM8V_3PnZxQypAYU9cnS66n293A-N1LbYBHRmiKq87LHq8MAdjvhfeTnqC-d0GV5WJOksN98x_T-eIBmdpFuAykTH1ZBsUA6OzAvuQqJ6zHy3GwgBpbFXVI0EZQHUELruNEkv8sgjWQeqG_U3sGbhN2wxWG51w9Mvp-9WvM_o4EcbUnzvYKVjJVQI-LjvVvI0b39SfZyKJkXDMGf-Op4SFo8MZw6edTUXyoIijQP1d7_Zfv3_i5nv-exUX9Ju4QPixlpSi2JwE5_2SJxIhddPRiGq9s6n-bFIdTN4WB0Rbw","expires_in":300,"issued_at":"2019-12-11T14:32:22.931794853Z"}
+    headers:
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 11 Dec 2019 14:32:22 GMT
+      Strict-Transport-Security:
+      - max-age=31536000
+    status: 200 OK
+    code: 200
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/vnd.oci.image.manifest.v1+json
+      - application/vnd.docker.distribution.manifest.v2+json
+      - application/vnd.docker.distribution.manifest.v1+prettyjws
+      - application/vnd.docker.distribution.manifest.v1+json
+      - application/vnd.docker.distribution.manifest.list.v2+json
+      Authorization:
+      - Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsIng1YyI6WyJNSUlDK2pDQ0FwK2dBd0lCQWdJQkFEQUtCZ2dxaGtqT1BRUURBakJHTVVRd1FnWURWUVFERXpzeVYwNVpPbFZMUzFJNlJFMUVVanBTU1U5Rk9reEhOa0U2UTFWWVZEcE5SbFZNT2tZelNFVTZOVkF5VlRwTFNqTkdPa05CTmxrNlNrbEVVVEFlRncweE9UQXhNVEl3TURJeU5EVmFGdzB5TURBeE1USXdNREl5TkRWYU1FWXhSREJDQmdOVkJBTVRPMUpMTkZNNlMwRkxVVHBEV0RWRk9rRTJSMVE2VTBwTVR6cFFNbEpMT2tOWlZVUTZTMEpEU0RwWFNVeE1Pa3hUU2xrNldscFFVVHBaVWxsRU1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBcjY2bXkveXpHN21VUzF3eFQ3dFplS2pqRzcvNnBwZFNMY3JCcko5VytwcndzMGtIUDVwUHRkMUpkcFdEWU1OZWdqQXhpUWtRUUNvd25IUnN2ODVUalBUdE5wUkdKVTRkeHJkeXBvWGc4TVhYUEUzL2lRbHhPS2VNU0prNlRKbG5wNGFtWVBHQlhuQXRoQzJtTlR5ak1zdFh2ZmNWN3VFYWpRcnlOVUcyUVdXQ1k1Ujl0a2k5ZG54Z3dCSEF6bG8wTzJCczFmcm5JbmJxaCtic3ZSZ1FxU3BrMWhxYnhSU3AyRlNrL2tBL1gyeUFxZzJQSUJxWFFMaTVQQ3krWERYZElJczV6VG9ZbWJUK0pmbnZaMzRLcG5mSkpNalpIRW4xUVJtQldOZXJZcVdtNVhkQVhUMUJrQU9aditMNFVwSTk3NFZFZ2ppY1JINVdBeWV4b1BFclRRSURBUUFCbzRHeU1JR3ZNQTRHQTFVZER3RUIvd1FFQXdJSGdEQVBCZ05WSFNVRUNEQUdCZ1JWSFNVQU1FUUdBMVVkRGdROUJEdFNTelJUT2t0QlMxRTZRMWcxUlRwQk5rZFVPbE5LVEU4NlVESlNTenBEV1ZWRU9rdENRMGc2VjBsTVREcE1VMHBaT2xwYVVGRTZXVkpaUkRCR0JnTlZIU01FUHpBOWdEc3lWMDVaT2xWTFMxSTZSRTFFVWpwU1NVOUZPa3hITmtFNlExVllWRHBOUmxWTU9rWXpTRVU2TlZBeVZUcExTak5HT2tOQk5sazZTa2xFVVRBS0JnZ3Foa2pPUFFRREFnTkpBREJHQWlFQXFOSXEwMFdZTmM5Z2tDZGdSUzRSWUhtNTRZcDBTa05Rd2lyMm5hSWtGd3dDSVFEMjlYdUl5TmpTa1cvWmpQaFlWWFB6QW9TNFVkRXNvUUhyUVZHMDd1N3ZsUT09Il19.eyJhY2Nlc3MiOlt7InR5cGUiOiJyZXBvc2l0b3J5IiwibmFtZSI6ImxpYnJhcnkvYnVzeWJveCIsImFjdGlvbnMiOlsicHVsbCJdfV0sImF1ZCI6InJlZ2lzdHJ5LmRvY2tlci5pbyIsImV4cCI6MTU3NjA3NTA0MiwiaWF0IjoxNTc2MDc0NzQyLCJpc3MiOiJhdXRoLmRvY2tlci5pbyIsImp0aSI6Imh2R3g1YlYzTTBfYnNaaEVrcS1UIiwibmJmIjoxNTc2MDc0NDQyLCJzdWIiOiIifQ.HYzG_ir5aYQAZlXrgaxCOOw9sGFNwzuunyO_7qEUbxWkM8V_3PnZxQypAYU9cnS66n293A-N1LbYBHRmiKq87LHq8MAdjvhfeTnqC-d0GV5WJOksN98x_T-eIBmdpFuAykTH1ZBsUA6OzAvuQqJ6zHy3GwgBpbFXVI0EZQHUELruNEkv8sgjWQeqG_U3sGbhN2wxWG51w9Mvp-9WvM_o4EcbUnzvYKVjJVQI-LjvVvI0b39SfZyKJkXDMGf-Op4SFo8MZw6edTUXyoIijQP1d7_Zfv3_i5nv-exUX9Ju4QPixlpSi2JwE5_2SJxIhddPRiGq9s6n-bFIdTN4WB0Rbw
+      Docker-Distribution-Api-Version:
+      - registry/2.0
+    url: https://registry-1.docker.io/v2/library/busybox/manifests/this-does-not-exist
+    method: GET
+  response:
+    body: |
+      {"errors":[{"code":"MANIFEST_UNKNOWN","message":"manifest unknown","detail":{"Tag":"this-does-not-exist"}}]}
+    headers:
+      Content-Length:
+      - "109"
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 11 Dec 2019 14:32:23 GMT
+      Docker-Distribution-Api-Version:
+      - registry/2.0
+      Strict-Transport-Security:
+      - max-age=31536000
+    status: 404 Not Found
+    code: 404
+    duration: ""
