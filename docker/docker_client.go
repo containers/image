@@ -200,9 +200,7 @@ func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
 			logrus.Debugf("error accessing certs directory due to permissions: %v", err)
 			continue
 		}
-		if err != nil {
-			return "", err
-		}
+		return "", err
 	}
 	return fullCertDirPath, nil
 }

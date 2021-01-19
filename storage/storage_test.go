@@ -121,9 +121,6 @@ func TestParse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseStoreReference(%q) returned error %v", "test", err)
 	}
-	if ref == nil {
-		t.Fatalf("ParseStoreReference(%q) returned nil reference", "test")
-	}
 
 	strRef := ref.StringWithinTransport()
 	ref, err = Transport.ParseReference(strRef)
