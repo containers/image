@@ -48,7 +48,7 @@ var (
 
 	// maxParallelDownloads is used to limit the maxmimum number of parallel
 	// downloads.  Let's follow Firefox by limiting it to 6.
-	maxParallelDownloads = 6
+	maxParallelDownloads = uint(6)
 )
 
 // compressionBufferSize is the buffer size used to compress a blob
@@ -108,18 +108,19 @@ func (d *digestingReader) Read(p []byte) (int, error) {
 // copier allows us to keep track of diffID values for blobs, and other
 // data shared across one or more images in a possible manifest list.
 type copier struct {
-	dest              types.ImageDestination
-	rawSource         types.ImageSource
-	reportWriter      io.Writer
-	progressOutput    io.Writer
-	progressInterval  time.Duration
-	progress          chan types.ProgressProperties
-	blobInfoCache     internalblobinfocache.BlobInfoCache2
-	copyInParallel    bool
-	compressionFormat compression.Algorithm
-	compressionLevel  *int
-	ociDecryptConfig  *encconfig.DecryptConfig
-	ociEncryptConfig  *encconfig.EncryptConfig
+	dest                 types.ImageDestination
+	rawSource            types.ImageSource
+	reportWriter         io.Writer
+	progressOutput       io.Writer
+	progressInterval     time.Duration
+	progress             chan types.ProgressProperties
+	blobInfoCache        internalblobinfocache.BlobInfoCache2
+	copyInParallel       bool
+	compressionFormat    compression.Algorithm
+	compressionLevel     *int
+	ociDecryptConfig     *encconfig.DecryptConfig
+	ociEncryptConfig     *encconfig.EncryptConfig
+	maxParallelDownloads uint
 }
 
 // imageCopier tracks state specific to a single image (possibly an item of a manifest list)
@@ -191,6 +192,8 @@ type Options struct {
 	// OciDecryptConfig contains the config that can be used to decrypt an image if it is
 	// encrypted if non-nil. If nil, it does not attempt to decrypt an image.
 	OciDecryptConfig *encconfig.DecryptConfig
+	// MaxParallelDownloads indicates the maximum layers to pull at the same time.  A reasonable default is used if this is left as 0.
+	MaxParallelDownloads uint
 }
 
 // validateImageListSelection returns an error if the passed-in value is not one that we recognize as a valid ImageListSelection value
@@ -266,9 +269,10 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		// FIXME? The cache is used for sources and destinations equally, but we only have a SourceCtx and DestinationCtx.
 		// For now, use DestinationCtx (because blob reuse changes the behavior of the destination side more); eventually
 		// we might want to add a separate CommonCtx — or would that be too confusing?
-		blobInfoCache:    internalblobinfocache.FromBlobInfoCache(blobinfocache.DefaultCache(options.DestinationCtx)),
-		ociDecryptConfig: options.OciDecryptConfig,
-		ociEncryptConfig: options.OciEncryptConfig,
+		blobInfoCache:        internalblobinfocache.FromBlobInfoCache(blobinfocache.DefaultCache(options.DestinationCtx)),
+		ociDecryptConfig:     options.OciDecryptConfig,
+		ociEncryptConfig:     options.OciEncryptConfig,
+		maxParallelDownloads: options.MaxParallelDownloads,
 	}
 	// Default to using gzip compression unless specified otherwise.
 	if options.DestinationCtx == nil || options.DestinationCtx.CompressionFormat == nil {
@@ -816,7 +820,11 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	// avoid malicious images causing troubles and to be nice to servers.
 	var copySemaphore *semaphore.Weighted
 	if ic.c.copyInParallel {
-		copySemaphore = semaphore.NewWeighted(int64(maxParallelDownloads))
+		max := ic.c.maxParallelDownloads
+		if max == 0 {
+			max = maxParallelDownloads
+		}
+		copySemaphore = semaphore.NewWeighted(int64(max))
 	} else {
 		copySemaphore = semaphore.NewWeighted(int64(1))
 	}
