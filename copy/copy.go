@@ -702,6 +702,9 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 			return nil, "", "", fmt.Errorf("Uploading manifest failed, attempted the following formats: %s", strings.Join(errs, ", "))
 		}
 	}
+	if targetInstance != nil {
+		targetInstance = &retManifestDigest
+	}
 
 	if options.SignBy != "" {
 		newSig, err := c.createSignature(manifestBytes, options.SignBy)
