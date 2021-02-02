@@ -26,12 +26,11 @@ as well as among different namespaces/repositories within a registry.
 
 Given an image name, a single `[[registry]]` TOML table is chosen based on its `prefix` field.
 
-`prefix`
-: A prefix of the user-specified image name, i.e. using one of the following formats:
-    - _host_[`:`_port_]
-    - _host_[`:`_port_]`/`_namespace_[`/`_namespace_…]
-    - _host_[`:`_port_]`/`_namespace_[`/`_namespace_…]`/`_repo_
-    - _host_[`:`_port_]`/`_namespace_[`/`_namespace_…]`/`_repo_(`:`_tag|`@`_digest_)
+`prefix`: A prefix of the user-specified image name, i.e. using one of the following formats:
+  - _host_[`:`_port_]
+  - _host_[`:`_port_]`/`_namespace_[`/`_namespace_…]
+  - _host_[`:`_port_]`/`_namespace_[`/`_namespace_…]`/`_repo_
+  - _host_[`:`_port_]`/`_namespace_[`/`_namespace_…]`/`_repo_(`:`_tag|`@`_digest_)
 
     The user-specified image name must start with the specified `prefix` (and continue
     with the appropriate separator) for a particular `[[registry]]` TOML table to be
