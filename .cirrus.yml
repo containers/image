@@ -1,13 +1,216 @@
-container:
-  image: golang:1.13
+---
 
+# Main collection of env. vars to set for all tasks and scripts.
 env:
-  GOPROXY: https://proxy.golang.org
+    ####
+    #### Global variables used for all tasks
+    ####
+    # Name of the ultimate destination branch for this CI run
+    DEST_BRANCH: "master"
+    # CI container image tag (c/skopeo branch name)
+    SKOPEO_CI_TAG: "master"
+    # Use GO module mirror (reason unknown, travis did it this way)
+    GOPROXY: https://proxy.golang.org
+    # Overrides default location (/tmp/cirrus) for repo clone
+    GOPATH: "/var/tmp/go"
+    GOBIN: "${GOPATH}/bin"
+    GOCACHE: "${GOPATH}/cache"
+    GOSRC: &gosrc "/var/tmp/go/src/github.com/containers/image"
+    CIRRUS_WORKING_DIR: *gosrc
+    # The default is 'sh' if unspecified
+    CIRRUS_SHELL: "/usr/bin/bash"
+    # Save a little typing (path relative to $CIRRUS_WORKING_DIR)
+    SCRIPT_BASE: "./contrib/cirrus"
+
+    ####
+    #### Cache-image names to test with (double-quotes around names are critical)
+    ####
+    FEDORA_NAME: "fedora-33"
+    PRIOR_FEDORA_NAME: "fedora-32"
+    UBUNTU_NAME: "ubuntu-20"
+    PRIOR_UBUNTU_NAME: "ubuntu-19"
+
+    # Google-cloud VM Images
+    IMAGE_SUFFIX: "c5402398833246208"
+    FEDORA_CACHE_IMAGE_NAME: "fedora-${IMAGE_SUFFIX}"
+    PRIOR_FEDORA_CACHE_IMAGE_NAME: "prior-fedora-${IMAGE_SUFFIX}"
+    UBUNTU_CACHE_IMAGE_NAME: "ubuntu-${IMAGE_SUFFIX}"
+    PRIOR_UBUNTU_CACHE_IMAGE_NAME: "prior-ubuntu-${IMAGE_SUFFIX}"
+
+    # Container FQIN's (include bleeding-edge development-level container deps.)
+    FEDORA_CONTAINER_FQIN: "quay.io/libpod/fedora_podman:${IMAGE_SUFFIX}"
+    PRIOR_FEDORA_CONTAINER_FQIN: "quay.io/libpod/prior-fedora_podman:${IMAGE_SUFFIX}"
+    UBUNTU_CONTAINER_FQIN: "quay.io/libpod/ubuntu_podman:${IMAGE_SUFFIX}"
+    PRIOR_UBUNTU_CONTAINER_FQIN: "quay.io/libpod/prior-ubuntu_podman:${IMAGE_SUFFIX}"
+    # Automatically built on quay.io when skopeo ${SKOPEO_CI_TAG} branch changes
+    SKOPEO_CI_CONTAINER_FQIN: "quay.io/skopeo/ci:${SKOPEO_CI_TAG}"
+
+
+gcp_credentials: ENCRYPTED[38c860dd789c68bd4f38b24d4fa5ddb525346f7ebe02c8bc91532d625f033cb357f9b4a22f09a8299c92bfdad7556ae5]
+
 
 validate_task:
-  validate_script:
-    - apt-get update -qq
-    - apt-get install -qq -y libgpgme-dev libdevmapper-dev btrfs-tools libbtrfs-dev
-    - make tools
-    - make .gitvalidation
-    - make validate
+    # The git-validation tool doesn't work well on branch or tag push,
+    # under Cirrus-CI, due to challenges obtaining the starting commit ID.
+    # Only do validation for PRs.
+    only_if: $CIRRUS_PR != ''
+    # https://cirrus-ci.org/guide/docker-builder-vm/#dockerfile-as-a-ci-environment
+    container:
+        dockerfile: .cirrus.Dockerfile
+        # golangci-lint tool requires heavy cpu/memory or gets OOM'd
+        cpu: 6
+        memory: 22
+        docker_arguments:
+            BASE_IMAGE: '${UBUNTU_CONTAINER_FQIN}'
+    script: |
+        git remote update
+        make tools
+        ${GOBIN}/git-validation -q -run DCO,short-subject,dangling-whitespace -range $(git merge-base ${DEST_BRANCH:-master} HEAD)..${CIRRUS_CHANGE_IN_REPO}
+        make validate
+
+
+cross_task:
+    container: &std_container
+        dockerfile: .cirrus.Dockerfile
+        # golangci-lint tool requires heavy cpu/memory or gets OOM'd
+        cpu: 2
+        memory: 4
+        docker_arguments:
+            BASE_IMAGE: '${UBUNTU_CONTAINER_FQIN}'
+    script: |
+        make cross
+
+
+test_task:
+    alias: test
+    depends_on:
+        - cross
+        - validate
+    container: *std_container
+    matrix:
+        - name: "Test"
+          env:
+              BUILDTAGS: 'btrfs_noversion libdm_no_deferred_remove'
+        - name: "Test w/ opengpg"
+          env:
+              BUILDTAGS: 'btrfs_noversion libdm_no_deferred_remove containers_image_openpgp'
+    script: |
+        make tools
+        make test BUILDTAGS="$BUILDTAGS"
+
+
+test_skopeo_task:
+    alias: test_skopeo
+    depends_on:
+        - cross
+        - validate
+    gce_instance:
+        image_project: libpod-218412
+        zone: "us-central1-f"
+        cpu: 2
+        memory: "4Gb"
+        # Required to be 200gig, do not modify - has i/o performance impact
+        # according to gcloud CLI tool warning messages.
+        disk: 200
+        image_name: ${FEDORA_CACHE_IMAGE_NAME}
+    matrix:
+        - name: "Skopeo"
+          env:
+              BUILDTAGS: 'btrfs_noversion libdm_no_deferred_remove'
+        - name: "Skopeo w/ opengpg"
+          env:
+              BUILDTAGS: 'btrfs_noversion libdm_no_deferred_remove containers_image_openpgp'
+    env:
+        SKOPEO_PATH: "${GOPATH}/src/github.com/containers/skopeo"
+        # Normally set to an empty-string.
+        # Temporarily set this to a containers/skopeo PR number to test changes.
+        SKOPEO_PR:
+        # TODO: Remove test technical-debt requiring integration tests to run
+        #       inside a container and with --privileged.  This is hiding bugs!
+        PODMANMAKE: >-
+            podman run -it --rm --privileged
+                -e GOPATH=$GOPATH
+                -v $GOPATH:$GOPATH:Z
+                -w $SKOPEO_PATH
+                $SKOPEO_CI_CONTAINER_FQIN
+                    make
+    setup_script: |
+        # This is required as part of the standard Fedora VM setup
+        growpart /dev/sda 1
+        resize2fs /dev/sda1
+
+        # VM's come with the distro. skopeo pre-installed
+        dnf erase -y skopeo
+
+        export "PATH=$PATH:$GOPATH/bin"
+        make tools
+        project_module=$(GO111MODULE="on" go list .)
+        rm -rf "${SKOPEO_PATH}"
+        git clone -b ${SKOPEO_CI_TAG} \
+            https://github.com/containers/skopeo.git ${SKOPEO_PATH}
+        cd "${SKOPEO_PATH}"
+        if [[ -n "$SKOPEO_PR" ]] && [[ $SKOPEO_PR -gt 1000 ]]; then
+            git fetch origin "+refs/pull/$SKOPEO_PR/head"
+            git checkout FETCH_HEAD
+        fi
+        GO111MODULE="on" go mod edit -replace ${project_module}=$GOSRC
+        echo "root:0:1" | tee -a /etc/subuid >> /etc/subgid
+    # Note: We _HAVE_ to spam BUILDTAGS in this way due to how Cirrus-CI
+    # mangles quoted strings when performing in-line 'env' substitution.
+    main_script: |
+        cd "${SKOPEO_PATH}"
+        set -x
+        $PODMANMAKE vendor BUILDTAGS="$BUILDTAGS"
+        $PODMANMAKE bin/skopeo BUILDTAGS="$BUILDTAGS"
+        $PODMANMAKE validate-local BUILDTAGS="$BUILDTAGS"
+        $PODMANMAKE test-unit-local BUILDTAGS="$BUILDTAGS"
+        $PODMANMAKE test-integration-local BUILDTAGS="$BUILDTAGS"
+        # Do not run inside podman, uses containers internally.
+        make test-system-local BUILDTAGS="$BUILDTAGS"
+
+
+# This task is critical.  It updates the "last-used by" timestamp stored
+# in metadata for all VM images.  This mechanism functions in tandem with
+# an out-of-band pruning operation to remove disused VM images.
+meta_task:
+    name: "VM img. keepalive"
+    alias: meta
+    container: &smallcontainer
+        cpu: 2
+        memory: 2
+        image: quay.io/libpod/imgts:$IMAGE_SUFFIX
+    env:
+        # Space-separated list of images used by this repository state
+        IMGNAMES: >-
+            ${FEDORA_CACHE_IMAGE_NAME}
+            ${PRIOR_FEDORA_CACHE_IMAGE_NAME}
+            ${UBUNTU_CACHE_IMAGE_NAME}
+            ${PRIOR_UBUNTU_CACHE_IMAGE_NAME}
+        BUILDID: "${CIRRUS_BUILD_ID}"
+        REPOREF: "${CIRRUS_REPO_NAME}"
+        GCPJSON: ENCRYPTED[04306103eee1933f87deb8a5af6514a7e3164aa589d6079abc0451eb2360879430ed020d6e025ca64ef667138ce9d786]
+        GCPNAME: ENCRYPTED[574c8afac5115af72e6722d7c1d1c7f9fca7a5586f3caad45251c1745d9b82d3c012b5e2f914e19fca0de56ce2c10f5d]
+        GCPPROJECT: libpod-218412
+    clone_script: &noop mkdir -p "$CIRRUS_WORKING_DIR"
+    script: /usr/local/bin/entrypoint.sh
+
+
+# Status aggregator for all tests.  This task simply ensures a defined
+# set of tasks all passed, and allows confirming that based on the status
+# of this task.
+success_task:
+    name: "Total Success"
+    alias: success
+    # N/B: ALL tasks must be listed here, minus their '_task' suffix.
+    depends_on:
+        - validate
+        - cross
+        - test
+        - test_skopeo
+        - meta
+    container: *smallcontainer
+    env:
+        CTR_FQIN: ${FEDORA_CONTAINER_FQIN}
+        TEST_ENVIRON: container
+    clone_script: *noop
+    script: /bin/true
