@@ -4,7 +4,7 @@ export GOPROXY=https://proxy.golang.org
 
 # Which github repository and branch to use for testing with skopeo
 SKOPEO_REPO = containers/skopeo
-SKOPEO_BRANCH = master
+SKOPEO_BRANCH ?= master
 # Set SUDO=sudo to run container integration tests using sudo.
 SUDO =
 
@@ -83,40 +83,19 @@ clean:
 test:
 	@$(GPGME_ENV) GO111MODULE="on" go test $(BUILDFLAGS) -cover ./...
 
-# This is not run as part of (make all), but Travis CI does run this.
-# Demonstrating a working version of skopeo (possibly with modified SKOPEO_REPO/SKOPEO_BRANCH, e.g.
-#    make test-skopeo SKOPEO_REPO=runcom/skopeo-1 SKOPEO_BRANCH=oci-3 SUDO=sudo
-# ) is a requirement before merging; note that Travis will only test
-# the master branch of the upstream repo.
-test-skopeo:
-	@echo === Testing skopeo build
-	@project_path=$$(pwd) && project_module=$$(GO111MODULE="on" go list .) && export GOPATH=$$(mktemp -d) && \
-		skopeo_path=$${GOPATH}/src/github.com/containers/skopeo && \
-		git clone -b $(SKOPEO_BRANCH) https://github.com/$(SKOPEO_REPO) $${skopeo_path} && \
-		cd $${skopeo_path} && \
-		GO111MODULE="on" go mod edit -replace $${project_module}=$${project_path} && \
-		make vendor && \
-		make BUILDTAGS="$(BUILDTAGS)" bin/skopeo test-unit-local && \
-		$(SUDO) make BUILDTAGS="$(BUILDTAGS)" check && \
-		rm -rf $${skopeo_path}
-
 fmt:
-	@gofmt -l -s -w $(SOURCE_DIRS)
+	@go fmt -l -s -w $(SOURCE_DIRS)
 
 validate: lint
 	@GO111MODULE="on" go vet ./...
-	@test -z "$$(gofmt -s -l . | grep -ve '^vendor' | tee /dev/stderr)"
+	@test -z "$$(go fmt -s -l . | grep -ve '^vendor' | tee /dev/stderr)"
 
 lint:
 	$(GOBIN)/golangci-lint run --build-tags "$(BUILDTAGS)"
 
-# When this is running in travis, it will only check the travis commit range
+# When this is running in CI, it will only check the CI commit range
 .gitvalidation:
 	@which $(GOBIN)/git-validation > /dev/null 2>/dev/null || (echo "ERROR: git-validation not found. Consider 'make clean && make tools'" && false)
-ifeq ($(TRAVIS),true)
-	$(GOBIN)/git-validation -q -run DCO,short-subject,dangling-whitespace
-else
 	git fetch -q "https://github.com/containers/image.git" "refs/heads/master"
 	upstream="$$(git rev-parse --verify FETCH_HEAD)" ; \
 		$(GOBIN)/git-validation -q -run DCO,short-subject,dangling-whitespace -range $$upstream..HEAD
-endif
