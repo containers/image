@@ -1349,7 +1349,15 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 		compressionOperation = types.PreserveOriginal
 		inputInfo = srcInfo
 		uploadCompressorName = srcCompressorName
-		uploadCompressionFormat = nil
+		// Remember if the original blob was compressed, and if so how, so that if
+		// LayerInfosForCopy() returned something that differs from what was in the
+		// source's manifest, and UpdatedImage() needs to call UpdateLayerInfos(),
+		// it will be able to correctly derive the MediaType for the copied blob.
+		if isCompressed {
+			uploadCompressionFormat = &compressionFormat
+		} else {
+			uploadCompressionFormat = nil
+		}
 	}
 
 	// Perform image encryption for valid mediatypes if ociEncryptConfig provided
