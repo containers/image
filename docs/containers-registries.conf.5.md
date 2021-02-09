@@ -163,10 +163,10 @@ If `short-name-mode` is not specified at all or left empty, default to the
 `permissive` mode.  If the user-specified short name was not aliased already,
 the `enforcing` and `permissive` mode if prompted, will record a new alias
 after a successful pull.  Note that the recorded alias will be written to
-`$XDG_CONFIG_HOME/containers/short-name-aliases.conf` to have a clear
+`/var/cache/containers/short-name-aliases.conf` for root to have a clear
 separation between possibly human-edited registries.conf files and the
-machine-generated `short-name-aliases-conf`.  Note that `$HOME/.config` is used
-if `$XDG_CONFIG_HOME` is not set.  If an alias is specified in a
+machine-generated `short-name-aliases-conf`.  Note that `$HOME/.cache` is used
+for rootless users.  If an alias is specified in a
 `registries.conf` file and also the machine-generated
 `short-name-aliases.conf`, the `short-name-aliases.conf` file has precedence.
 
