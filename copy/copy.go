@@ -839,26 +839,31 @@ func isTTY(w io.Writer) bool {
 // useLayerInfosForCopy implements LayerInfosForCopy, if necessary.
 // It may modify/replace ic.src.
 func (ic *imageCopier) useLayerInfosForCopy(ctx context.Context) error {
-	srcInfos := ic.src.LayerInfos()
 	updatedSrcInfos, err := ic.src.LayerInfosForCopy(ctx)
 	if err != nil {
 		return err
 	}
-	if updatedSrcInfos != nil && !reflect.DeepEqual(srcInfos, updatedSrcInfos) {
-		if !ic.canModifyManifest {
-			return errors.Errorf("Copying this image requires changing layer representation, which is not possible (image is signed or the destination specifies a digest)")
-		}
-		updates := *ic.manifestUpdates // A shallow copy
-		updates.LayerInfos = updatedSrcInfos
-		// We don’t set options.InformationOnly.LayerInfos and options.InformationOnly.LayerDiffIDs,
-		// because (we don’t have that information, and) the current update implementations don’t need that
-		// when we are not converting the manifest format.
-		img, err := updatedImageWithMIME(ctx, ic.src, updates)
-		if err != nil {
-			return errors.Wrapf(err, "Error preparing an internally-modified image manifest")
-		}
-		ic.src = img
+	if updatedSrcInfos == nil {
+		return nil
 	}
+	srcInfos := ic.src.LayerInfos()
+	if reflect.DeepEqual(srcInfos, updatedSrcInfos) {
+		return nil
+	}
+
+	if !ic.canModifyManifest {
+		return errors.Errorf("Copying this image requires changing layer representation, which is not possible (image is signed or the destination specifies a digest)")
+	}
+	updates := *ic.manifestUpdates // A shallow copy
+	updates.LayerInfos = updatedSrcInfos
+	// We don’t set options.InformationOnly.LayerInfos and options.InformationOnly.LayerDiffIDs,
+	// because (we don’t have that information, and) the current update implementations don’t need that
+	// when we are not converting the manifest format.
+	img, err := updatedImageWithMIME(ctx, ic.src, updates)
+	if err != nil {
+		return errors.Wrapf(err, "Error preparing an internally-modified image manifest")
+	}
+	ic.src = img
 	return nil
 }
 
