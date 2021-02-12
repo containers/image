@@ -649,6 +649,10 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 		return nil, "", "", err
 	}
 
+	if err := ic.useLayerInfosForCopy(ctx); err != nil {
+		return nil, "", "", err
+	}
+
 	destRequiresOciEncryption := (isEncrypted(src) && ic.c.ociDecryptConfig != nil) || options.OciEncryptLayers != nil
 	// We compute preferredManifestMIMEType only to show it in error messages.
 	// Without having to add this context in an error message, we would be happy enough to know only that no conversion is needed.
@@ -832,22 +836,36 @@ func isTTY(w io.Writer) bool {
 	return false
 }
 
-// copyLayers copies layers from ic.src/ic.c.rawSource to dest, using and updating ic.manifestUpdates if necessary and ic.canModifyManifest.
-func (ic *imageCopier) copyLayers(ctx context.Context) error {
+// useLayerInfosForCopy implements LayerInfosForCopy, if necessary.
+// It may modify/replace ic.src.
+func (ic *imageCopier) useLayerInfosForCopy(ctx context.Context) error {
 	srcInfos := ic.src.LayerInfos()
-	numLayers := len(srcInfos)
 	updatedSrcInfos, err := ic.src.LayerInfosForCopy(ctx)
 	if err != nil {
 		return err
 	}
-	srcInfosUpdated := false
 	if updatedSrcInfos != nil && !reflect.DeepEqual(srcInfos, updatedSrcInfos) {
 		if !ic.canModifyManifest {
 			return errors.Errorf("Copying this image requires changing layer representation, which is not possible (image is signed or the destination specifies a digest)")
 		}
-		srcInfos = updatedSrcInfos
-		srcInfosUpdated = true
+		updates := *ic.manifestUpdates // A shallow copy
+		updates.LayerInfos = updatedSrcInfos
+		// We don’t set options.InformationOnly.LayerInfos and options.InformationOnly.LayerDiffIDs,
+		// because (we don’t have that information, and) the current update implementations don’t need that
+		// when we are not converting the manifest format.
+		img, err := updatedImageWithMIME(ctx, ic.src, updates)
+		if err != nil {
+			return errors.Wrapf(err, "Error preparing an internally-modified image manifest")
+		}
+		ic.src = img
 	}
+	return nil
+}
+
+// copyLayers copies layers from ic.src/ic.c.rawSource to dest, using and updating ic.manifestUpdates if necessary and ic.canModifyManifest.
+func (ic *imageCopier) copyLayers(ctx context.Context) error {
+	srcInfos := ic.src.LayerInfos()
+	numLayers := len(srcInfos)
 
 	type copyLayerData struct {
 		destInfo types.BlobInfo
@@ -917,8 +935,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		defer copyGroup.Wait()
 
 		for i, srcLayer := range srcInfos {
-			err = ic.c.concurrentBlobCopiesSemaphore.Acquire(ctx, 1)
-			if err != nil {
+			if err := ic.c.concurrentBlobCopiesSemaphore.Acquire(ctx, 1); err != nil {
 				// This can only fail with ctx.Err(), so no need to blame acquiring the semaphore.
 				return fmt.Errorf("copying layer: %w", err)
 			}
@@ -948,7 +965,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	if ic.diffIDsAreNeeded {
 		ic.manifestUpdates.InformationOnly.LayerDiffIDs = diffIDs
 	}
-	if srcInfosUpdated || layerDigestsDiffer(srcInfos, destInfos) {
+	if layerDigestsDiffer(srcInfos, destInfos) {
 		ic.manifestUpdates.LayerInfos = destInfos
 	}
 	return nil
@@ -965,6 +982,34 @@ func layerDigestsDiffer(a, b []types.BlobInfo) bool {
 		}
 	}
 	return false
+}
+
+// updatedImageWithMIME is a horrible workaround for the fact that types.Image.UpdatedImage() is documented to
+// ignore ManifestUpdateOptions.LayerInfos[].MediaType.
+// Other than that it behaves like img.UpdatedImage(ctx, options).
+// TO DO: Move this to c/image.sourcedImage and implement directly instead of the
+// CompressionAlgorithm workaround.
+func updatedImageWithMIME(ctx context.Context, img types.Image, options types.ManifestUpdateOptions) (types.Image, error) {
+	if options.LayerInfos == nil {
+		return img.UpdatedImage(ctx, options)
+	}
+
+	optionsCopy := options
+	optionsCopy.LayerInfos = []types.BlobInfo{}
+	for _, b := range options.LayerInfos {
+		if b.MediaType != "" && b.CompressionOperation == types.PreserveOriginal && b.CompressionAlgorithm == nil {
+			// FIXME: c/image/copy has no business knowing this
+			switch b.MediaType {
+			case manifest.DockerV2Schema2LayerMediaType, imgspecv1.MediaTypeImageLayerGzip:
+				b.CompressionAlgorithm = &compression.Gzip
+			case imgspecv1.MediaTypeImageLayerZstd:
+				b.CompressionAlgorithm = &compression.Zstd
+			default: // Punt and hope for the best. This includes completely unknown blob types.
+			}
+		}
+		optionsCopy.LayerInfos = append(optionsCopy.LayerInfos, b)
+	}
+	return img.UpdatedImage(ctx, optionsCopy)
 }
 
 // copyUpdatedConfigAndManifest updates the image per ic.manifestUpdates, if necessary,
