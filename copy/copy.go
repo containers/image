@@ -650,7 +650,6 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 	}
 
 	destRequiresOciEncryption := (isEncrypted(src) && ic.c.ociDecryptConfig != nil) || options.OciEncryptLayers != nil
-
 	// We compute preferredManifestMIMEType only to show it in error messages.
 	// Without having to add this context in an error message, we would be happy enough to know only that no conversion is needed.
 	preferredManifestMIMEType, otherManifestMIMETypeCandidates, err := ic.determineManifestConversion(ctx, c.dest.SupportedManifestMIMETypes(), options.ForceManifestMIMEType, destRequiresOciEncryption)
@@ -842,7 +841,6 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		return err
 	}
 	srcInfosUpdated := false
-	// If we only need to check authorization, no updates required.
 	if updatedSrcInfos != nil && !reflect.DeepEqual(srcInfos, updatedSrcInfos) {
 		if !ic.canModifyManifest {
 			return errors.Errorf("Copying this image requires changing layer representation, which is not possible (image is signed or the destination specifies a digest)")
@@ -898,10 +896,10 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	var encryptAll bool
 	if ic.ociEncryptLayers != nil {
 		encryptAll = len(*ic.ociEncryptLayers) == 0
-		totalLayers := len(srcInfos)
+		numLayers := len(srcInfos)
 		for _, l := range *ic.ociEncryptLayers {
 			// if layer is negative, it is reverse indexed.
-			encLayerBitmap[(totalLayers+l)%totalLayers] = true
+			encLayerBitmap[(numLayers+l)%numLayers] = true
 		}
 
 		if encryptAll {
