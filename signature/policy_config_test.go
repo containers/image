@@ -107,7 +107,7 @@ func TestDefaultPolicy(t *testing.T) {
 	assert.Equal(t, policyFixtureContents, policy)
 
 	for _, path := range []string{
-		"/this/doesnt/exist", // Error reading file
+		"/this/does/not/exist", // Error reading file
 		"/dev/null",          // A failure case; most are tested in the individual method unit tests.
 	} {
 		policy, err := DefaultPolicy(&types.SystemContext{SignaturePolicyPath: path})
@@ -204,7 +204,7 @@ func TestNewPolicyFromFile(t *testing.T) {
 	assert.Equal(t, policyFixtureContents, policy)
 
 	// Error reading file
-	_, err = NewPolicyFromFile("/this/doesnt/exist")
+	_, err = NewPolicyFromFile("/this/does/not/exist")
 	assert.Error(t, err)
 
 	// A failure case; most are tested in the individual method unit tests.
@@ -278,7 +278,7 @@ func addExtraJSONMember(t *testing.T, encoded []byte, name string, extra interfa
 	return res
 }
 
-// policyJSONUnmarshallerTests formalizes the repeated structure of the JSON unmasrhaller
+// policyJSONUnmarshallerTests formalizes the repeated structure of the JSON unmarshaller
 // tests in this file, and allows sharing the test implementation.
 type policyJSONUmarshallerTests struct {
 	newDest         func() json.Unmarshaler           // Create a new json.Unmarshaler to test against
@@ -744,7 +744,7 @@ func TestNewPRSignedByKeyData(t *testing.T) {
 	// Failure cases tested in TestNewPRSignedBy.
 }
 
-// Return the result of modifying vaoidJSON with fn and unmarshalingit into *pr
+// Return the result of modifying validJSON with fn and unmarshaling it into *pr
 func tryUnmarshalModifiedSignedBy(t *testing.T, pr *prSignedBy, validJSON []byte, modifyFn func(mSI)) error {
 	var tmp mSI
 	err := json.Unmarshal(validJSON, &tmp)
@@ -1101,7 +1101,7 @@ func TestPRMExactReferenceUnmarshalJSON(t *testing.T) {
 	policyJSONUmarshallerTests{
 		newDest: func() json.Unmarshaler { return &prmExactReference{} },
 		newValidObject: func() (interface{}, error) {
-			return NewPRMExactReference("library/buxybox:latest")
+			return NewPRMExactReference("library/busybox:latest")
 		},
 		otherJSONParser: func(validJSON []byte) (interface{}, error) {
 			return newPolicyReferenceMatchFromJSON(validJSON)
@@ -1157,7 +1157,7 @@ func TestPRMExactRepositoryUnmarshalJSON(t *testing.T) {
 	policyJSONUmarshallerTests{
 		newDest: func() json.Unmarshaler { return &prmExactRepository{} },
 		newValidObject: func() (interface{}, error) {
-			return NewPRMExactRepository("library/buxybox:latest")
+			return NewPRMExactRepository("library/busybox:latest")
 		},
 		otherJSONParser: func(validJSON []byte) (interface{}, error) {
 			return newPolicyReferenceMatchFromJSON(validJSON)

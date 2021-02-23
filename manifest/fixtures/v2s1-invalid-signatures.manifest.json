@@ -1,6 +1,6 @@
 {
    "schemaVersion": 1,
-   "name": "mitr/buxybox",
+   "name": "mitr/busybox",
    "tag": "latest",
    "architecture": "amd64",
    "fsLayers": [

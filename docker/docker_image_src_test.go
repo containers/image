@@ -61,8 +61,8 @@ location = "@REGISTRY@/with-mirror"
 		ref, err := ParseReference("//" + c.input)
 		require.NoError(t, err, c.input)
 		src, err := ref.NewImageSource(context.Background(), &types.SystemContext{
-			RegistriesDirPath:           "/this/doesnt/exist",
-			DockerPerHostCertDirPath:    "/this/doesnt/exist",
+			RegistriesDirPath:           "/this/does/not/exist",
+			DockerPerHostCertDirPath:    "/this/does/not/exist",
 			SystemRegistriesConfPath:    registriesConf.Name(),
 			DockerInsecureSkipTLSVerify: types.OptionalBoolTrue,
 		})
