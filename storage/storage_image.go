@@ -45,6 +45,7 @@ var (
 type storageImageSource struct {
 	imageRef        storageReference
 	image           *storage.Image
+	systemContext   *types.SystemContext    // SystemContext used in GetBlob() to create temporary files
 	layerPosition   map[digest.Digest]int   // Where we are in reading a blob's layers
 	cachedManifest  []byte                  // A cached copy of the manifest, if already known, or nil
 	getBlobMutex    sync.Mutex              // Mutex to sync state for parallel GetBlob executions
@@ -96,6 +97,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, imageRef stor
 	// Build the reader object.
 	image := &storageImageSource{
 		imageRef:        imageRef,
+		systemContext:   sys,
 		image:           img,
 		layerPosition:   make(map[digest.Digest]int),
 		SignatureSizes:  []int{},
@@ -131,8 +133,35 @@ func (s *storageImageSource) GetBlob(ctx context.Context, info types.BlobInfo, c
 	if info.Digest == image.GzippedEmptyLayerDigest {
 		return ioutil.NopCloser(bytes.NewReader(image.GzippedEmptyLayer)), int64(len(image.GzippedEmptyLayer)), nil
 	}
+
+	// NOTE: the blob is first written to a temporary file and subsequently
+	// closed.  The intention is to keep the time we own the storage lock
+	// as short as possible to allow other processes to access the storage.
 	rc, n, _, err = s.getBlobAndLayerID(info)
-	return rc, n, err
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rc.Close()
+
+	tmpFile, err := ioutil.TempFile(tmpdir.TemporaryDirectoryForBigFiles(s.systemContext), "")
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if _, err := io.Copy(tmpFile, rc); err != nil {
+		return nil, 0, err
+	}
+
+	if _, err := tmpFile.Seek(0, 0); err != nil {
+		return nil, 0, err
+	}
+
+	wrapper := ioutils.NewReadCloserWrapper(tmpFile, func() error {
+		defer os.Remove(tmpFile.Name())
+		return tmpFile.Close()
+	})
+
+	return wrapper, n, err
 }
 
 // getBlobAndLayer reads the data blob or filesystem layer which matches the digest and size, if given.
