@@ -20,12 +20,22 @@ func TestWantedPlatforms(t *testing.T) {
 				{OS: "linux", Architecture: "amd64", Variant: ""},
 			},
 		},
-		{ // ARM
+		{ // ARM with variant
 			types.SystemContext{ArchitectureChoice: "arm", OSChoice: "linux", VariantChoice: "v6"},
 			[]imgspecv1.Platform{
 				{OS: "linux", Architecture: "arm", Variant: "v6"},
 				{OS: "linux", Architecture: "arm", Variant: "v5"},
 				{OS: "linux", Architecture: "arm", Variant: ""},
+			},
+		},
+		{ // ARM without variant
+			types.SystemContext{ArchitectureChoice: "arm", OSChoice: "linux"},
+			[]imgspecv1.Platform{
+				{OS: "linux", Architecture: "arm", Variant: ""},
+				{OS: "linux", Architecture: "arm", Variant: "v8"},
+				{OS: "linux", Architecture: "arm", Variant: "v7"},
+				{OS: "linux", Architecture: "arm", Variant: "v6"},
+				{OS: "linux", Architecture: "arm", Variant: "v5"},
 			},
 		},
 		{ // ARM64 has a base variant
