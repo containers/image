@@ -10,26 +10,26 @@ or trivially; for others, the protocol extensions described below are necessary.
 
 Any existing docker/distribution registry, whether or not it natively supports signatures,
 can be augmented with separate signature storage by configuring a signature storage URL in [`registries.d`](containers-registries.d.md).
-`registries.d` can be configured to use one storage URL for a whole docker/distribution server,
+The `registries.d` can be configured to use one storage URL for a whole docker/distribution server,
 or also separate URLs for smaller namespaces or individual repositories within the server
 (which e.g. allows image authors to manage their own signature storage while publishing
 the images on the public `docker.io` server).
 
 The signature storage URL defines a root of a path hierarchy.
-It can be either a `file:///…` URL, pointing to a local directory structure,
-or a `http`/`https` URL, pointing to a remote server.
-`file:///` signature storage can be both read and written, `http`/`https` only supports reading.
+It can be either a `file://` URL, pointing to a local directory structure,
+or a `http://`/ `https://` URL, pointing to a remote server.
+`file://` signature storage can be both read and written, `http://`/`https://` only supports reading.
 
 The same path hierarchy is used in both cases, so the HTTP/HTTPS server can be
-a simple static web server serving a directory structure created by writing to a `file:///` signature storage.
+a simple static web server serving a directory structure created by writing to a `file://` signature storage.
 (This of course does not prevent other server implementations,
 e.g. a HTTP server reading signatures from a database.)
 
 The usual workflow for producing and distributing images using the separate storage mechanism
 is to configure the repository in `registries.d` with `sigstore-staging` URL pointing to a private
-`file:///` staging area, and a `sigstore` URL pointing to a public web server.
+`file://` staging area, and a `sigstore` URL pointing to a public web server.
 To publish an image, the image author would sign the image as necessary (e.g. using `skopeo copy`),
-and then copy the created directory structure from the `file:///` staging area
+and then copy the created directory structure from the `file://` staging area
 to a subdirectory of a webroot of the public web server so that they are accessible using the public `sigstore` URL.
 The author would also instruct consumers of the image to, or provide a `registries.d` configuration file to,
 set up a `sigstore` URL pointing to the public web server.
