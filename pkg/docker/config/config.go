@@ -26,6 +26,7 @@ type dockerAuthConfig struct {
 type dockerConfigFile struct {
 	AuthConfigs map[string]dockerAuthConfig `json:"auths"`
 	CredHelpers map[string]string           `json:"credHelpers,omitempty"`
+	CredsStore  string           	        `json:"credsStore,omitempty"`
 }
 
 type authPath struct {
@@ -96,7 +97,16 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 		}
 
 		for registry, data := range auths.AuthConfigs {
-			conf, err := decodeDockerAuth(data)
+			var conf types.DockerAuthConfig
+			if data.Auth == "" && auths.CredsStore != "" {
+				conf.Username, conf.Password, err = getAuthFromCredHelper(auths.CredsStore, registry)
+				if err != nil && credentials.IsErrCredentialsNotFoundMessage(err.Error()) {
+					err = nil
+				}
+			} else {
+				conf, err = decodeDockerAuth(data)
+			}
+
 			if err != nil {
 				return nil, err
 			}
