@@ -17,7 +17,7 @@ Once the main configuration at `/etc/containers/registries.conf` is loaded, the
 files in `/etc/containers/registries.conf.d` are loaded in alpha-numerical
 order. Then the conf files in `$HOME/.config/containers/registries.conf.d` are loaded in alpha-numerical order, if they exist. If the `$HOME/.config/containers/registries.conf` is loaded, only the conf files under `$HOME/.config/containers/registries.conf.d` are loaded in alpha-numerical order.
 Specified fields in a conf file will overwrite any previous setting.  Note
-that only files with the `.conf` prefix are loaded, other files and
+that only files with the `.conf` suffix are loaded, other files and
 sub-directories are ignored.
 
 For instance, setting the `unqualified-search-registries` in
