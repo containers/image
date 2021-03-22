@@ -30,6 +30,7 @@ func TestGuessMIMEType(t *testing.T) {
 		{"unknown-version.manifest.json", ""},
 		{"non-json.manifest.json", ""}, // Not a manifest (nor JSON) at all
 		{"ociv1.manifest.json", imgspecv1.MediaTypeImageManifest},
+		{"ociv1.artifact.json", imgspecv1.MediaTypeImageManifest},
 		{"ociv1.image.index.json", imgspecv1.MediaTypeImageIndex},
 	}
 
