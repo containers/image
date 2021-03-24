@@ -56,21 +56,31 @@ type storageImageSource struct {
 
 type storageImageDestination struct {
 	imageRef        storageReference
-	directory       string                          // Temporary directory where we store blobs until Commit() time
-	nextTempFileID  int32                           // A counter that we use for computing filenames to assign to blobs
-	manifest        []byte                          // Manifest contents, temporary
-	signatures      []byte                          // Signature contents, temporary
-	signatureses    map[digest.Digest][]byte        // Instance signature contents, temporary
-	lock            sync.Mutex                      // Mutex to sync state for parallel executions of PutBlob and TryReusing blob
-	blobDiffIDs     map[digest.Digest]digest.Digest // Mapping from layer blobsums to their corresponding DiffIDs
-	fileSizes       map[digest.Digest]int64         // Mapping from layer blobsums to their sizes
-	filenames       map[digest.Digest]string        // Mapping from layer blobsums to names of files we used to hold them
-	SignatureSizes  []int                           `json:"signature-sizes,omitempty"`  // List of sizes of each signature slice
-	SignaturesSizes map[digest.Digest][]int         `json:"signatures-sizes,omitempty"` // Sizes of each manifest's signature slice
-	// fields to support early commit of layers below
-	currentIndex      int                     // The index of the layer to be committed (i.e., lower indices have already been committed)
-	indexToPulledBlob map[int]*types.BlobInfo // Mapping from layer (by index) to pulled down blob
-	indexToStorageID  map[int]*string         // Mapping from layer (by index) to the associated ID in the storage
+	directory       string                   // Temporary directory where we store blobs until Commit() time
+	nextTempFileID  int32                    // A counter that we use for computing filenames to assign to blobs
+	manifest        []byte                   // Manifest contents, temporary
+	signatures      []byte                   // Signature contents, temporary
+	signatureses    map[digest.Digest][]byte // Instance signature contents, temporary
+	SignatureSizes  []int                    `json:"signature-sizes,omitempty"`  // List of sizes of each signature slice
+	SignaturesSizes map[digest.Digest][]int  `json:"signatures-sizes,omitempty"` // Sizes of each manifest's signature slice
+
+	// A storage destination may be used concurrently.  Accesses are
+	// serialized via a mutex.  Please refer to the individual comments
+	// below for details.
+	lock sync.Mutex
+	// Mapping from layer (by index) to the associated ID in the storage.
+	// It's protected *implicitly* since `commitLayer()`, at any given
+	// time, can only be executed by *one* goroutine.  Please refer to
+	// `queueOrCommit()` for further details on how the single-caller
+	// guarantee is implemented.
+	indexToStorageID map[int]*string
+	// All accesses to below data are protected by `lock` which is made
+	// *explicit* in the code.
+	blobDiffIDs       map[digest.Digest]digest.Digest // Mapping from layer blobsums to their corresponding DiffIDs
+	fileSizes         map[digest.Digest]int64         // Mapping from layer blobsums to their sizes
+	filenames         map[digest.Digest]string        // Mapping from layer blobsums to names of files we used to hold them
+	currentIndex      int                             // The index of the layer to be committed (i.e., lower indices have already been committed)
+	indexToPulledBlob map[int]*types.BlobInfo         // Mapping from layer (by index) to pulled down blob
 }
 
 type storageImageCloser struct {
@@ -733,8 +743,11 @@ func (s *storageImageDestination) queueOrCommit(ctx context.Context, blob types.
 }
 
 // commitLayer commits the specified blob with the given index to the storage.
-// Note that the previous layer is expected to already be committed.  Callers
-// must take care of sequencing and locking.
+// Note that the previous layer is expected to already be committed.
+//
+// Caution: this function must be called without holding `s.lock`.  Callers
+// must guarantee that, at any given time, at most one goroutine may execute
+// `commitLayer()`.
 func (s *storageImageDestination) commitLayer(ctx context.Context, blob manifest.LayerInfo, index int) error {
 	// Already commited?  Return early.
 	if _, alreadyCommitted := s.indexToStorageID[index]; alreadyCommitted {
