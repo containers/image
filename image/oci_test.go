@@ -180,7 +180,7 @@ func TestManifestOCI1ConfigBlob(t *testing.T) {
 		}
 	}
 
-	// Generally conficBlob should match ConfigInfo; we don’t quite need it to, and this will
+	// Generally configBlob should match ConfigInfo; we don’t quite need it to, and this will
 	// guarantee that the returned object is returning the original contents instead
 	// of reading an object from elsewhere.
 	configBlob := []byte("config blob which does not match ConfigInfo")

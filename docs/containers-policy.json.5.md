@@ -114,7 +114,7 @@ Scopes are ignored.
 
 Using the mechanisms above, a set of policy requirements is looked up.  The policy requirements
 are represented as a JSON array of individual requirement objects.  For an image to be accepted,
-*all* of the requirements must be satisfied simulatenously.
+*all* of the requirements must be satisfied simultaneously.
 
 The policy requirements can also be used to decide whether an individual signature is accepted (= is signed by a recognized key of a known author);
 in that case some requirements may apply only to some signatures, but each signature must be accepted by *at least one* requirement object.

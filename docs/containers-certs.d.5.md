@@ -15,7 +15,7 @@ A certs directory can contain one or more files with the following extensions:
 * `*.key`  files with this extensions will be interpreted as client keys
 
 Note that the client certificate-key pair will be selected by the file name (e.g., `client.{cert,key}`).
-An examplary setup for a registry running at `my-registry.com:5000` may look as follows:
+An exemplary setup for a registry running at `my-registry.com:5000` may look as follows:
 ```
 /etc/containers/certs.d/    <- Certificate directory
 └── my-registry.com:5000    <- Hostname:port

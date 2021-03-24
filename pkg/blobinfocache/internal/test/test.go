@@ -70,7 +70,7 @@ func testGenericRecordDigestUncompressedPair(t *testing.T, cache blobinfocache.B
 		cache.RecordDigestUncompressedPair(digestCompressedB, digestUncompressed)
 		assert.Equal(t, digestUncompressed, cache.UncompressedDigest(digestCompressedB))
 
-		// Mapping an uncompresesd digest to self
+		// Mapping an uncompressed digest to self
 		cache.RecordDigestUncompressedPair(digestUncompressed, digestUncompressed)
 		assert.Equal(t, digestUncompressed, cache.UncompressedDigest(digestUncompressed))
 	}
@@ -96,7 +96,7 @@ func testGenericRecordKnownLocations(t *testing.T, cache blobinfocache.BlobInfoC
 	}
 }
 
-// candidate is a shorthand for types.BICReplacementCandiddate
+// candidate is a shorthand for types.BICReplacementCandidate
 type candidate struct {
 	d  digest.Digest
 	cn string

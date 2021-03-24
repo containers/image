@@ -99,7 +99,7 @@ func TestVerifyDockerManifestSignature(t *testing.T) {
 	assert.Nil(t, sig)
 
 	// Docker reference mismatch
-	sig, err = VerifyDockerManifestSignature(signature, manifest, "example.com/doesnt/match", mech, TestKeyFingerprint)
+	sig, err = VerifyDockerManifestSignature(signature, manifest, "example.com/does-not/match", mech, TestKeyFingerprint)
 	assert.Error(t, err)
 	assert.Nil(t, sig)
 

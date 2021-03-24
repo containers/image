@@ -34,7 +34,7 @@ func TestParseLocation(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "example.com", location)
 
-	location, err = parseLocation("example.com//////") // trailing slahes are stripped
+	location, err = parseLocation("example.com//////") // trailing slashes are stripped
 	assert.Nil(t, err)
 	assert.Equal(t, "example.com", location)
 

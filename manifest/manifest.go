@@ -30,7 +30,7 @@ const (
 	DockerV2ListMediaType = "application/vnd.docker.distribution.manifest.list.v2+json"
 	// DockerV2Schema2ForeignLayerMediaType is the MIME type used for schema 2 foreign layers.
 	DockerV2Schema2ForeignLayerMediaType = "application/vnd.docker.image.rootfs.foreign.diff.tar"
-	// DockerV2Schema2ForeignLayerMediaType is the MIME type used for gzippped schema 2 foreign layers.
+	// DockerV2Schema2ForeignLayerMediaType is the MIME type used for gzipped schema 2 foreign layers.
 	DockerV2Schema2ForeignLayerMediaTypeGzip = "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip"
 )
 
