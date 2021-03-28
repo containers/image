@@ -187,9 +187,9 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 		{"docker", "very.deep.com/n1/n2/n3/repo:tag2", "docker", "*.deep.com"},
 		{"docker", "not.very.deep.com/n1/n2/n3/repo:tag2", "docker", "*.very.deep.com"},
 		// Default
-		{"docker", "this.doesnt/match:anything", "docker", ""},
+		{"docker", "this.does-not/match:anything", "docker", ""},
 		// No match within a matched transport which doesn't have a "" scope
-		{"atomic", "this.doesnt/match:anything", "", ""},
+		{"atomic", "this.does-not/match:anything", "", ""},
 		// No configuration available for this transport at all
 		{"dir", "what/ever", "", ""}, // "what/ever" is not a valid scope for the real "dir" transport, but we only need it to be a valid reference.Named.
 	} {
@@ -501,7 +501,7 @@ func assertSARRejected(t *testing.T, sar signatureAcceptanceResult, parsedSig *S
 	assert.Error(t, err)
 }
 
-// assertSARRejectedPolicyRequiremnt verifies that isSignatureAuthorAccepted returns a consistent sarRejected result,
+// assertSARRejectedPolicyRequirement verifies that isSignatureAuthorAccepted returns a consistent sarRejected result,
 // and that the returned error is a PolicyRequirementError..
 func assertSARRejectedPolicyRequirement(t *testing.T, sar signatureAcceptanceResult, parsedSig *Signature, err error) {
 	assertSARRejected(t, sar, parsedSig, err)

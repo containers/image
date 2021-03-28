@@ -123,7 +123,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	// A signature which does not GPG verify
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
-	// Pass a nil pointer to, kind of, test that the return value does not depend on the image parmater..
+	// Pass a nil pointer to, kind of, test that the return value does not depend on the image parameter.
 	sar, parsedSig, err = pr.isSignatureAuthorAccepted(context.Background(), nil, []byte("invalid signature"))
 	assertSARRejected(t, sar, parsedSig, err)
 
@@ -134,7 +134,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	require.NoError(t, err)
 	sig, err := ioutil.ReadFile("fixtures/unknown-key.signature")
 	require.NoError(t, err)
-	// Pass a nil pointer to, kind of, test that the return value does not depend on the image parmater..
+	// Pass a nil pointer to, kind of, test that the return value does not depend on the image parameter..
 	sar, parsedSig, err = pr.isSignatureAuthorAccepted(context.Background(), nil, sig)
 	assertSARRejected(t, sar, parsedSig, err)
 
@@ -143,7 +143,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	require.NoError(t, err)
 	sig, err = ioutil.ReadFile("fixtures/invalid-blob.signature")
 	require.NoError(t, err)
-	// Pass a nil pointer to, kind of, test that the return value does not depend on the image parmater..
+	// Pass a nil pointer to, kind of, test that the return value does not depend on the image parameter..
 	sar, parsedSig, err = pr.isSignatureAuthorAccepted(context.Background(), nil, sig)
 	assertSARRejected(t, sar, parsedSig, err)
 	assert.IsType(t, InvalidSignatureError{}, err)

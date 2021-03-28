@@ -25,7 +25,7 @@ func TestTransportParseReference(t *testing.T) {
 }
 
 func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
-	// docker/policyconfiguation-accepted identities and scopes are accepted
+	// docker/policyconfiguration-accepted identities and scopes are accepted
 	for _, scope := range []string{
 		"registry.example.com/ns/stream" + sha256digest,
 		"registry.example.com/ns/stream:notlatest",

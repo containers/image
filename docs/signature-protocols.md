@@ -1,7 +1,7 @@
 # Signature access protocols
 
 The `github.com/containers/image` library supports signatures implemented as blobs “attached to” an image.
-Some image transports (local storage formats and remote procotocols) implement these signatures natively
+Some image transports (local storage formats and remote protocols) implement these signatures natively
 or trivially; for others, the protocol extensions described below are necessary.
 
 ## docker/distribution registries—separate storage

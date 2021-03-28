@@ -76,7 +76,7 @@ func TestPutManifestAppendsToExistingManifest(t *testing.T) {
 	ociRef, ok := ref.(ociReference)
 	require.True(t, ok)
 
-	// iniitally we have one manifest
+	// initially we have one manifest
 	index, err := ociRef.getIndex()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(index.Manifests), "Unexpected number of manifests")

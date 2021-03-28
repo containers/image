@@ -27,7 +27,7 @@ func TestParseShortNameValue(t *testing.T) {
 		{"fedora:latest", false},         // short name + tag
 		{"library/fedora", false},        // no registry
 		{"library/fedora:latest", false}, // no registry + tag
-		{"$$4455%%", false},              // gargabe
+		{"$$4455%%", false},              // garbage
 		{"docker://foo", false},          // transports are not supported
 		{"docker-archive://foo", false},  // transports are not supported
 		{"", false},                      // empty

@@ -115,7 +115,7 @@ func TestValidateRemoteName(t *testing.T) {
 		"docker/",
 
 		//namespace too long
-		"this_is_not_a_valid_namespace_because_its_lenth_is_greater_than_255_this_is_not_a_valid_namespace_because_its_lenth_is_greater_than_255_this_is_not_a_valid_namespace_because_its_lenth_is_greater_than_255_this_is_not_a_valid_namespace_because_its_lenth_is_greater_than_255/docker",
+		"this_is_not_a_valid_namespace_because_its_length_is_greater_than_255_this_is_not_a_valid_namespace_because_its_length_is_greater_than_255_this_is_not_a_valid_namespace_because_its_length_is_greater_than_255_this_is_not_a_valid_namespace_because_its_length_is_greater_than_255/docker",
 	}
 	for _, repositoryName := range invalidRepositoryNames {
 		if _, err := ParseNormalizedNamed(repositoryName); err == nil {

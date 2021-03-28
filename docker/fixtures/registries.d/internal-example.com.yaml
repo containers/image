@@ -5,7 +5,7 @@ docker:
         sigstore: http://registry.test.example.com/sigstore
     registry.test.example.com:8888:
         sigstore: http://registry.test.example.com:8889/sigstore
-        sigstore-staging: https://registry.test.example.com:8889/sigstore/specialAPIserverWhichDoesntExist
+        sigstore-staging: https://registry.test.example.com:8889/sigstore/specialAPIserverWhichDoesNotExist
     localhost:
         sigstore: file:///home/mitr/mydevelopment1
     localhost:8080:

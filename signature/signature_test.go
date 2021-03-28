@@ -94,7 +94,7 @@ func modifiedUntrustedSignatureJSON(t *testing.T, validJSON []byte, modifyFn fun
 }
 
 // Verify that input can be unmarshaled as an untrustedSignature, and that it passes JSON schema validation, and return the unmarshaled untrustedSignature.
-func succesfullyUnmarshalUntrustedSignature(t *testing.T, schemaLoader gojsonschema.JSONLoader, input []byte) untrustedSignature {
+func successfullyUnmarshalUntrustedSignature(t *testing.T, schemaLoader gojsonschema.JSONLoader, input []byte) untrustedSignature {
 	inputString := string(input)
 
 	var s untrustedSignature
@@ -108,7 +108,7 @@ func succesfullyUnmarshalUntrustedSignature(t *testing.T, schemaLoader gojsonsch
 	return s
 }
 
-// Verify that input can't be unmashaled as an untrusted signature, and that it fails JSON schema validation.
+// Verify that input can't be unmarshaled as an untrusted signature, and that it fails JSON schema validation.
 func assertUnmarshalUntrustedSignatureFails(t *testing.T, schemaLoader gojsonschema.JSONLoader, input []byte) {
 	inputString := string(input)
 
@@ -144,7 +144,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	require.NoError(t, err)
 
 	// Success
-	s = succesfullyUnmarshalUntrustedSignature(t, schemaLoader, validJSON)
+	s = successfullyUnmarshalUntrustedSignature(t, schemaLoader, validJSON)
 	assert.Equal(t, validSig, s)
 
 	// Various ways to corrupt the JSON
@@ -197,7 +197,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	}
 	for _, fn := range allowedModificationFns {
 		testJSON := modifiedUntrustedSignatureJSON(t, validJSON, fn)
-		s := succesfullyUnmarshalUntrustedSignature(t, schemaLoader, testJSON)
+		s := successfullyUnmarshalUntrustedSignature(t, schemaLoader, testJSON)
 		assert.Equal(t, validSig, s)
 	}
 
@@ -210,7 +210,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	}
 	validJSON, err = validSig.MarshalJSON()
 	require.NoError(t, err)
-	s = succesfullyUnmarshalUntrustedSignature(t, schemaLoader, validJSON)
+	s = successfullyUnmarshalUntrustedSignature(t, schemaLoader, validJSON)
 	assert.Equal(t, validSig, s)
 }
 

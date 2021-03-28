@@ -68,7 +68,7 @@ func TestParanoidUnmarshalJSONObject(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, testStruct{A: "x", B: 2}, ts)
 
-	// json.Unamarshaler is used for decoding values
+	// json.Unmarshaler is used for decoding values
 	ts = testStruct{}
 	unmarshalJSONCalled = implementsUnmarshalJSON(false)
 	err = paranoidUnmarshalJSONObject([]byte(`{"implementsUnmarshalJSON":true}`), tsResolver)

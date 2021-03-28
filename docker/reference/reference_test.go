@@ -385,13 +385,13 @@ func TestSerialization(t *testing.T) {
 		}
 		b, err := json.Marshal(m)
 		if err != nil {
-			failf("error marshalling: %v", err)
+			failf("error marshaling: %v", err)
 		}
 		t := serializationType{}
 
 		if err := json.Unmarshal(b, &t); err != nil {
 			if testcase.err == nil {
-				failf("error unmarshalling: %v", err)
+				failf("error unmarshaling: %v", err)
 			}
 			if err != testcase.err {
 				failf("wrong error, expected %v, got %v", testcase.err, err)
@@ -399,7 +399,7 @@ func TestSerialization(t *testing.T) {
 
 			continue
 		} else if testcase.err != nil {
-			failf("expected error unmarshalling: %v", testcase.err)
+			failf("expected error unmarshaling: %v", testcase.err)
 		}
 
 		if t.Description != testcase.description {
@@ -449,7 +449,7 @@ func TestSerialization(t *testing.T) {
 
 		b2, err := json.Marshal(t)
 		if err != nil {
-			failf("error marshing serialization type: %v", err)
+			failf("error marshaling serialization type: %v", err)
 		}
 
 		if string(b) != string(b2) {
