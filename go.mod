@@ -18,7 +18,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/imdario/mergo v0.3.11
-	github.com/klauspost/compress v1.11.12
+	github.com/klauspost/compress v1.11.13
 	github.com/klauspost/pgzip v1.2.5
 	github.com/konsorten/go-windows-terminal-sequences v1.0.3 // indirect
 	github.com/magefile/mage v1.10.0 // indirect
