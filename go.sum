@@ -165,6 +165,7 @@ github.com/containers/storage v1.26.1-0.20210219111608-5bd1a7d801b6/go.mod h1:o7
 github.com/containers/storage v1.27.0 h1:3r4yWPNCoqZa8ptvVhljoDJyBYKrJq/tmHyODD7Lv2Y=
 github.com/containers/storage v1.27.0/go.mod h1:o7PtlRZpFleYVu0TRAFSb/dPJHZnEk5GMFbVLsf0NOI=
 github.com/containers/storage v1.28.0/go.mod h1:ixAwO7Bj31cigqPEG7aCz+PYmxkDxbIFdUFioYdxbzI=
+github.com/containers/storage v1.28.1/go.mod h1:5bwiMh2LkrN3AWIfDFMH7A/xbVNLcve+oeXYvHvW8cc=
 github.com/coreos/go-iptables v0.4.5/go.mod h1:/mVI274lEDI2ns62jHCDnCyBF9Iwsmekav8Dbxlm1MU=
 github.com/coreos/go-oidc v2.1.0+incompatible/go.mod h1:CgnwVTmzoESiwO9qyAFEMiHoZ1nMCKZlZ9V6mm3/LKc=
 github.com/coreos/go-semver v0.2.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3EedlOD2RNk=
