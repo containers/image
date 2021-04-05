@@ -16,6 +16,9 @@ Container engines will use the `$HOME/.config/containers/registries.conf` if it 
 `unqualified-search-registries`
 : An array of _host_[`:`_port_] registries to try when pulling an unqualified image, in order.
 
+`credential-helpers`
+: An array of default credential helpers used as external credential stores.  Note that "containers-auth.json" is a reserved value to use auth files as specified in containers-auth.json(5).  The credential helpers are set to `["containers-auth.json"]` if none are specified.
+
 ### NAMESPACED `[[registry]]` SETTINGS
 
 The bulk of the configuration is represented as an array of `[[registry]]`
@@ -270,7 +273,7 @@ the destination registry is unambiguous. Pulling by digest
 tags.
 
 # SEE ALSO
-  containers-certs.d(5)
+ containers-auth.json(5) containers-certs.d(5)
 
 # HISTORY
 Dec 2019, Warning added for unqualified image names by Tom Sweeney <tsweeney@redhat.com>

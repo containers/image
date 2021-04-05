@@ -37,6 +37,11 @@ var systemRegistriesConfDirPath = builtinRegistriesConfDirPath
 // DO NOT change this, instead see systemRegistriesConfDirectoryPath above.
 const builtinRegistriesConfDirPath = "/etc/containers/registries.conf.d"
 
+// AuthenticationFileHelper is a special key for credential helpers indicating
+// the usage of consulting containers-auth.json files instead of a credential
+// helper.
+const AuthenticationFileHelper = "containers-auth.json"
+
 // Endpoint describes a remote location of a registry.
 type Endpoint struct {
 	// The endpoint's remote location.
@@ -154,6 +159,14 @@ type V2RegistriesConf struct {
 	Registries []Registry `toml:"registry"`
 	// An array of host[:port] (not prefix!) entries to use for resolving unqualified image references
 	UnqualifiedSearchRegistries []string `toml:"unqualified-search-registries"`
+	// An array of global credential helpers to use for authentication
+	// (e.g., ["pass", "secretservice"]).  The helpers are consulted in the
+	// specified order.  Note that "containers-auth.json" is a reserved
+	// value for consulting auth files as specified in
+	// containers-auth.json(5).
+	//
+	// If empty, CredentialHelpers defaults to  ["containers-auth.json"].
+	CredentialHelpers []string `toml:"credential-helpers"`
 
 	// ShortNameMode defines how short-name resolution should be handled by
 	// _consumers_ of this package.  Depending on the mode, the user should
@@ -601,6 +614,10 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedC
 		config.shortNameMode = defaultShortNameMode
 	}
 
+	if len(config.partialV2.CredentialHelpers) == 0 {
+		config.partialV2.CredentialHelpers = []string{AuthenticationFileHelper}
+	}
+
 	// populate the cache
 	configCache[wrapper] = config
 	return config, nil
@@ -663,6 +680,15 @@ func GetShortNameMode(ctx *types.SystemContext) (types.ShortNameMode, error) {
 	return config.shortNameMode, err
 }
 
+// CredentialHelpers returns the global top-level credential helpers.
+func CredentialHelpers(sys *types.SystemContext) ([]string, error) {
+	config, err := getConfig(sys)
+	if err != nil {
+		return nil, err
+	}
+	return config.partialV2.CredentialHelpers, nil
+}
+
 // refMatchesPrefix returns true iff ref,
 // which is a registry, repository namespace, repository or image reference (as formatted by
 // reference.Domain(), reference.Named.Name() or reference.Reference.String()
@@ -700,6 +726,12 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 		return nil, err
 	}
 
+	return findRegistryWithParsedConfig(config, ref)
+}
+
+// findRegistryWithParsedConfig implements `FindRegistry` with a pre-loaded
+// parseConfig.
+func findRegistryWithParsedConfig(config *parsedConfig, ref string) (*Registry, error) {
 	reg := Registry{}
 	prefixLen := 0
 	for _, r := range config.partialV2.Registries {
@@ -823,6 +855,11 @@ func (c *parsedConfig) updateWithConfigurationFrom(updates *parsedConfig) {
 	if updates.partialV2.UnqualifiedSearchRegistries != nil {
 		c.partialV2.UnqualifiedSearchRegistries = updates.partialV2.UnqualifiedSearchRegistries
 		c.unqualifiedSearchRegistriesOrigin = updates.unqualifiedSearchRegistriesOrigin
+	}
+
+	// == Merge credential helpers:
+	if updates.partialV2.CredentialHelpers != nil {
+		c.partialV2.CredentialHelpers = updates.partialV2.CredentialHelpers
 	}
 
 	// == Merge shortNameMode:
