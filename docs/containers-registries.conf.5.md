@@ -34,10 +34,15 @@ Given an image name, a single `[[registry]]` TOML table is chosen based on its `
   - _host_[`:`_port_]`/`_namespace_[`/`_namespace_…]
   - _host_[`:`_port_]`/`_namespace_[`/`_namespace_…]`/`_repo_
   - _host_[`:`_port_]`/`_namespace_[`/`_namespace_…]`/`_repo_(`:`_tag|`@`_digest_)
+  - [`*.`]_host_
 
     The user-specified image name must start with the specified `prefix` (and continue
     with the appropriate separator) for a particular `[[registry]]` TOML table to be
-    considered; (only) the TOML table with the longest match is used.
+    considered; (only) the TOML table with the longest match is used. It can
+    also include wildcarded subdomains in the format `*.example.com` along as mentioned
+    above. The wildcard should only be present at the beginning as shown in the formats
+    above. Other cases will not work. For example, `*.example.com` is valid but
+    `example.*.com`, `*.example.com/foo` and `*.example.com:5000/foo/bar:baz` are not.
 
     As a special case, the `prefix` field can be missing; if so, it defaults to the value
     of the `location` field (described below).
@@ -76,6 +81,19 @@ internet without having to change `Dockerfile`s, or to add redundancy).
     ```
     requests for the image `example.com/foo/myimage:latest` will actually work with the
     `internal-registry-for-example.net/bar/myimage:latest` image.
+
+    With a `prefix` containing a wildcard in the format: "*.example.com" for subdomain matching,
+    the location can be empty. In such a case,
+    prefix matching will occur, but no reference rewrite will occur. The
+    original requested image string will be used as-is. But other settings like
+    `insecure` / `blocked` / `mirrors` will be applied to matching images.
+
+    Example: Given
+    ```
+    prefix = "*.example.com"
+    ```
+    requests for the image `blah.example.com/foo/myimage:latest` will be used
+    as-is. But other settings like insecure/blocked/mirrors will be applied to matching images
 
 `mirror`
 : An array of TOML tables specifying (possibly-partial) mirrors for the
