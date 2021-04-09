@@ -83,43 +83,86 @@ func TestMirrors(t *testing.T) {
 	assert.True(t, reg.Mirrors[1].Insecure)
 }
 
-func TestRefMatchesPrefix(t *testing.T) {
+func TestRefMatchingSubdomainPrefix(t *testing.T) {
 	for _, c := range []struct {
 		ref, prefix string
-		expected    bool
+		expected    int
+	}{
+		// Check for subdomain matches
+		{"docker.io", "*.io", len("docker.io")},
+		{"docker.io/foo", "*.com", -1},
+		{"example.com/foo", "*.co", -1},
+		{"example.com/foo", "*.example.com", -1},
+		//FIXME: Port Number matching needs to be revisited.
+		// https://github.com/containers/image/pull/1191#pullrequestreview-631869416
+		//{"example.com:5000", "*.com", len("example.com")},
+		//{"example.com:5000/foo", "*.com", len("example.com")},
+		//{"sub.example.com:5000/foo", "*.example.com", len("sub.example.com")},
+		//{"example.com:5000/foo/bar", "*.com", len("example.com")},
+		//{"example.com:5000/foo/bar:baz", "*.com", len("example.com")},
+		//{"example.com:5000/foo/bar/bbq:baz", "*.com", len("example.com")},
+		//{"example.com:50000/foo", "*.example.com", -1},
+		{"example.com/foo", "*.com", len("example.com")},
+		{"example.com/foo:bar", "*.com", len("example.com")},
+		{"example.com/foo/bar:baz", "*.com", len("example.com")},
+		{"yet.another.example.com/foo", "**.example.com", -1},
+		{"yet.another.example.com/foo", "***.another.example.com", -1},
+		{"yet.another.example.com/foo", "**********.another.example.com", -1},
+		{"yet.another.example.com/foo/bar", "**********.another.example.com", -1},
+		{"yet.another.example.com/foo/bar", "*.another.example.com", len("yet.another.example.com")},
+		{"another.example.com/namespace.com/foo/bar/bbq:baz", "*.example.com", len("another.example.com")},
+		{"example.net/namespace-ends-in.com/foo/bar/bbq:baz", "*.com", -1},
+		{"another.example.com/namespace.com/foo/bar/bbq:baz", "*.namespace.com", -1},
+		{"sub.example.com/foo/bar", "*.com", len("sub.example.com")},
+		{"sub.example.com/foo/bar", "*.example.com", len("sub.example.com")},
+		{"another.sub.example.com/foo/bar/bbq:baz", "*.example.com", len("another.sub.example.com")},
+		{"another.sub.example.com/foo/bar/bbq:baz", "*.sub.example.com", len("another.sub.example.com")},
+		{"yet.another.example.com/foo/bar@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "*.example.com", len("yet.another.example.com")},
+		{"yet.another.sub.example.com/foo/bar@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "*.sub.example.com", len("yet.another.sub.example.com")},
+	} {
+		refLen := refMatchingSubdomainPrefix(c.ref, c.prefix)
+		assert.Equal(t, c.expected, refLen, fmt.Sprintf("%s vs. %s", c.ref, c.prefix))
+	}
+}
+
+func TestRefMatchingPrefix(t *testing.T) {
+	for _, c := range []struct {
+		ref, prefix string
+		expected    int
 	}{
 		// Prefix is a reference.Domain() value
-		{"docker.io", "docker.io", true},
-		{"docker.io", "example.com", false},
-		{"example.com:5000", "example.com:5000", true},
-		{"example.com:50000", "example.com:5000", false},
-		{"example.com:5000", "example.com", true}, // FIXME FIXME This is unintended and undocumented, don't rely on this behavior
-		{"example.com/foo", "example.com", true},
-		{"example.com/foo/bar", "example.com", true},
-		{"example.com/foo/bar:baz", "example.com", true},
-		{"example.com/foo/bar@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "example.com", true},
+		{"docker.io", "docker.io", len("docker.io")},
+		{"docker.io", "example.com", -1},
+		{"example.com:5000", "example.com:5000", len("example.com:5000")},
+		{"example.com:50000", "example.com:5000", -1},
+		{"example.com:5000", "example.com", len("example.com")}, // FIXME FIXME This is unintended and undocumented, don't rely on this behavior
+		{"example.com/foo", "example.com", len("example.com")},
+		{"example.com/foo/bar", "example.com", len("example.com")},
+		{"example.com/foo/bar:baz", "example.com", len("example.com")},
+		{"example.com/foo/bar@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "example.com", len("example.com")},
 		// Prefix is a reference.Named.Name() value or a repo namespace
-		{"docker.io", "docker.io/library", false},
-		{"docker.io/library", "docker.io/library", true},
-		{"example.com/library", "docker.io/library", false},
-		{"docker.io/libraryy", "docker.io/library", false},
-		{"docker.io/library/busybox", "docker.io/library", true},
-		{"docker.io", "docker.io/library/busybox", false},
-		{"docker.io/library/busybox", "docker.io/library/busybox", true},
-		{"example.com/library/busybox", "docker.io/library/busybox", false},
-		{"docker.io/library/busybox2", "docker.io/library/busybox", false},
+		{"docker.io", "docker.io/library", -1},
+		{"docker.io/library", "docker.io/library", len("docker.io/library")},
+		{"example.com/library", "docker.io/library", -1},
+		{"docker.io/libraryy", "docker.io/library", -1},
+		{"docker.io/library/busybox", "docker.io/library", len("docker.io/library")},
+		{"docker.io", "docker.io/library/busybox", -1},
+		{"docker.io/library/busybox", "docker.io/library/busybox", len("docker.io/library/busybox")},
+		{"example.com/library/busybox", "docker.io/library/busybox", -1},
+		{"docker.io/library/busybox2", "docker.io/library/busybox", -1},
 		// Prefix is a single image
-		{"example.com", "example.com/foo:bar", false},
-		{"example.com/foo", "example.com/foo:bar", false},
-		{"example.com/foo:bar", "example.com/foo:bar", true},
-		{"example.com/foo:bar2", "example.com/foo:bar", false},
-		{"example.com", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false},
-		{"example.com/foo", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false},
-		{"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", true},
-		{"example.com/foo@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false},
+		{"example.com", "example.com/foo:bar", -1},
+		{"example.com/foo", "example.com/foo:bar", -1},
+		{"example.com/foo:bar", "example.com/foo:bar", len("example.com/foo:bar")},
+		{"example.com/foo:bar2", "example.com/foo:bar", -1},
+		{"example.com", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", -1},
+		{"example.com/foo", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", -1},
+		{"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			len("example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")},
+		{"example.com/foo@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", -1},
 	} {
-		res := refMatchesPrefix(c.ref, c.prefix)
-		assert.Equal(t, c.expected, res, fmt.Sprintf("%s vs. %s", c.ref, c.prefix))
+		prefixLen := refMatchingPrefix(c.ref, c.prefix)
+		assert.Equal(t, c.expected, prefixLen, fmt.Sprintf("%s vs. %s", c.ref, c.prefix))
 	}
 }
 
@@ -192,12 +235,12 @@ func TestNewConfigWrapper(t *testing.T) {
 func TestFindRegistry(t *testing.T) {
 	sys := &types.SystemContext{
 		SystemRegistriesConfPath:    "testdata/find-registry.conf",
-		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+		SystemRegistriesConfDirPath: "testdata/registries.conf.d",
 	}
 
 	registries, err := GetRegistries(sys)
 	assert.Nil(t, err)
-	assert.Equal(t, 5, len(registries))
+	assert.Equal(t, 19, len(registries))
 
 	reg, err := FindRegistry(sys, "simple-prefix.com/foo/bar:latest")
 	assert.Nil(t, err)
@@ -214,6 +257,57 @@ func TestFindRegistry(t *testing.T) {
 	reg, err = FindRegistry(sys, "simple-prefix.com")
 	assert.Nil(t, err)
 	assert.NotNil(t, reg)
+
+	// subdomain prefix match
+	reg, err = FindRegistry(sys, "not.so.simple-prefix.com/")
+	assert.Nil(t, err)
+	assert.NotNil(t, reg)
+	assert.Equal(t, "subdomain-prefix.com", reg.Location)
+
+	reg, err = FindRegistry(sys, "not.quite.simple-prefix.com/")
+	assert.Nil(t, err)
+	assert.NotNil(t, reg)
+	assert.Equal(t, "subdomain-prefix-2.com", reg.Location)
+
+	reg, err = FindRegistry(sys, "not.quite.simple-prefix.com:5000/with/path/and/beyond:tag")
+	assert.Nil(t, err)
+	assert.NotNil(t, reg)
+	assert.Equal(t, "subdomain-prefix-2.com", reg.Location)
+
+	// subdomain prefix match for *.not.quite.simple-prefix.com
+	// location field overriden by /registries.conf.d/subdomain-override-1.conf
+	reg, err = FindRegistry(sys, "really.not.quite.simple-prefix.com:5000/with/path/and/beyond:tag")
+	assert.Nil(t, err)
+	assert.NotNil(t, reg)
+	assert.Equal(t, "subdomain-prefix-1-overridden-by-dropin-location.com", reg.Location)
+
+	// In this case, the override does NOT occur because the dropin
+	// prefix = "*.docker.com" which is not a match.
+	reg, err = FindRegistry(sys, "foo.docker.io:5000/omg/wtf/bbq:foo")
+	assert.Nil(t, err)
+	assert.NotNil(t, reg)
+	assert.Equal(t, "subdomain-prefix-2.com", reg.Location)
+
+	// subdomain prefix match for *.bar.example.com
+	// location field overriden by /registries.conf.d/subdomain-override-3.conf
+	reg, err = FindRegistry(sys, "foo.bar.example.com:6000/omg/wtf/bbq@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	assert.Nil(t, err)
+	assert.NotNil(t, reg)
+	assert.Equal(t, "subdomain-prefix-3-overridden-by-dropin-location.com", reg.Location)
+
+	// This case first matches with prefix = *.docker.io in find-registry.conf but
+	// there's a longer match with *.bar.docker.io which gets used
+	reg, err = FindRegistry(sys, "foo.bar.docker.io:5000/omg/wtf/bbq:foo")
+	assert.Nil(t, err)
+	assert.NotNil(t, reg)
+	assert.Equal(t, "subdomain-prefix-4.com", reg.Location)
+
+	// This case first matches with prefix = *.example.com in find-registry.conf but
+	// there's a longer match with foo.bar.example.com:5000 which gets used
+	reg, err = FindRegistry(sys, "foo.bar.example.com:5000/omg/wtf/bbq:foo")
+	assert.Nil(t, err)
+	assert.NotNil(t, reg)
+	assert.Equal(t, "subdomain-prefix-5.com", reg.Location)
 
 	// invalid match
 	reg, err = FindRegistry(sys, "simple-prefix.comx")
@@ -277,8 +371,7 @@ func TestInvalidV2Configs(t *testing.T) {
 	for _, c := range []struct{ path, errorSubstring string }{
 		{"testdata/insecure-conflicts.conf", "registry 'registry.com' is defined multiple times with conflicting 'insecure' setting"},
 		{"testdata/blocked-conflicts.conf", "registry 'registry.com' is defined multiple times with conflicting 'blocked' setting"},
-		{"testdata/missing-registry-location.conf", "invalid location"},
-		{"testdata/missing-mirror-location.conf", "invalid location"},
+		{"testdata/missing-mirror-location.conf", "invalid condition: mirror location is unset"},
 		{"testdata/invalid-prefix.conf", "invalid location"},
 		{"testdata/this-does-not-exist.conf", "no such file or directory"},
 	} {
@@ -429,6 +522,20 @@ func TestRewriteReferenceSuccess(t *testing.T) {
 		{"docker.io/library/image", "docker.io/library", "example.com", "example.com/image"},
 		{"docker.io/library/image", "docker.io", "example.com", "example.com/library/image"},
 		{"docker.io/library/prefix/image", "docker.io/library/prefix", "example.com", "example.com/image"},
+		// Wildcard prefix examples
+		{"docker.io/namespace/image", "*.io", "example.com", "example.com/namespace/image"},
+		{"docker.io/library/prefix/image", "*.io", "example.com", "example.com/library/prefix/image"},
+		{"sub.example.io/library/prefix/image", "*.example.io", "example.com", "example.com/library/prefix/image"},
+		{"another.sub.example.io:5000/library/prefix/image:latest", "*.sub.example.io", "example.com", "example.com:5000/library/prefix/image:latest"},
+		{"foo.bar.io/ns1/ns2/ns3/ns4", "*.bar.io", "omg.bbq.com/roflmao", "omg.bbq.com/roflmao/ns1/ns2/ns3/ns4"},
+		// Empty location with wildcard prefix examples. Essentially, no
+		// rewrite occurs and original reference is used as-is.
+		{"abc.internal.registry.com/foo:bar", "*.internal.registry.com", "", "abc.internal.registry.com/foo:bar"},
+		{"blah.foo.bar.com/omg:bbq", "*.com", "", "blah.foo.bar.com/omg:bbq"},
+		{"alien.vs.predator.foobar.io:5000/omg", "*.foobar.io", "", "alien.vs.predator.foobar.io:5000/omg"},
+		{"alien.vs.predator.foobar.io:5000/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "*.foobar.io", "",
+			"alien.vs.predator.foobar.io:5000/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		{"alien.vs.predator.foobar.io:5000/omg:bbq", "*.foobar.io", "", "alien.vs.predator.foobar.io:5000/omg:bbq"},
 	} {
 		ref := toNamedRef(t, c.inputRef)
 		testEndpoint := Endpoint{Location: c.location}
@@ -455,6 +562,9 @@ func TestRewriteReferenceFailedDuringParseNamed(t *testing.T) {
 		{"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			"example.com/fo", "example.com/foo"},
 		{"docker.io/library/image", "example.com", "example.com"},
+		{"docker.io/library/image", "*.com", "example.com"},
+		{"foo.docker.io/library/image", "*.example.com", "example.com/image"},
+		{"foo.docker.io/library/image", "*.docker.com", "example.com/image"},
 	} {
 		ref := toNamedRef(t, c.inputRef)
 		testEndpoint := Endpoint{Location: c.location}
@@ -542,8 +652,8 @@ func TestRegistriesConfDirectory(t *testing.T) {
 	assert.NotNil(t, registries)
 
 	assert.Equal(t, []string{"example-overwrite.com"}, registries.UnqualifiedSearchRegistries)
-	assert.Equal(t, 3, len(registries.Registries))
-	assertRegistryLocationsEqual(t, []string{"1.com", "2.com", "base.com"}, registries.Registries)
+	assert.Equal(t, 6, len(registries.Registries))
+	assertRegistryLocationsEqual(t, []string{"subdomain-prefix-3-overridden-by-dropin-location.com", "subdomain-prefix-2-overridden-by-dropin-location.com", "subdomain-prefix-1-overridden-by-dropin-location.com", "1.com", "2.com", "base.com"}, registries.Registries)
 
 	reg, err := FindRegistry(ctx, "base.com/test:latest")
 	require.NoError(t, err)

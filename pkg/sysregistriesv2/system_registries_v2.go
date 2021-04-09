@@ -44,7 +44,10 @@ const AuthenticationFileHelper = "containers-auth.json"
 
 // Endpoint describes a remote location of a registry.
 type Endpoint struct {
-	// The endpoint's remote location.
+	// The endpoint's remote location. Can be empty iff Prefix contains
+	// wildcard in the format: "*.example.com" for subdomain matching.
+	// Please refer to FindRegistry / PullSourcesFromReference instead
+	// of accessing/interpreting `Location` directly.
 	Location string `toml:"location,omitempty"`
 	// If true, certs verification will be skipped and HTTP (non-TLS)
 	// connections will be allowed.
@@ -62,11 +65,26 @@ var userRegistriesDir = filepath.FromSlash(".config/containers/registries.conf.d
 // The function errors if the newly created reference is not parsable.
 func (e *Endpoint) rewriteReference(ref reference.Named, prefix string) (reference.Named, error) {
 	refString := ref.String()
-	if !refMatchesPrefix(refString, prefix) {
+	var newNamedRef string
+	// refMatchingPrefix returns the length of the match. Everything that
+	// follows the match gets appended to registries location.
+	prefixLen := refMatchingPrefix(refString, prefix)
+	if prefixLen == -1 {
 		return nil, fmt.Errorf("invalid prefix '%v' for reference '%v'", prefix, refString)
 	}
-
-	newNamedRef := strings.Replace(refString, prefix, e.Location, 1)
+	// In the case of an empty `location` field, simply return the original
+	// input ref as-is.
+	//
+	// FIXME: already validated in postProcessRegistries, so check can probably
+	// be dropped.
+	// https://github.com/containers/image/pull/1191#discussion_r610621608
+	if e.Location == "" {
+		if prefix[:2] != "*." {
+			return nil, fmt.Errorf("invalid prefix '%v' for empty location, should be in the format: *.example.com", prefix)
+		}
+		return ref, nil
+	}
+	newNamedRef = e.Location + refString[prefixLen:]
 	newParsedRef, err := reference.ParseNamed(newNamedRef)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error rewriting reference")
@@ -82,6 +100,11 @@ type Registry struct {
 	// and we pull from "example.com/bar/myimage:latest", the image will
 	// effectively be pulled from "example.com/foo/bar/myimage:latest".
 	// If no Prefix is specified, it defaults to the specified location.
+	// Prefix can also be in the format: "*.example.com" for matching
+	// subdomains. The wildcard should only be in the beginning and should also
+	// not contain any namespaces or special characters: "/", "@" or ":".
+	// Please refer to FindRegistry / PullSourcesFromReference instead
+	// of accessing/interpreting `Prefix` directly.
 	Prefix string `toml:"prefix"`
 	// A registry is an Endpoint too
 	Endpoint
@@ -225,9 +248,15 @@ func (e *InvalidRegistries) Error() string {
 func parseLocation(input string) (string, error) {
 	trimmed := strings.TrimRight(input, "/")
 
-	if trimmed == "" {
-		return "", &InvalidRegistries{s: "invalid location: cannot be empty"}
-	}
+	// FIXME: This check needs to exist but fails for empty Location field with
+	// wildcarded prefix. Removal of this check "only" allows invalid input in,
+	// and does not prevent correct operation.
+	// https://github.com/containers/image/pull/1191#discussion_r610122617
+	//
+	//	if trimmed == "" {
+	//		return "", &InvalidRegistries{s: "invalid location: cannot be empty"}
+	//	}
+	//
 
 	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
 		msg := fmt.Sprintf("invalid location '%s': URI schemes are not supported", input)
@@ -306,11 +335,19 @@ func (config *V2RegistriesConf) postProcessRegistries() error {
 		}
 
 		if reg.Prefix == "" {
+			if reg.Location == "" {
+				return &InvalidRegistries{s: "invalid condition: both location and prefix are unset"}
+			}
 			reg.Prefix = reg.Location
 		} else {
 			reg.Prefix, err = parseLocation(reg.Prefix)
 			if err != nil {
 				return err
+			}
+			// FIXME: allow config authors to always use Prefix.
+			// https://github.com/containers/image/pull/1191#discussion_r610622495
+			if reg.Prefix[:2] != "*." && reg.Location == "" {
+				return &InvalidRegistries{s: "invalid condition: location is unset and prefix is not in the format: *.example.com"}
 			}
 		}
 
@@ -320,8 +357,19 @@ func (config *V2RegistriesConf) postProcessRegistries() error {
 			if err != nil {
 				return err
 			}
+
+			//FIXME: unqualifiedSearchRegistries now also accepts empty values
+			//and shouldn't
+			// https://github.com/containers/image/pull/1191#discussion_r610623216
+			if mir.Location == "" {
+				return &InvalidRegistries{s: "invalid condition: mirror location is unset"}
+			}
 		}
-		regMap[reg.Location] = append(regMap[reg.Location], reg)
+		if reg.Location == "" {
+			regMap[reg.Prefix] = append(regMap[reg.Prefix], reg)
+		} else {
+			regMap[reg.Location] = append(regMap[reg.Location], reg)
+		}
 	}
 
 	// Given a registry can be mentioned multiple times (e.g., to have
@@ -331,7 +379,13 @@ func (config *V2RegistriesConf) postProcessRegistries() error {
 	// Note: we need to iterate over the registries array to ensure a
 	// deterministic behavior which is not guaranteed by maps.
 	for _, reg := range config.Registries {
-		others, ok := regMap[reg.Location]
+		var others []*Registry
+		var ok bool
+		if reg.Location == "" {
+			others, ok = regMap[reg.Prefix]
+		} else {
+			others, ok = regMap[reg.Location]
+		}
 		if !ok {
 			return fmt.Errorf("Internal error in V2RegistriesConf.PostProcess: entry in regMap is missing")
 		}
@@ -623,6 +677,8 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedC
 	return config, nil
 }
 
+// GetRegistries has been deprecated. Use FindRegistry instead.
+//
 // GetRegistries loads and returns the registries specified in the config.
 // Note the parsed content of registry config files is cached.  For reloading,
 // use `InvalidateCache` and re-call `GetRegistries`.
@@ -689,27 +745,63 @@ func CredentialHelpers(sys *types.SystemContext) ([]string, error) {
 	return config.partialV2.CredentialHelpers, nil
 }
 
-// refMatchesPrefix returns true iff ref,
+// refMatchingSubdomainPrefix returns the length of ref
+// iff ref, which is a registry, repository namespace, repository or image reference (as formatted by
+// reference.Domain(), reference.Named.Name() or reference.Reference.String()
+// — note that this requires the name to start with an explicit hostname!),
+// matches a Registry.Prefix value containing wildcarded subdomains in the
+// format: *.example.com. Wildcards are only accepted at the beginning, so
+// other formats like example.*.com will not work. Wildcarded prefixes also
+// cannot contain port numbers or namespaces in them.
+func refMatchingSubdomainPrefix(ref, prefix string) int {
+	index := strings.Index(ref, prefix[1:])
+	if index == -1 {
+		return -1
+	}
+	if strings.Contains(ref[:index], "/") {
+		return -1
+	}
+	index += len(prefix[1:])
+	if index == len(ref) {
+		return index
+	}
+	switch ref[index] {
+	case ':', '/', '@':
+		return index
+	default:
+		return -1
+	}
+}
+
+// refMatchingPrefix returns the length of the prefix iff ref,
 // which is a registry, repository namespace, repository or image reference (as formatted by
 // reference.Domain(), reference.Named.Name() or reference.Reference.String()
 // — note that this requires the name to start with an explicit hostname!),
 // matches a Registry.Prefix value.
 // (This is split from the caller primarily to make testing easier.)
-func refMatchesPrefix(ref, prefix string) bool {
+func refMatchingPrefix(ref, prefix string) int {
 	switch {
+	case prefix[0:2] == "*.":
+		return refMatchingSubdomainPrefix(ref, prefix)
 	case len(ref) < len(prefix):
-		return false
+		return -1
 	case len(ref) == len(prefix):
-		return ref == prefix
+		if ref == prefix {
+			return len(prefix)
+		}
+		return -1
 	case len(ref) > len(prefix):
 		if !strings.HasPrefix(ref, prefix) {
-			return false
+			return -1
 		}
 		c := ref[len(prefix)]
 		// This allows "example.com:5000" to match "example.com",
 		// which is unintended; that will get fixed eventually, DON'T RELY
 		// ON THE CURRENT BEHAVIOR.
-		return c == ':' || c == '/' || c == '@'
+		if c == ':' || c == '/' || c == '@' {
+			return len(prefix)
+		}
+		return -1
 	default:
 		panic("Internal error: impossible comparison outcome")
 	}
@@ -735,7 +827,7 @@ func findRegistryWithParsedConfig(config *parsedConfig, ref string) (*Registry, 
 	reg := Registry{}
 	prefixLen := 0
 	for _, r := range config.partialV2.Registries {
-		if refMatchesPrefix(ref, r.Prefix) {
+		if refMatchingPrefix(ref, r.Prefix) != -1 {
 			length := len(r.Prefix)
 			if length > prefixLen {
 				reg = r
@@ -802,6 +894,17 @@ func loadConfigFile(path string, forceV2 bool) (*parsedConfig, error) {
 		res.shortNameMode = mode
 	} else {
 		res.shortNameMode = types.ShortNameModeInvalid
+	}
+
+	// Valid wildcarded prefixes must be in the format: *.example.com
+	// FIXME: Move to postProcessRegistries
+	// https://github.com/containers/image/pull/1191#discussion_r610623829
+	for i := range res.partialV2.Registries {
+		prefix := res.partialV2.Registries[i].Prefix
+		if prefix[:2] == "*." && strings.ContainsAny(prefix, "/@:") {
+			msg := fmt.Sprintf("Wildcarded prefix should be in the format: *.example.com. Current prefix %q is incorrectly formatted", prefix)
+			return nil, &InvalidRegistries{s: msg}
+		}
 	}
 
 	// Parse and validate short-name aliases.
