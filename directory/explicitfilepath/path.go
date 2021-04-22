@@ -1,17 +1,29 @@
 package explicitfilepath
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 )
 
 // ResolvePathToFullyExplicit returns the input path converted to an absolute, no-symlinks, cleaned up path.
 // To do so, all elements of the input path must exist; as a special case, the final component may be
-// a non-existent name (but not a symlink pointing to a non-existent name)
+// a non-existent name (but not a symlink pointing to a non-existent name, unless it's a /proc/self/fd "magic link").
 // This is intended as a a helper for implementations of types.ImageReference.PolicyConfigurationIdentity etc.
 func ResolvePathToFullyExplicit(path string) (string, error) {
+	// This function gets passed the URL // in addition to a potentially absolute
+	// path, i.e. we trim oci-archive:///path/to/foo.tar to ///path/to/foo.tar,
+	// relying on the kernel to trim the useless // but let's normalize it now.
+	if strings.HasPrefix(path, "///") {
+		path = path[2:]
+	}
+	// We don't resolve magic links, as they could be a pipe or something else.
+	if strings.HasPrefix(path, "/proc/") {
+		return path, nil
+	}
 	switch _, err := os.Lstat(path); {
 	case err == nil:
 		return resolveExistingPathToFullyExplicit(path)
