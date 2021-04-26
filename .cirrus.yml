@@ -16,11 +16,18 @@ env:
     GOBIN: "${GOPATH}/bin"
     GOCACHE: "${GOPATH}/cache"
     GOSRC: &gosrc "/var/tmp/go/src/github.com/containers/image"
+    # Required for consistency with containers/skopeo CI
+    SKOPEO_PATH: "${GOPATH}/src/github.com/containers/skopeo"
     CIRRUS_WORKING_DIR: *gosrc
     # The default is 'sh' if unspecified
     CIRRUS_SHELL: "/usr/bin/bash"
     # Save a little typing (path relative to $CIRRUS_WORKING_DIR)
     SCRIPT_BASE: "./contrib/cirrus"
+
+    # Normally set to an empty-string.
+    # Temporarily set this to a containers/skopeo PR number to
+    # test changes made there, in a PR in this repository.
+    SKOPEO_PR:
 
     ####
     #### Cache-image names to test with (double-quotes around names are critical)
@@ -84,7 +91,6 @@ cross_task:
 test_task:
     alias: test
     depends_on:
-        - cross
         - validate
     container: *std_container
     matrix:
@@ -99,11 +105,19 @@ test_task:
         make test BUILDTAGS="$BUILDTAGS"
 
 
+#####
+###### NOTE: This task is subtantially duplicated in the containers/skopeo
+###### repository's `.cirrus.yml`.  Changes needed here should first be
+###### merged in that repository, before being manually duplicated here.
+######
+###### The *ONLY* exception is in "setup_script" which must initially
+###### clone the skopeo repository.
+######
 test_skopeo_task:
     alias: test_skopeo
     depends_on:
-        - cross
         - validate
+        - cross
     gce_instance:
         image_project: libpod-218412
         zone: "us-central1-f"
@@ -120,53 +134,20 @@ test_skopeo_task:
         - name: "Skopeo w/ opengpg"
           env:
               BUILDTAGS: 'btrfs_noversion libdm_no_deferred_remove containers_image_openpgp'
-    env:
-        SKOPEO_PATH: "${GOPATH}/src/github.com/containers/skopeo"
-        # Normally set to an empty-string.
-        # Temporarily set this to a containers/skopeo PR number to test changes.
-        SKOPEO_PR:
-        # TODO: Remove test technical-debt requiring integration tests to run
-        #       inside a container and with --privileged.  This is hiding bugs!
-        PODMANMAKE: >-
-            podman run -it --rm --privileged
-                -e GOPATH=$GOPATH
-                -v $GOPATH:$GOPATH:Z
-                -w $SKOPEO_PATH
-                $SKOPEO_CI_CONTAINER_FQIN
-                    make
     setup_script: |
-        # This is required as part of the standard Fedora VM setup
-        growpart /dev/sda 1
-        resize2fs /dev/sda1
-
-        # VM's come with the distro. skopeo pre-installed
-        dnf erase -y skopeo
-
-        export "PATH=$PATH:$GOPATH/bin"
-        make tools
-        project_module=$(GO111MODULE="on" go list .)
-        rm -rf "${SKOPEO_PATH}"
-        git clone -b ${SKOPEO_CI_TAG} \
-            https://github.com/containers/skopeo.git ${SKOPEO_PATH}
-        cd "${SKOPEO_PATH}"
-        if [[ -n "$SKOPEO_PR" ]] && [[ $SKOPEO_PR -gt 1000 ]]; then
-            git fetch origin "+refs/pull/$SKOPEO_PR/head"
-            git checkout FETCH_HEAD
-        fi
-        GO111MODULE="on" go mod edit -replace ${project_module}=$GOSRC
-        echo "root:0:1" | tee -a /etc/subuid >> /etc/subgid
-    # Note: We _HAVE_ to spam BUILDTAGS in this way due to how Cirrus-CI
-    # mangles quoted strings when performing in-line 'env' substitution.
-    main_script: |
-        cd "${SKOPEO_PATH}"
-        set -x
-        $PODMANMAKE vendor BUILDTAGS="$BUILDTAGS"
-        $PODMANMAKE bin/skopeo BUILDTAGS="$BUILDTAGS"
-        $PODMANMAKE validate-local BUILDTAGS="$BUILDTAGS"
-        $PODMANMAKE test-unit-local BUILDTAGS="$BUILDTAGS"
-        $PODMANMAKE test-integration-local BUILDTAGS="$BUILDTAGS"
-        # Do not run inside podman, uses containers internally.
-        make test-system-local BUILDTAGS="$BUILDTAGS"
+        "${GOSRC}/${SCRIPT_BASE}/runner.sh" setup
+    vendor_script: >-
+        "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" vendor
+    build_script: >-
+        "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" build
+    validate_script: >-
+        "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" validate
+    unit_script: >-
+        "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" unit
+    integration_script: >-
+        "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" integration
+    system_script: >-
+        "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" system
 
 
 # This task is critical.  It updates the "last-used by" timestamp stored
