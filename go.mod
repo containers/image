@@ -7,7 +7,7 @@ require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
 	github.com/containers/ocicrypt v1.1.0
-	github.com/containers/storage v1.30.1
+	github.com/containers/storage v1.30.2
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v1.4.2-0.20191219165747-a9416c67da9f
 	github.com/docker/docker-credential-helpers v0.6.3
@@ -27,7 +27,6 @@ require (
 	github.com/opencontainers/selinux v1.8.0
 	github.com/ostreedev/ostree-go v0.0.0-20190702140239-759a8c1ac913
 	github.com/pkg/errors v0.9.1
-	github.com/pquerna/ffjson v0.0.0-20190813045741-dac163c6c0a9 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	github.com/ulikunitz/xz v0.5.10
