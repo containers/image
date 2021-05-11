@@ -66,7 +66,7 @@ All PRs require at least two LGTMs (Looks Good To Me) from maintainers.
 The sign-off is a line at the end of the explanation for the patch. Your
 signature certifies that you wrote the patch or otherwise have the right to pass
 it on as an open-source patch. The rules are simple: if you can certify
-the below (from [developercertificate.org](http://developercertificate.org/)):
+the below (from [developercertificate.org](https://developercertificate.org/)):
 
 ```
 Developer Certificate of Origin
