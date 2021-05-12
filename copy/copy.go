@@ -31,8 +31,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/vbauerster/mpb/v6"
 	"github.com/vbauerster/mpb/v6/decor"
-	"golang.org/x/crypto/ssh/terminal"
 	"golang.org/x/sync/semaphore"
+	"golang.org/x/term"
 )
 
 type digestingReader struct {
@@ -864,7 +864,7 @@ func (ic *imageCopier) noPendingManifestUpdates() bool {
 // isTTY returns true if the io.Writer is a file and a tty.
 func isTTY(w io.Writer) bool {
 	if f, ok := w.(*os.File); ok {
-		return terminal.IsTerminal(int(f.Fd()))
+		return term.IsTerminal(int(f.Fd()))
 	}
 	return false
 }
