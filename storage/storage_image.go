@@ -1034,25 +1034,6 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 			return errors.Wrapf(err, "error saving big data %q for image %q", blob.String(), img.ID)
 		}
 	}
-	// Set the reference's name on the image.  We don't need to worry about avoiding duplicate
-	// values because SetNames() will deduplicate the list that we pass to it.
-	if name := s.imageRef.DockerReference(); len(oldNames) > 0 || name != nil {
-		names := []string{}
-		if name != nil {
-			names = append(names, name.String())
-		}
-		if len(oldNames) > 0 {
-			names = append(names, oldNames...)
-		}
-		if err := s.imageRef.transport.store.SetNames(img.ID, names); err != nil {
-			if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
-				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
-			}
-			logrus.Debugf("error setting names %v on image %q: %v", names, img.ID, err)
-			return errors.Wrapf(err, "error setting names %v on image %q", names, img.ID)
-		}
-		logrus.Debugf("set names of image %q to %v", img.ID, names)
-	}
 	// Save the unparsedToplevel's manifest.
 	if len(toplevelManifest) != 0 {
 		manifestDigest, err := manifest.Digest(toplevelManifest)
@@ -1129,6 +1110,25 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 			return errors.Wrapf(err, "error saving metadata for image %q", img.ID)
 		}
 		logrus.Debugf("saved image metadata %q", string(metadata))
+	}
+	// Set the reference's name on the image.  We don't need to worry about avoiding duplicate
+	// values because SetNames() will deduplicate the list that we pass to it.
+	if name := s.imageRef.DockerReference(); len(oldNames) > 0 || name != nil {
+		names := []string{}
+		if name != nil {
+			names = append(names, name.String())
+		}
+		if len(oldNames) > 0 {
+			names = append(names, oldNames...)
+		}
+		if err := s.imageRef.transport.store.SetNames(img.ID, names); err != nil {
+			if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
+				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
+			}
+			logrus.Debugf("error setting names %v on image %q: %v", names, img.ID, err)
+			return errors.Wrapf(err, "error setting names %v on image %q", names, img.ID)
+		}
+		logrus.Debugf("set names of image %q to %v", img.ID, names)
 	}
 	return nil
 }
