@@ -200,8 +200,8 @@ github.com/containers/ocicrypt v1.0.1/go.mod h1:MeJDzk1RJHv89LjsH0Sp5KTY3ZYkjXO/
 github.com/containers/ocicrypt v1.1.0/go.mod h1:b8AOe0YR67uU8OqfVNcznfFpAzu3rdgUV4GP9qXPfu4=
 github.com/containers/ocicrypt v1.1.1 h1:prL8l9w3ntVqXvNH1CiNn5ENjcCnr38JqpSyvKKB4GI=
 github.com/containers/ocicrypt v1.1.1/go.mod h1:Dm55fwWm1YZAjYRaJ94z2mfZikIyIN4B0oB3dj3jFxY=
-github.com/containers/storage v1.31.2 h1:wWi7OsNtHUydGdK0EpQiK94MfQNj5qK2GtxNLoj4tU4=
-github.com/containers/storage v1.31.2/go.mod h1:J3q772EVbN9vgqoN/dkvInKnp4xK9ZXm7wHNfuiIDgE=
+github.com/containers/storage v1.32.0 h1:l2O+EybfGVkisqDkRysKG1VAO6jPPIYOV5Q4/sau86c=
+github.com/containers/storage v1.32.0/go.mod h1:J3q772EVbN9vgqoN/dkvInKnp4xK9ZXm7wHNfuiIDgE=
 github.com/coreos/bbolt v1.3.2/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=
 github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
 github.com/coreos/go-iptables v0.4.5/go.mod h1:/mVI274lEDI2ns62jHCDnCyBF9Iwsmekav8Dbxlm1MU=
