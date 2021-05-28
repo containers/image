@@ -7,7 +7,7 @@ require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
 	github.com/containers/ocicrypt v1.1.1
-	github.com/containers/storage v1.31.2
+	github.com/containers/storage v1.32.1
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v1.4.2-0.20191219165747-a9416c67da9f
 	github.com/docker/docker-credential-helpers v0.6.3
@@ -17,7 +17,7 @@ require (
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/imdario/mergo v0.3.12
-	github.com/klauspost/compress v1.12.2
+	github.com/klauspost/compress v1.12.3
 	github.com/klauspost/pgzip v1.2.5
 	github.com/manifoldco/promptui v0.8.0
 	github.com/morikuni/aec v1.0.0 // indirect
