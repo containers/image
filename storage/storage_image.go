@@ -449,7 +449,7 @@ func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream
 		return info, nil
 	}
 
-	return info, s.queueOrCommit(ctx, info, *options.LayerIndex)
+	return info, s.queueOrCommit(ctx, info, *options.LayerIndex, options.EmptyLayer)
 }
 
 // HasThreadSafePutBlob indicates whether PutBlob can be executed concurrently.
@@ -542,7 +542,7 @@ func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context,
 		return reused, info, err
 	}
 
-	return reused, info, s.queueOrCommit(ctx, info, *options.LayerIndex)
+	return reused, info, s.queueOrCommit(ctx, info, *options.LayerIndex, options.EmptyLayer)
 }
 
 // tryReusingBlobWithSrcRef is a wrapper around TryReusingBlob.
@@ -731,7 +731,7 @@ func (s *storageImageDestination) getConfigBlob(info types.BlobInfo) ([]byte, er
 // queueOrCommit queues in the specified blob to be committed to the storage.
 // If no other goroutine is already committing layers, the layer and all
 // subsequent layers (if already queued) will be committed to the storage.
-func (s *storageImageDestination) queueOrCommit(ctx context.Context, blob types.BlobInfo, index int) error {
+func (s *storageImageDestination) queueOrCommit(ctx context.Context, blob types.BlobInfo, index int, emptyLayer bool) error {
 	// NOTE: whenever the code below is touched, make sure that all code
 	// paths unlock the lock and to unlock it exactly once.
 	//
@@ -764,7 +764,7 @@ func (s *storageImageDestination) queueOrCommit(ctx context.Context, blob types.
 		s.lock.Unlock()
 		layerInfo := manifest.LayerInfo{
 			BlobInfo:   *info,
-			EmptyLayer: info.Digest == image.GzippedEmptyLayerDigest,
+			EmptyLayer: emptyLayer,
 		}
 		// Note: commitLayer locks on-demand.
 		if err := s.commitLayer(ctx, layerInfo, index); err != nil {
