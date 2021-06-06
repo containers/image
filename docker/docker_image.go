@@ -13,6 +13,7 @@ import (
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
 
@@ -131,7 +132,13 @@ func GetDigest(ctx context.Context, sys *types.SystemContext, ref types.ImageRef
 
 	path := fmt.Sprintf(manifestPath, reference.Path(dr.ref), tagOrDigest)
 	headers := map[string][]string{
-		"Accept": manifest.DefaultRequestedManifestMIMETypes,
+		"Accept": {
+			imgspecv1.MediaTypeImageManifest,
+			manifest.DockerV2Schema2MediaType,
+			manifest.DockerV2Schema1SignedMediaType,
+			manifest.DockerV2Schema1MediaType,
+			imgspecv1.MediaTypeImageIndex,
+		},
 	}
 
 	res, err := client.makeRequest(ctx, "HEAD", path, headers, nil, v2Auth, nil)
