@@ -29,8 +29,8 @@ import (
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/vbauerster/mpb/v6"
-	"github.com/vbauerster/mpb/v6/decor"
+	"github.com/vbauerster/mpb/v7"
+	"github.com/vbauerster/mpb/v7/decor"
 	"golang.org/x/sync/semaphore"
 	"golang.org/x/term"
 )
@@ -1102,8 +1102,9 @@ func (c *copier) createProgressBar(pool *mpb.Progress, info types.BlobInfo, kind
 			),
 		)
 	} else {
+		sstyle := mpb.SpinnerStyle(".", "..", "...", "....", "").PositionLeft()
 		bar = pool.Add(0,
-			mpb.NewSpinnerFiller([]string{".", "..", "...", "....", ""}, mpb.SpinnerOnLeft),
+			sstyle.Build(),
 			mpb.BarFillerClearOnComplete(),
 			mpb.PrependDecorators(
 				decor.OnComplete(decor.Name(prefix), onComplete),
