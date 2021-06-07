@@ -51,11 +51,13 @@ var (
 	ErrNotSupported = errors.New("not supported")
 )
 
-// SetAuthentication stores the username and password in the credential helper or file
-func SetAuthentication(sys *types.SystemContext, registry, username, password string) error {
+// SetCredentials stores the username and password in the credential helper or file
+// and returns path to file or helper name in format (helper:%s)
+func SetCredentials(sys *types.SystemContext, registry, username, password string) (string, error) {
+	path := ""
 	helpers, err := sysregistriesv2.CredentialHelpers(sys)
 	if err != nil {
-		return err
+		return path, err
 	}
 
 	// Make sure to collect all errors.
@@ -65,7 +67,7 @@ func SetAuthentication(sys *types.SystemContext, registry, username, password st
 		switch helper {
 		// Special-case the built-in helpers for auth files.
 		case sysregistriesv2.AuthenticationFileHelper:
-			err = modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
+			path, err = modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
 				if ch, exists := auths.CredHelpers[registry]; exists {
 					return false, setAuthToCredHelper(ch, registry, username, password)
 				}
@@ -76,7 +78,8 @@ func SetAuthentication(sys *types.SystemContext, registry, username, password st
 			})
 		// External helpers.
 		default:
-			err = setAuthToCredHelper(helper, registry, username, password)
+			path = fmt.Sprintf("credential helper: %s", helper)
+			err  = setAuthToCredHelper(helper, registry, username, password)
 		}
 		if err != nil {
 			multiErr = multierror.Append(multiErr, err)
@@ -84,9 +87,16 @@ func SetAuthentication(sys *types.SystemContext, registry, username, password st
 			continue
 		}
 		logrus.Debugf("Stored credentials for %s in credential helper %s", registry, helper)
-		return nil
+		return path, nil
 	}
-	return multiErr
+	return "", multiErr
+}
+
+
+// SetAuthentication stores the username and password in the credential helper or file
+func SetAuthentication(sys *types.SystemContext, registry, username, password string) error {
+	_, err := SetCredentials(sys, registry, username, password)
+	return err
 }
 
 // GetAllCredentials returns the registry credentials for all registries stored
@@ -322,7 +332,7 @@ func RemoveAuthentication(sys *types.SystemContext, registry string) error {
 		switch helper {
 		// Special-case the built-in helper for auth files.
 		case sysregistriesv2.AuthenticationFileHelper:
-			err = modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
+			_, err = modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
 				if innerHelper, exists := auths.CredHelpers[registry]; exists {
 					removeFromCredHelper(innerHelper)
 				}
@@ -368,7 +378,7 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 		switch helper {
 		// Special-case the built-in helper for auth files.
 		case sysregistriesv2.AuthenticationFileHelper:
-			err = modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
+			_, err = modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
 				for registry, helper := range auths.CredHelpers {
 					// Helpers in auth files are expected
 					// to exist, so no special treatment
@@ -494,41 +504,41 @@ func readJSONFile(path string, legacyFormat bool) (dockerConfigFile, error) {
 }
 
 // modifyJSON writes to auth.json if the dockerConfigFile has been updated
-func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (bool, error)) error {
+func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (bool, error)) (string, error) {
 	path, legacyFormat, err := getPathToAuth(sys)
 	if err != nil {
-		return err
+		return path, err
 	}
 	if legacyFormat {
-		return fmt.Errorf("writes to %s using legacy format are not supported", path)
+		return path, fmt.Errorf("writes to %s using legacy format are not supported", path)
 	}
 
 	dir := filepath.Dir(path)
 	if err = os.MkdirAll(dir, 0700); err != nil {
-		return err
+		return path, err
 	}
 
 	auths, err := readJSONFile(path, false)
 	if err != nil {
-		return errors.Wrapf(err, "error reading JSON file %q", path)
+		return path, errors.Wrapf(err, "error reading JSON file %q", path)
 	}
 
 	updated, err := editor(&auths)
 	if err != nil {
-		return errors.Wrapf(err, "error updating %q", path)
+		return path, errors.Wrapf(err, "error updating %q", path)
 	}
 	if updated {
 		newData, err := json.MarshalIndent(auths, "", "\t")
 		if err != nil {
-			return errors.Wrapf(err, "error marshaling JSON %q", path)
+			return path, errors.Wrapf(err, "error marshaling JSON %q", path)
 		}
 
 		if err = ioutil.WriteFile(path, newData, 0600); err != nil {
-			return errors.Wrapf(err, "error writing to file %q", path)
+			return path, errors.Wrapf(err, "error writing to file %q", path)
 		}
 	}
 
-	return nil
+	return path, nil
 }
 
 func getAuthFromCredHelper(credHelper, registry string) (types.DockerAuthConfig, error) {
