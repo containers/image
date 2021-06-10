@@ -6,7 +6,7 @@ env:
     #### Global variables used for all tasks
     ####
     # Name of the ultimate destination branch for this CI run
-    DEST_BRANCH: "master"
+    DEST_BRANCH: "main"
     # CI container image tag (c/skopeo branch name)
     SKOPEO_CI_TAG: "master"
     # Use GO module mirror (reason unknown, travis did it this way)
@@ -72,7 +72,7 @@ validate_task:
     script: |
         git remote update
         make tools
-        ${GOBIN}/git-validation -q -run DCO,short-subject,dangling-whitespace -range $(git merge-base ${DEST_BRANCH:-master} HEAD)..${CIRRUS_CHANGE_IN_REPO}
+        ${GOBIN}/git-validation -q -run DCO,short-subject,dangling-whitespace -range $(git merge-base ${DEST_BRANCH:-main} HEAD)..${CIRRUS_CHANGE_IN_REPO}
         make validate
 
 
