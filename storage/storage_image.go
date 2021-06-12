@@ -927,6 +927,13 @@ func (s *storageImageDestination) commitLayer(ctx context.Context, blob manifest
 	return nil
 }
 
+// Commit marks the process of storing the image as successful and asks for the image to be persisted.
+// unparsedToplevel contains data about the top-level manifest of the source (which may be a single-arch image or a manifest list
+// if PutManifest was only called for the single-arch image with instanceDigest == nil), primarily to allow lookups by the
+// original manifest list digest, if desired.
+// WARNING: This does not have any transactional semantics:
+// - Uploaded data MAY be visible to others before Commit() is called
+// - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {
 	if len(s.manifest) == 0 {
 		return errors.New("Internal error: storageImageDestination.Commit() called without PutManifest()")

@@ -60,7 +60,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	_, err = dest.PutBlob(context.Background(), reader, types.BlobInfo{Digest: blobDigest, Size: -1}, cache, false)
 	assert.Error(t, err)
 	assert.Contains(t, digestErrorString, err.Error())
-	err = dest.Commit(context.Background(), nil)
+	err = dest.Commit(context.Background(), nil) // nil unparsedToplevel is invalid, we don’t currently use the value
 	assert.NoError(t, err)
 
 	_, err = os.Lstat(blobPath)
@@ -144,7 +144,7 @@ func putTestConfig(t *testing.T, ociRef ociReference, tmpDir string) {
 	_, err = imageDest.PutBlob(context.Background(), bytes.NewReader(data), types.BlobInfo{Size: int64(len(data)), Digest: digest.FromBytes(data)}, cache, true)
 	assert.NoError(t, err)
 
-	err = imageDest.Commit(context.Background(), nil)
+	err = imageDest.Commit(context.Background(), nil) // nil unparsedToplevel is invalid, we don’t currently use the value
 	assert.NoError(t, err)
 
 	paths := []string{}
@@ -167,7 +167,7 @@ func putTestManifest(t *testing.T, ociRef ociReference, tmpDir string) {
 	err = imageDest.PutManifest(context.Background(), data, nil)
 	assert.NoError(t, err)
 
-	err = imageDest.Commit(context.Background(), nil)
+	err = imageDest.Commit(context.Background(), nil) // nil unparsedToplevel is invalid, we don’t currently use the value
 	assert.NoError(t, err)
 
 	paths := []string{}

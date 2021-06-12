@@ -160,7 +160,7 @@ func TestReferenceNewImage(t *testing.T) {
 	require.NoError(t, err)
 	err = dest.PutManifest(context.Background(), mFixture, nil)
 	assert.NoError(t, err)
-	err = dest.Commit(context.Background(), nil)
+	err = dest.Commit(context.Background(), nil) // nil unparsedToplevel is invalid, we don’t currently use the value
 	assert.NoError(t, err)
 
 	img, err := ref.NewImage(context.Background(), nil)
@@ -177,7 +177,7 @@ func TestReferenceNewImageNoValidManifest(t *testing.T) {
 	defer dest.Close()
 	err = dest.PutManifest(context.Background(), []byte(`{"schemaVersion":1}`), nil)
 	assert.NoError(t, err)
-	err = dest.Commit(context.Background(), nil)
+	err = dest.Commit(context.Background(), nil) // nil unparsedToplevel is invalid, we don’t currently use the value
 	assert.NoError(t, err)
 
 	_, err = ref.NewImage(context.Background(), nil)
