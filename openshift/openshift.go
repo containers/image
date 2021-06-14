@@ -435,14 +435,14 @@ func (d *openshiftImageDestination) PutManifest(ctx context.Context, m []byte, i
 }
 
 func (d *openshiftImageDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
-	var imageStreamName string
+	var imageStreamImageName string
 	if instanceDigest == nil {
 		if d.imageStreamImageName == "" {
 			return errors.Errorf("Internal error: Unknown manifest digest, can't add signatures")
 		}
-		imageStreamName = d.imageStreamImageName
+		imageStreamImageName = d.imageStreamImageName
 	} else {
-		imageStreamName = instanceDigest.String()
+		imageStreamImageName = instanceDigest.String()
 	}
 
 	// Because image signatures are a shared resource in Atomic Registry, the default upload
@@ -452,7 +452,7 @@ func (d *openshiftImageDestination) PutSignatures(ctx context.Context, signature
 		return nil // No need to even read the old state.
 	}
 
-	image, err := d.client.getImage(ctx, imageStreamName)
+	image, err := d.client.getImage(ctx, imageStreamImageName)
 	if err != nil {
 		return err
 	}
@@ -477,7 +477,7 @@ sigExists:
 			if err != nil || n != 16 {
 				return errors.Wrapf(err, "Error generating random signature len %d", n)
 			}
-			signatureName = fmt.Sprintf("%s@%032x", imageStreamName, randBytes)
+			signatureName = fmt.Sprintf("%s@%032x", imageStreamImageName, randBytes)
 			if _, ok := existingSigNames[signatureName]; !ok {
 				break
 			}
