@@ -79,7 +79,7 @@ func SetCredentials(sys *types.SystemContext, registry, username, password strin
 		// External helpers.
 		default:
 			path = fmt.Sprintf("credential helper: %s", helper)
-			err  = setAuthToCredHelper(helper, registry, username, password)
+			err = setAuthToCredHelper(helper, registry, username, password)
 		}
 		if err != nil {
 			multiErr = multierror.Append(multiErr, err)
@@ -91,7 +91,6 @@ func SetCredentials(sys *types.SystemContext, registry, username, password strin
 	}
 	return "", multiErr
 }
-
 
 // SetAuthentication stores the username and password in the credential helper or file
 func SetAuthentication(sys *types.SystemContext, registry, username, password string) error {

@@ -108,7 +108,7 @@ func TestDefaultPolicy(t *testing.T) {
 
 	for _, path := range []string{
 		"/this/does/not/exist", // Error reading file
-		"/dev/null",          // A failure case; most are tested in the individual method unit tests.
+		"/dev/null",            // A failure case; most are tested in the individual method unit tests.
 	} {
 		policy, err := DefaultPolicy(&types.SystemContext{SignaturePolicyPath: path})
 		assert.Error(t, err)
