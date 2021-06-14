@@ -57,20 +57,20 @@ var (
 // NOTE: The return value is only intended to be read by humans; its form is not an API,
 // it may change (or new forms can be added) any time.
 func SetCredentials(sys *types.SystemContext, registry, username, password string) (string, error) {
-	path := ""
 	helpers, err := sysregistriesv2.CredentialHelpers(sys)
 	if err != nil {
-		return path, err
+		return "", err
 	}
 
 	// Make sure to collect all errors.
 	var multiErr error
 	for _, helper := range helpers {
+		var desc string
 		var err error
 		switch helper {
 		// Special-case the built-in helpers for auth files.
 		case sysregistriesv2.AuthenticationFileHelper:
-			path, err = modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
+			desc, err = modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
 				if ch, exists := auths.CredHelpers[registry]; exists {
 					return false, setAuthToCredHelper(ch, registry, username, password)
 				}
@@ -81,7 +81,7 @@ func SetCredentials(sys *types.SystemContext, registry, username, password strin
 			})
 		// External helpers.
 		default:
-			path = fmt.Sprintf("credential helper: %s", helper)
+			desc = fmt.Sprintf("credential helper: %s", helper)
 			err = setAuthToCredHelper(helper, registry, username, password)
 		}
 		if err != nil {
@@ -90,7 +90,7 @@ func SetCredentials(sys *types.SystemContext, registry, username, password strin
 			continue
 		}
 		logrus.Debugf("Stored credentials for %s in credential helper %s", registry, helper)
-		return path, nil
+		return desc, nil
 	}
 	return "", multiErr
 }
