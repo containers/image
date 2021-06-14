@@ -52,7 +52,10 @@ var (
 )
 
 // SetCredentials stores the username and password in the credential helper or file
-// and returns path to file or helper name in format (helper:%s)
+// and returns path to file or helper name in format (helper:%s).
+// Returns a human-redable description of the location that was updated.
+// NOTE: The return value is only intended to be read by humans; its form is not an API,
+// it may change (or new forms can be added) any time.
 func SetCredentials(sys *types.SystemContext, registry, username, password string) (string, error) {
 	path := ""
 	helpers, err := sysregistriesv2.CredentialHelpers(sys)
@@ -502,7 +505,9 @@ func readJSONFile(path string, legacyFormat bool) (dockerConfigFile, error) {
 	return auths, nil
 }
 
-// modifyJSON writes to auth.json if the dockerConfigFile has been updated
+// modifyJSON finds an auth.json file, calls editor on the contents, and
+// writes it back if editor returns true.
+// Returns a human-redable description of the file, to be returned by SetCredentials.
 func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (bool, error)) (string, error) {
 	path, legacyFormat, err := getPathToAuth(sys)
 	if err != nil {
