@@ -84,11 +84,10 @@ test:
 	@$(GPGME_ENV) GO111MODULE="on" go test $(BUILDFLAGS) -cover ./...
 
 fmt:
-	@go fmt -l -s -w $(SOURCE_DIRS)
+	@gofmt -l -s -w $(SOURCE_DIRS)
 
 validate: lint
-	@GO111MODULE="on" go vet ./...
-	@test -z "$$(go fmt -s -l . | grep -ve '^vendor' | tee /dev/stderr)"
+	@hack/validate.sh
 
 lint:
 	$(GOBIN)/golangci-lint run --build-tags "$(BUILDTAGS)"

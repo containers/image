@@ -38,7 +38,7 @@ env:
     PRIOR_UBUNTU_NAME: "ubuntu-2010"
 
     # Google-cloud VM Images
-    IMAGE_SUFFIX: "c6032583541653504"
+    IMAGE_SUFFIX: "c4635821094469632"
     FEDORA_CACHE_IMAGE_NAME: "fedora-${IMAGE_SUFFIX}"
     PRIOR_FEDORA_CACHE_IMAGE_NAME: "prior-fedora-${IMAGE_SUFFIX}"
     UBUNTU_CACHE_IMAGE_NAME: "ubuntu-${IMAGE_SUFFIX}"
@@ -72,7 +72,7 @@ validate_task:
     script: |
         git remote update
         make tools
-        ${GOBIN}/git-validation -q -run DCO,short-subject,dangling-whitespace -range $(git merge-base ${DEST_BRANCH:-main} HEAD)..${CIRRUS_CHANGE_IN_REPO}
+        ${GOBIN}/git-validation -q -run DCO,short-subject,dangling-whitespace -range $(git merge-base origin/${DEST_BRANCH} HEAD)..${CIRRUS_CHANGE_IN_REPO}
         make validate
 
 
