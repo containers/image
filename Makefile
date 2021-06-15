@@ -95,6 +95,6 @@ lint:
 # When this is running in CI, it will only check the CI commit range
 .gitvalidation:
 	@which $(GOBIN)/git-validation > /dev/null 2>/dev/null || (echo "ERROR: git-validation not found. Consider 'make clean && make tools'" && false)
-	git fetch -q "https://github.com/containers/image.git" "refs/heads/master"
+	git fetch -q "https://github.com/containers/image.git" "refs/heads/main"
 	upstream="$$(git rev-parse --verify FETCH_HEAD)" ; \
 		$(GOBIN)/git-validation -q -run DCO,short-subject,dangling-whitespace -range $$upstream..HEAD
