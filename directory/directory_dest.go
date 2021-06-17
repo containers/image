@@ -21,13 +21,14 @@ const version = "Directory Transport Version: 1.1\n"
 var ErrNotContainerImageDir = errors.New("not a containers image directory, don't want to overwrite important data")
 
 type dirImageDestination struct {
-	ref      dirReference
-	compress bool
+	ref        dirReference
+	compress   bool
+	decompress bool
 }
 
 // newImageDestination returns an ImageDestination for writing to a directory.
-func newImageDestination(ref dirReference, compress bool) (types.ImageDestination, error) {
-	d := &dirImageDestination{ref: ref, compress: compress}
+func newImageDestination(ref dirReference, compress bool, decompress bool) (types.ImageDestination, error) {
+	d := &dirImageDestination{ref: ref, compress: compress, decompress: decompress}
 
 	// If directory exists check if it is empty
 	// if not empty, check whether the contents match that of a container image directory and overwrite the contents
@@ -103,6 +104,9 @@ func (d *dirImageDestination) SupportsSignatures(ctx context.Context) error {
 func (d *dirImageDestination) DesiredLayerCompression() types.LayerCompression {
 	if d.compress {
 		return types.Compress
+	}
+	if d.decompress {
+		return types.Decompress
 	}
 	return types.PreserveOriginal
 }
