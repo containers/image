@@ -65,6 +65,11 @@ func defaultPolicyPath(sys *types.SystemContext) string {
 // defaultPolicyPathWithHomeDir is an internal implementation detail of defaultPolicyPath,
 // it exists only to allow testing it with an artificial home directory.
 func defaultPolicyPathWithHomeDir(sys *types.SystemContext, homeDir string) string {
+	if envSigPath, ok := os.LookupEnv("CONTAINERS_POLICY_JSON"); ok {
+		if _, err := os.Stat(envSigPath); err == nil {
+			return envSigPath
+		}
+	}
 	if sys != nil && sys.SignaturePolicyPath != "" {
 		return sys.SignaturePolicyPath
 	}
