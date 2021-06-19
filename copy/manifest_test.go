@@ -258,11 +258,11 @@ func TestDetermineManifestListConversion(t *testing.T) {
 		// Destination accepts the unmodified original
 		{"s2→s1s2OCI", manifest.DockerV2ListMediaType, supportS1S2OCI, "", []string{v1.MediaTypeImageIndex}},
 		{"OCI→s1s2OCI", v1.MediaTypeImageIndex, supportS1S2OCI, "", []string{manifest.DockerV2ListMediaType}},
-		{"s2→s1s2", manifest.DockerV2ListMediaType, supportS1S2, "", nil},
-		{"OCI→OCI", v1.MediaTypeImageIndex, supportOnlyOCI, "", nil},
+		{"s2→s1s2", manifest.DockerV2ListMediaType, supportS1S2, "", []string{}},
+		{"OCI→OCI", v1.MediaTypeImageIndex, supportOnlyOCI, "", []string{}},
 		// Conversion necessary, try the preferred formats in order.
 		{"special→OCI", "unrecognized", supportS1S2OCI, v1.MediaTypeImageIndex, []string{manifest.DockerV2ListMediaType}},
-		{"special→s2", "unrecognized", supportS1S2, manifest.DockerV2ListMediaType, nil},
+		{"special→s2", "unrecognized", supportS1S2, manifest.DockerV2ListMediaType, []string{}},
 	}
 
 	for _, c := range cases {
@@ -283,7 +283,7 @@ func TestDetermineManifestListConversion(t *testing.T) {
 		preferredMIMEType, otherCandidates, err := copier.determineListConversion(c.sourceType, c.destTypes, v1.MediaTypeImageIndex)
 		require.NoError(t, err, c.description)
 		assert.Equal(t, v1.MediaTypeImageIndex, preferredMIMEType, c.description)
-		assert.Equal(t, []string(nil), otherCandidates, c.description)
+		assert.Equal(t, []string{}, otherCandidates, c.description)
 	}
 
 	// The destination doesn’t support list formats at all
