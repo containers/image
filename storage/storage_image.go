@@ -963,9 +963,6 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		}
 	}
 	// Find the list of layer blobs.
-	if len(s.manifest) == 0 {
-		return errors.New("Internal error: storageImageDestination.Commit() called without PutManifest()")
-	}
 	man, err := manifest.FromBlob(s.manifest, manifest.GuessMIMEType(s.manifest))
 	if err != nil {
 		return errors.Wrapf(err, "error parsing manifest")
