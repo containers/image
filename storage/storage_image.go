@@ -1011,6 +1011,18 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	} else {
 		logrus.Debugf("created new image ID %q", img.ID)
 	}
+
+	// Clean up the unfinished image on any error.
+	// (Is this the right thing to do if the image has existed before?)
+	commitSucceeded := false
+	defer func() {
+		if !commitSucceeded {
+			if _, err := s.imageRef.transport.store.DeleteImage(img.ID, true); err != nil {
+				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err)
+			}
+		}
+	}()
+
 	// Add the non-layer blobs as data items.  Since we only share layers, they should all be in files, so
 	// we just need to screen out the ones that are actually layers to get the list of non-layers.
 	dataBlobs := make(map[digest.Digest]struct{})
@@ -1026,9 +1038,6 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 			return errors.Wrapf(err, "error copying non-layer blob %q to image", blob)
 		}
 		if err := s.imageRef.transport.store.SetImageBigData(img.ID, blob.String(), v, manifest.Digest); err != nil {
-			if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
-				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
-			}
 			logrus.Debugf("error saving big data %q for image %q: %v", blob.String(), img.ID, err)
 			return errors.Wrapf(err, "error saving big data %q for image %q", blob.String(), img.ID)
 		}
@@ -1041,9 +1050,6 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		}
 		key := manifestBigDataKey(manifestDigest)
 		if err := s.imageRef.transport.store.SetImageBigData(img.ID, key, toplevelManifest, manifest.Digest); err != nil {
-			if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
-				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
-			}
 			logrus.Debugf("error saving top-level manifest for image %q: %v", img.ID, err)
 			return errors.Wrapf(err, "error saving top-level manifest for image %q", img.ID)
 		}
@@ -1057,26 +1063,17 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	}
 	key := manifestBigDataKey(manifestDigest)
 	if err := s.imageRef.transport.store.SetImageBigData(img.ID, key, s.manifest, manifest.Digest); err != nil {
-		if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
-			logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
-		}
 		logrus.Debugf("error saving manifest for image %q: %v", img.ID, err)
 		return errors.Wrapf(err, "error saving manifest for image %q", img.ID)
 	}
 	key = storage.ImageDigestBigDataKey
 	if err := s.imageRef.transport.store.SetImageBigData(img.ID, key, s.manifest, manifest.Digest); err != nil {
-		if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
-			logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
-		}
 		logrus.Debugf("error saving manifest for image %q: %v", img.ID, err)
 		return errors.Wrapf(err, "error saving manifest for image %q", img.ID)
 	}
 	// Save the signatures, if we have any.
 	if len(s.signatures) > 0 {
 		if err := s.imageRef.transport.store.SetImageBigData(img.ID, "signatures", s.signatures, manifest.Digest); err != nil {
-			if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
-				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
-			}
 			logrus.Debugf("error saving signatures for image %q: %v", img.ID, err)
 			return errors.Wrapf(err, "error saving signatures for image %q", img.ID)
 		}
@@ -1084,9 +1081,6 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	for instanceDigest, signatures := range s.signatureses {
 		key := signatureBigDataKey(instanceDigest)
 		if err := s.imageRef.transport.store.SetImageBigData(img.ID, key, signatures, manifest.Digest); err != nil {
-			if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
-				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
-			}
 			logrus.Debugf("error saving signatures for image %q: %v", img.ID, err)
 			return errors.Wrapf(err, "error saving signatures for image %q", img.ID)
 		}
@@ -1094,17 +1088,11 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	// Save our metadata.
 	metadata, err := json.Marshal(s)
 	if err != nil {
-		if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
-			logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
-		}
 		logrus.Debugf("error encoding metadata for image %q: %v", img.ID, err)
 		return errors.Wrapf(err, "error encoding metadata for image %q", img.ID)
 	}
 	if len(metadata) != 0 {
 		if err = s.imageRef.transport.store.SetMetadata(img.ID, string(metadata)); err != nil {
-			if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
-				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
-			}
 			logrus.Debugf("error saving metadata for image %q: %v", img.ID, err)
 			return errors.Wrapf(err, "error saving metadata for image %q", img.ID)
 		}
@@ -1121,14 +1109,13 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 			names = append(names, oldNames...)
 		}
 		if err := s.imageRef.transport.store.SetNames(img.ID, names); err != nil {
-			if _, err2 := s.imageRef.transport.store.DeleteImage(img.ID, true); err2 != nil {
-				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err2)
-			}
 			logrus.Debugf("error setting names %v on image %q: %v", names, img.ID, err)
 			return errors.Wrapf(err, "error setting names %v on image %q", names, img.ID)
 		}
 		logrus.Debugf("set names of image %q to %v", img.ID, names)
 	}
+
+	commitSucceeded = true
 	return nil
 }
 
