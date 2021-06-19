@@ -1048,8 +1048,8 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 			return errors.Wrapf(err, "error saving big data %q for image %q", blob.String(), img.ID)
 		}
 	}
-	// Save the unparsedToplevel's manifest.
-	if len(toplevelManifest) != 0 {
+	// Save the unparsedToplevel's manifest if it differs from the per-platform one, which is saved below.
+	if len(toplevelManifest) != 0 && !bytes.Equal(toplevelManifest, s.manifest) {
 		manifestDigest, err := manifest.Digest(toplevelManifest)
 		if err != nil {
 			return errors.Wrapf(err, "error digesting top-level manifest")
