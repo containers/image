@@ -1183,10 +1183,10 @@ func (s *storageImageDestination) PutSignatures(ctx context.Context, signatures 
 	if instanceDigest == nil {
 		s.signatures = sigblob
 		s.SignatureSizes = sizes
-	}
-	if instanceDigest == nil && len(s.manifest) > 0 {
-		manifestDigest := s.manifestDigest
-		instanceDigest = &manifestDigest
+		if len(s.manifest) > 0 {
+			manifestDigest := s.manifestDigest
+			instanceDigest = &manifestDigest
+		}
 	}
 	if instanceDigest != nil {
 		s.signatureses[*instanceDigest] = sigblob
