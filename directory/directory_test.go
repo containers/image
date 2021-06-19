@@ -142,38 +142,33 @@ func TestGetPutSignatures(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)
 
-	dest, err := ref.NewImageDestination(context.Background(), nil)
-	require.NoError(t, err)
-	defer dest.Close()
 	man := []byte("test-manifest")
+	list := []byte("test-manifest-list")
+	md, err := manifest.Digest(man)
+	require.NoError(t, err)
 	signatures := [][]byte{
 		[]byte("sig1"),
 		[]byte("sig2"),
 	}
-	err = dest.SupportsSignatures(context.Background())
-	assert.NoError(t, err)
-	err = dest.PutManifest(context.Background(), man, nil)
-	require.NoError(t, err)
-
-	err = dest.PutSignatures(context.Background(), signatures, nil)
-	require.NoError(t, err)
 	listSignatures := [][]byte{
 		[]byte("sig3"),
 		[]byte("sig4"),
 	}
-	md, err := manifest.Digest(man)
-	require.NoError(t, err)
 
+	dest, err := ref.NewImageDestination(context.Background(), nil)
+	require.NoError(t, err)
+	defer dest.Close()
 	err = dest.SupportsSignatures(context.Background())
 	assert.NoError(t, err)
-	err = dest.PutManifest(context.Background(), man, nil)
-	require.NoError(t, err)
+
 	err = dest.PutManifest(context.Background(), man, &md)
 	require.NoError(t, err)
+	err = dest.PutManifest(context.Background(), list, nil)
+	require.NoError(t, err)
 
-	err = dest.PutSignatures(context.Background(), listSignatures, nil)
-	assert.NoError(t, err)
 	err = dest.PutSignatures(context.Background(), signatures, &md)
+	assert.NoError(t, err)
+	err = dest.PutSignatures(context.Background(), listSignatures, nil)
 	assert.NoError(t, err)
 	err = dest.Commit(context.Background(), nil) // nil unparsedToplevel is invalid, we don’t currently use the value
 	assert.NoError(t, err)
