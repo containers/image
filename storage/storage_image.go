@@ -1017,8 +1017,9 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	commitSucceeded := false
 	defer func() {
 		if !commitSucceeded {
+			logrus.Errorf("Updating image %q (old names %v) failed, deleting it", img.ID, oldNames)
 			if _, err := s.imageRef.transport.store.DeleteImage(img.ID, true); err != nil {
-				logrus.Debugf("error deleting incomplete image %q: %v", img.ID, err)
+				logrus.Errorf("Error deleting incomplete image %q: %v", img.ID, err)
 			}
 		}
 	}()
