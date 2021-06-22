@@ -149,6 +149,7 @@ func TestNormalizedMIMEType(t *testing.T) {
 		DockerV2Schema2MediaType,
 		DockerV2ListMediaType,
 		imgspecv1.MediaTypeImageManifest,
+		imgspecv1.MediaTypeImageIndex,
 	} {
 		res := NormalizedMIMEType(c)
 		assert.Equal(t, c, res, c)

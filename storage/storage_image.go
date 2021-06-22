@@ -59,6 +59,7 @@ type storageImageDestination struct {
 	directory       string                   // Temporary directory where we store blobs until Commit() time
 	nextTempFileID  int32                    // A counter that we use for computing filenames to assign to blobs
 	manifest        []byte                   // Manifest contents, temporary
+	manifestDigest  digest.Digest            // Valid if len(manifest) != 0
 	signatures      []byte                   // Signature contents, temporary
 	signatureses    map[digest.Digest][]byte // Instance signature contents, temporary
 	SignatureSizes  []int                    `json:"signature-sizes,omitempty"`  // List of sizes of each signature slice
@@ -927,6 +928,13 @@ func (s *storageImageDestination) commitLayer(ctx context.Context, blob manifest
 	return nil
 }
 
+// Commit marks the process of storing the image as successful and asks for the image to be persisted.
+// unparsedToplevel contains data about the top-level manifest of the source (which may be a single-arch image or a manifest list
+// if PutManifest was only called for the single-arch image with instanceDigest == nil), primarily to allow lookups by the
+// original manifest list digest, if desired.
+// WARNING: This does not have any transactional semantics:
+// - Uploaded data MAY be visible to others before Commit() is called
+// - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {
 	if len(s.manifest) == 0 {
 		return errors.New("Internal error: storageImageDestination.Commit() called without PutManifest()")
@@ -956,9 +964,6 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		}
 	}
 	// Find the list of layer blobs.
-	if len(s.manifest) == 0 {
-		return errors.New("Internal error: storageImageDestination.Commit() called without PutManifest()")
-	}
 	man, err := manifest.FromBlob(s.manifest, manifest.GuessMIMEType(s.manifest))
 	if err != nil {
 		return errors.Wrapf(err, "error parsing manifest")
@@ -1043,8 +1048,8 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 			return errors.Wrapf(err, "error saving big data %q for image %q", blob.String(), img.ID)
 		}
 	}
-	// Save the unparsedToplevel's manifest.
-	if len(toplevelManifest) != 0 {
+	// Save the unparsedToplevel's manifest if it differs from the per-platform one, which is saved below.
+	if len(toplevelManifest) != 0 && !bytes.Equal(toplevelManifest, s.manifest) {
 		manifestDigest, err := manifest.Digest(toplevelManifest)
 		if err != nil {
 			return errors.Wrapf(err, "error digesting top-level manifest")
@@ -1058,11 +1063,7 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	// Save the image's manifest.  Allow looking it up by digest by using the key convention defined by the Store.
 	// Record the manifest twice: using a digest-specific key to allow references to that specific digest instance,
 	// and using storage.ImageDigestBigDataKey for future users that don’t specify any digest and for compatibility with older readers.
-	manifestDigest, err := manifest.Digest(s.manifest)
-	if err != nil {
-		return errors.Wrapf(err, "error computing manifest digest")
-	}
-	key := manifestBigDataKey(manifestDigest)
+	key := manifestBigDataKey(s.manifestDigest)
 	if err := s.imageRef.transport.store.SetImageBigData(img.ID, key, s.manifest, manifest.Digest); err != nil {
 		logrus.Debugf("error saving manifest for image %q: %v", img.ID, err)
 		return errors.Wrapf(err, "error saving manifest for image %q", img.ID)
@@ -1133,9 +1134,14 @@ func (s *storageImageDestination) SupportedManifestMIMETypes() []string {
 
 // PutManifest writes the manifest to the destination.
 func (s *storageImageDestination) PutManifest(ctx context.Context, manifestBlob []byte, instanceDigest *digest.Digest) error {
+	digest, err := manifest.Digest(manifestBlob)
+	if err != nil {
+		return err
+	}
 	newBlob := make([]byte, len(manifestBlob))
 	copy(newBlob, manifestBlob)
 	s.manifest = newBlob
+	s.manifestDigest = digest
 	return nil
 }
 
@@ -1177,13 +1183,10 @@ func (s *storageImageDestination) PutSignatures(ctx context.Context, signatures 
 	if instanceDigest == nil {
 		s.signatures = sigblob
 		s.SignatureSizes = sizes
-	}
-	if instanceDigest == nil && len(s.manifest) > 0 {
-		manifestDigest, err := manifest.Digest(s.manifest)
-		if err != nil {
-			return err
+		if len(s.manifest) > 0 {
+			manifestDigest := s.manifestDigest
+			instanceDigest = &manifestDigest
 		}
-		instanceDigest = &manifestDigest
 	}
 	if instanceDigest != nil {
 		s.signatureses[*instanceDigest] = sigblob
