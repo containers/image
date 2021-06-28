@@ -1,0 +1,6 @@
+{
+  "auths": {
+    "example.org/repo": { "auth": "ZXhhbXBsZTpvcmc=" },
+    "example.org": { "auth": "bG9jYWw6aG9zdA==" }
+  }
+}
