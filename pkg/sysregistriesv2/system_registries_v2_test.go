@@ -427,7 +427,7 @@ func TestMixingV1andV2(t *testing.T) {
 		SystemRegistriesConfPath:    "testdata/mixing-v1-v2.conf",
 		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
 	})
-	assert.NotNil(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "mixing sysregistry v1/v2 is not supported")
 }
 
