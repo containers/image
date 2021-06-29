@@ -203,12 +203,17 @@ type V2RegistriesConf struct {
 	ShortNameMode string `toml:"short-name-mode"`
 
 	shortNameAliasConf
+
+	// If you add any field, make sure to update Nonempty() below.
 }
 
 // Nonempty returns true if config contains at least one configuration entry.
 func (config *V2RegistriesConf) Nonempty() bool {
 	return (len(config.Registries) != 0 ||
-		len(config.UnqualifiedSearchRegistries) != 0)
+		len(config.UnqualifiedSearchRegistries) != 0 ||
+		len(config.CredentialHelpers) != 0 ||
+		config.ShortNameMode != "" ||
+		config.shortNameAliasConf.nonempty())
 }
 
 // parsedConfig is the result of parsing, and possibly merging, configuration files;

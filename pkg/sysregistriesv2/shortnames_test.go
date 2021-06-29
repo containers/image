@@ -10,6 +10,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestShortNameAliasConfNonempty(t *testing.T) {
+	res := (&shortNameAliasConf{}).nonempty()
+	assert.False(t, res)
+	for _, c := range []shortNameAliasConf{
+		{Aliases: map[string]string{"a": "example.com/b"}},
+	} {
+		res := (&c).nonempty()
+		assert.True(t, res, c)
+	}
+}
+
 func TestParseShortNameValue(t *testing.T) {
 	tests := []struct {
 		input string

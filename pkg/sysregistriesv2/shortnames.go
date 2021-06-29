@@ -49,6 +49,13 @@ type shortNameAliasConf struct {
 	// reference counter parts.
 	// Note that Aliases is niled after being loaded from a file.
 	Aliases map[string]string `toml:"aliases"`
+
+	// If you add any field, make sure to update nonempty() below.
+}
+
+// nonempty returns true if config contains at least one configuration entry.
+func (c *shortNameAliasConf) nonempty() bool {
+	return len(c.Aliases) != 0
 }
 
 // alias combines the parsed value of an alias with the config file it has been
