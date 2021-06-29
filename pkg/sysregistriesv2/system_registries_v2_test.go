@@ -13,6 +13,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestV1RegistriesConfNonempty(t *testing.T) {
+	res := (&V1RegistriesConf{}).Nonempty()
+	assert.False(t, res)
+	for _, c := range []V1RegistriesConf{
+		{V1TOMLConfig: V1TOMLConfig{Search: V1TOMLregistries{Registries: []string{"example.com"}}}},
+		{V1TOMLConfig: V1TOMLConfig{Insecure: V1TOMLregistries{Registries: []string{"example.com"}}}},
+		{V1TOMLConfig: V1TOMLConfig{Block: V1TOMLregistries{Registries: []string{"example.com"}}}},
+	} {
+		res := (&c).Nonempty()
+		assert.True(t, res, c)
+	}
+}
+
+func TestV2RegistriesConfNonempty(t *testing.T) {
+	res := (&V2RegistriesConf{}).Nonempty()
+	assert.False(t, res)
+	for _, c := range []V2RegistriesConf{
+		{Registries: []Registry{{Prefix: "example.com"}}},
+		{UnqualifiedSearchRegistries: []string{"example.com"}},
+		{CredentialHelpers: []string{"a"}},
+		{ShortNameMode: "enforcing"},
+		{shortNameAliasConf: shortNameAliasConf{Aliases: map[string]string{"a": "example.com/b"}}},
+	} {
+		res := (&c).Nonempty()
+		assert.True(t, res, c)
+	}
+}
+
 func TestParseLocation(t *testing.T) {
 	var err error
 	var location string
@@ -427,7 +455,7 @@ func TestMixingV1andV2(t *testing.T) {
 		SystemRegistriesConfPath:    "testdata/mixing-v1-v2.conf",
 		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
 	})
-	assert.NotNil(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "mixing sysregistry v1/v2 is not supported")
 }
 
