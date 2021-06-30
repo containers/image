@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -134,16 +135,19 @@ func TestGetAuth(t *testing.T) {
 
 	for _, configPath := range configPaths {
 		for _, tc := range []struct {
-			name          string
-			hostname      string
-			path          string
-			expected      types.DockerAuthConfig
-			expectedError error
-			sys           *types.SystemContext
+			name            string
+			ref             string
+			hostname        string
+			path            string
+			expected        types.DockerAuthConfig
+			expectedError   error
+			sys             *types.SystemContext
+			testPreviousAPI bool
 		}{
 			{
-				name:     "no auth config",
-				hostname: "index.docker.io",
+				name:            "no auth config",
+				hostname:        "index.docker.io",
+				testPreviousAPI: true,
 			},
 			{
 				name: "empty hostname",
@@ -157,11 +161,13 @@ func TestGetAuth(t *testing.T) {
 					Username: "example",
 					Password: "org",
 				},
+				testPreviousAPI: true,
 			},
 			{
-				name:     "match none",
-				hostname: "registry.example.org",
-				path:     filepath.Join("testdata", "example.json"),
+				name:            "match none",
+				hostname:        "registry.example.org",
+				path:            filepath.Join("testdata", "example.json"),
+				testPreviousAPI: true,
 			},
 			{
 				name:     "match docker.io",
@@ -171,6 +177,7 @@ func TestGetAuth(t *testing.T) {
 					Username: "docker",
 					Password: "io",
 				},
+				testPreviousAPI: true,
 			},
 			{
 				name:     "match docker.io normalized",
@@ -180,6 +187,7 @@ func TestGetAuth(t *testing.T) {
 					Username: "index",
 					Password: "docker.io",
 				},
+				testPreviousAPI: true,
 			},
 			{
 				name:     "normalize registry",
@@ -189,6 +197,7 @@ func TestGetAuth(t *testing.T) {
 					Username: "example",
 					Password: "org",
 				},
+				testPreviousAPI: true,
 			},
 			{
 				name:     "match localhost",
@@ -198,6 +207,7 @@ func TestGetAuth(t *testing.T) {
 					Username: "local",
 					Password: "host",
 				},
+				testPreviousAPI: true,
 			},
 			{
 				name:     "match ip",
@@ -207,6 +217,7 @@ func TestGetAuth(t *testing.T) {
 					Username: "10.10",
 					Password: "30.45-5000",
 				},
+				testPreviousAPI: true,
 			},
 			{
 				name:     "match port",
@@ -216,6 +227,7 @@ func TestGetAuth(t *testing.T) {
 					Username: "local",
 					Password: "host-5000",
 				},
+				testPreviousAPI: true,
 			},
 			{
 				name:     "use system context",
@@ -231,6 +243,7 @@ func TestGetAuth(t *testing.T) {
 						Password: "bar",
 					},
 				},
+				testPreviousAPI: true,
 			},
 			{
 				name:     "identity token",
@@ -241,11 +254,13 @@ func TestGetAuth(t *testing.T) {
 					Password:      "",
 					IdentityToken: "some very long identity token",
 				},
+				testPreviousAPI: true,
 			},
 			{
-				name:     "match none (empty.json)",
-				hostname: "https://localhost:5000",
-				path:     filepath.Join("testdata", "empty.json"),
+				name:            "match none (empty.json)",
+				hostname:        "https://localhost:5000",
+				path:            filepath.Join("testdata", "empty.json"),
+				testPreviousAPI: true,
 			},
 			{
 				name:     "credhelper from registries.conf",
@@ -258,6 +273,40 @@ func TestGetAuth(t *testing.T) {
 					Username: "foo",
 					Password: "bar",
 				},
+				testPreviousAPI: true,
+			},
+			{
+				name:     "match ref image",
+				hostname: "example.org",
+				ref:      "example.org/repo/image:latest",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{
+					Username: "example",
+					Password: "org",
+				},
+				testPreviousAPI: false,
+			},
+			{
+				name:     "match ref repo",
+				hostname: "example.org",
+				ref:      "example.org/repo",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{
+					Username: "example",
+					Password: "org",
+				},
+				testPreviousAPI: false,
+			},
+			{
+				name:     "match ref host",
+				hostname: "example.org",
+				ref:      "example.org/image:latest",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{
+					Username: "local",
+					Password: "host",
+				},
+				testPreviousAPI: false,
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
@@ -280,20 +329,29 @@ func TestGetAuth(t *testing.T) {
 				if tc.sys != nil {
 					sys = tc.sys
 				}
-				auth, err := getCredentialsWithHomeDir(sys, tc.hostname, tmpHomeDir)
+
+				var ref reference.Named
+				if tc.ref != "" {
+					ref, err = reference.ParseNamed(tc.ref)
+					assert.NoError(t, err)
+				}
+
+				auth, err := getCredentialsWithHomeDir(sys, ref, tc.hostname, tmpHomeDir)
 				assert.Equal(t, tc.expectedError, err)
 				assert.Equal(t, tc.expected, auth)
 
 				// Test for the previous APIs.
-				username, password, err := getAuthenticationWithHomeDir(sys, tc.hostname, tmpHomeDir)
-				if tc.expected.IdentityToken != "" {
-					assert.Equal(t, "", username)
-					assert.Equal(t, "", password)
-					assert.Error(t, err)
-				} else {
-					assert.Equal(t, tc.expected.Username, username)
-					assert.Equal(t, tc.expected.Password, password)
-					assert.Equal(t, tc.expectedError, err)
+				if tc.testPreviousAPI {
+					username, password, err := getAuthenticationWithHomeDir(sys, tc.hostname, tmpHomeDir)
+					if tc.expected.IdentityToken != "" {
+						assert.Equal(t, "", username)
+						assert.Equal(t, "", password)
+						assert.Error(t, err)
+					} else {
+						assert.Equal(t, tc.expected.Username, username)
+						assert.Equal(t, tc.expected.Password, password)
+						assert.Equal(t, tc.expectedError, err)
+					}
 				}
 
 				require.NoError(t, os.RemoveAll(configPath))
@@ -349,7 +407,7 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			auth, err := getCredentialsWithHomeDir(nil, tc.hostname, tmpDir)
+			auth, err := getCredentialsWithHomeDir(nil, nil, tc.hostname, tmpDir)
 			assert.Equal(t, tc.expectedError, err)
 			assert.Equal(t, tc.expected, auth)
 
@@ -403,7 +461,7 @@ func TestGetAuthPreferNewConfig(t *testing.T) {
 		}
 	}
 
-	auth, err := getCredentialsWithHomeDir(nil, "docker.io", tmpDir)
+	auth, err := getCredentialsWithHomeDir(nil, nil, "docker.io", tmpDir)
 	assert.NoError(t, err)
 	assert.Equal(t, "docker", auth.Username)
 	assert.Equal(t, "io", auth.Password)
@@ -448,7 +506,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	configPath := filepath.Join(configDir, "auth.json")
 
 	// no config file present
-	auth, err := getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
+	auth, err := getCredentialsWithHomeDir(nil, nil, "index.docker.io", tmpHomeDir)
 	if err != nil {
 		t.Fatalf("got unexpected error: %#+v", err)
 	}
@@ -457,7 +515,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if err := ioutil.WriteFile(configPath, []byte("Json rocks! Unless it doesn't."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
-	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
+	auth, err = getCredentialsWithHomeDir(nil, nil, "index.docker.io", tmpHomeDir)
 	if err == nil {
 		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}
@@ -468,7 +526,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	// remove the invalid config file
 	os.RemoveAll(configPath)
 	// no config file present
-	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
+	auth, err = getCredentialsWithHomeDir(nil, nil, "index.docker.io", tmpHomeDir)
 	if err != nil {
 		t.Fatalf("got unexpected error: %#+v", err)
 	}
@@ -478,7 +536,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if err := ioutil.WriteFile(configPath, []byte("I'm certainly not a json string."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
-	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
+	auth, err = getCredentialsWithHomeDir(nil, nil, "index.docker.io", tmpHomeDir)
 	if err == nil {
 		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}
@@ -565,4 +623,55 @@ func TestGetAllCredentials(t *testing.T) {
 		require.Equal(t, d.password, conf.Password, "%v", d)
 	}
 
+}
+
+func TestAuthKeysForRef(t *testing.T) {
+	for _, tc := range []struct {
+		name, ref string
+		expected  []string
+	}{
+		{
+			name: "image without tag",
+			ref:  "quay.io/image",
+			expected: []string{
+				"quay.io/image",
+				"quay.io",
+			},
+		},
+		{
+			name: "image with tag",
+			ref:  "quay.io/image:latest",
+			expected: []string{
+				"quay.io/image",
+				"quay.io",
+			},
+		},
+		{
+			name: "image single path tag",
+			ref:  "quay.io/user/image:latest",
+			expected: []string{
+				"quay.io/user/image",
+				"quay.io/user",
+				"quay.io",
+			},
+		},
+		{
+			name: "image with nested path",
+			ref:  "quay.io/a/b/c/d/image:latest",
+			expected: []string{
+				"quay.io/a/b/c/d/image",
+				"quay.io/a/b/c/d",
+				"quay.io/a/b/c",
+				"quay.io/a/b",
+				"quay.io/a",
+				"quay.io",
+			},
+		},
+	} {
+		ref, err := reference.ParseNamed(tc.ref)
+		require.NoError(t, err, tc.name)
+
+		result := authKeysForRef(ref)
+		require.Equal(t, tc.expected, result, tc.name)
+	}
 }
