@@ -164,7 +164,7 @@ type openshiftImageSource struct {
 	// Values specific to this image
 	sys *types.SystemContext
 	// State
-	docker               types.ImageSource // The Docker Registry endpoint, or nil if not resolved yet
+	docker               types.ImageSource // The docker/distribution API endpoint, or nil if not resolved yet
 	imageStreamImageName string            // Resolved image identifier, or "" if not known yet
 }
 
@@ -316,7 +316,7 @@ func (s *openshiftImageSource) ensureImageIsResolved(ctx context.Context) error 
 
 type openshiftImageDestination struct {
 	client *openshiftClient
-	docker types.ImageDestination // The Docker Registry endpoint
+	docker types.ImageDestination // The docker/distribution API endpoint
 	// State
 	imageStreamImageName string // "" if not yet known
 }
