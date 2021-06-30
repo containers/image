@@ -13,16 +13,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestGetManifestDescriptor is testing a regression issue where a nil error was being wrapped,
-// this causes the returned error to be nil as well and the user wasn't getting a proper error output.
-//
-// More info: https://github.com/containers/skopeo/issues/496
 func TestGetManifestDescriptor(t *testing.T) {
 	imageRef, err := NewReference("fixtures/two_images_manifest", "")
 	require.NoError(t, err)
 
+	// test a regression issue where a nil error was being wrapped,
+	// this causes the returned error to be nil as well and the user wasn't getting a proper error output.
+	//
+	// More info: https://github.com/containers/skopeo/issues/496
 	_, err = imageRef.(ociReference).getManifestDescriptor()
 	assert.EqualError(t, err, ErrMoreThanOneImage.Error())
+
+	imageRef, err = NewReference("fixtures/two_names_manifest", "imageValue0")
+	require.NoError(t, err)
+	manDescriptor, err := imageRef.(ociReference).getManifestDescriptor()
+	require.NoError(t, err)
+	assert.Equal(t, manDescriptor.Annotations["org.opencontainers.image.ref.name"], "imageValue0")
+
+	imageRef, err = NewIndexReference("fixtures/two_names_manifest", 1)
+	require.NoError(t, err)
+	manDescriptor, err = imageRef.(ociReference).getManifestDescriptor()
+	require.NoError(t, err)
+	assert.Equal(t, manDescriptor.Annotations["org.opencontainers.image.ref.name"], "imageValue1")
 }
 
 func TestTransportName(t *testing.T) {
@@ -124,6 +136,10 @@ func TestNewReference(t *testing.T) {
 
 	_, err = NewReference(tmpDir+"/has:colon", imageValue)
 	assert.Error(t, err)
+
+	// Test private newReference
+	_, err = newReference(tmpDir, imageValue, 1)
+	assert.Error(t, err)
 }
 
 // refToTempOCI creates a temporary directory and returns an reference to it.
@@ -170,7 +186,8 @@ func TestReferenceStringWithinTransport(t *testing.T) {
 
 	for _, c := range []struct{ input, result string }{
 		{"/dir1:notlatest:notlatest", "/dir1:notlatest:notlatest"}, // Explicit image
-		{"/dir3:", "/dir3:"}, // No image
+		{"/dir3:", "/dir3:"},     // No image
+		{"/dir1:@1", "/dir1:@1"}, // Explicit sourceIndex of image
 	} {
 		ref, err := ParseReference(tmpDir + c.input)
 		require.NoError(t, err, c.input)
