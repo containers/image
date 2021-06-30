@@ -598,12 +598,12 @@ type SystemContext struct {
 	// === docker.Transport overrides ===
 	// If not "", a directory containing a CA certificate (ending with ".crt"),
 	// a client certificate (ending with ".cert") and a client certificate key
-	// (ending with ".key") used when talking to a Docker Registry.
+	// (ending with ".key") used when talking to a container registry.
 	DockerCertPath string
 	// If not "", overrides the system’s default path for a directory containing host[:port] subdirectories with the same structure as DockerCertPath above.
 	// Ignored if DockerCertPath is non-empty.
 	DockerPerHostCertDirPath string
-	// Allow contacting docker registries over HTTP, or HTTPS with failed TLS verification. Note that this does not affect other TLS connections.
+	// Allow contacting container registries over HTTP, or HTTPS with failed TLS verification. Note that this does not affect other TLS connections.
 	DockerInsecureSkipTLSVerify OptionalBool
 	// if nil, the library tries to parse ~/.docker/config.json to retrieve credentials
 	// Ignored if DockerBearerRegistryToken is non-empty.

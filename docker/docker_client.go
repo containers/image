@@ -92,7 +92,7 @@ type bearerToken struct {
 	expirationTime time.Time
 }
 
-// dockerClient is configuration for dealing with a single Docker registry.
+// dockerClient is configuration for dealing with a single container registry.
 type dockerClient struct {
 	// The following members are set by newDockerClient and do not change afterwards.
 	sys       *types.SystemContext
@@ -752,7 +752,7 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 		err = ping("http")
 	}
 	if err != nil {
-		err = errors.Wrapf(err, "error pinging docker registry %s", c.registry)
+		err = errors.Wrapf(err, "error pinging container registry %s", c.registry)
 		if c.sys != nil && c.sys.DockerDisableV1Ping {
 			return err
 		}

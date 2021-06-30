@@ -306,7 +306,7 @@ func getCredentialsWithHomeDir(sys *types.SystemContext, ref reference.Named, re
 // .docker/config.json
 //
 // Deprecated: This API only has support for username and password. To get the
-// support for oauth2 in docker registry authentication, we added the new
+// support for oauth2 in container registry authentication, we added the new
 // GetCredentials API. The new API should be used and this API is kept to
 // maintain backward compatibility.
 func GetAuthentication(sys *types.SystemContext, registry string) (string, string, error) {

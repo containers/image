@@ -5,7 +5,7 @@
 containers' images and container image registries.
 
 The containers/image library allows application to pull and push images from
-container image registries, like the upstream docker registry. It also
+container image registries, like the docker.io and quay.io registries. It also
 implements "simple image signing".
 
 The containers/image library also allows you to inspect a repository on a
