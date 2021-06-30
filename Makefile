@@ -116,7 +116,7 @@ lint:
 ifeq ($(TRAVIS),true)
 	$(GOBIN)/git-validation -q -run DCO,short-subject,dangling-whitespace
 else
-	git fetch -q "https://github.com/containers/image.git" "refs/heads/master"
+	git fetch -q "https://github.com/containers/image.git" "refs/heads/release-5.5"
 	upstream="$$(git rev-parse --verify FETCH_HEAD)" ; \
 		$(GOBIN)/git-validation -q -run DCO,short-subject,dangling-whitespace -range $$upstream..HEAD
 endif
