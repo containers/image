@@ -14,21 +14,42 @@ import (
 )
 
 func TestV1RegistriesConfNonempty(t *testing.T) {
-	res := (&V1RegistriesConf{}).Nonempty()
-	assert.False(t, res)
+	for _, c := range []V1RegistriesConf{
+		{},
+		{V1TOMLConfig: V1TOMLConfig{Search: V1TOMLregistries{Registries: []string{}}}},
+		{V1TOMLConfig: V1TOMLConfig{Insecure: V1TOMLregistries{Registries: []string{}}}},
+		{V1TOMLConfig: V1TOMLConfig{Block: V1TOMLregistries{Registries: []string{}}}},
+	} {
+		copy := c // A shallow copy
+		res := copy.Nonempty()
+		assert.False(t, res, c)
+		assert.Equal(t, c, copy, c) // Ensure the method did not change the original value
+	}
 	for _, c := range []V1RegistriesConf{
 		{V1TOMLConfig: V1TOMLConfig{Search: V1TOMLregistries{Registries: []string{"example.com"}}}},
 		{V1TOMLConfig: V1TOMLConfig{Insecure: V1TOMLregistries{Registries: []string{"example.com"}}}},
 		{V1TOMLConfig: V1TOMLConfig{Block: V1TOMLregistries{Registries: []string{"example.com"}}}},
 	} {
-		res := (&c).Nonempty()
+		copy := c // A shallow copy
+		res := copy.Nonempty()
 		assert.True(t, res, c)
+		assert.Equal(t, c, copy, c) // Ensure the method did not change the original value
 	}
 }
 
 func TestV2RegistriesConfNonempty(t *testing.T) {
-	res := (&V2RegistriesConf{}).Nonempty()
-	assert.False(t, res)
+	for _, c := range []V2RegistriesConf{
+		{},
+		{Registries: []Registry{}},
+		{UnqualifiedSearchRegistries: []string{}},
+		{CredentialHelpers: []string{}},
+		{shortNameAliasConf: shortNameAliasConf{Aliases: map[string]string{}}},
+	} {
+		copy := c // A shallow copy
+		res := copy.Nonempty()
+		assert.False(t, res, c)
+		assert.Equal(t, c, copy, c) // Ensure the method did not change the original value
+	}
 	for _, c := range []V2RegistriesConf{
 		{Registries: []Registry{{Prefix: "example.com"}}},
 		{UnqualifiedSearchRegistries: []string{"example.com"}},
@@ -36,8 +57,10 @@ func TestV2RegistriesConfNonempty(t *testing.T) {
 		{ShortNameMode: "enforcing"},
 		{shortNameAliasConf: shortNameAliasConf{Aliases: map[string]string{"a": "example.com/b"}}},
 	} {
-		res := (&c).Nonempty()
+		copy := c // A shallow copy
+		res := copy.Nonempty()
 		assert.True(t, res, c)
+		assert.Equal(t, c, copy, c) // Ensure the method did not change the original value
 	}
 }
 

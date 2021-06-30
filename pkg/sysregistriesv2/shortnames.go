@@ -3,6 +3,7 @@ package sysregistriesv2
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -55,7 +56,11 @@ type shortNameAliasConf struct {
 
 // nonempty returns true if config contains at least one configuration entry.
 func (c *shortNameAliasConf) nonempty() bool {
-	return len(c.Aliases) != 0
+	copy := *c // A shallow copy
+	if copy.Aliases != nil && len(copy.Aliases) == 0 {
+		copy.Aliases = nil
+	}
+	return !reflect.DeepEqual(copy, shortNameAliasConf{})
 }
 
 // alias combines the parsed value of an alias with the config file it has been
