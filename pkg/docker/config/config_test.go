@@ -519,7 +519,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if err == nil {
 		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}
-	if !strings.Contains(err.Error(), "error unmarshaling JSON") {
+	if !strings.Contains(err.Error(), "unmarshaling JSON") {
 		t.Fatalf("expected JSON syntax error, not: %#+v", err)
 	}
 
@@ -540,7 +540,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if err == nil {
 		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}
-	if !strings.Contains(err.Error(), "error unmarshaling JSON") {
+	if !strings.Contains(err.Error(), "unmarshaling JSON") {
 		t.Fatalf("expected JSON syntax error, not: %#+v", err)
 	}
 }

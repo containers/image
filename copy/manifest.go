@@ -45,7 +45,7 @@ func (os *orderedSet) append(s string) {
 func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupportedManifestMIMETypes []string, forceManifestMIMEType string, requiresOciEncryption bool) (string, []string, error) {
 	_, srcType, err := ic.src.Manifest(ctx)
 	if err != nil { // This should have been cached?!
-		return "", nil, errors.Wrap(err, "Error reading manifest")
+		return "", nil, errors.Wrap(err, "reading manifest")
 	}
 	normalizedSrcType := manifest.NormalizedMIMEType(srcType)
 	if srcType != normalizedSrcType {

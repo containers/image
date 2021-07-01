@@ -149,7 +149,7 @@ func (s *storageReference) resolveImage(sys *types.SystemContext) (*storage.Imag
 	if loadedImage == nil {
 		img, err := s.transport.store.Image(s.id)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error reading image %q", s.id)
+			return nil, errors.Wrapf(err, "reading image %q", s.id)
 		}
 		loadedImage = img
 	}
