@@ -126,7 +126,7 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 				// readJSONFile returns an empty map in case the path doesn't exist.
 				auths, err := readJSONFile(path.path, path.legacyFormat)
 				if err != nil {
-					return nil, errors.Wrapf(err, "error reading JSON file %q", path.path)
+					return nil, errors.Wrapf(err, "reading JSON file %q", path.path)
 				}
 				// Credential helpers in the auth file have a
 				// direct mapping to a registry, so we can just
@@ -348,7 +348,7 @@ func RemoveAuthentication(sys *types.SystemContext, registry string) error {
 			logrus.Debugf("Not logged in to %s with credential helper %s", registry, helper)
 			return
 		}
-		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "error removing credentials for %s from credential helper %s", registry, helper))
+		multiErr = multierror.Append(multiErr, errors.Wrapf(err, "removing credentials for %s from credential helper %s", registry, helper))
 	}
 
 	for _, helper := range helpers {
@@ -508,13 +508,13 @@ func readJSONFile(path string, legacyFormat bool) (dockerConfigFile, error) {
 
 	if legacyFormat {
 		if err = json.Unmarshal(raw, &auths.AuthConfigs); err != nil {
-			return dockerConfigFile{}, errors.Wrapf(err, "error unmarshaling JSON at %q", path)
+			return dockerConfigFile{}, errors.Wrapf(err, "unmarshaling JSON at %q", path)
 		}
 		return auths, nil
 	}
 
 	if err = json.Unmarshal(raw, &auths); err != nil {
-		return dockerConfigFile{}, errors.Wrapf(err, "error unmarshaling JSON at %q", path)
+		return dockerConfigFile{}, errors.Wrapf(err, "unmarshaling JSON at %q", path)
 	}
 
 	if auths.AuthConfigs == nil {
@@ -546,21 +546,21 @@ func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (
 
 	auths, err := readJSONFile(path, false)
 	if err != nil {
-		return "", errors.Wrapf(err, "error reading JSON file %q", path)
+		return "", errors.Wrapf(err, "reading JSON file %q", path)
 	}
 
 	updated, err := editor(&auths)
 	if err != nil {
-		return "", errors.Wrapf(err, "error updating %q", path)
+		return "", errors.Wrapf(err, "updating %q", path)
 	}
 	if updated {
 		newData, err := json.MarshalIndent(auths, "", "\t")
 		if err != nil {
-			return "", errors.Wrapf(err, "error marshaling JSON %q", path)
+			return "", errors.Wrapf(err, "marshaling JSON %q", path)
 		}
 
 		if err = ioutil.WriteFile(path, newData, 0600); err != nil {
-			return "", errors.Wrapf(err, "error writing to file %q", path)
+			return "", errors.Wrapf(err, "writing to file %q", path)
 		}
 	}
 
@@ -603,7 +603,7 @@ func deleteAuthFromCredHelper(credHelper, registry string) error {
 func findAuthentication(ref reference.Named, registry, path string, legacyFormat bool) (types.DockerAuthConfig, error) {
 	auths, err := readJSONFile(path, legacyFormat)
 	if err != nil {
-		return types.DockerAuthConfig{}, errors.Wrapf(err, "error reading JSON file %q", path)
+		return types.DockerAuthConfig{}, errors.Wrapf(err, "reading JSON file %q", path)
 	}
 
 	// First try cred helpers. They should always be normalized.

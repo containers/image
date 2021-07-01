@@ -209,7 +209,7 @@ func RemoveShortNameAlias(ctx *types.SystemContext, name string) error {
 func parseShortNameValue(alias string) (reference.Named, error) {
 	ref, err := reference.Parse(alias)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing alias %q", alias)
+		return nil, errors.Wrapf(err, "parsing alias %q", alias)
 	}
 
 	if _, ok := ref.(reference.Digested); ok {
@@ -318,14 +318,14 @@ func loadShortNameAliasConf(confPath string) (*shortNameAliasConf, *shortNameAli
 	_, err := toml.DecodeFile(confPath, &conf)
 	if err != nil && !os.IsNotExist(err) {
 		// It's okay if the config doesn't exist.  Other errors are not.
-		return nil, nil, errors.Wrapf(err, "error loading short-name aliases config file %q", confPath)
+		return nil, nil, errors.Wrapf(err, "loading short-name aliases config file %q", confPath)
 	}
 
 	// Even if we don’t always need the cache, doing so validates the machine-generated config.  The
 	// file could still be corrupted by another process or user.
 	cache, err := newShortNameAliasCache(confPath, &conf)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "error loading short-name aliases config file %q", confPath)
+		return nil, nil, errors.Wrapf(err, "loading short-name aliases config file %q", confPath)
 	}
 
 	return &conf, cache, nil

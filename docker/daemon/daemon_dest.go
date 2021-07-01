@@ -42,7 +42,7 @@ func newImageDestination(ctx context.Context, sys *types.SystemContext, ref daem
 
 	c, err := newDockerClient(sys)
 	if err != nil {
-		return nil, errors.Wrap(err, "Error initializing docker engine client")
+		return nil, errors.Wrap(err, "initializing docker engine client")
 	}
 
 	reader, writer := io.Pipe()
@@ -84,7 +84,7 @@ func imageLoadGoroutine(ctx context.Context, c *client.Client, reader *io.PipeRe
 
 	resp, err := c.ImageLoad(ctx, reader, true)
 	if err != nil {
-		err = errors.Wrap(err, "Error saving image to docker engine")
+		err = errors.Wrap(err, "saving image to docker engine")
 		return
 	}
 	defer resp.Body.Close()

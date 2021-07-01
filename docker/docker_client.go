@@ -215,7 +215,7 @@ func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
 func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write bool, actions string) (*dockerClient, error) {
 	auth, err := config.GetCredentialsForRef(sys, ref.ref)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error getting username and password")
+		return nil, errors.Wrapf(err, "getting username and password")
 	}
 
 	sigBase, err := SignatureStorageBaseURL(sys, ref, write)
@@ -269,7 +269,7 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 	skipVerify := false
 	reg, err := sysregistriesv2.FindRegistry(sys, reference)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error loading registries")
+		return nil, errors.Wrapf(err, "loading registries")
 	}
 	if reg != nil {
 		if reg.Blocked {
@@ -297,7 +297,7 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 func CheckAuth(ctx context.Context, sys *types.SystemContext, username, password, registry string) error {
 	client, err := newDockerClient(sys, registry, registry)
 	if err != nil {
-		return errors.Wrapf(err, "error creating new docker client")
+		return errors.Wrapf(err, "creating new docker client")
 	}
 	client.auth = types.DockerAuthConfig{
 		Username: username,
@@ -346,7 +346,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 	// lint:ignore SA1019 We can't use GetCredentialsForRef because we want to search the whole registry.
 	auth, err := config.GetCredentials(sys, registry) // nolint:staticcheck // https://github.com/golangci/golangci-lint/issues/741
 	if err != nil {
-		return nil, errors.Wrapf(err, "error getting username and password")
+		return nil, errors.Wrapf(err, "getting username and password")
 	}
 
 	// The /v2/_catalog endpoint has been disabled for docker.io therefore
@@ -360,7 +360,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 
 	client, err := newDockerClient(sys, hostname, registry)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error creating new docker client")
+		return nil, errors.Wrapf(err, "creating new docker client")
 	}
 	client.auth = auth
 	if sys != nil {
@@ -752,7 +752,7 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 		err = ping("http")
 	}
 	if err != nil {
-		err = errors.Wrapf(err, "error pinging container registry %s", c.registry)
+		err = errors.Wrapf(err, "pinging container registry %s", c.registry)
 		if c.sys != nil && c.sys.DockerDisableV1Ping {
 			return err
 		}
@@ -800,7 +800,7 @@ func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerRe
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return nil, errors.Wrapf(clientLib.HandleErrorResponse(res), "Error downloading signatures for %s in %s", manifestDigest, ref.ref.Name())
+		return nil, errors.Wrapf(clientLib.HandleErrorResponse(res), "downloading signatures for %s in %s", manifestDigest, ref.ref.Name())
 	}
 
 	body, err := iolimits.ReadAtMost(res.Body, iolimits.MaxSignatureListBodySize)
@@ -810,7 +810,7 @@ func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerRe
 
 	var parsedBody extensionSignatureList
 	if err := json.Unmarshal(body, &parsedBody); err != nil {
-		return nil, errors.Wrapf(err, "Error decoding signature list")
+		return nil, errors.Wrapf(err, "decoding signature list")
 	}
 	return &parsedBody, nil
 }

@@ -34,7 +34,7 @@ func newImageDestination(ref dirReference, compress bool) (types.ImageDestinatio
 	// if the contents don't match throw an error
 	dirExists, err := pathExists(d.ref.resolvedPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error checking for path %q", d.ref.resolvedPath)
+		return nil, errors.Wrapf(err, "checking for path %q", d.ref.resolvedPath)
 	}
 	if dirExists {
 		isEmpty, err := isDirEmpty(d.ref.resolvedPath)
@@ -45,7 +45,7 @@ func newImageDestination(ref dirReference, compress bool) (types.ImageDestinatio
 		if !isEmpty {
 			versionExists, err := pathExists(d.ref.versionPath())
 			if err != nil {
-				return nil, errors.Wrapf(err, "error checking if path exists %q", d.ref.versionPath())
+				return nil, errors.Wrapf(err, "checking if path exists %q", d.ref.versionPath())
 			}
 			if versionExists {
 				contents, err := ioutil.ReadFile(d.ref.versionPath())
@@ -61,7 +61,7 @@ func newImageDestination(ref dirReference, compress bool) (types.ImageDestinatio
 			}
 			// delete directory contents so that only one image is in the directory at a time
 			if err = removeDirContents(d.ref.resolvedPath); err != nil {
-				return nil, errors.Wrapf(err, "error erasing contents in %q", d.ref.resolvedPath)
+				return nil, errors.Wrapf(err, "erasing contents in %q", d.ref.resolvedPath)
 			}
 			logrus.Debugf("overwriting existing container image directory %q", d.ref.resolvedPath)
 		}
@@ -74,7 +74,7 @@ func newImageDestination(ref dirReference, compress bool) (types.ImageDestinatio
 	// create version file
 	err = ioutil.WriteFile(d.ref.versionPath(), []byte(version), 0644)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error creating version file %q", d.ref.versionPath())
+		return nil, errors.Wrapf(err, "creating version file %q", d.ref.versionPath())
 	}
 	return d, nil
 }

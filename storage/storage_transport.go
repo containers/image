@@ -172,7 +172,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		var err error
 		named, err = reference.ParseNormalizedNamed(ref)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error parsing named reference %q", ref)
+			return nil, errors.Wrapf(err, "parsing named reference %q", ref)
 		}
 		named = reference.TagNameOnly(named)
 	}

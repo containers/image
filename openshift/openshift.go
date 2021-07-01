@@ -475,7 +475,7 @@ sigExists:
 			randBytes := make([]byte, 16)
 			n, err := rand.Read(randBytes)
 			if err != nil || n != 16 {
-				return errors.Wrapf(err, "Error generating random signature len %d", n)
+				return errors.Wrapf(err, "generating random signature len %d", n)
 			}
 			signatureName = fmt.Sprintf("%s@%032x", imageStreamImageName, randBytes)
 			if _, ok := existingSigNames[signatureName]; !ok {
