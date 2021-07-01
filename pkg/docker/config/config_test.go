@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -673,5 +674,215 @@ func TestAuthKeysForRef(t *testing.T) {
 
 		result := authKeysForRef(ref)
 		require.Equal(t, tc.expected, result, tc.name)
+	}
+}
+
+func TestSetCredentials(t *testing.T) {
+	const (
+		usernamePrefix = "username-"
+		passwordPrefix = "password-"
+	)
+	getAuth := func(sys *types.SystemContext, input string) types.DockerAuthConfig {
+		ref, err := reference.ParseNamed(input)
+		require.NoError(t, err)
+		auth, err := GetCredentialsForRef(sys, ref)
+		require.NoError(t, err)
+		return auth
+	}
+
+	for _, tc := range []struct {
+		input  []string
+		assert func(*types.SystemContext, dockerConfigFile)
+	}{
+		{
+			input: []string{"quay.io"},
+			assert: func(sys *types.SystemContext, auth dockerConfigFile) {
+				assert.Len(t, auth.AuthConfigs, 1)
+				assert.NotEmpty(t, auth.AuthConfigs["quay.io"].Auth)
+			},
+		},
+		{
+			input: []string{"quay.io/a/b/c/d/image"},
+			assert: func(sys *types.SystemContext, auth dockerConfigFile) {
+				assert.Len(t, auth.AuthConfigs, 1)
+				assert.NotEmpty(t, auth.AuthConfigs["quay.io/a/b/c/d/image"].Auth)
+
+				ta := getAuth(sys, "quay.io/a/b/c/d/image")
+				assert.Equal(t, usernamePrefix+"0", ta.Username)
+				assert.Equal(t, passwordPrefix+"0", ta.Password)
+			},
+		},
+		{
+			input: []string{
+				"quay.io/a/b/c",
+				"quay.io/a/b",
+				"quay.io/a",
+				"quay.io",
+				"my-registry.local",
+				"my-registry.local",
+			},
+			assert: func(sys *types.SystemContext, auth dockerConfigFile) {
+				assert.Len(t, auth.AuthConfigs, 5)
+				assert.NotEmpty(t, auth.AuthConfigs["quay.io/a/b/c"].Auth)
+				assert.NotEmpty(t, auth.AuthConfigs["quay.io/a/b"].Auth)
+				assert.NotEmpty(t, auth.AuthConfigs["quay.io/a"].Auth)
+				assert.NotEmpty(t, auth.AuthConfigs["quay.io"].Auth)
+				assert.NotEmpty(t, auth.AuthConfigs["my-registry.local"].Auth)
+
+				ta0 := getAuth(sys, "quay.io/a/b/c")
+				assert.Equal(t, usernamePrefix+"0", ta0.Username)
+				assert.Equal(t, passwordPrefix+"0", ta0.Password)
+
+				ta1 := getAuth(sys, "quay.io/a/b")
+				assert.Equal(t, usernamePrefix+"1", ta1.Username)
+				assert.Equal(t, passwordPrefix+"1", ta1.Password)
+
+				ta2 := getAuth(sys, "quay.io/a")
+				assert.Equal(t, usernamePrefix+"2", ta2.Username)
+				assert.Equal(t, passwordPrefix+"2", ta2.Password)
+
+			},
+		},
+	} {
+		tmpFile, err := ioutil.TempFile("", "auth.json.set")
+		require.NoError(t, err)
+		defer os.RemoveAll(tmpFile.Name())
+
+		_, err = tmpFile.WriteString("{}")
+		require.NoError(t, err)
+		sys := &types.SystemContext{AuthFilePath: tmpFile.Name()}
+
+		for i, input := range tc.input {
+			_, err := SetCredentials(
+				sys,
+				input,
+				usernamePrefix+fmt.Sprint(i),
+				passwordPrefix+fmt.Sprint(i),
+			)
+			assert.NoError(t, err)
+		}
+
+		auth, err := readJSONFile(tmpFile.Name(), false)
+		require.NoError(t, err)
+
+		tc.assert(sys, auth)
+	}
+}
+
+func TestRemoveAuthentication(t *testing.T) {
+	testAuth := dockerAuthConfig{Auth: "ZXhhbXBsZTpvcmc="}
+	for _, tc := range []struct {
+		config      dockerConfigFile
+		inputs      []string
+		shouldError bool
+		assert      func(dockerConfigFile)
+	}{
+		{
+			config: dockerConfigFile{
+				AuthConfigs: map[string]dockerAuthConfig{
+					"quay.io": testAuth,
+				},
+			},
+			inputs: []string{"quay.io"},
+			assert: func(auth dockerConfigFile) {
+				assert.Len(t, auth.AuthConfigs, 0)
+			},
+		},
+		{
+			config: dockerConfigFile{
+				AuthConfigs: map[string]dockerAuthConfig{
+					"quay.io": testAuth,
+				},
+			},
+			inputs:      []string{"quay.io/user/image"},
+			shouldError: true, // not logged in
+			assert: func(auth dockerConfigFile) {
+				assert.Len(t, auth.AuthConfigs, 1)
+				assert.NotEmpty(t, auth.AuthConfigs["quay.io"].Auth)
+			},
+		},
+		{
+			config: dockerConfigFile{
+				AuthConfigs: map[string]dockerAuthConfig{
+					"quay.io":           testAuth,
+					"my-registry.local": testAuth,
+				},
+			},
+			inputs: []string{"my-registry.local"},
+			assert: func(auth dockerConfigFile) {
+				assert.Len(t, auth.AuthConfigs, 1)
+				assert.NotEmpty(t, auth.AuthConfigs["quay.io"].Auth)
+			},
+		},
+		{
+			config: dockerConfigFile{
+				AuthConfigs: map[string]dockerAuthConfig{
+					"quay.io/a/b/c":     testAuth,
+					"quay.io/a/b":       testAuth,
+					"quay.io/a":         testAuth,
+					"quay.io":           testAuth,
+					"my-registry.local": testAuth,
+				},
+			},
+			inputs: []string{
+				"quay.io/a/b",
+				"quay.io",
+				"my-registry.local",
+			},
+			assert: func(auth dockerConfigFile) {
+				assert.Len(t, auth.AuthConfigs, 2)
+				assert.NotEmpty(t, auth.AuthConfigs["quay.io/a/b/c"].Auth)
+				assert.NotEmpty(t, auth.AuthConfigs["quay.io/a"].Auth)
+			},
+		},
+	} {
+
+		content, err := json.Marshal(&tc.config)
+		require.NoError(t, err)
+
+		tmpFile, err := ioutil.TempFile("", "auth.json")
+		require.NoError(t, err)
+		defer os.RemoveAll(tmpFile.Name())
+
+		_, err = tmpFile.Write(content)
+		require.NoError(t, err)
+
+		sys := &types.SystemContext{AuthFilePath: tmpFile.Name()}
+
+		for _, input := range tc.inputs {
+			err := RemoveAuthentication(sys, input)
+			if tc.shouldError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		}
+
+		auth, err := readJSONFile(tmpFile.Name(), false)
+		require.NoError(t, err)
+
+		tc.assert(auth)
+	}
+}
+
+func TestValidateKey(t *testing.T) {
+	for _, tc := range []struct {
+		key          string
+		shouldError  bool
+		isNamespaced bool
+	}{
+		{"my-registry.local", false, false},
+		{"https://my-registry.local", true, false},
+		{"my-registry.local/path", false, true},
+		{"quay.io/a/b/c/d", false, true},
+	} {
+
+		isNamespaced, err := validateKey(tc.key)
+		if tc.shouldError {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Equal(t, tc.isNamespaced, isNamespaced)
 	}
 }
