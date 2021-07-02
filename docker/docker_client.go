@@ -423,7 +423,14 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 				res := SearchResult{
 					Name: repo,
 				}
-				searchRes = append(searchRes, res)
+				// bugzilla.redhat.com/show_bug.cgi?id=1976283
+				// If we have a full match, make sure it's listed as the first result.
+				// (Note there might be a full match we never see if we reach the result limit first.)
+				if repo == image {
+					searchRes = append([]SearchResult{res}, searchRes...)
+				} else {
+					searchRes = append(searchRes, res)
+				}
 			}
 		}
 
