@@ -2,6 +2,9 @@ package docker
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,6 +14,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"encoding/base64"
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/iolimits"
@@ -284,6 +289,14 @@ func (s *dockerImageSource) GetBlob(ctx context.Context, info types.BlobInfo, ca
 		return s.getExternalBlob(ctx, info.URLs)
 	}
 
+	getKeyPath := fmt.Sprintf(blobsEncryptPath, reference.Path(s.physicalRef.ref), info.Digest.String())
+	logrus.Debugf("Get blob encrypt path: %s", getKeyPath)
+	keyResp, _ := s.c.makeRequest(ctx, "GET", getKeyPath, nil, nil, v2Auth, nil)
+	blobAesKey := ""
+	if keyResp != nil {
+		blobAesKey = keyResp.Header.Get("Blob-AESKey")
+	}	
+
 	path := fmt.Sprintf(blobsPath, reference.Path(s.physicalRef.ref), info.Digest.String())
 	logrus.Debugf("Downloading %s", path)
 	res, err := s.c.makeRequest(ctx, "GET", path, nil, nil, v2Auth, nil)
@@ -294,8 +307,91 @@ func (s *dockerImageSource) GetBlob(ctx context.Context, info types.BlobInfo, ca
 		res.Body.Close()
 		return nil, 0, err
 	}
+	aesKey, nonce := "", ""
+	tmpAk := strings.TrimSpace(res.Header.Get("Blob-AESKey"))
+	if tmpAk != "" {
+		blobAesKey = res.Header.Get("Blob-AESKey")
+	}
+	if blobAesKey != "" {
+		aesKey, nonce, err = parseBlobAesKey(blobAesKey)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+	
 	cache.RecordKnownLocation(s.physicalRef.Transport(), bicTransportScope(s.physicalRef), info.Digest, newBICLocationReference(s.physicalRef))
-	return res.Body, getBlobSize(res), nil
+
+	iorc, err := NewDecryptReaderCloser(res.Body, aesKey, nonce)
+	return iorc, getBlobSize(res), err
+}
+
+func parseBlobAesKey(aesKey string) (string, string, error) {
+	buf, err := base64.StdEncoding.DecodeString(aesKey)
+	if err != nil {
+		return "", "", nil
+	}
+	strs := strings.Split(string(buf), ":")
+	if len(strs) != 2 {
+		return "", "", fmt.Errorf("invalid ase key: %s", string(buf))
+	}
+	return strs[0], strs[1], nil
+}
+
+type DecryptReaderCloser struct {
+	stream              cipher.Stream
+	source              io.ReadCloser
+}
+
+func (d *DecryptReaderCloser) Read(p []byte) (n int, err error) {
+	if 	d.stream == nil {
+		return d.source.Read(p)
+	}
+	o, err := FillBuffer(d.source, p)
+	if err != nil {
+		if err != io.EOF {
+			return 0, err
+		}
+	}
+	d.stream.XORKeyStream(p[:o], p[:o])
+	return o, err
+}
+
+func (d *DecryptReaderCloser) Close() error {
+	return d.source.Close()
+}
+
+func NewDecryptReaderCloser(source io.ReadCloser, aesKey, nonce string,) (io.ReadCloser, error) {
+	if aesKey == "" && nonce == "" {
+		return source, nil
+	}
+	key, err := hex.DecodeString(aesKey)
+	if err != nil {
+		return nil, fmt.Errorf("hex decode string encryKey: %s  err: %v", key, err)
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("aes NewCipher err: %v", err)
+	}
+	stream := cipher.NewCTR(block, []byte(nonce))
+	if err != nil {
+		return nil, fmt.Errorf("failed to New GCM, err: %v", err)
+	}
+
+	d := DecryptReaderCloser{
+		source: source,
+		stream: stream,
+	}
+	return &d, nil
+}
+
+// FillBuffer fills the given buffer with as many bytes from the reader as possible. It returns
+// EOF if an EOF was encountered or any other error.
+func FillBuffer(reader io.Reader, buffer []byte) (int, error) {
+	n, err := io.ReadFull(reader, buffer)
+	if err == io.ErrUnexpectedEOF {
+		return n, io.EOF
+	}
+	return n, err
 }
 
 // GetSignatures returns the image's signatures.  It may use a remote (= slow) service.

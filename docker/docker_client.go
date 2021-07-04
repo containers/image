@@ -41,6 +41,7 @@ const (
 	resolvedPingV1URL       = "%s://%s/v1/_ping"
 	tagsPath                = "/v2/%s/tags/list"
 	manifestPath            = "/v2/%s/manifests/%s"
+	blobsEncryptPath        = "/v2/%s/blobs-encrypt/%s"
 	blobsPath               = "/v2/%s/blobs/%s"
 	blobUploadPath          = "/v2/%s/blobs/uploads/"
 	extensionsSignaturePath = "/extensions/v2/%s/signatures/%s"
@@ -545,7 +546,7 @@ func (c *dockerClient) makeRequestToResolvedURLOnce(ctx context.Context, method,
 			return nil, err
 		}
 	}
-	logrus.Debugf("%s %s", method, url)
+	logrus.Debugf("client %s %s", method, url)
 	res, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
