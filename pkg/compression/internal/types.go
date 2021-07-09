@@ -37,8 +37,9 @@ func (c Algorithm) Name() string {
 	return c.name
 }
 
-// Name returns the MIME type to use for the compression algorithm.
-func (c Algorithm) MIME() string {
+// InternalUnstableUndocumentedMIMEQuestionMark ???
+// DO NOT USE THIS anywhere outside of c/image until it is properly documented.
+func (c Algorithm) InternalUnstableUndocumentedMIMEQuestionMark() string {
 	return c.mime
 }
 
