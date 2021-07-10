@@ -33,7 +33,7 @@ func httpResponseToError(res *http.Response, context string) error {
 	case http.StatusTooManyRequests:
 		return ErrTooManyRequests
 	case http.StatusUnauthorized:
-		err := handleErrorResponse(res)
+		err := registryHTTPResponseToError(res)
 		return ErrUnauthorizedForCredentials{Err: err}
 	default:
 		if context != "" {
