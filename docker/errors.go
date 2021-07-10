@@ -38,7 +38,7 @@ func httpResponseToError(res *http.Response, context string) error {
 	case http.StatusTooManyRequests:
 		return ErrTooManyRequests
 	case http.StatusUnauthorized:
-		err := client.HandleErrorResponse(res)
+		err := registryHTTPResponseToError(res)
 		return ErrUnauthorizedForCredentials{Err: err}
 	case http.StatusBadRequest:
 		return internalTypes.BadPartialRequestError{Status: res.Status}
