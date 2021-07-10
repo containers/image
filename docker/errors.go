@@ -53,13 +53,13 @@ func httpResponseToError(res *http.Response, context string) error {
 // registryHTTPResponseToError creates a Go error from an HTTP error response of a docker/distribution
 // registry
 func registryHTTPResponseToError(res *http.Response) error {
-	errResponse := client.HandleErrorResponse(res)
-	if e, ok := perrors.Cause(errResponse).(*client.UnexpectedHTTPResponseError); ok {
+	err := client.HandleErrorResponse(res)
+	if e, ok := perrors.Cause(err).(*client.UnexpectedHTTPResponseError); ok {
 		response := string(e.Response)
 		if len(response) > 50 {
 			response = response[:50] + "..."
 		}
-		errResponse = fmt.Errorf("StatusCode: %d, %s", e.StatusCode, response)
+		err = fmt.Errorf("StatusCode: %d, %s", e.StatusCode, response)
 	}
-	return errResponse
+	return err
 }
