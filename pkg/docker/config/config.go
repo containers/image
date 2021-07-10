@@ -52,8 +52,8 @@ var (
 	ErrNotSupported = errors.New("not supported")
 )
 
-// SetCredentials stores the username and password in the credential helper or file
-// and returns path to file or helper name in format (helper:%s).
+// SetCredentials stores the username and password in a location
+// appropriate for sys and the users’ configuration.
 // Returns a human-redable description of the location that was updated.
 // NOTE: The return value is only intended to be read by humans; its form is not an API,
 // it may change (or new forms can be added) any time.
