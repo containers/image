@@ -487,13 +487,8 @@ func successStatus(status int) bool {
 	return status >= 200 && status <= 399
 }
 
-// isManifestInvalidError returns true iff err from client.HandleErrorResponse is a “manifest invalid” error.
+// isManifestInvalidError returns true iff err from registryHTTPResponseToError is a “manifest invalid” error.
 func isManifestInvalidError(err error) bool {
-	errors, ok := err.(errcode.Errors)
-	if !ok || len(errors) == 0 {
-		return false
-	}
-	err = errors[0]
 	ec, ok := err.(errcode.ErrorCoder)
 	if !ok {
 		return false

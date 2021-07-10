@@ -982,13 +982,8 @@ func (c *dockerClient) getOCIDescriptorContents(ctx context.Context, ref dockerR
 
 // isManifestUnknownError returns true iff err from fetchManifest is a “manifest unknown” error.
 func isManifestUnknownError(err error) bool {
-	var errs errcode.Errors
-	if !errors.As(err, &errs) || len(errs) == 0 {
-		return false
-	}
-	err = errs[0]
-	ec, ok := err.(errcode.ErrorCoder)
-	if !ok {
+	var ec errcode.ErrorCoder
+	if !errors.As(err, &ec) {
 		return false
 	}
 	return ec.ErrorCode() == v2.ErrorCodeManifestUnknown

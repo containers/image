@@ -64,8 +64,8 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"Www-Authenticate: Bearer realm=\"https://auth.docker.io/token\",service=\"registry.docker.io\",scope=\"repository:library/this-does-not-exist:pull\",error=\"insufficient_scope\"\r\n" +
 				"\r\n" +
 				"{\"errors\":[{\"code\":\"UNAUTHORIZED\",\"message\":\"authentication required\",\"detail\":[{\"Type\":\"repository\",\"Class\":\"\",\"Name\":\"library/this-does-not-exist\",\"Action\":\"pull\"}]}]}\n",
-			errorString:       "errors:\ndenied: requested access to the resource is denied\nunauthorized: authentication required\n",
-			errorType:         errcode.Errors{},
+			errorString:       "denied: requested access to the resource is denied",
+			errorType:         errcode.Error{},
 			unwrappedErrorPtr: nil,
 		},
 		{ // docker.io when a tag is not found
@@ -82,7 +82,7 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"\r\n" +
 				"{\"errors\":[{\"code\":\"MANIFEST_UNKNOWN\",\"message\":\"manifest unknown\",\"detail\":{\"Tag\":\"this-does-not-exist\"}}]}\n",
 			errorString:       "manifest unknown: manifest unknown",
-			errorType:         errcode.Errors{},
+			errorType:         errcode.Error{},
 			unwrappedErrorPtr: nil,
 		},
 		{ // public.ecr.aws does not implement tag list
@@ -96,7 +96,7 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"\r\n" +
 				"{\"errors\":[{\"code\":\"NOT_FOUND\",\"message\":\"404 page not found\"}]}\r\n",
 			errorString:       "unknown: 404 page not found",
-			errorType:         errcode.Errors{},
+			errorType:         errcode.Error{},
 			unwrappedErrorPtr: nil,
 		},
 	} {
