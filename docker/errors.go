@@ -6,8 +6,10 @@ import (
 	"net/http"
 
 	internalTypes "github.com/containers/image/v5/internal/types"
+	"github.com/docker/distribution/registry/api/errcode"
 	"github.com/docker/distribution/registry/client"
 	perrors "github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -38,7 +40,7 @@ func httpResponseToError(res *http.Response, context string) error {
 	case http.StatusTooManyRequests:
 		return ErrTooManyRequests
 	case http.StatusUnauthorized:
-		err := client.HandleErrorResponse(res)
+		err := registryHTTPResponseToError(res)
 		return ErrUnauthorizedForCredentials{Err: err}
 	case http.StatusBadRequest:
 		return internalTypes.BadPartialRequestError{Status: res.Status}
@@ -53,13 +55,39 @@ func httpResponseToError(res *http.Response, context string) error {
 // registryHTTPResponseToError creates a Go error from an HTTP error response of a docker/distribution
 // registry
 func registryHTTPResponseToError(res *http.Response) error {
-	errResponse := client.HandleErrorResponse(res)
-	if e, ok := perrors.Cause(errResponse).(*client.UnexpectedHTTPResponseError); ok {
+	err := client.HandleErrorResponse(res)
+	// len(errs) == 0 should never be returned by HandleErrorResponse; if it does, we don't modify it and let the caller report it as is.
+	if errs, ok := err.(errcode.Errors); ok && len(errs) > 0 {
+		// The docker/distribution registry implementation almost never returns
+		// more than one error in the HTTP body; it seems there is only one
+		// possible instance, where the second error reports a cleanup failure
+		// we don't really care about.
+		//
+		// The only _common_ case where a multi-element error is returned is
+		// created by the client.HandleErrorResponse parser when OAuth authorization fails:
+		// the first element contains errors from a WWW-Authenticate header, the second
+		// element contains errors from the response body.
+		//
+		// In that case the first one is currently _slightly_ more informative (ErrorCodeUnauthorized
+		// for invalid tokens, ErrorCodeDenied for permission denied with a valid token
+		// for the first error, vs. ErrorCodeUnauthorized for both cases for the second error.)
+		//
+		// Also, docker/docker similarly only logs the other errors and returns the
+		// first one.
+		if len(errs) > 1 {
+			logrus.Debugf("Discarding non-primary errors:")
+			for _, err := range errs[1:] {
+				logrus.Debugf("  %s", err.Error())
+			}
+		}
+		err = errs[0]
+	}
+	if e, ok := perrors.Cause(err).(*client.UnexpectedHTTPResponseError); ok {
 		response := string(e.Response)
 		if len(response) > 50 {
 			response = response[:50] + "..."
 		}
-		errResponse = fmt.Errorf("StatusCode: %d, %s", e.StatusCode, response)
+		err = fmt.Errorf("StatusCode: %d, %s", e.StatusCode, response)
 	}
-	return errResponse
+	return err
 }
