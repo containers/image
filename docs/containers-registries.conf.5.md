@@ -36,28 +36,28 @@ Given an image name, a single `[[registry]]` TOML table is chosen based on its `
   - _host_[`:`_port_]`/`_namespace_[`/`_namespace_…]`/`_repo_(`:`_tag|`@`_digest_)
   - [`*.`]_host_
 
-    The user-specified image name must start with the specified `prefix` (and continue
-    with the appropriate separator) for a particular `[[registry]]` TOML table to be
-    considered; (only) the TOML table with the longest match is used. It can
-    also include wildcarded subdomains in the format `*.example.com` along as mentioned
-    above. The wildcard should only be present at the beginning as shown in the formats
-    above. Other cases will not work. For example, `*.example.com` is valid but
-    `example.*.com`, `*.example.com/foo` and `*.example.com:5000/foo/bar:baz` are not.
+The user-specified image name must start with the specified `prefix` (and continue
+with the appropriate separator) for a particular `[[registry]]` TOML table to be
+considered; (only) the TOML table with the longest match is used. It can
+also include wildcarded subdomains in the format `*.example.com` along as mentioned
+above. The wildcard should only be present at the beginning as shown in the formats
+above. Other cases will not work. For example, `*.example.com` is valid but
+`example.*.com`, `*.example.com/foo` and `*.example.com:5000/foo/bar:baz` are not.
 
-    As a special case, the `prefix` field can be missing; if so, it defaults to the value
-    of the `location` field (described below).
+As a special case, the `prefix` field can be missing; if so, it defaults to the value
+of the `location` field (described below).
 
 #### Per-namespace settings
 
 `insecure`
 : `true` or `false`.
-    By default, container runtimes require TLS when retrieving images from a registry.
-    If `insecure` is set to `true`, unencrypted HTTP as well as TLS connections with untrusted
-    certificates are allowed.
+By default, container runtimes require TLS when retrieving images from a registry.
+If `insecure` is set to `true`, unencrypted HTTP as well as TLS connections with untrusted
+certificates are allowed.
 
 `blocked`
 : `true` or `false`.
-    If `true`, pulling images with matching names is forbidden.
+If `true`, pulling images with matching names is forbidden.
 
 #### Remapping and mirroring registries
 
@@ -69,55 +69,55 @@ internet without having to change `Dockerfile`s, or to add redundancy).
 
 `location`
 : Accepts the same format as the `prefix` field, and specifies the physical location
-    of the `prefix`-rooted namespace.
+of the `prefix`-rooted namespace.
 
-    By default, this equal to `prefix` (in which case `prefix` can be omitted and the
-    `[[registry]]` TOML table can only specify `location`).
+By default, this equal to `prefix` (in which case `prefix` can be omitted and the
+`[[registry]]` TOML table can only specify `location`).
 
-    Example: Given
-    ```
-    prefix = "example.com/foo"
-    location = "internal-registry-for-example.net/bar"
-    ```
-    requests for the image `example.com/foo/myimage:latest` will actually work with the
-    `internal-registry-for-example.net/bar/myimage:latest` image.
+Example: Given
+```
+prefix = "example.com/foo"
+location = "internal-registry-for-example.net/bar"
+```
+requests for the image `example.com/foo/myimage:latest` will actually work with the
+`internal-registry-for-example.net/bar/myimage:latest` image.
 
-    With a `prefix` containing a wildcard in the format: "*.example.com" for subdomain matching,
-    the location can be empty. In such a case,
-    prefix matching will occur, but no reference rewrite will occur. The
-    original requested image string will be used as-is. But other settings like
-    `insecure` / `blocked` / `mirrors` will be applied to matching images.
+With a `prefix` containing a wildcard in the format: "*.example.com" for subdomain matching,
+the location can be empty. In such a case,
+prefix matching will occur, but no reference rewrite will occur. The
+original requested image string will be used as-is. But other settings like
+`insecure` / `blocked` / `mirrors` will be applied to matching images.
 
-    Example: Given
-    ```
-    prefix = "*.example.com"
-    ```
-    requests for the image `blah.example.com/foo/myimage:latest` will be used
-    as-is. But other settings like insecure/blocked/mirrors will be applied to matching images
+Example: Given
+```
+prefix = "*.example.com"
+```
+requests for the image `blah.example.com/foo/myimage:latest` will be used
+as-is. But other settings like insecure/blocked/mirrors will be applied to matching images
 
 `mirror`
 : An array of TOML tables specifying (possibly-partial) mirrors for the
-    `prefix`-rooted namespace.
+`prefix`-rooted namespace.
 
-    The mirrors are attempted in the specified order; the first one that can be
-    contacted and contains the image will be used (and if none of the mirrors contains the image,
-    the primary location specified by the `registry.location` field, or using the unmodified
-    user-specified reference, is tried last).
+The mirrors are attempted in the specified order; the first one that can be
+contacted and contains the image will be used (and if none of the mirrors contains the image,
+the primary location specified by the `registry.location` field, or using the unmodified
+user-specified reference, is tried last).
 
-    Each TOML table in the `mirror` array can contain the following fields, with the same semantics
-    as if specified in the `[[registry]]` TOML table directly:
-    - `location`
-    - `insecure`
+Each TOML table in the `mirror` array can contain the following fields, with the same semantics
+as if specified in the `[[registry]]` TOML table directly:
+- `location`
+- `insecure`
 
 `mirror-by-digest-only`
 : `true` or `false`.
-    If `true`, mirrors will only be used during pulling if the image reference includes a digest.
-    Referencing an image by digest ensures that the same is always used
-    (whereas referencing an image by a tag may cause different registries to return
-    different images if the tag mapping is out of sync).
+If `true`, mirrors will only be used during pulling if the image reference includes a digest.
+Referencing an image by digest ensures that the same is always used
+(whereas referencing an image by a tag may cause different registries to return
+different images if the tag mapping is out of sync).
 
-    Note that if this is `true`, images referenced by a tag will only use the primary
-    registry, failing if that registry is not accessible.
+Note that if this is `true`, images referenced by a tag will only use the primary
+registry, failing if that registry is not accessible.
 
 *Note*: Redirection and mirrors are currently processed only when reading images, not when pushing
 to a registry; that may change in the future.
