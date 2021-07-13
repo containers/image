@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -177,6 +178,36 @@ func (ref ociReference) getIndex() (*imgspecv1.Index, error) {
 	return index, nil
 }
 
+// getImageLayouts returns a array of the target image's oci layouts in blobs/sha256/. If an error occurs is returned together
+// with an error.
+func (ref ociReference) getImageLayouts(digest string) ([]string, error) {
+	parts := strings.SplitN(digest, ":", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid digest: %s", digest)
+	}
+	manifestPath := filepath.Join(ref.dir, "blobs", parts[0], parts[1])
+
+	manifestJSON, err := os.Open(manifestPath)
+	if err != nil {
+		return nil, err
+	}
+	defer manifestJSON.Close()
+
+	manifest := &imgspecv1.Manifest{}
+	if err := json.NewDecoder(manifestJSON).Decode(manifest); err != nil {
+		return nil, err
+	}
+
+	layerDigests := []string{}
+	layerDigests = append(layerDigests, manifest.Config.Digest.String())
+
+	for _, l := range manifest.Layers {
+		layerDigests = append(layerDigests, l.Digest.String())
+	}
+
+	return layerDigests, nil
+}
+
 func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 	index, err := ref.getIndex()
 	if err != nil {
@@ -236,9 +267,84 @@ func (ref ociReference) NewImageDestination(ctx context.Context, sys *types.Syst
 	return newImageDestination(sys, ref)
 }
 
-// DeleteImage deletes the named image from the registry, if supported.
+// DeleteImage deletes the named image from a oci format image.
 func (ref ociReference) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
-	return errors.Errorf("Deleting images not implemented for oci: images")
+	index, err := ref.getIndex()
+	if err != nil {
+		return err
+	}
+
+	if ref.image == "" {
+		// this will delete all the image in the oci directory
+		return os.RemoveAll(ref.dir)
+	}
+
+	var currentIndex string
+	var manifests = []imgspecv1.Descriptor{}
+	var currentDigest, tmpDigest, othersDigest []string
+	for _, md := range index.Manifests {
+		refName, ok := md.Annotations[imgspecv1.AnnotationRefName]
+		if !ok {
+			continue
+		}
+
+		if refName == ref.image {
+			// the current image tag
+			currentDigest, err = ref.getImageLayouts(md.Digest.String())
+			if err != nil {
+				return fmt.Errorf("get current images(%s) layouts err %v", refName, err)
+			}
+			currentIndex = md.Digest.String()
+
+		} else {
+			// others image tag
+			tmpDigest, err = ref.getImageLayouts(md.Digest.String())
+			if err != nil {
+				fmt.Printf("get images(%s) layouts err:%v, continue!", refName, err)
+				continue
+			}
+			othersDigest = append(othersDigest, tmpDigest...)
+			manifests = append(manifests, md)
+		}
+	}
+
+	tmpDigest = []string{}
+	for _, c := range currentDigest {
+		commom_layout := false
+		for _, o := range othersDigest {
+			if c == o {
+				commom_layout = true
+				break
+			}
+		}
+
+		if !commom_layout {
+			tmpDigest = append(tmpDigest, c)
+		}
+	}
+
+	if currentIndex != "" {
+		tmpDigest = append(tmpDigest, currentIndex)
+	}
+
+	for _, l := range tmpDigest {
+		parts := strings.SplitN(l, ":", 2)
+		if len(parts) != 2 {
+			fmt.Printf("invalid digest: %s", l)
+			continue
+		}
+		os.Remove(filepath.Join(ref.dir, "blobs", parts[0], parts[1]))
+	}
+
+	// write index.json file
+	index.Manifests = manifests
+	indexBytes, err := json.Marshal(index)
+	if err != nil {
+		fmt.Printf("json.marshal failed, err:", err)
+		return err
+	}
+
+	return ioutil.WriteFile(ref.indexPath(), indexBytes, 0644)
 }
 
 // ociLayoutPath returns a path for the oci-layout within a directory using OCI conventions.
