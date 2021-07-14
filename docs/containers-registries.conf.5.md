@@ -39,8 +39,8 @@ Given an image name, a single `[[registry]]` TOML table is chosen based on its `
 The user-specified image name must start with the specified `prefix` (and continue
 with the appropriate separator) for a particular `[[registry]]` TOML table to be
 considered; (only) the TOML table with the longest match is used. It can
-also include wildcarded subdomains in the format `*.example.com` along as mentioned
-above. The wildcard should only be present at the beginning as shown in the formats
+also include wildcarded subdomains in the format `*.example.com`.
+The wildcard should only be present at the beginning as shown in the formats
 above. Other cases will not work. For example, `*.example.com` is valid but
 `example.*.com`, `*.example.com/foo` and `*.example.com:5000/foo/bar:baz` are not.
 
