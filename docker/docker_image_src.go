@@ -15,6 +15,7 @@ import (
 	"sync"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/httpdump"
 	"github.com/containers/image/v5/internal/iolimits"
 	internalTypes "github.com/containers/image/v5/internal/types"
 	"github.com/containers/image/v5/manifest"
@@ -453,13 +454,13 @@ func (s *dockerImageSource) getOneSignature(ctx context.Context, url *url.URL) (
 		return sig, false, nil
 
 	case "http", "https":
-		logrus.Debugf("GET %s", url)
 		req, err := http.NewRequest("GET", url.String(), nil)
 		if err != nil {
 			return nil, false, err
 		}
 		req = req.WithContext(ctx)
-		res, err := s.c.client.Do(req)
+		logrus.Debugf("GET %s", url)
+		res, err := httpdump.DoRequest(s.c.client, req)
 		if err != nil {
 			return nil, false, err
 		}
