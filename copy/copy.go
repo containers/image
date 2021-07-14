@@ -1752,6 +1752,10 @@ func doCompression(dest io.Writer, src io.Reader, metadata map[string]string, co
 
 // compressGoroutine reads all input from src and writes its compressed equivalent to dest.
 func (c *copier) compressGoroutine(dest *io.PipeWriter, src io.Reader, metadata map[string]string, compressionFormat compression.Algorithm) {
-	err := doCompression(dest, src, metadata, compressionFormat, c.compressionLevel)
-	_ = dest.CloseWithError(err) // CloseWithError(nil) is equivalent to Close(), always returns nil
+	err := errors.New("Internal error: unexpected panic in compressGoroutine")
+	defer func() { // Note that this is not the same as {defer dest.CloseWithError(err)}; we need err to be evaluated lazily.
+		_ = dest.CloseWithError(err) // CloseWithError(nil) is equivalent to Close(), always returns nil
+	}()
+
+	err = doCompression(dest, src, metadata, compressionFormat, c.compressionLevel)
 }
