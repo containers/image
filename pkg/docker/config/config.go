@@ -535,6 +535,7 @@ func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (
 	if err != nil {
 		return "", err
 	}
+	fmt.Printf("WARNING storage auth info into %s \n", path)
 	if legacyFormat {
 		return "", fmt.Errorf("writes to %s using legacy format are not supported", path)
 	}
