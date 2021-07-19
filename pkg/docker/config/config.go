@@ -665,10 +665,10 @@ func findAuthentication(ref reference.Named, registry, path string, legacyFormat
 	// those entries even in non-legacyFormat ~/.docker/config.json.
 	// The docker.io registry still uses the /v1/ key with a special host name,
 	// so account for that as well.
-	registry = normalizeRegistry(registry)
+	registry = normalizeAuthFileKey(registry, legacyFormat)
 	normalizedAuths := map[string]dockerAuthConfig{}
 	for k, v := range auths.AuthConfigs {
-		normalizedAuths[normalizeRegistry(k)] = v
+		normalizedAuths[normalizeAuthFileKey(k, legacyFormat)] = v
 	}
 
 	if val, exists := normalizedAuths[registry]; exists {
@@ -723,29 +723,27 @@ func decodeDockerAuth(conf dockerAuthConfig) (types.DockerAuthConfig, error) {
 	}, nil
 }
 
-// convertToHostname converts a registry url which has http|https prepended
-// to just an hostname.
-// Copied from github.com/docker/docker/registry/auth.go
-func convertToHostname(url string) string {
-	stripped := stripScheme(url)
-	nameParts := strings.SplitN(stripped, "/", 2)
-	return nameParts[0]
-}
-
-// stripScheme striped the http|https scheme from the provided URL.
-func stripScheme(url string) string {
-	stripped := strings.TrimPrefix(url, "http://")
+// normalizeAuthFileKey takes a key, converts it to a host name and normalizes
+// the resulting registry.
+func normalizeAuthFileKey(key string, legacyFormat bool) string {
+	stripped := strings.TrimPrefix(key, "http://")
 	stripped = strings.TrimPrefix(stripped, "https://")
-	return stripped
+
+	if legacyFormat || stripped != key {
+		stripped = strings.SplitN(stripped, "/", 2)[0]
+	}
+
+	return normalizeRegistry(stripped)
 }
 
+// normalizeRegistry converts the provided registry if a known docker.io host
+// is provided.
 func normalizeRegistry(registry string) string {
-	normalized := convertToHostname(registry)
-	switch normalized {
+	switch registry {
 	case "registry-1.docker.io", "docker.io":
 		return "index.docker.io"
 	}
-	return normalized
+	return registry
 }
 
 // validateKey verifies that the input key does not have a prefix that is not
