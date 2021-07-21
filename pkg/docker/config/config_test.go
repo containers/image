@@ -886,3 +886,94 @@ func TestValidateKey(t *testing.T) {
 		assert.Equal(t, tc.isNamespaced, isNamespaced)
 	}
 }
+
+func TestSetGetCredentials(t *testing.T) {
+	const (
+		username = "username"
+		password = "password"
+	)
+
+	tmpDir, err := ioutil.TempDir("", "auth-test-")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	for _, tc := range []struct {
+		name         string
+		set          string
+		get          string
+		useLegacyAPI bool
+		shouldAuth   bool
+	}{
+		{
+			name:       "Should match namespace",
+			set:        "quay.io/foo",
+			get:        "quay.io/foo/a",
+			shouldAuth: true,
+		},
+		{
+			name:       "Should match registry if repository provided",
+			set:        "quay.io",
+			get:        "quay.io/foo",
+			shouldAuth: true,
+		},
+		{
+			name:       "Should not match different repository",
+			set:        "quay.io/foo",
+			get:        "quay.io/bar",
+			shouldAuth: false,
+		},
+		{
+			name:       "Should match legacy registry entry (new API)",
+			set:        "https://quay.io/v1/",
+			get:        "quay.io/foo",
+			shouldAuth: true,
+		},
+		{
+			name:         "Should match legacy registry entry (legacy API)",
+			set:          "https://quay.io/v1/",
+			get:          "quay.io",
+			shouldAuth:   true,
+			useLegacyAPI: true,
+		},
+	} {
+
+		// Create a new empty SystemContext referring an empty auth.json
+		tmpFile, err := ioutil.TempFile("", "auth.json-")
+		require.NoError(t, err)
+		defer os.RemoveAll(tmpFile.Name())
+
+		sys := &types.SystemContext{}
+		if tc.useLegacyAPI {
+			sys.LegacyFormatAuthFilePath = tmpFile.Name()
+			_, err = tmpFile.WriteString(fmt.Sprintf(
+				`{"%s":{"auth":"dXNlcm5hbWU6cGFzc3dvcmQ="}}`, tc.set,
+			))
+		} else {
+			sys.AuthFilePath = tmpFile.Name()
+			_, err = tmpFile.WriteString(fmt.Sprintf(
+				`{"auths":{"%s":{"auth":"dXNlcm5hbWU6cGFzc3dvcmQ="}}}`, tc.set,
+			))
+		}
+		require.NoError(t, err)
+
+		// Try to authenticate against them
+		var auth types.DockerAuthConfig
+		if !tc.useLegacyAPI {
+			ref, err := reference.ParseNamed(tc.get)
+			require.NoError(t, err)
+			auth, err = getCredentialsWithHomeDir(sys, ref, reference.Domain(ref), tmpDir)
+			require.NoError(t, err)
+		} else {
+			auth, err = getCredentialsWithHomeDir(sys, nil, tc.get, tmpDir)
+			require.NoError(t, err)
+		}
+
+		if tc.shouldAuth {
+			assert.Equal(t, username, auth.Username, tc.name)
+			assert.Equal(t, password, auth.Password, tc.name)
+		} else {
+			assert.Empty(t, auth.Username, tc.name)
+			assert.Empty(t, auth.Password, tc.name)
+		}
+	}
+}
