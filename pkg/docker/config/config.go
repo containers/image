@@ -236,9 +236,8 @@ func getAuthFilePaths(sys *types.SystemContext, homeDir string) []authPath {
 // file or .docker/config.json, including support for OAuth2 and IdentityToken.
 // If an entry is not found, an empty struct is returned.
 //
-// Deprecated: GetCredentialsForRef should be used in favor of this API
-// because it allows different credentials for different repositories on the
-// same registry.
+// GetCredentialsForRef should almost always be used in favor of this API to
+// allow different credentials for different repositories on the same registry.
 func GetCredentials(sys *types.SystemContext, registry string) (types.DockerAuthConfig, error) {
 	return getCredentialsWithHomeDir(sys, nil, registry, homedir.Get())
 }

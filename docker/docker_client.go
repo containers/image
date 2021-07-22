@@ -343,8 +343,8 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 	v1Res := &V1Results{}
 
 	// Get credentials from authfile for the underlying hostname
-	// lint:ignore SA1019 We can't use GetCredentialsForRef because we want to search the whole registry.
-	auth, err := config.GetCredentials(sys, registry) // nolint:staticcheck // https://github.com/golangci/golangci-lint/issues/741
+	// We can't use GetCredentialsForRef here because we want to search the whole registry.
+	auth, err := config.GetCredentials(sys, registry)
 	if err != nil {
 		return nil, errors.Wrapf(err, "getting username and password")
 	}
