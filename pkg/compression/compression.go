@@ -29,7 +29,7 @@ var (
 	// Zstd compression.
 	Zstd = internal.NewAlgorithm("zstd", "zstd", []byte{0x28, 0xb5, 0x2f, 0xfd}, ZstdDecompressor, zstdCompressor)
 	// Zstd:chunked compression.
-	ZstdChunked = internal.NewAlgorithm("zstd:chunked", "zstd", []byte{0x28, 0xb5, 0x2f, 0xfd}, ZstdDecompressor, chunked.ZstdCompressor)
+	ZstdChunked = internal.NewAlgorithm("zstd:chunked", "zstd", nil, ZstdDecompressor, chunked.ZstdCompressor)
 
 	compressionAlgorithms = map[string]Algorithm{
 		Gzip.Name():        Gzip,
@@ -118,7 +118,8 @@ func DetectCompressionFormat(input io.Reader) (Algorithm, DecompressorFunc, io.R
 	var retAlgo Algorithm
 	var decompressor DecompressorFunc
 	for _, algo := range compressionAlgorithms {
-		if bytes.HasPrefix(buffer[:n], internal.AlgorithmPrefix(algo)) {
+		prefix := internal.AlgorithmPrefix(algo)
+		if len(prefix) > 0 && bytes.HasPrefix(buffer[:n], prefix) {
 			logrus.Debugf("Detected compression format %s", algo.Name())
 			retAlgo = algo
 			decompressor = internal.AlgorithmDecompressor(algo)
