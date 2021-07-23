@@ -101,26 +101,22 @@ test_task:
               BUILDTAGS: 'btrfs_noversion libdm_no_deferred_remove'
         - name: "Test w/ opengpg"
           env:
-              BUILDTAGS: 'btrfs_noversion libdm_no_deferred_remove containers_image_openpgp'
+              BUILDTAGS: &withopengpg 'btrfs_noversion libdm_no_deferred_remove containers_image_openpgp'
     script: |
         make tools
         make test BUILDTAGS="$BUILDTAGS"
 
 
 #####
-###### NOTE: This task is subtantially duplicated in the containers/skopeo
-###### repository's `.cirrus.yml`.  Changes needed here should first be
-###### merged in that repository, before being manually duplicated here.
-######
-###### The *ONLY* exception is in "setup_script" which must initially
-###### clone the skopeo repository.
-######
+##### NOTE: This task is subtantially duplicated in the containers/skopeo
+##### repository's `.cirrus.yml`.  Changes made here should be fully merged
+##### prior to being manually duplicated and maintained in containers/skopeo.
+#####
 test_skopeo_task:
     alias: test_skopeo
+    only_if: *not_docs
     depends_on:
         - validate
-        - cross
-    only_if: *not_docs
     gce_instance:
         image_project: libpod-218412
         zone: "us-central1-f"
@@ -131,25 +127,23 @@ test_skopeo_task:
         disk: 200
         image_name: ${FEDORA_CACHE_IMAGE_NAME}
     matrix:
-        - name: "Skopeo"
+        - name: "Skopeo Test"
           env:
               BUILDTAGS: 'btrfs_noversion libdm_no_deferred_remove'
-        - name: "Skopeo w/ opengpg"
+        - name: "Skopeo Test w/ opengpg"
           env:
-              BUILDTAGS: 'btrfs_noversion libdm_no_deferred_remove containers_image_openpgp'
-    setup_script: |
+              BUILDTAGS: *withopengpg
+    setup_script: >-
         "${GOSRC}/${SCRIPT_BASE}/runner.sh" setup
     vendor_script: >-
         "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" vendor
     build_script: >-
         "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" build
-    validate_script: >-
-        "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" validate
     unit_script: >-
         "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" unit
     integration_script: >-
         "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" integration
-    system_script: >-
+    system_script: >
         "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" system
 
 
