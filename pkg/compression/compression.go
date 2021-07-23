@@ -21,19 +21,19 @@ type Algorithm = types.Algorithm
 
 var (
 	// Gzip compression.
-	Gzip = internal.NewAlgorithm("gzip", "gzip",
+	Gzip = internal.NewAlgorithm(types.GzipAlgorithmName, types.GzipAlgorithmName,
 		[]byte{0x1F, 0x8B, 0x08}, GzipDecompressor, gzipCompressor)
 	// Bzip2 compression.
-	Bzip2 = internal.NewAlgorithm("bzip2", "bzip2",
+	Bzip2 = internal.NewAlgorithm(types.Bzip2AlgorithmName, types.Bzip2AlgorithmName,
 		[]byte{0x42, 0x5A, 0x68}, Bzip2Decompressor, bzip2Compressor)
 	// Xz compression.
-	Xz = internal.NewAlgorithm("Xz", "Xz",
+	Xz = internal.NewAlgorithm(types.XzAlgorithmName, types.XzAlgorithmName,
 		[]byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}, XzDecompressor, xzCompressor)
 	// Zstd compression.
-	Zstd = internal.NewAlgorithm("zstd", "zstd",
+	Zstd = internal.NewAlgorithm(types.ZstdAlgorithmName, types.ZstdAlgorithmName,
 		[]byte{0x28, 0xb5, 0x2f, 0xfd}, ZstdDecompressor, zstdCompressor)
 	// Zstd:chunked compression.
-	ZstdChunked = internal.NewAlgorithm("zstd:chunked", "zstd",
+	ZstdChunked = internal.NewAlgorithm(types.ZstdChunkedAlgorithmName, types.ZstdAlgorithmName, /* Note: InternalUnstableUndocumentedMIMEQuestionMark is not ZstdChunkedAlgorithmName */
 		nil, ZstdDecompressor, chunked.ZstdCompressor)
 
 	compressionAlgorithms = map[string]Algorithm{
