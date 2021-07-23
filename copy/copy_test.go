@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/containers/image/v5/pkg/compression"
+	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -80,7 +81,7 @@ func TestDigestingReaderRead(t *testing.T) {
 	}
 }
 
-func goDiffIDComputationGoroutineWithTimeout(layerStream io.ReadCloser, decompressor compression.DecompressorFunc) *diffIDResult {
+func goDiffIDComputationGoroutineWithTimeout(layerStream io.ReadCloser, decompressor compressiontypes.DecompressorFunc) *diffIDResult {
 	ch := make(chan diffIDResult)
 	go diffIDComputationGoroutine(ch, layerStream, nil)
 	timeout := time.After(time.Second)
@@ -112,7 +113,7 @@ func TestDiffIDComputationGoroutine(t *testing.T) {
 func TestComputeDiffID(t *testing.T) {
 	for _, c := range []struct {
 		filename     string
-		decompressor compression.DecompressorFunc
+		decompressor compressiontypes.DecompressorFunc
 		result       digest.Digest
 	}{
 		{"fixtures/Hello.uncompressed", nil, "sha256:185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969"},

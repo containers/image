@@ -20,6 +20,7 @@ import (
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache"
 	"github.com/containers/image/v5/pkg/compression"
+	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/transports"
 	"github.com/containers/image/v5/types"
@@ -57,7 +58,7 @@ var compressionBufferSize = 1048576
 
 // expectedCompressionFormats is used to check if a blob with a specified media type is compressed
 // using the algorithm that the media type says it should be compressed with
-var expectedCompressionFormats = map[string]*compression.Algorithm{
+var expectedCompressionFormats = map[string]*compressiontypes.Algorithm{
 	imgspecv1.MediaTypeImageLayerGzip:      &compression.Gzip,
 	imgspecv1.MediaTypeImageLayerZstd:      &compression.Zstd,
 	manifest.DockerV2Schema2LayerMediaType: &compression.Gzip,
@@ -117,7 +118,7 @@ type copier struct {
 	progress              chan types.ProgressProperties
 	blobInfoCache         internalblobinfocache.BlobInfoCache2
 	copyInParallel        bool
-	compressionFormat     compression.Algorithm
+	compressionFormat     compressiontypes.Algorithm
 	compressionLevel      *int
 	ociDecryptConfig      *encconfig.DecryptConfig
 	ociEncryptConfig      *encconfig.EncryptConfig
@@ -1360,7 +1361,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 // and returns a complete blobInfo of the copied blob and perhaps a <-chan diffIDResult if diffIDIsNeeded, to be read by the caller.
 func (ic *imageCopier) copyLayerFromStream(ctx context.Context, srcStream io.Reader, srcInfo types.BlobInfo,
 	diffIDIsNeeded bool, toEncrypt bool, bar *mpb.Bar, layerIndex int, emptyLayer bool) (types.BlobInfo, <-chan diffIDResult, error) {
-	var getDiffIDRecorder func(compression.DecompressorFunc) io.Writer // = nil
+	var getDiffIDRecorder func(compressiontypes.DecompressorFunc) io.Writer // = nil
 	var diffIDChan chan diffIDResult
 
 	err := errors.New("Internal error: unexpected panic in copyLayer") // For pipeWriter.CloseWithbelow
@@ -1371,7 +1372,7 @@ func (ic *imageCopier) copyLayerFromStream(ctx context.Context, srcStream io.Rea
 			_ = pipeWriter.CloseWithError(err) // CloseWithError(nil) is equivalent to Close(), always returns nil
 		}()
 
-		getDiffIDRecorder = func(decompressor compression.DecompressorFunc) io.Writer {
+		getDiffIDRecorder = func(decompressor compressiontypes.DecompressorFunc) io.Writer {
 			// If this fails, e.g. because we have exited and due to pipeWriter.CloseWithError() above further
 			// reading from the pipe has failed, we don’t really care.
 			// We only read from diffIDChan if the rest of the flow has succeeded, and when we do read from it,
@@ -1390,7 +1391,7 @@ func (ic *imageCopier) copyLayerFromStream(ctx context.Context, srcStream io.Rea
 }
 
 // diffIDComputationGoroutine reads all input from layerStream, uncompresses using decompressor if necessary, and sends its digest, and status, if any, to dest.
-func diffIDComputationGoroutine(dest chan<- diffIDResult, layerStream io.ReadCloser, decompressor compression.DecompressorFunc) {
+func diffIDComputationGoroutine(dest chan<- diffIDResult, layerStream io.ReadCloser, decompressor compressiontypes.DecompressorFunc) {
 	result := diffIDResult{
 		digest: "",
 		err:    errors.New("Internal error: unexpected panic in diffIDComputationGoroutine"),
@@ -1402,7 +1403,7 @@ func diffIDComputationGoroutine(dest chan<- diffIDResult, layerStream io.ReadClo
 }
 
 // computeDiffID reads all input from layerStream, uncompresses it using decompressor if necessary, and returns its digest.
-func computeDiffID(stream io.Reader, decompressor compression.DecompressorFunc) (digest.Digest, error) {
+func computeDiffID(stream io.Reader, decompressor compressiontypes.DecompressorFunc) (digest.Digest, error) {
 	if decompressor != nil {
 		s, err := decompressor(stream)
 		if err != nil {
@@ -1435,7 +1436,7 @@ func (r errorAnnotationReader) Read(b []byte) (n int, err error) {
 // perhaps (de/re/)compressing it if canModifyBlob,
 // and returns a complete blobInfo of the copied blob.
 func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, srcInfo types.BlobInfo,
-	getOriginalLayerCopyWriter func(decompressor compression.DecompressorFunc) io.Writer,
+	getOriginalLayerCopyWriter func(decompressor compressiontypes.DecompressorFunc) io.Writer,
 	canModifyBlob bool, isConfig bool, toEncrypt bool, bar *mpb.Bar, layerIndex int, emptyLayer bool) (types.BlobInfo, error) {
 	if isConfig { // This is guaranteed by the caller, but set it here to be explicit.
 		canModifyBlob = false
@@ -1729,7 +1730,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 }
 
 // doCompression reads all input from src and writes its compressed equivalent to dest.
-func doCompression(dest io.Writer, src io.Reader, metadata map[string]string, compressionFormat compression.Algorithm, compressionLevel *int) error {
+func doCompression(dest io.Writer, src io.Reader, metadata map[string]string, compressionFormat compressiontypes.Algorithm, compressionLevel *int) error {
 	compressor, err := compression.CompressStreamWithMetadata(dest, metadata, compressionFormat, compressionLevel)
 	if err != nil {
 		return err
@@ -1747,7 +1748,7 @@ func doCompression(dest io.Writer, src io.Reader, metadata map[string]string, co
 }
 
 // compressGoroutine reads all input from src and writes its compressed equivalent to dest.
-func (c *copier) compressGoroutine(dest *io.PipeWriter, src io.Reader, metadata map[string]string, compressionFormat compression.Algorithm) {
+func (c *copier) compressGoroutine(dest *io.PipeWriter, src io.Reader, metadata map[string]string, compressionFormat compressiontypes.Algorithm) {
 	err := errors.New("Internal error: unexpected panic in compressGoroutine")
 	defer func() { // Note that this is not the same as {defer dest.CloseWithError(err)}; we need err to be evaluated lazily.
 		_ = dest.CloseWithError(err) // CloseWithError(nil) is equivalent to Close(), always returns nil
