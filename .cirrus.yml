@@ -143,8 +143,6 @@ test_skopeo_task:
         "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" vendor
     build_script: >-
         "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" build
-    validate_script: >-
-        "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" validate
     unit_script: >-
         "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" unit
     integration_script: >-
