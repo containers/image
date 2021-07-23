@@ -27,7 +27,7 @@ var (
 	Bzip2 = internal.NewAlgorithm("bzip2", "bzip2",
 		[]byte{0x42, 0x5A, 0x68}, Bzip2Decompressor, bzip2Compressor)
 	// Xz compression.
-	Xz = internal.NewAlgorithm("Xz", "xz",
+	Xz = internal.NewAlgorithm("Xz", "Xz",
 		[]byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}, XzDecompressor, xzCompressor)
 	// Zstd compression.
 	Zstd = internal.NewAlgorithm("zstd", "zstd",
