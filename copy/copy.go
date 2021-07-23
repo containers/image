@@ -294,11 +294,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 	}
 	// Default to using gzip compression unless specified otherwise.
 	if options.DestinationCtx == nil || options.DestinationCtx.CompressionFormat == nil {
-		algo, err := compression.AlgorithmByName("gzip")
-		if err != nil {
-			return nil, err
-		}
-		c.compressionFormat = algo
+		c.compressionFormat = compression.Gzip
 	} else {
 		c.compressionFormat = *options.DestinationCtx.CompressionFormat
 	}
