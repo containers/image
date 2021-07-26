@@ -205,7 +205,9 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	}
 
 	logrus.Debugf("Upload of layer %s complete", computedDigest)
-	cache.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), computedDigest, newBICLocationReference(d.ref))
+	if inputInfo.CryptoOperation != types.Encrypt {
+		cache.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), computedDigest, newBICLocationReference(d.ref))
+	}
 	return types.BlobInfo{Digest: computedDigest, Size: sizeCounter.size}, nil
 }
 

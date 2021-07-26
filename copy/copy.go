@@ -1620,6 +1620,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 			finalizer = fin
 			inputInfo.Digest = ""
 			inputInfo.Size = -1
+			inputInfo.CryptoOperation = types.Encrypt
 			encrypted = true
 		}
 	}
