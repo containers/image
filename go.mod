@@ -1,6 +1,6 @@
 module github.com/containers/image/v5
 
-go 1.11
+go 1.13
 
 require (
 	github.com/14rcole/gopopulate v0.0.0-20180821133914-b175b219e774 // indirect
