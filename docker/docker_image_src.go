@@ -454,11 +454,10 @@ func (s *dockerImageSource) getOneSignature(ctx context.Context, url *url.URL) (
 
 	case "http", "https":
 		logrus.Debugf("GET %s", url)
-		req, err := http.NewRequest("GET", url.String(), nil)
+		req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
 		if err != nil {
 			return nil, false, err
 		}
-		req = req.WithContext(ctx)
 		res, err := s.c.client.Do(req)
 		if err != nil {
 			return nil, false, err

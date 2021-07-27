@@ -79,11 +79,10 @@ func (c *openshiftClient) doRequest(ctx context.Context, method, path string, re
 		logrus.Debugf("Will send body: %s", requestBody)
 		requestBodyReader = bytes.NewReader(requestBody)
 	}
-	req, err := http.NewRequest(method, url.String(), requestBodyReader)
+	req, err := http.NewRequestWithContext(ctx, method, url.String(), requestBodyReader)
 	if err != nil {
 		return nil, err
 	}
-	req = req.WithContext(ctx)
 
 	if len(c.bearerToken) != 0 {
 		req.Header.Set("Authorization", "Bearer "+c.bearerToken)

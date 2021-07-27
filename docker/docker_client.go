@@ -534,11 +534,10 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 // makeRequest should generally be preferred.
 // Note that no exponential back off is performed when receiving an http 429 status code.
 func (c *dockerClient) makeRequestToResolvedURLOnce(ctx context.Context, method, url string, headers map[string][]string, stream io.Reader, streamLen int64, auth sendAuth, extraScope *authScope) (*http.Response, error) {
-	req, err := http.NewRequest(method, url, stream)
+	req, err := http.NewRequestWithContext(ctx, method, url, stream)
 	if err != nil {
 		return nil, err
 	}
-	req = req.WithContext(ctx)
 	if streamLen != -1 { // Do not blindly overwrite if streamLen == -1, http.NewRequest above can figure out the length of bytes.Reader and similar objects without us having to compute it.
 		req.ContentLength = streamLen
 	}
@@ -631,12 +630,10 @@ func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge chall
 		return nil, errors.Errorf("missing realm in bearer auth challenge")
 	}
 
-	authReq, err := http.NewRequest(http.MethodPost, realm, nil)
+	authReq, err := http.NewRequestWithContext(ctx, http.MethodPost, realm, nil)
 	if err != nil {
 		return nil, err
 	}
-
-	authReq = authReq.WithContext(ctx)
 
 	// Make the form data required against the oauth2 authentication
 	// More details here: https://docs.docker.com/registry/spec/auth/oauth/
@@ -681,12 +678,11 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
 		return nil, errors.Errorf("missing realm in bearer auth challenge")
 	}
 
-	authReq, err := http.NewRequest(http.MethodGet, realm, nil)
+	authReq, err := http.NewRequestWithContext(ctx, http.MethodGet, realm, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	authReq = authReq.WithContext(ctx)
 	params := authReq.URL.Query()
 	if c.auth.Username != "" {
 		params.Add("account", c.auth.Username)
