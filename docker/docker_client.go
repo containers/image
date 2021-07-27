@@ -407,7 +407,8 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			logrus.Errorf("error getting search results from v2 endpoint %q: %v", registry, httpResponseToError(resp, ""))
+			err := httpResponseToError(resp, "")
+			logrus.Errorf("error getting search results from v2 endpoint %q: %v", registry, err)
 			return nil, errors.Wrapf(err, "couldn't search registry %q", registry)
 		}
 		v2Res := &V2Results{}
