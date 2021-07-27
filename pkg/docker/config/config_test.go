@@ -192,17 +192,17 @@ func TestGetAuth(t *testing.T) {
 			},
 			{
 				name:     "normalize registry",
-				hostname: "https://example.org/v1",
+				hostname: "normalize.example.org",
 				path:     filepath.Join("testdata", "full.json"),
 				expected: types.DockerAuthConfig{
-					Username: "example",
-					Password: "org",
+					Username: "normalize",
+					Password: "example",
 				},
 				testPreviousAPI: true,
 			},
 			{
 				name:     "match localhost",
-				hostname: "http://localhost",
+				hostname: "localhost",
 				path:     filepath.Join("testdata", "full.json"),
 				expected: types.DockerAuthConfig{
 					Username: "local",
@@ -222,7 +222,7 @@ func TestGetAuth(t *testing.T) {
 			},
 			{
 				name:     "match port",
-				hostname: "https://localhost:5000",
+				hostname: "localhost:5000",
 				path:     filepath.Join("testdata", "abnormal.json"),
 				expected: types.DockerAuthConfig{
 					Username: "local",
@@ -387,16 +387,16 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 		expectedError error
 	}{
 		{
-			name:     "normalize registry",
-			hostname: "https://docker.io/v1",
+			name:     "ignore schema and path",
+			hostname: "localhost",
 			expected: types.DockerAuthConfig{
-				Username: "docker",
-				Password: "io-legacy",
+				Username: "local",
+				Password: "host-legacy",
 			},
 		},
 		{
-			name:     "ignore schema and path",
-			hostname: "http://index.docker.io/v1",
+			name:     "normalize registry",
+			hostname: "docker.io",
 			expected: types.DockerAuthConfig{
 				Username: "docker",
 				Password: "io-legacy",
