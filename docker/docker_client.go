@@ -304,7 +304,7 @@ func CheckAuth(ctx context.Context, sys *types.SystemContext, username, password
 		Password: password,
 	}
 
-	resp, err := client.makeRequest(ctx, "GET", "/v2/", nil, nil, v2Auth, nil)
+	resp, err := client.makeRequest(ctx, http.MethodGet, "/v2/", nil, nil, v2Auth, nil)
 	if err != nil {
 		return err
 	}
@@ -380,7 +380,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 		u.RawQuery = q.Encode()
 
 		logrus.Debugf("trying to talk to v1 search endpoint")
-		resp, err := client.makeRequest(ctx, "GET", u.String(), nil, nil, noAuth, nil)
+		resp, err := client.makeRequest(ctx, http.MethodGet, u.String(), nil, nil, noAuth, nil)
 		if err != nil {
 			logrus.Debugf("error getting search results from v1 endpoint %q: %v", registry, err)
 		} else {
@@ -400,7 +400,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 	searchRes := []SearchResult{}
 	path := "/v2/_catalog"
 	for len(searchRes) < limit {
-		resp, err := client.makeRequest(ctx, "GET", path, nil, nil, v2Auth, nil)
+		resp, err := client.makeRequest(ctx, http.MethodGet, path, nil, nil, v2Auth, nil)
 		if err != nil {
 			logrus.Debugf("error getting search results from v2 endpoint %q: %v", registry, err)
 			return nil, errors.Wrapf(err, "couldn't search registry %q", registry)
@@ -736,7 +736,7 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 
 	ping := func(scheme string) error {
 		url := fmt.Sprintf(resolvedPingV2URL, scheme, c.registry)
-		resp, err := c.makeRequestToResolvedURL(ctx, "GET", url, nil, nil, -1, noAuth, nil)
+		resp, err := c.makeRequestToResolvedURL(ctx, http.MethodGet, url, nil, nil, -1, noAuth, nil)
 		if err != nil {
 			logrus.Debugf("Ping %s err %s (%#v)", url, err.Error(), err)
 			return err
@@ -763,7 +763,7 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 		// best effort to understand if we're talking to a V1 registry
 		pingV1 := func(scheme string) bool {
 			url := fmt.Sprintf(resolvedPingV1URL, scheme, c.registry)
-			resp, err := c.makeRequestToResolvedURL(ctx, "GET", url, nil, nil, -1, noAuth, nil)
+			resp, err := c.makeRequestToResolvedURL(ctx, http.MethodGet, url, nil, nil, -1, noAuth, nil)
 			if err != nil {
 				logrus.Debugf("Ping %s err %s (%#v)", url, err.Error(), err)
 				return false
@@ -797,7 +797,7 @@ func (c *dockerClient) detectProperties(ctx context.Context) error {
 // using the original data structures.
 func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerReference, manifestDigest digest.Digest) (*extensionSignatureList, error) {
 	path := fmt.Sprintf(extensionsSignaturePath, reference.Path(ref.ref), manifestDigest)
-	res, err := c.makeRequest(ctx, "GET", path, nil, nil, v2Auth, nil)
+	res, err := c.makeRequest(ctx, http.MethodGet, path, nil, nil, v2Auth, nil)
 	if err != nil {
 		return nil, err
 	}
