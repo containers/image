@@ -31,7 +31,12 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (types.Imag
 	if sys != nil {
 		if sys.DirForceCompress {
 			desiredLayerCompression = types.Compress
-		} else if sys.DirForceDecompress {
+
+			if sys.DirForceDecompress {
+				return nil, errors.Errorf("Cannot compress and decompress at the same time")
+			}
+		}
+		if sys.DirForceDecompress {
 			desiredLayerCompression = types.Decompress
 		}
 	}
