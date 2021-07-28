@@ -664,14 +664,11 @@ func findAuthentication(ref reference.Named, registry, path string, legacyFormat
 	// those entries even in non-legacyFormat ~/.docker/config.json.
 	// The docker.io registry still uses the /v1/ key with a special host name,
 	// so account for that as well.
-	registry = normalizeAuthFileKey(registry, legacyFormat)
-	normalizedAuths := map[string]dockerAuthConfig{}
+	registry = normalizeRegistry(registry)
 	for k, v := range auths.AuthConfigs {
-		normalizedAuths[normalizeAuthFileKey(k, legacyFormat)] = v
-	}
-
-	if val, exists := normalizedAuths[registry]; exists {
-		return decodeDockerAuth(val)
+		if normalizeAuthFileKey(k, legacyFormat) == registry {
+			return decodeDockerAuth(v)
+		}
 	}
 
 	return types.DockerAuthConfig{}, nil

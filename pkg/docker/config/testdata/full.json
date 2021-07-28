@@ -20,6 +20,9 @@
     },
     "10.10.30.45:5000": {
       "auth": "MTAuMTA6MzAuNDUtNTAwMA=="
+    },
+    "https://normalize.example.org/v1": {
+      "auth": "bm9ybWFsaXplOmV4YW1wbGU="
     }
   }
 }
