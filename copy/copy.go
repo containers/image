@@ -1312,7 +1312,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 			return info, cachedDiffID, nil
 		}
 		bar.Abort(true)
-		logrus.Errorf("Failed to retrieve partial blob: %v", err)
+		logrus.Debugf("Failed to retrieve partial blob: %v", err)
 	}
 
 	// Fallback: copy the layer, computing the diffID if we need to do so
