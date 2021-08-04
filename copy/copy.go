@@ -957,7 +957,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	}
 
 	if err := func() error { // A scope for defer
-		progressPool, progressCleanup := ic.c.newProgressPool(ctx)
+		progressPool, progressCleanup := ic.c.newProgressPool()
 		defer func() {
 			// Wait for all layers to be copied. progressCleanup() must not be called while any of the copyLayerHelpers interact with the progressPool.
 			copyGroup.Wait()
@@ -1063,11 +1063,12 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest(ctx context.Context, instanc
 
 // newProgressPool creates a *mpb.Progress and a cleanup function.
 // The caller must eventually call the returned cleanup function after the pool will no longer be updated.
-func (c *copier) newProgressPool(ctx context.Context) (*mpb.Progress, func()) {
-	ctx, cancel := context.WithCancel(ctx)
-	pool := mpb.NewWithContext(ctx, mpb.WithWidth(40), mpb.WithOutput(c.progressOutput))
+// NOTE: Every progress bar created within the progress pool must either successfully
+// complete or be aborted, or the cleanup function will hang. That is typically done
+// using "defer bar.Abort(false)", which must be called BEFORE the pool’s cleanup function is called.
+func (c *copier) newProgressPool() (*mpb.Progress, func()) {
+	pool := mpb.New(mpb.WithWidth(40), mpb.WithOutput(c.progressOutput))
 	return pool, func() {
-		cancel()
 		pool.Wait()
 	}
 }
@@ -1090,6 +1091,9 @@ func customPartialBlobCounter(filler interface{}, wcc ...decor.WC) decor.Decorat
 
 // createProgressBar creates a mpb.Bar in pool.  Note that if the copier's reportWriter
 // is ioutil.Discard, the progress bar's output will be discarded
+// NOTE: Every progress bar created within the progress pool must either successfully
+// complete or be aborted, or the pool’s cleanup function will hang. That is typically done
+// using "defer bar.Abort(false)", which must be called BEFORE the pool’s cleanup function is called.
 func (c *copier) createProgressBar(pool *mpb.Progress, partial bool, info types.BlobInfo, kind string, onComplete string) *mpb.Bar {
 	// shortDigestLen is the length of the digest used for blobs.
 	const shortDigestLen = 12
@@ -1155,7 +1159,7 @@ func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 		}
 
 		destInfo, err := func() (types.BlobInfo, error) { // A scope for defer
-			progressPool, progressCleanup := c.newProgressPool(ctx)
+			progressPool, progressCleanup := c.newProgressPool()
 			defer progressCleanup()
 			bar := c.createProgressBar(progressPool, false, srcInfo, "config", "done")
 			defer bar.Abort(false)
