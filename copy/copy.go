@@ -957,11 +957,11 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	}
 
 	if err := func() error { // A scope for defer
-		progressPool, progressCleanup := ic.c.newProgressPool()
+		progressPool := ic.c.newProgressPool()
 		defer func() {
-			// Wait for all layers to be copied. progressCleanup() must not be called while any of the copyLayerHelpers interact with the progressPool.
+			// Wait for all layers to be copied. progressPool.Wait() must not be called while any of the copyLayerHelpers interact with the progressPool.
 			copyGroup.Wait()
-			progressCleanup()
+			progressPool.Wait()
 		}()
 
 		for i, srcLayer := range srcInfos {
@@ -1061,16 +1061,13 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest(ctx context.Context, instanc
 	return man, manifestDigest, nil
 }
 
-// newProgressPool creates a *mpb.Progress and a cleanup function.
-// The caller must eventually call the returned cleanup function after the pool will no longer be updated.
+// newProgressPool creates a *mpb.Progress.
+// The caller must eventually call pool.Wait() after the pool will no longer be updated.
 // NOTE: Every progress bar created within the progress pool must either successfully
-// complete or be aborted, or the cleanup function will hang. That is typically done
-// using "defer bar.Abort(false)", which must be called BEFORE the pool’s cleanup function is called.
-func (c *copier) newProgressPool() (*mpb.Progress, func()) {
-	pool := mpb.New(mpb.WithWidth(40), mpb.WithOutput(c.progressOutput))
-	return pool, func() {
-		pool.Wait()
-	}
+// complete or be aborted, or pool.Wait() will hang. That is typically done
+// using "defer bar.Abort(false)", which must be called BEFORE pool.Wait() is called.
+func (c *copier) newProgressPool() *mpb.Progress {
+	return mpb.New(mpb.WithWidth(40), mpb.WithOutput(c.progressOutput))
 }
 
 // customPartialBlobCounter provides a decorator function for the partial blobs retrieval progress bar
@@ -1091,9 +1088,9 @@ func customPartialBlobCounter(filler interface{}, wcc ...decor.WC) decor.Decorat
 
 // createProgressBar creates a mpb.Bar in pool.  Note that if the copier's reportWriter
 // is ioutil.Discard, the progress bar's output will be discarded
-// NOTE: Every progress bar created within the progress pool must either successfully
-// complete or be aborted, or the pool’s cleanup function will hang. That is typically done
-// using "defer bar.Abort(false)", which must be called BEFORE the pool’s cleanup function is called.
+// NOTE: Every progress bar created within a progress pool must either successfully
+// complete or be aborted, or pool.Wait() will hang. That is typically done
+// using "defer bar.Abort(false)", which must happen BEFORE pool.Wait() is called.
 func (c *copier) createProgressBar(pool *mpb.Progress, partial bool, info types.BlobInfo, kind string, onComplete string) *mpb.Bar {
 	// shortDigestLen is the length of the digest used for blobs.
 	const shortDigestLen = 12
@@ -1159,8 +1156,8 @@ func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 		}
 
 		destInfo, err := func() (types.BlobInfo, error) { // A scope for defer
-			progressPool, progressCleanup := c.newProgressPool()
-			defer progressCleanup()
+			progressPool := c.newProgressPool()
+			defer progressPool.Wait()
 			bar := c.createProgressBar(progressPool, false, srcInfo, "config", "done")
 			defer bar.Abort(false)
 
