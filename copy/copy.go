@@ -958,11 +958,10 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 
 	if err := func() error { // A scope for defer
 		progressPool := ic.c.newProgressPool()
-		defer func() {
-			// Wait for all layers to be copied. progressPool.Wait() must not be called while any of the copyLayerHelpers interact with the progressPool.
-			copyGroup.Wait()
-			progressPool.Wait()
-		}()
+		defer progressPool.Wait()
+
+		// Ensure we wait for all layers to be copied. progressPool.Wait() must not be called while any of the copyLayerHelpers interact with the progressPool.
+		defer copyGroup.Wait()
 
 		for i, srcLayer := range srcInfos {
 			err = copySemaphore.Acquire(ctx, 1)
