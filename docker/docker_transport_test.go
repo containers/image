@@ -153,7 +153,7 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 }
 
 func TestReferenceNewImage(t *testing.T) {
-	ref, err := ParseReference("//busybox")
+	ref, err := ParseReference("//quay.io/libpod/busybox")
 	require.NoError(t, err)
 	img, err := ref.NewImage(context.Background(), &types.SystemContext{
 		RegistriesDirPath:        "/this/does/not/exist",
@@ -166,7 +166,7 @@ func TestReferenceNewImage(t *testing.T) {
 }
 
 func TestReferenceNewImageSource(t *testing.T) {
-	ref, err := ParseReference("//busybox")
+	ref, err := ParseReference("//quay.io/libpod/busybox")
 	require.NoError(t, err)
 	src, err := ref.NewImageSource(context.Background(),
 		&types.SystemContext{RegistriesDirPath: "/this/does/not/exist", DockerPerHostCertDirPath: "/this/does/not/exist"})
@@ -175,7 +175,7 @@ func TestReferenceNewImageSource(t *testing.T) {
 }
 
 func TestReferenceNewImageDestination(t *testing.T) {
-	ref, err := ParseReference("//busybox")
+	ref, err := ParseReference("//quay.io/libpod/busybox")
 	require.NoError(t, err)
 	dest, err := ref.NewImageDestination(context.Background(),
 		&types.SystemContext{RegistriesDirPath: "/this/does/not/exist", DockerPerHostCertDirPath: "/this/does/not/exist"})

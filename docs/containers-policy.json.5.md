@@ -68,7 +68,7 @@ i.e. either specifying a complete name of a tagged image, or prefix denoting
 a host/namespace/image stream or a wildcarded expression for matching all
 subdomains. For wildcarded subdomain matching, `*.example.com` is a valid case, but `example*.*.com` is not.
 
-*Note:* The _hostname_ and _port_ refer to the Docker registry host and port (the one used
+*Note:* The _hostname_ and _port_ refer to the container registry host and port (the one used
 e.g. for `docker pull`), _not_ to the OpenShift API host and port.
 
 ### `dir:`

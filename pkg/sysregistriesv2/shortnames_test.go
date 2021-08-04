@@ -10,6 +10,29 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestShortNameAliasConfNonempty(t *testing.T) {
+	for _, c := range []shortNameAliasConf{
+		{},
+		{Aliases: map[string]string{}},
+	} {
+		copy := c // A shallow copy
+		res := copy.nonempty()
+		assert.False(t, res, c)
+		assert.Equal(t, c, copy, c) // Ensure the method did not change the original value
+	}
+
+	res := (&shortNameAliasConf{}).nonempty()
+	assert.False(t, res)
+	for _, c := range []shortNameAliasConf{
+		{Aliases: map[string]string{"a": "example.com/b"}},
+	} {
+		copy := c // A shallow copy
+		res := copy.nonempty()
+		assert.True(t, res, c)
+		assert.Equal(t, c, copy, c) // Ensure the method did not change the original value
+	}
+}
+
 func TestParseShortNameValue(t *testing.T) {
 	tests := []struct {
 		input string

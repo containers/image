@@ -42,7 +42,7 @@ func TestGetPutManifest(t *testing.T) {
 	assert.NoError(t, err)
 	err = dest.PutManifest(context.Background(), list, nil)
 	assert.NoError(t, err)
-	err = dest.Commit(context.Background(), nil)
+	err = dest.Commit(context.Background(), nil) // nil unparsedToplevel is invalid, we don’t currently use the value
 	assert.NoError(t, err)
 
 	src, err := ref.NewImageSource(context.Background(), nil)
@@ -71,7 +71,7 @@ func TestGetPutBlob(t *testing.T) {
 	assert.Equal(t, types.PreserveOriginal, dest.DesiredLayerCompression())
 	info, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{Digest: digest.Digest("sha256:digest-test"), Size: int64(9)}, cache, false)
 	assert.NoError(t, err)
-	err = dest.Commit(context.Background(), nil)
+	err = dest.Commit(context.Background(), nil) // nil unparsedToplevel is invalid, we don’t currently use the value
 	assert.NoError(t, err)
 	assert.Equal(t, int64(9), info.Size)
 	assert.Equal(t, digest.FromBytes(blob), info.Digest)
@@ -130,7 +130,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	_, err = dest.PutBlob(context.Background(), reader, types.BlobInfo{Digest: blobDigest, Size: -1}, cache, false)
 	assert.Error(t, err)
 	assert.Contains(t, digestErrorString, err.Error())
-	err = dest.Commit(context.Background(), nil)
+	err = dest.Commit(context.Background(), nil) // nil unparsedToplevel is invalid, we don’t currently use the value
 	assert.NoError(t, err)
 
 	_, err = os.Lstat(blobPath)
@@ -142,40 +142,35 @@ func TestGetPutSignatures(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)
 
-	dest, err := ref.NewImageDestination(context.Background(), nil)
-	require.NoError(t, err)
-	defer dest.Close()
 	man := []byte("test-manifest")
+	list := []byte("test-manifest-list")
+	md, err := manifest.Digest(man)
+	require.NoError(t, err)
 	signatures := [][]byte{
 		[]byte("sig1"),
 		[]byte("sig2"),
 	}
-	err = dest.SupportsSignatures(context.Background())
-	assert.NoError(t, err)
-	err = dest.PutManifest(context.Background(), man, nil)
-	require.NoError(t, err)
-
-	err = dest.PutSignatures(context.Background(), signatures, nil)
-	require.NoError(t, err)
 	listSignatures := [][]byte{
 		[]byte("sig3"),
 		[]byte("sig4"),
 	}
-	md, err := manifest.Digest(man)
-	require.NoError(t, err)
 
+	dest, err := ref.NewImageDestination(context.Background(), nil)
+	require.NoError(t, err)
+	defer dest.Close()
 	err = dest.SupportsSignatures(context.Background())
 	assert.NoError(t, err)
-	err = dest.PutManifest(context.Background(), man, nil)
-	require.NoError(t, err)
+
 	err = dest.PutManifest(context.Background(), man, &md)
 	require.NoError(t, err)
+	err = dest.PutManifest(context.Background(), list, nil)
+	require.NoError(t, err)
 
-	err = dest.PutSignatures(context.Background(), listSignatures, nil)
-	assert.NoError(t, err)
 	err = dest.PutSignatures(context.Background(), signatures, &md)
 	assert.NoError(t, err)
-	err = dest.Commit(context.Background(), nil)
+	err = dest.PutSignatures(context.Background(), listSignatures, nil)
+	assert.NoError(t, err)
+	err = dest.Commit(context.Background(), nil) // nil unparsedToplevel is invalid, we don’t currently use the value
 	assert.NoError(t, err)
 
 	src, err := ref.NewImageSource(context.Background(), nil)

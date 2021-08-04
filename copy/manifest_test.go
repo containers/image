@@ -9,7 +9,7 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
-	"github.com/opencontainers/image-spec/specs-go/v1"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -218,5 +218,76 @@ func TestIsMultiImage(t *testing.T) {
 	// Error getting manifest MIME type
 	src := fakeImageSource("")
 	_, err := isMultiImage(context.Background(), src)
+	assert.Error(t, err)
+}
+
+func TestDetermineManifestListConversion(t *testing.T) {
+	supportS1S2OCI := []string{
+		v1.MediaTypeImageIndex,
+		v1.MediaTypeImageManifest,
+		manifest.DockerV2ListMediaType,
+		manifest.DockerV2Schema2MediaType,
+		manifest.DockerV2Schema1SignedMediaType,
+		manifest.DockerV2Schema1MediaType,
+	}
+	supportS1S2 := []string{
+		manifest.DockerV2ListMediaType,
+		manifest.DockerV2Schema2MediaType,
+		manifest.DockerV2Schema1SignedMediaType,
+		manifest.DockerV2Schema1MediaType,
+	}
+	supportOnlyOCI := []string{
+		v1.MediaTypeImageIndex,
+		v1.MediaTypeImageManifest,
+	}
+	supportOnlyS1 := []string{
+		manifest.DockerV2Schema1SignedMediaType,
+		manifest.DockerV2Schema1MediaType,
+	}
+
+	cases := []struct {
+		description             string
+		sourceType              string
+		destTypes               []string
+		expectedUpdate          string
+		expectedOtherCandidates []string
+	}{
+		// Destination accepts anything — try all variants
+		{"s2→anything", manifest.DockerV2ListMediaType, nil, "", []string{v1.MediaTypeImageIndex}},
+		{"OCI→anything", v1.MediaTypeImageIndex, nil, "", []string{manifest.DockerV2ListMediaType}},
+		// Destination accepts the unmodified original
+		{"s2→s1s2OCI", manifest.DockerV2ListMediaType, supportS1S2OCI, "", []string{v1.MediaTypeImageIndex}},
+		{"OCI→s1s2OCI", v1.MediaTypeImageIndex, supportS1S2OCI, "", []string{manifest.DockerV2ListMediaType}},
+		{"s2→s1s2", manifest.DockerV2ListMediaType, supportS1S2, "", []string{}},
+		{"OCI→OCI", v1.MediaTypeImageIndex, supportOnlyOCI, "", []string{}},
+		// Conversion necessary, try the preferred formats in order.
+		{"special→OCI", "unrecognized", supportS1S2OCI, v1.MediaTypeImageIndex, []string{manifest.DockerV2ListMediaType}},
+		{"special→s2", "unrecognized", supportS1S2, manifest.DockerV2ListMediaType, []string{}},
+	}
+
+	for _, c := range cases {
+		copier := &copier{}
+		preferredMIMEType, otherCandidates, err := copier.determineListConversion(c.sourceType, c.destTypes, "")
+		require.NoError(t, err, c.description)
+		if c.expectedUpdate == "" {
+			assert.Equal(t, manifest.NormalizedMIMEType(c.sourceType), preferredMIMEType, c.description)
+		} else {
+			assert.Equal(t, c.expectedUpdate, preferredMIMEType, c.description)
+		}
+		assert.Equal(t, c.expectedOtherCandidates, otherCandidates, c.description)
+	}
+
+	// With forceManifestMIMEType, the output is always the forced manifest type (in this case OCI index)
+	for _, c := range cases {
+		copier := &copier{}
+		preferredMIMEType, otherCandidates, err := copier.determineListConversion(c.sourceType, c.destTypes, v1.MediaTypeImageIndex)
+		require.NoError(t, err, c.description)
+		assert.Equal(t, v1.MediaTypeImageIndex, preferredMIMEType, c.description)
+		assert.Equal(t, []string{}, otherCandidates, c.description)
+	}
+
+	// The destination doesn’t support list formats at all
+	copier := &copier{}
+	_, _, err := copier.determineListConversion(v1.MediaTypeImageIndex, supportOnlyS1, "")
 	assert.Error(t, err)
 }

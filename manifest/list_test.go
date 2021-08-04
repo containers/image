@@ -113,9 +113,8 @@ func TestChooseInstance(t *testing.T) {
 			},
 		},
 	} {
-		man, err := ioutil.ReadFile(filepath.Join("..", "image", "fixtures", manifestList.listFile))
+		rawManifest, err := ioutil.ReadFile(filepath.Join("..", "image", "fixtures", manifestList.listFile))
 		require.NoError(t, err)
-		rawManifest := man
 		list, err := ListFromBlob(rawManifest, GuessMIMEType(rawManifest))
 		require.NoError(t, err)
 		// Match found

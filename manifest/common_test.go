@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/containers/image/v5/pkg/compression"
+	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
@@ -58,15 +59,15 @@ func TestLayerInfosToStrings(t *testing.T) {
 
 func TestCompressionVariantMIMEType(t *testing.T) {
 	sets := []compressionMIMETypeSet{
-		{mtsUncompressed: "AU", compression.Gzip.Name(): "AG" /* No zstd variant */},
-		{mtsUncompressed: "BU", compression.Gzip.Name(): "BG", compression.Zstd.Name(): mtsUnsupportedMIMEType},
-		{ /* No uncompressed variant */ compression.Gzip.Name(): "CG", compression.Zstd.Name(): "CZ"},
-		{mtsUncompressed: "", compression.Gzip.Name(): "DG"},
+		{mtsUncompressed: "AU", compressiontypes.GzipAlgorithmName: "AG" /* No zstd variant */},
+		{mtsUncompressed: "BU", compressiontypes.GzipAlgorithmName: "BG", compressiontypes.ZstdAlgorithmName: mtsUnsupportedMIMEType},
+		{ /* No uncompressed variant */ compressiontypes.GzipAlgorithmName: "CG", compressiontypes.ZstdAlgorithmName: "CZ"},
+		{mtsUncompressed: "", compressiontypes.GzipAlgorithmName: "DG"},
 	}
 
 	for _, c := range []struct {
 		input    string
-		algo     *compression.Algorithm
+		algo     *compressiontypes.Algorithm
 		expected string
 	}{
 		{"AU", nil, "AU"}, {"AU", &compression.Gzip, "AG"}, {"AU", &compression.Zstd, ""},
