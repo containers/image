@@ -51,6 +51,10 @@ var (
 	// maxParallelDownloads is used to limit the maximum number of parallel
 	// downloads.  Let's follow Firefox by limiting it to 6.
 	maxParallelDownloads = uint(6)
+
+	// defaultCompressionFormat is used if the destination transport requests
+	// compression, and the user does not explicitly instruct us to use an algorithm.
+	defaultCompressionFormat = &compression.Gzip
 )
 
 // compressionBufferSize is the buffer size used to compress a blob
@@ -118,7 +122,7 @@ type copier struct {
 	progress              chan types.ProgressProperties
 	blobInfoCache         internalblobinfocache.BlobInfoCache2
 	copyInParallel        bool
-	compressionFormat     *compressiontypes.Algorithm
+	compressionFormat     *compressiontypes.Algorithm // Compression algorithm to use, if the user explicitly requested one, or nil.
 	compressionLevel      *int
 	ociDecryptConfig      *encconfig.DecryptConfig
 	ociEncryptConfig      *encconfig.EncryptConfig
@@ -288,14 +292,9 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		maxParallelDownloads:  options.MaxParallelDownloads,
 		downloadForeignLayers: options.DownloadForeignLayers,
 	}
-	// Default to using gzip compression unless specified otherwise.
-	if options.DestinationCtx == nil || options.DestinationCtx.CompressionFormat == nil {
-		c.compressionFormat = &compression.Gzip
-	} else {
-		c.compressionFormat = options.DestinationCtx.CompressionFormat
-	}
 	if options.DestinationCtx != nil {
-		// Note that the compressionLevel can be nil.
+		// Note that compressionFormat and compressionLevel can be nil.
+		c.compressionFormat = options.DestinationCtx.CompressionFormat
 		c.compressionLevel = options.DestinationCtx.CompressionLevel
 	}
 
@@ -1539,7 +1538,11 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 		pipeReader, pipeWriter := io.Pipe()
 		defer pipeReader.Close()
 
-		uploadCompressionFormat = c.compressionFormat
+		if c.compressionFormat != nil {
+			uploadCompressionFormat = c.compressionFormat
+		} else {
+			uploadCompressionFormat = defaultCompressionFormat
+		}
 		// If this fails while writing data, it will do pipeWriter.CloseWithError(); if it fails otherwise,
 		// e.g. because we have exited and due to pipeReader.Close() above further writing to the pipe has failed,
 		// we don’t care.
@@ -1548,7 +1551,8 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 		inputInfo.Digest = ""
 		inputInfo.Size = -1
 		uploadCompressorName = uploadCompressionFormat.Name()
-	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && isCompressed && c.compressionFormat.Name() != compressionFormat.Name() {
+	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && isCompressed &&
+		c.compressionFormat != nil && c.compressionFormat.Name() != compressionFormat.Name() {
 		// When the blob is compressed, but the desired format is different, it first needs to be decompressed and finally
 		// re-compressed using the desired format.
 		logrus.Debugf("Blob will be converted")
