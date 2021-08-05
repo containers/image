@@ -957,12 +957,11 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	}
 
 	if err := func() error { // A scope for defer
-		progressPool, progressCleanup := ic.c.newProgressPool(ctx)
-		defer func() {
-			// Wait for all layers to be copied. progressCleanup() must not be called while any of the copyLayerHelpers interact with the progressPool.
-			copyGroup.Wait()
-			progressCleanup()
-		}()
+		progressPool := ic.c.newProgressPool()
+		defer progressPool.Wait()
+
+		// Ensure we wait for all layers to be copied. progressPool.Wait() must not be called while any of the copyLayerHelpers interact with the progressPool.
+		defer copyGroup.Wait()
 
 		for i, srcLayer := range srcInfos {
 			err = copySemaphore.Acquire(ctx, 1)
@@ -1061,15 +1060,13 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest(ctx context.Context, instanc
 	return man, manifestDigest, nil
 }
 
-// newProgressPool creates a *mpb.Progress and a cleanup function.
-// The caller must eventually call the returned cleanup function after the pool will no longer be updated.
-func (c *copier) newProgressPool(ctx context.Context) (*mpb.Progress, func()) {
-	ctx, cancel := context.WithCancel(ctx)
-	pool := mpb.NewWithContext(ctx, mpb.WithWidth(40), mpb.WithOutput(c.progressOutput))
-	return pool, func() {
-		cancel()
-		pool.Wait()
-	}
+// newProgressPool creates a *mpb.Progress.
+// The caller must eventually call pool.Wait() after the pool will no longer be updated.
+// NOTE: Every progress bar created within the progress pool must either successfully
+// complete or be aborted, or pool.Wait() will hang. That is typically done
+// using "defer bar.Abort(false)", which must be called BEFORE pool.Wait() is called.
+func (c *copier) newProgressPool() *mpb.Progress {
+	return mpb.New(mpb.WithWidth(40), mpb.WithOutput(c.progressOutput))
 }
 
 // customPartialBlobCounter provides a decorator function for the partial blobs retrieval progress bar
@@ -1090,6 +1087,9 @@ func customPartialBlobCounter(filler interface{}, wcc ...decor.WC) decor.Decorat
 
 // createProgressBar creates a mpb.Bar in pool.  Note that if the copier's reportWriter
 // is ioutil.Discard, the progress bar's output will be discarded
+// NOTE: Every progress bar created within a progress pool must either successfully
+// complete or be aborted, or pool.Wait() will hang. That is typically done
+// using "defer bar.Abort(false)", which must happen BEFORE pool.Wait() is called.
 func (c *copier) createProgressBar(pool *mpb.Progress, partial bool, info types.BlobInfo, kind string, onComplete string) *mpb.Bar {
 	// shortDigestLen is the length of the digest used for blobs.
 	const shortDigestLen = 12
@@ -1155,9 +1155,11 @@ func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 		}
 
 		destInfo, err := func() (types.BlobInfo, error) { // A scope for defer
-			progressPool, progressCleanup := c.newProgressPool(ctx)
-			defer progressCleanup()
+			progressPool := c.newProgressPool()
+			defer progressPool.Wait()
 			bar := c.createProgressBar(progressPool, false, srcInfo, "config", "done")
+			defer bar.Abort(false)
+
 			destInfo, err := c.copyBlobFromStream(ctx, bytes.NewReader(configBlob), srcInfo, nil, false, true, false, bar, -1, false)
 			if err != nil {
 				return types.BlobInfo{}, err
@@ -1245,8 +1247,11 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 		}
 		if reused {
 			logrus.Debugf("Skipping blob %s (already present):", srcInfo.Digest)
-			bar := ic.c.createProgressBar(pool, false, srcInfo, "blob", "skipped: already exists")
-			bar.SetTotal(0, true)
+			func() { // A scope for defer
+				bar := ic.c.createProgressBar(pool, false, srcInfo, "blob", "skipped: already exists")
+				defer bar.Abort(false)
+				bar.SetTotal(0, true)
+			}()
 
 			// Throw an event that the layer has been skipped
 			if ic.c.progress != nil && ic.c.progressInterval > 0 {
@@ -1279,40 +1284,49 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 	imgSource, okSource := ic.c.rawSource.(internalTypes.ImageSourceSeekable)
 	imgDest, okDest := ic.c.dest.(internalTypes.ImageDestinationPartial)
 	if okSource && okDest && !diffIDIsNeeded {
-		bar := ic.c.createProgressBar(pool, true, srcInfo, "blob", "done")
+		if reused, blobInfo := func() (bool, types.BlobInfo) { // A scope for defer
+			bar := ic.c.createProgressBar(pool, true, srcInfo, "blob", "done")
+			hideProgressBar := true
+			defer func() { // Note that this is not the same as defer bar.Abort(hideProgressBar); we need hideProgressBar to be evaluated lazily.
+				bar.Abort(hideProgressBar)
+			}()
 
-		progress := make(chan int64)
-		terminate := make(chan interface{})
+			progress := make(chan int64)
+			terminate := make(chan interface{})
 
-		defer close(terminate)
-		defer close(progress)
+			defer close(terminate)
+			defer close(progress)
 
-		proxy := imageSourceSeekableProxy{
-			source:   imgSource,
-			progress: progress,
-		}
-		go func() {
-			for {
-				select {
-				case written := <-progress:
-					bar.IncrInt64(written)
-				case <-terminate:
-					return
-				}
+			proxy := imageSourceSeekableProxy{
+				source:   imgSource,
+				progress: progress,
 			}
-		}()
+			go func() {
+				for {
+					select {
+					case written := <-progress:
+						bar.IncrInt64(written)
+					case <-terminate:
+						return
+					}
+				}
+			}()
 
-		bar.SetTotal(srcInfo.Size, false)
-		info, err := imgDest.PutBlobPartial(ctx, proxy, srcInfo, ic.c.blobInfoCache)
-		if err == nil {
-			bar.SetRefill(srcInfo.Size - bar.Current())
-			bar.SetCurrent(srcInfo.Size)
-			bar.SetTotal(srcInfo.Size, true)
-			logrus.Debugf("Retrieved partial blob %v", srcInfo.Digest)
-			return info, cachedDiffID, nil
+			bar.SetTotal(srcInfo.Size, false)
+			info, err := imgDest.PutBlobPartial(ctx, proxy, srcInfo, ic.c.blobInfoCache)
+			if err == nil {
+				bar.SetRefill(srcInfo.Size - bar.Current())
+				bar.SetCurrent(srcInfo.Size)
+				bar.SetTotal(srcInfo.Size, true)
+				hideProgressBar = false
+				logrus.Debugf("Retrieved partial blob %v", srcInfo.Digest)
+				return true, info
+			}
+			logrus.Debugf("Failed to retrieve partial blob: %v", err)
+			return false, types.BlobInfo{}
+		}(); reused {
+			return blobInfo, cachedDiffID, nil
 		}
-		bar.Abort(true)
-		logrus.Debugf("Failed to retrieve partial blob: %v", err)
 	}
 
 	// Fallback: copy the layer, computing the diffID if we need to do so
@@ -1322,32 +1336,35 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 	}
 	defer srcStream.Close()
 
-	bar := ic.c.createProgressBar(pool, false, srcInfo, "blob", "done")
+	return func() (types.BlobInfo, digest.Digest, error) { // A scope for defer
+		bar := ic.c.createProgressBar(pool, false, srcInfo, "blob", "done")
+		defer bar.Abort(false)
 
-	blobInfo, diffIDChan, err := ic.copyLayerFromStream(ctx, srcStream, types.BlobInfo{Digest: srcInfo.Digest, Size: srcBlobSize, MediaType: srcInfo.MediaType, Annotations: srcInfo.Annotations}, diffIDIsNeeded, toEncrypt, bar, layerIndex, emptyLayer)
-	if err != nil {
-		return types.BlobInfo{}, "", err
-	}
-
-	diffID := cachedDiffID
-	if diffIDIsNeeded {
-		select {
-		case <-ctx.Done():
-			return types.BlobInfo{}, "", ctx.Err()
-		case diffIDResult := <-diffIDChan:
-			if diffIDResult.err != nil {
-				return types.BlobInfo{}, "", errors.Wrap(diffIDResult.err, "computing layer DiffID")
-			}
-			logrus.Debugf("Computed DiffID %s for layer %s", diffIDResult.digest, srcInfo.Digest)
-			// This is safe because we have just computed diffIDResult.Digest ourselves, and in the process
-			// we have read all of the input blob, so srcInfo.Digest must have been validated by digestingReader.
-			ic.c.blobInfoCache.RecordDigestUncompressedPair(srcInfo.Digest, diffIDResult.digest)
-			diffID = diffIDResult.digest
+		blobInfo, diffIDChan, err := ic.copyLayerFromStream(ctx, srcStream, types.BlobInfo{Digest: srcInfo.Digest, Size: srcBlobSize, MediaType: srcInfo.MediaType, Annotations: srcInfo.Annotations}, diffIDIsNeeded, toEncrypt, bar, layerIndex, emptyLayer)
+		if err != nil {
+			return types.BlobInfo{}, "", err
 		}
-	}
 
-	bar.SetTotal(srcInfo.Size, true)
-	return blobInfo, diffID, nil
+		diffID := cachedDiffID
+		if diffIDIsNeeded {
+			select {
+			case <-ctx.Done():
+				return types.BlobInfo{}, "", ctx.Err()
+			case diffIDResult := <-diffIDChan:
+				if diffIDResult.err != nil {
+					return types.BlobInfo{}, "", errors.Wrap(diffIDResult.err, "computing layer DiffID")
+				}
+				logrus.Debugf("Computed DiffID %s for layer %s", diffIDResult.digest, srcInfo.Digest)
+				// This is safe because we have just computed diffIDResult.Digest ourselves, and in the process
+				// we have read all of the input blob, so srcInfo.Digest must have been validated by digestingReader.
+				ic.c.blobInfoCache.RecordDigestUncompressedPair(srcInfo.Digest, diffIDResult.digest)
+				diffID = diffIDResult.digest
+			}
+		}
+
+		bar.SetTotal(srcInfo.Size, true)
+		return blobInfo, diffID, nil
+	}()
 }
 
 // copyLayerFromStream is an implementation detail of copyLayer; mostly providing a separate “defer” scope.
