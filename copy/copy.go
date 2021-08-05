@@ -118,7 +118,7 @@ type copier struct {
 	progress              chan types.ProgressProperties
 	blobInfoCache         internalblobinfocache.BlobInfoCache2
 	copyInParallel        bool
-	compressionFormat     compressiontypes.Algorithm
+	compressionFormat     *compressiontypes.Algorithm
 	compressionLevel      *int
 	ociDecryptConfig      *encconfig.DecryptConfig
 	ociEncryptConfig      *encconfig.EncryptConfig
@@ -290,9 +290,9 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 	}
 	// Default to using gzip compression unless specified otherwise.
 	if options.DestinationCtx == nil || options.DestinationCtx.CompressionFormat == nil {
-		c.compressionFormat = compression.Gzip
+		c.compressionFormat = &compression.Gzip
 	} else {
-		c.compressionFormat = *options.DestinationCtx.CompressionFormat
+		c.compressionFormat = options.DestinationCtx.CompressionFormat
 	}
 	if options.DestinationCtx != nil {
 		// Note that the compressionLevel can be nil.
@@ -1519,7 +1519,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 	// short-circuit conditions
 	var inputInfo types.BlobInfo
 	var compressionOperation types.LayerCompression
-	uploadCompressionFormat := &c.compressionFormat
+	uploadCompressionFormat := c.compressionFormat
 	srcCompressorName := internalblobinfocache.Uncompressed
 	if isCompressed {
 		srcCompressorName = compressionFormat.Name()
