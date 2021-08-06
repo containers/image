@@ -98,10 +98,10 @@ test_task:
     matrix:
         - name: "Test"
           env:
-              BUILDTAGS: 'btrfs_noversion libdm_no_deferred_remove'
+              BUILDTAGS: 'btrfs_noversion libdm_no_deferred_remove no_libsubid'
         - name: "Test w/ opengpg"
           env:
-              BUILDTAGS: &withopengpg 'btrfs_noversion libdm_no_deferred_remove containers_image_openpgp'
+              BUILDTAGS: &withopengpg 'btrfs_noversion libdm_no_deferred_remove containers_image_openpgp  no_libsubid'
     script: |
         make tools
         make test BUILDTAGS="$BUILDTAGS"
@@ -129,7 +129,7 @@ test_skopeo_task:
     matrix:
         - name: "Skopeo Test"
           env:
-              BUILDTAGS: 'btrfs_noversion libdm_no_deferred_remove'
+              BUILDTAGS: 'btrfs_noversion libdm_no_deferred_remove no_libsubid'
         - name: "Skopeo Test w/ opengpg"
           env:
               BUILDTAGS: *withopengpg

@@ -17,7 +17,7 @@ endif
 BUILD_TAGS_WINDOWS_CROSS = containers_image_openpgp
 BUILD_TAGS_DARWIN_CROSS = containers_image_openpgp
 
-BUILDTAGS = btrfs_noversion libdm_no_deferred_remove
+BUILDTAGS = btrfs_noversion libdm_no_deferred_remove no_libsubid
 BUILDFLAGS := -tags "$(BUILDTAGS)"
 
 PACKAGES := $(shell GO111MODULE=on go list $(BUILDFLAGS) ./...)
@@ -87,7 +87,7 @@ fmt:
 	@gofmt -l -s -w $(SOURCE_DIRS)
 
 validate: lint
-	@hack/validate.sh
+	@BUILDTAGS="$(BUILDTAGS)" hack/validate.sh
 
 lint:
 	$(GOBIN)/golangci-lint run --build-tags "$(BUILDTAGS)"
