@@ -38,7 +38,7 @@ env:
     PRIOR_UBUNTU_NAME: "ubuntu-2010"
 
     # Google-cloud VM Images
-    IMAGE_SUFFIX: "c4635821094469632"
+    IMAGE_SUFFIX: "c6724387953967104"
     FEDORA_CACHE_IMAGE_NAME: "fedora-${IMAGE_SUFFIX}"
     PRIOR_FEDORA_CACHE_IMAGE_NAME: "prior-fedora-${IMAGE_SUFFIX}"
     UBUNTU_CACHE_IMAGE_NAME: "ubuntu-${IMAGE_SUFFIX}"
@@ -49,8 +49,8 @@ env:
     PRIOR_FEDORA_CONTAINER_FQIN: "quay.io/libpod/prior-fedora_podman:${IMAGE_SUFFIX}"
     UBUNTU_CONTAINER_FQIN: "quay.io/libpod/ubuntu_podman:${IMAGE_SUFFIX}"
     PRIOR_UBUNTU_CONTAINER_FQIN: "quay.io/libpod/prior-ubuntu_podman:${IMAGE_SUFFIX}"
-    # Automatically built on quay.io when skopeo ${SKOPEO_CI_TAG} branch changes
-    SKOPEO_CI_CONTAINER_FQIN: "quay.io/skopeo/ci:${SKOPEO_CI_TAG}"
+    # Built along with the standard PR-based workflow in c/automation_images
+    SKOPEO_CIDEV_CONTAINER_FQIN: "quay.io/libpod/skopeo_cidev:${IMAGE_SUFFIX}"
 
 
 gcp_credentials: ENCRYPTED[38c860dd789c68bd4f38b24d4fa5ddb525346f7ebe02c8bc91532d625f033cb357f9b4a22f09a8299c92bfdad7556ae5]
