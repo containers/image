@@ -277,6 +277,18 @@ func TestGetAuth(t *testing.T) {
 				testPreviousAPI: true,
 			},
 			{
+				name:     "identity token credhelper from registries.conf",
+				hostname: "registry-b.com",
+				sys: &types.SystemContext{
+					SystemRegistriesConfPath:    filepath.Join("testdata", "cred-helper.conf"),
+					SystemRegistriesConfDirPath: filepath.Join("testdata", "IdoNotExist"),
+				},
+				expected: types.DockerAuthConfig{
+					IdentityToken: "fizzbuzz",
+				},
+				testPreviousAPI: true,
+			},
+			{
 				name:     "match ref image",
 				hostname: "example.org",
 				ref:      "example.org/repo/image:latest",
