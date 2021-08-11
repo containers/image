@@ -326,7 +326,7 @@ func TestFindRegistry(t *testing.T) {
 	assert.Equal(t, "subdomain-prefix-2.com", reg.Location)
 
 	// subdomain prefix match for *.not.quite.simple-prefix.com
-	// location field overriden by /registries.conf.d/subdomain-override-1.conf
+	// location field overridden by /registries.conf.d/subdomain-override-1.conf
 	reg, err = FindRegistry(sys, "really.not.quite.simple-prefix.com:5000/with/path/and/beyond:tag")
 	assert.Nil(t, err)
 	assert.NotNil(t, reg)
@@ -340,7 +340,7 @@ func TestFindRegistry(t *testing.T) {
 	assert.Equal(t, "subdomain-prefix-2.com", reg.Location)
 
 	// subdomain prefix match for *.bar.example.com
-	// location field overriden by /registries.conf.d/subdomain-override-3.conf
+	// location field overridden by /registries.conf.d/subdomain-override-3.conf
 	reg, err = FindRegistry(sys, "foo.bar.example.com:6000/omg/wtf/bbq@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	assert.Nil(t, err)
 	assert.NotNil(t, reg)
