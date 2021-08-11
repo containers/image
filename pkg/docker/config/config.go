@@ -601,10 +601,18 @@ func getAuthFromCredHelper(credHelper, registry string) (types.DockerAuthConfig,
 	if err != nil {
 		return types.DockerAuthConfig{}, err
 	}
-	return types.DockerAuthConfig{
-		Username: creds.Username,
-		Password: creds.Secret,
-	}, nil
+
+	switch creds.Username {
+	case "<token>":
+		return types.DockerAuthConfig{
+			IdentityToken: creds.Secret,
+		}, nil
+	default:
+		return types.DockerAuthConfig{
+			Username: creds.Username,
+			Password: creds.Secret,
+		}, nil
+	}
 }
 
 func setAuthToCredHelper(credHelper, registry, username, password string) error {
