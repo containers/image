@@ -110,6 +110,7 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				var e errcode.Error
 				ok := errors.As(err, &e)
 				require.True(t, ok)
+				// Note: (skopeo inspect) is checking for this errcode.Error value
 				assert.Equal(t, errcode.Error{
 					Code:    errcode.ErrorCodeUnknown, // The NOT_FOUND value is not defined, and turns into Unknown
 					Message: "404 page not found",
