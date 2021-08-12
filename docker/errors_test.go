@@ -17,6 +17,7 @@ import (
 // NOR the error texts are an API commitment subject to API stability expectations;
 // they can change at any time for any reason.
 func TestRegistryHTTPResponseToError(t *testing.T) {
+	var unwrappedUnexpectedHTTPResponseError *unexpectedHTTPResponseError
 	for _, c := range []struct {
 		name              string
 		response          string
@@ -43,7 +44,7 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"<html><body>JSON? What JSON?</body></html>\r\n",
 			errorString:       "StatusCode: 400, <html><body>JSON? What JSON?</body></html>\r\n",
 			errorType:         nil,
-			unwrappedErrorPtr: nil,
+			unwrappedErrorPtr: &unwrappedUnexpectedHTTPResponseError,
 		},
 		{
 			name: "401 body not in expected format",
