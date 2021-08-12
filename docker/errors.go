@@ -54,7 +54,7 @@ func httpResponseToError(res *http.Response, context string) error {
 // registry
 func registryHTTPResponseToError(res *http.Response) error {
 	err := client.HandleErrorResponse(res)
-	if e, ok := perrors.Cause(err).(*client.UnexpectedHTTPResponseError); ok {
+	if e, ok := err.(*client.UnexpectedHTTPResponseError); ok {
 		response := string(e.Response)
 		if len(response) > 50 {
 			response = response[:50] + "..."
