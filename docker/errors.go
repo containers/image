@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	internalTypes "github.com/containers/image/v5/internal/types"
 	"github.com/docker/distribution/registry/client"
 	perrors "github.com/pkg/errors"
 )
@@ -33,15 +32,11 @@ func httpResponseToError(res *http.Response, context string) error {
 	switch res.StatusCode {
 	case http.StatusOK:
 		return nil
-	case http.StatusPartialContent:
-		return nil
 	case http.StatusTooManyRequests:
 		return ErrTooManyRequests
 	case http.StatusUnauthorized:
 		err := client.HandleErrorResponse(res)
 		return ErrUnauthorizedForCredentials{Err: err}
-	case http.StatusBadRequest:
-		return internalTypes.BadPartialRequestError{Status: res.Status}
 	default:
 		if context != "" {
 			context = context + ": "
