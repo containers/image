@@ -478,7 +478,7 @@ func listAuthsFromCredHelper(credHelper string) (map[string]string, error) {
 	return helperclient.List(p)
 }
 
-// getPathToAuth gets the path of the auth.json file used for reading and writting credentials
+// getPathToAuth gets the path of the auth.json file used for reading and writing credentials
 // returns the path, and a bool specifies whether the file is in legacy format
 func getPathToAuth(sys *types.SystemContext) (string, bool, error) {
 	return getPathToAuthWithOS(sys, runtime.GOOS)

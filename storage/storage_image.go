@@ -813,7 +813,7 @@ func (s *storageImageDestination) queueOrCommit(ctx context.Context, blob types.
 	//
 	// The conceptual benefit of this design is that caller can continue
 	// pulling layers after an early return.  At any given time, only one
-	// caller is the "worker" routine comitting layers.  All other routines
+	// caller is the "worker" routine committing layers.  All other routines
 	// can continue pulling and queuing in layers.
 	s.lock.Lock()
 	s.indexToPulledLayerInfo[index] = &manifest.LayerInfo{
@@ -852,7 +852,7 @@ func (s *storageImageDestination) queueOrCommit(ctx context.Context, blob types.
 // must guarantee that, at any given time, at most one goroutine may execute
 // `commitLayer()`.
 func (s *storageImageDestination) commitLayer(ctx context.Context, blob manifest.LayerInfo, index int) error {
-	// Already commited?  Return early.
+	// Already committed?  Return early.
 	if _, alreadyCommitted := s.indexToStorageID[index]; alreadyCommitted {
 		return nil
 	}
@@ -1065,7 +1065,7 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	if len(layerBlobs) > 0 { // Can happen when using caches
 		prev := s.indexToStorageID[len(layerBlobs)-1]
 		if prev == nil {
-			return errors.Errorf("Internal error: StorageImageDestination.Commit(): previous layer %d hasn't been commited (lastLayer == nil)", len(layerBlobs)-1)
+			return errors.Errorf("Internal error: StorageImageDestination.Commit(): previous layer %d hasn't been committed (lastLayer == nil)", len(layerBlobs)-1)
 		}
 		lastLayer = *prev
 	}

@@ -1185,7 +1185,7 @@ type diffIDResult struct {
 
 // copyLayer copies a layer with srcInfo (with known Digest and Annotations and possibly known Size) in src to dest, perhaps (de/re/)compressing it,
 // and returns a complete blobInfo of the copied layer, and a value for LayerDiffIDs if diffIDIsNeeded
-// srcRef can be used as an additional hint to the destination during checking whehter a layer can be reused but srcRef can be nil.
+// srcRef can be used as an additional hint to the destination during checking whether a layer can be reused but srcRef can be nil.
 func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, toEncrypt bool, pool *mpb.Progress, layerIndex int, srcRef reference.Named, emptyLayer bool) (types.BlobInfo, digest.Digest, error) {
 	// If the srcInfo doesn't contain compression information, try to compute it from the
 	// MediaType, which was either read from a manifest by way of LayerInfos() or constructed
