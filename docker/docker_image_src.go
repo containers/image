@@ -371,9 +371,7 @@ func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, 
 		return nil, nil, err
 	}
 	if err := httpResponseToError(res, "Error fetching partial blob"); err != nil {
-		if res.Body != nil {
-			res.Body.Close()
-		}
+		res.Body.Close()
 		return nil, nil, err
 	}
 
