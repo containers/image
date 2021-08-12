@@ -18,6 +18,7 @@ import (
 // they can change at any time for any reason.
 func TestRegistryHTTPResponseToError(t *testing.T) {
 	var unwrappedUnexpectedHTTPResponseError *unexpectedHTTPResponseError
+	var unwrappedErrcodeError errcode.Error
 	for _, c := range []struct {
 		name              string
 		response          string
@@ -52,9 +53,9 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"Header1: Value1\r\n" +
 				"\r\n" +
 				"<html><body>JSON? What JSON?</body></html>\r\n",
-			errorString:       "unauthorized: authentication required",
-			errorType:         errcode.Error{},
-			unwrappedErrorPtr: nil,
+			errorString:       "authentication required",
+			errorType:         nil,
+			unwrappedErrorPtr: &unwrappedErrcodeError,
 			errorCode:         &errcode.ErrorCodeUnauthorized,
 		},
 		{ // docker.io when an image is not found
@@ -69,9 +70,9 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"Www-Authenticate: Bearer realm=\"https://auth.docker.io/token\",service=\"registry.docker.io\",scope=\"repository:library/this-does-not-exist:pull\",error=\"insufficient_scope\"\r\n" +
 				"\r\n" +
 				"{\"errors\":[{\"code\":\"UNAUTHORIZED\",\"message\":\"authentication required\",\"detail\":[{\"Type\":\"repository\",\"Class\":\"\",\"Name\":\"library/this-does-not-exist\",\"Action\":\"pull\"}]}]}\n",
-			errorString:       "denied: requested access to the resource is denied",
-			errorType:         errcode.Error{},
-			unwrappedErrorPtr: nil,
+			errorString:       "requested access to the resource is denied",
+			errorType:         nil,
+			unwrappedErrorPtr: &unwrappedErrcodeError,
 			errorCode:         &errcode.ErrorCodeDenied,
 		},
 		{ // docker.io when a tag is not found
@@ -87,9 +88,9 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"Strict-Transport-Security: max-age=31536000\r\n" +
 				"\r\n" +
 				"{\"errors\":[{\"code\":\"MANIFEST_UNKNOWN\",\"message\":\"manifest unknown\",\"detail\":{\"Tag\":\"this-does-not-exist\"}}]}\n",
-			errorString:       "manifest unknown: manifest unknown",
-			errorType:         errcode.Error{},
-			unwrappedErrorPtr: nil,
+			errorString:       "manifest unknown",
+			errorType:         nil,
+			unwrappedErrorPtr: &unwrappedErrcodeError,
 			errorCode:         &v2.ErrorCodeManifestUnknown,
 		},
 		{ // public.ecr.aws does not implement tag list
@@ -103,8 +104,8 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"\r\n" +
 				"{\"errors\":[{\"code\":\"NOT_FOUND\",\"message\":\"404 page not found\"}]}\r\n",
 			errorString:       "unknown: 404 page not found",
-			errorType:         errcode.Error{},
-			unwrappedErrorPtr: nil,
+			errorType:         nil,
+			unwrappedErrorPtr: &unwrappedErrcodeError,
 			errorCode:         &errcode.ErrorCodeUnknown,
 			fn: func(t *testing.T, err error) {
 				var e errcode.Error

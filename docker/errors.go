@@ -76,13 +76,21 @@ func registryHTTPResponseToError(res *http.Response) error {
 		}
 		err = errs[0]
 	}
-	if e, ok := err.(*unexpectedHTTPResponseError); ok {
+	switch e := err.(type) {
+	case *unexpectedHTTPResponseError:
 		response := string(e.Response)
 		if len(response) > 50 {
 			response = response[:50] + "..."
 		}
 		// %.0w makes e visible to error.Unwrap() without including any text
 		err = fmt.Errorf("StatusCode: %d, %s%.0w", e.StatusCode, response, e)
+	case errcode.Error:
+		// e.Error() is fmt.Sprintf("%s: %s", e.Code.Error(), e.Message, which is usually
+		// rather redundant. So reword it without using e.Code.Error() if e.Message is the default.
+		if e.Message == e.Code.Message() {
+			// %.0w makes e visible to error.Unwrap() without including any text
+			err = fmt.Errorf("%s%.0w", e.Message, e)
+		}
 	}
 	return err
 }
