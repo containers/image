@@ -28,6 +28,7 @@ func (e ErrUnauthorizedForCredentials) Error() string {
 
 // httpResponseToError translates the https.Response into an error, possibly prefixing it with the supplied context. It returns
 // nil if the response is not considered an error.
+// NOTE: Almost all callers in this package should use registryHTTPResponseToError instead.
 func httpResponseToError(res *http.Response, context string) error {
 	switch res.StatusCode {
 	case http.StatusOK:
