@@ -434,6 +434,8 @@ func (s *dockerImageSource) GetSignatures(ctx context.Context, instanceDigest *d
 		return nil, err
 	}
 	switch {
+	case s.c.cosignSignatureBase != nil:
+		return s.getCosignSignaturesFromLookaside(ctx, instanceDigest)
 	case s.c.supportsSignatures:
 		return s.getSignaturesFromAPIExtension(ctx, instanceDigest)
 	case s.c.signatureBase != nil:
@@ -473,6 +475,30 @@ func (s *dockerImageSource) getSignaturesFromLookaside(ctx context.Context, inst
 	signatures := [][]byte{}
 	for i := 0; ; i++ {
 		url := signatureStorageURL(s.c.signatureBase, manifestDigest, i)
+		signature, missing, err := s.getOneSignature(ctx, url)
+		if err != nil {
+			return nil, err
+		}
+		if missing {
+			break
+		}
+		signatures = append(signatures, signature)
+	}
+	return signatures, nil
+}
+
+// getCosignSignaturesFromLookaside implements GetSignatures() from the lookaside location configured in s.c.signatureBase,
+// which is not nil.
+func (s *dockerImageSource) getCosignSignaturesFromLookaside(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
+	manifestDigest, err := s.manifestDigest(ctx, instanceDigest)
+	if err != nil {
+		return nil, err
+	}
+
+	// NOTE: Keep this in sync with docs/signature-protocols.md!
+	signatures := [][]byte{}
+	for i := 0; ; i++ {
+		url := cosignSignatureStorageURL(s.c.cosignSignatureBase, manifestDigest, i)
 		signature, missing, err := s.getOneSignature(ctx, url)
 		if err != nil {
 			return nil, err
