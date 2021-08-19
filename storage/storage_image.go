@@ -23,7 +23,7 @@ import (
 	"github.com/containers/image/v5/pkg/blobinfocache/none"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage"
-	"github.com/containers/storage/drivers"
+	graphdriver "github.com/containers/storage/drivers"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/containers/storage/pkg/chunked"
 	"github.com/containers/storage/pkg/ioutils"
@@ -484,7 +484,10 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	}
 	// Set up to digest the blob and count its size while saving it to a file.
 	hasher := digest.Canonical.Digester()
-	if blobinfo.Digest.Validate() == nil {
+	if blobinfo.Digest != "" {
+		if err := blobinfo.Digest.Validate(); err != nil {
+			return errorBlobInfo, fmt.Errorf("invalid digest %#v: %w", blobinfo.Digest.String(), err)
+		}
 		if a := blobinfo.Digest.Algorithm(); a.Available() {
 			hasher = a.Digester()
 		}
@@ -510,7 +513,7 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 		return errorBlobInfo, errors.Wrapf(err, "storing blob to file %q", filename)
 	}
 	// Ensure that any information that we were given about the blob is correct.
-	if blobinfo.Digest.Validate() == nil && blobinfo.Digest != hasher.Digest() {
+	if blobinfo.Digest != "" && blobinfo.Digest != hasher.Digest() {
 		return errorBlobInfo, errors.WithStack(ErrBlobDigestMismatch)
 	}
 	if blobinfo.Size >= 0 && blobinfo.Size != counter.Count {
@@ -523,7 +526,7 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	s.filenames[hasher.Digest()] = filename
 	s.lock.Unlock()
 	blobDigest := blobinfo.Digest
-	if blobDigest.Validate() != nil {
+	if blobDigest == "" {
 		blobDigest = hasher.Digest()
 	}
 	blobSize := blobinfo.Size
