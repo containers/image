@@ -515,27 +515,27 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	if err != nil {
 		return errorBlobInfo, errors.Wrapf(err, "storing blob to file %q", filename)
 	}
-	// Ensure that any information that we were given about the blob is correct.
-	if blobinfo.Digest != "" && blobinfo.Digest != hasher.Digest() {
+
+	// Determine blob properties, and ensure that any information that we were given about the blob is correct.
+	blobDigest := blobinfo.Digest
+	if blobDigest == "" {
+		blobDigest = hasher.Digest()
+	} else if blobinfo.Digest != hasher.Digest() {
 		return errorBlobInfo, errors.WithStack(ErrBlobDigestMismatch)
 	}
-	if blobinfo.Size >= 0 && blobinfo.Size != counter.Count {
+	blobSize := blobinfo.Size
+	if blobSize < 0 {
+		blobSize = counter.Count
+	} else if blobinfo.Size != counter.Count {
 		return errorBlobInfo, errors.WithStack(ErrBlobSizeMismatch)
 	}
+
 	// Record information about the blob.
 	s.lock.Lock()
 	s.blobDiffIDs[hasher.Digest()] = diffID.Digest()
 	s.fileSizes[hasher.Digest()] = counter.Count
 	s.filenames[hasher.Digest()] = filename
 	s.lock.Unlock()
-	blobDigest := blobinfo.Digest
-	if blobDigest == "" {
-		blobDigest = hasher.Digest()
-	}
-	blobSize := blobinfo.Size
-	if blobSize < 0 {
-		blobSize = counter.Count
-	}
 	// This is safe because we have just computed both values ourselves.
 	cache.RecordDigestUncompressedPair(blobDigest, diffID.Digest())
 	return types.BlobInfo{
