@@ -34,8 +34,10 @@ import (
 )
 
 var (
-	// ErrBlobDigestMismatch is returned when PutBlob() is given a blob
+	// ErrBlobDigestMismatch could potentially be returned when PutBlob() is given a blob
 	// with a digest-based name that doesn't match its contents.
+	// Deprecated: PutBlob() doesn't do this any more (it just accepts the caller’s value),
+	// and there is no known user of this error.
 	ErrBlobDigestMismatch = stderrors.New("blob digest mismatch")
 	// ErrBlobSizeMismatch is returned when PutBlob() is given a blob
 	// with an expected size that doesn't match the reader.
@@ -482,17 +484,18 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 		Digest: "",
 		Size:   -1,
 	}
-	// Set up to digest the blob and count its size while saving it to a file.
-	var hasher digest.Digester // = nil
 	if blobinfo.Digest != "" {
 		if err := blobinfo.Digest.Validate(); err != nil {
 			return errorBlobInfo, fmt.Errorf("invalid digest %#v: %w", blobinfo.Digest.String(), err)
 		}
-		if a := blobinfo.Digest.Algorithm(); a.Available() {
-			hasher = a.Digester()
-		}
 	}
-	if hasher == nil {
+
+	// Set up to digest the blob if necessary, and count its size while saving it to a file.
+	// “It is not mandatory for the implementation to verify [blobinfo.Digest]”, so we rely
+	// on it being correct after we read all of stream. In most cases, the caller is
+	// copy.Image, which uses a digestingReader to validate the digest.
+	var hasher digest.Digester // = nil when we don't need to compute the blob digest
+	if blobinfo.Digest == "" {
 		hasher = digest.Canonical.Digester()
 	}
 	diffID := digest.Canonical.Digester()
@@ -504,7 +507,9 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	defer file.Close()
 	counter := ioutils.NewWriteCounter(file)
 	reader := io.TeeReader(stream, counter)
-	reader = io.TeeReader(reader, hasher.Hash())
+	if hasher != nil {
+		reader = io.TeeReader(reader, hasher.Hash())
+	}
 	decompressed, err := archive.DecompressStream(reader)
 	if err != nil {
 		return errorBlobInfo, errors.Wrap(err, "setting up to decompress blob")
@@ -517,12 +522,11 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 		return errorBlobInfo, errors.Wrapf(err, "storing blob to file %q", filename)
 	}
 
-	// Determine blob properties, and ensure that any information that we were given about the blob is correct.
+	// Determine blob properties, and fail if information that we were given about the blob
+	// is known to be incorrect.
 	blobDigest := blobinfo.Digest
-	if blobDigest == "" {
+	if hasher != nil {
 		blobDigest = hasher.Digest()
-	} else if blobinfo.Digest != hasher.Digest() {
-		return errorBlobInfo, errors.WithStack(ErrBlobDigestMismatch)
 	}
 	blobSize := blobinfo.Size
 	if blobSize < 0 {
@@ -537,7 +541,8 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	s.fileSizes[blobDigest] = counter.Count
 	s.filenames[blobDigest] = filename
 	s.lock.Unlock()
-	// This is safe because we have just computed both values ourselves.
+	// This is safe because we have just computed diffID, and blobDigest was either computed
+	// by us, or validated by the caller (usually copy.digestingReader).
 	cache.RecordDigestUncompressedPair(blobDigest, diffID.Digest())
 	return types.BlobInfo{
 		Digest:    blobDigest,
