@@ -532,9 +532,9 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 
 	// Record information about the blob.
 	s.lock.Lock()
-	s.blobDiffIDs[hasher.Digest()] = diffID.Digest()
-	s.fileSizes[hasher.Digest()] = counter.Count
-	s.filenames[hasher.Digest()] = filename
+	s.blobDiffIDs[blobDigest] = diffID.Digest()
+	s.fileSizes[blobDigest] = counter.Count
+	s.filenames[blobDigest] = filename
 	s.lock.Unlock()
 	// This is safe because we have just computed both values ourselves.
 	cache.RecordDigestUncompressedPair(blobDigest, diffID.Digest())
