@@ -483,7 +483,7 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 		Size:   -1,
 	}
 	// Set up to digest the blob and count its size while saving it to a file.
-	hasher := digest.Canonical.Digester()
+	var hasher digest.Digester // = nil
 	if blobinfo.Digest != "" {
 		if err := blobinfo.Digest.Validate(); err != nil {
 			return errorBlobInfo, fmt.Errorf("invalid digest %#v: %w", blobinfo.Digest.String(), err)
@@ -491,6 +491,9 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 		if a := blobinfo.Digest.Algorithm(); a.Available() {
 			hasher = a.Digester()
 		}
+	}
+	if hasher == nil {
+		hasher = digest.Canonical.Digester()
 	}
 	diffID := digest.Canonical.Digester()
 	filename := s.computeNextBlobCacheFile()
