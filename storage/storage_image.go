@@ -514,6 +514,7 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	if err != nil {
 		return errorBlobInfo, errors.Wrap(err, "setting up to decompress blob")
 	}
+
 	// Copy the data to the file.
 	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
 	_, err = io.Copy(diffID.Hash(), decompressed)
