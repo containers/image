@@ -502,8 +502,9 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 		return errorBlobInfo, errors.Wrapf(err, "creating temporary file %q", filename)
 	}
 	defer file.Close()
-	counter := ioutils.NewWriteCounter(hasher.Hash())
-	reader := io.TeeReader(io.TeeReader(stream, counter), file)
+	counter := ioutils.NewWriteCounter(file)
+	reader := io.TeeReader(stream, counter)
+	reader = io.TeeReader(reader, hasher.Hash())
 	decompressed, err := archive.DecompressStream(reader)
 	if err != nil {
 		return errorBlobInfo, errors.Wrap(err, "setting up to decompress blob")
