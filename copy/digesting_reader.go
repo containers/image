@@ -1,6 +1,7 @@
 package copy
 
 import (
+	"hash"
 	"io"
 
 	digest "github.com/opencontainers/go-digest"
@@ -10,6 +11,7 @@ import (
 type digestingReader struct {
 	source              io.Reader
 	digester            digest.Digester
+	hash                hash.Hash
 	expectedDigest      digest.Digest
 	validationFailed    bool
 	validationSucceeded bool
@@ -32,6 +34,7 @@ func newDigestingReader(source io.Reader, expectedDigest digest.Digest) (*digest
 	return &digestingReader{
 		source:           source,
 		digester:         digester,
+		hash:             digester.Hash(),
 		expectedDigest:   expectedDigest,
 		validationFailed: false,
 	}, nil
@@ -40,7 +43,7 @@ func newDigestingReader(source io.Reader, expectedDigest digest.Digest) (*digest
 func (d *digestingReader) Read(p []byte) (int, error) {
 	n, err := d.source.Read(p)
 	if n > 0 {
-		if n2, err := d.digester.Hash().Write(p[:n]); n2 != n || err != nil {
+		if n2, err := d.hash.Write(p[:n]); n2 != n || err != nil {
 			// Coverage: This should not happen, the hash.Hash interface requires
 			// d.digest.Write to never return an error, and the io.Writer interface
 			// requires n2 == len(input) if no error is returned.
