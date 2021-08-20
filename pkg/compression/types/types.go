@@ -38,4 +38,9 @@ const (
 	// will actually be available. (In fact it is intended for this types package not to depend
 	// on any of the implementations.)
 	ZstdChunkedAlgorithmName = "zstd:chunked"
+	// GzipEstargzAlgorithmName is the name used by pkg/compression.Estargz.
+	// NOTE: Importing only this /types package does not inherently guarantee a GzipEstargz algorithm
+	// will actually be available. (In fact it is intended for this types package not to depend
+	// on any of the implementations.)
+	GzipEstargzAlgorithmName = "gzip:estargz"
 )

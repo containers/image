@@ -35,6 +35,9 @@ var (
 	// Zstd:chunked compression.
 	ZstdChunked = internal.NewAlgorithm(types.ZstdChunkedAlgorithmName, types.ZstdAlgorithmName, /* Note: InternalUnstableUndocumentedMIMEQuestionMark is not ZstdChunkedAlgorithmName */
 		nil, ZstdDecompressor, compressor.ZstdCompressor)
+	// Gzip:estargz compression.
+	GzipEstargz = internal.NewAlgorithm(types.GzipEstargzAlgorithmName, types.GzipAlgorithmName, /* Note: InternalUnstableUndocumentedMIMEQuestionMark is not EstargzAlgorithmName */
+		nil, GzipDecompressor, compressor.EstargzCompressor)
 
 	compressionAlgorithms = map[string]Algorithm{
 		Gzip.Name():        Gzip,
@@ -42,6 +45,7 @@ var (
 		Xz.Name():          Xz,
 		Zstd.Name():        Zstd,
 		ZstdChunked.Name(): ZstdChunked,
+		GzipEstargz.Name(): GzipEstargz,
 	}
 )
 
