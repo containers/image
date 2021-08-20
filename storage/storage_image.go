@@ -1018,7 +1018,10 @@ func (s *storageImageDestination) commitLayer(ctx context.Context, blob manifest
 	defer file.Close()
 	// Build the new layer using the diff, regardless of where it came from.
 	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
-	layer, _, err := s.imageRef.transport.store.PutLayer(id, lastLayer, nil, "", false, nil, file)
+	layer, _, err := s.imageRef.transport.store.PutLayer(id, lastLayer, nil, "", false, &storage.LayerOptions{
+		OriginalDigest:     blob.Digest,
+		UncompressedDigest: diffID,
+	}, file)
 	if err != nil && errors.Cause(err) != storage.ErrDuplicateID {
 		return errors.Wrapf(err, "adding layer with blob %q", blob.Digest)
 	}
