@@ -18,6 +18,7 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/image"
+	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/internal/tmpdir"
 	internalTypes "github.com/containers/image/v5/internal/types"
 	"github.com/containers/image/v5/manifest"
@@ -492,10 +493,6 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	}
 
 	// Set up to digest the blob if necessary, and count its size while saving it to a file.
-	var hasher digest.Digester // = nil when we don't need to compute the blob digest
-	if blobinfo.Digest == "" {
-		hasher = digest.Canonical.Digester()
-	}
 	filename := s.computeNextBlobCacheFile()
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY|os.O_EXCL, 0600)
 	if err != nil {
@@ -504,9 +501,7 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	defer file.Close()
 	counter := ioutils.NewWriteCounter(file)
 	stream = io.TeeReader(stream, counter)
-	if hasher != nil {
-		stream = io.TeeReader(stream, hasher.Hash())
-	}
+	digester, stream := putblobdigest.DigestIfUnknown(stream, blobinfo)
 	decompressed, err := archive.DecompressStream(stream)
 	if err != nil {
 		return errorBlobInfo, errors.Wrap(err, "setting up to decompress blob")
@@ -523,10 +518,7 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 
 	// Determine blob properties, and fail if information that we were given about the blob
 	// is known to be incorrect.
-	blobDigest := blobinfo.Digest
-	if hasher != nil {
-		blobDigest = hasher.Digest()
-	}
+	blobDigest := digester.Digest()
 	blobSize := blobinfo.Size
 	if blobSize < 0 {
 		blobSize = counter.Count

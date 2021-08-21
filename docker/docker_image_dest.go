@@ -17,6 +17,7 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/iolimits"
+	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/internal/uploadreader"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache/none"
@@ -161,8 +162,7 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 		return types.BlobInfo{}, errors.Wrap(err, "determining upload URL")
 	}
 
-	digester := digest.Canonical.Digester()
-	stream = io.TeeReader(stream, digester.Hash())
+	digester, stream := putblobdigest.DigestIfCanonicalUnknown(stream, inputInfo)
 	sizeCounter := &sizeCounter{}
 	stream = io.TeeReader(stream, sizeCounter)
 

@@ -60,32 +60,46 @@ func TestGetPutManifest(t *testing.T) {
 }
 
 func TestGetPutBlob(t *testing.T) {
+	computedBlob := []byte("test-blob")
+	providedBlob := []byte("provided-blob")
+	providedDigest := digest.Digest("sha256:provided-test-digest")
+
 	ref, tmpDir := refToTempDir(t)
 	defer os.RemoveAll(tmpDir)
 	cache := memory.New()
 
-	blob := []byte("test-blob")
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	require.NoError(t, err)
 	defer dest.Close()
 	assert.Equal(t, types.PreserveOriginal, dest.DesiredLayerCompression())
-	info, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{Digest: digest.Digest("sha256:digest-test"), Size: int64(9)}, cache, false)
+	// PutBlob with caller-provided data
+	providedInfo, err := dest.PutBlob(context.Background(), bytes.NewReader(providedBlob), types.BlobInfo{Digest: providedDigest, Size: int64(len(providedBlob))}, cache, false)
 	assert.NoError(t, err)
+	assert.Equal(t, int64(len(providedBlob)), providedInfo.Size)
+	assert.Equal(t, providedDigest, providedInfo.Digest)
+	// PutBlob with unknown data
+	computedInfo, err := dest.PutBlob(context.Background(), bytes.NewReader(computedBlob), types.BlobInfo{Digest: "", Size: int64(-1)}, cache, false)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(len(computedBlob)), computedInfo.Size)
+	assert.Equal(t, digest.FromBytes(computedBlob), computedInfo.Digest)
 	err = dest.Commit(context.Background(), nil) // nil unparsedToplevel is invalid, we don’t currently use the value
 	assert.NoError(t, err)
-	assert.Equal(t, int64(9), info.Size)
-	assert.Equal(t, digest.FromBytes(blob), info.Digest)
 
 	src, err := ref.NewImageSource(context.Background(), nil)
 	require.NoError(t, err)
 	defer src.Close()
-	rc, size, err := src.GetBlob(context.Background(), info, cache)
-	assert.NoError(t, err)
-	defer rc.Close()
-	b, err := ioutil.ReadAll(rc)
-	assert.NoError(t, err)
-	assert.Equal(t, blob, b)
-	assert.Equal(t, int64(len(blob)), size)
+	for digest, expectedBlob := range map[digest.Digest][]byte{
+		providedInfo.Digest: providedBlob,
+		computedInfo.Digest: computedBlob,
+	} {
+		rc, size, err := src.GetBlob(context.Background(), types.BlobInfo{Digest: digest, Size: int64(len(expectedBlob))}, cache)
+		assert.NoError(t, err)
+		defer rc.Close()
+		b, err := ioutil.ReadAll(rc)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedBlob, b)
+		assert.Equal(t, int64(len(expectedBlob)), size)
+	}
 }
 
 // readerFromFunc allows implementing Reader by any function, e.g. a closure.

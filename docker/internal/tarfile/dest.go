@@ -10,6 +10,7 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/iolimits"
+	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/internal/tmpdir"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
@@ -104,8 +105,7 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 		defer os.Remove(streamCopy.Name())
 		defer streamCopy.Close()
 
-		digester := digest.Canonical.Digester()
-		stream2 := io.TeeReader(stream, digester.Hash())
+		digester, stream2 := putblobdigest.DigestIfUnknown(stream, inputInfo)
 		// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
 		size, err := io.Copy(streamCopy, stream2)
 		if err != nil {
@@ -116,9 +116,7 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 			return types.BlobInfo{}, err
 		}
 		inputInfo.Size = size // inputInfo is a struct, so we are only modifying our copy.
-		if inputInfo.Digest == "" {
-			inputInfo.Digest = digester.Digest()
-		}
+		inputInfo.Digest = digester.Digest()
 		stream = streamCopy
 		logrus.Debugf("... streaming done")
 	}

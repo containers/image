@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -163,8 +164,7 @@ func (d *dirImageDestination) PutBlob(ctx context.Context, stream io.Reader, inp
 		}
 	}()
 
-	digester := digest.Canonical.Digester()
-	stream = io.TeeReader(stream, digester.Hash())
+	digester, stream := putblobdigest.DigestIfCanonicalUnknown(stream, inputInfo)
 	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
 	size, err := io.Copy(blobFile, stream)
 	if err != nil {
