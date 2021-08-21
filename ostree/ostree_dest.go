@@ -167,17 +167,17 @@ func (d *ostreeImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
-	computedDigest := digester.Digest()
+	blobDigest := digester.Digest()
 	if inputInfo.Size != -1 && size != inputInfo.Size {
-		return types.BlobInfo{}, errors.Errorf("Size mismatch when copying %s, expected %d, got %d", computedDigest, inputInfo.Size, size)
+		return types.BlobInfo{}, errors.Errorf("Size mismatch when copying %s, expected %d, got %d", blobDigest, inputInfo.Size, size)
 	}
 	if err := blobFile.Sync(); err != nil {
 		return types.BlobInfo{}, err
 	}
 
-	hash := computedDigest.Hex()
-	d.blobs[hash] = &blobToImport{Size: size, Digest: computedDigest, BlobPath: blobPath}
-	return types.BlobInfo{Digest: computedDigest, Size: size}, nil
+	hash := blobDigest.Hex()
+	d.blobs[hash] = &blobToImport{Size: size, Digest: blobDigest, BlobPath: blobPath}
+	return types.BlobInfo{Digest: blobDigest, Size: size}, nil
 }
 
 func fixFiles(selinuxHnd *C.struct_selabel_handle, root string, dir string, usermode bool) error {

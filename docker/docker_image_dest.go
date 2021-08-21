@@ -186,12 +186,12 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
-	computedDigest := digester.Digest()
+	blobDigest := digester.Digest()
 
 	// FIXME: DELETE uploadLocation on failure (does not really work in docker/distribution servers, which incorrectly require the "delete" action in the token's scope)
 
 	locationQuery := uploadLocation.Query()
-	locationQuery.Set("digest", computedDigest.String())
+	locationQuery.Set("digest", blobDigest.String())
 	uploadLocation.RawQuery = locationQuery.Encode()
 	res, err = d.c.makeRequestToResolvedURL(ctx, http.MethodPut, uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, nil, -1, v2Auth, nil)
 	if err != nil {
@@ -203,9 +203,9 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 		return types.BlobInfo{}, errors.Wrapf(registryHTTPResponseToError(res), "uploading layer to %s", uploadLocation)
 	}
 
-	logrus.Debugf("Upload of layer %s complete", computedDigest)
-	cache.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), computedDigest, newBICLocationReference(d.ref))
-	return types.BlobInfo{Digest: computedDigest, Size: sizeCounter.size}, nil
+	logrus.Debugf("Upload of layer %s complete", blobDigest)
+	cache.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), blobDigest, newBICLocationReference(d.ref))
+	return types.BlobInfo{Digest: blobDigest, Size: sizeCounter.size}, nil
 }
 
 // blobExists returns true iff repo contains a blob with digest, and if so, also its size.

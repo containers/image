@@ -146,9 +146,9 @@ func (d *ociImageDestination) PutBlob(ctx context.Context, stream io.Reader, inp
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
-	computedDigest := digester.Digest()
+	blobDigest := digester.Digest()
 	if inputInfo.Size != -1 && size != inputInfo.Size {
-		return types.BlobInfo{}, errors.Errorf("Size mismatch when copying %s, expected %d, got %d", computedDigest, inputInfo.Size, size)
+		return types.BlobInfo{}, errors.Errorf("Size mismatch when copying %s, expected %d, got %d", blobDigest, inputInfo.Size, size)
 	}
 	if err := blobFile.Sync(); err != nil {
 		return types.BlobInfo{}, err
@@ -164,7 +164,7 @@ func (d *ociImageDestination) PutBlob(ctx context.Context, stream io.Reader, inp
 		}
 	}
 
-	blobPath, err := d.ref.blobPath(computedDigest, d.sharedBlobDir)
+	blobPath, err := d.ref.blobPath(blobDigest, d.sharedBlobDir)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
@@ -179,7 +179,7 @@ func (d *ociImageDestination) PutBlob(ctx context.Context, stream io.Reader, inp
 		return types.BlobInfo{}, err
 	}
 	succeeded = true
-	return types.BlobInfo{Digest: computedDigest, Size: size}, nil
+	return types.BlobInfo{Digest: blobDigest, Size: size}, nil
 }
 
 // TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
