@@ -471,7 +471,7 @@ func (s *storageImageDestination) HasThreadSafePutBlob() bool {
 }
 
 // PutBlob writes contents of stream and returns data representing the result.
-// inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
+// inputInfo.Digest can be optionally provided if known; if provided, and stream is read to the end without error, the digest MUST match the stream contents.
 // inputInfo.Size is the expected length of stream, if known.
 // inputInfo.MediaType describes the blob format, if known.
 // May update cache.
@@ -492,9 +492,6 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	}
 
 	// Set up to digest the blob if necessary, and count its size while saving it to a file.
-	// “It is not mandatory for the implementation to verify [blobinfo.Digest]”, so we rely
-	// on it being correct after we read all of stream. In most cases, the caller is
-	// copy.Image, which uses a digestingReader to validate the digest.
 	var hasher digest.Digester // = nil when we don't need to compute the blob digest
 	if blobinfo.Digest == "" {
 		hasher = digest.Canonical.Digester()
