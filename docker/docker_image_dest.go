@@ -162,9 +162,12 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	}
 
 	digester := digest.Canonical.Digester()
+	stream = io.TeeReader(stream, digester.Hash())
 	sizeCounter := &sizeCounter{}
+	stream = io.TeeReader(stream, sizeCounter)
+
 	uploadLocation, err = func() (*url.URL, error) { // A scope for defer
-		uploadReader := uploadreader.NewUploadReader(io.TeeReader(stream, io.MultiWriter(digester.Hash(), sizeCounter)))
+		uploadReader := uploadreader.NewUploadReader(stream)
 		// This error text should never be user-visible, we terminate only after makeRequestToResolvedURL
 		// returns, so there isn’t a way for the error text to be provided to any of our callers.
 		defer uploadReader.Terminate(errors.New("Reading data from an already terminated upload"))

@@ -496,7 +496,6 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	if blobinfo.Digest == "" {
 		hasher = digest.Canonical.Digester()
 	}
-	diffID := digest.Canonical.Digester()
 	filename := s.computeNextBlobCacheFile()
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY|os.O_EXCL, 0600)
 	if err != nil {
@@ -504,15 +503,16 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	}
 	defer file.Close()
 	counter := ioutils.NewWriteCounter(file)
-	reader := io.TeeReader(stream, counter)
+	stream = io.TeeReader(stream, counter)
 	if hasher != nil {
-		reader = io.TeeReader(reader, hasher.Hash())
+		stream = io.TeeReader(stream, hasher.Hash())
 	}
-	decompressed, err := archive.DecompressStream(reader)
+	decompressed, err := archive.DecompressStream(stream)
 	if err != nil {
 		return errorBlobInfo, errors.Wrap(err, "setting up to decompress blob")
 	}
 
+	diffID := digest.Canonical.Digester()
 	// Copy the data to the file.
 	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
 	_, err = io.Copy(diffID.Hash(), decompressed)

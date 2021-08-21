@@ -160,10 +160,9 @@ func (d *ostreeImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	defer blobFile.Close()
 
 	digester := digest.Canonical.Digester()
-	tee := io.TeeReader(stream, digester.Hash())
-
+	stream = io.TeeReader(stream, digester.Hash())
 	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
-	size, err := io.Copy(blobFile, tee)
+	size, err := io.Copy(blobFile, stream)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}

@@ -105,9 +105,9 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 		defer streamCopy.Close()
 
 		digester := digest.Canonical.Digester()
-		tee := io.TeeReader(stream, digester.Hash())
+		stream2 := io.TeeReader(stream, digester.Hash())
 		// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
-		size, err := io.Copy(streamCopy, tee)
+		size, err := io.Copy(streamCopy, stream2)
 		if err != nil {
 			return types.BlobInfo{}, err
 		}
