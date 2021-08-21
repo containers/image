@@ -95,7 +95,7 @@ func (d *Destination) HasThreadSafePutBlob() bool {
 func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
 	// Ouch, we need to stream the blob into a temporary file just to determine the size.
 	// When the layer is decompressed, we also have to generate the digest on uncompressed data.
-	if inputInfo.Size == -1 || inputInfo.Digest.String() == "" {
+	if inputInfo.Size == -1 || inputInfo.Digest == "" {
 		logrus.Debugf("docker tarfile: input with unknown size, streaming to disk first ...")
 		streamCopy, err := ioutil.TempFile(tmpdir.TemporaryDirectoryForBigFiles(d.sysCtx), "docker-tarfile-blob")
 		if err != nil {

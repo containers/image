@@ -131,7 +131,7 @@ func (d *dockerImageDestination) HasThreadSafePutBlob() bool {
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
-	if inputInfo.Digest.String() != "" {
+	if inputInfo.Digest != "" {
 		// This should not really be necessary, at least the copy code calls TryReusingBlob automatically.
 		// Still, we need to check, if only because the "initiate upload" endpoint does not have a documented "blob already exists" return value.
 		// But we do that with NoCache, so that it _only_ checks the primary destination, instead of trying all mount candidates _again_.
@@ -484,7 +484,7 @@ func (d *dockerImageDestination) PutSignatures(ctx context.Context, signatures [
 		return nil
 	}
 	if instanceDigest == nil {
-		if d.manifestDigest.String() == "" {
+		if d.manifestDigest == "" {
 			// This shouldn’t happen, ImageDestination users are required to call PutManifest before PutSignatures
 			return errors.Errorf("Unknown manifest digest, can't add signatures")
 		}
