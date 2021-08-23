@@ -1,7 +1,9 @@
 package docker
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	internalTypes "github.com/containers/image/v5/internal/types"
 	"github.com/containers/image/v5/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -94,4 +97,88 @@ func TestSimplifyContentType(t *testing.T) {
 		out := simplifyContentType(c.input)
 		assert.Equal(t, c.expected, out, c.input)
 	}
+}
+
+func readNextStream(streams chan io.ReadCloser, errs chan error) ([]byte, error) {
+	select {
+	case r := <-streams:
+		if r == nil {
+			return nil, nil
+		}
+		defer r.Close()
+		return ioutil.ReadAll(r)
+	case err := <-errs:
+		return nil, err
+	}
+}
+
+type verifyGetBlobAtData struct {
+	expectedData  []byte
+	expectedError error
+}
+
+func verifyGetBlobAtOutput(t *testing.T, streams chan io.ReadCloser, errs chan error, expected []verifyGetBlobAtData) {
+	for _, c := range expected {
+		data, err := readNextStream(streams, errs)
+		assert.Equal(t, c.expectedData, data)
+		assert.Equal(t, c.expectedError, err)
+	}
+}
+
+func TestSplitHTTP200ResponseToPartial(t *testing.T) {
+	body := ioutil.NopCloser(bytes.NewReader([]byte("123456789")))
+	defer body.Close()
+	streams := make(chan io.ReadCloser)
+	errs := make(chan error)
+	chunks := []internalTypes.ImageSourceChunk{
+		{Offset: 1, Length: 2},
+		{Offset: 4, Length: 1},
+	}
+	go splitHTTP200ResponseToPartial(streams, errs, body, chunks)
+
+	expected := []verifyGetBlobAtData{
+		{[]byte("23"), nil},
+		{[]byte("5"), nil},
+		{[]byte(nil), nil},
+	}
+
+	verifyGetBlobAtOutput(t, streams, errs, expected)
+}
+
+func TestHandle206Response(t *testing.T) {
+	body := ioutil.NopCloser(bytes.NewReader([]byte("--AAA\r\n\r\n23\r\n--AAA\r\n\r\n5\r\n--AAA--")))
+	defer body.Close()
+	streams := make(chan io.ReadCloser)
+	errs := make(chan error)
+	chunks := []internalTypes.ImageSourceChunk{
+		{Offset: 1, Length: 2},
+		{Offset: 4, Length: 1},
+	}
+	mediaType := "multipart/form-data"
+	params := map[string]string{
+		"boundary": "AAA",
+	}
+	go handle206Response(streams, errs, body, chunks, mediaType, params)
+
+	expected := []verifyGetBlobAtData{
+		{[]byte("23"), nil},
+		{[]byte("5"), nil},
+		{[]byte(nil), nil},
+	}
+	verifyGetBlobAtOutput(t, streams, errs, expected)
+
+	body = ioutil.NopCloser(bytes.NewReader([]byte("HELLO")))
+	defer body.Close()
+	streams = make(chan io.ReadCloser)
+	errs = make(chan error)
+	chunks = []internalTypes.ImageSourceChunk{{Offset: 100, Length: 5}}
+	mediaType = "text/plain"
+	params = map[string]string{}
+	go handle206Response(streams, errs, body, chunks, mediaType, params)
+
+	expected = []verifyGetBlobAtData{
+		{[]byte("HELLO"), nil},
+		{[]byte(nil), nil},
+	}
+	verifyGetBlobAtOutput(t, streams, errs, expected)
 }
