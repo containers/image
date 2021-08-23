@@ -60,7 +60,7 @@ var (
 // Returns a human-redable description of the location that was updated.
 // NOTE: The return value is only intended to be read by humans; its form is not an API,
 // it may change (or new forms can be added) any time.
-func SetCredentials(sys *types.SystemContext,  key, username, password string) (string, error) {
+func SetCredentials(sys *types.SystemContext, key, username, password string) (string, error) {
 	isNamespaced, err := validateKey(key)
 	if err != nil {
 		return "", err

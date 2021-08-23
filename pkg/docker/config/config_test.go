@@ -638,7 +638,7 @@ func TestGetAllCredentials(t *testing.T) {
 	}
 
 	// test "credStore"
-	f, err := os.OpenFile(authFilePath, os.O_RDWR | os.O_TRUNC, 0644)
+	f, err := os.OpenFile(authFilePath, os.O_RDWR|os.O_TRUNC, 0644)
 	require.NoError(t, err)
 	_, err = f.Write([]byte(`{ "credsStore": "helper-registry" }`))
 	require.NoError(t, err)
@@ -661,7 +661,7 @@ func withTmpHome(t *testing.T) func() {
 	dir, err := ioutil.TempDir("", "test-home")
 	if err != nil {
 		t.Fatal(err)
-		return func() { }
+		return func() {}
 	}
 	oldHome, oldHomeExists := os.LookupEnv("HOME")
 	os.Setenv("HOME", dir)
