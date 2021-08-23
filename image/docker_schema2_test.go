@@ -419,7 +419,7 @@ func (d *memoryImageDest) PutBlob(ctx context.Context, stream io.Reader, inputIn
 	if d.storedBlobs == nil {
 		d.storedBlobs = make(map[digest.Digest][]byte)
 	}
-	if inputInfo.Digest.String() == "" {
+	if inputInfo.Digest == "" {
 		panic("inputInfo.Digest unexpectedly empty")
 	}
 	contents, err := ioutil.ReadAll(stream)

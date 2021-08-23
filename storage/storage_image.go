@@ -18,6 +18,7 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/image"
+	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/internal/tmpdir"
 	internalTypes "github.com/containers/image/v5/internal/types"
 	"github.com/containers/image/v5/manifest"
@@ -471,7 +472,7 @@ func (s *storageImageDestination) HasThreadSafePutBlob() bool {
 }
 
 // PutBlob writes contents of stream and returns data representing the result.
-// inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
+// inputInfo.Digest can be optionally provided if known; if provided, and stream is read to the end without error, the digest MUST match the stream contents.
 // inputInfo.Size is the expected length of stream, if known.
 // inputInfo.MediaType describes the blob format, if known.
 // May update cache.
@@ -492,14 +493,6 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	}
 
 	// Set up to digest the blob if necessary, and count its size while saving it to a file.
-	// “It is not mandatory for the implementation to verify [blobinfo.Digest]”, so we rely
-	// on it being correct after we read all of stream. In most cases, the caller is
-	// copy.Image, which uses a digestingReader to validate the digest.
-	var hasher digest.Digester // = nil when we don't need to compute the blob digest
-	if blobinfo.Digest == "" {
-		hasher = digest.Canonical.Digester()
-	}
-	diffID := digest.Canonical.Digester()
 	filename := s.computeNextBlobCacheFile()
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY|os.O_EXCL, 0600)
 	if err != nil {
@@ -507,15 +500,14 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 	}
 	defer file.Close()
 	counter := ioutils.NewWriteCounter(file)
-	reader := io.TeeReader(stream, counter)
-	if hasher != nil {
-		reader = io.TeeReader(reader, hasher.Hash())
-	}
-	decompressed, err := archive.DecompressStream(reader)
+	stream = io.TeeReader(stream, counter)
+	digester, stream := putblobdigest.DigestIfUnknown(stream, blobinfo)
+	decompressed, err := archive.DecompressStream(stream)
 	if err != nil {
 		return errorBlobInfo, errors.Wrap(err, "setting up to decompress blob")
 	}
 
+	diffID := digest.Canonical.Digester()
 	// Copy the data to the file.
 	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
 	_, err = io.Copy(diffID.Hash(), decompressed)
@@ -526,10 +518,7 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 
 	// Determine blob properties, and fail if information that we were given about the blob
 	// is known to be incorrect.
-	blobDigest := blobinfo.Digest
-	if hasher != nil {
-		blobDigest = hasher.Digest()
-	}
+	blobDigest := digester.Digest()
 	blobSize := blobinfo.Size
 	if blobSize < 0 {
 		blobSize = counter.Count
