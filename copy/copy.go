@@ -63,20 +63,19 @@ var expectedCompressionFormats = map[string]*compressiontypes.Algorithm{
 // copier allows us to keep track of diffID values for blobs, and other
 // data shared across one or more images in a possible manifest list.
 type copier struct {
-	dest                  types.ImageDestination
-	rawSource             types.ImageSource
-	reportWriter          io.Writer
-	progressOutput        io.Writer
-	progressInterval      time.Duration
-	progress              chan types.ProgressProperties
-	blobInfoCache         internalblobinfocache.BlobInfoCache2
-	copyInParallel        bool
-	compressionFormat     *compressiontypes.Algorithm // Compression algorithm to use, if the user explicitly requested one, or nil.
-	compressionLevel      *int
-	ociDecryptConfig      *encconfig.DecryptConfig
-	ociEncryptConfig      *encconfig.EncryptConfig
-	maxParallelDownloads  uint
-	downloadForeignLayers bool
+	dest                          types.ImageDestination
+	rawSource                     types.ImageSource
+	reportWriter                  io.Writer
+	progressOutput                io.Writer
+	progressInterval              time.Duration
+	progress                      chan types.ProgressProperties
+	blobInfoCache                 internalblobinfocache.BlobInfoCache2
+	compressionFormat             *compressiontypes.Algorithm // Compression algorithm to use, if the user explicitly requested one, or nil.
+	compressionLevel              *int
+	ociDecryptConfig              *encconfig.DecryptConfig
+	ociEncryptConfig              *encconfig.EncryptConfig
+	concurrentBlobCopiesSemaphore *semaphore.Weighted // Limits the amount of concurrently copied blobs
+	downloadForeignLayers         bool
 }
 
 // imageCopier tracks state specific to a single image (possibly an item of a manifest list)
@@ -149,7 +148,10 @@ type Options struct {
 	// encrypted if non-nil. If nil, it does not attempt to decrypt an image.
 	OciDecryptConfig *encconfig.DecryptConfig
 
-	// MaxParallelDownloads indicates the maximum layers to pull at the same time.  A reasonable default is used if this is left as 0.
+	// A weighted semaphore to limit the amount of concurrently copied layers and configs. Applies to all copy operations using the semaphore. If set, MaxParallelDownloads is ignored.
+	ConcurrentBlobCopiesSemaphore *semaphore.Weighted
+
+	// MaxParallelDownloads indicates the maximum layers to pull at the same time. Applies to a single copy operation. A reasonable default is used if this is left as 0. Ignored if ConcurrentBlobCopiesSemaphore is set.
 	MaxParallelDownloads uint
 
 	// When OptimizeDestinationImageAlreadyExists is set, optimize the copy assuming that the destination image already
@@ -222,7 +224,6 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 	if !isTTY(reportWriter) {
 		progressOutput = ioutil.Discard
 	}
-	copyInParallel := dest.HasThreadSafePutBlob() && rawSource.HasThreadSafeGetBlob()
 
 	c := &copier{
 		dest:             dest,
@@ -231,16 +232,35 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		progressOutput:   progressOutput,
 		progressInterval: options.ProgressInterval,
 		progress:         options.Progress,
-		copyInParallel:   copyInParallel,
 		// FIXME? The cache is used for sources and destinations equally, but we only have a SourceCtx and DestinationCtx.
 		// For now, use DestinationCtx (because blob reuse changes the behavior of the destination side more); eventually
 		// we might want to add a separate CommonCtx — or would that be too confusing?
 		blobInfoCache:         internalblobinfocache.FromBlobInfoCache(blobinfocache.DefaultCache(options.DestinationCtx)),
 		ociDecryptConfig:      options.OciDecryptConfig,
 		ociEncryptConfig:      options.OciEncryptConfig,
-		maxParallelDownloads:  options.MaxParallelDownloads,
 		downloadForeignLayers: options.DownloadForeignLayers,
 	}
+
+	// Set the concurrentBlobCopiesSemaphore if we can copy layers in parallel.
+	if dest.HasThreadSafePutBlob() && rawSource.HasThreadSafeGetBlob() {
+		c.concurrentBlobCopiesSemaphore = options.ConcurrentBlobCopiesSemaphore
+		if c.concurrentBlobCopiesSemaphore == nil {
+			max := options.MaxParallelDownloads
+			if max == 0 {
+				max = maxParallelDownloads
+			}
+			c.concurrentBlobCopiesSemaphore = semaphore.NewWeighted(int64(max))
+		}
+	} else {
+		c.concurrentBlobCopiesSemaphore = semaphore.NewWeighted(int64(1))
+		if options.ConcurrentBlobCopiesSemaphore != nil {
+			if err := options.ConcurrentBlobCopiesSemaphore.Acquire(ctx, 1); err != nil {
+				return nil, fmt.Errorf("acquiring semaphore for concurrent blob copies: %w", err)
+			}
+			defer options.ConcurrentBlobCopiesSemaphore.Release(1)
+		}
+	}
+
 	if options.DestinationCtx != nil {
 		// Note that compressionFormat and compressionLevel can be nil.
 		c.compressionFormat = options.DestinationCtx.CompressionFormat
@@ -852,22 +872,9 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	// copyGroup is used to determine if all layers are copied
 	copyGroup := sync.WaitGroup{}
 
-	// copySemaphore is used to limit the number of parallel downloads to
-	// avoid malicious images causing troubles and to be nice to servers.
-	var copySemaphore *semaphore.Weighted
-	if ic.c.copyInParallel {
-		max := ic.c.maxParallelDownloads
-		if max == 0 {
-			max = maxParallelDownloads
-		}
-		copySemaphore = semaphore.NewWeighted(int64(max))
-	} else {
-		copySemaphore = semaphore.NewWeighted(int64(1))
-	}
-
 	data := make([]copyLayerData, numLayers)
 	copyLayerHelper := func(index int, srcLayer types.BlobInfo, toEncrypt bool, pool *mpb.Progress, srcRef reference.Named) {
-		defer copySemaphore.Release(1)
+		defer ic.c.concurrentBlobCopiesSemaphore.Release(1)
 		defer copyGroup.Done()
 		cld := copyLayerData{}
 		if !ic.c.downloadForeignLayers && ic.c.dest.AcceptsForeignLayerURLs() && len(srcLayer.URLs) != 0 {
@@ -912,9 +919,10 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		defer copyGroup.Wait()
 
 		for i, srcLayer := range srcInfos {
-			err = copySemaphore.Acquire(ctx, 1)
+			err = ic.c.concurrentBlobCopiesSemaphore.Acquire(ctx, 1)
 			if err != nil {
-				return errors.Wrapf(err, "Can't acquire semaphore")
+				// This can only fail with ctx.Err(), so no need to blame acquiring the semaphore.
+				return fmt.Errorf("copying layer: %w", err)
 			}
 			copyGroup.Add(1)
 			go copyLayerHelper(i, srcLayer, encLayerBitmap[i], progressPool, ic.c.rawSource.Reference().DockerReference())
@@ -1097,6 +1105,12 @@ func (c *copier) createProgressBar(pool *mpb.Progress, partial bool, info types.
 func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 	srcInfo := src.ConfigInfo()
 	if srcInfo.Digest != "" {
+		if err := c.concurrentBlobCopiesSemaphore.Acquire(ctx, 1); err != nil {
+			// This can only fail with ctx.Err(), so no need to blame acquiring the semaphore.
+			return fmt.Errorf("copying config: %w", err)
+		}
+		defer c.concurrentBlobCopiesSemaphore.Release(1)
+
 		configBlob, err := src.ConfigBlob(ctx)
 		if err != nil {
 			return errors.Wrapf(err, "reading config blob %s", srcInfo.Digest)
