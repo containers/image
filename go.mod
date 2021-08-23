@@ -7,7 +7,7 @@ require (
 	github.com/BurntSushi/toml v0.4.1
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
 	github.com/containers/ocicrypt v1.1.2
-	github.com/containers/storage v1.34.0
+	github.com/containers/storage v1.34.2-0.20210823065237-1a182cb72875
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v20.10.8+incompatible
 	github.com/docker/docker-credential-helpers v0.6.4
@@ -17,7 +17,7 @@ require (
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/imdario/mergo v0.3.12
-	github.com/klauspost/compress v1.13.3
+	github.com/klauspost/compress v1.13.4
 	github.com/klauspost/pgzip v1.2.5
 	github.com/manifoldco/promptui v0.8.0
 	github.com/morikuni/aec v1.0.0 // indirect
@@ -38,6 +38,6 @@ require (
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
-	golang.org/x/sys v0.0.0-20210806184541-e5e7981a1069
+	golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55
 	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
 )
