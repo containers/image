@@ -30,6 +30,7 @@ type dockerAuthConfig struct {
 type dockerConfigFile struct {
 	AuthConfigs map[string]dockerAuthConfig `json:"auths"`
 	CredHelpers map[string]string           `json:"credHelpers,omitempty"`
+	CredsStore  string                      `json:"credsStore,omitempty"`
 }
 
 type authPath struct {
@@ -59,7 +60,7 @@ var (
 // Returns a human-redable description of the location that was updated.
 // NOTE: The return value is only intended to be read by humans; its form is not an API,
 // it may change (or new forms can be added) any time.
-func SetCredentials(sys *types.SystemContext, key, username, password string) (string, error) {
+func SetCredentials(sys *types.SystemContext,  key, username, password string) (string, error) {
 	isNamespaced, err := validateKey(key)
 	if err != nil {
 		return "", err
@@ -84,6 +85,9 @@ func SetCredentials(sys *types.SystemContext, key, username, password string) (s
 						return false, unsupportedNamespaceErr(ch)
 					}
 					return false, setAuthToCredHelper(ch, key, username, password)
+				}
+				if auths.CredsStore != "" {
+					return false, setAuthToCredHelper(auths.CredsStore, key, username, password)
 				}
 				creds := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 				newCreds := dockerAuthConfig{Auth: creds}
@@ -155,6 +159,13 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 				}
 				for registry := range auths.AuthConfigs {
 					addRegistry(registry)
+				}
+				if auths.CredsStore != "" {
+					if creds, err := listAuthsFromCredHelper(auths.CredsStore); err == nil {
+						for registry := range creds {
+							addRegistry(registry)
+						}
+					}
 				}
 			}
 		// External helpers.
@@ -440,6 +451,14 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 				}
 				auths.CredHelpers = make(map[string]string)
 				auths.AuthConfigs = make(map[string]dockerAuthConfig)
+				if auths.CredsStore != "" {
+					if creds, err := listAuthsFromCredHelper(auths.CredsStore); err == nil {
+						for registry := range creds {
+							_ = deleteAuthFromCredHelper(auths.CredsStore, registry)
+						}
+					}
+
+				}
 				return true, nil
 			})
 		// External helpers.
@@ -644,6 +663,12 @@ func findAuthentication(ref reference.Named, registry, path string, legacyFormat
 	// First try cred helpers. They should always be normalized.
 	if ch, exists := auths.CredHelpers[registry]; exists {
 		return getAuthFromCredHelper(ch, registry)
+	}
+
+	if auths.CredsStore != "" {
+		if cred, err := getAuthFromCredHelper(auths.CredsStore, registry); err == nil {
+			return cred, err
+		}
 	}
 
 	// Support for different paths in auth.
