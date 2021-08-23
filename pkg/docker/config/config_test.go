@@ -637,6 +637,23 @@ func TestGetAllCredentials(t *testing.T) {
 		require.Equal(t, d.password, conf.Password, "%v", d)
 	}
 
+	// test "credStore"
+	f, err := os.OpenFile(authFilePath, os.O_RDWR | os.O_TRUNC, 0644)
+	require.NoError(t, err)
+	_, err = f.Write([]byte(`{ "credsStore": "helper-registry" }`))
+	require.NoError(t, err)
+	err = f.Close()
+	require.NoError(t, err)
+	sys = types.SystemContext{
+		AuthFilePath:                authFilePath,
+		SystemRegistriesConfPath:    "",
+		SystemRegistriesConfDirPath: "",
+	}
+	authConfigs, err = GetAllCredentials(&sys)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(authConfigs))
+	require.Equal(t, "foo", authConfigs["registry-a.com"].Username)
+	require.Equal(t, "bar", authConfigs["registry-a.com"].Password)
 }
 
 func withTmpHome(t *testing.T) func() {
