@@ -7,7 +7,7 @@ require (
 	github.com/BurntSushi/toml v0.4.1
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
 	github.com/containers/ocicrypt v1.1.2
-	github.com/containers/storage v1.34.2-0.20210823065237-1a182cb72875
+	github.com/containers/storage v1.35.0
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v20.10.8+incompatible
 	github.com/docker/docker-credential-helpers v0.6.4
