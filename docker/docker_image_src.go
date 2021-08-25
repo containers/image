@@ -279,6 +279,7 @@ func (s *dockerImageSource) HasThreadSafeGetBlob() bool {
 }
 
 // GetBlobAt returns a stream for the specified blob.
+// The specified chunks must be not overlapping and sorted by their offset.
 func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []internalTypes.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
 	headers := make(map[string][]string)
 
