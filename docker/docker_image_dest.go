@@ -432,8 +432,9 @@ func (d *dockerImageDestination) PutManifest(ctx context.Context, m []byte, inst
 	}
 	defer res.Body.Close()
 	if !successStatus(res.StatusCode) {
-		err = errors.Wrapf(registryHTTPResponseToError(res), "uploading manifest %s to %s", refTail, d.ref.ref.Name())
-		if isManifestInvalidError(errors.Cause(err)) {
+		rawErr := registryHTTPResponseToError(res)
+		err := errors.Wrapf(rawErr, "uploading manifest %s to %s", refTail, d.ref.ref.Name())
+		if isManifestInvalidError(rawErr) {
 			err = types.ManifestTypeRejectedError{Err: err}
 		}
 		return err

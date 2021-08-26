@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,8 +25,8 @@ func TestIsManifestInvalidError(t *testing.T) {
 		"{\"errors\":[{\"code\":\"TAG_INVALID\",\"message\":\"manifest tag did not match URI\"}]}\n"
 	resp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader([]byte(response))), nil)
 	require.NoError(t, err)
-	err = errors.Wrapf(registryHTTPResponseToError(resp), "this is wrapped in PutManifest")
+	err = registryHTTPResponseToError(resp)
 
-	res := isManifestInvalidError(errors.Cause(err)) // This is what PutManifest does
+	res := isManifestInvalidError(err)
 	assert.True(t, res, "%#v", err)
 }
