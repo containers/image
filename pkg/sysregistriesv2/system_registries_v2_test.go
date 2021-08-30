@@ -423,7 +423,8 @@ func TestInvalidV2Configs(t *testing.T) {
 		{"testdata/insecure-conflicts.conf", "registry 'registry.com' is defined multiple times with conflicting 'insecure' setting"},
 		{"testdata/blocked-conflicts.conf", "registry 'registry.com' is defined multiple times with conflicting 'blocked' setting"},
 		{"testdata/missing-mirror-location.conf", "invalid condition: mirror location is unset"},
-		{"testdata/invalid-prefix.conf", "invalid location"},
+		{"testdata/invalid-location.conf", "invalid location"},
+		{"testdata/invalid-prefix.conf", "invalid prefix"},
 		{"testdata/this-does-not-exist.conf", "no such file or directory"},
 	} {
 		_, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: c.path})

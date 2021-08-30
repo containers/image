@@ -75,14 +75,10 @@ func (e *Endpoint) rewriteReference(ref reference.Named, prefix string) (referen
 	}
 	// In the case of an empty `location` field, simply return the original
 	// input ref as-is.
-	//
-	// FIXME: already validated in postProcessRegistries, so check can probably
-	// be dropped.
-	// https://github.com/containers/image/pull/1191#discussion_r610621608
-	if e.Location == "" {
-		if prefix[:2] != "*." {
-			return nil, fmt.Errorf("invalid prefix '%v' for empty location, should be in the format: *.example.com", prefix)
-		}
+	locationPrefixCheck := EmptyLocationWildcardedPrefixCheck(e.Location, prefix)
+	if locationPrefixCheck == -1 {
+		return nil, fmt.Errorf("invalid prefix '%v' for empty location, should be in the format: *.example.com", prefix)
+	} else if locationPrefixCheck == 1 {
 		return ref, nil
 	}
 	newNamedRef = e.Location + refString[prefixLen:]
@@ -271,18 +267,22 @@ func (e *InvalidRegistries) Error() string {
 func parseLocation(input string) (string, error) {
 	trimmed := strings.TrimRight(input, "/")
 
-	// FIXME: This check needs to exist but fails for empty Location field with
-	// wildcarded prefix. Removal of this check "only" allows invalid input in,
-	// and does not prevent correct operation.
-	// https://github.com/containers/image/pull/1191#discussion_r610122617
-	//
-	//	if trimmed == "" {
-	//		return "", &InvalidRegistries{s: "invalid location: cannot be empty"}
-	//	}
-	//
-
 	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
 		msg := fmt.Sprintf("invalid location '%s': URI schemes are not supported", input)
+		return "", &InvalidRegistries{s: msg}
+	}
+
+	return trimmed, nil
+}
+
+// parsePrefix parses the input string, performs some sanity checks and returns
+// the sanitized input string.  An error is returned if the input string is
+// empty or if contains an "http{s,}://" prefix.
+func parsePrefix(input string) (string, error) {
+	trimmed := strings.TrimRight(input, "/")
+
+	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
+		msg := fmt.Sprintf("invalid prefix '%s': URI schemes are not supported", input)
 		return "", &InvalidRegistries{s: msg}
 	}
 
@@ -343,6 +343,21 @@ func (config *V1RegistriesConf) ConvertToV2() (*V2RegistriesConf, error) {
 // anchoredDomainRegexp is an internal implementation detail of postProcess, defining the valid values of elements of UnqualifiedSearchRegistries.
 var anchoredDomainRegexp = regexp.MustCompile("^" + reference.DomainRegexp.String() + "$")
 
+// WildcardedPrefixCheck is the only place to check if a prefix contains "*."
+func WildcardedPrefixCheck(prefix string) bool {
+	return prefix[:2] == "*."
+}
+
+func EmptyLocationWildcardedPrefixCheck(location string, prefix string) int {
+	if location == "" {
+		if !(WildcardedPrefixCheck(prefix)) {
+			return -1
+		}
+		return 1
+	}
+	return 0
+}
+
 // postProcess checks the consistency of all the configuration, looks for conflicts,
 // and normalizes the configuration (e.g., sets the Prefix to Location if not set).
 func (config *V2RegistriesConf) postProcessRegistries() error {
@@ -357,35 +372,35 @@ func (config *V2RegistriesConf) postProcessRegistries() error {
 			return err
 		}
 
-		if reg.Prefix == "" {
-			if reg.Location == "" {
-				return &InvalidRegistries{s: "invalid condition: both location and prefix are unset"}
-			}
-			reg.Prefix = reg.Location
-		} else {
-			reg.Prefix, err = parseLocation(reg.Prefix)
+		if reg.Prefix != "" {
+			reg.Prefix, err = parsePrefix(reg.Prefix)
 			if err != nil {
 				return err
 			}
-			// FIXME: allow config authors to always use Prefix.
-			// https://github.com/containers/image/pull/1191#discussion_r610622495
-			if reg.Prefix[:2] != "*." && reg.Location == "" {
-				return &InvalidRegistries{s: "invalid condition: location is unset and prefix is not in the format: *.example.com"}
+			if reg.Location != "" {
+				reg.Location, err = parseLocation(reg.Location)
+				if err != nil {
+					return err
+				}
 			}
+		} else if reg.Location != "" {
+			reg.Prefix, err = parseLocation(reg.Location)
+			if err != nil {
+				return err
+			}
+			reg.Location = reg.Prefix
+		} else {
+			return &InvalidRegistries{s: "invalid condition: both location and prefix are unset"}
 		}
 
 		// make sure mirrors are valid
 		for _, mir := range reg.Mirrors {
+			if mir.Location == "" {
+				return &InvalidRegistries{s: "invalid condition: mirror location is unset"}
+			}
 			mir.Location, err = parseLocation(mir.Location)
 			if err != nil {
 				return err
-			}
-
-			//FIXME: unqualifiedSearchRegistries now also accepts empty values
-			//and shouldn't
-			// https://github.com/containers/image/pull/1191#discussion_r610623216
-			if mir.Location == "" {
-				return &InvalidRegistries{s: "invalid condition: mirror location is unset"}
 			}
 		}
 		if reg.Location == "" {
@@ -804,7 +819,7 @@ func refMatchingSubdomainPrefix(ref, prefix string) int {
 // (This is split from the caller primarily to make testing easier.)
 func refMatchingPrefix(ref, prefix string) int {
 	switch {
-	case prefix[0:2] == "*.":
+	case WildcardedPrefixCheck(prefix):
 		return refMatchingSubdomainPrefix(ref, prefix)
 	case len(ref) < len(prefix):
 		return -1
@@ -917,17 +932,6 @@ func loadConfigFile(path string, forceV2 bool) (*parsedConfig, error) {
 		res.shortNameMode = mode
 	} else {
 		res.shortNameMode = types.ShortNameModeInvalid
-	}
-
-	// Valid wildcarded prefixes must be in the format: *.example.com
-	// FIXME: Move to postProcessRegistries
-	// https://github.com/containers/image/pull/1191#discussion_r610623829
-	for i := range res.partialV2.Registries {
-		prefix := res.partialV2.Registries[i].Prefix
-		if prefix[:2] == "*." && strings.ContainsAny(prefix, "/@:") {
-			msg := fmt.Sprintf("Wildcarded prefix should be in the format: *.example.com. Current prefix %q is incorrectly formatted", prefix)
-			return nil, &InvalidRegistries{s: msg}
-		}
 	}
 
 	// Parse and validate short-name aliases.
