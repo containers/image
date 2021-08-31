@@ -643,11 +643,6 @@ func TestGetAllCredentials(t *testing.T) {
 	require.NoError(t, err)
 	err = f.Close()
 	require.NoError(t, err)
-	sys = types.SystemContext{
-		AuthFilePath:                authFilePath,
-		SystemRegistriesConfPath:    "",
-		SystemRegistriesConfDirPath: "",
-	}
 	authConfigs, err = GetAllCredentials(&sys)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(authConfigs))
