@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"syscall"
 
 	"github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer"
 	httptransport "github.com/go-openapi/runtime/client"
@@ -37,6 +38,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/sigstore/sigstore/pkg/signature/options"
+	"golang.org/x/term"
 )
 
 const (
@@ -135,7 +137,15 @@ func getCertForOauthID(priv *ecdsa.PrivateKey, ops operations.ClientService, oid
 		return nil, nil, err
 	}
 
-	tok, err := oauthflow.OIDConnect(oidcIssuer, oidcClientID, "", oauthflow.DefaultIDTokenGetter)
+	var flow oauthflow.TokenGetter
+	// TODO: use default flow if stdin is open.
+	if !term.IsTerminal(syscall.Stdin) {
+		flow = oauthflow.DefaultIDTokenGetter
+	} else {
+		flow = oauthflow.NewDeviceFlowTokenGetter(oidcIssuer, oauthflow.SigstoreDeviceURL, oauthflow.SigstoreTokenURL)
+	}
+
+	tok, err := oauthflow.OIDConnect(oidcIssuer, oidcClientID, "", flow)
 	if err != nil {
 		return nil, nil, err
 	}
