@@ -671,16 +671,11 @@ func TestSetCredentials(t *testing.T) {
 		{
 			input: []string{"quay.io"},
 			assert: func(sys *types.SystemContext, auth dockerConfigFile) {
-				assert.Len(t, auth.AuthConfigs, 1)
-				assert.NotEmpty(t, auth.AuthConfigs["quay.io"].Auth)
 			},
 		},
 		{
 			input: []string{"quay.io/a/b/c/d/image"},
 			assert: func(sys *types.SystemContext, auth dockerConfigFile) {
-				assert.Len(t, auth.AuthConfigs, 1)
-				assert.NotEmpty(t, auth.AuthConfigs["quay.io/a/b/c/d/image"].Auth)
-
 				ta := getAuth(sys, "quay.io/a/b/c/d/image")
 				assert.Equal(t, usernamePrefix+"0", ta.Username)
 				assert.Equal(t, passwordPrefix+"0", ta.Password)
@@ -696,13 +691,6 @@ func TestSetCredentials(t *testing.T) {
 				"my-registry.local",
 			},
 			assert: func(sys *types.SystemContext, auth dockerConfigFile) {
-				assert.Len(t, auth.AuthConfigs, 5)
-				assert.NotEmpty(t, auth.AuthConfigs["quay.io/a/b/c"].Auth)
-				assert.NotEmpty(t, auth.AuthConfigs["quay.io/a/b"].Auth)
-				assert.NotEmpty(t, auth.AuthConfigs["quay.io/a"].Auth)
-				assert.NotEmpty(t, auth.AuthConfigs["quay.io"].Auth)
-				assert.NotEmpty(t, auth.AuthConfigs["my-registry.local"].Auth)
-
 				ta0 := getAuth(sys, "quay.io/a/b/c")
 				assert.Equal(t, usernamePrefix+"0", ta0.Username)
 				assert.Equal(t, passwordPrefix+"0", ta0.Password)
@@ -726,6 +714,7 @@ func TestSetCredentials(t *testing.T) {
 		require.NoError(t, err)
 		sys := &types.SystemContext{AuthFilePath: tmpFile.Name()}
 
+		writtenCredentials := map[string]int{}
 		for i, input := range tc.input {
 			_, err := SetCredentials(
 				sys,
@@ -734,10 +723,17 @@ func TestSetCredentials(t *testing.T) {
 				passwordPrefix+fmt.Sprint(i),
 			)
 			assert.NoError(t, err)
+			writtenCredentials[input] = i // Possibly overwriting a previous entry
 		}
 
 		auth, err := readJSONFile(tmpFile.Name(), false)
 		require.NoError(t, err)
+		assert.Len(t, auth.AuthConfigs, len(writtenCredentials))
+		// auth.AuthConfigs and writtenCredentials are both maps, i.e. their keys are unique;
+		// so A \subset B && len(A) == len(B) implies A == B
+		for key := range writtenCredentials {
+			assert.NotEmpty(t, auth.AuthConfigs[key].Auth)
+		}
 
 		tc.assert(sys, auth)
 	}
