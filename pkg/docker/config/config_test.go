@@ -282,6 +282,42 @@ func TestGetAuth(t *testing.T) {
 				expected:        types.DockerAuthConfig{Username: "local", Password: "host"},
 				testPreviousAPI: false,
 			},
+			// Test matching of docker.io/[library/] explicitly, to make sure the docker.io
+			// normalization behavior doesn’t affect the semantics.
+			{
+				name:            "docker.io library repo match",
+				hostname:        "docker.io",
+				ref:             "docker.io/library/busybox:latest",
+				path:            filepath.Join("testdata", "refpath.json"),
+				expected:        types.DockerAuthConfig{Username: "library", Password: "busybox"},
+				testPreviousAPI: false,
+			},
+			{
+				name:            "docker.io library namespace match",
+				hostname:        "docker.io",
+				ref:             "docker.io/library/notbusybox:latest",
+				path:            filepath.Join("testdata", "refpath.json"),
+				expected:        types.DockerAuthConfig{Username: "library", Password: "other"},
+				testPreviousAPI: false,
+			},
+			{ // This tests that the docker.io/vendor key in auth file is not normalized to docker.io/library/vendor
+				name:            "docker.io vendor repo match",
+				hostname:        "docker.io",
+				ref:             "docker.io/vendor/product:latest",
+				path:            filepath.Join("testdata", "refpath.json"),
+				expected:        types.DockerAuthConfig{Username: "first", Password: "level"},
+				testPreviousAPI: false,
+			},
+			// ref: "docker.io/vendor:latest" is imposible to express using the reference syntax,
+			// it is normalized to "docker.io/library/vendor:latest".
+			{
+				name:            "docker.io host-only match",
+				hostname:        "docker.io",
+				ref:             "docker.io/other-vendor/other-product:latest",
+				path:            filepath.Join("testdata", "refpath.json"),
+				expected:        types.DockerAuthConfig{Username: "top", Password: "level"},
+				testPreviousAPI: false,
+			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				if err := os.RemoveAll(configPath); err != nil {
@@ -307,7 +343,7 @@ func TestGetAuth(t *testing.T) {
 				var ref reference.Named
 				if tc.ref != "" {
 					ref, err = reference.ParseNamed(tc.ref)
-					assert.NoError(t, err)
+					require.NoError(t, err)
 				}
 
 				auth, err := getCredentialsWithHomeDir(sys, ref, tc.hostname, tmpHomeDir)
@@ -643,6 +679,24 @@ func TestAuthKeysForRef(t *testing.T) {
 				"quay.io",
 			},
 		},
+		{
+			name: "docker.io library image",
+			ref:  "docker.io/library/busybox:latest",
+			expected: []string{
+				"docker.io/library/busybox",
+				"docker.io/library",
+				"docker.io",
+			},
+		},
+		{
+			name: "docker.io non-library image",
+			ref:  "docker.io/vendor/busybox:latest",
+			expected: []string{
+				"docker.io/vendor/busybox",
+				"docker.io/vendor",
+				"docker.io",
+			},
+		},
 	} {
 		ref, err := reference.ParseNamed(tc.ref)
 		require.NoError(t, err, tc.name)
@@ -668,6 +722,13 @@ func TestSetCredentials(t *testing.T) {
 			"quay.io",
 			"my-registry.local",
 			"my-registry.local",
+		},
+		{
+			"docker.io",
+			"docker.io/vendor/product",
+			"docker.io/vendor",
+			"docker.io/library/busybox",
+			"docker.io/library",
 		},
 	} {
 		tmpFile, err := ioutil.TempFile("", "auth.json.set")
@@ -702,9 +763,9 @@ func TestSetCredentials(t *testing.T) {
 
 		// Verify that the configuration is interpreted as expected
 		for key, i := range writtenCredentials {
-			if strings.Contains(key, "/") { // Full-registry keys can't be read by GetCredentialsForRef
-				ref, err := reference.ParseNamed(key)
-				require.NoError(t, err, key)
+			ref, err := reference.ParseNamed(key)
+			// Full-registry keys and docker.io/top-level-namespace can't be read by GetCredentialsForRef
+			if err == nil {
 				auth, err := GetCredentialsForRef(sys, ref)
 				require.NoError(t, err)
 				assert.Equal(t, usernamePrefix+fmt.Sprint(i), auth.Username)
