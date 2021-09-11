@@ -136,77 +136,67 @@ func TestGetAuth(t *testing.T) {
 
 	for _, configPath := range configPaths {
 		for _, tc := range []struct {
-			name            string
-			ref             string
-			hostname        string
-			path            string
-			expected        types.DockerAuthConfig
-			sys             *types.SystemContext
-			testPreviousAPI bool
+			name     string
+			ref      string
+			hostname string
+			path     string
+			expected types.DockerAuthConfig
+			sys      *types.SystemContext
 		}{
 			{
-				name:            "no auth config",
-				hostname:        "index.docker.io",
-				testPreviousAPI: true,
+				name:     "no auth config",
+				hostname: "index.docker.io",
 			},
 			{
 				name: "empty hostname",
 				path: filepath.Join("testdata", "example.json"),
 			},
 			{
-				name:            "match one",
-				hostname:        "example.org",
-				path:            filepath.Join("testdata", "example.json"),
-				expected:        types.DockerAuthConfig{Username: "example", Password: "org"},
-				testPreviousAPI: true,
+				name:     "match one",
+				hostname: "example.org",
+				path:     filepath.Join("testdata", "example.json"),
+				expected: types.DockerAuthConfig{Username: "example", Password: "org"},
 			},
 			{
-				name:            "match none",
-				hostname:        "registry.example.org",
-				path:            filepath.Join("testdata", "example.json"),
-				testPreviousAPI: true,
+				name:     "match none",
+				hostname: "registry.example.org",
+				path:     filepath.Join("testdata", "example.json"),
 			},
 			{
-				name:            "match docker.io",
-				hostname:        "docker.io",
-				path:            filepath.Join("testdata", "full.json"),
-				expected:        types.DockerAuthConfig{Username: "docker", Password: "io"},
-				testPreviousAPI: true,
+				name:     "match docker.io",
+				hostname: "docker.io",
+				path:     filepath.Join("testdata", "full.json"),
+				expected: types.DockerAuthConfig{Username: "docker", Password: "io"},
 			},
 			{
-				name:            "match docker.io normalized",
-				hostname:        "docker.io",
-				path:            filepath.Join("testdata", "abnormal.json"),
-				expected:        types.DockerAuthConfig{Username: "index", Password: "docker.io"},
-				testPreviousAPI: true,
+				name:     "match docker.io normalized",
+				hostname: "docker.io",
+				path:     filepath.Join("testdata", "abnormal.json"),
+				expected: types.DockerAuthConfig{Username: "index", Password: "docker.io"},
 			},
 			{
-				name:            "normalize registry",
-				hostname:        "normalize.example.org",
-				path:            filepath.Join("testdata", "full.json"),
-				expected:        types.DockerAuthConfig{Username: "normalize", Password: "example"},
-				testPreviousAPI: true,
+				name:     "normalize registry",
+				hostname: "normalize.example.org",
+				path:     filepath.Join("testdata", "full.json"),
+				expected: types.DockerAuthConfig{Username: "normalize", Password: "example"},
 			},
 			{
-				name:            "match localhost",
-				hostname:        "localhost",
-				path:            filepath.Join("testdata", "full.json"),
-				expected:        types.DockerAuthConfig{Username: "local", Password: "host"},
-				testPreviousAPI: true,
+				name:     "match localhost",
+				hostname: "localhost",
+				path:     filepath.Join("testdata", "full.json"),
+				expected: types.DockerAuthConfig{Username: "local", Password: "host"},
 			},
 			{
-				name:            "match ip",
-				hostname:        "10.10.30.45:5000",
-				path:            filepath.Join("testdata", "full.json"),
-				expected:        types.DockerAuthConfig{Username: "10.10", Password: "30.45-5000"},
-				testPreviousAPI: true,
+				name:     "match ip",
+				hostname: "10.10.30.45:5000",
+				path:     filepath.Join("testdata", "full.json"),
+				expected: types.DockerAuthConfig{Username: "10.10", Password: "30.45-5000"},
 			},
 			{
-				name:            "match port",
-				hostname:        "localhost:5000",
-				path:            filepath.Join("testdata", "abnormal.json"),
-				expected:        types.DockerAuthConfig{Username: "local", Password: "host-5000"},
-				testPreviousAPI: true,
+				name:     "match port",
+				hostname: "localhost:5000",
+				path:     filepath.Join("testdata", "abnormal.json"),
+				expected: types.DockerAuthConfig{Username: "local", Password: "host-5000"},
 			},
 			{
 				name:     "use system context",
@@ -219,7 +209,6 @@ func TestGetAuth(t *testing.T) {
 						Password: "bar",
 					},
 				},
-				testPreviousAPI: true,
 			},
 			{
 				name:     "identity token",
@@ -230,13 +219,11 @@ func TestGetAuth(t *testing.T) {
 					Password:      "",
 					IdentityToken: "some very long identity token",
 				},
-				testPreviousAPI: true,
 			},
 			{
-				name:            "match none (empty.json)",
-				hostname:        "localhost:5000",
-				path:            filepath.Join("testdata", "empty.json"),
-				testPreviousAPI: true,
+				name:     "match none (empty.json)",
+				hostname: "localhost:5000",
+				path:     filepath.Join("testdata", "empty.json"),
 			},
 			{
 				name:     "credhelper from registries.conf",
@@ -245,8 +232,7 @@ func TestGetAuth(t *testing.T) {
 					SystemRegistriesConfPath:    filepath.Join("testdata", "cred-helper.conf"),
 					SystemRegistriesConfDirPath: filepath.Join("testdata", "IdoNotExist"),
 				},
-				expected:        types.DockerAuthConfig{Username: "foo", Password: "bar"},
-				testPreviousAPI: true,
+				expected: types.DockerAuthConfig{Username: "foo", Password: "bar"},
 			},
 			{
 				name:     "identity token credhelper from registries.conf",
@@ -255,68 +241,60 @@ func TestGetAuth(t *testing.T) {
 					SystemRegistriesConfPath:    filepath.Join("testdata", "cred-helper.conf"),
 					SystemRegistriesConfDirPath: filepath.Join("testdata", "IdoNotExist"),
 				},
-				expected:        types.DockerAuthConfig{IdentityToken: "fizzbuzz"},
-				testPreviousAPI: true,
+				expected: types.DockerAuthConfig{IdentityToken: "fizzbuzz"},
 			},
 			{
-				name:            "match ref image",
-				hostname:        "example.org",
-				ref:             "example.org/repo/image:latest",
-				path:            filepath.Join("testdata", "refpath.json"),
-				expected:        types.DockerAuthConfig{Username: "example", Password: "org"},
-				testPreviousAPI: false,
+				name:     "match ref image",
+				hostname: "example.org",
+				ref:      "example.org/repo/image:latest",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{Username: "example", Password: "org"},
 			},
 			{
-				name:            "match ref repo",
-				hostname:        "example.org",
-				ref:             "example.org/repo",
-				path:            filepath.Join("testdata", "refpath.json"),
-				expected:        types.DockerAuthConfig{Username: "example", Password: "org"},
-				testPreviousAPI: false,
+				name:     "match ref repo",
+				hostname: "example.org",
+				ref:      "example.org/repo",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{Username: "example", Password: "org"},
 			},
 			{
-				name:            "match ref host",
-				hostname:        "example.org",
-				ref:             "example.org/image:latest",
-				path:            filepath.Join("testdata", "refpath.json"),
-				expected:        types.DockerAuthConfig{Username: "local", Password: "host"},
-				testPreviousAPI: false,
+				name:     "match ref host",
+				hostname: "example.org",
+				ref:      "example.org/image:latest",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{Username: "local", Password: "host"},
 			},
 			// Test matching of docker.io/[library/] explicitly, to make sure the docker.io
 			// normalization behavior doesn’t affect the semantics.
 			{
-				name:            "docker.io library repo match",
-				hostname:        "docker.io",
-				ref:             "docker.io/library/busybox:latest",
-				path:            filepath.Join("testdata", "refpath.json"),
-				expected:        types.DockerAuthConfig{Username: "library", Password: "busybox"},
-				testPreviousAPI: false,
+				name:     "docker.io library repo match",
+				hostname: "docker.io",
+				ref:      "docker.io/library/busybox:latest",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{Username: "library", Password: "busybox"},
 			},
 			{
-				name:            "docker.io library namespace match",
-				hostname:        "docker.io",
-				ref:             "docker.io/library/notbusybox:latest",
-				path:            filepath.Join("testdata", "refpath.json"),
-				expected:        types.DockerAuthConfig{Username: "library", Password: "other"},
-				testPreviousAPI: false,
+				name:     "docker.io library namespace match",
+				hostname: "docker.io",
+				ref:      "docker.io/library/notbusybox:latest",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{Username: "library", Password: "other"},
 			},
 			{ // This tests that the docker.io/vendor key in auth file is not normalized to docker.io/library/vendor
-				name:            "docker.io vendor repo match",
-				hostname:        "docker.io",
-				ref:             "docker.io/vendor/product:latest",
-				path:            filepath.Join("testdata", "refpath.json"),
-				expected:        types.DockerAuthConfig{Username: "first", Password: "level"},
-				testPreviousAPI: false,
+				name:     "docker.io vendor repo match",
+				hostname: "docker.io",
+				ref:      "docker.io/vendor/product:latest",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{Username: "first", Password: "level"},
 			},
 			// ref: "docker.io/vendor:latest" is imposible to express using the reference syntax,
 			// it is normalized to "docker.io/library/vendor:latest".
 			{
-				name:            "docker.io host-only match",
-				hostname:        "docker.io",
-				ref:             "docker.io/other-vendor/other-product:latest",
-				path:            filepath.Join("testdata", "refpath.json"),
-				expected:        types.DockerAuthConfig{Username: "top", Password: "level"},
-				testPreviousAPI: false,
+				name:     "docker.io host-only match",
+				hostname: "docker.io",
+				ref:      "docker.io/other-vendor/other-product:latest",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{Username: "top", Password: "level"},
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
@@ -351,16 +329,14 @@ func TestGetAuth(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, tc.expected, auth)
 
-				// Test for the previous APIs.
-				if tc.testPreviousAPI {
-					username, password, err := getAuthenticationWithHomeDir(sys, tc.hostname, tmpHomeDir)
-					if tc.expected.IdentityToken != "" {
-						assert.Error(t, err)
-					} else {
-						require.NoError(t, err)
-						assert.Equal(t, tc.expected.Username, username)
-						assert.Equal(t, tc.expected.Password, password)
-					}
+				// Verify the previous API also returns data consistent with the current one.
+				username, password, err := getAuthenticationWithHomeDir(sys, key, tmpHomeDir)
+				if tc.expected.IdentityToken != "" {
+					assert.Error(t, err)
+				} else {
+					require.NoError(t, err)
+					assert.Equal(t, tc.expected.Username, username)
+					assert.Equal(t, tc.expected.Password, password)
 				}
 
 				require.NoError(t, os.RemoveAll(configPath))
