@@ -284,8 +284,12 @@ func TestGetAuth(t *testing.T) {
 				path:     filepath.Join("testdata", "refpath.json"),
 				expected: types.DockerAuthConfig{Username: "first", Password: "level"},
 			},
-			// ref: "docker.io/vendor:latest" is imposible to express using the reference syntax,
-			// it is normalized to "docker.io/library/vendor:latest".
+			{ // This tests that the docker.io/vendor key in the query is not normalized to docker.io/library/vendor.
+				name:     "docker.io vendor namespace match",
+				key:      "docker.io/vendor",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{Username: "first", Password: "level"},
+			},
 			{
 				name:     "docker.io host-only match",
 				key:      "docker.io/other-vendor/other-product",
