@@ -637,7 +637,7 @@ func TestGetAllCredentials(t *testing.T) {
 	}
 }
 
-func TestAuthKeysForRef(t *testing.T) {
+func TestAuthKeysForKey(t *testing.T) {
 	for _, tc := range []struct {
 		name, ref string
 		expected  []string
@@ -701,7 +701,7 @@ func TestAuthKeysForRef(t *testing.T) {
 		ref, err := reference.ParseNamed(tc.ref)
 		require.NoError(t, err, tc.name)
 
-		result := authKeysForRef(ref)
+		result := authKeysForKey(ref.Name())
 		require.Equal(t, tc.expected, result, tc.name)
 	}
 }

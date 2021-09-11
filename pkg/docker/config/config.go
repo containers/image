@@ -277,7 +277,7 @@ func getCredentialsWithHomeDir(sys *types.SystemContext, ref reference.Named, re
 	// Anonymous function to query credentials from auth files.
 	getCredentialsFromAuthFiles := func() (types.DockerAuthConfig, string, error) {
 		for _, path := range getAuthFilePaths(sys, homeDir) {
-			authConfig, err := findAuthentication(ref, registry, path.path, path.legacyFormat)
+			authConfig, err := findCredentialsInFile(key, registry, path.path, path.legacyFormat)
 			if err != nil {
 				return types.DockerAuthConfig{}, "", err
 			}
@@ -650,28 +650,27 @@ func deleteAuthFromCredHelper(credHelper, registry string) error {
 	return helperclient.Erase(p, registry)
 }
 
-// findAuthentication looks for auth of registry in path. If ref is
-// not nil, then it will be taken into account when looking up the
-// authentication credentials.
-func findAuthentication(ref reference.Named, registry, path string, legacyFormat bool) (types.DockerAuthConfig, error) {
+// findCredentialsInFile looks for credentials matching "key"
+// (which is "registry" or a namespace in "registry") in "path".
+func findCredentialsInFile(key, registry, path string, legacyFormat bool) (types.DockerAuthConfig, error) {
 	auths, err := readJSONFile(path, legacyFormat)
 	if err != nil {
 		return types.DockerAuthConfig{}, errors.Wrapf(err, "reading JSON file %q", path)
 	}
 
 	// First try cred helpers. They should always be normalized.
-	// This intentionally uses "registry", not "ref"; we don't support namespaced
+	// This intentionally uses "registry", not "key"; we don't support namespaced
 	// credentials in helpers.
 	if ch, exists := auths.CredHelpers[registry]; exists {
 		return getAuthFromCredHelper(ch, registry)
 	}
 
-	// Support for different paths in auth.
+	// Support sub-registry namespaces in auth.
 	// (This is not a feature of ~/.docker/config.json; we support it even for
 	// those files as an extension.)
 	var keys []string
-	if !legacyFormat && ref != nil {
-		keys = authKeysForRef(ref)
+	if !legacyFormat {
+		keys = authKeysForKey(key)
 	} else {
 		keys = []string{registry}
 	}
@@ -702,23 +701,22 @@ func findAuthentication(ref reference.Named, registry, path string, legacyFormat
 	return types.DockerAuthConfig{}, nil
 }
 
-// authKeysForRef returns the valid paths for a provided reference. For example,
-// when given a reference "quay.io/repo/ns/image:tag", then it would return
+// authKeysForKey returns the keys matching a provided auth file key, in order
+// from the best match to worst. For example,
+// when given a repository key "quay.io/repo/ns/image", it returns
 // - quay.io/repo/ns/image
 // - quay.io/repo/ns
 // - quay.io/repo
 // - quay.io
-func authKeysForRef(ref reference.Named) (res []string) {
-	name := ref.Name()
-
+func authKeysForKey(key string) (res []string) {
 	for {
-		res = append(res, name)
+		res = append(res, key)
 
-		lastSlash := strings.LastIndex(name, "/")
+		lastSlash := strings.LastIndex(key, "/")
 		if lastSlash == -1 {
 			break
 		}
-		name = name[:lastSlash]
+		key = key[:lastSlash]
 	}
 
 	return res
