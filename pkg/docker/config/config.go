@@ -262,8 +262,15 @@ func getCredentialsWithHomeDir(sys *types.SystemContext, ref reference.Named, re
 		)
 	}
 
+	var key string
+	if ref != nil {
+		key = ref.Name()
+	} else {
+		key = registry
+	}
+
 	if sys != nil && sys.DockerAuthConfig != nil {
-		logrus.Debugf("Returning credentials for %s from DockerAuthConfig", registry)
+		logrus.Debugf("Returning credentials for %s from DockerAuthConfig", key)
 		return *sys.DockerAuthConfig, nil
 	}
 
@@ -291,26 +298,29 @@ func getCredentialsWithHomeDir(sys *types.SystemContext, ref reference.Named, re
 	for _, helper := range helpers {
 		var (
 			creds          types.DockerAuthConfig
+			helperKey      string
 			credHelperPath string
 			err            error
 		)
 		switch helper {
 		// Special-case the built-in helper for auth files.
 		case sysregistriesv2.AuthenticationFileHelper:
+			helperKey = key
 			creds, credHelperPath, err = getCredentialsFromAuthFiles()
 		// External helpers.
 		default:
 			// This intentionally uses "registry", not "key"; we don't support namespaced
 			// credentials in helpers, but a "registry" is a valid parent of "key".
+			helperKey = registry
 			creds, err = getAuthFromCredHelper(helper, registry)
 		}
 		if err != nil {
-			logrus.Debugf("Error looking up credentials for %s in credential helper %s: %v", registry, helper, err)
+			logrus.Debugf("Error looking up credentials for %s in credential helper %s: %v", helperKey, helper, err)
 			multiErr = multierror.Append(multiErr, err)
 			continue
 		}
 		if creds != (types.DockerAuthConfig{}) {
-			msg := fmt.Sprintf("Found credentials for %s in credential helper %s", registry, helper)
+			msg := fmt.Sprintf("Found credentials for %s in credential helper %s", helperKey, helper)
 			if credHelperPath != "" {
 				msg = fmt.Sprintf("%s in file %s", msg, credHelperPath)
 			}
@@ -322,7 +332,7 @@ func getCredentialsWithHomeDir(sys *types.SystemContext, ref reference.Named, re
 		return types.DockerAuthConfig{}, multiErr
 	}
 
-	logrus.Debugf("No credentials for %s found", registry)
+	logrus.Debugf("No credentials for %s found", key)
 	return types.DockerAuthConfig{}, nil
 }
 
