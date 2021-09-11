@@ -340,13 +340,14 @@ func TestGetAuth(t *testing.T) {
 					sys = tc.sys
 				}
 
-				var ref reference.Named
+				key := tc.hostname
 				if tc.ref != "" {
-					ref, err = reference.ParseNamed(tc.ref)
+					ref, err := reference.ParseNamed(tc.ref)
 					require.NoError(t, err)
+					key = ref.Name()
 				}
 
-				auth, err := getCredentialsWithHomeDir(sys, ref, tc.hostname, tmpHomeDir)
+				auth, err := getCredentialsWithHomeDir(sys, key, tmpHomeDir)
 				require.NoError(t, err)
 				assert.Equal(t, tc.expected, auth)
 
@@ -414,7 +415,7 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			auth, err := getCredentialsWithHomeDir(nil, nil, tc.hostname, tmpDir)
+			auth, err := getCredentialsWithHomeDir(nil, tc.hostname, tmpDir)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expected, auth)
 
@@ -468,7 +469,7 @@ func TestGetAuthPreferNewConfig(t *testing.T) {
 		}
 	}
 
-	auth, err := getCredentialsWithHomeDir(nil, nil, "docker.io", tmpDir)
+	auth, err := getCredentialsWithHomeDir(nil, "docker.io", tmpDir)
 	assert.NoError(t, err)
 	assert.Equal(t, "docker", auth.Username)
 	assert.Equal(t, "io", auth.Password)
@@ -513,7 +514,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	configPath := filepath.Join(configDir, "auth.json")
 
 	// no config file present
-	auth, err := getCredentialsWithHomeDir(nil, nil, "index.docker.io", tmpHomeDir)
+	auth, err := getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err != nil {
 		t.Fatalf("got unexpected error: %#+v", err)
 	}
@@ -522,7 +523,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if err := ioutil.WriteFile(configPath, []byte("Json rocks! Unless it doesn't."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
-	auth, err = getCredentialsWithHomeDir(nil, nil, "index.docker.io", tmpHomeDir)
+	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err == nil {
 		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}
@@ -533,7 +534,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	// remove the invalid config file
 	os.RemoveAll(configPath)
 	// no config file present
-	auth, err = getCredentialsWithHomeDir(nil, nil, "index.docker.io", tmpHomeDir)
+	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err != nil {
 		t.Fatalf("got unexpected error: %#+v", err)
 	}
@@ -543,7 +544,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if err := ioutil.WriteFile(configPath, []byte("I'm certainly not a json string."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
-	auth, err = getCredentialsWithHomeDir(nil, nil, "index.docker.io", tmpHomeDir)
+	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err == nil {
 		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}
@@ -963,16 +964,8 @@ func TestSetGetCredentials(t *testing.T) {
 		require.NoError(t, err)
 
 		// Try to authenticate against them
-		var auth types.DockerAuthConfig
-		if !tc.useLegacyAPI {
-			ref, err := reference.ParseNamed(tc.get)
-			require.NoError(t, err)
-			auth, err = getCredentialsWithHomeDir(sys, ref, reference.Domain(ref), tmpDir)
-			require.NoError(t, err)
-		} else {
-			auth, err = getCredentialsWithHomeDir(sys, nil, tc.get, tmpDir)
-			require.NoError(t, err)
-		}
+		auth, err := getCredentialsWithHomeDir(sys, tc.get, tmpDir)
+		require.NoError(t, err)
 
 		if tc.shouldAuth {
 			assert.Equal(t, username, auth.Username, tc.name)

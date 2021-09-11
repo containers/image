@@ -54,8 +54,8 @@ var (
 
 // SetCredentials stores the username and password in a location
 // appropriate for sys and the users’ configuration.
-// A valid key can be either a registry hostname or additionally a namespace if
-// the AuthenticationFileHelper is being unsed.
+// A valid key is a repository, a namespace within a registry, or a registry hostname;
+// using forms other than just a registry may fail depending on configuration.
 // Returns a human-redable description of the location that was updated.
 // NOTE: The return value is only intended to be read by humans; its form is not an API,
 // it may change (or new forms can be added) any time.
@@ -230,16 +230,14 @@ func getAuthFilePaths(sys *types.SystemContext, homeDir string) []authPath {
 	return paths
 }
 
-// GetCredentials returns the registry credentials stored in the
-// registry-specific credential helpers or in the default global credentials
-// helpers with falling back to using either auth.json
-// file or .docker/config.json, including support for OAuth2 and IdentityToken.
+// GetCredentials returns the registry credentials matching key, appropriate for
+// sys and the users’ configuration.
 // If an entry is not found, an empty struct is returned.
+// A valid key is a repository, a namespace within a registry, or a registry hostname.
 //
-// GetCredentialsForRef should almost always be used in favor of this API to
-// allow different credentials for different repositories on the same registry.
-func GetCredentials(sys *types.SystemContext, registry string) (types.DockerAuthConfig, error) {
-	return getCredentialsWithHomeDir(sys, nil, registry, homedir.Get())
+// GetCredentialsForRef should almost always be used in favor of this API.
+func GetCredentials(sys *types.SystemContext, key string) (types.DockerAuthConfig, error) {
+	return getCredentialsWithHomeDir(sys, key, homedir.Get())
 }
 
 // GetCredentialsForRef returns the registry credentials necessary for
@@ -247,31 +245,23 @@ func GetCredentials(sys *types.SystemContext, registry string) (types.DockerAuth
 // appropriate for sys and the users’ configuration.
 // If an entry is not found, an empty struct is returned.
 func GetCredentialsForRef(sys *types.SystemContext, ref reference.Named) (types.DockerAuthConfig, error) {
-	return getCredentialsWithHomeDir(sys, ref, reference.Domain(ref), homedir.Get())
+	return getCredentialsWithHomeDir(sys, ref.Name(), homedir.Get())
 }
 
 // getCredentialsWithHomeDir is an internal implementation detail of
 // GetCredentialsForRef and GetCredentials. It exists only to allow testing it
 // with an artificial home directory.
-func getCredentialsWithHomeDir(sys *types.SystemContext, ref reference.Named, registry, homeDir string) (types.DockerAuthConfig, error) {
-	// consistency check of the ref and registry arguments
-	if ref != nil && reference.Domain(ref) != registry {
-		return types.DockerAuthConfig{}, errors.Errorf(
-			"internal error: provided reference domain %q name does not match registry %q",
-			reference.Domain(ref), registry,
-		)
-	}
-
-	var key string
-	if ref != nil {
-		key = ref.Name()
-	} else {
-		key = registry
-	}
-
+func getCredentialsWithHomeDir(sys *types.SystemContext, key, homeDir string) (types.DockerAuthConfig, error) {
 	if sys != nil && sys.DockerAuthConfig != nil {
 		logrus.Debugf("Returning credentials for %s from DockerAuthConfig", key)
 		return *sys.DockerAuthConfig, nil
+	}
+
+	var registry string // We compute this once because it is used in several places.
+	if firstSlash := strings.IndexRune(key, '/'); firstSlash != -1 {
+		registry = key[:firstSlash]
+	} else {
+		registry = key
 	}
 
 	// Anonymous function to query credentials from auth files.
@@ -336,23 +326,23 @@ func getCredentialsWithHomeDir(sys *types.SystemContext, ref reference.Named, re
 	return types.DockerAuthConfig{}, nil
 }
 
-// GetAuthentication returns the registry credentials stored in the
-// registry-specific credential helpers or in the default global credentials
-// helpers with falling back to using either auth.json file or
-// .docker/config.json
+// GetAuthentication returns the registry credentials matching key, appropriate for
+// sys and the users’ configuration.
+// If an entry is not found, an empty struct is returned.
+// A valid key is a repository, a namespace within a registry, or a registry hostname.
 //
 // Deprecated: This API only has support for username and password. To get the
 // support for oauth2 in container registry authentication, we added the new
-// GetCredentials API. The new API should be used and this API is kept to
+// GetCredentialsForRef and GetCredentials API. The new API should be used and this API is kept to
 // maintain backward compatibility.
-func GetAuthentication(sys *types.SystemContext, registry string) (string, string, error) {
-	return getAuthenticationWithHomeDir(sys, registry, homedir.Get())
+func GetAuthentication(sys *types.SystemContext, key string) (string, string, error) {
+	return getAuthenticationWithHomeDir(sys, key, homedir.Get())
 }
 
 // getAuthenticationWithHomeDir is an internal implementation detail of GetAuthentication,
 // it exists only to allow testing it with an artificial home directory.
-func getAuthenticationWithHomeDir(sys *types.SystemContext, registry, homeDir string) (string, string, error) {
-	auth, err := getCredentialsWithHomeDir(sys, nil, registry, homeDir)
+func getAuthenticationWithHomeDir(sys *types.SystemContext, key, homeDir string) (string, string, error) {
+	auth, err := getCredentialsWithHomeDir(sys, key, homeDir)
 	if err != nil {
 		return "", "", err
 	}
@@ -364,8 +354,8 @@ func getAuthenticationWithHomeDir(sys *types.SystemContext, registry, homeDir st
 
 // RemoveAuthentication removes credentials for `key` from all possible
 // sources such as credential helpers and auth files.
-// A valid key can be either a registry hostname or additionally a namespace if
-// the AuthenticationFileHelper is being unsed.
+// A valid key is a repository, a namespace within a registry, or a registry hostname;
+// using forms other than just a registry may fail depending on configuration.
 func RemoveAuthentication(sys *types.SystemContext, key string) error {
 	isNamespaced, err := validateKey(key)
 	if err != nil {
