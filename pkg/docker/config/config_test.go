@@ -546,43 +546,47 @@ func TestGetAllCredentials(t *testing.T) {
 	}
 
 	for _, data := range [][]struct {
-		server   string
-		username string
-		password string
-		noStore  bool
+		writeKey    string
+		expectedKey string
+		username    string
+		password    string
 	}{
 		{
 			{
-				server:   "example.org",
-				username: "example-user",
-				password: "example-password",
+				writeKey:    "example.org",
+				expectedKey: "example.org",
+				username:    "example-user",
+				password:    "example-password",
 			},
 			{
-				server:   "quay.io",
-				username: "quay-user",
-				password: "quay-password",
+				writeKey:    "quay.io",
+				expectedKey: "quay.io",
+				username:    "quay-user",
+				password:    "quay-password",
 			},
 			{
-				server:   "localhost:5000",
-				username: "local-user",
-				password: "local-password",
+				writeKey:    "localhost:5000",
+				expectedKey: "localhost:5000",
+				username:    "local-user",
+				password:    "local-password",
 			},
 			{
-				server:   "registry-a.com",
-				username: "foo",
-				password: "bar",
-				noStore:  true,
+				writeKey:    "",
+				expectedKey: "registry-a.com",
+				username:    "foo",
+				password:    "bar",
 			},
 		},
 	} {
 		// Write the credentials to the authfile.
 		err := ioutil.WriteFile(authFilePath, []byte{'{', '}'}, 0700)
 		require.NoError(t, err)
+
 		for _, d := range data {
-			if d.noStore {
+			if d.writeKey == "" {
 				continue
 			}
-			err := SetAuthentication(&sys, d.server, d.username, d.password)
+			err := SetAuthentication(&sys, d.writeKey, d.username, d.password)
 			require.NoError(t, err)
 		}
 
@@ -593,7 +597,7 @@ func TestGetAllCredentials(t *testing.T) {
 		require.Equal(t, len(data), len(authConfigs))
 
 		for _, d := range data {
-			conf, exists := authConfigs[d.server]
+			conf, exists := authConfigs[d.expectedKey]
 			require.True(t, exists, "%v", d)
 			require.Equal(t, d.username, conf.Username, "%v", d)
 			require.Equal(t, d.password, conf.Password, "%v", d)
