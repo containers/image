@@ -660,28 +660,20 @@ func TestGetAllCredentials(t *testing.T) {
 
 func TestAuthKeysForKey(t *testing.T) {
 	for _, tc := range []struct {
-		name, ref string
-		expected  []string
+		name, input string
+		expected    []string
 	}{
 		{
-			name: "image without tag",
-			ref:  "quay.io/image",
+			name:  "a top-level repo",
+			input: "quay.io/image",
 			expected: []string{
 				"quay.io/image",
 				"quay.io",
 			},
 		},
 		{
-			name: "image with tag",
-			ref:  "quay.io/image:latest",
-			expected: []string{
-				"quay.io/image",
-				"quay.io",
-			},
-		},
-		{
-			name: "image single path tag",
-			ref:  "quay.io/user/image:latest",
+			name:  "a second-level repo",
+			input: "quay.io/user/image",
 			expected: []string{
 				"quay.io/user/image",
 				"quay.io/user",
@@ -689,8 +681,8 @@ func TestAuthKeysForKey(t *testing.T) {
 			},
 		},
 		{
-			name: "image with nested path",
-			ref:  "quay.io/a/b/c/d/image:latest",
+			name:  "a deeply-nested repo",
+			input: "quay.io/a/b/c/d/image",
 			expected: []string{
 				"quay.io/a/b/c/d/image",
 				"quay.io/a/b/c/d",
@@ -701,8 +693,8 @@ func TestAuthKeysForKey(t *testing.T) {
 			},
 		},
 		{
-			name: "docker.io library image",
-			ref:  "docker.io/library/busybox:latest",
+			name:  "docker.io library repo",
+			input: "docker.io/library/busybox",
 			expected: []string{
 				"docker.io/library/busybox",
 				"docker.io/library",
@@ -710,8 +702,8 @@ func TestAuthKeysForKey(t *testing.T) {
 			},
 		},
 		{
-			name: "docker.io non-library image",
-			ref:  "docker.io/vendor/busybox:latest",
+			name:  "docker.io non-library repo",
+			input: "docker.io/vendor/busybox",
 			expected: []string{
 				"docker.io/vendor/busybox",
 				"docker.io/vendor",
@@ -719,10 +711,7 @@ func TestAuthKeysForKey(t *testing.T) {
 			},
 		},
 	} {
-		ref, err := reference.ParseNamed(tc.ref)
-		require.NoError(t, err, tc.name)
-
-		result := authKeysForKey(ref.Name())
+		result := authKeysForKey(tc.input)
 		require.Equal(t, tc.expected, result, tc.name)
 	}
 }
