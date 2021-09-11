@@ -524,11 +524,9 @@ func TestGetAllCredentials(t *testing.T) {
 	// Create a temporary authentication file.
 	tmpFile, err := ioutil.TempFile("", "auth.json.")
 	require.NoError(t, err)
-	_, err = tmpFile.Write([]byte{'{', '}'})
-	require.NoError(t, err)
-	err = tmpFile.Close()
-	require.NoError(t, err)
 	authFilePath := tmpFile.Name()
+	defer tmpFile.Close()
+	defer os.Remove(authFilePath)
 	// override PATH for executing credHelper
 	path, err := os.Getwd()
 	require.NoError(t, err)
@@ -547,57 +545,60 @@ func TestGetAllCredentials(t *testing.T) {
 		SystemRegistriesConfDirPath: filepath.Join("testdata", "IdoNotExist"),
 	}
 
-	data := []struct {
+	for _, data := range [][]struct {
 		server   string
 		username string
 		password string
 		noStore  bool
 	}{
 		{
-			server:   "example.org",
-			username: "example-user",
-			password: "example-password",
+			{
+				server:   "example.org",
+				username: "example-user",
+				password: "example-password",
+			},
+			{
+				server:   "quay.io",
+				username: "quay-user",
+				password: "quay-password",
+			},
+			{
+				server:   "localhost:5000",
+				username: "local-user",
+				password: "local-password",
+			},
+			{
+				server:   "registry-a.com",
+				username: "foo",
+				password: "bar",
+				noStore:  true,
+			},
 		},
-		{
-			server:   "quay.io",
-			username: "quay-user",
-			password: "quay-password",
-		},
-		{
-			server:   "localhost:5000",
-			username: "local-user",
-			password: "local-password",
-		},
-		{
-			server:   "registry-a.com",
-			username: "foo",
-			password: "bar",
-			noStore:  true,
-		},
-	}
-
-	// Write the credentials to the authfile.
-	for _, d := range data {
-		if d.noStore {
-			continue
-		}
-		err := SetAuthentication(&sys, d.server, d.username, d.password)
+	} {
+		// Write the credentials to the authfile.
+		err := ioutil.WriteFile(authFilePath, []byte{'{', '}'}, 0700)
 		require.NoError(t, err)
+		for _, d := range data {
+			if d.noStore {
+				continue
+			}
+			err := SetAuthentication(&sys, d.server, d.username, d.password)
+			require.NoError(t, err)
+		}
+
+		// Now ask for all credentials and make sure that map includes all
+		// servers and the correct credentials.
+		authConfigs, err := GetAllCredentials(&sys)
+		require.NoError(t, err)
+		require.Equal(t, len(data), len(authConfigs))
+
+		for _, d := range data {
+			conf, exists := authConfigs[d.server]
+			require.True(t, exists, "%v", d)
+			require.Equal(t, d.username, conf.Username, "%v", d)
+			require.Equal(t, d.password, conf.Password, "%v", d)
+		}
 	}
-
-	// Now ask for all credentials and make sure that map includes all
-	// servers and the correct credentials.
-	authConfigs, err := GetAllCredentials(&sys)
-	require.NoError(t, err)
-	require.Equal(t, len(data), len(authConfigs))
-
-	for _, d := range data {
-		conf, exists := authConfigs[d.server]
-		require.True(t, exists, "%v", d)
-		require.Equal(t, d.username, conf.Username, "%v", d)
-		require.Equal(t, d.password, conf.Password, "%v", d)
-	}
-
 }
 
 func TestAuthKeysForRef(t *testing.T) {
