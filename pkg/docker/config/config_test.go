@@ -584,7 +584,7 @@ func TestGetAllCredentials(t *testing.T) {
 		username    string
 		password    string
 	}{
-		{
+		{ // Basic operation, including a credential helper.
 			{
 				writeKey:    "example.org",
 				expectedKey: "example.org",
@@ -602,6 +602,26 @@ func TestGetAllCredentials(t *testing.T) {
 				expectedKey: "localhost:5000",
 				username:    "local-user",
 				password:    "local-password",
+			},
+			{
+				writeKey:    "",
+				expectedKey: "registry-a.com",
+				username:    "foo",
+				password:    "bar",
+			},
+		},
+		{ // docker.io normalization, both namespaced and not
+			{
+				writeKey:    "docker.io/vendor",
+				expectedKey: "docker.io/vendor",
+				username:    "u1",
+				password:    "p1",
+			},
+			{
+				writeKey:    "index.docker.io", // Ideally we would even use a HTTPS URL
+				expectedKey: "docker.io",
+				username:    "u2",
+				password:    "p2",
 			},
 			{
 				writeKey:    "",

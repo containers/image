@@ -128,10 +128,14 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 	// possible sources, and then call `GetCredentials` on them.  That
 	// prevents us from having to reverse engineer the logic in
 	// `GetCredentials`.
-	allRegistries := make(map[string]bool)
-	addRegistry := func(s string) {
-		allRegistries[s] = true
+	allKeys := make(map[string]bool)
+	addKey := func(s string) {
+		allKeys[s] = true
 	}
+
+	// To use GetCredentials, we must at least convert the URL forms into host names.
+	// While we're at it, we’ll also canonicalize docker.io to the standard format.
+	normalizedDockerIORegistry := normalizeRegistry("docker.io")
 
 	helpers, err := sysregistriesv2.CredentialHelpers(sys)
 	if err != nil {
@@ -151,10 +155,14 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 				// direct mapping to a registry, so we can just
 				// walk the map.
 				for registry := range auths.CredHelpers {
-					addRegistry(registry)
+					addKey(registry)
 				}
-				for registry := range auths.AuthConfigs {
-					addRegistry(registry)
+				for key := range auths.AuthConfigs {
+					key := normalizeAuthFileKey(key, path.legacyFormat)
+					if key == normalizedDockerIORegistry {
+						key = "docker.io"
+					}
+					addKey(key)
 				}
 			}
 		// External helpers.
@@ -166,7 +174,7 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 			switch errors.Cause(err) {
 			case nil:
 				for registry := range creds {
-					addRegistry(registry)
+					addKey(registry)
 				}
 			case exec.ErrNotFound:
 				// It's okay if the helper doesn't exist.
@@ -179,8 +187,8 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 	// Now use `GetCredentials` to the specific auth configs for each
 	// previously listed registry.
 	authConfigs := make(map[string]types.DockerAuthConfig)
-	for registry := range allRegistries {
-		authConf, err := GetCredentials(sys, registry)
+	for key := range allKeys {
+		authConf, err := GetCredentials(sys, key)
 		if err != nil {
 			if credentials.IsErrCredentialsNotFoundMessage(err.Error()) {
 				// Ignore if the credentials could not be found (anymore).
@@ -189,7 +197,7 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 			// Note: we rely on the logging in `GetCredentials`.
 			return nil, err
 		}
-		authConfigs[registry] = authConf
+		authConfigs[key] = authConf
 	}
 
 	return authConfigs, nil
