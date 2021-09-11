@@ -141,7 +141,6 @@ func TestGetAuth(t *testing.T) {
 			hostname        string
 			path            string
 			expected        types.DockerAuthConfig
-			expectedError   error
 			sys             *types.SystemContext
 			testPreviousAPI bool
 		}{
@@ -312,20 +311,18 @@ func TestGetAuth(t *testing.T) {
 				}
 
 				auth, err := getCredentialsWithHomeDir(sys, ref, tc.hostname, tmpHomeDir)
-				assert.Equal(t, tc.expectedError, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expected, auth)
 
 				// Test for the previous APIs.
 				if tc.testPreviousAPI {
 					username, password, err := getAuthenticationWithHomeDir(sys, tc.hostname, tmpHomeDir)
 					if tc.expected.IdentityToken != "" {
-						assert.Equal(t, "", username)
-						assert.Equal(t, "", password)
 						assert.Error(t, err)
 					} else {
+						require.NoError(t, err)
 						assert.Equal(t, tc.expected.Username, username)
 						assert.Equal(t, tc.expected.Password, password)
-						assert.Equal(t, tc.expectedError, err)
 					}
 				}
 
@@ -355,10 +352,9 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name          string
-		hostname      string
-		expected      types.DockerAuthConfig
-		expectedError error
+		name     string
+		hostname string
+		expected types.DockerAuthConfig
 	}{
 		{
 			name:     "ignore schema and path",
@@ -383,12 +379,12 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 			}
 
 			auth, err := getCredentialsWithHomeDir(nil, nil, tc.hostname, tmpDir)
-			assert.Equal(t, tc.expectedError, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.expected, auth)
 
 			// Testing for previous APIs
 			username, password, err := getAuthenticationWithHomeDir(nil, tc.hostname, tmpDir)
-			assert.Equal(t, tc.expectedError, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.expected.Username, username)
 			assert.Equal(t, tc.expected.Password, password)
 		})
