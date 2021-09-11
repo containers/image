@@ -859,24 +859,26 @@ func TestRemoveAuthentication(t *testing.T) {
 }
 
 func TestValidateKey(t *testing.T) {
+	// Invalid keys
+	for _, key := range []string{
+		"https://my-registry.local",
+	} {
+		_, err := validateKey(key)
+		assert.Error(t, err, key)
+	}
+
+	// Valid keys
 	for _, tc := range []struct {
 		key          string
-		shouldError  bool
 		isNamespaced bool
 	}{
-		{"my-registry.local", false, false},
-		{"https://my-registry.local", true, false},
-		{"my-registry.local/path", false, true},
-		{"quay.io/a/b/c/d", false, true},
+		{"my-registry.local", false},
+		{"my-registry.local/path", true},
+		{"quay.io/a/b/c/d", true},
 	} {
-
 		isNamespaced, err := validateKey(tc.key)
-		if tc.shouldError {
-			assert.Error(t, err)
-		} else {
-			assert.NoError(t, err)
-		}
-		assert.Equal(t, tc.isNamespaced, isNamespaced)
+		require.NoError(t, err, tc.key)
+		assert.Equal(t, tc.isNamespaced, isNamespaced, tc.key)
 	}
 }
 
