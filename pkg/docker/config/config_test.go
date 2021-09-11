@@ -146,10 +146,12 @@ func TestGetAuth(t *testing.T) {
 			{
 				name:     "no auth config",
 				hostname: "index.docker.io",
+				expected: types.DockerAuthConfig{},
 			},
 			{
-				name: "empty hostname",
-				path: filepath.Join("testdata", "example.json"),
+				name:     "empty hostname",
+				path:     filepath.Join("testdata", "example.json"),
+				expected: types.DockerAuthConfig{},
 			},
 			{
 				name:     "match one",
@@ -161,6 +163,7 @@ func TestGetAuth(t *testing.T) {
 				name:     "match none",
 				hostname: "registry.example.org",
 				path:     filepath.Join("testdata", "example.json"),
+				expected: types.DockerAuthConfig{},
 			},
 			{
 				name:     "match docker.io",
@@ -224,6 +227,7 @@ func TestGetAuth(t *testing.T) {
 				name:     "match none (empty.json)",
 				hostname: "localhost:5000",
 				path:     filepath.Join("testdata", "empty.json"),
+				expected: types.DockerAuthConfig{},
 			},
 			{
 				name:     "credhelper from registries.conf",
