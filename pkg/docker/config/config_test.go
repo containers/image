@@ -137,15 +137,14 @@ func TestGetAuth(t *testing.T) {
 	for _, configPath := range configPaths {
 		for _, tc := range []struct {
 			name     string
-			ref      string
-			hostname string
+			key      string
 			path     string
 			expected types.DockerAuthConfig
 			sys      *types.SystemContext
 		}{
 			{
 				name:     "no auth config",
-				hostname: "index.docker.io",
+				key:      "index.docker.io",
 				expected: types.DockerAuthConfig{},
 			},
 			{
@@ -155,55 +154,55 @@ func TestGetAuth(t *testing.T) {
 			},
 			{
 				name:     "match one",
-				hostname: "example.org",
+				key:      "example.org",
 				path:     filepath.Join("testdata", "example.json"),
 				expected: types.DockerAuthConfig{Username: "example", Password: "org"},
 			},
 			{
 				name:     "match none",
-				hostname: "registry.example.org",
+				key:      "registry.example.org",
 				path:     filepath.Join("testdata", "example.json"),
 				expected: types.DockerAuthConfig{},
 			},
 			{
 				name:     "match docker.io",
-				hostname: "docker.io",
+				key:      "docker.io",
 				path:     filepath.Join("testdata", "full.json"),
 				expected: types.DockerAuthConfig{Username: "docker", Password: "io"},
 			},
 			{
 				name:     "match docker.io normalized",
-				hostname: "docker.io",
+				key:      "docker.io",
 				path:     filepath.Join("testdata", "abnormal.json"),
 				expected: types.DockerAuthConfig{Username: "index", Password: "docker.io"},
 			},
 			{
 				name:     "normalize registry",
-				hostname: "normalize.example.org",
+				key:      "normalize.example.org",
 				path:     filepath.Join("testdata", "full.json"),
 				expected: types.DockerAuthConfig{Username: "normalize", Password: "example"},
 			},
 			{
 				name:     "match localhost",
-				hostname: "localhost",
+				key:      "localhost",
 				path:     filepath.Join("testdata", "full.json"),
 				expected: types.DockerAuthConfig{Username: "local", Password: "host"},
 			},
 			{
 				name:     "match ip",
-				hostname: "10.10.30.45:5000",
+				key:      "10.10.30.45:5000",
 				path:     filepath.Join("testdata", "full.json"),
 				expected: types.DockerAuthConfig{Username: "10.10", Password: "30.45-5000"},
 			},
 			{
 				name:     "match port",
-				hostname: "localhost:5000",
+				key:      "localhost:5000",
 				path:     filepath.Join("testdata", "abnormal.json"),
 				expected: types.DockerAuthConfig{Username: "local", Password: "host-5000"},
 			},
 			{
 				name:     "use system context",
-				hostname: "example.org",
+				key:      "example.org",
 				path:     filepath.Join("testdata", "example.json"),
 				expected: types.DockerAuthConfig{Username: "foo", Password: "bar"},
 				sys: &types.SystemContext{
@@ -214,9 +213,9 @@ func TestGetAuth(t *testing.T) {
 				},
 			},
 			{
-				name:     "identity token",
-				hostname: "example.org",
-				path:     filepath.Join("testdata", "example_identitytoken.json"),
+				name: "identity token",
+				key:  "example.org",
+				path: filepath.Join("testdata", "example_identitytoken.json"),
 				expected: types.DockerAuthConfig{
 					Username:      "00000000-0000-0000-0000-000000000000",
 					Password:      "",
@@ -225,13 +224,13 @@ func TestGetAuth(t *testing.T) {
 			},
 			{
 				name:     "match none (empty.json)",
-				hostname: "localhost:5000",
+				key:      "localhost:5000",
 				path:     filepath.Join("testdata", "empty.json"),
 				expected: types.DockerAuthConfig{},
 			},
 			{
-				name:     "credhelper from registries.conf",
-				hostname: "registry-a.com",
+				name: "credhelper from registries.conf",
+				key:  "registry-a.com",
 				sys: &types.SystemContext{
 					SystemRegistriesConfPath:    filepath.Join("testdata", "cred-helper.conf"),
 					SystemRegistriesConfDirPath: filepath.Join("testdata", "IdoNotExist"),
@@ -239,8 +238,8 @@ func TestGetAuth(t *testing.T) {
 				expected: types.DockerAuthConfig{Username: "foo", Password: "bar"},
 			},
 			{
-				name:     "identity token credhelper from registries.conf",
-				hostname: "registry-b.com",
+				name: "identity token credhelper from registries.conf",
+				key:  "registry-b.com",
 				sys: &types.SystemContext{
 					SystemRegistriesConfPath:    filepath.Join("testdata", "cred-helper.conf"),
 					SystemRegistriesConfDirPath: filepath.Join("testdata", "IdoNotExist"),
@@ -249,22 +248,19 @@ func TestGetAuth(t *testing.T) {
 			},
 			{
 				name:     "match ref image",
-				hostname: "example.org",
-				ref:      "example.org/repo/image:latest",
+				key:      "example.org/repo/image",
 				path:     filepath.Join("testdata", "refpath.json"),
 				expected: types.DockerAuthConfig{Username: "example", Password: "org"},
 			},
 			{
 				name:     "match ref repo",
-				hostname: "example.org",
-				ref:      "example.org/repo",
+				key:      "example.org/repo",
 				path:     filepath.Join("testdata", "refpath.json"),
 				expected: types.DockerAuthConfig{Username: "example", Password: "org"},
 			},
 			{
 				name:     "match ref host",
-				hostname: "example.org",
-				ref:      "example.org/image:latest",
+				key:      "example.org/image",
 				path:     filepath.Join("testdata", "refpath.json"),
 				expected: types.DockerAuthConfig{Username: "local", Password: "host"},
 			},
@@ -272,22 +268,19 @@ func TestGetAuth(t *testing.T) {
 			// normalization behavior doesn’t affect the semantics.
 			{
 				name:     "docker.io library repo match",
-				hostname: "docker.io",
-				ref:      "docker.io/library/busybox:latest",
+				key:      "docker.io/library/busybox",
 				path:     filepath.Join("testdata", "refpath.json"),
 				expected: types.DockerAuthConfig{Username: "library", Password: "busybox"},
 			},
 			{
 				name:     "docker.io library namespace match",
-				hostname: "docker.io",
-				ref:      "docker.io/library/notbusybox:latest",
+				key:      "docker.io/library/notbusybox",
 				path:     filepath.Join("testdata", "refpath.json"),
 				expected: types.DockerAuthConfig{Username: "library", Password: "other"},
 			},
 			{ // This tests that the docker.io/vendor key in auth file is not normalized to docker.io/library/vendor
 				name:     "docker.io vendor repo match",
-				hostname: "docker.io",
-				ref:      "docker.io/vendor/product:latest",
+				key:      "docker.io/vendor/product",
 				path:     filepath.Join("testdata", "refpath.json"),
 				expected: types.DockerAuthConfig{Username: "first", Password: "level"},
 			},
@@ -295,8 +288,7 @@ func TestGetAuth(t *testing.T) {
 			// it is normalized to "docker.io/library/vendor:latest".
 			{
 				name:     "docker.io host-only match",
-				hostname: "docker.io",
-				ref:      "docker.io/other-vendor/other-product:latest",
+				key:      "docker.io/other-vendor/other-product",
 				path:     filepath.Join("testdata", "refpath.json"),
 				expected: types.DockerAuthConfig{Username: "top", Password: "level"},
 			},
@@ -322,19 +314,12 @@ func TestGetAuth(t *testing.T) {
 					sys = tc.sys
 				}
 
-				key := tc.hostname
-				if tc.ref != "" {
-					ref, err := reference.ParseNamed(tc.ref)
-					require.NoError(t, err)
-					key = ref.Name()
-				}
-
-				auth, err := getCredentialsWithHomeDir(sys, key, tmpHomeDir)
+				auth, err := getCredentialsWithHomeDir(sys, tc.key, tmpHomeDir)
 				require.NoError(t, err)
 				assert.Equal(t, tc.expected, auth)
 
 				// Verify the previous API also returns data consistent with the current one.
-				username, password, err := getAuthenticationWithHomeDir(sys, key, tmpHomeDir)
+				username, password, err := getAuthenticationWithHomeDir(sys, tc.key, tmpHomeDir)
 				if tc.expected.IdentityToken != "" {
 					assert.Error(t, err)
 				} else {
