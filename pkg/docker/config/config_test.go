@@ -656,30 +656,15 @@ func TestSetCredentials(t *testing.T) {
 		usernamePrefix = "username-"
 		passwordPrefix = "password-"
 	)
-	getAuth := func(sys *types.SystemContext, input string) types.DockerAuthConfig {
-		ref, err := reference.ParseNamed(input)
-		require.NoError(t, err)
-		auth, err := GetCredentialsForRef(sys, ref)
-		require.NoError(t, err)
-		return auth
-	}
 
 	for _, tc := range []struct {
-		input  []string
-		assert func(*types.SystemContext, dockerConfigFile)
+		input []string
 	}{
 		{
 			input: []string{"quay.io"},
-			assert: func(sys *types.SystemContext, auth dockerConfigFile) {
-			},
 		},
 		{
 			input: []string{"quay.io/a/b/c/d/image"},
-			assert: func(sys *types.SystemContext, auth dockerConfigFile) {
-				ta := getAuth(sys, "quay.io/a/b/c/d/image")
-				assert.Equal(t, usernamePrefix+"0", ta.Username)
-				assert.Equal(t, passwordPrefix+"0", ta.Password)
-			},
 		},
 		{
 			input: []string{
@@ -689,20 +674,6 @@ func TestSetCredentials(t *testing.T) {
 				"quay.io",
 				"my-registry.local",
 				"my-registry.local",
-			},
-			assert: func(sys *types.SystemContext, auth dockerConfigFile) {
-				ta0 := getAuth(sys, "quay.io/a/b/c")
-				assert.Equal(t, usernamePrefix+"0", ta0.Username)
-				assert.Equal(t, passwordPrefix+"0", ta0.Password)
-
-				ta1 := getAuth(sys, "quay.io/a/b")
-				assert.Equal(t, usernamePrefix+"1", ta1.Username)
-				assert.Equal(t, passwordPrefix+"1", ta1.Password)
-
-				ta2 := getAuth(sys, "quay.io/a")
-				assert.Equal(t, usernamePrefix+"2", ta2.Username)
-				assert.Equal(t, passwordPrefix+"2", ta2.Password)
-
 			},
 		},
 	} {
@@ -726,6 +697,7 @@ func TestSetCredentials(t *testing.T) {
 			writtenCredentials[input] = i // Possibly overwriting a previous entry
 		}
 
+		// Read the resulting file and verify it contains the expected keys
 		auth, err := readJSONFile(tmpFile.Name(), false)
 		require.NoError(t, err)
 		assert.Len(t, auth.AuthConfigs, len(writtenCredentials))
@@ -735,7 +707,17 @@ func TestSetCredentials(t *testing.T) {
 			assert.NotEmpty(t, auth.AuthConfigs[key].Auth)
 		}
 
-		tc.assert(sys, auth)
+		// Verify that the configuration is interpreted as expected
+		for key, i := range writtenCredentials {
+			if strings.Contains(key, "/") { // Full-registry keys can't be read by GetCredentialsForRef
+				ref, err := reference.ParseNamed(key)
+				require.NoError(t, err, key)
+				auth, err := GetCredentialsForRef(sys, ref)
+				require.NoError(t, err)
+				assert.Equal(t, usernamePrefix+fmt.Sprint(i), auth.Username)
+				assert.Equal(t, passwordPrefix+fmt.Sprint(i), auth.Password)
+			}
+		}
 	}
 }
 
