@@ -300,6 +300,8 @@ func getCredentialsWithHomeDir(sys *types.SystemContext, ref reference.Named, re
 			creds, credHelperPath, err = getCredentialsFromAuthFiles()
 		// External helpers.
 		default:
+			// This intentionally uses "registry", not "key"; we don't support namespaced
+			// credentials in helpers, but a "registry" is a valid parent of "key".
 			creds, err = getAuthFromCredHelper(helper, registry)
 		}
 		if err != nil {
@@ -649,6 +651,8 @@ func findAuthentication(ref reference.Named, registry, path string, legacyFormat
 	}
 
 	// First try cred helpers. They should always be normalized.
+	// This intentionally uses "registry", not "ref"; we don't support namespaced
+	// credentials in helpers.
 	if ch, exists := auths.CredHelpers[registry]; exists {
 		return getAuthFromCredHelper(ch, registry)
 	}
