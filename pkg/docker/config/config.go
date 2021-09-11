@@ -260,6 +260,11 @@ func GetCredentialsForRef(sys *types.SystemContext, ref reference.Named) (types.
 // GetCredentialsForRef and GetCredentials. It exists only to allow testing it
 // with an artificial home directory.
 func getCredentialsWithHomeDir(sys *types.SystemContext, key, homeDir string) (types.DockerAuthConfig, error) {
+	_, err := validateKey(key)
+	if err != nil {
+		return types.DockerAuthConfig{}, err
+	}
+
 	if sys != nil && sys.DockerAuthConfig != nil {
 		logrus.Debugf("Returning credentials for %s from DockerAuthConfig", key)
 		return *sys.DockerAuthConfig, nil

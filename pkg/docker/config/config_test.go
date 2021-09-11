@@ -234,7 +234,7 @@ func TestGetAuth(t *testing.T) {
 			},
 			{
 				name:            "match none (empty.json)",
-				hostname:        "https://localhost:5000",
+				hostname:        "localhost:5000",
 				path:            filepath.Join("testdata", "empty.json"),
 				testPreviousAPI: true,
 			},
