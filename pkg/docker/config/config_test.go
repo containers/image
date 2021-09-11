@@ -657,24 +657,16 @@ func TestSetCredentials(t *testing.T) {
 		passwordPrefix = "password-"
 	)
 
-	for _, tc := range []struct {
-		input []string
-	}{
+	for _, tc := range [][]string{
+		{"quay.io"},
+		{"quay.io/a/b/c/d/image"},
 		{
-			input: []string{"quay.io"},
-		},
-		{
-			input: []string{"quay.io/a/b/c/d/image"},
-		},
-		{
-			input: []string{
-				"quay.io/a/b/c",
-				"quay.io/a/b",
-				"quay.io/a",
-				"quay.io",
-				"my-registry.local",
-				"my-registry.local",
-			},
+			"quay.io/a/b/c",
+			"quay.io/a/b",
+			"quay.io/a",
+			"quay.io",
+			"my-registry.local",
+			"my-registry.local",
 		},
 	} {
 		tmpFile, err := ioutil.TempFile("", "auth.json.set")
@@ -686,7 +678,7 @@ func TestSetCredentials(t *testing.T) {
 		sys := &types.SystemContext{AuthFilePath: tmpFile.Name()}
 
 		writtenCredentials := map[string]int{}
-		for i, input := range tc.input {
+		for i, input := range tc {
 			_, err := SetCredentials(
 				sys,
 				input,
