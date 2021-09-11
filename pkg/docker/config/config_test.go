@@ -862,6 +862,10 @@ func TestValidateKey(t *testing.T) {
 	// Invalid keys
 	for _, key := range []string{
 		"https://my-registry.local",
+		"host/foo:tag",
+		"host/foo@digest",
+		"localhost:5000/repo:tag",
+		"localhost:5000/repo@digest",
 	} {
 		_, err := validateKey(key)
 		assert.Error(t, err, key)
@@ -875,6 +879,8 @@ func TestValidateKey(t *testing.T) {
 		{"my-registry.local", false},
 		{"my-registry.local/path", true},
 		{"quay.io/a/b/c/d", true},
+		{"localhost:5000", false},
+		{"localhost:5000/repo", true},
 	} {
 		isNamespaced, err := validateKey(tc.key)
 		require.NoError(t, err, tc.key)

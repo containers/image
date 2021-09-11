@@ -773,11 +773,24 @@ func normalizeRegistry(registry string) string {
 
 // validateKey verifies that the input key does not have a prefix that is not
 // allowed and returns an indicator if the key is namespaced.
-func validateKey(key string) (isNamespaced bool, err error) {
+func validateKey(key string) (bool, error) {
 	if strings.HasPrefix(key, "http://") || strings.HasPrefix(key, "https://") {
-		return isNamespaced, errors.Errorf("key %s contains http[s]:// prefix", key)
+		return false, errors.Errorf("key %s contains http[s]:// prefix", key)
 	}
 
+	// Ideally this should only accept explicitly valid keys, compare
+	// validateIdentityRemappingPrefix. For now, just reject values that look
+	// like tagged or digested values.
+	if strings.ContainsRune(key, '@') {
+		return false, fmt.Errorf(`key %s contains a '@' character`, key)
+	}
+
+	firstSlash := strings.IndexRune(key, '/')
+	isNamespaced := firstSlash != -1
+	// Reject host/repo:tag, but allow localhost:5000 and localhost:5000/foo.
+	if isNamespaced && strings.ContainsRune(key[firstSlash+1:], ':') {
+		return false, fmt.Errorf(`key %s contains a ':' character after host[:port]`, key)
+	}
 	// check if the provided key contains one or more subpaths.
-	return strings.ContainsRune(key, '/'), nil
+	return isNamespaced, nil
 }
