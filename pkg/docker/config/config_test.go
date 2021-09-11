@@ -784,13 +784,21 @@ func TestSetCredentials(t *testing.T) {
 
 		// Verify that the configuration is interpreted as expected
 		for key, i := range writtenCredentials {
+			expected := types.DockerAuthConfig{
+				Username: usernamePrefix + fmt.Sprint(i),
+				Password: passwordPrefix + fmt.Sprint(i),
+			}
+			auth, err := GetCredentials(sys, key)
+			require.NoError(t, err)
+			assert.Equal(t, expected, auth)
 			ref, err := reference.ParseNamed(key)
-			// Full-registry keys and docker.io/top-level-namespace can't be read by GetCredentialsForRef
+			// Full-registry keys and docker.io/top-level-namespace can't be read by GetCredentialsForRef;
+			// We have already tested that above, so ignore that; only verify that the two
+			// return consistent results if both are possible.
 			if err == nil {
 				auth, err := GetCredentialsForRef(sys, ref)
 				require.NoError(t, err)
-				assert.Equal(t, usernamePrefix+fmt.Sprint(i), auth.Username)
-				assert.Equal(t, passwordPrefix+fmt.Sprint(i), auth.Password)
+				assert.Equal(t, expected, auth, ref.String())
 			}
 		}
 	}
