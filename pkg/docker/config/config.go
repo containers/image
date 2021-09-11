@@ -309,15 +309,14 @@ func getCredentialsWithHomeDir(sys *types.SystemContext, ref reference.Named, re
 			multiErr = multierror.Append(multiErr, err)
 			continue
 		}
-		if len(creds.Username)+len(creds.Password)+len(creds.IdentityToken) == 0 {
-			continue
+		if creds != (types.DockerAuthConfig{}) {
+			msg := fmt.Sprintf("Found credentials for %s in credential helper %s", registry, helper)
+			if credHelperPath != "" {
+				msg = fmt.Sprintf("%s in file %s", msg, credHelperPath)
+			}
+			logrus.Debug(msg)
+			return creds, nil
 		}
-		msg := fmt.Sprintf("Found credentials for %s in credential helper %s", registry, helper)
-		if credHelperPath != "" {
-			msg = fmt.Sprintf("%s in file %s", msg, credHelperPath)
-		}
-		logrus.Debug(msg)
-		return creds, nil
 	}
 	if multiErr != nil {
 		return types.DockerAuthConfig{}, multiErr
