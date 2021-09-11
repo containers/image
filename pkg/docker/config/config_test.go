@@ -905,11 +905,11 @@ func TestSetGetCredentials(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	for _, tc := range []struct {
-		name         string
-		set          string
-		get          string
-		useLegacyAPI bool
-		shouldAuth   bool
+		name            string
+		set             string
+		get             string
+		useLegacyFormat bool
+		shouldAuth      bool
 	}{
 		{
 			name:       "Should match namespace",
@@ -936,11 +936,11 @@ func TestSetGetCredentials(t *testing.T) {
 			shouldAuth: true,
 		},
 		{
-			name:         "Should match legacy registry entry (legacy API)",
-			set:          "https://quay.io/v1/",
-			get:          "quay.io",
-			shouldAuth:   true,
-			useLegacyAPI: true,
+			name:            "Should match legacy registry entry (legacy API)",
+			set:             "https://quay.io/v1/",
+			get:             "quay.io",
+			shouldAuth:      true,
+			useLegacyFormat: true,
 		},
 	} {
 
@@ -950,7 +950,7 @@ func TestSetGetCredentials(t *testing.T) {
 		defer os.RemoveAll(tmpFile.Name())
 
 		sys := &types.SystemContext{}
-		if tc.useLegacyAPI {
+		if tc.useLegacyFormat {
 			sys.LegacyFormatAuthFilePath = tmpFile.Name()
 			_, err = tmpFile.WriteString(fmt.Sprintf(
 				`{"%s":{"auth":"dXNlcm5hbWU6cGFzc3dvcmQ="}}`, tc.set,
