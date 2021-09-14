@@ -35,20 +35,17 @@ env:
     FEDORA_NAME: "fedora-34"
     PRIOR_FEDORA_NAME: "fedora-33"
     UBUNTU_NAME: "ubuntu-2104"
-    PRIOR_UBUNTU_NAME: "ubuntu-2010"
 
     # Google-cloud VM Images
-    IMAGE_SUFFIX: "c6724387953967104"
+    IMAGE_SUFFIX: "c6431352024203264"
     FEDORA_CACHE_IMAGE_NAME: "fedora-${IMAGE_SUFFIX}"
     PRIOR_FEDORA_CACHE_IMAGE_NAME: "prior-fedora-${IMAGE_SUFFIX}"
     UBUNTU_CACHE_IMAGE_NAME: "ubuntu-${IMAGE_SUFFIX}"
-    PRIOR_UBUNTU_CACHE_IMAGE_NAME: "prior-ubuntu-${IMAGE_SUFFIX}"
 
     # Container FQIN's (include bleeding-edge development-level container deps.)
     FEDORA_CONTAINER_FQIN: "quay.io/libpod/fedora_podman:${IMAGE_SUFFIX}"
     PRIOR_FEDORA_CONTAINER_FQIN: "quay.io/libpod/prior-fedora_podman:${IMAGE_SUFFIX}"
     UBUNTU_CONTAINER_FQIN: "quay.io/libpod/ubuntu_podman:${IMAGE_SUFFIX}"
-    PRIOR_UBUNTU_CONTAINER_FQIN: "quay.io/libpod/prior-ubuntu_podman:${IMAGE_SUFFIX}"
     # Built along with the standard PR-based workflow in c/automation_images
     SKOPEO_CIDEV_CONTAINER_FQIN: "quay.io/libpod/skopeo_cidev:${IMAGE_SUFFIX}"
 
@@ -163,7 +160,6 @@ meta_task:
             ${FEDORA_CACHE_IMAGE_NAME}
             ${PRIOR_FEDORA_CACHE_IMAGE_NAME}
             ${UBUNTU_CACHE_IMAGE_NAME}
-            ${PRIOR_UBUNTU_CACHE_IMAGE_NAME}
         BUILDID: "${CIRRUS_BUILD_ID}"
         REPOREF: "${CIRRUS_REPO_NAME}"
         GCPJSON: ENCRYPTED[04306103eee1933f87deb8a5af6514a7e3164aa589d6079abc0451eb2360879430ed020d6e025ca64ef667138ce9d786]
