@@ -16,6 +16,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMain(m *testing.M) {
+	// fake homedir
+	// let's hope nobody uses C getpwuid()
+	tmp, err := ioutil.TempDir("", "testHome")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create tmp file: %v\n", err)
+		os.Exit(1)
+	}
+
+	homeEnvVar := "HOME"
+	if runtime.GOOS == "windows" {
+		homeEnvVar = "USERPROFILE"
+	}
+
+	oldHome, hadHome := os.LookupEnv(homeEnvVar)
+	defer func() {
+		if hadHome {
+			os.Setenv(homeEnvVar, oldHome)
+		} else {
+			os.Unsetenv(homeEnvVar)
+		}
+	}()
+
+	os.Setenv(homeEnvVar, tmp)
+	m.Run()
+}
+
 func TestGetPathToAuth(t *testing.T) {
 	const linux = "linux"
 	const darwin = "darwin"
@@ -650,6 +677,78 @@ func TestGetAllCredentials(t *testing.T) {
 	require.Equal(t, "bar", authConfigs["registry-a.com"].Password)
 }
 
+func TestCredStore(t *testing.T) {
+	// Create a temporary authentication file.
+	tmpFile, err := ioutil.TempFile("", "auth.json.")
+	require.NoError(t, err)
+	authFilePath := tmpFile.Name()
+	defer os.Remove(authFilePath)
+	_, err = tmpFile.Write([]byte(`{ "credsStore": "mock-helper" }`))
+	require.NoError(t, err)
+	err = tmpFile.Close()
+	require.NoError(t, err)
+	require.NoError(t, err)
+
+	sys := types.SystemContext{
+		AuthFilePath: authFilePath,
+	}
+
+	// Set up path to mock cred helper
+	path, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	origPath := os.Getenv("PATH")
+	newPath := fmt.Sprintf("%s:%s", filepath.Join(path, "testdata"), origPath)
+	os.Setenv("PATH", newPath)
+	t.Logf("using PATH: %q", newPath)
+	defer os.Setenv("PATH", origPath)
+
+	// Set up temporary store for mock cred helper
+	mockHelperStore, err := ioutil.TempFile("", "cred-helper-store.json")
+	require.NoError(t, err)
+	defer os.Remove(mockHelperStore.Name())
+	_, err = mockHelperStore.Write([]byte("{}"))
+	require.NoError(t, err)
+	err = mockHelperStore.Close()
+	require.NoError(t, err)
+	os.Setenv("CRED_HELPER_STORE_FILE", mockHelperStore.Name())
+
+	expectedCreds := map[string]types.DockerAuthConfig{
+		"quay.io":    {Username: "test-user", Password: "test-pwd"},
+		"docker.io":  {Username: "test-user-2", Password: "test-pwd-2"},
+		"example.io": {Username: "test-user-3", Password: "test-pwd-3"},
+	}
+
+	for server, cred := range expectedCreds {
+		err = SetAuthentication(&sys, server, cred.Username, cred.Password)
+		require.NoError(t, err)
+	}
+
+	creds, err := GetAllCredentials(&sys)
+	require.NoError(t, err)
+	require.Equal(t, expectedCreds, creds)
+
+	cred, err := GetCredentials(&sys, "quay.io")
+	require.NoError(t, err)
+	require.Equal(t, types.DockerAuthConfig{Username: "test-user", Password: "test-pwd"}, cred)
+
+	err = RemoveAuthentication(&sys, "quay.io")
+	require.NoError(t, err)
+
+	err = RemoveAuthentication(&sys, "quay.io")
+	require.ErrorIs(t, err, ErrNotLoggedIn)
+
+	creds, err = GetAllCredentials(&sys)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(creds))
+
+	err = RemoveAllAuthentication(&sys)
+	require.NoError(t, err)
+	creds, err = GetAllCredentials(&sys)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(creds))
+}
 
 func TestAuthKeysForRef(t *testing.T) {
 	for _, tc := range []struct {
