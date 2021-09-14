@@ -161,10 +161,13 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 					addRegistry(registry)
 				}
 				if auths.CredsStore != "" {
-					if creds, err := listAuthsFromCredHelper(auths.CredsStore); err == nil {
+					creds, err := listAuthsFromCredHelper(auths.CredsStore)
+					if err == nil {
 						for registry := range creds {
 							addRegistry(registry)
 						}
+					} else {
+						return nil, err
 					}
 				}
 			}
@@ -467,10 +470,16 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 				auths.CredHelpers = make(map[string]string)
 				auths.AuthConfigs = make(map[string]dockerAuthConfig)
 				if auths.CredsStore != "" {
-					if creds, err := listAuthsFromCredHelper(auths.CredsStore); err == nil {
+					creds, err := listAuthsFromCredHelper(auths.CredsStore)
+					if err == nil {
 						for registry := range creds {
-							_ = deleteAuthFromCredHelper(auths.CredsStore, registry)
+							err = deleteAuthFromCredHelper(auths.CredsStore, registry)
+							if err != nil {
+								return false, err
+							}
 						}
+					} else {
+						return false, err
 					}
 
 				}
