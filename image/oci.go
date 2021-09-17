@@ -216,7 +216,7 @@ func (m *manifestOCI1) convertToManifestSchema2(_ context.Context, _ *types.Mani
 		case imgspecv1.MediaTypeImageLayerGzip:
 			layers[idx].MediaType = manifest.DockerV2Schema2LayerMediaType
 		case imgspecv1.MediaTypeImageLayerZstd:
-			return nil, fmt.Errorf("Error during manifest conversion: %q: zstd compression is not supported for docker images", layers[idx].MediaType)
+			layers[idx].MediaType = manifest.DockerV2Schema2LayerMediaTypeZstd
 		default:
 			return nil, fmt.Errorf("Unknown media type during manifest conversion: %q", layers[idx].MediaType)
 		}

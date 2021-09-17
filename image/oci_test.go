@@ -486,7 +486,7 @@ func TestConvertToManifestSchema2AllMediaTypes(t *testing.T) {
 	_, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
 	})
-	require.Error(t, err) // zstd compression is not supported for docker images
+	require.NoError(t, err)
 }
 
 func TestConvertToV2S2WithInvalidMIMEType(t *testing.T) {
