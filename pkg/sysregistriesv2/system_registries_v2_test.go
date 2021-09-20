@@ -291,7 +291,7 @@ func TestFindRegistry(t *testing.T) {
 
 	registries, err := GetRegistries(sys)
 	assert.Nil(t, err)
-	assert.Equal(t, 19, len(registries))
+	assert.Equal(t, 20, len(registries))
 
 	reg, err := FindRegistry(sys, "simple-prefix.com/foo/bar:latest")
 	assert.Nil(t, err)
@@ -382,6 +382,12 @@ func TestFindRegistry(t *testing.T) {
 	assert.NotNil(t, reg)
 	assert.Equal(t, "empty-prefix.com", reg.Prefix)
 	assert.Equal(t, "empty-prefix.com", reg.Location)
+
+	reg, err = FindRegistry(sys, "empty-location.set-prefix.example.com/namespace/repo")
+	assert.Nil(t, err)
+	assert.NotNil(t, reg)
+	assert.NotNil(t, "empty-location.set-prefix.example.com", reg.Prefix)
+	assert.Equal(t, "", reg.Location)
 
 	_, err = FindRegistry(&types.SystemContext{SystemRegistriesConfPath: "testdata/this-does-not-exist.conf"}, "example.com")
 	assert.Error(t, err)
@@ -579,6 +585,14 @@ func TestRewriteReferenceSuccess(t *testing.T) {
 		{"sub.example.io/library/prefix/image", "*.example.io", "example.com", "example.com/library/prefix/image"},
 		{"another.sub.example.io:5000/library/prefix/image:latest", "*.sub.example.io", "example.com", "example.com:5000/library/prefix/image:latest"},
 		{"foo.bar.io/ns1/ns2/ns3/ns4", "*.bar.io", "omg.bbq.com/roflmao", "omg.bbq.com/roflmao/ns1/ns2/ns3/ns4"},
+		// Empty location with non-wildcard prefix examples. Essentially, no
+		// rewrite occurs and original reference is used as-is.
+		{"registry.com/foo", "registry.com", "", "registry.com/foo"},
+		{"abc.internal.registry.com/foo:bar", "abc.internal.registry.com", "", "abc.internal.registry.com/foo:bar"},
+		{"abc.internal.registry.com/foo/bar:baz", "abc.internal.registry.com", "", "abc.internal.registry.com/foo/bar:baz"},
+		{"alien.vs.predator.foobar.io:5000/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "alien.vs.predator.foobar.io", "",
+			"alien.vs.predator.foobar.io:5000/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		{"alien.vs.predator.foobar.io:5000/omg:bbq", "alien.vs.predator.foobar.io", "", "alien.vs.predator.foobar.io:5000/omg:bbq"},
 		// Empty location with wildcard prefix examples. Essentially, no
 		// rewrite occurs and original reference is used as-is.
 		{"abc.internal.registry.com/foo:bar", "*.internal.registry.com", "", "abc.internal.registry.com/foo:bar"},
@@ -602,7 +616,6 @@ func TestRewriteReferenceFailedDuringParseNamed(t *testing.T) {
 		{"example.com/foo/image:latest", "example.com/foo", "example.com/path/"},
 		{"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			"example.com/foo", "example.com"},
-		{"example.com:5000/image:latest", "example.com", ""},
 		{"example.com:5000/image:latest", "example.com", "example.com:5000"},
 		// Malformed prefix
 		{"example.com/foo/image:latest", "example.com//foo", "example.com/path"},
