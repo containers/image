@@ -122,9 +122,9 @@ type ImageListSelection int
 
 // Options allows supplying non-default configuration modifying the behavior of CopyImage.
 type Options struct {
-	RemoveSignatures bool   // Remove any pre-existing signatures. SignBy will still add a new signature.
-	Sign             bool   // Adds cosign signature using ephemeral keys.
-	SignBy           string // If non-empty, asks for a signature to be added during the copy, and specifies a key ID, as accepted by signature.NewGPGSigningMechanism().SignDockerManifest(),
+	RemoveSignatures bool                       // Remove any pre-existing signatures. SignBy will still add a new signature.
+	SigstoreSign     *types.SigstoreSignOptions // Adds sigstore signature using ephemeral keys.
+	SignBy           string                     // If non-empty, asks for a signature to be added during the copy, and specifies a key ID, as accepted by signature.NewGPGSigningMechanism().SignDockerManifest(),
 	ReportWriter     io.Writer
 	SourceCtx        *types.SystemContext
 	DestinationCtx   *types.SystemContext
@@ -752,7 +752,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 		sigs = append(sigs, newSig)
 	}
 
-	if options.Sign {
+	if options.SigstoreSign != nil && options.SigstoreSign.Keyless {
 		newSig, err := c.createSignature(manifestBytes, "")
 		if err != nil {
 			return nil, "", "", err

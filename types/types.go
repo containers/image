@@ -683,3 +683,10 @@ type ProgressProperties struct {
 	// interval. Will be reset after each ProgressEventRead event.
 	OffsetUpdate uint64
 }
+
+// SigstoreSignOptions is used to set various Sigstore signing options
+// requested by the user.
+type SigstoreSignOptions struct {
+	// If set, use generated ephemeral keys signed by the Fulcio root.
+	Keyless bool
+}
