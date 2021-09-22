@@ -88,6 +88,18 @@ func (d *dockerImageDestination) SupportsSignatures(ctx context.Context) error {
 	}
 }
 
+// SupportsSigstoreSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
+// Note: It is still possible for PutSignatures to fail if SupportsSigstoreSignatures returns nil.
+func (d *dockerImageDestination) SupportsSigstoreSignatures(ctx context.Context) error {
+	if err := d.c.detectProperties(ctx); err != nil {
+		return err
+	}
+
+	if !d.c.supportsSigstoreSignatures {
+		return errors.Errorf("Internal error: registry does not support sigstore signatures")
+	}
+	return nil
+}
 func (d *dockerImageDestination) DesiredLayerCompression() types.LayerCompression {
 	return types.Compress
 }

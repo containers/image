@@ -89,3 +89,11 @@ type BadPartialRequestError struct {
 func (e BadPartialRequestError) Error() string {
 	return e.Status
 }
+
+type ImageDestinationSigstore interface {
+	// SupportsSigstoreSignatures returns an error (to be displayed to the user) if the
+	// destination certainly can't store Sigstore signatures.
+	// Note: It is still possible for PutSignatures to fail if
+	// SupportsSigstoreSignatures returns nil.
+	SupportsSigstoreSignatures(ctx context.Context) error
+}

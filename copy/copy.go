@@ -407,8 +407,15 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	}
 	if len(sigs) != 0 {
 		c.Printf("Checking if image list destination supports signatures\n")
-		if err := c.dest.SupportsSignatures(ctx); err != nil {
-			return nil, errors.Wrapf(err, "Can not copy signatures to %s", transports.ImageName(c.dest.Reference()))
+		destSigstore, ok := c.dest.(internalTypes.ImageDestinationSigstore)
+		if ok {
+			if err := destSigstore.SupportsSigstoreSignatures(ctx); err != nil {
+				return nil, errors.Wrapf(err, "Cannot copy signatures for %s", transports.ImageName(c.dest.Reference()))
+			}
+		} else {
+			if err := c.dest.SupportsSignatures(ctx); err != nil {
+				return nil, errors.Wrapf(err, "Cannot copy signatures to %s", transports.ImageName(c.dest.Reference()))
+			}
 		}
 	}
 	canModifyManifestList := (len(sigs) == 0)
@@ -625,8 +632,15 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 	}
 	if len(sigs) != 0 {
 		c.Printf("Checking if image destination supports signatures\n")
-		if err := c.dest.SupportsSignatures(ctx); err != nil {
-			return nil, "", "", errors.Wrapf(err, "Can not copy signatures to %s", transports.ImageName(c.dest.Reference()))
+		destSigstore, ok := c.dest.(internalTypes.ImageDestinationSigstore)
+		if ok {
+			if err := destSigstore.SupportsSigstoreSignatures(ctx); err != nil {
+				return nil, "", "", errors.Wrapf(err, "Cannot copy signatures to %s", transports.ImageName(c.dest.Reference()))
+			}
+		} else {
+			if err := c.dest.SupportsSignatures(ctx); err != nil {
+				return nil, "", "", errors.Wrapf(err, "Cannot copy signatures to %s", transports.ImageName(c.dest.Reference()))
+			}
 		}
 	}
 

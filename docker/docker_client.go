@@ -110,10 +110,11 @@ type dockerClient struct {
 
 	// The following members are detected registry properties:
 	// They are set after a successful detectProperties(), and never change afterwards.
-	client             *http.Client
-	scheme             string
-	challenges         []challenge
-	supportsSignatures bool
+	client                     *http.Client
+	scheme                     string
+	challenges                 []challenge
+	supportsSignatures         bool
+	supportsSigstoreSignatures bool
 
 	// Private state for setupRequestAuth (key: string, value: bearerToken)
 	tokenCache sync.Map
@@ -748,6 +749,10 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 		}
 		c.challenges = parseAuthHeader(resp.Header)
 		c.scheme = scheme
+		// TODO(font): If we received a successful response, then we can
+		// support pushing Sigstore images as it's just another image. Is there
+		// a better way to check for support?
+		c.supportsSigstoreSignatures = true
 		c.supportsSignatures = resp.Header.Get("X-Registry-Supports-Signatures") == "1"
 		return nil
 	}
