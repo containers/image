@@ -433,9 +433,13 @@ func (s *dockerImageSource) GetSignatures(ctx context.Context, instanceDigest *d
 	if err := s.c.detectProperties(ctx); err != nil {
 		return nil, err
 	}
+
+	// Check if sigstore signatures exists. If so, use them.
+	if sigs, err := s.getSigstoreSignatures(ctx, instanceDigest); err == nil {
+		return sigs, err
+	}
+
 	switch {
-	case s.c.cosignSignatureBase != nil:
-		return s.getCosignSignaturesFromLookaside(ctx, instanceDigest)
 	case s.c.supportsSignatures:
 		return s.getSignaturesFromAPIExtension(ctx, instanceDigest)
 	case s.c.signatureBase != nil:
@@ -487,27 +491,22 @@ func (s *dockerImageSource) getSignaturesFromLookaside(ctx context.Context, inst
 	return signatures, nil
 }
 
-// getCosignSignaturesFromLookaside implements GetSignatures() from the lookaside location configured in s.c.signatureBase,
-// which is not nil.
-func (s *dockerImageSource) getCosignSignaturesFromLookaside(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
+// getSigstoreSignatures implements GetSignatures() using the Cosign spec.
+func (s *dockerImageSource) getSigstoreSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
 	manifestDigest, err := s.manifestDigest(ctx, instanceDigest)
 	if err != nil {
 		return nil, err
 	}
 
-	// NOTE: Keep this in sync with docs/signature-protocols.md!
-	signatures := [][]byte{}
-	for i := 0; ; i++ {
-		url := cosignSignatureStorageURL(s.c.cosignSignatureBase, manifestDigest, i)
-		signature, missing, err := s.getOneSignature(ctx, url)
-		if err != nil {
-			return nil, err
-		}
-		if missing {
-			break
-		}
-		signatures = append(signatures, signature)
+	url, err := sigstoreSignatureURL(s.physicalRef, manifestDigest, s.c.scheme)
+	if err != nil {
+		return nil, err
 	}
+	signature, _, err := s.getOneSignature(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+	signatures := append([][]byte{}, signature)
 	return signatures, nil
 }
 
@@ -543,6 +542,7 @@ func (s *dockerImageSource) getOneSignature(ctx context.Context, url *url.URL) (
 		} else if res.StatusCode != http.StatusOK {
 			return nil, false, errors.Errorf("Error reading signature from %s: status %d (%s)", url.String(), res.StatusCode, http.StatusText(res.StatusCode))
 		}
+		// TODO(font): Assess if iolimits.MaxSignatureBodySize is sufficient.
 		sig, err := iolimits.ReadAtMost(res.Body, iolimits.MaxSignatureBodySize)
 		if err != nil {
 			return nil, false, err
