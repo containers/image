@@ -353,6 +353,10 @@ func (config *V2RegistriesConf) postProcessRegistries() error {
 		// Prefix and Location cannot both be empty.
 		// Either one at least must be set.
 		if reg.Prefix != "" {
+			if isWildcardedPrefix(reg.Prefix) && strings.ContainsAny(reg.Prefix, "/@:") {
+				msg := fmt.Sprintf("Wildcarded prefix should be in the format: *.example.com. Current prefix %q is incorrectly formatted", reg.Prefix)
+				return &InvalidRegistries{s: msg}
+			}
 			reg.Prefix, err = parseLocation(reg.Prefix)
 			if err != nil {
 				return err
@@ -767,6 +771,11 @@ func CredentialHelpers(sys *types.SystemContext) ([]string, error) {
 	return config.partialV2.CredentialHelpers, nil
 }
 
+// isWildcardedPrefix only checks if the first two characters match "*.".
+func isWildcardedPrefix(prefix string) bool {
+	return prefix[:2] == "*."
+}
+
 // refMatchingSubdomainPrefix returns the length of ref
 // iff ref, which is a registry, repository namespace, repository or image reference (as formatted by
 // reference.Domain(), reference.Named.Name() or reference.Reference.String()
@@ -803,7 +812,7 @@ func refMatchingSubdomainPrefix(ref, prefix string) int {
 // (This is split from the caller primarily to make testing easier.)
 func refMatchingPrefix(ref, prefix string) int {
 	switch {
-	case prefix[0:2] == "*.":
+	case isWildcardedPrefix(prefix):
 		return refMatchingSubdomainPrefix(ref, prefix)
 	case len(ref) < len(prefix):
 		return -1
@@ -916,17 +925,6 @@ func loadConfigFile(path string, forceV2 bool) (*parsedConfig, error) {
 		res.shortNameMode = mode
 	} else {
 		res.shortNameMode = types.ShortNameModeInvalid
-	}
-
-	// Valid wildcarded prefixes must be in the format: *.example.com
-	// FIXME: Move to postProcessRegistries
-	// https://github.com/containers/image/pull/1191#discussion_r610623829
-	for i := range res.partialV2.Registries {
-		prefix := res.partialV2.Registries[i].Prefix
-		if prefix[:2] == "*." && strings.ContainsAny(prefix, "/@:") {
-			msg := fmt.Sprintf("Wildcarded prefix should be in the format: *.example.com. Current prefix %q is incorrectly formatted", prefix)
-			return nil, &InvalidRegistries{s: msg}
-		}
 	}
 
 	// Parse and validate short-name aliases.

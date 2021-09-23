@@ -134,6 +134,25 @@ func TestMirrors(t *testing.T) {
 	assert.True(t, reg.Mirrors[1].Insecure)
 }
 
+func TestWildcardedPrefix(t *testing.T) {
+	for _, c := range []struct {
+		prefix   string
+		expected bool
+	}{
+		// Only check if the first two characters are "*."
+		{"*.io", true},
+		{"*.com/foo@bar", true},
+		{"foo.com/bar", false},
+		{"*foo.com/bar", false},
+		{"foo*.com/bar", false},
+		{".foo*.com/bar", false},
+		{"*.foo*.com/bar", true},
+	} {
+		isValid := isWildcardedPrefix(c.prefix)
+		assert.Equal(t, c.expected, isValid)
+	}
+}
+
 func TestRefMatchingSubdomainPrefix(t *testing.T) {
 	for _, c := range []struct {
 		ref, prefix string
