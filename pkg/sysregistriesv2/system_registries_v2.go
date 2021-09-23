@@ -264,16 +264,6 @@ func (e *InvalidRegistries) Error() string {
 func parseLocation(input string) (string, error) {
 	trimmed := strings.TrimRight(input, "/")
 
-	// FIXME: This check needs to exist but fails for empty Location field with
-	// wildcarded prefix. Removal of this check "only" allows invalid input in,
-	// and does not prevent correct operation.
-	// https://github.com/containers/image/pull/1191#discussion_r610122617
-	//
-	//	if trimmed == "" {
-	//		return "", &InvalidRegistries{s: "invalid location: cannot be empty"}
-	//	}
-	//
-
 	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
 		msg := fmt.Sprintf("invalid location '%s': URI schemes are not supported", input)
 		return "", &InvalidRegistries{s: msg}
