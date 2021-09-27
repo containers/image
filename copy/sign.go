@@ -41,8 +41,8 @@ func (c *copier) createGPGSignature(manifest []byte, keyIdentity string) ([]byte
 	return newSig, nil
 }
 
-// createCosignSignature creates a new signature of manifest.
-func (c *copier) createCosignSignature(manifest []byte) ([]byte, error) {
+// createSigstoreSignature creates a new signature of manifest.
+func (c *copier) createSigstoreSignature(manifest []byte) ([]byte, error) {
 	mech, err := signature.NewSigstoreSigningMechanism()
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing Sigstore")

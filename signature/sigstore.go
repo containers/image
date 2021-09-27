@@ -66,33 +66,22 @@ func fulcioServer() string {
 	return defaultFulcioURL
 }
 
-type sigstoreSigningMechanism struct {
+type sigstoreSigning struct {
 	ctx   context.Context
 	cert  []byte
 	chain []byte
 	*signature.ECDSASignerVerifier
 }
 
-// newSigstoreSigningMechanism returns a new sigstore signing mechanism.
-// The caller must call .Close() on the returned SigningMechanism.
-func newSigstoreSigningMechanism() (SigstoreSigningMechanism, error) {
-	return &sigstoreSigningMechanism{
+// NewSigstoreSigning returns a new sigstore signing mechanism.
+func NewSigstoreSigning() (SigstoreSigning, error) {
+	s := sigstoreSigning{
 		ctx: context.Background(),
-	}, nil
+	}
+	return &s, s.generateCertificate()
 }
 
-// Close removes resources associated with the mechanism, if any.
-func (s *sigstoreSigningMechanism) Close() error {
-	return nil
-}
-
-// SupportsSigning returns nil if the mechanism supports signing, or a SigningNotSupportedError.
-func (s *sigstoreSigningMechanism) SupportsSigning() error {
-	return nil
-
-}
-
-func (s *sigstoreSigningMechanism) GenerateCertificate() error {
+func (s *sigstoreSigning) generateCertificate() error {
 	fulcioServer, err := url.Parse(fulcioServer())
 	if err != nil {
 		return errors.Wrap(err, "parsing Fulcio URL")
@@ -183,13 +172,13 @@ func getCertForOauthID(priv *ecdsa.PrivateKey, ops operations.ClientService, oid
 	return certPem, chainPem, nil
 }
 
-// Sign creates a signature using the payload input.
+// sign creates a signature using the payload input.
 // Fails with a SigningNotSupportedError if the mechanism does not support signing.
-func (s *sigstoreSigningMechanism) Sign(payload []byte) ([]byte, error) {
+func (s *sigstoreSigning) sign(payload []byte) ([]byte, error) {
 	return s.SignMessage(bytes.NewReader(payload), options.WithContext(s.ctx))
 }
 
-func (s *sigstoreSigningMechanism) Upload(signature, payload []byte) (*models.LogEntryAnon, error) {
+func (s *sigstoreSigning) upload(signature, payload []byte) (*models.LogEntryAnon, error) {
 	rekorClient, err := rekorClient.GetRekorClient(rekorServer())
 	if err != nil {
 		return nil, err
@@ -279,25 +268,25 @@ func verifyTLogEntry(rekorClient *client.Rekor, uuid string) (*models.LogEntryAn
 	if err != nil {
 		return nil, errors.Wrap(err, "rekor public key")
 	}
-	rekorPubKey, err := PemToECDSAKey([]byte(resp.Payload))
+	rekorPubKey, err := pemToECDSAKey([]byte(resp.Payload))
 	if err != nil {
 		return nil, errors.Wrap(err, "rekor public key pem to ecdsa")
 	}
 
-	payload := BundlePayload{
+	payload := bundlePayload{
 		Body:           e.Body,
 		IntegratedTime: *e.IntegratedTime,
 		LogIndex:       *e.LogIndex,
 		LogID:          *e.LogID,
 	}
-	if err := VerifySET(payload, []byte(e.Verification.SignedEntryTimestamp), rekorPubKey); err != nil {
+	if err := verifySET(payload, []byte(e.Verification.SignedEntryTimestamp), rekorPubKey); err != nil {
 		return nil, errors.Wrap(err, "verifying signedEntryTimestamp")
 	}
 
 	return &e, nil
 }
 
-func PemToECDSAKey(pemBytes []byte) (*ecdsa.PublicKey, error) {
+func pemToECDSAKey(pemBytes []byte) (*ecdsa.PublicKey, error) {
 	pub, err := cryptoutils.UnmarshalPEMToPublicKey(pemBytes)
 	if err != nil {
 		return nil, err
@@ -309,14 +298,14 @@ func PemToECDSAKey(pemBytes []byte) (*ecdsa.PublicKey, error) {
 	return ecdsaPub, nil
 }
 
-type BundlePayload struct {
+type bundlePayload struct {
 	Body           interface{} `json:"body"`
 	IntegratedTime int64       `json:"integratedTime"`
 	LogIndex       int64       `json:"logIndex"`
 	LogID          string      `json:"logID"`
 }
 
-func VerifySET(bundlePayload BundlePayload, signature []byte, pub *ecdsa.PublicKey) error {
+func verifySET(bundlePayload bundlePayload, signature []byte, pub *ecdsa.PublicKey) error {
 	contents, err := json.Marshal(bundlePayload)
 	if err != nil {
 		return errors.Wrap(err, "marshaling")

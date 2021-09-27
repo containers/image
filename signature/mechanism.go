@@ -35,19 +35,14 @@ type SigningMechanism interface {
 	UntrustedSignatureContents(untrustedSignature []byte) (untrustedContents []byte, shortKeyIdentifier string, err error)
 }
 
-// SigstoreSigningMechanism abstracts a way to sign binary blobs and verify their signatures.
+// SigstoreSignings a way to sign binary blobs and verify their signatures.
 // Each mechanism should eventually be closed by calling Close().
-// TODO: consolidate with SigningMechanism interface above.
-type SigstoreSigningMechanism interface {
-	// Close removes resources associated with the mechanism, if any.
-	Close() error
-	// SupportsSigning returns nil if the mechanism supports signing, or a SigningNotSupportedError.
-	SupportsSigning() error
-	GenerateCertificate() error
-	// Sign creates a (non-detached) signature of input using ephemeral keys.
-	// Fails with a SigningNotSupportedError if the mechanism does not support signing.
-	Sign(payload []byte) (signature []byte, err error)
-	Upload(signature, payload []byte) (*models.LogEntryAnon, error)
+// TODO: possibly consolidate with SigningMechanism interface above.
+type SigstoreSigning interface {
+	// sign creates a (non-detached) signature of input using ephemeral keys.
+	sign(payload []byte) (signature []byte, err error)
+	// upload uploads the signature and payload to the Sigstore tranparency log.
+	upload(signature, payload []byte) (*models.LogEntryAnon, error)
 }
 
 // SigningNotSupportedError is returned when trying to sign using a mechanism which does not support that.
@@ -70,12 +65,6 @@ func NewGPGSigningMechanism() (SigningMechanism, error) {
 // The caller must call .Close() on the returned SigningMechanism.
 func NewEphemeralGPGSigningMechanism(blob []byte) (SigningMechanism, []string, error) {
 	return newEphemeralGPGSigningMechanism(blob)
-}
-
-// NewSigstoreSigningMechanism returns a new sigstore signing mechanism.
-// The caller must call .Close() on the returned SigningMechanism.
-func NewSigstoreSigningMechanism() (SigstoreSigningMechanism, error) {
-	return newSigstoreSigningMechanism()
 }
 
 // gpgUntrustedSignatureContents returns UNTRUSTED contents of the signature WITHOUT ANY VERIFICATION,

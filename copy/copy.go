@@ -65,6 +65,7 @@ var expectedCompressionFormats = map[string]*compressiontypes.Algorithm{
 type copier struct {
 	dest                          types.ImageDestination
 	rawSource                     types.ImageSource
+	sigstoreSign                  signature.SigstoreSigning
 	reportWriter                  io.Writer
 	progressOutput                io.Writer
 	progressInterval              time.Duration
@@ -266,6 +267,15 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		// Note that compressionFormat and compressionLevel can be nil.
 		c.compressionFormat = options.DestinationCtx.CompressionFormat
 		c.compressionLevel = options.DestinationCtx.CompressionLevel
+	}
+
+	if options.SigstoreSign != nil && options.SigstoreSign.Keyless {
+		c.Printf("Generating certificate\n")
+		c.sigstoreSign, err = signature.NewSigstoreSigning()
+		if err != nil {
+			errors.Wrap(err, "Sigstore sign setup failed")
+			return nil, err
+		}
 	}
 
 	unparsedToplevel := image.UnparsedInstance(rawSource, nil)
@@ -544,7 +554,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 
 	// Sign the manifest list.
 	if options.SignBy != "" {
-		newSig, err := c.createSignature(manifestList, options.SignBy)
+		newSig, err := c.createGPGSignature(manifestList, options.SignBy)
 		if err != nil {
 			return nil, err
 		}
@@ -759,7 +769,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 	}
 
 	if options.SignBy != "" {
-		newSig, err := c.createSignature(manifestBytes, options.SignBy)
+		newSig, err := c.createGPGSignature(manifestBytes, options.SignBy)
 		if err != nil {
 			return nil, "", "", err
 		}
@@ -767,7 +777,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 	}
 
 	if options.SigstoreSign != nil && options.SigstoreSign.Keyless {
-		newSig, err := c.createSignature(manifestBytes, "")
+		newSig, err := c.createSigstoreSignature(manifestBytes)
 		if err != nil {
 			return nil, "", "", err
 		}
