@@ -24,6 +24,7 @@ import (
 	"github.com/go-openapi/swag"
 	"github.com/google/trillian/merkle/logverifier"
 	"github.com/google/trillian/merkle/rfc6962/hasher"
+	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	fulcioClient "github.com/sigstore/fulcio/pkg/client"
 	"github.com/sigstore/fulcio/pkg/generated/client/operations"
@@ -38,8 +39,34 @@ import (
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/sigstore/sigstore/pkg/signature/options"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/term"
 )
+
+func SigstoreSignDockerManifest(sigstoreSign SigstoreSigning, manifestDigest digest.Digest, dockerReference string) ([]byte, []byte, error) {
+	logrus.Debugf("Marshalling payload into JSON")
+	cosignSignature := newUnstrustedCosignSignature(manifestDigest, dockerReference)
+	sigPayload, err := cosignSignature.MarshalJSON()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	logrus.Debugf("Signing payload")
+	signature, err := sigstoreSign.sign(sigPayload)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error creating signature for %s, %v: %w", dockerReference, manifestDigest, err)
+	}
+
+	return signature, sigPayload, nil
+}
+
+func SigstoreUploadTransparencyLogEntry(sigstoreSign SigstoreSigning, signature, payload []byte) (int64, error) {
+	tlogEntry, err := sigstoreSign.upload(signature, payload)
+	if err != nil {
+		return -1, err
+	}
+	return *tlogEntry.LogIndex, nil
+}
 
 const (
 	defaultRekorURL  = "https://rekor.sigstore.dev"

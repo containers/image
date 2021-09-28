@@ -9,14 +9,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// createSignature creates a new signature of manifest using keyIdentity.
-func (c *copier) createSignature(manifest []byte, keyIdentity string) ([]byte, error) {
-	if keyIdentity == "" {
-		return c.createCosignSignature(manifest)
-	}
-	return c.createGPGSignature(manifest, keyIdentity)
-}
-
 // createGPGSignature creates a new GPG signature of manifest using keyIdentity.
 func (c *copier) createGPGSignature(manifest []byte, keyIdentity string) ([]byte, error) {
 	mech, err := signature.NewGPGSigningMechanism()
@@ -43,18 +35,9 @@ func (c *copier) createGPGSignature(manifest []byte, keyIdentity string) ([]byte
 
 // createSigstoreSignature creates a new signature of manifest.
 func (c *copier) createSigstoreSignature(manifest []byte) ([]byte, error) {
-	mech, err := signature.NewSigstoreSigningMechanism()
-	if err != nil {
-		return nil, errors.Wrap(err, "initializing Sigstore")
-	}
-	defer mech.Close()
-	if err := mech.SupportsSigning(); err != nil {
-		return nil, errors.Wrap(err, "signing is not supported")
-	}
-
 	dockerReference := c.dest.Reference().DockerReference()
 	if dockerReference == nil {
-		return nil, errors.Errorf("Cannot determine canonical Docker reference for destination %s", transports.ImageName(c.dest.Reference()))
+		return nil, fmt.Errorf("Cannot determine canonical Docker reference for destination %s", transports.ImageName(c.dest.Reference()))
 	}
 
 	manifestDigest, err := man.Digest(manifest)
@@ -62,31 +45,19 @@ func (c *copier) createSigstoreSignature(manifest []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	fmt.Println("Generating certificate from Fulcio")
-	if err := mech.GenerateCertificate(); err != nil {
-		return nil, errors.Wrap(err, "getting key from Fulcio")
-	}
-
-	fmt.Println("Marshalling payload into JSON")
-	cosignSignature := signature.NewCosignSignature(manifestDigest, dockerReference.String())
-	sigPayload, err := cosignSignature.MarshalJSON()
+	c.Printf("Signing manifest\n")
+	newSignature, sigPayload, err := signature.SigstoreSignDockerManifest(c.sigstoreSign, manifestDigest, dockerReference.String())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating signature: %w", err)
 	}
 
-	fmt.Println("Signing payload")
-	signature, err := mech.Sign(sigPayload)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error creating signature for %s, %v", dockerReference.String(), manifestDigest)
-	}
-
-	fmt.Println("Sending entry to transparency log")
-	tlogEntry, err := mech.Upload(signature, sigPayload)
+	c.Printf("Uploading entry to transparency log\n")
+	tlogEntry, err := signature.SigstoreUploadTransparencyLogEntry(c.sigstoreSign, newSignature, sigPayload)
 
 	if err != nil {
-		return nil, errors.Wrapf(err, "error uploading entry to transparency log for %s", dockerReference.String())
+		return nil, fmt.Errorf("error uploading entry to transparency log for %s: %w", dockerReference.String(), err)
 	}
-	fmt.Println("Rekor entry successful. Index number: ", tlogEntry)
+	c.Printf("Rekor entry successful. Index number: %d\n", tlogEntry)
 
-	return signature, nil
+	return newSignature, nil
 }
