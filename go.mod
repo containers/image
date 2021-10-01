@@ -8,7 +8,7 @@ require (
 	github.com/containerd/containerd v1.5.4 // indirect
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
 	github.com/containers/ocicrypt v1.1.2
-	github.com/containers/storage v1.36.0
+	github.com/containers/storage v1.37.0
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v20.10.8+incompatible
 	github.com/docker/docker-credential-helpers v0.6.4
