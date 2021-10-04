@@ -515,3 +515,45 @@ func TestResolveLocally(t *testing.T) {
 	require.Len(t, aliases, 1)
 	assert.Equal(t, "localhost/foo@sha256:d366a4665ab44f0648d7a00ae3fae139d55e32f9712c67accd604bb55df9d05a", aliases[0].String())
 }
+
+func TestPrompt(t *testing.T) {
+	tmp, err := ioutil.TempFile("", "aliases.conf")
+	require.NoError(t, err)
+	defer os.Remove(tmp.Name())
+
+	sys := &types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/aliases.conf",
+		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+		UserShortNameAliasConfPath:  tmp.Name(),
+	}
+
+	_, err = sysregistriesv2.TryUpdatingCache(sys)
+	require.NoError(t, err)
+
+	tests := []struct {
+		mode           types.ShortNameMode
+		original       string
+		items          []string
+		expected       string
+		mustFail       bool
+		errorSubstring string // no API guarantee for checking behavior
+	}{
+		{types.ShortNameModeEnforcing, "image:tag", []string{"fqn.com/image:tag"}, "image:tag", false, ""},
+		{types.ShortNameModeEnforcing, "image:tag", []string{"fqn.com/image:tag", "fqn.com/another/image:tag"}, "image:tag", true, errNoTTY.Error()},
+		{types.ShortNameModePermissive, "image:tag", []string{"fqn.com/image:tag", "fqn.com/another/image:tag"}, "image:tag", false, ""},
+		// TODO: it would be great to have a means to test the prompt
+		// but I (@vrothberg) have absolutely no idea how to do that.
+	}
+
+	// All of them should resolve correctly.
+	for _, test := range tests {
+		given, err := Prompt(test.mode, test.original, test.items)
+		if test.mustFail {
+			require.Error(t, err, "%v", test)
+			require.Contains(t, err.Error(), test.errorSubstring, "%v", test)
+			continue
+		}
+		require.NoError(t, err, "%v", test)
+		require.Equal(t, test.expected, given, "%v", test)
+	}
+}
