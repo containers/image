@@ -82,8 +82,7 @@ location = "internal-registry-for-example.net/bar"
 requests for the image `example.com/foo/myimage:latest` will actually work with the
 `internal-registry-for-example.net/bar/myimage:latest` image.
 
-With a `prefix` containing a wildcard in the format: "*.example.com" for subdomain matching,
-the location can be empty. In such a case,
+With any valid `prefix`, the location can be emtpy. In such a case,
 prefix matching will occur, but no reference rewrite will occur. The
 original requested image string will be used as-is. But other settings like
 `insecure` / `blocked` / `mirrors` will be applied to matching images.
@@ -91,6 +90,10 @@ original requested image string will be used as-is. But other settings like
 Example: Given
 ```
 prefix = "*.example.com"
+```
+OR
+```
+prefix = "blah.example.com"
 ```
 requests for the image `blah.example.com/foo/myimage:latest` will be used
 as-is. But other settings like insecure/blocked/mirrors will be applied to matching images
