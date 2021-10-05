@@ -5,7 +5,8 @@ go 1.13
 require (
 	github.com/14rcole/gopopulate v0.0.0-20180821133914-b175b219e774 // indirect
 	github.com/BurntSushi/toml v0.4.1
-	github.com/containerd/containerd v1.5.4 // indirect
+	github.com/bits-and-blooms/bitset v1.2.1 // indirect
+	github.com/containerd/containerd v1.5.7 // indirect
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
 	github.com/containers/ocicrypt v1.1.2
 	github.com/containers/storage v1.37.0
@@ -15,6 +16,8 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/ghodss/yaml v1.0.0
+	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/imdario/mergo v0.3.12
@@ -36,9 +39,13 @@ require (
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190809123943-df4f5c81cb3b // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.6
+	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
-	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
-	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
-	golang.org/x/sys v0.0.0-20210910150752-751e447fb3d0
+	golang.org/x/net v0.0.0-20211005001312-d4b1ae081e3b
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sys v0.0.0-20211004093028-2c5d950f24ef
 	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
+	golang.org/x/text v0.3.7 // indirect
+	google.golang.org/genproto v0.0.0-20211005153810-c76a74d43a8e // indirect
+	google.golang.org/grpc v1.41.0 // indirect
 )
