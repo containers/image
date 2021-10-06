@@ -1,4 +1,4 @@
-% containers-certs.d(5)
+% containers-certs.d 5 Directory for storing custom container-registry TLS configurations
 
 # NAME
 containers-certs.d - Directory for storing custom container-registry TLS configurations

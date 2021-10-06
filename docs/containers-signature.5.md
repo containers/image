@@ -1,9 +1,11 @@
-% container-signature(5) Container signature format
+% container-signature 5 Container signature format
 % Miloslav Trmač
 % March 2017
 
-# Container signature format
+# NAME
+container-signature - Container signature format
 
+# DESCRIPTION
 This document describes the format of container signatures,
 as implemented by the `github.com/containers/image/signature` package.
 
