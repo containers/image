@@ -1,4 +1,4 @@
-% containers-auth.json(5)
+% containers-auth.json 5
 
 # NAME
 containers-auth.json - syntax for the registry authentication file

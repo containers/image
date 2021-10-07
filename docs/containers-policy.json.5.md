@@ -1,4 +1,4 @@
-% CONTAINERS-POLICY.JSON(5) policy.json Man Page
+% CONTAINERS-POLICY.JSON 5 policy.json Man Page
 % Miloslav Trmač
 % September 2016
 

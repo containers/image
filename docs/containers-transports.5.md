@@ -1,4 +1,4 @@
-% CONTAINERS-TRANSPORTS(5) Containers Transports Man Page
+% CONTAINERS-TRANSPORTS 5 Containers Transports Man Page
 % Valentin Rothberg
 % April 2019
 

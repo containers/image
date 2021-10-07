@@ -1,4 +1,4 @@
-% CONTAINERS-REGISTRIES.CONF(5) System-wide registry configuration file
+% CONTAINERS-REGISTRIES.CONF 5 System-wide registry configuration file
 % Brent Baude
 % Aug 2017
 

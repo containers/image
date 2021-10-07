@@ -1,4 +1,4 @@
-% CONTAINERS-REGISTRIES.D(5) Registries.d Man Page
+% containers-registries.d 5 Registries.d Man Page
 % Miloslav Trmač
 % August 2016
 
