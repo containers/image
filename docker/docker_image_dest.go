@@ -19,7 +19,6 @@ import (
 	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/internal/uploadreader"
 	"github.com/containers/image/v5/manifest"
-	"github.com/containers/image/v5/pkg/blobinfocache/none"
 	"github.com/containers/image/v5/types"
 	"github.com/docker/distribution/registry/api/errcode"
 	v2 "github.com/docker/distribution/registry/api/v2"
@@ -134,8 +133,7 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	if inputInfo.Digest != "" {
 		// This should not really be necessary, at least the copy code calls TryReusingBlob automatically.
 		// Still, we need to check, if only because the "initiate upload" endpoint does not have a documented "blob already exists" return value.
-		// But we do that with NoCache, so that it _only_ checks the primary destination, instead of trying all mount candidates _again_.
-		haveBlob, reusedInfo, err := d.TryReusingBlob(ctx, inputInfo, none.NoCache, false)
+		haveBlob, reusedInfo, err := d.tryReusingExactBlob(ctx, inputInfo, cache)
 		if err != nil {
 			return types.BlobInfo{}, err
 		}
@@ -282,6 +280,21 @@ func (d *dockerImageDestination) mountBlob(ctx context.Context, srcRepo referenc
 	}
 }
 
+// tryReusingExactBlob is a subset of TryReusingBlob which _only_ looks for exactly the specified
+// blob in the current repository, with no cross-repo reuse or mounting; cache may be updated, it is not read.
+// The caller must ensure info.Digest is set.
+func (d *dockerImageDestination) tryReusingExactBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (bool, types.BlobInfo, error) {
+	exists, size, err := d.blobExists(ctx, d.ref.ref, info.Digest, nil)
+	if err != nil {
+		return false, types.BlobInfo{}, err
+	}
+	if exists {
+		cache.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), info.Digest, newBICLocationReference(d.ref))
+		return true, types.BlobInfo{Digest: info.Digest, MediaType: info.MediaType, Size: size}, nil
+	}
+	return false, types.BlobInfo{}, nil
+}
+
 // TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 // (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
 // info.Digest must not be empty.
@@ -297,13 +310,12 @@ func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.
 	}
 
 	// First, check whether the blob happens to already exist at the destination.
-	exists, size, err := d.blobExists(ctx, d.ref.ref, info.Digest, nil)
+	haveBlob, reusedInfo, err := d.tryReusingExactBlob(ctx, info, cache)
 	if err != nil {
 		return false, types.BlobInfo{}, err
 	}
-	if exists {
-		cache.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), info.Digest, newBICLocationReference(d.ref))
-		return true, types.BlobInfo{Digest: info.Digest, MediaType: info.MediaType, Size: size}, nil
+	if haveBlob {
+		return true, reusedInfo, nil
 	}
 
 	// Then try reusing blobs from other locations.
