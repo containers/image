@@ -75,14 +75,7 @@ func (e *Endpoint) rewriteReference(ref reference.Named, prefix string) (referen
 	}
 	// In the case of an empty `location` field, simply return the original
 	// input ref as-is.
-	//
-	// FIXME: already validated in postProcessRegistries, so check can probably
-	// be dropped.
-	// https://github.com/containers/image/pull/1191#discussion_r610621608
 	if e.Location == "" {
-		if prefix[:2] != "*." {
-			return nil, fmt.Errorf("invalid prefix '%v' for empty location, should be in the format: *.example.com", prefix)
-		}
 		return ref, nil
 	}
 	newNamedRef = e.Location + refString[prefixLen:]
@@ -357,21 +350,27 @@ func (config *V2RegistriesConf) postProcessRegistries() error {
 			return err
 		}
 
-		if reg.Prefix == "" {
-			if reg.Location == "" {
-				return &InvalidRegistries{s: "invalid condition: both location and prefix are unset"}
-			}
-			reg.Prefix = reg.Location
-		} else {
+		// Prefix and Location cannot both be empty.
+		// Either one at least must be set.
+		if reg.Prefix != "" {
 			reg.Prefix, err = parseLocation(reg.Prefix)
 			if err != nil {
 				return err
 			}
-			// FIXME: allow config authors to always use Prefix.
-			// https://github.com/containers/image/pull/1191#discussion_r610622495
-			if reg.Prefix[:2] != "*." && reg.Location == "" {
-				return &InvalidRegistries{s: "invalid condition: location is unset and prefix is not in the format: *.example.com"}
+			if reg.Location != "" {
+				reg.Location, err = parseLocation(reg.Location)
+				if err != nil {
+					return err
+				}
 			}
+		} else if reg.Location != "" {
+			reg.Prefix, err = parseLocation(reg.Location)
+			if err != nil {
+				return err
+			}
+			reg.Location = reg.Prefix
+		} else {
+			return &InvalidRegistries{s: "invalid condition: both location and prefix are unset"}
 		}
 
 		// make sure mirrors are valid
