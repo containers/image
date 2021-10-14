@@ -75,14 +75,7 @@ func (e *Endpoint) rewriteReference(ref reference.Named, prefix string) (referen
 	}
 	// In the case of an empty `location` field, simply return the original
 	// input ref as-is.
-	//
-	// FIXME: already validated in postProcessRegistries, so check can probably
-	// be dropped.
-	// https://github.com/containers/image/pull/1191#discussion_r610621608
 	if e.Location == "" {
-		if prefix[:2] != "*." {
-			return nil, fmt.Errorf("invalid prefix '%v' for empty location, should be in the format: *.example.com", prefix)
-		}
 		return ref, nil
 	}
 	newNamedRef = e.Location + refString[prefixLen:]
@@ -271,16 +264,6 @@ func (e *InvalidRegistries) Error() string {
 func parseLocation(input string) (string, error) {
 	trimmed := strings.TrimRight(input, "/")
 
-	// FIXME: This check needs to exist but fails for empty Location field with
-	// wildcarded prefix. Removal of this check "only" allows invalid input in,
-	// and does not prevent correct operation.
-	// https://github.com/containers/image/pull/1191#discussion_r610122617
-	//
-	//	if trimmed == "" {
-	//		return "", &InvalidRegistries{s: "invalid location: cannot be empty"}
-	//	}
-	//
-
 	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
 		msg := fmt.Sprintf("invalid location '%s': URI schemes are not supported", input)
 		return "", &InvalidRegistries{s: msg}
@@ -357,21 +340,31 @@ func (config *V2RegistriesConf) postProcessRegistries() error {
 			return err
 		}
 
-		if reg.Prefix == "" {
-			if reg.Location == "" {
-				return &InvalidRegistries{s: "invalid condition: both location and prefix are unset"}
+		// Prefix and Location cannot both be empty.
+		// Either one at least must be set.
+		if reg.Prefix != "" {
+			if isWildcardedPrefix(reg.Prefix) && strings.ContainsAny(reg.Prefix, "/@:") {
+				msg := fmt.Sprintf("Wildcarded prefix should be in the format: *.example.com. Current prefix %q is incorrectly formatted", reg.Prefix)
+				return &InvalidRegistries{s: msg}
 			}
-			reg.Prefix = reg.Location
-		} else {
 			reg.Prefix, err = parseLocation(reg.Prefix)
 			if err != nil {
 				return err
 			}
-			// FIXME: allow config authors to always use Prefix.
-			// https://github.com/containers/image/pull/1191#discussion_r610622495
-			if reg.Prefix[:2] != "*." && reg.Location == "" {
-				return &InvalidRegistries{s: "invalid condition: location is unset and prefix is not in the format: *.example.com"}
+			if reg.Location != "" {
+				reg.Location, err = parseLocation(reg.Location)
+				if err != nil {
+					return err
+				}
 			}
+		} else if reg.Location != "" {
+			reg.Prefix, err = parseLocation(reg.Location)
+			if err != nil {
+				return err
+			}
+			reg.Location = reg.Prefix
+		} else {
+			return &InvalidRegistries{s: "invalid condition: both location and prefix are unset"}
 		}
 
 		// make sure mirrors are valid
@@ -768,6 +761,11 @@ func CredentialHelpers(sys *types.SystemContext) ([]string, error) {
 	return config.partialV2.CredentialHelpers, nil
 }
 
+// isWildcardedPrefix only checks if the first two characters match "*.".
+func isWildcardedPrefix(prefix string) bool {
+	return prefix[:2] == "*."
+}
+
 // refMatchingSubdomainPrefix returns the length of ref
 // iff ref, which is a registry, repository namespace, repository or image reference (as formatted by
 // reference.Domain(), reference.Named.Name() or reference.Reference.String()
@@ -804,7 +802,7 @@ func refMatchingSubdomainPrefix(ref, prefix string) int {
 // (This is split from the caller primarily to make testing easier.)
 func refMatchingPrefix(ref, prefix string) int {
 	switch {
-	case prefix[0:2] == "*.":
+	case isWildcardedPrefix(prefix):
 		return refMatchingSubdomainPrefix(ref, prefix)
 	case len(ref) < len(prefix):
 		return -1
@@ -917,17 +915,6 @@ func loadConfigFile(path string, forceV2 bool) (*parsedConfig, error) {
 		res.shortNameMode = mode
 	} else {
 		res.shortNameMode = types.ShortNameModeInvalid
-	}
-
-	// Valid wildcarded prefixes must be in the format: *.example.com
-	// FIXME: Move to postProcessRegistries
-	// https://github.com/containers/image/pull/1191#discussion_r610623829
-	for i := range res.partialV2.Registries {
-		prefix := res.partialV2.Registries[i].Prefix
-		if prefix[:2] == "*." && strings.ContainsAny(prefix, "/@:") {
-			msg := fmt.Sprintf("Wildcarded prefix should be in the format: *.example.com. Current prefix %q is incorrectly formatted", prefix)
-			return nil, &InvalidRegistries{s: msg}
-		}
 	}
 
 	// Parse and validate short-name aliases.
