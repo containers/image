@@ -211,6 +211,11 @@ func TestRefMatchingPrefix(t *testing.T) {
 		{"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			len("example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")},
 		{"example.com/foo@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", -1},
+		// Prefix is invalid, but we shouldn’t crash.
+		// (Note that this is necessary only because loadConfigFile doesn’t reject single-character values outright,
+		// which it, in principle, could; a valid prefix/location must start with a host name, and host names
+		// that could ever match anything contain either a dot or a port number, due to docker.io normalization rules.)
+		{"example.com/foo", "*", -1},
 	} {
 		prefixLen := refMatchingPrefix(c.ref, c.prefix)
 		assert.Equal(t, c.expected, prefixLen, fmt.Sprintf("%s vs. %s", c.ref, c.prefix))
