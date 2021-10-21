@@ -17,6 +17,7 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/putblobdigest"
+	"github.com/containers/image/v5/internal/streamdigest"
 	"github.com/containers/image/v5/internal/uploadreader"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
@@ -130,6 +131,19 @@ func (d *dockerImageDestination) HasThreadSafePutBlob() bool {
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
+	// If requested, precompute the blob digest to prevent uploading layers that already exist on the registry.
+	// This functionality is particularly useful when BlobInfoCache has not been populated with compressed digests,
+	// the source blob is uncompressed, and the destination blob is being compressed "on the fly".
+	if inputInfo.Digest == "" && d.c.sys.DockerRegistryPushPrecomputeDigests {
+		logrus.Debugf("Precomputing digest layer for %s", reference.Path(d.ref.ref))
+		streamCopy, cleanup, err := streamdigest.ComputeBlobInfo(d.c.sys, stream, &inputInfo)
+		if err != nil {
+			return types.BlobInfo{}, err
+		}
+		defer cleanup()
+		stream = streamCopy
+	}
+
 	if inputInfo.Digest != "" {
 		// This should not really be necessary, at least the copy code calls TryReusingBlob automatically.
 		// Still, we need to check, if only because the "initiate upload" endpoint does not have a documented "blob already exists" return value.
