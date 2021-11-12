@@ -30,7 +30,7 @@ require (
 	github.com/opencontainers/selinux v1.10.0
 	github.com/ostreedev/ostree-go v0.0.0-20190702140239-759a8c1ac913
 	github.com/pkg/errors v0.9.1
-	github.com/satori/go.uuid v1.2.0 // indirect
+	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	github.com/ulikunitz/xz v0.5.10
@@ -38,7 +38,6 @@ require (
 	github.com/vbauerster/mpb/v7 v7.3.0
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190809123943-df4f5c81cb3b // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0
-	github.com/yhcote/sif v1.0.2-0.20181213102235-838fcf45c762
 	go.etcd.io/bbolt v1.3.6
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
