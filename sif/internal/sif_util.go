@@ -11,10 +11,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/containers/image/v5/sif/sif"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
-	"github.com/yhcote/sif/pkg/sif"
 
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
