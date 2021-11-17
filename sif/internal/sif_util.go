@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package internal
@@ -13,56 +14,54 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containers/image/v5/sif/sif"
 	"github.com/pkg/errors"
+	"github.com/sylabs/sif/v2/pkg/sif"
 
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type SifImage struct {
-	fimg      sif.FileImage
-	rootfs    *sif.Descriptor
+	fimg      *sif.FileImage
+	rootfs    sif.Descriptor
 	deffile   *sif.Descriptor
-	defReader *io.SectionReader
+	defReader io.Reader
 	cmdlist   []string
 	runscript *bytes.Buffer
 	env       *sif.Descriptor
-	envReader *io.SectionReader
+	envReader io.Reader
 	envlist   []string
 }
 
 func LoadSIFImage(path string) (image SifImage, err error) {
 	// open up the SIF file and get its header
-	image.fimg, err = sif.LoadContainer(path, true)
+	image.fimg, err = sif.LoadContainerFromPath(path, sif.OptLoadWithFlag(os.O_RDONLY))
 	if err != nil {
 		return
 	}
 
 	// check for a system partition and save it
-	image.rootfs, _, err = image.fimg.GetPartPrimSys()
+	image.rootfs, err = image.fimg.GetDescriptor(sif.WithPartitionType(sif.PartPrimSys))
 	if err != nil {
 		return SifImage{}, errors.Wrap(err, "looking up rootfs from SIF file")
 	}
 
 	// look for a definition file object
-	searchDesc := sif.Descriptor{Datatype: sif.DataDeffile}
-	resultDescs, _, err := image.fimg.GetFromDescr(searchDesc)
-	if err == nil && resultDescs != nil {
+	resultDesc, err := image.fimg.GetDescriptor(sif.WithDataType(sif.DataDeffile))
+	if err == nil {
 		// we assume in practice that typical SIF files don't hold multiple deffiles
-		image.deffile = resultDescs[0]
-		image.defReader = io.NewSectionReader(image.fimg.Fp, image.deffile.Fileoff, image.deffile.Filelen)
+		image.deffile = &resultDesc
+		image.defReader = resultDesc.GetReader()
 	}
 	if err = image.generateConfig(); err != nil {
 		return SifImage{}, err
 	}
 
 	// look for an environment variable set object
-	searchDesc = sif.Descriptor{Datatype: sif.DataEnvVar}
-	resultDescs, _, err = image.fimg.GetFromDescr(searchDesc)
-	if err == nil && resultDescs != nil {
+	resultDesc, err = image.fimg.GetDescriptor(sif.WithDataType(sif.DataEnvVar))
+	if err == nil {
 		// we assume in practice that typical SIF files don't hold multiple EnvVar sets
-		image.env = resultDescs[0]
-		image.envReader = io.NewSectionReader(image.fimg.Fp, image.env.Fileoff, image.env.Filelen)
+		image.env = &resultDesc
+		image.envReader = resultDesc.GetReader()
 	}
 
 	return image, nil
@@ -171,11 +170,11 @@ func (image SifImage) UnloadSIFImage() (err error) {
 }
 
 func (image SifImage) GetSIFID() string {
-	return image.fimg.Header.ID.String()
+	return image.fimg.ID()
 }
 
 func (image SifImage) GetSIFArch() string {
-	return sif.GetGoArch(string(image.fimg.Header.Arch[:sif.HdrArchLen-1]))
+	return image.fimg.PrimaryArch()
 }
 
 const squashFilename = "rootfs.squashfs"
@@ -214,15 +213,12 @@ func (image *SifImage) writeRunscript(tempdir string) (err error) {
 }
 
 func (image SifImage) SquashFSToTarLayer(tempdir string) (tarpath string, err error) {
-	if _, err = image.fimg.Fp.Seek(image.rootfs.Fileoff, 0); err != nil {
-		return
-	}
 	f, err := os.Create(filepath.Join(tempdir, squashFilename))
 	if err != nil {
 		return
 	}
 	defer f.Close()
-	if _, err = io.CopyN(f, image.fimg.Fp, image.rootfs.Filelen); err != nil {
+	if _, err = io.CopyN(f, image.rootfs.GetReader(), image.rootfs.Size()); err != nil {
 		return
 	}
 	if err = f.Sync(); err != nil {
