@@ -5,6 +5,8 @@
 // LICENSE file distributed with the sources of this project regarding your
 // rights to use or distribute this software.
 
+// +build linux
+
 // Package sif implements data structures and routines to create
 // and access SIF files.
 // 	- sif.go contains the data definition the file format.
@@ -18,8 +20,9 @@ package sif
 
 import (
 	"bytes"
-	"github.com/satori/go.uuid"
 	"os"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 // Layout of a SIF file (example)
