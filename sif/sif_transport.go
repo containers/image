@@ -63,7 +63,7 @@ func (ref sifReference) Transport() types.ImageTransport {
 // StringWithinTransport returns a string representation of the reference, which MUST be such that
 // reference.Transport().ParseReference(reference.StringWithinTransport()) returns an equivalent reference.
 func (ref sifReference) StringWithinTransport() string {
-	return fmt.Sprintf("%s", ref.file)
+	return ref.file
 }
 
 // DockerReference returns a Docker reference associated with this reference

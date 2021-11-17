@@ -159,11 +159,11 @@ func createDescriptor(fimg *FileImage, input DescriptorInput) (err error) {
 
 	// look for a free entry in the descriptor table
 	for idx, v = range fimg.DescrArr {
-		if v.Used == false {
+		if !v.Used {
 			break
 		}
 	}
-	if int64(idx) == fimg.Header.Dtotal-1 && fimg.DescrArr[idx].Used == true {
+	if int64(idx) == fimg.Header.Dtotal-1 && fimg.DescrArr[idx].Used {
 		return fmt.Errorf("no descriptor table free entry, warning: header.Dfree was > 0")
 	}
 
@@ -349,11 +349,7 @@ func (fimg *FileImage) AddObject(input DescriptorInput) error {
 
 // descrIsLast return true if passed descriptor's object is the last in a SIF file
 func objectIsLast(fimg *FileImage, descr *Descriptor) bool {
-	if fimg.Filesize == descr.Fileoff+descr.Filelen {
-		return true
-	}
-
-	return false
+	return fimg.Filesize == descr.Fileoff+descr.Filelen
 }
 
 // compactAtDescr joins data objects leading and following "descr" by compacting a SIF file
@@ -361,7 +357,7 @@ func compactAtDescr(fimg *FileImage, descr *Descriptor) error {
 	var prev Descriptor
 
 	for _, v := range fimg.DescrArr {
-		if v.Used == false || v.ID == descr.ID {
+		if !v.Used || v.ID == descr.ID {
 			continue
 		} else {
 			if v.Fileoff > prev.Fileoff {
@@ -370,7 +366,7 @@ func compactAtDescr(fimg *FileImage, descr *Descriptor) error {
 		}
 	}
 	// make sure it's not the only used descriptor first
-	if prev.Used == true {
+	if prev.Used {
 		if err := fimg.Fp.Truncate(prev.Fileoff + prev.Filelen); err != nil {
 			return err
 		}
