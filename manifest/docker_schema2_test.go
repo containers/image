@@ -2,11 +2,13 @@ package manifest
 
 import (
 	"io/ioutil"
+	"path/filepath"
 	"testing"
 
 	"github.com/containers/image/v5/pkg/compression"
 	"github.com/containers/image/v5/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSupportedSchema2MediaType(t *testing.T) {
@@ -56,6 +58,24 @@ func TestSupportedSchema2MediaType(t *testing.T) {
 			assert.Nil(t, err)
 		}
 	}
+}
+
+func TestSchema2FromManifest(t *testing.T) {
+	validManifest, err := ioutil.ReadFile(filepath.Join("fixtures", "v2s2.manifest.json"))
+	require.NoError(t, err)
+
+	parser := func(m []byte) error {
+		_, err := Schema2FromManifest(m)
+		return err
+	}
+	// Schema mismatch is rejected
+	testManifestFixturesAreRejected(t, parser, []string{
+		"schema2-to-schema1-by-docker.json",
+		"v2list.manifest.json",
+		"ociv1.manifest.json", "ociv1.image.index.json",
+	})
+	// Extra fields are rejected
+	testValidManifestWithExtraFieldsIsRejected(t, parser, validManifest, []string{"fsLayers", "history", "manifests"})
 }
 
 func TestUpdateLayerInfosV2S2GzipToZstd(t *testing.T) {
