@@ -79,7 +79,7 @@ func (fimg *FileImage) mapFile(rdonly bool) error {
 		return fmt.Errorf("file is to big to be mapped")
 	}
 
-	if rdonly == false {
+	if !rdonly {
 		prot = syscall.PROT_WRITE
 		flags = syscall.MAP_SHARED
 	}
@@ -110,7 +110,7 @@ func (fimg *FileImage) mapFile(rdonly bool) error {
 }
 
 func (fimg *FileImage) unmapFile() error {
-	if fimg.Amodebuf == true {
+	if fimg.Amodebuf {
 		return nil
 	}
 	if err := syscall.Munmap(fimg.Filedata); err != nil {
@@ -207,7 +207,7 @@ func LoadContainerReader(b *bytes.Reader) (fimg FileImage, err error) {
 
 	// in the case where the reader buffer doesn't include descriptor data, we
 	// don't return an error and DescrArr will be set to nil
-	readDescriptors(&fimg)
+	_ = readDescriptors(&fimg)
 
 	return fimg, nil
 }
