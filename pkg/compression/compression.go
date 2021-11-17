@@ -35,6 +35,9 @@ var (
 	// Zstd:chunked compression.
 	ZstdChunked = internal.NewAlgorithm(types.ZstdChunkedAlgorithmName, types.ZstdAlgorithmName, /* Note: InternalUnstableUndocumentedMIMEQuestionMark is not ZstdChunkedAlgorithmName */
 		nil, ZstdDecompressor, compressor.ZstdCompressor)
+	// Squashfs compression.
+	Squashfs = internal.NewAlgorithm(types.SquashfsAlgorithmName, types.SquashfsAlgorithmName,
+		[]byte{0x68, 0x73, 0x71, 0x73}, SquashfsDecompressor, nil)
 
 	compressionAlgorithms = map[string]Algorithm{
 		Gzip.Name():        Gzip,
@@ -42,6 +45,7 @@ var (
 		Xz.Name():          Xz,
 		Zstd.Name():        Zstd,
 		ZstdChunked.Name(): ZstdChunked,
+		Squashfs.Name():    Squashfs,
 	}
 )
 
@@ -74,6 +78,11 @@ func XzDecompressor(r io.Reader) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+	return ioutil.NopCloser(r), nil
+}
+
+// SquashfsDecompressor is a DecompressorFunc for the squashfs compression algorithm.
+func SquashfsDecompressor(r io.Reader) (io.ReadCloser, error) {
 	return ioutil.NopCloser(r), nil
 }
 

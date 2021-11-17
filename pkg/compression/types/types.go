@@ -38,4 +38,9 @@ const (
 	// will actually be available. (In fact it is intended for this types package not to depend
 	// on any of the implementations.)
 	ZstdChunkedAlgorithmName = "zstd:chunked"
+	// SquashfsAlgorithName is the name used by pkg/compression.Squashfs
+	// NOTE: Importing only this /types package does not inherently guarantee a Squashfs algorithm
+	// will actually be available. (In fact it is intended for this types package not to depend
+	// on any of the implementations.)
+	SquashfsAlgorithmName = "squashfs"
 )
