@@ -14,9 +14,7 @@ import (
 	"strings"
 
 	"github.com/containers/image/v5/sif/sif"
-	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
-	uuid "github.com/satori/go.uuid"
 
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -31,7 +29,6 @@ type SifImage struct {
 	env       *sif.Descriptor
 	envReader *io.SectionReader
 	envlist   []string
-	diffID    digest.Digest
 }
 
 func LoadSIFImage(path string) (image SifImage, err error) {
@@ -154,7 +151,9 @@ func (image *SifImage) generateConfig() error {
 	if len(image.cmdlist) == 0 && len(image.envlist) == 0 {
 		image.cmdlist = append(image.cmdlist, "bash")
 	} else {
-		image.generateRunscript()
+		if err = image.generateRunscript(); err != nil {
+			return errors.Wrap(err, "generating runscript")
+		}
 		image.cmdlist = []string{"/podman/runscript"}
 	}
 
@@ -236,21 +235,4 @@ func (image SifImage) SquashFSToTarLayer(tempdir string) (tarpath string, err er
 		return
 	}
 	return filepath.Join(tempdir, tarFilename), nil
-}
-
-func createSIF() error {
-	cinfo := sif.CreateInfo{
-		Pathname:   "container.sif",
-		Launchstr:  sif.HdrLaunch,
-		Sifversion: sif.HdrVersion,
-		ID:         uuid.NewV4(),
-	}
-
-	image, err := sif.CreateContainer(cinfo)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("SIF: %+v\n", image)
-
-	return nil
 }

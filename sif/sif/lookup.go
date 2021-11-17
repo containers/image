@@ -85,7 +85,7 @@ func (fimg *FileImage) GetFromDescrID(id uint32) (*Descriptor, int, error) {
 	var match = -1
 
 	for i, v := range fimg.DescrArr {
-		if v.Used == false {
+		if !v.Used {
 			continue
 		} else {
 			if v.ID == id {
@@ -111,7 +111,7 @@ func (fimg *FileImage) GetPartFromGroup(groupid uint32) ([]*Descriptor, []int, e
 	var count int
 
 	for i, v := range fimg.DescrArr {
-		if v.Used == false {
+		if !v.Used {
 			continue
 		} else {
 			if v.Datatype == DataPartition && v.Groupid == groupid {
@@ -136,7 +136,7 @@ func (fimg *FileImage) GetSignFromGroup(groupid uint32) ([]*Descriptor, []int, e
 	var count int
 
 	for i, v := range fimg.DescrArr {
-		if v.Used == false {
+		if !v.Used {
 			continue
 		} else {
 			if v.Datatype == DataSignature && v.Groupid == groupid {
@@ -161,7 +161,7 @@ func (fimg *FileImage) GetFromLinkedDescr(ID uint32) ([]*Descriptor, []int, erro
 	var count int
 
 	for i, v := range fimg.DescrArr {
-		if v.Used == false {
+		if !v.Used {
 			continue
 		} else {
 			if v.Link == ID {
@@ -186,7 +186,7 @@ func (fimg *FileImage) GetFromDescr(descr Descriptor) ([]*Descriptor, []int, err
 	var count int
 
 	for i, v := range fimg.DescrArr {
-		if v.Used == false {
+		if !v.Used {
 			continue
 		} else {
 			if descr.Datatype != 0 && descr.Datatype != v.Datatype {
@@ -245,8 +245,11 @@ func (fimg *FileImage) GetFromDescr(descr Descriptor) ([]*Descriptor, []int, err
 
 // GetData return a memory mapped byte slice mirroring the data object in a SIF file.
 func (descr *Descriptor) GetData(fimg *FileImage) []byte {
-	if fimg.Amodebuf == true {
-		fimg.Fp.Seek(descr.Fileoff, 0)
+	if fimg.Amodebuf {
+		_, err := fimg.Fp.Seek(descr.Fileoff, 0)
+		if err != nil {
+			return nil
+		}
 		data := make([]byte, descr.Filelen)
 		if n, _ := fimg.Fp.Read(data); int64(n) != descr.Filelen {
 			return nil
@@ -354,7 +357,7 @@ func (fimg *FileImage) GetPartPrimSys() (*Descriptor, int, error) {
 	index := -1
 
 	for i, v := range fimg.DescrArr {
-		if v.Used == false {
+		if !v.Used {
 			continue
 		} else {
 			if v.Datatype == DataPartition {
