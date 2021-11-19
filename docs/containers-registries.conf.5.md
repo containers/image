@@ -106,20 +106,26 @@ contacted and contains the image will be used (and if none of the mirrors contai
 the primary location specified by the `registry.location` field, or using the unmodified
 user-specified reference, is tried last).
 
-Each TOML table in the `mirror` array can contain the following fields, with the same semantics
-as if specified in the `[[registry]]` TOML table directly:
-- `location`
-- `insecure`
+Each TOML table in the `mirror` array can contain the following fields:
+- `location`： same semantics
+as specified in the `[[registry]]` TOML table
+- `insecure`： same semantics
+as specified in the `[[registry]]` TOML table
+- `pull-from-mirror`: `all`, `digest-only` or `tag-only`.  If "digest-only"， mirrors will only be used for digest pulls. Pulling images by tag can potentially yield different images, depending on which endpoint we pull from.  Restricting mirrors to pulls by digest avoids that issue.  If "tag-only", mirrors will only be used for tag pulls.  For a more up-to-date and expensive mirror that it is less likely to be out of sync if tags move, it should not be unnecessarily used for digest references.  Default is "all" (or left empty), mirrors will be used for both digest pulls and tag pulls unless the mirror-by-digest-only is set for the primary registry.
+Note that this per-mirror setting is allowed only when `mirror-by-digest-only` is not configured for the primary registry.
 
 `mirror-by-digest-only`
 : `true` or `false`.
 If `true`, mirrors will only be used during pulling if the image reference includes a digest.
+Note that if all mirrors are configured to be digest-only, images referenced by a tag will only use the primary
+registry.
+If all mirrors are configured to be tag-only, images referenced by a digest will only use the primary
+registry.
+
 Referencing an image by digest ensures that the same is always used
 (whereas referencing an image by a tag may cause different registries to return
 different images if the tag mapping is out of sync).
 
-Note that if this is `true`, images referenced by a tag will only use the primary
-registry, failing if that registry is not accessible.
 
 *Note*: Redirection and mirrors are currently processed only when reading images, not when pushing
 to a registry; that may change in the future.
