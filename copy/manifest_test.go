@@ -143,9 +143,9 @@ func TestDetermineManifestConversion(t *testing.T) {
 	for _, c := range cases {
 		src := fakeImageSource(c.sourceType)
 		ic := &imageCopier{
-			manifestUpdates:   &types.ManifestUpdateOptions{},
-			src:               src,
-			canModifyManifest: true,
+			manifestUpdates:            &types.ManifestUpdateOptions{},
+			src:                        src,
+			cannotModifyManifestReason: "",
 		}
 		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
 		require.NoError(t, err, c.description)
@@ -162,9 +162,9 @@ func TestDetermineManifestConversion(t *testing.T) {
 	for _, c := range cases {
 		src := fakeImageSource(c.sourceType)
 		ic := &imageCopier{
-			manifestUpdates:   &types.ManifestUpdateOptions{},
-			src:               src,
-			canModifyManifest: false,
+			manifestUpdates:            &types.ManifestUpdateOptions{},
+			src:                        src,
+			cannotModifyManifestReason: "Preserving digests",
 		}
 		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
 		require.NoError(t, err, c.description)
@@ -177,9 +177,9 @@ func TestDetermineManifestConversion(t *testing.T) {
 	for _, c := range cases {
 		src := fakeImageSource(c.sourceType)
 		ic := &imageCopier{
-			manifestUpdates:   &types.ManifestUpdateOptions{},
-			src:               src,
-			canModifyManifest: true,
+			manifestUpdates:            &types.ManifestUpdateOptions{},
+			src:                        src,
+			cannotModifyManifestReason: "",
 		}
 		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, v1.MediaTypeImageManifest, false)
 		require.NoError(t, err, c.description)
@@ -190,9 +190,9 @@ func TestDetermineManifestConversion(t *testing.T) {
 
 	// Error reading the manifest — smoke test only.
 	ic := imageCopier{
-		manifestUpdates:   &types.ManifestUpdateOptions{},
-		src:               fakeImageSource(""),
-		canModifyManifest: true,
+		manifestUpdates:            &types.ManifestUpdateOptions{},
+		src:                        fakeImageSource(""),
+		cannotModifyManifestReason: "",
 	}
 	_, _, err := ic.determineManifestConversion(context.Background(), supportS1S2, "", false)
 	assert.Error(t, err)
