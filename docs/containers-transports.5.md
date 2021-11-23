@@ -60,7 +60,7 @@ The _algo:digest_ refers to the image ID reported by docker-inspect(1).
 ### **oci:**_path[:reference]_
 
 An image compliant with the "Open Container Image Layout Specification" at _path_.
-Using a _reference_ is optional and allows for storing multiple images at the same _path_.
+Using a _reference_ is optional for a single image reference but required for storing multiple images at the same _path_.
 
 ### **oci-archive:**_path[:reference]_
 
