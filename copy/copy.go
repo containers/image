@@ -411,7 +411,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 		sigs = []internalsig.Signature{}
 	} else {
 		c.Printf("Getting image list signatures\n")
-		s, err := c.rawSource.GetSignaturesWithFormat(ctx, nil)
+		s, err := unparsedToplevel.UntrustedSignatures(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("reading signatures: %w", err)
 		}
