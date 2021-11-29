@@ -32,6 +32,9 @@ func TestGuessMIMEType(t *testing.T) {
 		{"ociv1.manifest.json", imgspecv1.MediaTypeImageManifest},
 		{"ociv1.artifact.json", imgspecv1.MediaTypeImageManifest},
 		{"ociv1.image.index.json", imgspecv1.MediaTypeImageIndex},
+		{"ociv1nomime.manifest.json", imgspecv1.MediaTypeImageManifest},
+		{"ociv1nomime.artifact.json", imgspecv1.MediaTypeImageManifest},
+		{"ociv1nomime.image.index.json", imgspecv1.MediaTypeImageIndex},
 	}
 
 	for _, c := range cases {
