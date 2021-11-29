@@ -105,35 +105,86 @@ func TestResolve(t *testing.T) {
 		UserShortNameAliasConfPath:  tmp.Name(),
 	}
 
+	sysResolveToDockerHub := &types.SystemContext{
+		SystemRegistriesConfPath:                                  "testdata/aliases.conf",
+		SystemRegistriesConfDirPath:                               "testdata/this-does-not-exist",
+		UserShortNameAliasConfPath:                                tmp.Name(),
+		PodmanOnlyShortNamesIgnoreRegistriesConfAndForceDockerHub: true,
+	}
+
 	_, err = sysregistriesv2.TryUpdatingCache(sys)
 	require.NoError(t, err)
 
+	digest := "@sha256:d366a4665ab44f0648d7a00ae3fae139d55e32f9712c67accd604bb55df9d05a"
+
 	tests := []struct {
-		name, value string
+		input, value, dockerHubValue string
 	}{
-		{"docker", "docker.io/library/foo:latest"},
-		{"docker:tag", "docker.io/library/foo:tag"},
-		{
-			"docker@sha256:d366a4665ab44f0648d7a00ae3fae139d55e32f9712c67accd604bb55df9d05a",
-			"docker.io/library/foo@sha256:d366a4665ab44f0648d7a00ae3fae139d55e32f9712c67accd604bb55df9d05a",
+		{ // alias
+			"docker",
+			"docker.io/library/foo:latest",
+			"docker.io/library/docker:latest",
 		},
-		{"quay/foo", "quay.io/library/foo:latest"},
-		{"quay/foo:tag", "quay.io/library/foo:tag"},
-		{
-			"quay/foo@sha256:d366a4665ab44f0648d7a00ae3fae139d55e32f9712c67accd604bb55df9d05a",
-			"quay.io/library/foo@sha256:d366a4665ab44f0648d7a00ae3fae139d55e32f9712c67accd604bb55df9d05a",
+		{ // alias tagged
+			"docker:tag",
+			"docker.io/library/foo:tag",
+			"docker.io/library/docker:tag",
 		},
-		{"example", "example.com/library/foo:latest"},
-		{"example:tag", "example.com/library/foo:tag"},
-		{
-			"example@sha256:d366a4665ab44f0648d7a00ae3fae139d55e32f9712c67accd604bb55df9d05a",
-			"example.com/library/foo@sha256:d366a4665ab44f0648d7a00ae3fae139d55e32f9712c67accd604bb55df9d05a",
+		{ // alias digested
+			"docker" + digest,
+			"docker.io/library/foo" + digest,
+			"docker.io/library/docker" + digest,
+		},
+		{ // alias with repo
+			"quay/foo",
+			"quay.io/library/foo:latest",
+			"docker.io/quay/foo:latest",
+		},
+		{ // alias with repo tagged
+			"quay/foo:tag",
+			"quay.io/library/foo:tag",
+			"docker.io/quay/foo:tag",
+		},
+		{ // alias with repo digested
+			"quay/foo" + digest,
+			"quay.io/library/foo" + digest,
+			"docker.io/quay/foo" + digest,
+		},
+		{ // alias
+			"example",
+			"example.com/library/foo:latest",
+			"docker.io/library/example:latest",
+		},
+		{ // alias with tag
+			"example:tag",
+			"example.com/library/foo:tag",
+			"docker.io/library/example:tag",
+		},
+		{ // alias digested
+			"example" + digest,
+			"example.com/library/foo" + digest,
+			"docker.io/library/example" + digest,
+		},
+		{ // FQN
+			"registry.com/repo/image",
+			"registry.com/repo/image:latest",
+			"registry.com/repo/image:latest",
+		},
+		{ // FQN tagged
+			"registry.com/repo/image:tag",
+			"registry.com/repo/image:tag",
+			"registry.com/repo/image:tag",
+		},
+		{ // FQN digested
+			"registry.com/repo/image" + digest,
+			"registry.com/repo/image" + digest,
+			"registry.com/repo/image" + digest,
 		},
 	}
 
 	// All of them should resolve correctly.
 	for _, test := range tests {
-		resolved, err := Resolve(sys, test.name)
+		resolved, err := Resolve(sys, test.input)
 		require.NoError(t, err, "%v", test)
 		require.NotNil(t, resolved)
 		require.Len(t, resolved.PullCandidates, 1)
@@ -141,11 +192,29 @@ func TestResolve(t *testing.T) {
 		assert.False(t, resolved.PullCandidates[0].record)
 	}
 
-	// Non-existent should return an error as no search registries are
-	// configured in the config.
+	// Now another run with enforcing resolution to Docker Hub.
+	for _, test := range tests {
+		resolved, err := Resolve(sysResolveToDockerHub, test.input)
+		require.NoError(t, err, "%v", test)
+		require.NotNil(t, resolved)
+		require.Len(t, resolved.PullCandidates, 1)
+		assert.Equal(t, test.dockerHubValue, resolved.PullCandidates[0].Value.String())
+		assert.False(t, resolved.PullCandidates[0].record)
+	}
+
+	// Non-existent alias should return an error as no search registries
+	// are configured in the config.
 	resolved, err := Resolve(sys, "doesnotexist")
 	require.Error(t, err)
 	require.Nil(t, resolved)
+
+	// It'll work though when enforcing resolving to Docker Hub.
+	resolved, err = Resolve(sysResolveToDockerHub, "doesnotexist")
+	require.NoError(t, err)
+	require.NotNil(t, resolved)
+	require.Len(t, resolved.PullCandidates, 1)
+	assert.Equal(t, "docker.io/library/doesnotexist:latest", resolved.PullCandidates[0].Value.String())
+	assert.False(t, resolved.PullCandidates[0].record)
 
 	// An empty name is not valid.
 	resolved, err = Resolve(sys, "")
@@ -156,14 +225,6 @@ func TestResolve(t *testing.T) {
 	resolved, err = Resolve(sys, "Invalid#$")
 	require.Error(t, err)
 	require.Nil(t, resolved)
-
-	// Fully-qualified input will be returned as is.
-	resolved, err = Resolve(sys, "quay.io/repo/fedora")
-	require.NoError(t, err)
-	require.NotNil(t, resolved)
-	require.Len(t, resolved.PullCandidates, 1)
-	assert.Equal(t, "quay.io/repo/fedora:latest", resolved.PullCandidates[0].Value.String())
-	assert.False(t, resolved.PullCandidates[0].record)
 }
 
 func toNamed(t *testing.T, input string, trim bool) reference.Named {
@@ -470,48 +531,74 @@ func TestResolveLocally(t *testing.T) {
 		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
 		UserShortNameAliasConfPath:  tmp.Name(),
 	}
+	sysResolveToDockerHub := &types.SystemContext{
+		SystemRegistriesConfPath:                                  "testdata/two-reg.conf",
+		SystemRegistriesConfDirPath:                               "testdata/this-does-not-exist",
+		UserShortNameAliasConfPath:                                tmp.Name(),
+		PodmanOnlyShortNamesIgnoreRegistriesConfAndForceDockerHub: true,
+	}
 
-	aliases, err := ResolveLocally(sys, "repo/image") // alias match
-	require.NoError(t, err)
-	require.Len(t, aliases, 4)                                             // alias + localhost + two regs
-	assert.Equal(t, "quay.io/repo/image:latest", aliases[0].String())      // alias
-	assert.Equal(t, "localhost/repo/image:latest", aliases[1].String())    // localhost
-	assert.Equal(t, "quay.io/repo/image:latest", aliases[2].String())      // registry 0
-	assert.Equal(t, "registry.com/repo/image:latest", aliases[3].String()) // registry 0
+	digest := "@sha256:d366a4665ab44f0648d7a00ae3fae139d55e32f9712c67accd604bb55df9d05a"
 
-	aliases, err = ResolveLocally(sys, "foo") // no alias match
-	require.NoError(t, err)
-	require.Len(t, aliases, 3)                                      // localhost + two regs
-	assert.Equal(t, "localhost/foo:latest", aliases[0].String())    // localhost
-	assert.Equal(t, "quay.io/foo:latest", aliases[1].String())      // registry 0
-	assert.Equal(t, "registry.com/foo:latest", aliases[2].String()) // registry 0
+	tests := []struct {
+		input                         string
+		expectedSys                   []string
+		expectedSysResolveToDockerHub string
+	}{
+		{ // alias match
+			"repo/image",
+			[]string{"quay.io/repo/image:latest", "localhost/repo/image:latest", "quay.io/repo/image:latest", "registry.com/repo/image:latest"},
+			"docker.io/repo/image:latest",
+		},
+		{ // no alias match
+			"foo",
+			[]string{"localhost/foo:latest", "quay.io/foo:latest", "registry.com/foo:latest"},
+			"docker.io/library/foo:latest",
+		},
+		{ // no alias match tagged
+			"foo:tag",
+			[]string{"localhost/foo:tag", "quay.io/foo:tag", "registry.com/foo:tag"},
+			"docker.io/library/foo:tag",
+		},
+		{ // no alias match digested
+			"foo" + digest,
+			[]string{"localhost/foo" + digest, "quay.io/foo" + digest, "registry.com/foo" + digest},
+			"docker.io/library/foo" + digest,
+		},
+		{ // localhost
+			"localhost/foo",
+			[]string{"localhost/foo:latest"},
+			"localhost/foo:latest",
+		},
+		{ // localhost tagged
+			"localhost/foo:tag",
+			[]string{"localhost/foo:tag"},
+			"localhost/foo:tag",
+		},
+		{ // localhost digested
+			"localhost/foo" + digest,
+			[]string{"localhost/foo" + digest},
+			"localhost/foo" + digest,
+		},
+		{ // non-localhost FQN + digest
+			"registry.com/repo/image" + digest,
+			[]string{"registry.com/repo/image" + digest},
+			"registry.com/repo/image" + digest,
+		},
+	}
 
-	aliases, err = ResolveLocally(sys, "foo:tag") // no alias match tagged
-	require.NoError(t, err)
-	require.Len(t, aliases, 3)                                   // localhost + two regs
-	assert.Equal(t, "localhost/foo:tag", aliases[0].String())    // localhost
-	assert.Equal(t, "quay.io/foo:tag", aliases[1].String())      // registry 0
-	assert.Equal(t, "registry.com/foo:tag", aliases[2].String()) // registry 0
+	for _, test := range tests {
+		aliases, err := ResolveLocally(sys, test.input)
+		require.NoError(t, err)
+		require.Len(t, aliases, len(test.expectedSys))
+		for i := range aliases {
+			assert.Equal(t, test.expectedSys[i], aliases[i].String())
+		}
 
-	aliases, err = ResolveLocally(sys, "foo@sha256:d366a4665ab44f0648d7a00ae3fae139d55e32f9712c67accd604bb55df9d05a") // no alias match digested
-	require.NoError(t, err)
-	require.Len(t, aliases, 3)                                                                                                       // localhost + two regs
-	assert.Equal(t, "localhost/foo@sha256:d366a4665ab44f0648d7a00ae3fae139d55e32f9712c67accd604bb55df9d05a", aliases[0].String())    // localhost
-	assert.Equal(t, "quay.io/foo@sha256:d366a4665ab44f0648d7a00ae3fae139d55e32f9712c67accd604bb55df9d05a", aliases[1].String())      // registry 0
-	assert.Equal(t, "registry.com/foo@sha256:d366a4665ab44f0648d7a00ae3fae139d55e32f9712c67accd604bb55df9d05a", aliases[2].String()) // registry 0
-
-	aliases, err = ResolveLocally(sys, "localhost/foo") // localhost
-	require.NoError(t, err)
-	require.Len(t, aliases, 1)
-	assert.Equal(t, "localhost/foo:latest", aliases[0].String())
-
-	aliases, err = ResolveLocally(sys, "localhost/foo:tag") // localhost + tag
-	require.NoError(t, err)
-	require.Len(t, aliases, 1)
-	assert.Equal(t, "localhost/foo:tag", aliases[0].String())
-
-	aliases, err = ResolveLocally(sys, "localhost/foo@sha256:d366a4665ab44f0648d7a00ae3fae139d55e32f9712c67accd604bb55df9d05a") // localhost + digest
-	require.NoError(t, err)
-	require.Len(t, aliases, 1)
-	assert.Equal(t, "localhost/foo@sha256:d366a4665ab44f0648d7a00ae3fae139d55e32f9712c67accd604bb55df9d05a", aliases[0].String())
+		// Another run enforcing resolving to Docker Hub.
+		aliases, err = ResolveLocally(sysResolveToDockerHub, test.input)
+		require.NoError(t, err)
+		require.Len(t, aliases, 1)
+		assert.Equal(t, test.expectedSysResolveToDockerHub, aliases[0].String())
+	}
 }
