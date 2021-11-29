@@ -433,6 +433,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 
 	// Determine if we're allowed to modify the manifest list.
 	// If we can, set to the empty string. If we can't, set to the reason why.
+	// Compare, and perhaps keep in sync with, the version in copyOneImage.
 	cannotModifyManifestListReason := ""
 	if len(sigs) > 0 {
 		cannotModifyManifestListReason = "Would invalidate signatures"
@@ -663,6 +664,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 
 	// Determine if we're allowed to modify the manifest.
 	// If we can, set to the empty string. If we can't, set to the reason why.
+	// Compare, and perhaps keep in sync with, the version in copyMultipleImages.
 	cannotModifyManifestReason := ""
 	if len(sigs) > 0 {
 		cannotModifyManifestReason = "Would invalidate signatures"
