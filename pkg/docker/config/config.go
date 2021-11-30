@@ -30,6 +30,7 @@ type dockerAuthConfig struct {
 type dockerConfigFile struct {
 	AuthConfigs map[string]dockerAuthConfig `json:"auths"`
 	CredHelpers map[string]string           `json:"credHelpers,omitempty"`
+	CredsStore  string                      `json:"credsStore,omitempty"`
 }
 
 type authPath struct {
@@ -84,6 +85,9 @@ func SetCredentials(sys *types.SystemContext, key, username, password string) (s
 						return false, unsupportedNamespaceErr(ch)
 					}
 					return false, setAuthToCredHelper(ch, key, username, password)
+				}
+				if auths.CredsStore != "" {
+					return false, setAuthToCredHelper(auths.CredsStore, key, username, password)
 				}
 				creds := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 				newCreds := dockerAuthConfig{Auth: creds}
@@ -155,6 +159,16 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 				}
 				for registry := range auths.AuthConfigs {
 					addRegistry(registry)
+				}
+				if auths.CredsStore != "" {
+					creds, err := listAuthsFromCredHelper(auths.CredsStore)
+					if err == nil {
+						for registry := range creds {
+							addRegistry(registry)
+						}
+					} else {
+						return nil, err
+					}
 				}
 			}
 		// External helpers.
@@ -397,6 +411,21 @@ func RemoveAuthentication(sys *types.SystemContext, key string) error {
 				if innerHelper, exists := auths.CredHelpers[key]; exists {
 					removeFromCredHelper(innerHelper)
 				}
+				if auths.CredsStore != "" {
+					c, err := getAuthFromCredHelper(auths.CredsStore, key)
+					if err != nil {
+						multiErr = multierror.Append(multiErr, errors.Wrapf(err, "removing credentials for %s from credential helper %s", key, auths.CredsStore))
+					} else {
+						if c.Username != "" || c.IdentityToken != "" {
+							err = deleteAuthFromCredHelper(auths.CredsStore, key)
+							if err != nil {
+								multiErr = multierror.Append(multiErr, errors.Wrapf(err, "removing credentials for %s from credential helper %s", key, auths.CredsStore))
+							} else {
+								isLoggedIn = true
+							}
+						}
+					}
+				}
 				if _, ok := auths.AuthConfigs[key]; ok {
 					isLoggedIn = true
 					delete(auths.AuthConfigs, key)
@@ -447,6 +476,20 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 				}
 				auths.CredHelpers = make(map[string]string)
 				auths.AuthConfigs = make(map[string]dockerAuthConfig)
+				if auths.CredsStore != "" {
+					creds, err := listAuthsFromCredHelper(auths.CredsStore)
+					if err == nil {
+						for registry := range creds {
+							err = deleteAuthFromCredHelper(auths.CredsStore, registry)
+							if err != nil {
+								return false, err
+							}
+						}
+					} else {
+						return false, err
+					}
+
+				}
 				return true, nil
 			})
 		// External helpers.
@@ -651,6 +694,12 @@ func findAuthentication(ref reference.Named, registry, path string, legacyFormat
 	// First try cred helpers. They should always be normalized.
 	if ch, exists := auths.CredHelpers[registry]; exists {
 		return getAuthFromCredHelper(ch, registry)
+	}
+
+	if auths.CredsStore != "" {
+		if cred, err := getAuthFromCredHelper(auths.CredsStore, registry); err == nil {
+			return cred, err
+		}
 	}
 
 	// Support for different paths in auth.
