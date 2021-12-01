@@ -1,6 +1,10 @@
 {
   "auths": {
     "example.org/repo": { "auth": "ZXhhbXBsZTpvcmc=" },
-    "example.org": { "auth": "bG9jYWw6aG9zdA==" }
+    "example.org": { "auth": "bG9jYWw6aG9zdA==" },
+    "docker.io/vendor": { "auth": "Zmlyc3Q6bGV2ZWw="},
+    "docker.io": { "auth": "dG9wOmxldmVs"},
+    "docker.io/library/busybox": { "auth": "bGlicmFyeTpidXN5Ym94" },
+    "docker.io/library": { "auth": "bGlicmFyeTpvdGhlcg==" }
   }
 }

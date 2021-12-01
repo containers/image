@@ -136,190 +136,165 @@ func TestGetAuth(t *testing.T) {
 
 	for _, configPath := range configPaths {
 		for _, tc := range []struct {
-			name            string
-			ref             string
-			hostname        string
-			path            string
-			expected        types.DockerAuthConfig
-			expectedError   error
-			sys             *types.SystemContext
-			testPreviousAPI bool
+			name     string
+			key      string
+			path     string
+			expected types.DockerAuthConfig
+			sys      *types.SystemContext
 		}{
 			{
-				name:            "no auth config",
-				hostname:        "index.docker.io",
-				testPreviousAPI: true,
+				name:     "no auth config",
+				key:      "index.docker.io",
+				expected: types.DockerAuthConfig{},
 			},
 			{
-				name: "empty hostname",
-				path: filepath.Join("testdata", "example.json"),
+				name:     "empty hostname",
+				path:     filepath.Join("testdata", "example.json"),
+				expected: types.DockerAuthConfig{},
 			},
 			{
 				name:     "match one",
-				hostname: "example.org",
+				key:      "example.org",
 				path:     filepath.Join("testdata", "example.json"),
-				expected: types.DockerAuthConfig{
-					Username: "example",
-					Password: "org",
-				},
-				testPreviousAPI: true,
+				expected: types.DockerAuthConfig{Username: "example", Password: "org"},
 			},
 			{
-				name:            "match none",
-				hostname:        "registry.example.org",
-				path:            filepath.Join("testdata", "example.json"),
-				testPreviousAPI: true,
+				name:     "match none",
+				key:      "registry.example.org",
+				path:     filepath.Join("testdata", "example.json"),
+				expected: types.DockerAuthConfig{},
 			},
 			{
 				name:     "match docker.io",
-				hostname: "docker.io",
+				key:      "docker.io",
 				path:     filepath.Join("testdata", "full.json"),
-				expected: types.DockerAuthConfig{
-					Username: "docker",
-					Password: "io",
-				},
-				testPreviousAPI: true,
+				expected: types.DockerAuthConfig{Username: "docker", Password: "io"},
 			},
 			{
 				name:     "match docker.io normalized",
-				hostname: "docker.io",
+				key:      "docker.io",
 				path:     filepath.Join("testdata", "abnormal.json"),
-				expected: types.DockerAuthConfig{
-					Username: "index",
-					Password: "docker.io",
-				},
-				testPreviousAPI: true,
+				expected: types.DockerAuthConfig{Username: "index", Password: "docker.io"},
 			},
 			{
 				name:     "normalize registry",
-				hostname: "normalize.example.org",
+				key:      "normalize.example.org",
 				path:     filepath.Join("testdata", "full.json"),
-				expected: types.DockerAuthConfig{
-					Username: "normalize",
-					Password: "example",
-				},
-				testPreviousAPI: true,
+				expected: types.DockerAuthConfig{Username: "normalize", Password: "example"},
 			},
 			{
 				name:     "match localhost",
-				hostname: "localhost",
+				key:      "localhost",
 				path:     filepath.Join("testdata", "full.json"),
-				expected: types.DockerAuthConfig{
-					Username: "local",
-					Password: "host",
-				},
-				testPreviousAPI: true,
+				expected: types.DockerAuthConfig{Username: "local", Password: "host"},
 			},
 			{
 				name:     "match ip",
-				hostname: "10.10.30.45:5000",
+				key:      "10.10.30.45:5000",
 				path:     filepath.Join("testdata", "full.json"),
-				expected: types.DockerAuthConfig{
-					Username: "10.10",
-					Password: "30.45-5000",
-				},
-				testPreviousAPI: true,
+				expected: types.DockerAuthConfig{Username: "10.10", Password: "30.45-5000"},
 			},
 			{
 				name:     "match port",
-				hostname: "localhost:5000",
+				key:      "localhost:5000",
 				path:     filepath.Join("testdata", "abnormal.json"),
-				expected: types.DockerAuthConfig{
-					Username: "local",
-					Password: "host-5000",
-				},
-				testPreviousAPI: true,
+				expected: types.DockerAuthConfig{Username: "local", Password: "host-5000"},
 			},
 			{
 				name:     "use system context",
-				hostname: "example.org",
+				key:      "example.org",
 				path:     filepath.Join("testdata", "example.json"),
-				expected: types.DockerAuthConfig{
-					Username: "foo",
-					Password: "bar",
-				},
+				expected: types.DockerAuthConfig{Username: "foo", Password: "bar"},
 				sys: &types.SystemContext{
 					DockerAuthConfig: &types.DockerAuthConfig{
 						Username: "foo",
 						Password: "bar",
 					},
 				},
-				testPreviousAPI: true,
 			},
 			{
-				name:     "identity token",
-				hostname: "example.org",
-				path:     filepath.Join("testdata", "example_identitytoken.json"),
+				name: "identity token",
+				key:  "example.org",
+				path: filepath.Join("testdata", "example_identitytoken.json"),
 				expected: types.DockerAuthConfig{
 					Username:      "00000000-0000-0000-0000-000000000000",
 					Password:      "",
 					IdentityToken: "some very long identity token",
 				},
-				testPreviousAPI: true,
 			},
 			{
-				name:            "match none (empty.json)",
-				hostname:        "https://localhost:5000",
-				path:            filepath.Join("testdata", "empty.json"),
-				testPreviousAPI: true,
+				name:     "match none (empty.json)",
+				key:      "localhost:5000",
+				path:     filepath.Join("testdata", "empty.json"),
+				expected: types.DockerAuthConfig{},
 			},
 			{
-				name:     "credhelper from registries.conf",
-				hostname: "registry-a.com",
+				name: "credhelper from registries.conf",
+				key:  "registry-a.com",
 				sys: &types.SystemContext{
 					SystemRegistriesConfPath:    filepath.Join("testdata", "cred-helper.conf"),
 					SystemRegistriesConfDirPath: filepath.Join("testdata", "IdoNotExist"),
 				},
-				expected: types.DockerAuthConfig{
-					Username: "foo",
-					Password: "bar",
-				},
-				testPreviousAPI: true,
+				expected: types.DockerAuthConfig{Username: "foo", Password: "bar"},
 			},
 			{
-				name:     "identity token credhelper from registries.conf",
-				hostname: "registry-b.com",
+				name: "identity token credhelper from registries.conf",
+				key:  "registry-b.com",
 				sys: &types.SystemContext{
 					SystemRegistriesConfPath:    filepath.Join("testdata", "cred-helper.conf"),
 					SystemRegistriesConfDirPath: filepath.Join("testdata", "IdoNotExist"),
 				},
-				expected: types.DockerAuthConfig{
-					IdentityToken: "fizzbuzz",
-				},
-				testPreviousAPI: true,
+				expected: types.DockerAuthConfig{IdentityToken: "fizzbuzz"},
 			},
 			{
 				name:     "match ref image",
-				hostname: "example.org",
-				ref:      "example.org/repo/image:latest",
+				key:      "example.org/repo/image",
 				path:     filepath.Join("testdata", "refpath.json"),
-				expected: types.DockerAuthConfig{
-					Username: "example",
-					Password: "org",
-				},
-				testPreviousAPI: false,
+				expected: types.DockerAuthConfig{Username: "example", Password: "org"},
 			},
 			{
 				name:     "match ref repo",
-				hostname: "example.org",
-				ref:      "example.org/repo",
+				key:      "example.org/repo",
 				path:     filepath.Join("testdata", "refpath.json"),
-				expected: types.DockerAuthConfig{
-					Username: "example",
-					Password: "org",
-				},
-				testPreviousAPI: false,
+				expected: types.DockerAuthConfig{Username: "example", Password: "org"},
 			},
 			{
 				name:     "match ref host",
-				hostname: "example.org",
-				ref:      "example.org/image:latest",
+				key:      "example.org/image",
 				path:     filepath.Join("testdata", "refpath.json"),
-				expected: types.DockerAuthConfig{
-					Username: "local",
-					Password: "host",
-				},
-				testPreviousAPI: false,
+				expected: types.DockerAuthConfig{Username: "local", Password: "host"},
+			},
+			// Test matching of docker.io/[library/] explicitly, to make sure the docker.io
+			// normalization behavior doesn’t affect the semantics.
+			{
+				name:     "docker.io library repo match",
+				key:      "docker.io/library/busybox",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{Username: "library", Password: "busybox"},
+			},
+			{
+				name:     "docker.io library namespace match",
+				key:      "docker.io/library/notbusybox",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{Username: "library", Password: "other"},
+			},
+			{ // This tests that the docker.io/vendor key in auth file is not normalized to docker.io/library/vendor
+				name:     "docker.io vendor repo match",
+				key:      "docker.io/vendor/product",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{Username: "first", Password: "level"},
+			},
+			{ // This tests that the docker.io/vendor key in the query is not normalized to docker.io/library/vendor.
+				name:     "docker.io vendor namespace match",
+				key:      "docker.io/vendor",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{Username: "first", Password: "level"},
+			},
+			{
+				name:     "docker.io host-only match",
+				key:      "docker.io/other-vendor/other-product",
+				path:     filepath.Join("testdata", "refpath.json"),
+				expected: types.DockerAuthConfig{Username: "top", Password: "level"},
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
@@ -343,28 +318,18 @@ func TestGetAuth(t *testing.T) {
 					sys = tc.sys
 				}
 
-				var ref reference.Named
-				if tc.ref != "" {
-					ref, err = reference.ParseNamed(tc.ref)
-					assert.NoError(t, err)
-				}
-
-				auth, err := getCredentialsWithHomeDir(sys, ref, tc.hostname, tmpHomeDir)
-				assert.Equal(t, tc.expectedError, err)
+				auth, err := getCredentialsWithHomeDir(sys, tc.key, tmpHomeDir)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expected, auth)
 
-				// Test for the previous APIs.
-				if tc.testPreviousAPI {
-					username, password, err := getAuthenticationWithHomeDir(sys, tc.hostname, tmpHomeDir)
-					if tc.expected.IdentityToken != "" {
-						assert.Equal(t, "", username)
-						assert.Equal(t, "", password)
-						assert.Error(t, err)
-					} else {
-						assert.Equal(t, tc.expected.Username, username)
-						assert.Equal(t, tc.expected.Password, password)
-						assert.Equal(t, tc.expectedError, err)
-					}
+				// Verify the previous API also returns data consistent with the current one.
+				username, password, err := getAuthenticationWithHomeDir(sys, tc.key, tmpHomeDir)
+				if tc.expected.IdentityToken != "" {
+					assert.Error(t, err)
+				} else {
+					require.NoError(t, err)
+					assert.Equal(t, tc.expected.Username, username)
+					assert.Equal(t, tc.expected.Password, password)
 				}
 
 				require.NoError(t, os.RemoveAll(configPath))
@@ -393,10 +358,9 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name          string
-		hostname      string
-		expected      types.DockerAuthConfig
-		expectedError error
+		name     string
+		hostname string
+		expected types.DockerAuthConfig
 	}{
 		{
 			name:     "ignore schema and path",
@@ -420,13 +384,13 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			auth, err := getCredentialsWithHomeDir(nil, nil, tc.hostname, tmpDir)
-			assert.Equal(t, tc.expectedError, err)
+			auth, err := getCredentialsWithHomeDir(nil, tc.hostname, tmpDir)
+			require.NoError(t, err)
 			assert.Equal(t, tc.expected, auth)
 
 			// Testing for previous APIs
 			username, password, err := getAuthenticationWithHomeDir(nil, tc.hostname, tmpDir)
-			assert.Equal(t, tc.expectedError, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.expected.Username, username)
 			assert.Equal(t, tc.expected.Password, password)
 		})
@@ -474,7 +438,7 @@ func TestGetAuthPreferNewConfig(t *testing.T) {
 		}
 	}
 
-	auth, err := getCredentialsWithHomeDir(nil, nil, "docker.io", tmpDir)
+	auth, err := getCredentialsWithHomeDir(nil, "docker.io", tmpDir)
 	assert.NoError(t, err)
 	assert.Equal(t, "docker", auth.Username)
 	assert.Equal(t, "io", auth.Password)
@@ -519,7 +483,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	configPath := filepath.Join(configDir, "auth.json")
 
 	// no config file present
-	auth, err := getCredentialsWithHomeDir(nil, nil, "index.docker.io", tmpHomeDir)
+	auth, err := getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err != nil {
 		t.Fatalf("got unexpected error: %#+v", err)
 	}
@@ -528,7 +492,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if err := ioutil.WriteFile(configPath, []byte("Json rocks! Unless it doesn't."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
-	auth, err = getCredentialsWithHomeDir(nil, nil, "index.docker.io", tmpHomeDir)
+	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err == nil {
 		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}
@@ -539,7 +503,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	// remove the invalid config file
 	os.RemoveAll(configPath)
 	// no config file present
-	auth, err = getCredentialsWithHomeDir(nil, nil, "index.docker.io", tmpHomeDir)
+	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err != nil {
 		t.Fatalf("got unexpected error: %#+v", err)
 	}
@@ -549,7 +513,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if err := ioutil.WriteFile(configPath, []byte("I'm certainly not a json string."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
-	auth, err = getCredentialsWithHomeDir(nil, nil, "index.docker.io", tmpHomeDir)
+	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
 	if err == nil {
 		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
 	}
@@ -562,11 +526,9 @@ func TestGetAllCredentials(t *testing.T) {
 	// Create a temporary authentication file.
 	tmpFile, err := ioutil.TempFile("", "auth.json.")
 	require.NoError(t, err)
-	_, err = tmpFile.Write([]byte{'{', '}'})
-	require.NoError(t, err)
-	err = tmpFile.Close()
-	require.NoError(t, err)
 	authFilePath := tmpFile.Name()
+	defer tmpFile.Close()
+	defer os.Remove(authFilePath)
 	// override PATH for executing credHelper
 	path, err := os.Getwd()
 	require.NoError(t, err)
@@ -585,83 +547,102 @@ func TestGetAllCredentials(t *testing.T) {
 		SystemRegistriesConfDirPath: filepath.Join("testdata", "IdoNotExist"),
 	}
 
-	data := []struct {
-		server   string
-		username string
-		password string
-		noStore  bool
+	for _, data := range [][]struct {
+		writeKey    string
+		expectedKey string
+		username    string
+		password    string
 	}{
-		{
-			server:   "example.org",
-			username: "example-user",
-			password: "example-password",
+		{ // Basic operation, including a credential helper.
+			{
+				writeKey:    "example.org",
+				expectedKey: "example.org",
+				username:    "example-user",
+				password:    "example-password",
+			},
+			{
+				writeKey:    "quay.io",
+				expectedKey: "quay.io",
+				username:    "quay-user",
+				password:    "quay-password",
+			},
+			{
+				writeKey:    "localhost:5000",
+				expectedKey: "localhost:5000",
+				username:    "local-user",
+				password:    "local-password",
+			},
+			{
+				writeKey:    "",
+				expectedKey: "registry-a.com",
+				username:    "foo",
+				password:    "bar",
+			},
 		},
-		{
-			server:   "quay.io",
-			username: "quay-user",
-			password: "quay-password",
+		{ // docker.io normalization, both namespaced and not
+			{
+				writeKey:    "docker.io/vendor",
+				expectedKey: "docker.io/vendor",
+				username:    "u1",
+				password:    "p1",
+			},
+			{
+				writeKey:    "index.docker.io", // Ideally we would even use a HTTPS URL
+				expectedKey: "docker.io",
+				username:    "u2",
+				password:    "p2",
+			},
+			{
+				writeKey:    "",
+				expectedKey: "registry-a.com",
+				username:    "foo",
+				password:    "bar",
+			},
 		},
-		{
-			server:   "localhost:5000",
-			username: "local-user",
-			password: "local-password",
-		},
-		{
-			server:   "registry-a.com",
-			username: "foo",
-			password: "bar",
-			noStore:  true,
-		},
-	}
-
-	// Write the credentials to the authfile.
-	for _, d := range data {
-		if d.noStore {
-			continue
-		}
-		err := SetAuthentication(&sys, d.server, d.username, d.password)
+	} {
+		// Write the credentials to the authfile.
+		err := ioutil.WriteFile(authFilePath, []byte{'{', '}'}, 0700)
 		require.NoError(t, err)
+
+		for _, d := range data {
+			if d.writeKey == "" {
+				continue
+			}
+			err := SetAuthentication(&sys, d.writeKey, d.username, d.password)
+			require.NoError(t, err)
+		}
+
+		// Now ask for all credentials and make sure that map includes all
+		// servers and the correct credentials.
+		authConfigs, err := GetAllCredentials(&sys)
+		require.NoError(t, err)
+		require.Equal(t, len(data), len(authConfigs))
+
+		for _, d := range data {
+			conf, exists := authConfigs[d.expectedKey]
+			require.True(t, exists, "%v", d)
+			require.Equal(t, d.username, conf.Username, "%v", d)
+			require.Equal(t, d.password, conf.Password, "%v", d)
+		}
 	}
-
-	// Now ask for all credentials and make sure that map includes all
-	// servers and the correct credentials.
-	authConfigs, err := GetAllCredentials(&sys)
-	require.NoError(t, err)
-	require.Equal(t, len(data), len(authConfigs))
-
-	for _, d := range data {
-		conf, exists := authConfigs[d.server]
-		require.True(t, exists, "%v", d)
-		require.Equal(t, d.username, conf.Username, "%v", d)
-		require.Equal(t, d.password, conf.Password, "%v", d)
-	}
-
 }
 
-func TestAuthKeysForRef(t *testing.T) {
+func TestAuthKeysForKey(t *testing.T) {
 	for _, tc := range []struct {
-		name, ref string
-		expected  []string
+		name, input string
+		expected    []string
 	}{
 		{
-			name: "image without tag",
-			ref:  "quay.io/image",
+			name:  "a top-level repo",
+			input: "quay.io/image",
 			expected: []string{
 				"quay.io/image",
 				"quay.io",
 			},
 		},
 		{
-			name: "image with tag",
-			ref:  "quay.io/image:latest",
-			expected: []string{
-				"quay.io/image",
-				"quay.io",
-			},
-		},
-		{
-			name: "image single path tag",
-			ref:  "quay.io/user/image:latest",
+			name:  "a second-level repo",
+			input: "quay.io/user/image",
 			expected: []string{
 				"quay.io/user/image",
 				"quay.io/user",
@@ -669,8 +650,8 @@ func TestAuthKeysForRef(t *testing.T) {
 			},
 		},
 		{
-			name: "image with nested path",
-			ref:  "quay.io/a/b/c/d/image:latest",
+			name:  "a deeply-nested repo",
+			input: "quay.io/a/b/c/d/image",
 			expected: []string{
 				"quay.io/a/b/c/d/image",
 				"quay.io/a/b/c/d",
@@ -680,11 +661,26 @@ func TestAuthKeysForRef(t *testing.T) {
 				"quay.io",
 			},
 		},
+		{
+			name:  "docker.io library repo",
+			input: "docker.io/library/busybox",
+			expected: []string{
+				"docker.io/library/busybox",
+				"docker.io/library",
+				"docker.io",
+			},
+		},
+		{
+			name:  "docker.io non-library repo",
+			input: "docker.io/vendor/busybox",
+			expected: []string{
+				"docker.io/vendor/busybox",
+				"docker.io/vendor",
+				"docker.io",
+			},
+		},
 	} {
-		ref, err := reference.ParseNamed(tc.ref)
-		require.NoError(t, err, tc.name)
-
-		result := authKeysForRef(ref)
+		result := authKeysForKey(tc.input)
 		require.Equal(t, tc.expected, result, tc.name)
 	}
 }
@@ -694,66 +690,24 @@ func TestSetCredentials(t *testing.T) {
 		usernamePrefix = "username-"
 		passwordPrefix = "password-"
 	)
-	getAuth := func(sys *types.SystemContext, input string) types.DockerAuthConfig {
-		ref, err := reference.ParseNamed(input)
-		require.NoError(t, err)
-		auth, err := GetCredentialsForRef(sys, ref)
-		require.NoError(t, err)
-		return auth
-	}
 
-	for _, tc := range []struct {
-		input  []string
-		assert func(*types.SystemContext, dockerConfigFile)
-	}{
+	for _, tc := range [][]string{
+		{"quay.io"},
+		{"quay.io/a/b/c/d/image"},
 		{
-			input: []string{"quay.io"},
-			assert: func(sys *types.SystemContext, auth dockerConfigFile) {
-				assert.Len(t, auth.AuthConfigs, 1)
-				assert.NotEmpty(t, auth.AuthConfigs["quay.io"].Auth)
-			},
+			"quay.io/a/b/c",
+			"quay.io/a/b",
+			"quay.io/a",
+			"quay.io",
+			"my-registry.local",
+			"my-registry.local",
 		},
 		{
-			input: []string{"quay.io/a/b/c/d/image"},
-			assert: func(sys *types.SystemContext, auth dockerConfigFile) {
-				assert.Len(t, auth.AuthConfigs, 1)
-				assert.NotEmpty(t, auth.AuthConfigs["quay.io/a/b/c/d/image"].Auth)
-
-				ta := getAuth(sys, "quay.io/a/b/c/d/image")
-				assert.Equal(t, usernamePrefix+"0", ta.Username)
-				assert.Equal(t, passwordPrefix+"0", ta.Password)
-			},
-		},
-		{
-			input: []string{
-				"quay.io/a/b/c",
-				"quay.io/a/b",
-				"quay.io/a",
-				"quay.io",
-				"my-registry.local",
-				"my-registry.local",
-			},
-			assert: func(sys *types.SystemContext, auth dockerConfigFile) {
-				assert.Len(t, auth.AuthConfigs, 5)
-				assert.NotEmpty(t, auth.AuthConfigs["quay.io/a/b/c"].Auth)
-				assert.NotEmpty(t, auth.AuthConfigs["quay.io/a/b"].Auth)
-				assert.NotEmpty(t, auth.AuthConfigs["quay.io/a"].Auth)
-				assert.NotEmpty(t, auth.AuthConfigs["quay.io"].Auth)
-				assert.NotEmpty(t, auth.AuthConfigs["my-registry.local"].Auth)
-
-				ta0 := getAuth(sys, "quay.io/a/b/c")
-				assert.Equal(t, usernamePrefix+"0", ta0.Username)
-				assert.Equal(t, passwordPrefix+"0", ta0.Password)
-
-				ta1 := getAuth(sys, "quay.io/a/b")
-				assert.Equal(t, usernamePrefix+"1", ta1.Username)
-				assert.Equal(t, passwordPrefix+"1", ta1.Password)
-
-				ta2 := getAuth(sys, "quay.io/a")
-				assert.Equal(t, usernamePrefix+"2", ta2.Username)
-				assert.Equal(t, passwordPrefix+"2", ta2.Password)
-
-			},
+			"docker.io",
+			"docker.io/vendor/product",
+			"docker.io/vendor",
+			"docker.io/library/busybox",
+			"docker.io/library",
 		},
 	} {
 		tmpFile, err := ioutil.TempFile("", "auth.json.set")
@@ -764,7 +718,8 @@ func TestSetCredentials(t *testing.T) {
 		require.NoError(t, err)
 		sys := &types.SystemContext{AuthFilePath: tmpFile.Name()}
 
-		for i, input := range tc.input {
+		writtenCredentials := map[string]int{}
+		for i, input := range tc {
 			_, err := SetCredentials(
 				sys,
 				input,
@@ -772,12 +727,38 @@ func TestSetCredentials(t *testing.T) {
 				passwordPrefix+fmt.Sprint(i),
 			)
 			assert.NoError(t, err)
+			writtenCredentials[input] = i // Possibly overwriting a previous entry
 		}
 
+		// Read the resulting file and verify it contains the expected keys
 		auth, err := readJSONFile(tmpFile.Name(), false)
 		require.NoError(t, err)
+		assert.Len(t, auth.AuthConfigs, len(writtenCredentials))
+		// auth.AuthConfigs and writtenCredentials are both maps, i.e. their keys are unique;
+		// so A \subset B && len(A) == len(B) implies A == B
+		for key := range writtenCredentials {
+			assert.NotEmpty(t, auth.AuthConfigs[key].Auth)
+		}
 
-		tc.assert(sys, auth)
+		// Verify that the configuration is interpreted as expected
+		for key, i := range writtenCredentials {
+			expected := types.DockerAuthConfig{
+				Username: usernamePrefix + fmt.Sprint(i),
+				Password: passwordPrefix + fmt.Sprint(i),
+			}
+			auth, err := GetCredentials(sys, key)
+			require.NoError(t, err)
+			assert.Equal(t, expected, auth)
+			ref, err := reference.ParseNamed(key)
+			// Full-registry keys and docker.io/top-level-namespace can't be read by GetCredentialsForRef;
+			// We have already tested that above, so ignore that; only verify that the two
+			// return consistent results if both are possible.
+			if err == nil {
+				auth, err := GetCredentialsForRef(sys, ref)
+				require.NoError(t, err)
+				assert.Equal(t, expected, auth, ref.String())
+			}
+		}
 	}
 }
 
@@ -878,24 +859,32 @@ func TestRemoveAuthentication(t *testing.T) {
 }
 
 func TestValidateKey(t *testing.T) {
+	// Invalid keys
+	for _, key := range []string{
+		"https://my-registry.local",
+		"host/foo:tag",
+		"host/foo@digest",
+		"localhost:5000/repo:tag",
+		"localhost:5000/repo@digest",
+	} {
+		_, err := validateKey(key)
+		assert.Error(t, err, key)
+	}
+
+	// Valid keys
 	for _, tc := range []struct {
 		key          string
-		shouldError  bool
 		isNamespaced bool
 	}{
-		{"my-registry.local", false, false},
-		{"https://my-registry.local", true, false},
-		{"my-registry.local/path", false, true},
-		{"quay.io/a/b/c/d", false, true},
+		{"my-registry.local", false},
+		{"my-registry.local/path", true},
+		{"quay.io/a/b/c/d", true},
+		{"localhost:5000", false},
+		{"localhost:5000/repo", true},
 	} {
-
 		isNamespaced, err := validateKey(tc.key)
-		if tc.shouldError {
-			assert.Error(t, err)
-		} else {
-			assert.NoError(t, err)
-		}
-		assert.Equal(t, tc.isNamespaced, isNamespaced)
+		require.NoError(t, err, tc.key)
+		assert.Equal(t, tc.isNamespaced, isNamespaced, tc.key)
 	}
 }
 
@@ -910,11 +899,11 @@ func TestSetGetCredentials(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	for _, tc := range []struct {
-		name         string
-		set          string
-		get          string
-		useLegacyAPI bool
-		shouldAuth   bool
+		name            string
+		set             string
+		get             string
+		useLegacyFormat bool
+		shouldAuth      bool
 	}{
 		{
 			name:       "Should match namespace",
@@ -941,11 +930,11 @@ func TestSetGetCredentials(t *testing.T) {
 			shouldAuth: true,
 		},
 		{
-			name:         "Should match legacy registry entry (legacy API)",
-			set:          "https://quay.io/v1/",
-			get:          "quay.io",
-			shouldAuth:   true,
-			useLegacyAPI: true,
+			name:            "Should match legacy registry entry (legacy API)",
+			set:             "https://quay.io/v1/",
+			get:             "quay.io",
+			shouldAuth:      true,
+			useLegacyFormat: true,
 		},
 	} {
 
@@ -955,7 +944,7 @@ func TestSetGetCredentials(t *testing.T) {
 		defer os.RemoveAll(tmpFile.Name())
 
 		sys := &types.SystemContext{}
-		if tc.useLegacyAPI {
+		if tc.useLegacyFormat {
 			sys.LegacyFormatAuthFilePath = tmpFile.Name()
 			_, err = tmpFile.WriteString(fmt.Sprintf(
 				`{"%s":{"auth":"dXNlcm5hbWU6cGFzc3dvcmQ="}}`, tc.set,
@@ -969,16 +958,8 @@ func TestSetGetCredentials(t *testing.T) {
 		require.NoError(t, err)
 
 		// Try to authenticate against them
-		var auth types.DockerAuthConfig
-		if !tc.useLegacyAPI {
-			ref, err := reference.ParseNamed(tc.get)
-			require.NoError(t, err)
-			auth, err = getCredentialsWithHomeDir(sys, ref, reference.Domain(ref), tmpDir)
-			require.NoError(t, err)
-		} else {
-			auth, err = getCredentialsWithHomeDir(sys, nil, tc.get, tmpDir)
-			require.NoError(t, err)
-		}
+		auth, err := getCredentialsWithHomeDir(sys, tc.get, tmpDir)
+		require.NoError(t, err)
 
 		if tc.shouldAuth {
 			assert.Equal(t, username, auth.Username, tc.name)
