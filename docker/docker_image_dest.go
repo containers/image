@@ -464,6 +464,19 @@ func (d *dockerImageDestination) PutManifest(ctx context.Context, m []byte, inst
 		}
 		return err
 	}
+	// A HTTP server may not be a registry at all, and just return 200 OK to everything
+	// (in particular that can fairly easily happen after tearing down a website and
+	// replacing it with a global 302 redirect to a new website, completely ignoring the
+	// path in the request); in that case we could “succeed” uploading a whole image.
+	// There aren’t that many obvious ways to detect that, except that the docker/distribution
+	// client has, since https://github.com/distribution/distribution/commit/cb6f0023500c3d2afb8c9f3ee4a0097526192156
+	// in 2016, required the manifest PUT to return a Docker-Content-Digest value.
+	// We don’t need the value, and concievably the server could use some future digest
+	// algorithm we don’t recognize, so don’t even try to parse it; just checking for
+	// the header presence is enough to rule out non-registry websites.
+	if v := res.Header.Values("Docker-Content-Digest"); len(v) == 0 {
+		return fmt.Errorf("server didn't return a Docker-Content-Digest header, it probably isn’t a container registry")
+	}
 	return nil
 }
 
