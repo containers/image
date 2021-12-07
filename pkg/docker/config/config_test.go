@@ -547,6 +547,14 @@ func TestGetAllCredentials(t *testing.T) {
 		SystemRegistriesConfDirPath: filepath.Join("testdata", "IdoNotExist"),
 	}
 
+	// Make sure that we can handle no-creds-found errors.
+	os.Setenv("DOCKER_CONFIG", filepath.Join(path, "testdata"))
+	authConfigs, err := GetAllCredentials(nil)
+	require.NoError(t, err)
+	require.Len(t, authConfigs, 1)
+	require.Equal(t, authConfigs["registry-no-creds.com"], types.DockerAuthConfig{})
+	os.Unsetenv("DOCKER_CONFIG")
+
 	for _, data := range [][]struct {
 		writeKey    string
 		expectedKey string
