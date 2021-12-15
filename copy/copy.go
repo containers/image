@@ -1073,18 +1073,15 @@ func (c *copier) newProgressPool() *mpb.Progress {
 	return mpb.New(mpb.WithWidth(40), mpb.WithOutput(c.progressOutput))
 }
 
-// customPartialBlobCounter provides a decorator function for the partial blobs retrieval progress bar
-func customPartialBlobCounter(wcc ...decor.WC) decor.Decorator {
-	producer := func(s decor.Statistics) string {
-		if s.Total == 0 {
-			pairFmt := "%.1f / %.1f (skipped: %.1f)"
-			return fmt.Sprintf(pairFmt, decor.SizeB1024(s.Current), decor.SizeB1024(s.Total), decor.SizeB1024(s.Refill))
-		}
-		pairFmt := "%.1f / %.1f (skipped: %.1f = %.2f%%)"
-		percentage := 100.0 * float64(s.Refill) / float64(s.Total)
-		return fmt.Sprintf(pairFmt, decor.SizeB1024(s.Current), decor.SizeB1024(s.Total), decor.SizeB1024(s.Refill), percentage)
+// customPartialBlobDecorFunc implements mpb.DecorFunc for the partial blobs retrieval progress bar
+func customPartialBlobDecorFunc(s decor.Statistics) string {
+	if s.Total == 0 {
+		pairFmt := "%.1f / %.1f (skipped: %.1f)"
+		return fmt.Sprintf(pairFmt, decor.SizeB1024(s.Current), decor.SizeB1024(s.Total), decor.SizeB1024(s.Refill))
 	}
-	return decor.Any(producer, wcc...)
+	pairFmt := "%.1f / %.1f (skipped: %.1f = %.2f%%)"
+	percentage := 100.0 * float64(s.Refill) / float64(s.Total)
+	return fmt.Sprintf(pairFmt, decor.SizeB1024(s.Current), decor.SizeB1024(s.Total), decor.SizeB1024(s.Refill), percentage)
 }
 
 // createProgressBar creates a mpb.Bar in pool.  Note that if the copier's reportWriter
@@ -1118,7 +1115,7 @@ func (c *copier) createProgressBar(pool *mpb.Progress, partial bool, info types.
 					decor.OnComplete(decor.Name(prefix), onComplete),
 				),
 				mpb.AppendDecorators(
-					customPartialBlobCounter(),
+					decor.Any(customPartialBlobDecorFunc),
 				),
 			)
 		} else {
