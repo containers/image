@@ -1106,7 +1106,6 @@ func (c *copier) createProgressBar(pool *mpb.Progress, partial bool, info types.
 	// Use a normal progress bar when we know the size (i.e., size > 0).
 	// Otherwise, use a spinner to indicate that something's happening.
 	var bar *mpb.Bar
-	sstyle := mpb.SpinnerStyle(".", "..", "...", "....", "").PositionLeft()
 	if info.Size > 0 {
 		if partial {
 			bar = pool.AddBar(info.Size,
@@ -1130,8 +1129,8 @@ func (c *copier) createProgressBar(pool *mpb.Progress, partial bool, info types.
 			)
 		}
 	} else {
-		bar = pool.Add(0,
-			sstyle.Build(),
+		bar = pool.New(0,
+			mpb.SpinnerStyle(".", "..", "...", "....", "").PositionLeft(),
 			mpb.BarFillerClearOnComplete(),
 			mpb.PrependDecorators(
 				decor.OnComplete(decor.Name(prefix), onComplete),
