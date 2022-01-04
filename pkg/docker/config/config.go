@@ -285,7 +285,7 @@ func getCredentialsWithHomeDir(sys *types.SystemContext, key, homeDir string) (t
 				return types.DockerAuthConfig{}, "", err
 			}
 
-			if (authConfig.Username != "" && authConfig.Password != "") || authConfig.IdentityToken != "" {
+			if authConfig != (types.DockerAuthConfig{}) {
 				return authConfig, path.path, nil
 			}
 		}
