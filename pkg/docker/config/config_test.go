@@ -551,8 +551,7 @@ func TestGetAllCredentials(t *testing.T) {
 	os.Setenv("DOCKER_CONFIG", filepath.Join(path, "testdata"))
 	authConfigs, err := GetAllCredentials(nil)
 	require.NoError(t, err)
-	require.Len(t, authConfigs, 1)
-	require.Equal(t, authConfigs["registry-no-creds.com"], types.DockerAuthConfig{})
+	require.Empty(t, authConfigs)
 	os.Unsetenv("DOCKER_CONFIG")
 
 	for _, data := range [][]struct {
