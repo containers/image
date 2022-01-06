@@ -1,217 +1,151 @@
-package sifimage
+package sif
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
-	"time"
 
 	"github.com/containers/image/v5/internal/tmpdir"
 	"github.com/containers/image/v5/types"
-	"github.com/klauspost/pgzip"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
-
 	imgspecs "github.com/opencontainers/image-spec/specs-go"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
+	"github.com/sylabs/sif/v2/pkg/sif"
 )
 
 type sifImageSource struct {
-	ref        sifReference
-	sifimg     loadedSifImage
-	workdir    string
-	diffID     digest.Digest
-	diffSize   int64
-	blobID     digest.Digest
-	blobSize   int64
-	blobTime   time.Time
-	blobType   string
-	blobFile   string
-	config     []byte
-	configID   digest.Digest
-	configSize int64
-	manifest   []byte
+	ref          sifReference
+	workDir      string
+	layerDigest  digest.Digest
+	layerSize    int64
+	layerFile    string
+	config       []byte
+	configDigest digest.Digest
+	manifest     []byte
 }
 
-func (s *sifImageSource) getLayerInfo(tarpath string) error {
-	ftar, err := os.Open(tarpath)
+// getBlobInfo returns the digest,  and size of the provided file.
+func getBlobInfo(path string) (digest.Digest, int64, error) {
+	f, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("error opening %q for reading: %v", tarpath, err)
+		return "", -1, fmt.Errorf("opening %q for reading: %w", path, err)
 	}
-	defer ftar.Close()
+	defer f.Close()
 
-	diffDigester := digest.Canonical.Digester()
-	s.diffSize, err = io.Copy(diffDigester.Hash(), ftar)
+	// TODO: Instead of writing the tar file to disk, and reading
+	// it here again, stream the tar file to a pipe and
+	// compute the digest while writing it to disk.
+	logrus.Debugf("Computing a digest of the SIF conversion output...")
+	digester := digest.Canonical.Digester()
+	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
+	size, err := io.Copy(digester.Hash(), f)
 	if err != nil {
-		return fmt.Errorf("error reading %q: %v", tarpath, err)
+		return "", -1, fmt.Errorf("reading %q: %w", path, err)
 	}
-	s.diffID = diffDigester.Digest()
+	digest := digester.Digest()
+	logrus.Debugf("... finished computing the digest of the SIF conversion output")
 
-	return nil
-}
-func (s *sifImageSource) createBlob(tarpath string) error {
-	s.blobFile = fmt.Sprintf("%s.%s", tarpath, "gz")
-	fgz, err := os.Create(s.blobFile)
-	if err != nil {
-		return errors.Wrapf(err, "creating file for compressed blob")
-	}
-	defer fgz.Close()
-	fileinfo, err := fgz.Stat()
-	if err != nil {
-		return fmt.Errorf("error reading modtime of %q: %v", s.blobFile, err)
-	}
-	s.blobTime = fileinfo.ModTime()
-
-	ftar, err := os.Open(tarpath)
-	if err != nil {
-		return fmt.Errorf("error opening %q for reading: %v", tarpath, err)
-	}
-	defer ftar.Close()
-
-	writer := pgzip.NewWriter(fgz)
-	defer writer.Close()
-	_, err = io.Copy(writer, ftar)
-	if err != nil {
-		return fmt.Errorf("error compressing %q: %v", tarpath, err)
-	}
-
-	return nil
-}
-
-func (s *sifImageSource) getBlobInfo() error {
-	fgz, err := os.Open(s.blobFile)
-	if err != nil {
-		return fmt.Errorf("error opening %q for reading: %v", s.blobFile, err)
-	}
-	defer fgz.Close()
-
-	blobDigester := digest.Canonical.Digester()
-	s.blobSize, err = io.Copy(blobDigester.Hash(), fgz)
-	if err != nil {
-		return fmt.Errorf("error reading %q: %v", s.blobFile, err)
-	}
-	s.blobID = blobDigester.Digest()
-
-	return nil
+	return digest, size, nil
 }
 
 // newImageSource returns an ImageSource for reading from an existing directory.
 // newImageSource extracts SIF objects and saves them in a temp directory.
 func newImageSource(ctx context.Context, sys *types.SystemContext, ref sifReference) (types.ImageSource, error) {
-	var imgSrc sifImageSource
-
-	sifimg, err := loadSIFImage(ref.resolvedFile)
+	sifImg, err := sif.LoadContainerFromPath(ref.file, sif.OptLoadWithFlag(os.O_RDONLY))
 	if err != nil {
-		return nil, errors.Wrap(err, "loading SIF file")
+		return nil, fmt.Errorf("loading SIF file: %w", err)
 	}
+	defer func() {
+		_ = sifImg.UnloadContainer()
+	}()
 
-	workdir, err := ioutil.TempDir(tmpdir.TemporaryDirectoryForBigFiles(sys), "sif")
+	workDir, err := ioutil.TempDir(tmpdir.TemporaryDirectoryForBigFiles(sys), "sif")
 	if err != nil {
-		return nil, errors.Wrapf(err, "creating temp directory")
+		return nil, fmt.Errorf("creating temp directory: %w", err)
 	}
+	succeeded := false
+	defer func() {
+		if !succeeded {
+			os.RemoveAll(workDir)
+		}
+	}()
 
-	tarpath, err := sifimg.SquashFSToTarLayer(workdir)
+	layerPath, commandLine, err := convertSIFToElements(ctx, sifImg, workDir)
 	if err != nil {
-		return nil, errors.Wrapf(err, "converting rootfs from SquashFS to Tarball")
+		return nil, fmt.Errorf("converting rootfs from SquashFS to Tarball: %w", err)
 	}
 
-	// generate layer info
-	err = imgSrc.getLayerInfo(tarpath)
+	layerDigest, layerSize, err := getBlobInfo(layerPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "gathering layer diff information")
+		return nil, fmt.Errorf("gathering blob information: %w", err)
 	}
 
-	// prepare compressed blob
-	err = imgSrc.createBlob(tarpath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "creating blob file")
-	}
-
-	// generate blob info
-	err = imgSrc.getBlobInfo()
-	if err != nil {
-		return nil, errors.Wrapf(err, "gathering blob information")
-	}
-
-	// populate the rootfs section of the config
-	rootfs := imgspecv1.RootFS{
-		Type:    "layers",
-		DiffIDs: []digest.Digest{imgSrc.diffID},
-	}
-	created := imgSrc.blobTime
-	history := []imgspecv1.History{
-		{
-			Created:   &created,
-			CreatedBy: fmt.Sprintf("/bin/sh -c #(nop) ADD file:%s in %c", imgSrc.diffID.Hex(), os.PathSeparator),
-			Comment:   "imported from SIF, uuid: " + sifimg.GetSIFID(),
+	created := sifImg.ModifiedAt()
+	config := imgspecv1.Image{
+		Created:      &created,
+		Architecture: sifImg.PrimaryArch(),
+		OS:           "linux",
+		Config: imgspecv1.ImageConfig{
+			Cmd: commandLine,
 		},
-		{
-			Created:    &created,
-			CreatedBy:  "/bin/sh -c #(nop) CMD [\"bash\"]",
-			EmptyLayer: true,
+		RootFS: imgspecv1.RootFS{
+			Type:    "layers",
+			DiffIDs: []digest.Digest{layerDigest},
+		},
+		History: []imgspecv1.History{
+			{
+				Created:   &created,
+				CreatedBy: fmt.Sprintf("/bin/sh -c #(nop) ADD file:%s in %c", layerDigest.Hex(), os.PathSeparator),
+				Comment:   "imported from SIF, uuid: " + sifImg.ID(),
+			},
+			{
+				Created:    &created,
+				CreatedBy:  "/bin/sh -c #(nop) CMD [\"bash\"]",
+				EmptyLayer: true,
+			},
 		},
 	}
-
-	// build an OCI image config
-	var config imgspecv1.Image
-	config.Created = &created
-	config.Architecture = sifimg.GetSIFArch()
-	config.OS = "linux"
-	config.RootFS = rootfs
-	config.History = history
-	err = sifimg.GetConfig(&config)
-	if err != nil {
-		return nil, errors.Wrapf(err, "getting config elements from SIF")
-	}
-
-	// Encode and digest the image configuration blob.
 	configBytes, err := json.Marshal(&config)
 	if err != nil {
-		return nil, fmt.Errorf("error generating configuration blob for %q: %v", ref.resolvedFile, err)
+		return nil, fmt.Errorf("generating configuration blob for %q: %w", ref.resolvedFile, err)
 	}
-	configID := digest.Canonical.FromBytes(configBytes)
-	configSize := int64(len(configBytes))
+	configDigest := digest.Canonical.FromBytes(configBytes)
 
-	// Populate a manifest with the configuration blob and the SquashFS part as the single layer.
-	layerDescriptor := imgspecv1.Descriptor{
-		Digest:    imgSrc.blobID,
-		Size:      imgSrc.blobSize,
-		MediaType: imgspecv1.MediaTypeImageLayerGzip,
-	}
 	manifest := imgspecv1.Manifest{
-		Versioned: imgspecs.Versioned{
-			SchemaVersion: 2,
-		},
+		Versioned: imgspecs.Versioned{SchemaVersion: 2},
+		MediaType: imgspecv1.MediaTypeImageManifest,
 		Config: imgspecv1.Descriptor{
-			Digest:    configID,
-			Size:      configSize,
+			Digest:    configDigest,
+			Size:      int64(len(configBytes)),
 			MediaType: imgspecv1.MediaTypeImageConfig,
 		},
-		Layers: []imgspecv1.Descriptor{layerDescriptor},
+		Layers: []imgspecv1.Descriptor{{
+			Digest:    layerDigest,
+			Size:      layerSize,
+			MediaType: imgspecv1.MediaTypeImageLayer,
+		}},
 	}
 	manifestBytes, err := json.Marshal(&manifest)
 	if err != nil {
-		return nil, fmt.Errorf("error generating manifest for %q: %v", ref.resolvedFile, err)
+		return nil, fmt.Errorf("generating manifest for %q: %w", ref.resolvedFile, err)
 	}
 
+	succeeded = true
 	return &sifImageSource{
-		ref:        ref,
-		sifimg:     sifimg,
-		workdir:    workdir,
-		diffID:     imgSrc.diffID,
-		diffSize:   imgSrc.diffSize,
-		blobID:     imgSrc.blobID,
-		blobSize:   imgSrc.blobSize,
-		blobType:   layerDescriptor.MediaType,
-		blobFile:   imgSrc.blobFile,
-		config:     configBytes,
-		configID:   configID,
-		configSize: configSize,
-		manifest:   manifestBytes,
+		ref:          ref,
+		workDir:      workDir,
+		layerDigest:  layerDigest,
+		layerSize:    layerSize,
+		layerFile:    layerPath,
+		config:       configBytes,
+		configDigest: configDigest,
+		manifest:     manifestBytes,
 	}, nil
 }
 
@@ -222,31 +156,30 @@ func (s *sifImageSource) Reference() types.ImageReference {
 
 // Close removes resources associated with an initialized ImageSource, if any.
 func (s *sifImageSource) Close() error {
-	os.RemoveAll(s.workdir)
-	return s.sifimg.UnloadSIFImage()
+	return os.RemoveAll(s.workDir)
 }
 
 // HasThreadSafeGetBlob indicates whether GetBlob can be executed concurrently.
 func (s *sifImageSource) HasThreadSafeGetBlob() bool {
-	return false
+	return true
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 // The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
 // May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
 func (s *sifImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
-	// We should only be asked about things in the manifest.  Maybe the configuration blob.
-	if info.Digest == s.configID {
-		return ioutil.NopCloser(bytes.NewBuffer(s.config)), s.configSize, nil
-	}
-	if info.Digest == s.blobID {
-		reader, err := os.Open(s.blobFile)
+	switch info.Digest {
+	case s.configDigest:
+		return ioutil.NopCloser(bytes.NewBuffer(s.config)), int64(len(s.config)), nil
+	case s.layerDigest:
+		reader, err := os.Open(s.layerFile)
 		if err != nil {
-			return nil, -1, fmt.Errorf("error opening %q: %v", s.blobFile, err)
+			return nil, -1, fmt.Errorf("opening %q: %w", s.layerFile, err)
 		}
-		return reader, s.blobSize, nil
+		return reader, s.layerSize, nil
+	default:
+		return nil, -1, fmt.Errorf("no blob with digest %q found", info.Digest.String())
 	}
-	return nil, -1, fmt.Errorf("no blob with digest %q found", info.Digest.String())
 }
 
 // GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).
@@ -255,7 +188,7 @@ func (s *sifImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache
 // this never happens if the primary manifest is not a manifest list (e.g. if the source never returns manifest lists).
 func (s *sifImageSource) GetManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error) {
 	if instanceDigest != nil {
-		return nil, "", fmt.Errorf("manifest lists are not supported by the sif transport")
+		return nil, "", errors.New("manifest lists are not supported by the sif transport")
 	}
 	return s.manifest, imgspecv1.MediaTypeImageManifest, nil
 }
@@ -266,7 +199,7 @@ func (s *sifImageSource) GetManifest(ctx context.Context, instanceDigest *digest
 // (e.g. if the source never returns manifest lists).
 func (s *sifImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
 	if instanceDigest != nil {
-		return nil, fmt.Errorf("manifest lists are not supported by the sif transport")
+		return nil, errors.New("manifest lists are not supported by the sif transport")
 	}
 	return nil, nil
 }
