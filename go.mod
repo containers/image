@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/14rcole/gopopulate v0.0.0-20180821133914-b175b219e774 // indirect
 	github.com/BurntSushi/toml v0.4.1
-	github.com/containerd/containerd v1.5.8 // indirect
+	github.com/containerd/containerd v1.5.9 // indirect
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
 	github.com/containers/ocicrypt v1.1.2
 	github.com/containers/storage v1.37.0
@@ -26,7 +26,7 @@ require (
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mtrmac/gpgme v0.1.2
 	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/image-spec v1.0.2-0.20211123152302-43a7dee1ec31
+	github.com/opencontainers/image-spec v1.0.3-0.20211202193544-a5463b7f9c84
 	github.com/opencontainers/selinux v1.10.0
 	github.com/ostreedev/ostree-go v0.0.0-20190702140239-759a8c1ac913
 	github.com/pkg/errors v0.9.1
