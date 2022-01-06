@@ -25,7 +25,7 @@ import (
 
 type sifImageSource struct {
 	ref        sifReference
-	sifimg     SifImage
+	sifimg     loadedSifImage
 	workdir    string
 	diffID     digest.Digest
 	diffSize   int64
@@ -107,7 +107,7 @@ func (s *sifImageSource) getBlobInfo() error {
 func newImageSource(ctx context.Context, sys *types.SystemContext, ref sifReference) (types.ImageSource, error) {
 	var imgSrc sifImageSource
 
-	sifimg, err := LoadSIFImage(ref.resolvedFile)
+	sifimg, err := loadSIFImage(ref.resolvedFile)
 	if err != nil {
 		return nil, errors.Wrap(err, "loading SIF file")
 	}

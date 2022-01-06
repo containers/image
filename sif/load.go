@@ -20,7 +20,7 @@ import (
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-type SifImage struct {
+type loadedSifImage struct {
 	fimg      *sif.FileImage
 	rootfs    sif.Descriptor
 	deffile   *sif.Descriptor
@@ -32,7 +32,7 @@ type SifImage struct {
 	envlist   []string
 }
 
-func LoadSIFImage(path string) (image SifImage, err error) {
+func loadSIFImage(path string) (image loadedSifImage, err error) {
 	// open up the SIF file and get its header
 	image.fimg, err = sif.LoadContainerFromPath(path, sif.OptLoadWithFlag(os.O_RDONLY))
 	if err != nil {
@@ -42,7 +42,7 @@ func LoadSIFImage(path string) (image SifImage, err error) {
 	// check for a system partition and save it
 	image.rootfs, err = image.fimg.GetDescriptor(sif.WithPartitionType(sif.PartPrimSys))
 	if err != nil {
-		return SifImage{}, errors.Wrap(err, "looking up rootfs from SIF file")
+		return loadedSifImage{}, errors.Wrap(err, "looking up rootfs from SIF file")
 	}
 
 	// look for a definition file object
@@ -53,7 +53,7 @@ func LoadSIFImage(path string) (image SifImage, err error) {
 		image.defReader = resultDesc.GetReader()
 	}
 	if err = image.generateConfig(); err != nil {
-		return SifImage{}, err
+		return loadedSifImage{}, err
 	}
 
 	// look for an environment variable set object
@@ -67,7 +67,7 @@ func LoadSIFImage(path string) (image SifImage, err error) {
 	return image, nil
 }
 
-func (image *SifImage) parseEnvironment(scanner *bufio.Scanner) error {
+func (image *loadedSifImage) parseEnvironment(scanner *bufio.Scanner) error {
 	for scanner.Scan() {
 		s := strings.TrimSpace(scanner.Text())
 		if s == "" || strings.HasPrefix(s, "#") {
@@ -84,7 +84,7 @@ func (image *SifImage) parseEnvironment(scanner *bufio.Scanner) error {
 	return nil
 }
 
-func (image *SifImage) parseRunscript(scanner *bufio.Scanner) error {
+func (image *loadedSifImage) parseRunscript(scanner *bufio.Scanner) error {
 	for scanner.Scan() {
 		s := strings.TrimSpace(scanner.Text())
 		if strings.HasPrefix(s, "%") {
@@ -98,7 +98,7 @@ func (image *SifImage) parseRunscript(scanner *bufio.Scanner) error {
 	return nil
 }
 
-func (image *SifImage) generateRunscript() error {
+func (image *loadedSifImage) generateRunscript() error {
 	base := `#!/bin/bash
 `
 	image.runscript = bytes.NewBufferString(base)
@@ -117,7 +117,7 @@ func (image *SifImage) generateRunscript() error {
 	return nil
 }
 
-func (image *SifImage) generateConfig() error {
+func (image *loadedSifImage) generateConfig() error {
 	if image.deffile == nil {
 		image.cmdlist = append(image.cmdlist, "bash")
 		return nil
@@ -159,21 +159,21 @@ func (image *SifImage) generateConfig() error {
 	return nil
 }
 
-func (image SifImage) GetConfig(config *imgspecv1.Image) error {
+func (image loadedSifImage) GetConfig(config *imgspecv1.Image) error {
 	config.Config.Cmd = append(config.Config.Cmd, image.cmdlist...)
 	return nil
 }
 
-func (image SifImage) UnloadSIFImage() (err error) {
+func (image loadedSifImage) UnloadSIFImage() (err error) {
 	err = image.fimg.UnloadContainer()
 	return
 }
 
-func (image SifImage) GetSIFID() string {
+func (image loadedSifImage) GetSIFID() string {
 	return image.fimg.ID()
 }
 
-func (image SifImage) GetSIFArch() string {
+func (image loadedSifImage) GetSIFArch() string {
 	return image.fimg.PrimaryArch()
 }
 
@@ -198,7 +198,7 @@ unsquashfs -f ` + squashFilename + ` && tar --acls --xattrs -C ./squashfs-root -
 	return
 }
 
-func (image *SifImage) writeRunscript(tempdir string) (err error) {
+func (image *loadedSifImage) writeRunscript(tempdir string) (err error) {
 	if image.runscript == nil {
 		return nil
 	}
@@ -212,7 +212,7 @@ func (image *SifImage) writeRunscript(tempdir string) (err error) {
 	return nil
 }
 
-func (image SifImage) SquashFSToTarLayer(tempdir string) (tarpath string, err error) {
+func (image loadedSifImage) SquashFSToTarLayer(tempdir string) (tarpath string, err error) {
 	f, err := os.Create(filepath.Join(tempdir, squashFilename))
 	if err != nil {
 		return
