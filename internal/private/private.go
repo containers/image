@@ -21,7 +21,7 @@ type ImageDestination interface {
 	// Please note that TryReusingBlobWithOptions and PutBlobWithOptions
 	// *must* be used the together.  Mixing the two with non "WithOptions"
 	// functions is not supported.
-	PutBlobWithOptions(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, options PutBlobOptions) (types.BlobInfo, error)
+	PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options PutBlobOptions) (types.BlobInfo, error)
 
 	// TryReusingBlobWithOptions is a wrapper around TryReusingBlob.  If
 	// options.LayerIndex is set, the reused blob will be recoreded as
@@ -30,7 +30,7 @@ type ImageDestination interface {
 	// Please note that TryReusingBlobWithOptions and PutBlobWithOptions
 	// *must* be used the together.  Mixing the two with non "WithOptions"
 	// functions is not supported.
-	TryReusingBlobWithOptions(ctx context.Context, blobinfo types.BlobInfo, options TryReusingBlobOptions) (bool, types.BlobInfo, error)
+	TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options TryReusingBlobOptions) (bool, types.BlobInfo, error)
 }
 
 // PutBlobOptions are used in PutBlobWithOptions.
