@@ -649,7 +649,7 @@ func (s *storageImageDestination) tryReusingBlobAsPending(ctx context.Context, b
 		}
 	}
 
-	return s.tryReusingBlobLocked(ctx, blobinfo, options.Cache, options.CanSubstitute)
+	return s.tryReusingBlobLocked(ctx, blobinfo, options)
 }
 
 // TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
@@ -666,12 +666,15 @@ func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo t
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	return s.tryReusingBlobLocked(ctx, blobinfo, cache, canSubstitute)
+	return s.tryReusingBlobLocked(ctx, blobinfo, private.TryReusingBlobOptions{
+		Cache:         cache,
+		CanSubstitute: canSubstitute,
+	})
 }
 
 // tryReusingBlobLocked implements a core functionality of TryReusingBlob.
 // This must be called with a lock being held on storageImageDestination.
-func (s *storageImageDestination) tryReusingBlobLocked(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
+func (s *storageImageDestination) tryReusingBlobLocked(ctx context.Context, blobinfo types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
 	if blobinfo.Digest == "" {
 		return false, types.BlobInfo{}, errors.Errorf(`Can not check for a blob with unknown digest`)
 	}
@@ -720,9 +723,9 @@ func (s *storageImageDestination) tryReusingBlobLocked(ctx context.Context, blob
 
 	// Does the blob correspond to a known DiffID which we already have available?
 	// Because we must return the size, which is unknown for unavailable compressed blobs, the returned BlobInfo refers to the
-	// uncompressed layer, and that can happen only if canSubstitute, or if the incoming manifest already specifies the size.
-	if canSubstitute || blobinfo.Size != -1 {
-		if uncompressedDigest := cache.UncompressedDigest(blobinfo.Digest); uncompressedDigest != "" && uncompressedDigest != blobinfo.Digest {
+	// uncompressed layer, and that can happen only if options.CanSubstitute, or if the incoming manifest already specifies the size.
+	if options.CanSubstitute || blobinfo.Size != -1 {
+		if uncompressedDigest := options.Cache.UncompressedDigest(blobinfo.Digest); uncompressedDigest != "" && uncompressedDigest != blobinfo.Digest {
 			layers, err := s.imageRef.transport.store.LayersByUncompressedDigest(uncompressedDigest)
 			if err != nil && errors.Cause(err) != storage.ErrLayerUnknown {
 				return false, types.BlobInfo{}, errors.Wrapf(err, `looking for layers with digest %q`, uncompressedDigest)
@@ -732,8 +735,8 @@ func (s *storageImageDestination) tryReusingBlobLocked(ctx context.Context, blob
 					s.blobDiffIDs[blobinfo.Digest] = layers[0].UncompressedDigest
 					return true, blobinfo, nil
 				}
-				if !canSubstitute {
-					return false, types.BlobInfo{}, fmt.Errorf("Internal error: canSubstitute was expected to be true for blobInfo %v", blobinfo)
+				if !options.CanSubstitute {
+					return false, types.BlobInfo{}, fmt.Errorf("Internal error: options.CanSubstitute was expected to be true for blobInfo %v", blobinfo)
 				}
 				s.blobDiffIDs[uncompressedDigest] = layers[0].UncompressedDigest
 				return true, types.BlobInfo{
