@@ -635,11 +635,7 @@ func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context,
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 // May use and/or update cache.
 func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
-	// lock the entire method as it executes fairly quickly
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.tryReusingBlobLocked(ctx, blobinfo, private.TryReusingBlobOptions{
+	return s.TryReusingBlobWithOptions(ctx, blobinfo, private.TryReusingBlobOptions{
 		Cache:         cache,
 		CanSubstitute: canSubstitute,
 	})
