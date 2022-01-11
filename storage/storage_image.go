@@ -617,7 +617,7 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 // reflected in the manifest that will be written.
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context, blobinfo types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
-	reused, info, err := s.tryReusingBlobWithSrcRef(ctx, blobinfo, options.Cache, options.CanSubstitute, options.SrcRef)
+	reused, info, err := s.tryReusingBlobAsPending(ctx, blobinfo, options.Cache, options.CanSubstitute, options.SrcRef)
 	if err != nil || !reused || options.LayerIndex == nil {
 		return reused, info, err
 	}
@@ -625,9 +625,9 @@ func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context,
 	return reused, info, s.queueOrCommit(ctx, info, *options.LayerIndex, options.EmptyLayer)
 }
 
-// tryReusingBlobWithSrcRef is a wrapper around TryReusingBlob.
-// If ref is provided, this function first tries to get layer from Additional Layer Store.
-func (s *storageImageDestination) tryReusingBlobWithSrcRef(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool, ref reference.Named) (bool, types.BlobInfo, error) {
+// tryReusingBlobAsPending implements TryReusingBlobWithOptions, filling s.blobDiffIDs and other metadata.
+// The caller must arrange the blob to be eventually commited using s.commitLayer().
+func (s *storageImageDestination) tryReusingBlobAsPending(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool, ref reference.Named) (bool, types.BlobInfo, error) {
 	// lock the entire method as it executes fairly quickly
 	s.lock.Lock()
 	defer s.lock.Unlock()
