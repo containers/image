@@ -480,7 +480,7 @@ func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
-	return s.putBlobToPendingFile(ctx, stream, blobinfo, private.PutBlobOptions{
+	return s.PutBlobWithOptions(ctx, stream, blobinfo, private.PutBlobOptions{
 		Cache:    cache,
 		IsConfig: isConfig,
 	})
