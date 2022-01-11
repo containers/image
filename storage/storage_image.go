@@ -665,12 +665,6 @@ func (s *storageImageDestination) tryReusingBlobAsPending(ctx context.Context, b
 		}
 	}
 
-	return s.tryReusingBlobLocked(ctx, blobinfo, options)
-}
-
-// tryReusingBlobLocked implements a core functionality of TryReusingBlob.
-// This must be called with a lock being held on storageImageDestination.
-func (s *storageImageDestination) tryReusingBlobLocked(ctx context.Context, blobinfo types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
 	if blobinfo.Digest == "" {
 		return false, types.BlobInfo{}, errors.Errorf(`Can not check for a blob with unknown digest`)
 	}
