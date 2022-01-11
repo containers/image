@@ -617,7 +617,7 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 // reflected in the manifest that will be written.
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context, blobinfo types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
-	reused, info, err := s.tryReusingBlobAsPending(ctx, blobinfo, options.Cache, options.CanSubstitute, options.SrcRef)
+	reused, info, err := s.tryReusingBlobAsPending(ctx, blobinfo, options)
 	if err != nil || !reused || options.LayerIndex == nil {
 		return reused, info, err
 	}
@@ -627,14 +627,14 @@ func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context,
 
 // tryReusingBlobAsPending implements TryReusingBlobWithOptions, filling s.blobDiffIDs and other metadata.
 // The caller must arrange the blob to be eventually commited using s.commitLayer().
-func (s *storageImageDestination) tryReusingBlobAsPending(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool, ref reference.Named) (bool, types.BlobInfo, error) {
+func (s *storageImageDestination) tryReusingBlobAsPending(ctx context.Context, blobinfo types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
 	// lock the entire method as it executes fairly quickly
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if ref != nil {
+	if options.SrcRef != nil {
 		// Check if we have the layer in the underlying additional layer store.
-		aLayer, err := s.imageRef.transport.store.LookupAdditionalLayer(blobinfo.Digest, ref.String())
+		aLayer, err := s.imageRef.transport.store.LookupAdditionalLayer(blobinfo.Digest, options.SrcRef.String())
 		if err != nil && errors.Cause(err) != storage.ErrLayerUnknown {
 			return false, types.BlobInfo{}, errors.Wrapf(err, `looking for compressed layers with digest %q and labels`, blobinfo.Digest)
 		} else if err == nil {
@@ -649,7 +649,7 @@ func (s *storageImageDestination) tryReusingBlobAsPending(ctx context.Context, b
 		}
 	}
 
-	return s.tryReusingBlobLocked(ctx, blobinfo, cache, canSubstitute)
+	return s.tryReusingBlobLocked(ctx, blobinfo, options.Cache, options.CanSubstitute)
 }
 
 // TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
