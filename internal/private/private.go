@@ -18,11 +18,9 @@ type ImageSource interface {
 	BlobChunkAccessor
 }
 
-// ImageDestination is an internal extension to the types.ImageDestination
-// interface.
-type ImageDestination interface {
-	types.ImageDestination
-
+// ImageDestinationInternalOnly is the part of private.ImageDestination that is not
+// a part of types.ImageDestination.
+type ImageDestinationInternalOnly interface {
 	// SupportsPutBlobPartial returns true if PutBlobPartial is supported.
 	SupportsPutBlobPartial() bool
 
@@ -50,6 +48,13 @@ type ImageDestination interface {
 	// reflected in the manifest that will be written.
 	// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 	TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options TryReusingBlobOptions) (bool, types.BlobInfo, error)
+}
+
+// ImageDestination is an internal extension to the types.ImageDestination
+// interface.
+type ImageDestination interface {
+	types.ImageDestination
+	ImageDestinationInternalOnly
 }
 
 // PutBlobOptions are used in PutBlobWithOptions.
