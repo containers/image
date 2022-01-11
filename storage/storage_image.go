@@ -625,6 +625,26 @@ func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context,
 	return reused, info, s.queueOrCommit(ctx, info, *options.LayerIndex, options.EmptyLayer)
 }
 
+// TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
+// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
+// info.Digest must not be empty.
+// If canSubstitute, TryReusingBlob can use an equivalent equivalent of the desired blob; in that case the returned info may not match the input.
+// If the blob has been successfully reused, returns (true, info, nil); info must contain at least a digest and size, and may
+// include CompressionOperation and CompressionAlgorithm fields to indicate that a change to the compression type should be
+// reflected in the manifest that will be written.
+// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
+// May use and/or update cache.
+func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
+	// lock the entire method as it executes fairly quickly
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.tryReusingBlobLocked(ctx, blobinfo, private.TryReusingBlobOptions{
+		Cache:         cache,
+		CanSubstitute: canSubstitute,
+	})
+}
+
 // tryReusingBlobAsPending implements TryReusingBlobWithOptions, filling s.blobDiffIDs and other metadata.
 // The caller must arrange the blob to be eventually commited using s.commitLayer().
 func (s *storageImageDestination) tryReusingBlobAsPending(ctx context.Context, blobinfo types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
@@ -650,26 +670,6 @@ func (s *storageImageDestination) tryReusingBlobAsPending(ctx context.Context, b
 	}
 
 	return s.tryReusingBlobLocked(ctx, blobinfo, options)
-}
-
-// TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
-// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
-// info.Digest must not be empty.
-// If canSubstitute, TryReusingBlob can use an equivalent equivalent of the desired blob; in that case the returned info may not match the input.
-// If the blob has been successfully reused, returns (true, info, nil); info must contain at least a digest and size, and may
-// include CompressionOperation and CompressionAlgorithm fields to indicate that a change to the compression type should be
-// reflected in the manifest that will be written.
-// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
-// May use and/or update cache.
-func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
-	// lock the entire method as it executes fairly quickly
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.tryReusingBlobLocked(ctx, blobinfo, private.TryReusingBlobOptions{
-		Cache:         cache,
-		CanSubstitute: canSubstitute,
-	})
 }
 
 // tryReusingBlobLocked implements a core functionality of TryReusingBlob.
