@@ -459,7 +459,7 @@ func (s *storageImageDestination) HasThreadSafePutBlob() bool {
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, options private.PutBlobOptions) (types.BlobInfo, error) {
-	info, err := s.putBlobToPendingFile(ctx, stream, blobinfo, options.Cache, options.IsConfig)
+	info, err := s.putBlobToPendingFile(ctx, stream, blobinfo, options)
 	if err != nil {
 		return info, err
 	}
@@ -480,12 +480,15 @@ func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
-	return s.putBlobToPendingFile(ctx, stream, blobinfo, cache, isConfig)
+	return s.putBlobToPendingFile(ctx, stream, blobinfo, private.PutBlobOptions{
+		Cache:    cache,
+		IsConfig: isConfig,
+	})
 }
 
-// putBlobToPendingFile implements ImageDestination.PutBlob, storing stream into an on-disk file.
+// putBlobToPendingFile implements ImageDestination.PutBlobWithOptions, storing stream into an on-disk file.
 // The caller must arrange the blob to be eventually commited using s.commitLayer().
-func (s *storageImageDestination) putBlobToPendingFile(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
+func (s *storageImageDestination) putBlobToPendingFile(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, options private.PutBlobOptions) (types.BlobInfo, error) {
 	// Stores a layer or data blob in our temporary directory, checking that any information
 	// in the blobinfo matches the incoming data.
 	errorBlobInfo := types.BlobInfo{
@@ -540,7 +543,7 @@ func (s *storageImageDestination) putBlobToPendingFile(ctx context.Context, stre
 	s.lock.Unlock()
 	// This is safe because we have just computed diffID, and blobDigest was either computed
 	// by us, or validated by the caller (usually copy.digestingReader).
-	cache.RecordDigestUncompressedPair(blobDigest, diffID.Digest())
+	options.Cache.RecordDigestUncompressedPair(blobDigest, diffID.Digest())
 	return types.BlobInfo{
 		Digest:    blobDigest,
 		Size:      blobSize,
