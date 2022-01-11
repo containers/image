@@ -8,6 +8,7 @@ import (
 
 	"github.com/containers/image/v5/directory"
 	"github.com/containers/image/v5/docker"
+	"github.com/containers/image/v5/internal/imagedestination"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/types"
@@ -47,7 +48,7 @@ func TestCreateSignature(t *testing.T) {
 	require.NoError(t, err)
 	defer dirDest.Close()
 	c := &copier{
-		dest:         dirDest,
+		dest:         imagedestination.FromPublic(dirDest),
 		reportWriter: ioutil.Discard,
 	}
 	_, err = c.createSignature(manifestBlob, testKeyFingerprint, "")
@@ -61,7 +62,7 @@ func TestCreateSignature(t *testing.T) {
 	require.NoError(t, err)
 	defer dockerDest.Close()
 	c = &copier{
-		dest:         dockerDest,
+		dest:         imagedestination.FromPublic(dockerDest),
 		reportWriter: ioutil.Discard,
 	}
 
