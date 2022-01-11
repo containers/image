@@ -1238,10 +1238,10 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 			options := private.TryReusingBlobOptions{
 				Cache:         ic.c.blobInfoCache,
 				CanSubstitute: ic.canSubstituteBlobs,
-				SrcRef:        srcRef,
 				EmptyLayer:    emptyLayer,
+				LayerIndex:    &layerIndex,
+				SrcRef:        srcRef,
 			}
-			options.LayerIndex = &layerIndex
 			reused, blobInfo, err = dest.TryReusingBlobWithOptions(ctx, srcInfo, options)
 		} else {
 			reused, blobInfo, err = ic.c.dest.TryReusingBlob(ctx, srcInfo, ic.c.blobInfoCache, ic.canSubstituteBlobs)
