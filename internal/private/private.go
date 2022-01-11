@@ -64,6 +64,9 @@ type PutBlobOptions struct {
 
 	// The following fields are new to internal/private.  Users of internal/private MUST fill them in,
 	// but they also must expect that they will be ignored by types.ImageDestination transports.
+	// Transports, OTOH, MUST support these fields being zero-valued for types.ImageDestination callers
+	// if they use internal/imagedestination/impl.Compat;
+	// in that case, they will all be consistently zero-valued.
 
 	EmptyLayer bool // True if the blob is an "empty"/"throwaway" layer, and may not necessarily be physically represented.
 	LayerIndex *int // If the blob is a layer, a zero-based index of the layer within the image; nil otherwise.
@@ -78,6 +81,9 @@ type TryReusingBlobOptions struct {
 
 	// The following fields are new to internal/private.  Users of internal/private MUST fill them in,
 	// but they also must expect that they will be ignored by types.ImageDestination transports.
+	// Transports, OTOH, MUST support these fields being zero-valued for types.ImageDestination callers
+	// if they use internal/imagedestination/impl.Compat;
+	// in that case, they will all be consistently zero-valued.
 
 	EmptyLayer bool            // True if the blob is an "empty"/"throwaway" layer, and may not necessarily be physically represented.
 	LayerIndex *int            // If the blob is a layer, a zero-based index of the layer within the image; nil otherwise.
