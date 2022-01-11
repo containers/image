@@ -551,49 +551,6 @@ func (s *storageImageDestination) putBlobToPendingFile(ctx context.Context, stre
 	}, nil
 }
 
-// TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
-// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
-// info.Digest must not be empty.
-// If the blob has been successfully reused, returns (true, info, nil); info must contain at least a digest and size, and may
-// include CompressionOperation and CompressionAlgorithm fields to indicate that a change to the compression type should be
-// reflected in the manifest that will be written.
-// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
-func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context, blobinfo types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
-	reused, info, err := s.tryReusingBlobWithSrcRef(ctx, blobinfo, options.Cache, options.CanSubstitute, options.SrcRef)
-	if err != nil || !reused || options.LayerIndex == nil {
-		return reused, info, err
-	}
-
-	return reused, info, s.queueOrCommit(ctx, info, *options.LayerIndex, options.EmptyLayer)
-}
-
-// tryReusingBlobWithSrcRef is a wrapper around TryReusingBlob.
-// If ref is provided, this function first tries to get layer from Additional Layer Store.
-func (s *storageImageDestination) tryReusingBlobWithSrcRef(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool, ref reference.Named) (bool, types.BlobInfo, error) {
-	// lock the entire method as it executes fairly quickly
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if ref != nil {
-		// Check if we have the layer in the underlying additional layer store.
-		aLayer, err := s.imageRef.transport.store.LookupAdditionalLayer(blobinfo.Digest, ref.String())
-		if err != nil && errors.Cause(err) != storage.ErrLayerUnknown {
-			return false, types.BlobInfo{}, errors.Wrapf(err, `looking for compressed layers with digest %q and labels`, blobinfo.Digest)
-		} else if err == nil {
-			// Record the uncompressed value so that we can use it to calculate layer IDs.
-			s.blobDiffIDs[blobinfo.Digest] = aLayer.UncompressedDigest()
-			s.blobAdditionalLayer[blobinfo.Digest] = aLayer
-			return true, types.BlobInfo{
-				Digest:    blobinfo.Digest,
-				Size:      aLayer.CompressedSize(),
-				MediaType: blobinfo.MediaType,
-			}, nil
-		}
-	}
-
-	return s.tryReusingBlobLocked(ctx, blobinfo, cache, canSubstitute)
-}
-
 type zstdFetcher struct {
 	chunkAccessor private.BlobChunkAccessor
 	ctx           context.Context
@@ -650,6 +607,49 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	s.lock.Unlock()
 
 	return srcInfo, nil
+}
+
+// TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
+// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
+// info.Digest must not be empty.
+// If the blob has been successfully reused, returns (true, info, nil); info must contain at least a digest and size, and may
+// include CompressionOperation and CompressionAlgorithm fields to indicate that a change to the compression type should be
+// reflected in the manifest that will be written.
+// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
+func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context, blobinfo types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
+	reused, info, err := s.tryReusingBlobWithSrcRef(ctx, blobinfo, options.Cache, options.CanSubstitute, options.SrcRef)
+	if err != nil || !reused || options.LayerIndex == nil {
+		return reused, info, err
+	}
+
+	return reused, info, s.queueOrCommit(ctx, info, *options.LayerIndex, options.EmptyLayer)
+}
+
+// tryReusingBlobWithSrcRef is a wrapper around TryReusingBlob.
+// If ref is provided, this function first tries to get layer from Additional Layer Store.
+func (s *storageImageDestination) tryReusingBlobWithSrcRef(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool, ref reference.Named) (bool, types.BlobInfo, error) {
+	// lock the entire method as it executes fairly quickly
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if ref != nil {
+		// Check if we have the layer in the underlying additional layer store.
+		aLayer, err := s.imageRef.transport.store.LookupAdditionalLayer(blobinfo.Digest, ref.String())
+		if err != nil && errors.Cause(err) != storage.ErrLayerUnknown {
+			return false, types.BlobInfo{}, errors.Wrapf(err, `looking for compressed layers with digest %q and labels`, blobinfo.Digest)
+		} else if err == nil {
+			// Record the uncompressed value so that we can use it to calculate layer IDs.
+			s.blobDiffIDs[blobinfo.Digest] = aLayer.UncompressedDigest()
+			s.blobAdditionalLayer[blobinfo.Digest] = aLayer
+			return true, types.BlobInfo{
+				Digest:    blobinfo.Digest,
+				Size:      aLayer.CompressedSize(),
+				MediaType: blobinfo.MediaType,
+			}, nil
+		}
+	}
+
+	return s.tryReusingBlobLocked(ctx, blobinfo, cache, canSubstitute)
 }
 
 // TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
