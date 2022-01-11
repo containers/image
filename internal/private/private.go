@@ -34,28 +34,29 @@ type ImageDestination interface {
 
 // PutBlobOptions are used in PutBlobWithOptions.
 type PutBlobOptions struct {
-	// Cache to look up blob infos.
-	Cache types.BlobInfoCache
-	// Denotes whether the blob is a config or not.
-	IsConfig bool
-	// Indicates an empty layer.
-	EmptyLayer bool
-	// The corresponding index in the layer slice.
-	LayerIndex *int
+	Cache    types.BlobInfoCache // Cache to optionally update with the uploaded bloblook up blob infos.
+	IsConfig bool                // True if the blob is a config
+
+	// The following fields are new to internal/private.  Users of internal/private MUST fill them in,
+	// but they also must expect that they will be ignored by types.ImageDestination transports.
+
+	EmptyLayer bool // True if the blob is an "empty"/"throwaway" layer, and may not necessarily be physically represented.
+	LayerIndex *int // If the blob is a layer, a zero-based index of the layer within the image; nil otherwise.
 }
 
 // TryReusingBlobOptions are used in TryReusingBlobWithOptions.
 type TryReusingBlobOptions struct {
-	// Cache to look up blob infos.
-	Cache types.BlobInfoCache
-	// Use an equivalent of the desired blob.
+	Cache types.BlobInfoCache // Cache to use and/or update.
+	// If true, it is allowed to use an equivalent of the desired blob;
+	// in that case the returned info may not match the input.
 	CanSubstitute bool
-	// Indicates an empty layer.
-	EmptyLayer bool
-	// The corresponding index in the layer slice.
-	LayerIndex *int
-	// The reference of the image that contains the target blob.
-	SrcRef reference.Named
+
+	// The following fields are new to internal/private.  Users of internal/private MUST fill them in,
+	// but they also must expect that they will be ignored by types.ImageDestination transports.
+
+	EmptyLayer bool            // True if the blob is an "empty"/"throwaway" layer, and may not necessarily be physically represented.
+	LayerIndex *int            // If the blob is a layer, a zero-based index of the layer within the image; nil otherwise.
+	SrcRef     reference.Named // A reference to the source image that contains the input blob.
 }
 
 // ImageSourceChunk is a portion of a blob.
