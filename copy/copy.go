@@ -1235,14 +1235,13 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 		// Hence, we need to special case and cast.
 		dest, ok := ic.c.dest.(private.ImageDestination)
 		if ok {
-			options := private.TryReusingBlobOptions{
+			reused, blobInfo, err = dest.TryReusingBlobWithOptions(ctx, srcInfo, private.TryReusingBlobOptions{
 				Cache:         ic.c.blobInfoCache,
 				CanSubstitute: ic.canSubstituteBlobs,
 				EmptyLayer:    emptyLayer,
 				LayerIndex:    &layerIndex,
 				SrcRef:        srcRef,
-			}
-			reused, blobInfo, err = dest.TryReusingBlobWithOptions(ctx, srcInfo, options)
+			})
 		} else {
 			reused, blobInfo, err = ic.c.dest.TryReusingBlob(ctx, srcInfo, ic.c.blobInfoCache, ic.canSubstituteBlobs)
 		}
