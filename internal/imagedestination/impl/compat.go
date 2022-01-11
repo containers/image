@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
 )
@@ -40,7 +41,7 @@ func AddCompat(dest private.ImageDestinationInternalOnly) Compat {
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (c *Compat) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
 	return c.dest.PutBlobWithOptions(ctx, stream, inputInfo, private.PutBlobOptions{
-		Cache:    cache,
+		Cache:    blobinfocache.FromBlobInfoCache(cache),
 		IsConfig: isConfig,
 	})
 }
@@ -56,7 +57,7 @@ func (c *Compat) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.
 // May use and/or update cache.
 func (c *Compat) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
 	return c.dest.TryReusingBlobWithOptions(ctx, info, private.TryReusingBlobOptions{
-		Cache:         cache,
+		Cache:         blobinfocache.FromBlobInfoCache(cache),
 		CanSubstitute: canSubstitute,
 	})
 }

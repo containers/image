@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/types"
 )
 
@@ -38,7 +39,7 @@ type ImageDestinationInternalOnly interface {
 	// It is available only if SupportsPutBlobPartial().
 	// Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
 	// should fall back to PutBlobWithOptions.
-	PutBlobPartial(ctx context.Context, chunkAccessor BlobChunkAccessor, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error)
+	PutBlobPartial(ctx context.Context, chunkAccessor BlobChunkAccessor, srcInfo types.BlobInfo, cache blobinfocache.BlobInfoCache2) (types.BlobInfo, error)
 
 	// TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 	// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
@@ -59,8 +60,8 @@ type ImageDestination interface {
 
 // PutBlobOptions are used in PutBlobWithOptions.
 type PutBlobOptions struct {
-	Cache    types.BlobInfoCache // Cache to optionally update with the uploaded bloblook up blob infos.
-	IsConfig bool                // True if the blob is a config
+	Cache    blobinfocache.BlobInfoCache2 // Cache to optionally update with the uploaded bloblook up blob infos.
+	IsConfig bool                         // True if the blob is a config
 
 	// The following fields are new to internal/private.  Users of internal/private MUST fill them in,
 	// but they also must expect that they will be ignored by types.ImageDestination transports.
@@ -74,7 +75,7 @@ type PutBlobOptions struct {
 
 // TryReusingBlobOptions are used in TryReusingBlobWithOptions.
 type TryReusingBlobOptions struct {
-	Cache types.BlobInfoCache // Cache to use and/or update.
+	Cache blobinfocache.BlobInfoCache2 // Cache to use and/or update.
 	// If true, it is allowed to use an equivalent of the desired blob;
 	// in that case the returned info may not match the input.
 	CanSubstitute bool
