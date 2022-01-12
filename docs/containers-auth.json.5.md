@@ -11,7 +11,7 @@ on Windows and macOS, at `$HOME/.config/containers/auth.json`.
 
 When searching for the credential for a registry, the following files will be read in sequence until the valid credential is found:
 first reading the primary (read/write) file, or the explicit override using an option of the calling application.
-If credentials are not present, search in `${XDG\_CONFIG\_HOME}/containers/auth.json`, `$HOME/.docker/config.json`, `$HOME/.dockercfg`.
+If credentials are not present, search in `${XDG_CONFIG_HOME}/containers/auth.json` (usually `~/.config/containers/auth.json`), `$HOME/.docker/config.json`, `$HOME/.dockercfg`.
 
 Except the primary (read/write) file, other files are read-only, unless the user use an option of the calling application explicitly points at it as an override.
 
