@@ -1,7 +1,7 @@
 //go:build linux
 // +build linux
 
-package internal
+package sifimage
 
 import (
 	"bufio"

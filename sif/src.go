@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/containers/image/v5/internal/tmpdir"
-	"github.com/containers/image/v5/sif/internal"
 	"github.com/containers/image/v5/types"
 	"github.com/klauspost/pgzip"
 	"github.com/opencontainers/go-digest"
@@ -26,7 +25,7 @@ import (
 
 type sifImageSource struct {
 	ref        sifReference
-	sifimg     internal.SifImage
+	sifimg     SifImage
 	workdir    string
 	diffID     digest.Digest
 	diffSize   int64
@@ -108,7 +107,7 @@ func (s *sifImageSource) getBlobInfo() error {
 func newImageSource(ctx context.Context, sys *types.SystemContext, ref sifReference) (types.ImageSource, error) {
 	var imgSrc sifImageSource
 
-	sifimg, err := internal.LoadSIFImage(ref.resolvedFile)
+	sifimg, err := LoadSIFImage(ref.resolvedFile)
 	if err != nil {
 		return nil, errors.Wrap(err, "loading SIF file")
 	}
