@@ -15,7 +15,6 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/ghodss/yaml v1.0.0
-	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/imdario/mergo v0.3.12
@@ -31,7 +30,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
-	github.com/sylabs/sif/v2 v2.3.0
+	github.com/sylabs/sif/v2 v2.3.1
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbatts/tar-split v0.11.2
 	github.com/vbauerster/mpb/v7 v7.3.0
@@ -43,7 +42,4 @@ require (
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20211214234402-4825e8c3871d
 	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
-	golang.org/x/text v0.3.7 // indirect
-	google.golang.org/genproto v0.0.0-20211005153810-c76a74d43a8e // indirect
-	google.golang.org/grpc v1.41.0 // indirect
 )
