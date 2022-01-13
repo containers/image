@@ -16,7 +16,6 @@ require (
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/imdario/mergo v0.3.12
@@ -32,13 +31,13 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
+	github.com/sylabs/sif/v2 v2.3.0
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbatts/tar-split v0.11.2
 	github.com/vbauerster/mpb/v7 v7.3.0
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190809123943-df4f5c81cb3b // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.6
-	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
