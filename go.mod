@@ -33,13 +33,13 @@ require (
 	github.com/sylabs/sif/v2 v2.3.1
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbatts/tar-split v0.11.2
-	github.com/vbauerster/mpb/v7 v7.3.0
+	github.com/vbauerster/mpb/v7 v7.3.1
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190809123943-df4f5c81cb3b // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20211214234402-4825e8c3871d
+	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
 	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
 )
