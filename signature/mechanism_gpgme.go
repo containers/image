@@ -9,7 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/mtrmac/gpgme"
+	"github.com/proglottis/gpgme"
 )
 
 // A GPG/OpenPGP signing mechanism, implemented using gpgme.
