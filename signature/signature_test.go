@@ -226,7 +226,7 @@ func TestSign(t *testing.T) {
 	sig := newUntrustedSignature("digest!@#", "reference#@!")
 
 	// Successful signing
-	signature, err := sig.sign(mech, TestKeyFingerprint)
+	signature, err := sig.sign(mech, TestKeyFingerprint, "")
 	require.NoError(t, err)
 
 	verified, err := verifyAndExtractSignature(mech, signature, signatureAcceptanceRules{
@@ -255,11 +255,11 @@ func TestSign(t *testing.T) {
 	assert.Equal(t, sig.UntrustedDockerReference, verified.DockerReference)
 
 	// Error creating blob to sign
-	_, err = untrustedSignature{}.sign(mech, TestKeyFingerprint)
+	_, err = untrustedSignature{}.sign(mech, TestKeyFingerprint, "")
 	assert.Error(t, err)
 
 	// Error signing
-	_, err = sig.sign(mech, "this fingerprint doesn't exist")
+	_, err = sig.sign(mech, "this fingerprint doesn't exist", "")
 	assert.Error(t, err)
 }
 

@@ -50,7 +50,7 @@ func TestCreateSignature(t *testing.T) {
 		dest:         dirDest,
 		reportWriter: ioutil.Discard,
 	}
-	_, err = c.createSignature(manifestBlob, testKeyFingerprint)
+	_, err = c.createSignature(manifestBlob, testKeyFingerprint, "")
 	assert.Error(t, err)
 
 	// Set up a docker: reference
@@ -66,14 +66,14 @@ func TestCreateSignature(t *testing.T) {
 	}
 
 	// Signing with an unknown key fails
-	_, err = c.createSignature(manifestBlob, "this key does not exist")
+	_, err = c.createSignature(manifestBlob, "this key does not exist", "")
 	assert.Error(t, err)
 
 	// Success
 	mech, err = signature.NewGPGSigningMechanism()
 	require.NoError(t, err)
 	defer mech.Close()
-	sig, err := c.createSignature(manifestBlob, testKeyFingerprint)
+	sig, err := c.createSignature(manifestBlob, testKeyFingerprint, "")
 	require.NoError(t, err)
 	verified, err := signature.VerifyDockerManifestSignature(sig, manifestBlob, "docker.io/library/busybox:latest", mech, testKeyFingerprint)
 	require.NoError(t, err)
