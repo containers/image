@@ -142,7 +142,7 @@ func createTarFromSIFInputs(ctx context.Context, tarPath, squashFSPath string, i
 }
 
 // convertSIFToElements processes sifImage and creates/returns
-// the relevant elements for contructing an OCI-like image:
+// the relevant elements for constructing an OCI-like image:
 // - A path to a tar file containing a root filesystem,
 // - A command to run.
 // The returned tar file path is inside tempDir, which can be assumed to be empty
@@ -166,7 +166,7 @@ func convertSIFToElements(ctx context.Context, sifImage *sif.FileImage, tempDir 
 	// So, overall, this process requires at least 2 compressed copies (SIF and squashFSPath) and 2
 	// uncompressed copies (extractedRootPath and tarPath) of the data, all using up space at the same time.
 	// That's rather unsatisfactory, ideally we would be streaming the data directly from a squashfs parser
-	// reading from the SIF file to a tarball, for 1 compresed and 1 uncompressed copy.
+	// reading from the SIF file to a tarball, for 1 compressed and 1 uncompressed copy.
 	defer os.Remove(squashFSPath)
 	defer func() {
 		if !succeeded {
