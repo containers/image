@@ -2,11 +2,21 @@ package signature
 
 import (
 	"io/ioutil"
+	"os"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// Kill the running gpg-agent to drop unlocked keys. This allows for testing handling of invalid passphrases.
+func killGPGAgent(t *testing.T) {
+	cmd := exec.Command("gpgconf", "--kill", "gpg-agent")
+	cmd.Env = append(os.Environ(), "GNUPGHOME="+testGPGHomeDirectory)
+	err := cmd.Run()
+	assert.NoError(t, err)
+}
 
 func TestSignDockerManifest(t *testing.T) {
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
@@ -37,6 +47,57 @@ func TestSignDockerManifest(t *testing.T) {
 
 	// Error creating blob to sign
 	_, err = SignDockerManifest(manifest, "", mech, TestKeyFingerprint)
+	assert.Error(t, err)
+
+	// Error signing
+	_, err = SignDockerManifest(manifest, TestImageSignatureReference, mech, "this fingerprint doesn't exist")
+	assert.Error(t, err)
+}
+
+func TestSignDockerManifestWithPassphrase(t *testing.T) {
+	killGPGAgent(t)
+
+	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
+	require.NoError(t, err)
+	defer mech.Close()
+
+	if err := mech.SupportsSigning(); err != nil {
+		t.Skipf("Signing not supported: %v", err)
+	}
+
+	manifest, err := ioutil.ReadFile("fixtures/image.manifest.json")
+	require.NoError(t, err)
+
+	// Invalid passphrase
+	_, err = SignDockerManifestWithOptions(manifest, TestImageSignatureReference, mech, TestKeyFingerprintWithPassphrase, &SignOptions{Passphrase: TestPassphrase + "\n"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid passphrase")
+
+	// Wrong passphrase
+	_, err = SignDockerManifestWithOptions(manifest, TestImageSignatureReference, mech, TestKeyFingerprintWithPassphrase, &SignOptions{Passphrase: "wrong"})
+	require.Error(t, err)
+
+	// No passphrase
+	_, err = SignDockerManifestWithOptions(manifest, TestImageSignatureReference, mech, TestKeyFingerprintWithPassphrase, nil)
+	require.Error(t, err)
+
+	// Successful signing
+	signature, err := SignDockerManifestWithOptions(manifest, TestImageSignatureReference, mech, TestKeyFingerprintWithPassphrase, &SignOptions{Passphrase: TestPassphrase})
+	require.NoError(t, err)
+
+	verified, err := VerifyDockerManifestSignature(signature, manifest, TestImageSignatureReference, mech, TestKeyFingerprintWithPassphrase)
+	assert.NoError(t, err)
+	assert.Equal(t, TestImageSignatureReference, verified.DockerReference)
+	assert.Equal(t, TestImageManifestDigest, verified.DockerManifestDigest)
+
+	// Error computing Docker manifest
+	invalidManifest, err := ioutil.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
+	require.NoError(t, err)
+	_, err = SignDockerManifest(invalidManifest, TestImageSignatureReference, mech, TestKeyFingerprintWithPassphrase)
+	assert.Error(t, err)
+
+	// Error creating blob to sign
+	_, err = SignDockerManifest(manifest, "", mech, TestKeyFingerprintWithPassphrase)
 	assert.Error(t, err)
 
 	// Error signing

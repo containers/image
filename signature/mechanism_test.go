@@ -150,7 +150,7 @@ func TestNewEphemeralGPGSigningMechanism(t *testing.T) {
 	mech, keyIdentities, err = NewEphemeralGPGSigningMechanism(bytes.Join([][]byte{keyBlob, keyBlob}, nil))
 	require.NoError(t, err)
 	defer mech.Close()
-	assert.Equal(t, []string{TestKeyFingerprint, TestKeyFingerprint}, keyIdentities)
+	assert.Equal(t, []string{TestKeyFingerprint, TestKeyFingerprintWithPassphrase, TestKeyFingerprint, TestKeyFingerprintWithPassphrase}, keyIdentities)
 
 	// Invalid input: This is, sadly, accepted anyway by GPG, just returns no keys.
 	// For openpgpSigningMechanism we can detect this and fail.
