@@ -4,10 +4,8 @@ import (
 	"context"
 
 	"github.com/containers/image/v5/docker/reference"
-	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
 )
 
 // UnparsedImage implements types.UnparsedImage .
@@ -48,17 +46,18 @@ func (i *UnparsedImage) Manifest(ctx context.Context) ([]byte, string, error) {
 			return nil, "", err
 		}
 
-		// ImageSource.GetManifest does not do digest verification, but we do;
-		// this immediately protects also any user of types.Image.
-		if digest, haveDigest := i.expectedManifestDigest(); haveDigest {
-			matches, err := manifest.MatchesDigest(m, digest)
-			if err != nil {
-				return nil, "", errors.Wrap(err, "computing manifest digest")
-			}
-			if !matches {
-				return nil, "", errors.Errorf("Manifest does not match provided manifest digest %s", digest)
-			}
-		}
+		//EDIT by adinerman, remove digest check to support digest check by agent (where image layers aren't compressed)
+		//// ImageSource.GetManifest does not do digest verification, but we do;
+		//// this immediately protects also any user of types.Image.
+		//if digest, haveDigest := i.expectedManifestDigest(); haveDigest {
+		//	matches, err := manifest.MatchesDigest(m, digest)
+		//	if err != nil {
+		//		return nil, "", errors.Wrap(err, "computing manifest digest")
+		//	}
+		//	if !matches {
+		//		return nil, "", errors.Errorf("Manifest does not match provided manifest digest %s", digest)
+		//	}
+		//}
 
 		i.cachedManifest = m
 		i.cachedManifestMIMEType = mt
