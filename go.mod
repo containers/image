@@ -6,7 +6,7 @@ require (
 	github.com/14rcole/gopopulate v0.0.0-20180821133914-b175b219e774 // indirect
 	github.com/BurntSushi/toml v1.0.0
 	github.com/containerd/containerd v1.5.9 // indirect
-	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
+	github.com/containers/libtrust v0.0.0-20200511145503-9c3a6c22cd9a
 	github.com/containers/ocicrypt v1.1.2
 	github.com/containers/storage v1.38.2
 	github.com/docker/distribution v2.7.1+incompatible
