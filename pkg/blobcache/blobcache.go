@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/containers/buildah/docker"
 	"github.com/containers/common/libimage"
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/image"
@@ -333,7 +332,7 @@ func (s *blobCacheSource) LayerInfosForCopy(ctx context.Context, instanceDigest 
 							info.MediaType = v1.MediaTypeImageLayer
 							info.CompressionAlgorithm = nil
 						}
-					case docker.V2S2MediaTypeUncompressedLayer, manifest.DockerV2Schema2LayerMediaType:
+					case manifest.DockerV2SchemaLayerMediaTypeUncompressed, manifest.DockerV2Schema2LayerMediaType:
 						switch s.reference.compress {
 						case types.Compress:
 							info.MediaType = manifest.DockerV2Schema2LayerMediaType
