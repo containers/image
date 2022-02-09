@@ -7,8 +7,9 @@ import (
 
 // bicTransportScope returns a BICTransportScope appropriate for ref.
 func bicTransportScope(ref dockerReference) types.BICTransportScope {
-	// Blobs can be reused across the whole registry.
-	return types.BICTransportScope{Opaque: reference.Domain(ref.ref)}
+	// Blobs can be reused across multiple registries
+	// therefore bucket all blobs in same scope
+	return types.BICTransportScope{Opaque: "all"}
 }
 
 // newBICLocationReference returns a BICLocationReference appropriate for ref.

@@ -336,6 +336,7 @@ func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.
 	bic := blobinfocache.FromBlobInfoCache(cache)
 	candidates := bic.CandidateLocations2(d.ref.Transport(), bicTransportScope(d.ref), info.Digest, canSubstitute)
 	for _, candidate := range candidates {
+		crossRegistry := false
 		candidateRepo, err := parseBICLocationReference(candidate.Location)
 		if err != nil {
 			logrus.Debugf("Error parsing BlobInfoCache location reference: %s", err)
@@ -350,7 +351,8 @@ func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.
 		// Sanity checks:
 		if reference.Domain(candidateRepo) != reference.Domain(d.ref.ref) {
 			logrus.Debugf("... Internal error: domain %s does not match destination %s", reference.Domain(candidateRepo), reference.Domain(d.ref.ref))
-			continue
+			// most likely this blob is on a different registry
+			crossRegistry = true
 		}
 		if candidateRepo.Name() == d.ref.ref.Name() && candidate.Digest == info.Digest {
 			logrus.Debug("... Already tried the primary destination")
@@ -361,6 +363,13 @@ func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.
 
 		// Checking candidateRepo, and mounting from it, requires an
 		// expanded token scope.
+
+		if crossRegistry {
+			// found following blob in different registry but we need to check blob presence against the registry
+			// where we are planning to push, hence switch back the candidate repo to the one where we are planning to push
+			candidateRepo, _ = parseBICLocationReference(types.BICLocationReference{Opaque: string(d.ref.ref.Name())})
+		}
+
 		extraScope := &authScope{
 			remoteName: reference.Path(candidateRepo),
 			actions:    "pull",
