@@ -18,9 +18,9 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/image"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/internal/tmpdir"
-	internalTypes "github.com/containers/image/v5/internal/types"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache/none"
 	"github.com/containers/image/v5/types"
@@ -453,7 +453,7 @@ func (s *storageImageDestination) computeNextBlobCacheFile() string {
 // Please not that TryReusingBlobWithOptions and PutBlobWithOptions *must* be
 // used the together.  Mixing the two with non "WithOptions" functions is not
 // supported.
-func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, options internalTypes.PutBlobOptions) (types.BlobInfo, error) {
+func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, options private.PutBlobOptions) (types.BlobInfo, error) {
 	info, err := s.PutBlob(ctx, stream, blobinfo, options.Cache, options.IsConfig)
 	if err != nil {
 		return info, err
@@ -549,7 +549,7 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 // Please not that TryReusingBlobWithOptions and PutBlobWithOptions *must* be
 // used the together.  Mixing the two with the non "WithOptions" functions
 // is not supported.
-func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context, blobinfo types.BlobInfo, options internalTypes.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
+func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context, blobinfo types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
 	reused, info, err := s.tryReusingBlobWithSrcRef(ctx, blobinfo, options.Cache, options.CanSubstitute, options.SrcRef)
 	if err != nil || !reused || options.LayerIndex == nil {
 		return reused, info, err
@@ -586,23 +586,23 @@ func (s *storageImageDestination) tryReusingBlobWithSrcRef(ctx context.Context, 
 }
 
 type zstdFetcher struct {
-	stream   internalTypes.ImageSourceSeekable
+	stream   private.ImageSourceSeekable
 	ctx      context.Context
 	blobInfo types.BlobInfo
 }
 
 // GetBlobAt converts from chunked.GetBlobAt to ImageSourceSeekable.GetBlobAt.
 func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
-	var newChunks []internalTypes.ImageSourceChunk
+	var newChunks []private.ImageSourceChunk
 	for _, v := range chunks {
-		i := internalTypes.ImageSourceChunk{
+		i := private.ImageSourceChunk{
 			Offset: v.Offset,
 			Length: v.Length,
 		}
 		newChunks = append(newChunks, i)
 	}
 	rc, errs, err := f.stream.GetBlobAt(f.ctx, f.blobInfo, newChunks)
-	if _, ok := err.(internalTypes.BadPartialRequestError); ok {
+	if _, ok := err.(private.BadPartialRequestError); ok {
 		err = chunked.ErrBadRequest{}
 	}
 	return rc, errs, err
@@ -611,7 +611,7 @@ func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.Read
 
 // PutBlobPartial attempts to create a blob using the data that is already present at the destination storage.  stream is accessed
 // in a non-sequential way to retrieve the missing chunks.
-func (s *storageImageDestination) PutBlobPartial(ctx context.Context, stream internalTypes.ImageSourceSeekable, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error) {
+func (s *storageImageDestination) PutBlobPartial(ctx context.Context, stream private.ImageSourceSeekable, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error) {
 	fetcher := zstdFetcher{
 		stream:   stream,
 		ctx:      ctx,

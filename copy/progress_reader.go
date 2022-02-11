@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	internalTypes "github.com/containers/image/v5/internal/types"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
 )
 
@@ -84,14 +84,14 @@ func (r *progressReader) Read(p []byte) (int, error) {
 // are received.
 type imageSourceSeekableProxy struct {
 	// source is the seekable input to read from.
-	source internalTypes.ImageSourceSeekable
+	source private.ImageSourceSeekable
 	// progress is the chan where the total number of bytes read so far are reported.
 	progress chan int64
 }
 
 // GetBlobAt reads from the ImageSourceSeekable and report how many bytes were received
 // to the progress chan.
-func (s imageSourceSeekableProxy) GetBlobAt(ctx context.Context, bInfo types.BlobInfo, chunks []internalTypes.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
+func (s imageSourceSeekableProxy) GetBlobAt(ctx context.Context, bInfo types.BlobInfo, chunks []private.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
 	rc, errs, err := s.source.GetBlobAt(ctx, bInfo, chunks)
 	if err == nil {
 		total := int64(0)

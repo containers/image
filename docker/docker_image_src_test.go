@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	internalTypes "github.com/containers/image/v5/internal/types"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -130,7 +130,7 @@ func TestSplitHTTP200ResponseToPartial(t *testing.T) {
 	defer body.Close()
 	streams := make(chan io.ReadCloser)
 	errs := make(chan error)
-	chunks := []internalTypes.ImageSourceChunk{
+	chunks := []private.ImageSourceChunk{
 		{Offset: 1, Length: 2},
 		{Offset: 4, Length: 1},
 	}
@@ -150,7 +150,7 @@ func TestHandle206Response(t *testing.T) {
 	defer body.Close()
 	streams := make(chan io.ReadCloser)
 	errs := make(chan error)
-	chunks := []internalTypes.ImageSourceChunk{
+	chunks := []private.ImageSourceChunk{
 		{Offset: 1, Length: 2},
 		{Offset: 4, Length: 1},
 	}
@@ -171,7 +171,7 @@ func TestHandle206Response(t *testing.T) {
 	defer body.Close()
 	streams = make(chan io.ReadCloser)
 	errs = make(chan error)
-	chunks = []internalTypes.ImageSourceChunk{{Offset: 100, Length: 5}}
+	chunks = []private.ImageSourceChunk{{Offset: 100, Length: 5}}
 	mediaType = "text/plain"
 	params = map[string]string{}
 	go handle206Response(streams, errs, body, chunks, mediaType, params)
