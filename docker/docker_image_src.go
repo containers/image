@@ -16,7 +16,7 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/iolimits"
-	internalTypes "github.com/containers/image/v5/internal/types"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/types"
@@ -288,7 +288,7 @@ func (s *dockerImageSource) HasThreadSafeGetBlob() bool {
 }
 
 // splitHTTP200ResponseToPartial splits a 200 response in multiple streams as specified by the chunks
-func splitHTTP200ResponseToPartial(streams chan io.ReadCloser, errs chan error, body io.ReadCloser, chunks []internalTypes.ImageSourceChunk) {
+func splitHTTP200ResponseToPartial(streams chan io.ReadCloser, errs chan error, body io.ReadCloser, chunks []private.ImageSourceChunk) {
 	defer close(streams)
 	defer close(errs)
 	currentOffset := uint64(0)
@@ -322,7 +322,7 @@ func splitHTTP200ResponseToPartial(streams chan io.ReadCloser, errs chan error, 
 }
 
 // handle206Response reads a 206 response and send each part as a separate ReadCloser to the streams chan.
-func handle206Response(streams chan io.ReadCloser, errs chan error, body io.ReadCloser, chunks []internalTypes.ImageSourceChunk, mediaType string, params map[string]string) {
+func handle206Response(streams chan io.ReadCloser, errs chan error, body io.ReadCloser, chunks []private.ImageSourceChunk, mediaType string, params map[string]string) {
 	defer close(streams)
 	defer close(errs)
 	if !strings.HasPrefix(mediaType, "multipart/") {
@@ -359,7 +359,7 @@ func handle206Response(streams chan io.ReadCloser, errs chan error, body io.Read
 
 // GetBlobAt returns a stream for the specified blob.
 // The specified chunks must be not overlapping and sorted by their offset.
-func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []internalTypes.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
+func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []private.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
 	headers := make(map[string][]string)
 
 	var rangeVals []string
@@ -401,7 +401,7 @@ func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, 
 		return streams, errs, nil
 	case http.StatusBadRequest:
 		res.Body.Close()
-		return nil, nil, internalTypes.BadPartialRequestError{Status: res.Status}
+		return nil, nil, private.BadPartialRequestError{Status: res.Status}
 	default:
 		err := httpResponseToError(res, "Error fetching partial blob")
 		if err == nil {

@@ -16,7 +16,7 @@ import (
 	"github.com/containers/image/v5/image"
 	internalblobinfocache "github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/pkg/platform"
-	internalTypes "github.com/containers/image/v5/internal/types"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache"
 	"github.com/containers/image/v5/pkg/compression"
@@ -1233,9 +1233,9 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 		// Note: the storage destination optimizes the committing of
 		// layers which requires passing the index of the layer.
 		// Hence, we need to special case and cast.
-		dest, ok := ic.c.dest.(internalTypes.ImageDestinationWithOptions)
+		dest, ok := ic.c.dest.(private.ImageDestination)
 		if ok {
-			options := internalTypes.TryReusingBlobOptions{
+			options := private.TryReusingBlobOptions{
 				Cache:         ic.c.blobInfoCache,
 				CanSubstitute: ic.canSubstituteBlobs,
 				SrcRef:        srcRef,
@@ -1286,8 +1286,8 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 	// of the source file are not known yet and must be fetched.
 	// Attempt a partial only when the source allows to retrieve a blob partially and
 	// the destination has support for it.
-	imgSource, okSource := ic.c.rawSource.(internalTypes.ImageSourceSeekable)
-	imgDest, okDest := ic.c.dest.(internalTypes.ImageDestinationPartial)
+	imgSource, okSource := ic.c.rawSource.(private.ImageSourceSeekable)
+	imgDest, okDest := ic.c.dest.(private.ImageDestinationPartial)
 	if okSource && okDest && !diffIDIsNeeded {
 		if reused, blobInfo := func() (bool, types.BlobInfo) { // A scope for defer
 			bar := ic.c.createProgressBar(pool, true, srcInfo, "blob", "done")
@@ -1662,9 +1662,9 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 	// Note: the storage destination optimizes the committing of layers
 	// which requires passing the index of the layer.  Hence, we need to
 	// special case and cast.
-	dest, ok := c.dest.(internalTypes.ImageDestinationWithOptions)
+	dest, ok := c.dest.(private.ImageDestination)
 	if ok {
-		options := internalTypes.PutBlobOptions{
+		options := private.PutBlobOptions{
 			Cache:      c.blobInfoCache,
 			IsConfig:   isConfig,
 			EmptyLayer: emptyLayer,
