@@ -19,6 +19,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var _ private.ImageSourceSeekable = (*dockerImageSource)(nil)
+
 func TestDockerImageSourceReference(t *testing.T) {
 	manifestPathRegex := regexp.MustCompile("^/v2/.*/manifests/latest$")
 
