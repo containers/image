@@ -8,9 +8,9 @@ import (
 	"github.com/containers/image/v5/types"
 )
 
-// ImageDestinationWithOptions is an internal extension to the ImageDestination
+// ImageDestination is an internal extension to the types.ImageDestination
 // interface.
-type ImageDestinationWithOptions interface {
+type ImageDestination interface {
 	types.ImageDestination
 
 	// PutBlobWithOptions is a wrapper around PutBlob.  If

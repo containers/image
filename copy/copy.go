@@ -1233,7 +1233,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 		// Note: the storage destination optimizes the committing of
 		// layers which requires passing the index of the layer.
 		// Hence, we need to special case and cast.
-		dest, ok := ic.c.dest.(private.ImageDestinationWithOptions)
+		dest, ok := ic.c.dest.(private.ImageDestination)
 		if ok {
 			options := private.TryReusingBlobOptions{
 				Cache:         ic.c.blobInfoCache,
@@ -1662,7 +1662,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 	// Note: the storage destination optimizes the committing of layers
 	// which requires passing the index of the layer.  Hence, we need to
 	// special case and cast.
-	dest, ok := c.dest.(private.ImageDestinationWithOptions)
+	dest, ok := c.dest.(private.ImageDestination)
 	if ok {
 		options := private.PutBlobOptions{
 			Cache:      c.blobInfoCache,
