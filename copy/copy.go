@@ -1273,8 +1273,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 	// Attempt a partial only when the source allows to retrieve a blob partially and
 	// the destination has support for it.
 	imgSource, okSource := ic.c.rawSource.(private.ImageSourceSeekable)
-	imgDest, okDest := ic.c.dest.(private.ImageDestinationPartial)
-	if okSource && okDest && !diffIDIsNeeded {
+	if okSource && ic.c.dest.SupportsPutBlobPartial() && !diffIDIsNeeded {
 		if reused, blobInfo := func() (bool, types.BlobInfo) { // A scope for defer
 			bar := ic.c.createProgressBar(pool, true, srcInfo, "blob", "done")
 			hideProgressBar := true
@@ -1304,7 +1303,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 			}()
 
 			bar.SetTotal(srcInfo.Size, false)
-			info, err := imgDest.PutBlobPartial(ctx, proxy, srcInfo, ic.c.blobInfoCache)
+			info, err := ic.c.dest.PutBlobPartial(ctx, proxy, srcInfo, ic.c.blobInfoCache)
 			if err == nil {
 				bar.SetRefill(srcInfo.Size - bar.Current())
 				bar.SetCurrent(srcInfo.Size)

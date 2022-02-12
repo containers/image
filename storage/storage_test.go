@@ -37,13 +37,12 @@ import (
 )
 
 var (
-	topwd                                 = ""
-	_     types.ImageDestination          = &storageImageDestination{}
-	_     private.ImageDestination        = (*storageImageDestination)(nil)
-	_     private.ImageDestinationPartial = (*storageImageDestination)(nil)
-	_     types.ImageSource               = &storageImageSource{}
-	_     types.ImageReference            = &storageReference{}
-	_     types.ImageTransport            = &storageTransport{}
+	topwd                          = ""
+	_     types.ImageDestination   = &storageImageDestination{}
+	_     private.ImageDestination = (*storageImageDestination)(nil)
+	_     types.ImageSource        = &storageImageSource{}
+	_     types.ImageReference     = &storageReference{}
+	_     types.ImageTransport     = &storageTransport{}
 )
 
 const (

@@ -2,6 +2,7 @@ package imagedestination
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/containers/image/v5/internal/private"
@@ -31,6 +32,11 @@ type wrapped struct {
 	types.ImageDestination
 }
 
+// SupportsPutBlobPartial returns true if PutBlobPartial is supported.
+func (w *wrapped) SupportsPutBlobPartial() bool {
+	return false
+}
+
 // PutBlobWithOptions writes contents of stream and returns data representing the result.
 // inputInfo.Digest can be optionally provided if known; if provided, and stream is read to the end without error, the digest MUST match the stream contents.
 // inputInfo.Size is the expected length of stream, if known.
@@ -40,6 +46,15 @@ type wrapped struct {
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (w *wrapped) PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options private.PutBlobOptions) (types.BlobInfo, error) {
 	return w.PutBlob(ctx, stream, inputInfo, options.Cache, options.IsConfig)
+}
+
+// PutBlobPartial attempts to create a blob using the data that is already present
+// at the destination. stream is accessed in a non-sequential way to retrieve the missing chunks.
+// It is available only if SupportsPutBlobPartial().
+// Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
+// should fall back to PutBlobWithOptions.
+func (w *wrapped) PutBlobPartial(ctx context.Context, stream private.ImageSourceSeekable, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error) {
+	return types.BlobInfo{}, fmt.Errorf("internal error: PutBlobPartial is not supported by the %q transport", w.Reference().Transport().Name())
 }
 
 // TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination

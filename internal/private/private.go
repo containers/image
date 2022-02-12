@@ -13,6 +13,9 @@ import (
 type ImageDestination interface {
 	types.ImageDestination
 
+	// SupportsPutBlobPartial returns true if PutBlobPartial is supported.
+	SupportsPutBlobPartial() bool
+
 	// PutBlobWithOptions writes contents of stream and returns data representing the result.
 	// inputInfo.Digest can be optionally provided if known; if provided, and stream is read to the end without error, the digest MUST match the stream contents.
 	// inputInfo.Size is the expected length of stream, if known.
@@ -21,6 +24,13 @@ type ImageDestination interface {
 	// to any other readers for download using the supplied digest.
 	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 	PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options PutBlobOptions) (types.BlobInfo, error)
+
+	// PutBlobPartial attempts to create a blob using the data that is already present
+	// at the destination. stream is accessed in a non-sequential way to retrieve the missing chunks.
+	// It is available only if SupportsPutBlobPartial().
+	// Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
+	// should fall back to PutBlobWithOptions.
+	PutBlobPartial(ctx context.Context, stream ImageSourceSeekable, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error)
 
 	// TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 	// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
@@ -72,13 +82,6 @@ type ImageSourceSeekable interface {
 	// GetBlobAt returns a stream for the specified blob.
 	// The specified chunks must be not overlapping and sorted by their offset.
 	GetBlobAt(context.Context, types.BlobInfo, []ImageSourceChunk) (chan io.ReadCloser, chan error, error)
-}
-
-// ImageDestinationPartial is a service to store a blob by requesting the missing chunks to a ImageSourceSeekable.
-// This API is experimental and can be changed without bumping the major version number.
-type ImageDestinationPartial interface {
-	// PutBlobPartial writes contents of stream and returns data representing the result.
-	PutBlobPartial(ctx context.Context, stream ImageSourceSeekable, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error)
 }
 
 // BadPartialRequestError is returned by ImageSourceSeekable.GetBlobAt on an invalid request.

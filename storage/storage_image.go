@@ -609,8 +609,11 @@ func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.Read
 
 }
 
-// PutBlobPartial attempts to create a blob using the data that is already present at the destination storage.  stream is accessed
-// in a non-sequential way to retrieve the missing chunks.
+// PutBlobPartial attempts to create a blob using the data that is already present
+// at the destination. stream is accessed in a non-sequential way to retrieve the missing chunks.
+// It is available only if SupportsPutBlobPartial().
+// Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
+// should fall back to PutBlobWithOptions.
 func (s *storageImageDestination) PutBlobPartial(ctx context.Context, stream private.ImageSourceSeekable, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error) {
 	fetcher := zstdFetcher{
 		stream:   stream,
@@ -1259,6 +1262,11 @@ func (s *storageImageDestination) MustMatchRuntimeOS() bool {
 // Does not make a difference if Reference().DockerReference() is nil.
 func (s *storageImageDestination) IgnoresEmbeddedDockerReference() bool {
 	return true // Yes, we want the unmodified manifest
+}
+
+// SupportsPutBlobPartial returns true if PutBlobPartial is supported.
+func (s *storageImageDestination) SupportsPutBlobPartial() bool {
+	return true
 }
 
 // PutSignatures records the image's signatures for committing as a single data blob.
