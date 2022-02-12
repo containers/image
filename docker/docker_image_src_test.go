@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var _ private.BlobChunkAccessor = (*dockerImageSource)(nil)
+var _ private.ImageSource = (*dockerImageSource)(nil)
 
 func TestDockerImageSourceReference(t *testing.T) {
 	manifestPathRegex := regexp.MustCompile("^/v2/.*/manifests/latest$")

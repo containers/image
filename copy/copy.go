@@ -16,6 +16,7 @@ import (
 	"github.com/containers/image/v5/image"
 	internalblobinfocache "github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/imagedestination"
+	"github.com/containers/image/v5/internal/imagesource"
 	"github.com/containers/image/v5/internal/pkg/platform"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
@@ -65,7 +66,7 @@ var expectedCompressionFormats = map[string]*compressiontypes.Algorithm{
 // data shared across one or more images in a possible manifest list.
 type copier struct {
 	dest                          private.ImageDestination
-	rawSource                     types.ImageSource
+	rawSource                     private.ImageSource
 	reportWriter                  io.Writer
 	progressOutput                io.Writer
 	progressInterval              time.Duration
@@ -233,7 +234,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 
 	c := &copier{
 		dest:             imagedestination.FromPublic(dest),
-		rawSource:        rawSource,
+		rawSource:        imagesource.FromPublic(rawSource),
 		reportWriter:     reportWriter,
 		progressOutput:   progressOutput,
 		progressInterval: options.ProgressInterval,
@@ -1272,8 +1273,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 	// of the source file are not known yet and must be fetched.
 	// Attempt a partial only when the source allows to retrieve a blob partially and
 	// the destination has support for it.
-	sourceChunkAccessor, hasChunkAccessor := ic.c.rawSource.(private.BlobChunkAccessor)
-	if hasChunkAccessor && ic.c.dest.SupportsPutBlobPartial() && !diffIDIsNeeded {
+	if ic.c.rawSource.SupportsGetBlobAt() && ic.c.dest.SupportsPutBlobPartial() && !diffIDIsNeeded {
 		if reused, blobInfo := func() (bool, types.BlobInfo) { // A scope for defer
 			bar := ic.c.createProgressBar(pool, true, srcInfo, "blob", "done")
 			hideProgressBar := true
@@ -1288,7 +1288,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 			defer close(progress)
 
 			proxy := blobChunkAccessorProxy{
-				wrapped:  sourceChunkAccessor,
+				wrapped:  ic.c.rawSource,
 				progress: progress,
 			}
 			go func() {

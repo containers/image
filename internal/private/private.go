@@ -8,6 +8,16 @@ import (
 	"github.com/containers/image/v5/types"
 )
 
+// ImageSource is an internal extension to the types.ImageSource interface.
+type ImageSource interface {
+	types.ImageSource
+
+	// SupportsGetBlobAt() returns true if GetBlobAt (BlobChunkAccessor) is supported.
+	SupportsGetBlobAt() bool
+	// BlobChunkAccessor.GetBlobAt is available only if SupportsGetBlobAt().
+	BlobChunkAccessor
+}
+
 // ImageDestination is an internal extension to the types.ImageDestination
 // interface.
 type ImageDestination interface {

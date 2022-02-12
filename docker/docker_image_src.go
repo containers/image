@@ -147,6 +147,11 @@ func (s *dockerImageSource) Close() error {
 	return nil
 }
 
+// SupportsGetBlobAt() returns true if GetBlobAt (BlobChunkAccessor) is supported.
+func (s *dockerImageSource) SupportsGetBlobAt() bool {
+	return true
+}
+
 // LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer
 // blobsums that are listed in the image's manifest.  If values are returned, they should be used when using GetBlob()
 // to read the image's layers.
