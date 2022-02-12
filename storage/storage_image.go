@@ -586,9 +586,9 @@ func (s *storageImageDestination) tryReusingBlobWithSrcRef(ctx context.Context, 
 }
 
 type zstdFetcher struct {
-	stream   private.BlobChunkAccessor
-	ctx      context.Context
-	blobInfo types.BlobInfo
+	chunkAccessor private.BlobChunkAccessor
+	ctx           context.Context
+	blobInfo      types.BlobInfo
 }
 
 // GetBlobAt converts from chunked.GetBlobAt to BlobChunkAccessor.GetBlobAt.
@@ -601,7 +601,7 @@ func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.Read
 		}
 		newChunks = append(newChunks, i)
 	}
-	rc, errs, err := f.stream.GetBlobAt(f.ctx, f.blobInfo, newChunks)
+	rc, errs, err := f.chunkAccessor.GetBlobAt(f.ctx, f.blobInfo, newChunks)
 	if _, ok := err.(private.BadPartialRequestError); ok {
 		err = chunked.ErrBadRequest{}
 	}
@@ -610,15 +610,15 @@ func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.Read
 }
 
 // PutBlobPartial attempts to create a blob using the data that is already present
-// at the destination. stream is accessed in a non-sequential way to retrieve the missing chunks.
+// at the destination. chunkAccessor is accessed in a non-sequential way to retrieve the missing chunks.
 // It is available only if SupportsPutBlobPartial().
 // Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
 // should fall back to PutBlobWithOptions.
-func (s *storageImageDestination) PutBlobPartial(ctx context.Context, stream private.BlobChunkAccessor, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error) {
+func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error) {
 	fetcher := zstdFetcher{
-		stream:   stream,
-		ctx:      ctx,
-		blobInfo: srcInfo,
+		chunkAccessor: chunkAccessor,
+		ctx:           ctx,
+		blobInfo:      srcInfo,
 	}
 
 	differ, err := chunked.GetDiffer(ctx, s.imageRef.transport.store, srcInfo.Size, srcInfo.Annotations, &fetcher)

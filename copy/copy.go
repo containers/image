@@ -1272,8 +1272,8 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 	// of the source file are not known yet and must be fetched.
 	// Attempt a partial only when the source allows to retrieve a blob partially and
 	// the destination has support for it.
-	imgSource, okSource := ic.c.rawSource.(private.BlobChunkAccessor)
-	if okSource && ic.c.dest.SupportsPutBlobPartial() && !diffIDIsNeeded {
+	sourceChunkAccessor, hasChunkAccessor := ic.c.rawSource.(private.BlobChunkAccessor)
+	if hasChunkAccessor && ic.c.dest.SupportsPutBlobPartial() && !diffIDIsNeeded {
 		if reused, blobInfo := func() (bool, types.BlobInfo) { // A scope for defer
 			bar := ic.c.createProgressBar(pool, true, srcInfo, "blob", "done")
 			hideProgressBar := true
@@ -1288,7 +1288,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 			defer close(progress)
 
 			proxy := blobChunkAccessorProxy{
-				source:   imgSource,
+				wrapped:  sourceChunkAccessor,
 				progress: progress,
 			}
 			go func() {

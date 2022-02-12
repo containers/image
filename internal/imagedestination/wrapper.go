@@ -49,11 +49,11 @@ func (w *wrapped) PutBlobWithOptions(ctx context.Context, stream io.Reader, inpu
 }
 
 // PutBlobPartial attempts to create a blob using the data that is already present
-// at the destination. stream is accessed in a non-sequential way to retrieve the missing chunks.
+// at the destination. chunkAccessor is accessed in a non-sequential way to retrieve the missing chunks.
 // It is available only if SupportsPutBlobPartial().
 // Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
 // should fall back to PutBlobWithOptions.
-func (w *wrapped) PutBlobPartial(ctx context.Context, stream private.BlobChunkAccessor, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error) {
+func (w *wrapped) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error) {
 	return types.BlobInfo{}, fmt.Errorf("internal error: PutBlobPartial is not supported by the %q transport", w.Reference().Transport().Name())
 }
 

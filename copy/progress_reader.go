@@ -83,8 +83,8 @@ func (r *progressReader) Read(p []byte) (int, error) {
 // blobChunkAccessorProxy wraps a BlobChunkAccessor and keeps track of how many bytes
 // are received.
 type blobChunkAccessorProxy struct {
-	// source is the underlying BlobChunkAccessor
-	source private.BlobChunkAccessor
+	// wrapped is the underlying BlobChunkAccessor
+	wrapped private.BlobChunkAccessor
 	// progress is the chan where the total number of bytes read so far are reported.
 	progress chan int64
 }
@@ -94,8 +94,8 @@ type blobChunkAccessorProxy struct {
 // The specified chunks must be not overlapping and sorted by their offset.
 // The readers must be fully consumed, in the order they are returned, before blocking
 // to read the next chunk.
-func (s blobChunkAccessorProxy) GetBlobAt(ctx context.Context, bInfo types.BlobInfo, chunks []private.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
-	rc, errs, err := s.source.GetBlobAt(ctx, bInfo, chunks)
+func (s blobChunkAccessorProxy) GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []private.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
+	rc, errs, err := s.wrapped.GetBlobAt(ctx, info, chunks)
 	if err == nil {
 		total := int64(0)
 		for _, c := range chunks {

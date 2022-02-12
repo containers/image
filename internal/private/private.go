@@ -26,11 +26,11 @@ type ImageDestination interface {
 	PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options PutBlobOptions) (types.BlobInfo, error)
 
 	// PutBlobPartial attempts to create a blob using the data that is already present
-	// at the destination. stream is accessed in a non-sequential way to retrieve the missing chunks.
+	// at the destination. chunkAccessor is accessed in a non-sequential way to retrieve the missing chunks.
 	// It is available only if SupportsPutBlobPartial().
 	// Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
 	// should fall back to PutBlobWithOptions.
-	PutBlobPartial(ctx context.Context, stream BlobChunkAccessor, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error)
+	PutBlobPartial(ctx context.Context, chunkAccessor BlobChunkAccessor, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error)
 
 	// TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 	// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
@@ -83,7 +83,7 @@ type BlobChunkAccessor interface {
 	// The specified chunks must be not overlapping and sorted by their offset.
 	// The readers must be fully consumed, in the order they are returned, before blocking
 	// to read the next chunk.
-	GetBlobAt(context.Context, types.BlobInfo, []ImageSourceChunk) (chan io.ReadCloser, chan error, error)
+	GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []ImageSourceChunk) (chan io.ReadCloser, chan error, error)
 }
 
 // BadPartialRequestError is returned by BlobChunkAccessor.GetBlobAt on an invalid request.
