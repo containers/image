@@ -1283,27 +1283,10 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 				bar.Abort(hideProgressBar)
 			}()
 
-			progress := make(chan int64)
-			terminate := make(chan interface{})
-
-			defer close(terminate)
-			defer close(progress)
-
 			proxy := blobChunkAccessorProxy{
-				wrapped:  ic.c.rawSource,
-				progress: progress,
+				wrapped: ic.c.rawSource,
+				bar:     bar,
 			}
-			go func() {
-				for {
-					select {
-					case written := <-progress:
-						bar.IncrInt64(written)
-					case <-terminate:
-						return
-					}
-				}
-			}()
-
 			bar.SetTotal(srcInfo.Size, false)
 			info, err := ic.c.dest.PutBlobPartial(ctx, &proxy, srcInfo, ic.c.blobInfoCache)
 			if err == nil {
