@@ -204,20 +204,22 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		reportWriter = options.ReportWriter
 	}
 
-	dest, err := destRef.NewImageDestination(ctx, options.DestinationCtx)
+	publicDest, err := destRef.NewImageDestination(ctx, options.DestinationCtx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "initializing destination %s", transports.ImageName(destRef))
 	}
+	dest := imagedestination.FromPublic(publicDest)
 	defer func() {
 		if err := dest.Close(); err != nil {
 			retErr = errors.Wrapf(retErr, " (dest: %v)", err)
 		}
 	}()
 
-	rawSource, err := srcRef.NewImageSource(ctx, options.SourceCtx)
+	publicRawSource, err := srcRef.NewImageSource(ctx, options.SourceCtx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "initializing source %s", transports.ImageName(srcRef))
 	}
+	rawSource := imagesource.FromPublic(publicRawSource)
 	defer func() {
 		if err := rawSource.Close(); err != nil {
 			retErr = errors.Wrapf(retErr, " (src: %v)", err)
@@ -233,8 +235,8 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 	}
 
 	c := &copier{
-		dest:             imagedestination.FromPublic(dest),
-		rawSource:        imagesource.FromPublic(rawSource),
+		dest:             dest,
+		rawSource:        rawSource,
 		reportWriter:     reportWriter,
 		progressOutput:   progressOutput,
 		progressInterval: options.ProgressInterval,
