@@ -30,7 +30,7 @@ type ImageDestination interface {
 	// It is available only if SupportsPutBlobPartial().
 	// Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
 	// should fall back to PutBlobWithOptions.
-	PutBlobPartial(ctx context.Context, stream ImageSourceSeekable, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error)
+	PutBlobPartial(ctx context.Context, stream BlobChunkAccessor, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error)
 
 	// TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 	// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
@@ -76,15 +76,17 @@ type ImageSourceChunk struct {
 	Length uint64
 }
 
-// ImageSourceSeekable is an image source that permits to fetch chunks of the entire blob.
-// This API is experimental and can be changed without bumping the major version number.
-type ImageSourceSeekable interface {
-	// GetBlobAt returns a stream for the specified blob.
+// BlobChunkAccessor allows fetching discontiguous chunks of a blob.
+type BlobChunkAccessor interface {
+	// GetBlobAt returns a sequential channel of readers that contain data for the requested
+	// blob chunks, and a channel that might get a single error value.
 	// The specified chunks must be not overlapping and sorted by their offset.
+	// The readers must be fully consumed, in the order they are returned, before blocking
+	// to read the next chunk.
 	GetBlobAt(context.Context, types.BlobInfo, []ImageSourceChunk) (chan io.ReadCloser, chan error, error)
 }
 
-// BadPartialRequestError is returned by ImageSourceSeekable.GetBlobAt on an invalid request.
+// BadPartialRequestError is returned by BlobChunkAccessor.GetBlobAt on an invalid request.
 type BadPartialRequestError struct {
 	Status string
 }

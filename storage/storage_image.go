@@ -586,12 +586,12 @@ func (s *storageImageDestination) tryReusingBlobWithSrcRef(ctx context.Context, 
 }
 
 type zstdFetcher struct {
-	stream   private.ImageSourceSeekable
+	stream   private.BlobChunkAccessor
 	ctx      context.Context
 	blobInfo types.BlobInfo
 }
 
-// GetBlobAt converts from chunked.GetBlobAt to ImageSourceSeekable.GetBlobAt.
+// GetBlobAt converts from chunked.GetBlobAt to BlobChunkAccessor.GetBlobAt.
 func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
 	var newChunks []private.ImageSourceChunk
 	for _, v := range chunks {
@@ -614,7 +614,7 @@ func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.Read
 // It is available only if SupportsPutBlobPartial().
 // Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
 // should fall back to PutBlobWithOptions.
-func (s *storageImageDestination) PutBlobPartial(ctx context.Context, stream private.ImageSourceSeekable, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error) {
+func (s *storageImageDestination) PutBlobPartial(ctx context.Context, stream private.BlobChunkAccessor, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error) {
 	fetcher := zstdFetcher{
 		stream:   stream,
 		ctx:      ctx,

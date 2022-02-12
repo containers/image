@@ -357,8 +357,11 @@ func handle206Response(streams chan io.ReadCloser, errs chan error, body io.Read
 	}
 }
 
-// GetBlobAt returns a stream for the specified blob.
+// GetBlobAt returns a sequential channel of readers that contain data for the requested
+// blob chunks, and a channel that might get a single error value.
 // The specified chunks must be not overlapping and sorted by their offset.
+// The readers must be fully consumed, in the order they are returned, before blocking
+// to read the next chunk.
 func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []private.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
 	headers := make(map[string][]string)
 

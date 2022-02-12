@@ -80,18 +80,21 @@ func (r *progressReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-// imageSourceSeekableProxy wraps ImageSourceSeekable and keeps track of how many bytes
+// blobChunkAccessorProxy wraps a BlobChunkAccessor and keeps track of how many bytes
 // are received.
-type imageSourceSeekableProxy struct {
-	// source is the seekable input to read from.
-	source private.ImageSourceSeekable
+type blobChunkAccessorProxy struct {
+	// source is the underlying BlobChunkAccessor
+	source private.BlobChunkAccessor
 	// progress is the chan where the total number of bytes read so far are reported.
 	progress chan int64
 }
 
-// GetBlobAt reads from the ImageSourceSeekable and report how many bytes were received
-// to the progress chan.
-func (s imageSourceSeekableProxy) GetBlobAt(ctx context.Context, bInfo types.BlobInfo, chunks []private.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
+// GetBlobAt returns a sequential channel of readers that contain data for the requested
+// blob chunks, and a channel that might get a single error value.
+// The specified chunks must be not overlapping and sorted by their offset.
+// The readers must be fully consumed, in the order they are returned, before blocking
+// to read the next chunk.
+func (s blobChunkAccessorProxy) GetBlobAt(ctx context.Context, bInfo types.BlobInfo, chunks []private.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
 	rc, errs, err := s.source.GetBlobAt(ctx, bInfo, chunks)
 	if err == nil {
 		total := int64(0)
