@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	_ types.ImageReference   = &blobCacheReference{}
+	_ types.ImageReference   = &BlobCache{}
 	_ types.ImageSource      = &blobCacheSource{}
 	_ types.ImageDestination = &blobCacheDestination{}
 )
@@ -37,20 +37,9 @@ const (
 // BlobCache is an object which saves copies of blobs that are written to it while passing them
 // through to some real destination, and which can be queried directly in order to read them
 // back.
-type BlobCache interface {
-	types.ImageReference
-	// HasBlob checks if a blob that matches the passed-in digest (and
-	// size, if not -1), is present in the cache.
-	HasBlob(types.BlobInfo) (bool, int64, error)
-	// Directories returns the list of cache directories.
-	Directory() string
-	// clearCache() clears the contents of the cache directories.  Note
-	// that this also clears content which was not placed there by this
-	// cache implementation.
-	clearCache() error
-}
-
-type blobCacheReference struct {
+//
+// Implements types.ImageReference.
+type BlobCache struct {
 	reference types.ImageReference
 	// WARNING: The contents of this directory may be accessed concurrently,
 	// both within this process and by multiple different processes
@@ -59,7 +48,7 @@ type blobCacheReference struct {
 }
 
 type blobCacheSource struct {
-	reference *blobCacheReference
+	reference *BlobCache
 	source    types.ImageSource
 	sys       types.SystemContext
 	// this mutex synchronizes the counters below
@@ -70,7 +59,7 @@ type blobCacheSource struct {
 }
 
 type blobCacheDestination struct {
-	reference   *blobCacheReference
+	reference   *BlobCache
 	destination types.ImageDestination
 }
 
@@ -86,7 +75,7 @@ func makeFilename(blobSum digest.Digest, isConfig bool) string {
 // as-is to the specified directory or a temporary directory.
 // The compress argument controls whether or not the cache will try to substitute a compressed
 // or different version of a blob when preparing the list of layers when reading an image.
-func NewBlobCache(ref types.ImageReference, directory string, compress types.LayerCompression) (BlobCache, error) {
+func NewBlobCache(ref types.ImageReference, directory string, compress types.LayerCompression) (*BlobCache, error) {
 	if directory == "" {
 		return nil, errors.Errorf("error creating cache around reference %q: no directory specified", transports.ImageName(ref))
 	}
@@ -96,44 +85,44 @@ func NewBlobCache(ref types.ImageReference, directory string, compress types.Lay
 	default:
 		return nil, errors.Errorf("unhandled LayerCompression value %v", compress)
 	}
-	return &blobCacheReference{
+	return &BlobCache{
 		reference: ref,
 		directory: directory,
 		compress:  compress,
 	}, nil
 }
 
-func (r *blobCacheReference) Transport() types.ImageTransport {
-	return r.reference.Transport()
+func (b *BlobCache) Transport() types.ImageTransport {
+	return b.reference.Transport()
 }
 
-func (r *blobCacheReference) StringWithinTransport() string {
-	return r.reference.StringWithinTransport()
+func (b *BlobCache) StringWithinTransport() string {
+	return b.reference.StringWithinTransport()
 }
 
-func (r *blobCacheReference) DockerReference() reference.Named {
-	return r.reference.DockerReference()
+func (b *BlobCache) DockerReference() reference.Named {
+	return b.reference.DockerReference()
 }
 
-func (r *blobCacheReference) PolicyConfigurationIdentity() string {
-	return r.reference.PolicyConfigurationIdentity()
+func (b *BlobCache) PolicyConfigurationIdentity() string {
+	return b.reference.PolicyConfigurationIdentity()
 }
 
-func (r *blobCacheReference) PolicyConfigurationNamespaces() []string {
-	return r.reference.PolicyConfigurationNamespaces()
+func (b *BlobCache) PolicyConfigurationNamespaces() []string {
+	return b.reference.PolicyConfigurationNamespaces()
 }
 
-func (r *blobCacheReference) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
-	return r.reference.DeleteImage(ctx, sys)
+func (b *BlobCache) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
+	return b.reference.DeleteImage(ctx, sys)
 }
 
-func (r *blobCacheReference) HasBlob(blobinfo types.BlobInfo) (bool, int64, error) {
+func (b *BlobCache) HasBlob(blobinfo types.BlobInfo) (bool, int64, error) {
 	if blobinfo.Digest == "" {
 		return false, -1, nil
 	}
 
 	for _, isConfig := range []bool{false, true} {
-		filename := filepath.Join(r.directory, makeFilename(blobinfo.Digest, isConfig))
+		filename := filepath.Join(b.directory, makeFilename(blobinfo.Digest, isConfig))
 		fileInfo, err := os.Stat(filename)
 		if err == nil && (blobinfo.Size == -1 || blobinfo.Size == fileInfo.Size()) {
 			return true, fileInfo.Size(), nil
@@ -146,53 +135,53 @@ func (r *blobCacheReference) HasBlob(blobinfo types.BlobInfo) (bool, int64, erro
 	return false, -1, nil
 }
 
-func (r *blobCacheReference) Directory() string {
-	return r.directory
+func (b *BlobCache) Directory() string {
+	return b.directory
 }
 
-func (r *blobCacheReference) clearCache() error {
-	f, err := os.Open(r.directory)
+func (b *BlobCache) clearCache() error {
+	f, err := os.Open(b.directory)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 	defer f.Close()
 	names, err := f.Readdirnames(-1)
 	if err != nil {
-		return errors.Wrapf(err, "error reading directory %q", r.directory)
+		return errors.Wrapf(err, "error reading directory %q", b.directory)
 	}
 	for _, name := range names {
-		pathname := filepath.Join(r.directory, name)
+		pathname := filepath.Join(b.directory, name)
 		if err = os.RemoveAll(pathname); err != nil {
-			return errors.Wrapf(err, "clearing cache for %q", transports.ImageName(r))
+			return errors.Wrapf(err, "clearing cache for %q", transports.ImageName(b))
 		}
 	}
 	return nil
 }
 
-func (r *blobCacheReference) NewImage(ctx context.Context, sys *types.SystemContext) (types.ImageCloser, error) {
-	src, err := r.NewImageSource(ctx, sys)
+func (b *BlobCache) NewImage(ctx context.Context, sys *types.SystemContext) (types.ImageCloser, error) {
+	src, err := b.NewImageSource(ctx, sys)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error creating new image %q", transports.ImageName(r.reference))
+		return nil, errors.Wrapf(err, "error creating new image %q", transports.ImageName(b.reference))
 	}
 	return image.FromSource(ctx, sys, src)
 }
 
-func (r *blobCacheReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
-	src, err := r.reference.NewImageSource(ctx, sys)
+func (b *BlobCache) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
+	src, err := b.reference.NewImageSource(ctx, sys)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error creating new image source %q", transports.ImageName(r.reference))
+		return nil, errors.Wrapf(err, "error creating new image source %q", transports.ImageName(b.reference))
 	}
-	logrus.Debugf("starting to read from image %q using blob cache in %q (compression=%v)", transports.ImageName(r.reference), r.directory, r.compress)
-	return &blobCacheSource{reference: r, source: src, sys: *sys}, nil
+	logrus.Debugf("starting to read from image %q using blob cache in %q (compression=%v)", transports.ImageName(b.reference), b.directory, b.compress)
+	return &blobCacheSource{reference: b, source: src, sys: *sys}, nil
 }
 
-func (r *blobCacheReference) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
-	dest, err := r.reference.NewImageDestination(ctx, sys)
+func (b *BlobCache) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
+	dest, err := b.reference.NewImageDestination(ctx, sys)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error creating new image destination %q", transports.ImageName(r.reference))
+		return nil, errors.Wrapf(err, "error creating new image destination %q", transports.ImageName(b.reference))
 	}
-	logrus.Debugf("starting to write to image %q using blob cache in %q", transports.ImageName(r.reference), r.directory)
-	return &blobCacheDestination{reference: r, destination: dest}, nil
+	logrus.Debugf("starting to write to image %q using blob cache in %q", transports.ImageName(b.reference), b.directory)
+	return &blobCacheDestination{reference: b, destination: dest}, nil
 }
 
 func (s *blobCacheSource) Reference() types.ImageReference {
