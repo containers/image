@@ -248,7 +248,7 @@ func TestBlobCache(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected error copying the image using the cache: %v", err)
 				}
-				if err = cachedSrcRef.ClearCache(); err != nil {
+				if err = cachedSrcRef.clearCache(); err != nil {
 					t.Fatalf("error clearing cache: %v", err)
 				}
 			}

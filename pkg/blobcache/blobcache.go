@@ -45,10 +45,10 @@ type BlobCache interface {
 	HasBlob(types.BlobInfo) (bool, int64, error)
 	// Directories returns the list of cache directories.
 	Directory() string
-	// ClearCache() clears the contents of the cache directories.  Note
+	// clearCache() clears the contents of the cache directories.  Note
 	// that this also clears content which was not placed there by this
 	// cache implementation.
-	ClearCache() error
+	clearCache() error
 }
 
 type blobCacheReference struct {
@@ -99,8 +99,7 @@ func CacheLookupReferenceFunc(directory string, compress types.LayerCompression)
 
 // NewBlobCache creates a new blob cache that wraps an image reference.  Any blobs which are
 // written to the destination image created from the resulting reference will also be stored
-// as-is to the specified directory or a temporary directory.  The cache directory's contents
-// can be cleared by calling the returned BlobCache()'s ClearCache() method.
+// as-is to the specified directory or a temporary directory.
 // The compress argument controls whether or not the cache will try to substitute a compressed
 // or different version of a blob when preparing the list of layers when reading an image.
 func NewBlobCache(ref types.ImageReference, directory string, compress types.LayerCompression) (BlobCache, error) {
@@ -167,7 +166,7 @@ func (r *blobCacheReference) Directory() string {
 	return r.directory
 }
 
-func (r *blobCacheReference) ClearCache() error {
+func (r *blobCacheReference) clearCache() error {
 	f, err := os.Open(r.directory)
 	if err != nil {
 		return errors.WithStack(err)
