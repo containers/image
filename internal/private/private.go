@@ -8,10 +8,23 @@ import (
 	"github.com/containers/image/v5/types"
 )
 
+// ImageSource is an internal extension to the types.ImageSource interface.
+type ImageSource interface {
+	types.ImageSource
+
+	// SupportsGetBlobAt() returns true if GetBlobAt (BlobChunkAccessor) is supported.
+	SupportsGetBlobAt() bool
+	// BlobChunkAccessor.GetBlobAt is available only if SupportsGetBlobAt().
+	BlobChunkAccessor
+}
+
 // ImageDestination is an internal extension to the types.ImageDestination
 // interface.
 type ImageDestination interface {
 	types.ImageDestination
+
+	// SupportsPutBlobPartial returns true if PutBlobPartial is supported.
+	SupportsPutBlobPartial() bool
 
 	// PutBlobWithOptions writes contents of stream and returns data representing the result.
 	// inputInfo.Digest can be optionally provided if known; if provided, and stream is read to the end without error, the digest MUST match the stream contents.
@@ -21,6 +34,13 @@ type ImageDestination interface {
 	// to any other readers for download using the supplied digest.
 	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 	PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options PutBlobOptions) (types.BlobInfo, error)
+
+	// PutBlobPartial attempts to create a blob using the data that is already present
+	// at the destination. chunkAccessor is accessed in a non-sequential way to retrieve the missing chunks.
+	// It is available only if SupportsPutBlobPartial().
+	// Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
+	// should fall back to PutBlobWithOptions.
+	PutBlobPartial(ctx context.Context, chunkAccessor BlobChunkAccessor, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error)
 
 	// TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 	// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
@@ -34,28 +54,29 @@ type ImageDestination interface {
 
 // PutBlobOptions are used in PutBlobWithOptions.
 type PutBlobOptions struct {
-	// Cache to look up blob infos.
-	Cache types.BlobInfoCache
-	// Denotes whether the blob is a config or not.
-	IsConfig bool
-	// Indicates an empty layer.
-	EmptyLayer bool
-	// The corresponding index in the layer slice.
-	LayerIndex *int
+	Cache    types.BlobInfoCache // Cache to optionally update with the uploaded bloblook up blob infos.
+	IsConfig bool                // True if the blob is a config
+
+	// The following fields are new to internal/private.  Users of internal/private MUST fill them in,
+	// but they also must expect that they will be ignored by types.ImageDestination transports.
+
+	EmptyLayer bool // True if the blob is an "empty"/"throwaway" layer, and may not necessarily be physically represented.
+	LayerIndex *int // If the blob is a layer, a zero-based index of the layer within the image; nil otherwise.
 }
 
 // TryReusingBlobOptions are used in TryReusingBlobWithOptions.
 type TryReusingBlobOptions struct {
-	// Cache to look up blob infos.
-	Cache types.BlobInfoCache
-	// Use an equivalent of the desired blob.
+	Cache types.BlobInfoCache // Cache to use and/or update.
+	// If true, it is allowed to use an equivalent of the desired blob;
+	// in that case the returned info may not match the input.
 	CanSubstitute bool
-	// Indicates an empty layer.
-	EmptyLayer bool
-	// The corresponding index in the layer slice.
-	LayerIndex *int
-	// The reference of the image that contains the target blob.
-	SrcRef reference.Named
+
+	// The following fields are new to internal/private.  Users of internal/private MUST fill them in,
+	// but they also must expect that they will be ignored by types.ImageDestination transports.
+
+	EmptyLayer bool            // True if the blob is an "empty"/"throwaway" layer, and may not necessarily be physically represented.
+	LayerIndex *int            // If the blob is a layer, a zero-based index of the layer within the image; nil otherwise.
+	SrcRef     reference.Named // A reference to the source image that contains the input blob.
 }
 
 // ImageSourceChunk is a portion of a blob.
@@ -65,22 +86,17 @@ type ImageSourceChunk struct {
 	Length uint64
 }
 
-// ImageSourceSeekable is an image source that permits to fetch chunks of the entire blob.
-// This API is experimental and can be changed without bumping the major version number.
-type ImageSourceSeekable interface {
-	// GetBlobAt returns a stream for the specified blob.
+// BlobChunkAccessor allows fetching discontiguous chunks of a blob.
+type BlobChunkAccessor interface {
+	// GetBlobAt returns a sequential channel of readers that contain data for the requested
+	// blob chunks, and a channel that might get a single error value.
 	// The specified chunks must be not overlapping and sorted by their offset.
-	GetBlobAt(context.Context, types.BlobInfo, []ImageSourceChunk) (chan io.ReadCloser, chan error, error)
+	// The readers must be fully consumed, in the order they are returned, before blocking
+	// to read the next chunk.
+	GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []ImageSourceChunk) (chan io.ReadCloser, chan error, error)
 }
 
-// ImageDestinationPartial is a service to store a blob by requesting the missing chunks to a ImageSourceSeekable.
-// This API is experimental and can be changed without bumping the major version number.
-type ImageDestinationPartial interface {
-	// PutBlobPartial writes contents of stream and returns data representing the result.
-	PutBlobPartial(ctx context.Context, stream ImageSourceSeekable, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error)
-}
-
-// BadPartialRequestError is returned by ImageSourceSeekable.GetBlobAt on an invalid request.
+// BadPartialRequestError is returned by BlobChunkAccessor.GetBlobAt on an invalid request.
 type BadPartialRequestError struct {
 	Status string
 }
