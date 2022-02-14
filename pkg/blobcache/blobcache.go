@@ -1,10 +1,5 @@
 package blobcache
 
-// *** NOTE ***
-// Historically, this package has lived in containers/buildah but was copied
-// over into containers/image to simplify extending the (internal) API of image
-// destinations and image sources.
-
 import (
 	"bytes"
 	"context"
