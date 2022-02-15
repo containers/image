@@ -207,9 +207,12 @@ func (d *blobCacheDestination) TryReusingBlob(ctx context.Context, info types.Bl
 		return present, reusedInfo, err
 	}
 
-	for _, isConfig := range []bool{false, true} {
-		filename := d.reference.blobPath(info.Digest, isConfig)
-		f, err := os.Open(filename)
+	blobPath, _, isConfig, err := d.reference.findBlob(info)
+	if err != nil {
+		return false, types.BlobInfo{}, err
+	}
+	if blobPath != "" {
+		f, err := os.Open(blobPath)
 		if err == nil {
 			defer f.Close()
 			uploadedInfo, err := d.destination.PutBlob(ctx, f, info, cache, isConfig)

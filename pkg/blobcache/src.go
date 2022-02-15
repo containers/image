@@ -68,26 +68,23 @@ func (s *blobCacheSource) HasThreadSafeGetBlob() bool {
 }
 
 func (s *blobCacheSource) GetBlob(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
-	present, size, err := s.reference.HasBlob(blobinfo)
+	blobPath, size, _, err := s.reference.findBlob(blobinfo)
 	if err != nil {
 		return nil, -1, err
 	}
-	if present {
-		for _, isConfig := range []bool{false, true} {
-			filename := s.reference.blobPath(blobinfo.Digest, isConfig)
-			f, err := os.Open(filename)
-			if err == nil {
-				s.mu.Lock()
-				s.cacheHits++
-				s.mu.Unlock()
-				return f, size, nil
-			}
-			if !os.IsNotExist(err) {
-				s.mu.Lock()
-				s.cacheErrors++
-				s.mu.Unlock()
-				return nil, -1, perrors.Wrap(err, "checking for cache")
-			}
+	if blobPath != "" {
+		f, err := os.Open(blobPath)
+		if err == nil {
+			s.mu.Lock()
+			s.cacheHits++
+			s.mu.Unlock()
+			return f, size, nil
+		}
+		if !os.IsNotExist(err) {
+			s.mu.Lock()
+			s.cacheErrors++
+			s.mu.Unlock()
+			return nil, -1, perrors.Wrap(err, "checking for cache")
 		}
 	}
 	s.mu.Lock()

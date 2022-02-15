@@ -87,22 +87,37 @@ func (b *BlobCache) blobPath(digest digest.Digest, isConfig bool) string {
 	return filepath.Join(b.directory, baseName)
 }
 
-func (b *BlobCache) HasBlob(blobinfo types.BlobInfo) (bool, int64, error) {
-	if blobinfo.Digest == "" {
-		return false, -1, nil
+// findBlob checks if we have a blob for info in cache (whether a config or not)
+// and if so, returns it path and size, and whether it was stored as a config.
+// It returns ("", -1, nil) if the blob is not
+func (b *BlobCache) findBlob(info types.BlobInfo) (string, int64, bool, error) {
+	if info.Digest == "" {
+		return "", -1, false, nil
 	}
 
 	for _, isConfig := range []bool{false, true} {
-		filename := b.blobPath(blobinfo.Digest, isConfig)
-		fileInfo, err := os.Stat(filename)
-		if err == nil && (blobinfo.Size == -1 || blobinfo.Size == fileInfo.Size()) {
-			return true, fileInfo.Size(), nil
+		path := b.blobPath(info.Digest, isConfig)
+		fileInfo, err := os.Stat(path)
+		if err == nil && (info.Size == -1 || info.Size == fileInfo.Size()) {
+			return path, fileInfo.Size(), isConfig, nil
 		}
 		if !os.IsNotExist(err) {
-			return false, -1, perrors.Wrap(err, "checking size")
+			return "", -1, false, perrors.Wrap(err, "checking size")
 		}
 	}
 
+	return "", -1, false, nil
+
+}
+
+func (b *BlobCache) HasBlob(blobinfo types.BlobInfo) (bool, int64, error) {
+	path, size, _, err := b.findBlob(blobinfo)
+	if err != nil {
+		return false, -1, err
+	}
+	if path != "" {
+		return true, size, nil
+	}
 	return false, -1, nil
 }
 
