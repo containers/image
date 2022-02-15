@@ -32,13 +32,6 @@ type BlobCache struct {
 	compress  types.LayerCompression
 }
 
-func makeFilename(blobSum digest.Digest, isConfig bool) string {
-	if isConfig {
-		return blobSum.String() + ".config"
-	}
-	return blobSum.String()
-}
-
 // NewBlobCache creates a new blob cache that wraps an image reference.  Any blobs which are
 // written to the destination image created from the resulting reference will also be stored
 // as-is to the specified directory or a temporary directory.
@@ -85,13 +78,22 @@ func (b *BlobCache) DeleteImage(ctx context.Context, sys *types.SystemContext) e
 	return b.reference.DeleteImage(ctx, sys)
 }
 
+// blobPath returns the path appropriate for storing a blob with digest.
+func (b *BlobCache) blobPath(digest digest.Digest, isConfig bool) string {
+	baseName := digest.String()
+	if isConfig {
+		baseName += ".config"
+	}
+	return filepath.Join(b.directory, baseName)
+}
+
 func (b *BlobCache) HasBlob(blobinfo types.BlobInfo) (bool, int64, error) {
 	if blobinfo.Digest == "" {
 		return false, -1, nil
 	}
 
 	for _, isConfig := range []bool{false, true} {
-		filename := filepath.Join(b.directory, makeFilename(blobinfo.Digest, isConfig))
+		filename := b.blobPath(blobinfo.Digest, isConfig)
 		fileInfo, err := os.Stat(filename)
 		if err == nil && (blobinfo.Size == -1 || blobinfo.Size == fileInfo.Size()) {
 			return true, fileInfo.Size(), nil

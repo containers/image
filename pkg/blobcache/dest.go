@@ -69,7 +69,7 @@ func (d *blobCacheDestination) IgnoresEmbeddedDockerReference() bool {
 // file.  If we successfully save all of the data, rename the file to match the digest of the data,
 // and make notes about the relationship between the file that holds a copy of the compressed data
 // and this new file.
-func saveStream(wg *sync.WaitGroup, decompressReader io.ReadCloser, tempFile *os.File, compressedFilename string, compressedDigest digest.Digest, isConfig bool, alternateDigest *digest.Digest) {
+func (d *blobCacheDestination) saveStream(wg *sync.WaitGroup, decompressReader io.ReadCloser, tempFile *os.File, compressedFilename string, compressedDigest digest.Digest, isConfig bool, alternateDigest *digest.Digest) {
 	defer wg.Done()
 	// Decompress from and digest the reading end of that pipe.
 	decompressed, err3 := archive.DecompressStream(decompressReader)
@@ -88,7 +88,7 @@ func saveStream(wg *sync.WaitGroup, decompressReader io.ReadCloser, tempFile *os
 	decompressed.Close()
 	tempFile.Close()
 	// Determine the name that we should give to the uncompressed copy of the blob.
-	decompressedFilename := filepath.Join(filepath.Dir(tempFile.Name()), makeFilename(digester.Digest(), isConfig))
+	decompressedFilename := d.reference.blobPath(digester.Digest(), isConfig)
 	if err3 == nil {
 		// Rename the temporary file.
 		if err3 = os.Rename(tempFile.Name(), decompressedFilename); err3 != nil {
@@ -129,7 +129,7 @@ func (d *blobCacheDestination) PutBlob(ctx context.Context, stream io.Reader, in
 	needToWait := false
 	compression := archive.Uncompressed
 	if inputInfo.Digest != "" {
-		filename := filepath.Join(d.reference.directory, makeFilename(inputInfo.Digest, isConfig))
+		filename := d.reference.blobPath(inputInfo.Digest, isConfig)
 		tempfile, err = os.CreateTemp(filepath.Dir(filename), filepath.Base(filename))
 		if err == nil {
 			stream = io.TeeReader(stream, tempfile)
@@ -177,7 +177,7 @@ func (d *blobCacheDestination) PutBlob(ctx context.Context, stream io.Reader, in
 						// Let saveStream() close the reading end and handle the temporary file.
 						wg.Add(1)
 						needToWait = true
-						go saveStream(wg, decompressReader, decompressedTemp, filename, inputInfo.Digest, isConfig, &alternateDigest)
+						go d.saveStream(wg, decompressReader, decompressedTemp, filename, inputInfo.Digest, isConfig, &alternateDigest)
 					}
 				}
 			}
@@ -208,7 +208,7 @@ func (d *blobCacheDestination) TryReusingBlob(ctx context.Context, info types.Bl
 	}
 
 	for _, isConfig := range []bool{false, true} {
-		filename := filepath.Join(d.reference.directory, makeFilename(info.Digest, isConfig))
+		filename := d.reference.blobPath(info.Digest, isConfig)
 		f, err := os.Open(filename)
 		if err == nil {
 			defer f.Close()
@@ -228,7 +228,7 @@ func (d *blobCacheDestination) PutManifest(ctx context.Context, manifestBytes []
 	if err != nil {
 		logrus.Warnf("error digesting manifest %q: %v", string(manifestBytes), err)
 	} else {
-		filename := filepath.Join(d.reference.directory, makeFilename(manifestDigest, false))
+		filename := d.reference.blobPath(manifestDigest, false)
 		if err = ioutils.AtomicWriteFile(filename, manifestBytes, 0600); err != nil {
 			logrus.Warnf("error saving manifest as %q: %v", filename, err)
 		}

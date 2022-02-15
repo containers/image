@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/containers/image/v5/internal/image"
@@ -49,7 +48,7 @@ func (s *blobCacheSource) Close() error {
 
 func (s *blobCacheSource) GetManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error) {
 	if instanceDigest != nil {
-		filename := filepath.Join(s.reference.directory, makeFilename(*instanceDigest, false))
+		filename := s.reference.blobPath(*instanceDigest, false)
 		manifestBytes, err := os.ReadFile(filename)
 		if err == nil {
 			s.cacheHits++
@@ -75,7 +74,7 @@ func (s *blobCacheSource) GetBlob(ctx context.Context, blobinfo types.BlobInfo, 
 	}
 	if present {
 		for _, isConfig := range []bool{false, true} {
-			filename := filepath.Join(s.reference.directory, makeFilename(blobinfo.Digest, isConfig))
+			filename := s.reference.blobPath(blobinfo.Digest, isConfig)
 			f, err := os.Open(filename)
 			if err == nil {
 				s.mu.Lock()
@@ -129,7 +128,7 @@ func (s *blobCacheSource) LayerInfosForCopy(ctx context.Context, instanceDigest 
 		for _, info := range infos {
 			var replaceDigest []byte
 			var err error
-			blobFile := filepath.Join(s.reference.directory, makeFilename(info.Digest, false))
+			blobFile := s.reference.blobPath(info.Digest, false)
 			alternate := ""
 			switch s.reference.compress {
 			case types.Compress:
@@ -140,7 +139,7 @@ func (s *blobCacheSource) LayerInfosForCopy(ctx context.Context, instanceDigest 
 				replaceDigest, err = os.ReadFile(alternate)
 			}
 			if err == nil && digest.Digest(replaceDigest).Validate() == nil {
-				alternate = filepath.Join(filepath.Dir(alternate), makeFilename(digest.Digest(replaceDigest), false))
+				alternate = s.reference.blobPath(digest.Digest(replaceDigest), false)
 				fileInfo, err := os.Stat(alternate)
 				if err == nil {
 					switch info.MediaType {
