@@ -17,6 +17,7 @@ import (
 	cp "github.com/containers/image/v5/copy"
 	"github.com/containers/image/v5/directory"
 	"github.com/containers/image/v5/internal/image"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/pkg/blobinfocache/none"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/types"
@@ -30,6 +31,7 @@ import (
 var (
 	_ types.ImageReference   = &BlobCache{}
 	_ types.ImageSource      = &blobCacheSource{}
+	_ private.ImageSource    = (*blobCacheSource)(nil)
 	_ types.ImageDestination = &blobCacheDestination{}
 )
 
