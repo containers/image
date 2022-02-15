@@ -27,6 +27,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var (
+	_ types.ImageReference   = &BlobCache{}
+	_ types.ImageSource      = &blobCacheSource{}
+	_ types.ImageDestination = &blobCacheDestination{}
+)
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if testing.Verbose() {

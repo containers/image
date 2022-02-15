@@ -14,12 +14,6 @@ import (
 	perrors "github.com/pkg/errors"
 )
 
-var (
-	_ types.ImageReference   = &BlobCache{}
-	_ types.ImageSource      = &blobCacheSource{}
-	_ types.ImageDestination = &blobCacheDestination{}
-)
-
 const (
 	compressedNote   = ".compressed"
 	decompressedNote = ".decompressed"
