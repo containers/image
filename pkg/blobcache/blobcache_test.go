@@ -29,10 +29,11 @@ import (
 )
 
 var (
-	_ types.ImageReference   = &BlobCache{}
-	_ types.ImageSource      = &blobCacheSource{}
-	_ private.ImageSource    = (*blobCacheSource)(nil)
-	_ types.ImageDestination = &blobCacheDestination{}
+	_ types.ImageReference     = &BlobCache{}
+	_ types.ImageSource        = &blobCacheSource{}
+	_ private.ImageSource      = (*blobCacheSource)(nil)
+	_ types.ImageDestination   = &blobCacheDestination{}
+	_ private.ImageDestination = (*blobCacheDestination)(nil)
 )
 
 func TestMain(m *testing.M) {
