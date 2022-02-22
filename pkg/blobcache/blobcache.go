@@ -139,7 +139,7 @@ func (b *BlobCache) Directory() string {
 	return b.directory
 }
 
-func (b *BlobCache) clearCache() error {
+func (b *BlobCache) ClearCache() error {
 	f, err := os.Open(b.directory)
 	if err != nil {
 		return errors.WithStack(err)
