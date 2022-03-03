@@ -70,6 +70,30 @@ func (index *OCI1Index) UpdateInstances(updates []ListUpdate) error {
 	return nil
 }
 
+func (index *OCI1Index) UpdateInstancesAndDiscardOthers(listUpdate []ListUpdate) error {
+	existingManifest := map[digest.Digest]imgspecv1.Descriptor{}
+	for _, m := range index.Manifests {
+		for _, u := range listUpdate {
+			if m.Digest == u.Digest {
+				existingManifest[u.Digest] = m
+			}
+		}
+	}
+	index.Manifests = []imgspecv1.Descriptor{}
+	for _, u := range listUpdate {
+		updatedManifest, ok := existingManifest[u.Digest]
+		if !ok {
+			return errors.New("digest needs to exist in manifest")
+		}
+		updatedManifest.MediaType = u.MediaType
+		updatedManifest.Digest = u.Digest
+		updatedManifest.Size = u.Size
+		index.Manifests = append(index.Manifests, updatedManifest)
+	}
+
+	return nil
+}
+
 // ChooseInstance parses blob as an oci v1 manifest index, and returns the digest
 // of the image which is appropriate for the current environment.
 func (index *OCI1Index) ChooseInstance(ctx *types.SystemContext) (digest.Digest, error) {

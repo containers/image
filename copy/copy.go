@@ -476,6 +476,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	}
 	c.Printf("Copying %d of %d images in list\n", imagesToCopy, len(instanceDigests))
 	updates := make([]manifest.ListUpdate, len(instanceDigests))
+	copiedUpdates := []manifest.ListUpdate{}
 	instancesCopied := 0
 	for i, instanceDigest := range instanceDigests {
 		if options.ImageListSelection == CopySpecificImages {
@@ -512,6 +513,16 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 			MediaType: updatedManifestType,
 		}
 		updates[i] = update
+		copiedUpdates = append(copiedUpdates, update)
+	}
+
+	// In case we want to copy specific digests (i.e. CopySpecificImages) modify the manifest list to only contain
+	// the images we want to copy.
+	if len(copiedUpdates) < len(instanceDigests) {
+		updates = copiedUpdates
+		if err = updatedList.UpdateInstancesAndDiscardOthers(updates); err != nil {
+			return nil, err
+		}
 	}
 
 	// Now reset the digest/size/types of the manifests in the list to account for any conversions that we made.

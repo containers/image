@@ -33,6 +33,10 @@ type List interface {
 	// must be specified.
 	UpdateInstances([]ListUpdate) error
 
+	// UpdateInstancesAndDiscardOthers overrides the instances slice with information contained in the passed-in slice.
+	// All instances which do not have a matching digest in the passed-in slice will be discarded.
+	UpdateInstancesAndDiscardOthers([]ListUpdate) error
+
 	// Instance returns the size and MIME type of a particular instance in the list.
 	Instance(digest.Digest) (ListUpdate, error)
 
