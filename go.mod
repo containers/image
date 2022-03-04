@@ -18,7 +18,7 @@ require (
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/imdario/mergo v0.3.12
-	github.com/klauspost/compress v1.14.4
+	github.com/klauspost/compress v1.15.0
 	github.com/klauspost/pgzip v1.2.5
 	github.com/manifoldco/promptui v0.9.0
 	github.com/opencontainers/go-digest v1.0.0
