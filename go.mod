@@ -10,7 +10,7 @@ require (
 	github.com/containers/ocicrypt v1.1.2
 	github.com/containers/storage v1.38.3-0.20220301151551-d06b0f81c0aa
 	github.com/docker/distribution v2.8.1+incompatible
-	github.com/docker/docker v20.10.12+incompatible
+	github.com/docker/docker v20.10.13+incompatible
 	github.com/docker/docker-credential-helpers v0.6.4
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
