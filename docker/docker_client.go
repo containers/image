@@ -538,7 +538,7 @@ func (c *dockerClient) makeRequestToResolvedURLOnce(ctx context.Context, method,
 	if err != nil {
 		return nil, err
 	}
-	if streamLen != -1 { // Do not blindly overwrite if streamLen == -1, http.NewRequest above can figure out the length of bytes.Reader and similar objects without us having to compute it.
+	if streamLen != -1 { // Do not blindly overwrite if streamLen == -1, http.NewRequestWithContext above can figure out the length of bytes.Reader and similar objects without us having to compute it.
 		req.ContentLength = streamLen
 	}
 	req.Header.Set("Docker-Distribution-API-Version", "registry/2.0")
