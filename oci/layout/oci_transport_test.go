@@ -61,9 +61,7 @@ func TestParseReference(t *testing.T) {
 
 // testParseReference is a test shared for Transport.ParseReference and ParseReference.
 func testParseReference(t *testing.T, fn func(string) (types.ImageReference, error)) {
-	tmpDir, err := ioutil.TempDir("", "oci-transport-test")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	for _, path := range []string{
 		"/",
@@ -88,7 +86,7 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 		}
 	}
 
-	_, err = fn(tmpDir + ":invalid'image!value@")
+	_, err := fn(tmpDir + ":invalid'image!value@")
 	assert.Error(t, err)
 }
 
@@ -98,9 +96,7 @@ func TestNewReference(t *testing.T) {
 		noImageValue = ""
 	)
 
-	tmpDir, err := ioutil.TempDir("", "oci-transport-test")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	ref, err := NewReference(tmpDir, imageValue)
 	require.NoError(t, err)
@@ -127,11 +123,8 @@ func TestNewReference(t *testing.T) {
 }
 
 // refToTempOCI creates a temporary directory and returns an reference to it.
-// The caller should
-//   defer os.RemoveAll(tmpDir)
-func refToTempOCI(t *testing.T) (ref types.ImageReference, tmpDir string) {
-	tmpDir, err := ioutil.TempDir("", "oci-transport-test")
-	require.NoError(t, err)
+func refToTempOCI(t *testing.T) (types.ImageReference, string) {
+	tmpDir := t.TempDir()
 	m := `{
 		"schemaVersion": 2,
 		"manifests": [
@@ -150,23 +143,20 @@ func refToTempOCI(t *testing.T) (ref types.ImageReference, tmpDir string) {
 		]
 	}
 `
-	err = ioutil.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
+	err := ioutil.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
 	require.NoError(t, err)
-	ref, err = NewReference(tmpDir, "imageValue")
+	ref, err := NewReference(tmpDir, "imageValue")
 	require.NoError(t, err)
 	return ref, tmpDir
 }
 
 func TestReferenceTransport(t *testing.T) {
-	ref, tmpDir := refToTempOCI(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempOCI(t)
 	assert.Equal(t, Transport, ref.Transport())
 }
 
 func TestReferenceStringWithinTransport(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "oci-transport-test")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	for _, c := range []struct{ input, result string }{
 		{"/dir1:notlatest:notlatest", "/dir1:notlatest:notlatest"}, // Explicit image
@@ -185,14 +175,12 @@ func TestReferenceStringWithinTransport(t *testing.T) {
 }
 
 func TestReferenceDockerReference(t *testing.T) {
-	ref, tmpDir := refToTempOCI(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempOCI(t)
 	assert.Nil(t, ref.DockerReference())
 }
 
 func TestReferencePolicyConfigurationIdentity(t *testing.T) {
 	ref, tmpDir := refToTempOCI(t)
-	defer os.RemoveAll(tmpDir)
 
 	assert.Equal(t, tmpDir, ref.PolicyConfigurationIdentity())
 	// A non-canonical path.  Test just one, the various other cases are
@@ -209,7 +197,6 @@ func TestReferencePolicyConfigurationIdentity(t *testing.T) {
 
 func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 	ref, tmpDir := refToTempOCI(t)
-	defer os.RemoveAll(tmpDir)
 	// We don't really know enough to make a full equality test here.
 	ns := ref.PolicyConfigurationNamespaces()
 	require.NotNil(t, ns)
@@ -240,37 +227,32 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 }
 
 func TestReferenceNewImage(t *testing.T) {
-	ref, tmpDir := refToTempOCI(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempOCI(t)
 	_, err := ref.NewImage(context.Background(), nil)
 	assert.Error(t, err)
 }
 
 func TestReferenceNewImageSource(t *testing.T) {
-	ref, tmpDir := refToTempOCI(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempOCI(t)
 	_, err := ref.NewImageSource(context.Background(), nil)
 	assert.NoError(t, err)
 }
 
 func TestReferenceNewImageDestination(t *testing.T) {
-	ref, tmpDir := refToTempOCI(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempOCI(t)
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	assert.NoError(t, err)
 	defer dest.Close()
 }
 
 func TestReferenceDeleteImage(t *testing.T) {
-	ref, tmpDir := refToTempOCI(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempOCI(t)
 	err := ref.DeleteImage(context.Background(), nil)
 	assert.Error(t, err)
 }
 
 func TestReferenceOCILayoutPath(t *testing.T) {
 	ref, tmpDir := refToTempOCI(t)
-	defer os.RemoveAll(tmpDir)
 	ociRef, ok := ref.(ociReference)
 	require.True(t, ok)
 	assert.Equal(t, tmpDir+"/oci-layout", ociRef.ociLayoutPath())
@@ -278,7 +260,6 @@ func TestReferenceOCILayoutPath(t *testing.T) {
 
 func TestReferenceIndexPath(t *testing.T) {
 	ref, tmpDir := refToTempOCI(t)
-	defer os.RemoveAll(tmpDir)
 	ociRef, ok := ref.(ociReference)
 	require.True(t, ok)
 	assert.Equal(t, tmpDir+"/index.json", ociRef.indexPath())
@@ -288,7 +269,6 @@ func TestReferenceBlobPath(t *testing.T) {
 	const hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 	ref, tmpDir := refToTempOCI(t)
-	defer os.RemoveAll(tmpDir)
 	ociRef, ok := ref.(ociReference)
 	require.True(t, ok)
 	bp, err := ociRef.blobPath("sha256:"+hex, "")
@@ -299,8 +279,7 @@ func TestReferenceBlobPath(t *testing.T) {
 func TestReferenceSharedBlobPathShared(t *testing.T) {
 	const hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
-	ref, tmpDir := refToTempOCI(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempOCI(t)
 	ociRef, ok := ref.(ociReference)
 	require.True(t, ok)
 	bp, err := ociRef.blobPath("sha256:"+hex, "/external/path")
@@ -311,8 +290,7 @@ func TestReferenceSharedBlobPathShared(t *testing.T) {
 func TestReferenceBlobPathInvalid(t *testing.T) {
 	const hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
-	ref, tmpDir := refToTempOCI(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempOCI(t)
 	ociRef, ok := ref.(ociReference)
 	require.True(t, ok)
 	_, err := ociRef.blobPath(hex, "")

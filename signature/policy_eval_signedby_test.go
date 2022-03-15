@@ -184,11 +184,9 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 
 // createInvalidSigDir creates a directory suitable for dirImageMock, in which image.Signatures()
 // fails.
-// The caller should eventually call os.RemoveAll on the returned path.
 func createInvalidSigDir(t *testing.T) string {
-	dir, err := ioutil.TempDir("", "skopeo-test-unreadable-signature")
-	require.NoError(t, err)
-	err = ioutil.WriteFile(path.Join(dir, "manifest.json"), []byte("{}"), 0644)
+	dir := t.TempDir()
+	err := ioutil.WriteFile(path.Join(dir, "manifest.json"), []byte("{}"), 0644)
 	require.NoError(t, err)
 	// Creating a 000-permissions file would work for unprivileged accounts, but root (in particular,
 	// in the Docker container we use for testing) would still have access.  So, create a symlink
@@ -212,7 +210,6 @@ func TestPRSignedByIsRunningImageAllowed(t *testing.T) {
 
 	// Error reading signatures
 	invalidSigDir := createInvalidSigDir(t)
-	defer os.RemoveAll(invalidSigDir)
 	image = dirImageMock(t, invalidSigDir, "testing/manifest:latest")
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)

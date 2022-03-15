@@ -1,7 +1,6 @@
 package blobinfocache
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -115,9 +114,7 @@ func TestBlobInfoCacheDir(t *testing.T) {
 }
 
 func TestDefaultCache(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "TestDefaultCache")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Success
 	normalDir := filepath.Join(tmpDir, "normal")
@@ -152,7 +149,7 @@ func TestDefaultCache(t *testing.T) {
 
 	// Error creating the parent directory:
 	unwritableDir := filepath.Join(tmpDir, "unwritable")
-	err = os.Mkdir(unwritableDir, 0700)
+	err := os.Mkdir(unwritableDir, 0700)
 	require.NoError(t, err)
 	defer func() {
 		err = os.Chmod(unwritableDir, 0700) // To make it possible to remove it again

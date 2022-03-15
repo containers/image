@@ -3,7 +3,6 @@ package signature
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/containers/image/v5/docker"
@@ -355,7 +354,6 @@ func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
 
 	// Error reading signatures.
 	invalidSigDir := createInvalidSigDir(t)
-	defer os.RemoveAll(invalidSigDir)
 	img = pcImageMock(t, invalidSigDir, "testing/manifest:latest")
 	sigs, err = pc.GetSignaturesWithAcceptedAuthor(context.Background(), img)
 	assert.Error(t, err)

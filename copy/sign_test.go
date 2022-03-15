@@ -39,9 +39,7 @@ func TestCreateSignature(t *testing.T) {
 	defer os.Unsetenv("GNUPGHOME")
 
 	// Signing a directory: reference, which does not have a DockerReference(), fails.
-	tempDir, err := ioutil.TempDir("", "signature-dir-dest")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 	dirRef, err := directory.NewReference(tempDir)
 	require.NoError(t, err)
 	dirDest, err := dirRef.NewImageDestination(context.Background(), nil)
