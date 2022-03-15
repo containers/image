@@ -10,13 +10,13 @@ import (
 
 var _ blobinfocache.BlobInfoCache2 = &cache{}
 
-func newTestCache(t *testing.T) (blobinfocache.BlobInfoCache2, func(t *testing.T)) {
+func newTestCache(t *testing.T) blobinfocache.BlobInfoCache2 {
 	// We need a separate temporary directory here, because bolt.Open(…, &bolt.Options{Readonly:true}) can't deal with
 	// an existing but empty file, and incorrectly fails without releasing the lock - which in turn causes
 	// any future writes to hang.  Creating a temporary directory allows us to use a path to a
 	// non-existent file, thus replicating the expected conditions for creating a new DB.
 	dir := t.TempDir()
-	return new2(filepath.Join(dir, "db")), func(t *testing.T) {}
+	return new2(filepath.Join(dir, "db"))
 }
 
 func TestNew(t *testing.T) {
