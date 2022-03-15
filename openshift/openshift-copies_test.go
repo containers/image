@@ -15,24 +15,22 @@ const fixtureKubeConfigPath = "testdata/admin.kubeconfig"
 
 // Set up KUBECONFIG to point at the fixture, and return a handler to clean it up.
 // Callers MUST NOT call testing.T.Parallel().
-func setupKubeConfigForSerialTest() func() {
+func setupKubeConfigForSerialTest(t *testing.T) {
 	// Environment is per-process, so this looks very unsafe; actually it seems fine because tests are not
 	// run in parallel unless they opt in by calling t.Parallel().  So don’t do that.
 	oldKC, hasKC := os.LookupEnv("KUBECONFIG")
-	cleanup := func() {
+	t.Cleanup(func() {
 		if hasKC {
 			os.Setenv("KUBECONFIG", oldKC)
 		} else {
 			os.Unsetenv("KUBECONFIG")
 		}
-	}
+	})
 	os.Setenv("KUBECONFIG", fixtureKubeConfigPath)
-	return cleanup
 }
 
 func TestClientConfigLoadingRules(t *testing.T) {
-	cleanup := setupKubeConfigForSerialTest()
-	defer cleanup()
+	setupKubeConfigForSerialTest(t)
 
 	rules := newOpenShiftClientConfigLoadingRules()
 	res, err := rules.Load()
@@ -66,8 +64,7 @@ func TestClientConfigLoadingRules(t *testing.T) {
 }
 
 func TestDirectClientConfig(t *testing.T) {
-	cleanup := setupKubeConfigForSerialTest()
-	defer cleanup()
+	setupKubeConfigForSerialTest(t)
 
 	rules := newOpenShiftClientConfigLoadingRules()
 	config, err := rules.Load()
@@ -87,8 +84,7 @@ func TestDirectClientConfig(t *testing.T) {
 }
 
 func TestDeferredLoadingClientConfig(t *testing.T) {
-	cleanup := setupKubeConfigForSerialTest()
-	defer cleanup()
+	setupKubeConfigForSerialTest(t)
 
 	rules := newOpenShiftClientConfigLoadingRules()
 	deferred := newNonInteractiveDeferredLoadingClientConfig(rules)
@@ -105,8 +101,7 @@ func TestDeferredLoadingClientConfig(t *testing.T) {
 }
 
 func TestDefaultClientConfig(t *testing.T) {
-	cleanup := setupKubeConfigForSerialTest()
-	defer cleanup()
+	setupKubeConfigForSerialTest(t)
 
 	config := defaultClientConfig()
 	res, err := config.ClientConfig()
