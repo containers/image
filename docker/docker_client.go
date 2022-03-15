@@ -522,7 +522,7 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method stri
 		if delay > backoffMaxDelay {
 			delay = backoffMaxDelay
 		}
-		logrus.Debugf("Too many requests to %s: sleeping for %f seconds before next attempt", url.String(), delay.Seconds())
+		logrus.Debugf("Too many requests to %s: sleeping for %f seconds before next attempt", url.Redacted(), delay.Seconds())
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -557,7 +557,7 @@ func (c *dockerClient) makeRequestToResolvedURLOnce(ctx context.Context, method 
 			return nil, err
 		}
 	}
-	logrus.Debugf("%s %s", method, url.String())
+	logrus.Debugf("%s %s", method, url.Redacted())
 	res, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -657,7 +657,7 @@ func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge chall
 	authReq.Body = ioutil.NopCloser(bytes.NewBufferString(params.Encode()))
 	authReq.Header.Add("User-Agent", c.userAgent)
 	authReq.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	logrus.Debugf("%s %s", authReq.Method, authReq.URL.String())
+	logrus.Debugf("%s %s", authReq.Method, authReq.URL.Redacted())
 	res, err := c.client.Do(authReq)
 	if err != nil {
 		return nil, err
@@ -709,7 +709,7 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
 	}
 	authReq.Header.Add("User-Agent", c.userAgent)
 
-	logrus.Debugf("%s %s", authReq.Method, authReq.URL.String())
+	logrus.Debugf("%s %s", authReq.Method, authReq.URL.Redacted())
 	res, err := c.client.Do(authReq)
 	if err != nil {
 		return nil, err
@@ -745,11 +745,11 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 		}
 		resp, err := c.makeRequestToResolvedURL(ctx, http.MethodGet, url, nil, nil, -1, noAuth, nil)
 		if err != nil {
-			logrus.Debugf("Ping %s err %s (%#v)", url.String(), err.Error(), err)
+			logrus.Debugf("Ping %s err %s (%#v)", url.Redacted(), err.Error(), err)
 			return err
 		}
 		defer resp.Body.Close()
-		logrus.Debugf("Ping %s status %d", url.String(), resp.StatusCode)
+		logrus.Debugf("Ping %s status %d", url.Redacted(), resp.StatusCode)
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
 			return httpResponseToError(resp, "")
 		}
@@ -775,11 +775,11 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 			}
 			resp, err := c.makeRequestToResolvedURL(ctx, http.MethodGet, url, nil, nil, -1, noAuth, nil)
 			if err != nil {
-				logrus.Debugf("Ping %s err %s (%#v)", url.String(), err.Error(), err)
+				logrus.Debugf("Ping %s err %s (%#v)", url.Redacted(), err.Error(), err)
 				return false
 			}
 			defer resp.Body.Close()
-			logrus.Debugf("Ping %s status %d", url.String(), resp.StatusCode)
+			logrus.Debugf("Ping %s status %d", url.Redacted(), resp.StatusCode)
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
 				return false
 			}

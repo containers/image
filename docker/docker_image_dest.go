@@ -257,9 +257,8 @@ func (d *dockerImageDestination) mountBlob(ctx context.Context, srcRepo referenc
 			"from":  {reference.Path(srcRepo)},
 		}.Encode(),
 	}
-	mountPath := u.String()
-	logrus.Debugf("Trying to mount %s", mountPath)
-	res, err := d.c.makeRequest(ctx, http.MethodPost, mountPath, nil, nil, v2Auth, extraScope)
+	logrus.Debugf("Trying to mount %s", u.Redacted())
+	res, err := d.c.makeRequest(ctx, http.MethodPost, u.String(), nil, nil, v2Auth, extraScope)
 	if err != nil {
 		return err
 	}
@@ -276,7 +275,7 @@ func (d *dockerImageDestination) mountBlob(ctx context.Context, srcRepo referenc
 		if err != nil {
 			return errors.Wrap(err, "determining upload URL after a mount attempt")
 		}
-		logrus.Debugf("... started an upload instead of mounting, trying to cancel at %s", uploadLocation.String())
+		logrus.Debugf("... started an upload instead of mounting, trying to cancel at %s", uploadLocation.Redacted())
 		res2, err := d.c.makeRequestToResolvedURL(ctx, http.MethodDelete, uploadLocation, nil, nil, -1, v2Auth, extraScope)
 		if err != nil {
 			logrus.Debugf("Error trying to cancel an inadvertent upload: %s", err)
@@ -600,9 +599,9 @@ func (d *dockerImageDestination) putOneSignature(url *url.URL, signature []byte)
 		return nil
 
 	case "http", "https":
-		return errors.Errorf("Writing directly to a %s sigstore %s is not supported. Configure a sigstore-staging: location", url.Scheme, url.String())
+		return errors.Errorf("Writing directly to a %s sigstore %s is not supported. Configure a sigstore-staging: location", url.Scheme, url.Redacted())
 	default:
-		return errors.Errorf("Unsupported scheme when writing signature to %s", url.String())
+		return errors.Errorf("Unsupported scheme when writing signature to %s", url.Redacted())
 	}
 }
 
@@ -620,9 +619,9 @@ func (c *dockerClient) deleteOneSignature(url *url.URL) (missing bool, err error
 		return false, err
 
 	case "http", "https":
-		return false, errors.Errorf("Writing directly to a %s sigstore %s is not supported. Configure a sigstore-staging: location", url.Scheme, url.String())
+		return false, errors.Errorf("Writing directly to a %s sigstore %s is not supported. Configure a sigstore-staging: location", url.Scheme, url.Redacted())
 	default:
-		return false, errors.Errorf("Unsupported scheme when deleting signature from %s", url.String())
+		return false, errors.Errorf("Unsupported scheme when deleting signature from %s", url.Redacted())
 	}
 }
 

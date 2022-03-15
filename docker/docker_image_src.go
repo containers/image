@@ -525,7 +525,7 @@ func (s *dockerImageSource) getOneSignature(ctx context.Context, url *url.URL) (
 		return sig, false, nil
 
 	case "http", "https":
-		logrus.Debugf("GET %s", url)
+		logrus.Debugf("GET %s", url.Redacted())
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 		if err != nil {
 			return nil, false, err
@@ -538,7 +538,7 @@ func (s *dockerImageSource) getOneSignature(ctx context.Context, url *url.URL) (
 		if res.StatusCode == http.StatusNotFound {
 			return nil, true, nil
 		} else if res.StatusCode != http.StatusOK {
-			return nil, false, errors.Errorf("Error reading signature from %s: status %d (%s)", url.String(), res.StatusCode, http.StatusText(res.StatusCode))
+			return nil, false, errors.Errorf("Error reading signature from %s: status %d (%s)", url.Redacted(), res.StatusCode, http.StatusText(res.StatusCode))
 		}
 		sig, err := iolimits.ReadAtMost(res.Body, iolimits.MaxSignatureBodySize)
 		if err != nil {
@@ -547,7 +547,7 @@ func (s *dockerImageSource) getOneSignature(ctx context.Context, url *url.URL) (
 		return sig, false, nil
 
 	default:
-		return nil, false, errors.Errorf("Unsupported scheme when reading signature from %s", url.String())
+		return nil, false, errors.Errorf("Unsupported scheme when reading signature from %s", url.Redacted())
 	}
 }
 
