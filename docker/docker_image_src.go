@@ -253,13 +253,14 @@ func (s *dockerImageSource) getExternalBlob(ctx context.Context, urls []string) 
 		return nil, 0, errors.New("internal error: getExternalBlob called with no URLs")
 	}
 	for _, u := range urls {
-		if u, err := url.Parse(u); err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		url, err := url.Parse(u)
+		if err != nil || (url.Scheme != "http" && url.Scheme != "https") {
 			continue // unsupported url. skip this url.
 		}
 		// NOTE: we must not authenticate on additional URLs as those
 		//       can be abused to leak credentials or tokens.  Please
 		//       refer to CVE-2020-15157 for more information.
-		resp, err = s.c.makeRequestToResolvedURL(ctx, http.MethodGet, u, nil, nil, -1, noAuth, nil)
+		resp, err = s.c.makeRequestToResolvedURL(ctx, http.MethodGet, url, nil, nil, -1, noAuth, nil)
 		if err == nil {
 			if resp.StatusCode != http.StatusOK {
 				err = errors.Errorf("error fetching external blob from %q: %d (%s)", u, resp.StatusCode, http.StatusText(resp.StatusCode))

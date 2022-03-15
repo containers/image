@@ -182,7 +182,7 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 		// This error text should never be user-visible, we terminate only after makeRequestToResolvedURL
 		// returns, so there isn’t a way for the error text to be provided to any of our callers.
 		defer uploadReader.Terminate(errors.New("Reading data from an already terminated upload"))
-		res, err = d.c.makeRequestToResolvedURL(ctx, http.MethodPatch, uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, uploadReader, inputInfo.Size, v2Auth, nil)
+		res, err = d.c.makeRequestToResolvedURL(ctx, http.MethodPatch, uploadLocation, map[string][]string{"Content-Type": {"application/octet-stream"}}, uploadReader, inputInfo.Size, v2Auth, nil)
 		if err != nil {
 			logrus.Debugf("Error uploading layer chunked %v", err)
 			return nil, err
@@ -207,7 +207,7 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	locationQuery := uploadLocation.Query()
 	locationQuery.Set("digest", blobDigest.String())
 	uploadLocation.RawQuery = locationQuery.Encode()
-	res, err = d.c.makeRequestToResolvedURL(ctx, http.MethodPut, uploadLocation.String(), map[string][]string{"Content-Type": {"application/octet-stream"}}, nil, -1, v2Auth, nil)
+	res, err = d.c.makeRequestToResolvedURL(ctx, http.MethodPut, uploadLocation, map[string][]string{"Content-Type": {"application/octet-stream"}}, nil, -1, v2Auth, nil)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
@@ -277,7 +277,7 @@ func (d *dockerImageDestination) mountBlob(ctx context.Context, srcRepo referenc
 			return errors.Wrap(err, "determining upload URL after a mount attempt")
 		}
 		logrus.Debugf("... started an upload instead of mounting, trying to cancel at %s", uploadLocation.String())
-		res2, err := d.c.makeRequestToResolvedURL(ctx, http.MethodDelete, uploadLocation.String(), nil, nil, -1, v2Auth, extraScope)
+		res2, err := d.c.makeRequestToResolvedURL(ctx, http.MethodDelete, uploadLocation, nil, nil, -1, v2Auth, extraScope)
 		if err != nil {
 			logrus.Debugf("Error trying to cancel an inadvertent upload: %s", err)
 		} else {
