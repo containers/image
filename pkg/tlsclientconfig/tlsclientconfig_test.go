@@ -20,20 +20,45 @@ func TestSetupCertificates(t *testing.T) {
 	err := SetupCertificates("testdata/full", &tlsc)
 	require.NoError(t, err)
 	require.NotNil(t, tlsc.RootCAs)
-	// RootCAs include SystemCertPool
+
+	// SystemCertPool is implemented natively, and .Subjects() does not
+	// return raw certificates, on some systems (as of Go 1.18,
+	// Windows, macOS, iOS); so, .Subjects() is deprecated.
+	// We still use .Subjects() in these tests, because they work
+	// acceptably even in the native case, and they work fine on Linux,
+	// which we care about the most.
+
+	// For an unknown reason, with Go 1.18, as of Mar 15 2022,
+	// (golangci-lint) reports staticcheck SA1019 about using
+	// the deprecated .Subjects() function, but the //lint:ignore
+	// directives are ineffective (and cause extra warnings about
+	// pointless lint:ignore directives). So, use the big hammer
+	// of silencing staticcheck entirely; that should be removed
+	// as soon as practical.
+
+	// On systems where SystemCertPool is not special-cased, RootCAs include SystemCertPool;
+	// On systems where SystemCertPool is special cased, this compares two empty sets
+	// and succeeds.
+	// There isn’t a plausible alternative to calling .Subjects() here.
 	loadedSubjectBytes := map[string]struct{}{}
-	for _, s := range tlsc.RootCAs.Subjects() {
+	// lint:ignore SA1019 Receiving no data for system roots is acceptable.
+	for _, s := range tlsc.RootCAs.Subjects() { //nolint staticcheck: the lint:ignore directive is somehow not recognized (and causes an extra warning!)
 		loadedSubjectBytes[string(s)] = struct{}{}
 	}
 	systemCertPool, err := x509.SystemCertPool()
 	require.NoError(t, err)
-	for _, s := range systemCertPool.Subjects() {
+	// lint:ignore SA1019 Receiving no data for system roots is acceptable.
+	for _, s := range systemCertPool.Subjects() { //nolint staticcheck: the lint:ignore directive is somehow not recognized (and causes an extra warning!)
 		_, ok := loadedSubjectBytes[string(s)]
 		assert.True(t, ok)
 	}
-	// RootCAs include our certificates
+
+	// RootCAs include our certificates.
+	// We could possibly test without .Subjects() this by validating certificates
+	// signed by our test CAs.
 	loadedSubjectCNs := map[string]struct{}{}
-	for _, s := range tlsc.RootCAs.Subjects() {
+	// lint:ignore SA1019 We only care about non-system roots here.
+	for _, s := range tlsc.RootCAs.Subjects() { //nolint staticcheck: the lint:ignore directive is somehow not recognized (and causes an extra warning!)
 		subjectRDN := pkix.RDNSequence{}
 		rest, err := asn1.Unmarshal(s, &subjectRDN)
 		require.NoError(t, err)
