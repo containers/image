@@ -16,7 +16,7 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/iolimits"
-	internalTypes "github.com/containers/image/v5/internal/types"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/types"
@@ -147,6 +147,11 @@ func (s *dockerImageSource) Close() error {
 	return nil
 }
 
+// SupportsGetBlobAt() returns true if GetBlobAt (BlobChunkAccessor) is supported.
+func (s *dockerImageSource) SupportsGetBlobAt() bool {
+	return true
+}
+
 // LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer
 // blobsums that are listed in the image's manifest.  If values are returned, they should be used when using GetBlob()
 // to read the image's layers.
@@ -236,6 +241,9 @@ func (s *dockerImageSource) ensureManifestIsLoaded(ctx context.Context) error {
 	return nil
 }
 
+// getExternalBlob returns the reader of the first available blob URL from urls, which must not be empty.
+// This function can return nil reader when no url is supported by this function. In this case, the caller
+// should fallback to fetch the non-external blob (i.e. pull from the registry).
 func (s *dockerImageSource) getExternalBlob(ctx context.Context, urls []string) (io.ReadCloser, int64, error) {
 	var (
 		resp *http.Response
@@ -244,20 +252,26 @@ func (s *dockerImageSource) getExternalBlob(ctx context.Context, urls []string) 
 	if len(urls) == 0 {
 		return nil, 0, errors.New("internal error: getExternalBlob called with no URLs")
 	}
-	for _, url := range urls {
+	for _, u := range urls {
+		if u, err := url.Parse(u); err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+			continue // unsupported url. skip this url.
+		}
 		// NOTE: we must not authenticate on additional URLs as those
 		//       can be abused to leak credentials or tokens.  Please
 		//       refer to CVE-2020-15157 for more information.
-		resp, err = s.c.makeRequestToResolvedURL(ctx, http.MethodGet, url, nil, nil, -1, noAuth, nil)
+		resp, err = s.c.makeRequestToResolvedURL(ctx, http.MethodGet, u, nil, nil, -1, noAuth, nil)
 		if err == nil {
 			if resp.StatusCode != http.StatusOK {
-				err = errors.Errorf("error fetching external blob from %q: %d (%s)", url, resp.StatusCode, http.StatusText(resp.StatusCode))
+				err = errors.Errorf("error fetching external blob from %q: %d (%s)", u, resp.StatusCode, http.StatusText(resp.StatusCode))
 				logrus.Debug(err)
 				resp.Body.Close()
 				continue
 			}
 			break
 		}
+	}
+	if resp == nil && err == nil {
+		return nil, 0, nil // fallback to non-external blob
 	}
 	if err != nil {
 		return nil, 0, err
@@ -278,8 +292,82 @@ func (s *dockerImageSource) HasThreadSafeGetBlob() bool {
 	return true
 }
 
-// GetBlobAt returns a stream for the specified blob.
-func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []internalTypes.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
+// splitHTTP200ResponseToPartial splits a 200 response in multiple streams as specified by the chunks
+func splitHTTP200ResponseToPartial(streams chan io.ReadCloser, errs chan error, body io.ReadCloser, chunks []private.ImageSourceChunk) {
+	defer close(streams)
+	defer close(errs)
+	currentOffset := uint64(0)
+
+	body = makeBufferedNetworkReader(body, 64, 16384)
+	defer body.Close()
+	for _, c := range chunks {
+		if c.Offset != currentOffset {
+			if c.Offset < currentOffset {
+				errs <- fmt.Errorf("invalid chunk offset specified %v (expected >= %v)", c.Offset, currentOffset)
+				break
+			}
+			toSkip := c.Offset - currentOffset
+			if _, err := io.Copy(ioutil.Discard, io.LimitReader(body, int64(toSkip))); err != nil {
+				errs <- err
+				break
+			}
+			currentOffset += toSkip
+		}
+		s := signalCloseReader{
+			closed:        make(chan interface{}),
+			stream:        ioutil.NopCloser(io.LimitReader(body, int64(c.Length))),
+			consumeStream: true,
+		}
+		streams <- s
+
+		// Wait until the stream is closed before going to the next chunk
+		<-s.closed
+		currentOffset += c.Length
+	}
+}
+
+// handle206Response reads a 206 response and send each part as a separate ReadCloser to the streams chan.
+func handle206Response(streams chan io.ReadCloser, errs chan error, body io.ReadCloser, chunks []private.ImageSourceChunk, mediaType string, params map[string]string) {
+	defer close(streams)
+	defer close(errs)
+	if !strings.HasPrefix(mediaType, "multipart/") {
+		streams <- body
+		return
+	}
+	boundary, found := params["boundary"]
+	if !found {
+		errs <- errors.Errorf("could not find boundary")
+		body.Close()
+		return
+	}
+	buffered := makeBufferedNetworkReader(body, 64, 16384)
+	defer buffered.Close()
+	mr := multipart.NewReader(buffered, boundary)
+	for {
+		p, err := mr.NextPart()
+		if err != nil {
+			if err != io.EOF {
+				errs <- err
+			}
+			return
+		}
+		s := signalCloseReader{
+			closed: make(chan interface{}),
+			stream: p,
+		}
+		streams <- s
+		// NextPart() cannot be called while the current part
+		// is being read, so wait until it is closed
+		<-s.closed
+	}
+}
+
+// GetBlobAt returns a sequential channel of readers that contain data for the requested
+// blob chunks, and a channel that might get a single error value.
+// The specified chunks must be not overlapping and sorted by their offset.
+// The readers must be fully consumed, in the order they are returned, before blocking
+// to read the next chunk.
+func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []private.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
 	headers := make(map[string][]string)
 
 	var rangeVals []string
@@ -299,59 +387,37 @@ func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, 
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := httpResponseToError(res, "Error fetching partial blob"); err != nil {
-		if res.Body != nil {
-			res.Body.Close()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		// if the server replied with a 200 status code, convert the full body response to a series of
+		// streams as it would have been done with 206.
+		streams := make(chan io.ReadCloser)
+		errs := make(chan error)
+		go splitHTTP200ResponseToPartial(streams, errs, res.Body, chunks)
+		return streams, errs, nil
+	case http.StatusPartialContent:
+		mediaType, params, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
+		if err != nil {
+			return nil, nil, err
 		}
-		return nil, nil, err
-	}
-	if res.StatusCode != http.StatusPartialContent {
+
+		streams := make(chan io.ReadCloser)
+		errs := make(chan error)
+
+		go handle206Response(streams, errs, res.Body, chunks, mediaType, params)
+		return streams, errs, nil
+	case http.StatusBadRequest:
 		res.Body.Close()
-		return nil, nil, errors.Errorf("invalid status code returned when fetching blob %d (%s)", res.StatusCode, http.StatusText(res.StatusCode))
-	}
-
-	mediaType, params, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
-	if err != nil {
+		return nil, nil, private.BadPartialRequestError{Status: res.Status}
+	default:
+		err := httpResponseToError(res, "Error fetching partial blob")
+		if err == nil {
+			err = errors.Errorf("invalid status code returned when fetching blob %d (%s)", res.StatusCode, http.StatusText(res.StatusCode))
+		}
+		res.Body.Close()
 		return nil, nil, err
 	}
-
-	streams := make(chan io.ReadCloser)
-	errs := make(chan error)
-
-	go func() {
-		defer close(streams)
-		defer close(errs)
-		if !strings.HasPrefix(mediaType, "multipart/") {
-			streams <- res.Body
-			return
-		}
-		boundary, found := params["boundary"]
-		if !found {
-			errs <- errors.Errorf("could not find boundary")
-			return
-		}
-		buffered := makeBufferedNetworkReader(res.Body, 64, 16384)
-		defer buffered.Close()
-		mr := multipart.NewReader(buffered, boundary)
-		for {
-			p, err := mr.NextPart()
-			if err != nil {
-				if err != io.EOF {
-					errs <- err
-				}
-				return
-			}
-			s := signalCloseReader{
-				Closed: make(chan interface{}),
-				Stream: p,
-			}
-			streams <- s
-			// NextPart() cannot be called while the current part
-			// is being read, so wait until it is closed
-			<-s.Closed
-		}
-	}()
-	return streams, errs, nil
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
@@ -359,7 +425,12 @@ func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, 
 // May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
 func (s *dockerImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
 	if len(info.URLs) != 0 {
-		return s.getExternalBlob(ctx, info.URLs)
+		r, s, err := s.getExternalBlob(ctx, info.URLs)
+		if err != nil {
+			return nil, 0, err
+		} else if r != nil {
+			return r, s, nil
+		}
 	}
 
 	path := fmt.Sprintf(blobsPath, reference.Path(s.physicalRef.ref), info.Digest.String())
@@ -585,7 +656,7 @@ type bufferedNetworkReaderBuffer struct {
 }
 
 type bufferedNetworkReader struct {
-	stream      io.Reader
+	stream      io.ReadCloser
 	emptyBuffer chan *bufferedNetworkReaderBuffer
 	readyBuffer chan *bufferedNetworkReaderBuffer
 	terminate   chan bool
@@ -611,9 +682,10 @@ func handleBufferedNetworkReader(br *bufferedNetworkReader) {
 	}
 }
 
-func (n *bufferedNetworkReader) Close() {
+func (n *bufferedNetworkReader) Close() error {
 	close(n.terminate)
 	close(n.emptyBuffer)
+	return n.stream.Close()
 }
 
 func (n *bufferedNetworkReader) read(p []byte) (int, error) {
@@ -657,7 +729,7 @@ func (n *bufferedNetworkReader) Read(p []byte) (int, error) {
 	return n.read(p)
 }
 
-func makeBufferedNetworkReader(stream io.Reader, nBuffers, bufferSize uint) *bufferedNetworkReader {
+func makeBufferedNetworkReader(stream io.ReadCloser, nBuffers, bufferSize uint) *bufferedNetworkReader {
 	br := bufferedNetworkReader{
 		stream:      stream,
 		emptyBuffer: make(chan *bufferedNetworkReaderBuffer, nBuffers),
@@ -680,15 +752,22 @@ func makeBufferedNetworkReader(stream io.Reader, nBuffers, bufferSize uint) *buf
 }
 
 type signalCloseReader struct {
-	Closed chan interface{}
-	Stream io.ReadCloser
+	closed        chan interface{}
+	stream        io.ReadCloser
+	consumeStream bool
 }
 
 func (s signalCloseReader) Read(p []byte) (int, error) {
-	return s.Stream.Read(p)
+	return s.stream.Read(p)
 }
 
 func (s signalCloseReader) Close() error {
-	defer close(s.Closed)
-	return s.Stream.Close()
+	defer close(s.closed)
+	if s.consumeStream {
+		if _, err := io.Copy(ioutil.Discard, s.stream); err != nil {
+			s.stream.Close()
+			return err
+		}
+	}
+	return s.stream.Close()
 }

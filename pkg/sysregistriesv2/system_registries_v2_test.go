@@ -70,8 +70,7 @@ func TestParseLocation(t *testing.T) {
 
 	// invalid locations
 	_, err = parseLocation("https://example.com")
-	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "invalid location 'https://example.com': URI schemes are not supported")
+	assert.ErrorContains(t, err, "invalid location 'https://example.com': URI schemes are not supported")
 
 	_, err = parseLocation("john.doe@example.com")
 	assert.Nil(t, err)
@@ -211,6 +210,11 @@ func TestRefMatchingPrefix(t *testing.T) {
 		{"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			len("example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")},
 		{"example.com/foo@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", -1},
+		// Prefix is invalid, but we shouldn’t crash.
+		// (Note that this is necessary only because loadConfigFile doesn’t reject single-character values outright,
+		// which it, in principle, could; a valid prefix/location must start with a host name, and host names
+		// that could ever match anything contain either a dot or a port number, due to docker.io normalization rules.)
+		{"example.com/foo", "*", -1},
 	} {
 		prefixLen := refMatchingPrefix(c.ref, c.prefix)
 		assert.Equal(t, c.expected, prefixLen, fmt.Sprintf("%s vs. %s", c.ref, c.prefix))
@@ -326,7 +330,7 @@ func TestFindRegistry(t *testing.T) {
 	assert.Equal(t, "subdomain-prefix-2.com", reg.Location)
 
 	// subdomain prefix match for *.not.quite.simple-prefix.com
-	// location field overriden by /registries.conf.d/subdomain-override-1.conf
+	// location field overridden by /registries.conf.d/subdomain-override-1.conf
 	reg, err = FindRegistry(sys, "really.not.quite.simple-prefix.com:5000/with/path/and/beyond:tag")
 	assert.Nil(t, err)
 	assert.NotNil(t, reg)
@@ -340,7 +344,7 @@ func TestFindRegistry(t *testing.T) {
 	assert.Equal(t, "subdomain-prefix-2.com", reg.Location)
 
 	// subdomain prefix match for *.bar.example.com
-	// location field overriden by /registries.conf.d/subdomain-override-3.conf
+	// location field overridden by /registries.conf.d/subdomain-override-3.conf
 	reg, err = FindRegistry(sys, "foo.bar.example.com:6000/omg/wtf/bbq@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	assert.Nil(t, err)
 	assert.NotNil(t, reg)
@@ -429,7 +433,7 @@ func TestInvalidV2Configs(t *testing.T) {
 		_, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: c.path})
 		assert.Error(t, err, c.path)
 		if c.errorSubstring != "" {
-			assert.Contains(t, err.Error(), c.errorSubstring, c.path)
+			assert.ErrorContains(t, err, c.errorSubstring, c.path)
 		}
 	}
 }
@@ -478,8 +482,7 @@ func TestMixingV1andV2(t *testing.T) {
 		SystemRegistriesConfPath:    "testdata/mixing-v1-v2.conf",
 		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
 	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "mixing sysregistry v1/v2 is not supported")
+	assert.ErrorContains(t, err, "mixing sysregistry v1/v2 is not supported")
 }
 
 func TestConfigCache(t *testing.T) {

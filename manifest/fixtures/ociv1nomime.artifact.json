@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 2,
+  "config": {
+    "mediaType": "application/vnd.oci.custom.artifact.config.v1+json",
+    "digest": "",
+    "size": 0
+  },
+  "layers": null
+}

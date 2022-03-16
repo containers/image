@@ -20,6 +20,32 @@ func manifestSchema1FromFixture(t *testing.T, fixture string) *Schema1 {
 	return m
 }
 
+func TestSchema1FromManifest(t *testing.T) {
+	validManifest, err := ioutil.ReadFile(filepath.Join("fixtures", "schema2-to-schema1-by-docker.json"))
+	require.NoError(t, err)
+
+	// Invalid manifest version is rejected
+	m, err := Schema1FromManifest(validManifest)
+	require.NoError(t, err)
+	m.SchemaVersion = 2
+	manifest, err := m.Serialize()
+	require.NoError(t, err)
+	_, err = Schema1FromManifest(manifest)
+	assert.Error(t, err)
+
+	parser := func(m []byte) error {
+		_, err := Schema1FromManifest(m)
+		return err
+	}
+	// Schema mismatch is rejected
+	testManifestFixturesAreRejected(t, parser, []string{
+		"v2s2.manifest.json", "v2list.manifest.json",
+		"ociv1.manifest.json", "ociv1.image.index.json",
+	})
+	// Extra fields are rejected
+	testValidManifestWithExtraFieldsIsRejected(t, parser, validManifest, []string{"config", "layers", "manifests"})
+}
+
 func TestSchema1Initialize(t *testing.T) {
 	// Test this indirectly via Schema1FromComponents; otherwise we would have to break the API and create an instance manually.
 

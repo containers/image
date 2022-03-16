@@ -1,3 +1,4 @@
+//go:build !containers_image_storage_stub
 // +build !containers_image_storage_stub
 
 package storage
@@ -20,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containers/image/v5/internal/private"
 	imanifest "github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache/memory"
 	"github.com/containers/image/v5/types"
@@ -35,11 +37,12 @@ import (
 )
 
 var (
-	topwd                        = ""
-	_     types.ImageDestination = &storageImageDestination{}
-	_     types.ImageSource      = &storageImageSource{}
-	_     types.ImageReference   = &storageReference{}
-	_     types.ImageTransport   = &storageTransport{}
+	topwd                          = ""
+	_     types.ImageDestination   = &storageImageDestination{}
+	_     private.ImageDestination = (*storageImageDestination)(nil)
+	_     types.ImageSource        = &storageImageSource{}
+	_     types.ImageReference     = &storageReference{}
+	_     types.ImageTransport     = &storageTransport{}
 )
 
 const (

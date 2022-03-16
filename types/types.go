@@ -299,7 +299,7 @@ type ImageDestination interface {
 	IgnoresEmbeddedDockerReference() bool
 
 	// PutBlob writes contents of stream and returns data representing the result.
-	// inputInfo.Digest can be optionally provided if known; it is not mandatory for the implementation to verify it.
+	// inputInfo.Digest can be optionally provided if known; if provided, and stream is read to the end without error, the digest MUST match the stream contents.
 	// inputInfo.Size is the expected length of stream, if known.
 	// inputInfo.MediaType describes the blob format, if known.
 	// May update cache.
@@ -561,6 +561,11 @@ type SystemContext struct {
 	UserShortNameAliasConfPath string
 	// If set, short-name resolution in pkg/shortnames must follow the specified mode
 	ShortNameMode *ShortNameMode
+	// If set, short names will resolve in pkg/shortnames to docker.io only, and unqualified-search registries and
+	// short-name aliases in registries.conf are ignored.  Note that this field is only intended to help enforce
+	// resolving to Docker Hub in the Docker-compatible REST API of Podman; it should never be used outside this
+	// specific context.
+	PodmanOnlyShortNamesIgnoreRegistriesConfAndForceDockerHub bool
 	// If not "", overrides the default path for the authentication file, but only new format files
 	AuthFilePath string
 	// if not "", overrides the default path for the authentication file, but with the legacy format;
@@ -622,6 +627,10 @@ type SystemContext struct {
 	DockerLogMirrorChoice bool
 	// Directory to use for OSTree temporary files
 	OSTreeTmpDirPath string
+	// If true, all blobs will have precomputed digests to ensure layers are not uploaded that already exist on the registry.
+	// Note that this requires writing blobs to temporary files, and takes more time than the default behavior,
+	// when the digest for a blob is unknown.
+	DockerRegistryPushPrecomputeDigests bool
 
 	// === docker/daemon.Transport overrides ===
 	// A directory containing a CA certificate (ending with ".crt"),

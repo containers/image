@@ -1,13 +1,14 @@
 package daemon
 
-import "testing"
 import (
-	"github.com/containers/image/v5/types"
-	dockerclient "github.com/docker/docker/client"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"os"
 	"path/filepath"
+	"testing"
+
+	"github.com/containers/image/v5/types"
+	dockerclient "github.com/docker/docker/client"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDockerClientFromNilSystemContext(t *testing.T) {
@@ -45,10 +46,7 @@ func TestTlsConfigFromInvalidCertPath(t *testing.T) {
 	}
 
 	_, err := tlsConfig(ctx)
-
-	if assert.Error(t, err, "An error was expected") {
-		assert.Regexp(t, "could not read CA certificate", err.Error())
-	}
+	assert.ErrorContains(t, err, "could not read CA certificate")
 }
 
 func TestTlsConfigFromCertPath(t *testing.T) {

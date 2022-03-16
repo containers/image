@@ -8,6 +8,7 @@ import (
 
 	"github.com/containers/image/v5/directory"
 	"github.com/containers/image/v5/docker"
+	"github.com/containers/image/v5/internal/imagedestination"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/types"
@@ -47,10 +48,10 @@ func TestCreateSignature(t *testing.T) {
 	require.NoError(t, err)
 	defer dirDest.Close()
 	c := &copier{
-		dest:         dirDest,
+		dest:         imagedestination.FromPublic(dirDest),
 		reportWriter: ioutil.Discard,
 	}
-	_, err = c.createSignature(manifestBlob, testKeyFingerprint)
+	_, err = c.createSignature(manifestBlob, testKeyFingerprint, "")
 	assert.Error(t, err)
 
 	// Set up a docker: reference
@@ -61,19 +62,19 @@ func TestCreateSignature(t *testing.T) {
 	require.NoError(t, err)
 	defer dockerDest.Close()
 	c = &copier{
-		dest:         dockerDest,
+		dest:         imagedestination.FromPublic(dockerDest),
 		reportWriter: ioutil.Discard,
 	}
 
 	// Signing with an unknown key fails
-	_, err = c.createSignature(manifestBlob, "this key does not exist")
+	_, err = c.createSignature(manifestBlob, "this key does not exist", "")
 	assert.Error(t, err)
 
 	// Success
 	mech, err = signature.NewGPGSigningMechanism()
 	require.NoError(t, err)
 	defer mech.Close()
-	sig, err := c.createSignature(manifestBlob, testKeyFingerprint)
+	sig, err := c.createSignature(manifestBlob, testKeyFingerprint, "")
 	require.NoError(t, err)
 	verified, err := signature.VerifyDockerManifestSignature(sig, manifestBlob, "docker.io/library/busybox:latest", mech, testKeyFingerprint)
 	require.NoError(t, err)

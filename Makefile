@@ -68,7 +68,7 @@ tools: .install.gitvalidation .install.golangci-lint .install.golint
 
 .install.golangci-lint:
 	if [ ! -x "$(GOBIN)/golangci-lint" ]; then \
-		curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(GOBIN) v1.35.2; \
+		curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(GOBIN) v1.44.2; \
 	fi
 
 .install.golint:
@@ -87,7 +87,7 @@ fmt:
 	@gofmt -l -s -w $(SOURCE_DIRS)
 
 validate: lint
-	@hack/validate.sh
+	@BUILDTAGS="$(BUILDTAGS)" hack/validate.sh
 
 lint:
 	$(GOBIN)/golangci-lint run --build-tags "$(BUILDTAGS)"
