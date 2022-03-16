@@ -316,6 +316,5 @@ func TestReferenceBlobPathInvalid(t *testing.T) {
 	ociRef, ok := ref.(ociReference)
 	require.True(t, ok)
 	_, err := ociRef.blobPath(hex, "")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "unexpected digest reference "+hex)
+	assert.ErrorContains(t, err, "unexpected digest reference "+hex)
 }

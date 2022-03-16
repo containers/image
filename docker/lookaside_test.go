@@ -170,9 +170,8 @@ func TestLoadAndMergeConfig(t *testing.T) {
 		[]byte("default-docker:\n sigstore: file:////tmp/different"), 0644)
 	require.NoError(t, err)
 	_, err = loadAndMergeConfig(duplicateDefault)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "0.yaml")
-	assert.Contains(t, err.Error(), "1.yaml")
+	assert.ErrorContains(t, err, "0.yaml")
+	assert.ErrorContains(t, err, "1.yaml")
 
 	// Duplicate DefaultDocker
 	duplicateNS := filepath.Join(tmpDir, "duplicateNS")
@@ -185,9 +184,8 @@ func TestLoadAndMergeConfig(t *testing.T) {
 		[]byte("docker:\n example.com:\n  sigstore: file:////tmp/different"), 0644)
 	require.NoError(t, err)
 	_, err = loadAndMergeConfig(duplicateNS)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "0.yaml")
-	assert.Contains(t, err.Error(), "1.yaml")
+	assert.ErrorContains(t, err, "0.yaml")
+	assert.ErrorContains(t, err, "1.yaml")
 
 	// A fully worked example, including an empty-dictionary file and a non-.yaml file
 	config, err = loadAndMergeConfig("fixtures/registries.d")
