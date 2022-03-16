@@ -88,10 +88,9 @@ func testValidManifestWithExtraFieldsIsRejected(t *testing.T, parser func([]byte
 		updatedManifest := []byte(string(validManifest[:end]) +
 			fmt.Sprintf(`,"%s":[]}`, field))
 		err := parser(updatedManifest)
-		assert.Error(t, err, field)
 		// Make sure it is the error from validateUnambiguousManifestFormat, not something that
 		// went wrong with creating updatedManifest.
-		assert.Contains(t, err.Error(), "rejecting ambiguous manifest")
+		assert.ErrorContains(t, err, "rejecting ambiguous manifest", field)
 	}
 }
 

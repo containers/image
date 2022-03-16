@@ -70,8 +70,7 @@ func TestSignDockerManifestWithPassphrase(t *testing.T) {
 
 	// Invalid passphrase
 	_, err = SignDockerManifestWithOptions(manifest, TestImageSignatureReference, mech, TestKeyFingerprintWithPassphrase, &SignOptions{Passphrase: TestPassphrase + "\n"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid passphrase")
+	assert.ErrorContains(t, err, "invalid passphrase")
 
 	// Wrong passphrase
 	_, err = SignDockerManifestWithOptions(manifest, TestImageSignatureReference, mech, TestKeyFingerprintWithPassphrase, &SignOptions{Passphrase: "wrong"})

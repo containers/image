@@ -58,8 +58,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	require.NoError(t, err)
 	defer dest.Close()
 	_, err = dest.PutBlob(context.Background(), reader, types.BlobInfo{Digest: blobDigest, Size: -1}, cache, false)
-	assert.Error(t, err)
-	assert.Contains(t, digestErrorString, err.Error())
+	assert.ErrorContains(t, err, digestErrorString)
 	err = dest.Commit(context.Background(), nil) // nil unparsedToplevel is invalid, we don’t currently use the value
 	assert.NoError(t, err)
 

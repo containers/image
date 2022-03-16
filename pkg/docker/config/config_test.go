@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/containers/image/v5/docker/reference"
@@ -492,13 +491,8 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if err := ioutil.WriteFile(configPath, []byte("Json rocks! Unless it doesn't."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
-	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
-	if err == nil {
-		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
-	}
-	if !strings.Contains(err.Error(), "unmarshaling JSON") {
-		t.Fatalf("expected JSON syntax error, not: %#+v", err)
-	}
+	_, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
+	assert.ErrorContains(t, err, "unmarshaling JSON")
 
 	// remove the invalid config file
 	os.RemoveAll(configPath)
@@ -513,13 +507,8 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if err := ioutil.WriteFile(configPath, []byte("I'm certainly not a json string."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
-	auth, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
-	if err == nil {
-		t.Fatalf("got unexpected non-error: username=%q, password=%q", auth.Username, auth.Password)
-	}
-	if !strings.Contains(err.Error(), "unmarshaling JSON") {
-		t.Fatalf("expected JSON syntax error, not: %#+v", err)
-	}
+	_, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
+	assert.ErrorContains(t, err, "unmarshaling JSON")
 }
 
 func TestGetAllCredentials(t *testing.T) {

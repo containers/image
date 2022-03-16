@@ -70,8 +70,7 @@ func TestParseLocation(t *testing.T) {
 
 	// invalid locations
 	_, err = parseLocation("https://example.com")
-	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "invalid location 'https://example.com': URI schemes are not supported")
+	assert.ErrorContains(t, err, "invalid location 'https://example.com': URI schemes are not supported")
 
 	_, err = parseLocation("john.doe@example.com")
 	assert.Nil(t, err)
@@ -434,7 +433,7 @@ func TestInvalidV2Configs(t *testing.T) {
 		_, err := GetRegistries(&types.SystemContext{SystemRegistriesConfPath: c.path})
 		assert.Error(t, err, c.path)
 		if c.errorSubstring != "" {
-			assert.Contains(t, err.Error(), c.errorSubstring, c.path)
+			assert.ErrorContains(t, err, c.errorSubstring, c.path)
 		}
 	}
 }
@@ -483,8 +482,7 @@ func TestMixingV1andV2(t *testing.T) {
 		SystemRegistriesConfPath:    "testdata/mixing-v1-v2.conf",
 		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
 	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "mixing sysregistry v1/v2 is not supported")
+	assert.ErrorContains(t, err, "mixing sysregistry v1/v2 is not supported")
 }
 
 func TestConfigCache(t *testing.T) {
