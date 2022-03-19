@@ -50,9 +50,7 @@ func TestNewReference(t *testing.T) {
 
 // testNewReference is a test shared for Transport.ParseReference and NewReference.
 func testNewReference(t *testing.T, fn func(string) (types.ImageReference, error)) {
-	tmpDir, err := ioutil.TempDir("", "dir-transport-test")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	for _, path := range []string{
 		"/",
@@ -68,42 +66,35 @@ func testNewReference(t *testing.T, fn func(string) (types.ImageReference, error
 		assert.Equal(t, path, dirRef.path, path)
 	}
 
-	_, err = fn(tmpDir + "/thisparentdoesnotexist/something")
+	_, err := fn(tmpDir + "/thisparentdoesnotexist/something")
 	assert.Error(t, err)
 }
 
 // refToTempDir creates a temporary directory and returns a reference to it.
-// The caller should
-//   defer os.RemoveAll(tmpDir)
-func refToTempDir(t *testing.T) (ref types.ImageReference, tmpDir string) {
-	tmpDir, err := ioutil.TempDir("", "dir-transport-test")
-	require.NoError(t, err)
-	ref, err = NewReference(tmpDir)
+func refToTempDir(t *testing.T) (types.ImageReference, string) {
+	tmpDir := t.TempDir()
+	ref, err := NewReference(tmpDir)
 	require.NoError(t, err)
 	return ref, tmpDir
 }
 
 func TestReferenceTransport(t *testing.T) {
-	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempDir(t)
 	assert.Equal(t, Transport, ref.Transport())
 }
 
 func TestReferenceStringWithinTransport(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
 	assert.Equal(t, tmpDir, ref.StringWithinTransport())
 }
 
 func TestReferenceDockerReference(t *testing.T) {
-	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempDir(t)
 	assert.Nil(t, ref.DockerReference())
 }
 
 func TestReferencePolicyConfigurationIdentity(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
 
 	assert.Equal(t, tmpDir, ref.PolicyConfigurationIdentity())
 	// A non-canonical path.  Test just one, the various other cases are
@@ -120,7 +111,6 @@ func TestReferencePolicyConfigurationIdentity(t *testing.T) {
 
 func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
 	// We don't really know enough to make a full equality test here.
 	ns := ref.PolicyConfigurationNamespaces()
 	require.NotNil(t, ns)
@@ -150,8 +140,7 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 }
 
 func TestReferenceNewImage(t *testing.T) {
-	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempDir(t)
 
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	require.NoError(t, err)
@@ -169,8 +158,7 @@ func TestReferenceNewImage(t *testing.T) {
 }
 
 func TestReferenceNewImageNoValidManifest(t *testing.T) {
-	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempDir(t)
 
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	require.NoError(t, err)
@@ -185,24 +173,21 @@ func TestReferenceNewImageNoValidManifest(t *testing.T) {
 }
 
 func TestReferenceNewImageSource(t *testing.T) {
-	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempDir(t)
 	src, err := ref.NewImageSource(context.Background(), nil)
 	assert.NoError(t, err)
 	defer src.Close()
 }
 
 func TestReferenceNewImageDestination(t *testing.T) {
-	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempDir(t)
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	assert.NoError(t, err)
 	defer dest.Close()
 }
 
 func TestReferenceDeleteImage(t *testing.T) {
-	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempDir(t)
 	err := ref.DeleteImage(context.Background(), nil)
 	assert.Error(t, err)
 }
@@ -211,7 +196,6 @@ func TestReferenceManifestPath(t *testing.T) {
 	dhex := digest.Digest("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 
 	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
 	dirRef, ok := ref.(dirReference)
 	require.True(t, ok)
 	assert.Equal(t, tmpDir+"/manifest.json", dirRef.manifestPath(nil))
@@ -222,7 +206,6 @@ func TestReferenceLayerPath(t *testing.T) {
 	const hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
 	dirRef, ok := ref.(dirReference)
 	require.True(t, ok)
 	assert.Equal(t, tmpDir+"/"+hex, dirRef.layerPath("sha256:"+hex))
@@ -232,7 +215,6 @@ func TestReferenceSignaturePath(t *testing.T) {
 	dhex := digest.Digest("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 
 	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
 	dirRef, ok := ref.(dirReference)
 	require.True(t, ok)
 	assert.Equal(t, tmpDir+"/signature-1", dirRef.signaturePath(0, nil))
@@ -243,7 +225,6 @@ func TestReferenceSignaturePath(t *testing.T) {
 
 func TestReferenceVersionPath(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
 	dirRef, ok := ref.(dirReference)
 	require.True(t, ok)
 	assert.Equal(t, tmpDir+"/version", dirRef.versionPath())

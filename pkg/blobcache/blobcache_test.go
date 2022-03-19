@@ -58,15 +58,7 @@ func makeLayer(filename string, repeat int, compression archive.Compression) ([]
 }
 
 func TestBlobCache(t *testing.T) {
-	cacheDir, err := ioutil.TempDir("", "blobcache")
-	if err != nil {
-		t.Fatalf("error creating persistent cache directory: %v", err)
-	}
-	defer func() {
-		if err := os.RemoveAll(cacheDir); err != nil {
-			t.Fatalf("error removing persistent cache directory %q: %v", cacheDir, err)
-		}
-	}()
+	cacheDir := t.TempDir()
 
 	systemContext := types.SystemContext{}
 
@@ -119,11 +111,7 @@ func TestBlobCache(t *testing.T) {
 					t.Fatalf("error encoding image manifest: %v", err)
 				}
 				// Write this image to a "dir" destination with blob caching using this directory.
-				srcdir, err := ioutil.TempDir("", "blobcache-source")
-				if err != nil {
-					t.Fatalf("error creating temporary source directory: %v", err)
-				}
-				defer os.RemoveAll(srcdir)
+				srcdir := t.TempDir()
 				srcRef, err := directory.NewReference(srcdir)
 				if err != nil {
 					t.Fatalf("error creating source image name reference for %q: %v", srcdir, err)
@@ -215,11 +203,7 @@ func TestBlobCache(t *testing.T) {
 				}
 				// Now that we've deleted some of the contents, try to copy from the source image
 				// to a second image.  It should fail because the source is missing some blobs.
-				destdir, err := ioutil.TempDir("", "blobcache-destination")
-				if err != nil {
-					t.Fatalf("error creating temporary destination directory: %v", err)
-				}
-				defer os.RemoveAll(destdir)
+				destdir := t.TempDir()
 				destRef, err := directory.NewReference(destdir)
 				if err != nil {
 					t.Fatalf("error creating destination image reference for %q: %v", destdir, err)

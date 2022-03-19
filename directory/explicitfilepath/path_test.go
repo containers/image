@@ -2,7 +2,6 @@ package explicitfilepath
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -125,12 +124,10 @@ func testPathsAreSameFile(t *testing.T, path1, path2, description string) {
 }
 
 func runPathResolvingTestCase(t *testing.T, f func(string) (string, error), c pathResolvingTestCase, suffix string) {
-	topDir, err := ioutil.TempDir("", "pathResolving")
-	require.NoError(t, err)
+	topDir := t.TempDir()
 	defer func() {
-		// Clean up after the "Unreadable directory" case; os.RemoveAll just fails.
+		// Clean up after the "Unreadable directory" case; os.RemoveAll just fails without this.
 		_ = os.Chmod(filepath.Join(topDir, "unreadable"), 0755) // Ignore errors, especially if this does not exist.
-		os.RemoveAll(topDir)
 	}()
 
 	input := c.setup(t, topDir) + suffix // Do not call filepath.Join() on input, it calls filepath.Clean() internally!

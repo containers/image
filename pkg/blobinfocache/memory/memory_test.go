@@ -9,8 +9,8 @@ import (
 
 var _ blobinfocache.BlobInfoCache2 = &cache{}
 
-func newTestCache(t *testing.T) (blobinfocache.BlobInfoCache2, func(t *testing.T)) {
-	return new2(), func(t *testing.T) {}
+func newTestCache(t *testing.T) blobinfocache.BlobInfoCache2 {
+	return new2()
 }
 
 func TestNew(t *testing.T) {

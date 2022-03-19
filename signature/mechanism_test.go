@@ -63,9 +63,7 @@ func TestNewGPGSigningMechanismInDirectory(t *testing.T) {
 
 	// Similarly, using a newly created empty directory makes TestKeyFingerprint
 	// unavailable
-	emptyDir, err := ioutil.TempDir("", "signing-empty-directory")
-	require.NoError(t, err)
-	defer os.RemoveAll(emptyDir)
+	emptyDir := t.TempDir()
 	mech, err = newGPGSigningMechanismInDirectory(emptyDir)
 	require.NoError(t, err)
 	defer mech.Close()
@@ -77,9 +75,7 @@ func TestNewGPGSigningMechanismInDirectory(t *testing.T) {
 	// If pubring.gpg is unreadable in the directory, either initializing
 	// the mechanism fails (with openpgp), or it succeeds (sadly, gpgme) and
 	// later verification fails.
-	unreadableDir, err := ioutil.TempDir("", "signing-unreadable-directory")
-	require.NoError(t, err)
-	defer os.RemoveAll(unreadableDir)
+	unreadableDir := t.TempDir()
 	f, err := os.OpenFile(filepath.Join(unreadableDir, "pubring.gpg"), os.O_RDONLY|os.O_CREATE, 0000)
 	require.NoError(t, err)
 	f.Close()

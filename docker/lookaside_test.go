@@ -29,9 +29,7 @@ func TestSignatureStorageBaseURL(t *testing.T) {
 
 	// No match found
 	// expect default user storage base
-	emptyDir, err := ioutil.TempDir("", "empty-dir")
-	require.NoError(t, err)
-	defer os.RemoveAll(emptyDir)
+	emptyDir := t.TempDir()
 	base, err := SignatureStorageBaseURL(&types.SystemContext{RegistriesDirPath: emptyDir},
 		dockerRefFromString(t, "//this/is/not/in/the:configuration"), false)
 	assert.NoError(t, err)
@@ -55,9 +53,7 @@ func TestRegistriesDirPath(t *testing.T) {
 	const nondefaultPath = "/this/is/not/the/default/registries.d"
 	const variableReference = "$HOME"
 	const rootPrefix = "/root/prefix"
-	tempHome, err := ioutil.TempDir("", "tempHome")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempHome)
+	tempHome := t.TempDir()
 	var userRegistriesDir = filepath.FromSlash(".config/containers/registries.d")
 	userRegistriesDirPath := filepath.Join(tempHome, userRegistriesDir)
 	for _, c := range []struct {
@@ -115,9 +111,7 @@ func TestRegistriesDirPath(t *testing.T) {
 }
 
 func TestLoadAndMergeConfig(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "merge-config")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// No registries.d exists
 	config, err := loadAndMergeConfig(filepath.Join(tmpDir, "thisdoesnotexist"))

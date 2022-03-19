@@ -37,12 +37,11 @@ import (
 )
 
 var (
-	topwd                          = ""
-	_     types.ImageDestination   = &storageImageDestination{}
-	_     private.ImageDestination = (*storageImageDestination)(nil)
-	_     types.ImageSource        = &storageImageSource{}
-	_     types.ImageReference     = &storageReference{}
-	_     types.ImageTransport     = &storageTransport{}
+	_ types.ImageDestination   = &storageImageDestination{}
+	_ private.ImageDestination = (*storageImageDestination)(nil)
+	_ types.ImageSource        = &storageImageSource{}
+	_ types.ImageReference     = &storageReference{}
+	_ types.ImageTransport     = &storageTransport{}
 )
 
 const (
@@ -53,31 +52,17 @@ func TestMain(m *testing.M) {
 	if reexec.Init() {
 		return
 	}
-	wd, err := ioutil.TempDir("", "test.")
-	if err != nil {
-		os.Exit(1)
-	}
-	topwd = wd
 	debug := false
 	flag.BoolVar(&debug, "debug", false, "print debug statements")
 	flag.Parse()
 	if debug {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
-	code := m.Run()
-	os.RemoveAll(wd)
-	os.Exit(code)
+	os.Exit(m.Run())
 }
 
 func newStoreWithGraphDriverOptions(t *testing.T, options []string) storage.Store {
-	wd, err := ioutil.TempDir(topwd, "test.")
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = os.MkdirAll(wd, 0700)
-	if err != nil {
-		t.Fatal(err)
-	}
+	wd := t.TempDir()
 	run := filepath.Join(wd, "run")
 	root := filepath.Join(wd, "root")
 	Transport.SetDefaultUIDMap([]idtools.IDMap{{

@@ -55,9 +55,7 @@ var imageNameTestcases = []struct{ input, normalized, branchName string }{
 }
 
 func TestTransportParseReference(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "ostreeParseReference")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	for _, c := range imageNameTestcases {
 		for _, suffix := range repoSuffixes {
@@ -104,9 +102,7 @@ func TestTransportValidatePolicyConfigurationScope(t *testing.T) {
 }
 
 func TestNewReference(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "ostreeNewReference")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	for _, c := range imageNameTestcases {
 		for _, suffix := range repoSuffixes {
@@ -161,9 +157,7 @@ func TestReferenceTransport(t *testing.T) {
 }
 
 func TestReferenceStringWithinTransport(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "ostreeStringWithinTransport")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	for _, c := range validReferenceTestCases {
 		ref, err := Transport.ParseReference(withTmpDir(c.input, tmpDir))
@@ -179,9 +173,7 @@ func TestReferenceStringWithinTransport(t *testing.T) {
 }
 
 func TestReferenceDockerReference(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "ostreeDockerReference")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	for _, c := range validReferenceTestCases {
 		ref, err := Transport.ParseReference(withTmpDir(c.input, tmpDir))
@@ -192,9 +184,7 @@ func TestReferenceDockerReference(t *testing.T) {
 }
 
 func TestReferencePolicyConfigurationIdentity(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "ostreePolicyConfigurationIdentity")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	for _, c := range validReferenceTestCases {
 		ref, err := Transport.ParseReference(withTmpDir(c.input, tmpDir))
@@ -204,9 +194,7 @@ func TestReferencePolicyConfigurationIdentity(t *testing.T) {
 }
 
 func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "ostreePolicyConfigurationNamespaces")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Test both that DockerReferenceIdentity returns the expected value (fullName+suffix),
 	// and that DockerReferenceNamespaces starts with the expected value (fullName), i.e. that the two functions are
@@ -257,9 +245,7 @@ func TestReferenceNewImageSource(t *testing.T) {
 }
 
 func TestReferenceNewImageDestination(t *testing.T) {
-	otherTmpDir, err := ioutil.TempDir("", "ostree-transport-test")
-	require.NoError(t, err)
-	defer os.RemoveAll(otherTmpDir)
+	otherTmpDir := t.TempDir()
 
 	for _, c := range []struct {
 		sys    *types.SystemContext
@@ -281,9 +267,7 @@ func TestReferenceNewImageDestination(t *testing.T) {
 }
 
 func TestReferenceDeleteImage(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "ostreeDeleteImage")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	ref, err := Transport.ParseReference(withTmpDir("busybox@$TMP/this-repo-does-not-exist", tmpDir))
 	require.NoError(t, err)

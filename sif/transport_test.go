@@ -49,11 +49,9 @@ func TestNewReference(t *testing.T) {
 
 // testNewReference is a test shared for Transport.ParseReference and NewReference.
 func testNewReference(t *testing.T, fn func(string) (types.ImageReference, error)) {
-	tmpDir, err := ioutil.TempDir("", "sif-transport-test")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "image.sif")
-	err = ioutil.WriteFile(tmpFile, nil, 0600)
+	err := ioutil.WriteFile(tmpFile, nil, 0600)
 	require.NoError(t, err)
 
 	for _, file := range []string{

@@ -225,9 +225,7 @@ func TestNewConfigWrapper(t *testing.T) {
 	const nondefaultPath = "/this/is/not/the/default/registries.conf"
 	const variableReference = "$HOME"
 	const rootPrefix = "/root/prefix"
-	tempHome, err := ioutil.TempDir("", "tempHome")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempHome)
+	tempHome := t.TempDir()
 	var userRegistriesFile = filepath.FromSlash(".config/containers/registries.conf")
 	userRegistriesFilePath := filepath.Join(tempHome, userRegistriesFile)
 

@@ -251,9 +251,7 @@ func TestReferenceNewImageSource(t *testing.T) {
 }
 
 func TestReferenceNewImageDestination(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "docker-archive-test")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	ref, err := ParseReference(filepath.Join(tmpDir, "no-reference"))
 	require.NoError(t, err)
@@ -269,9 +267,7 @@ func TestReferenceNewImageDestination(t *testing.T) {
 }
 
 func TestReferenceDeleteImage(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "docker-archive-test")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	for i, suffix := range []string{"", ":some-reference", ":@0"} {
 		testFile := filepath.Join(tmpDir, fmt.Sprintf("file%d.tar", i))

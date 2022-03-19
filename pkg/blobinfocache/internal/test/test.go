@@ -24,8 +24,8 @@ const (
 )
 
 // GenericCache runs an implementation-independent set of tests, given a
-// newTestCache, which can be called repeatedly and always returns a (cache, cleanup callback) pair
-func GenericCache(t *testing.T, newTestCache func(t *testing.T) (blobinfocache.BlobInfoCache2, func(t *testing.T))) {
+// newTestCache, which can be called repeatedly and always returns a fresh cache instance
+func GenericCache(t *testing.T, newTestCache func(t *testing.T) blobinfocache.BlobInfoCache2) {
 	for _, s := range []struct {
 		name string
 		fn   func(t *testing.T, cache blobinfocache.BlobInfoCache2)
@@ -37,8 +37,7 @@ func GenericCache(t *testing.T, newTestCache func(t *testing.T) (blobinfocache.B
 		{"CandidateLocations2", testGenericCandidateLocations2},
 	} {
 		t.Run(s.name, func(t *testing.T) {
-			cache, cleanup := newTestCache(t)
-			defer cleanup(t)
+			cache := newTestCache(t)
 			s.fn(t, cache)
 		})
 	}

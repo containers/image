@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
-	"io/ioutil"
 	"os"
 	"sort"
 	"testing"
@@ -93,11 +92,9 @@ func TestSetupCertificates(t *testing.T) {
 	assert.Equal(t, &tls.Config{}, &tlsc)
 
 	// Directory not accessible
-	unreadableDir, err := ioutil.TempDir("", "containers-image-tlsclientconfig")
-	require.NoError(t, err)
+	unreadableDir := t.TempDir()
 	defer func() {
 		_ = os.Chmod(unreadableDir, 0700)
-		_ = os.Remove(unreadableDir)
 	}()
 	err = os.Chmod(unreadableDir, 000)
 	require.NoError(t, err)

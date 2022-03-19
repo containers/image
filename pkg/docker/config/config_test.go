@@ -24,9 +24,7 @@ func TestGetPathToAuth(t *testing.T) {
 	// on any state of the filesystem.
 	darwinDefault := filepath.Join(os.Getenv("HOME"), ".config", "containers", "auth.json")
 
-	tmpDir, err := ioutil.TempDir("", "TestGetPathToAuth")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Environment is per-process, so this looks very unsafe; actually it seems fine because tests are not
 	// run in parallel unless they opt in by calling t.Parallel().  So don’t do that.
@@ -82,20 +80,11 @@ func TestGetPathToAuth(t *testing.T) {
 
 func TestGetAuth(t *testing.T) {
 	origXDG := os.Getenv("XDG_RUNTIME_DIR")
-	tmpXDGRuntimeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tmpXDGRuntimeDir := t.TempDir()
 	t.Logf("using temporary XDG_RUNTIME_DIR directory: %q", tmpXDGRuntimeDir)
 	// override XDG_RUNTIME_DIR
 	os.Setenv("XDG_RUNTIME_DIR", tmpXDGRuntimeDir)
-	defer func() {
-		err := os.RemoveAll(tmpXDGRuntimeDir)
-		if err != nil {
-			t.Logf("failed to cleanup temporary home directory %q: %v", tmpXDGRuntimeDir, err)
-		}
-		os.Setenv("XDG_RUNTIME_DIR", origXDG)
-	}()
+	defer os.Setenv("XDG_RUNTIME_DIR", origXDG)
 
 	// override PATH for executing credHelper
 	curtDir, err := os.Getwd()
@@ -108,17 +97,8 @@ func TestGetAuth(t *testing.T) {
 		os.Setenv("PATH", origPath)
 	}()
 
-	tmpHomeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tmpHomeDir := t.TempDir()
 	t.Logf("using temporary home directory: %q", tmpHomeDir)
-	defer func() {
-		err := os.RemoveAll(tmpHomeDir)
-		if err != nil {
-			t.Logf("failed to cleanup temporary home directory %q: %v", tmpHomeDir, err)
-		}
-	}()
 
 	configDir1 := filepath.Join(tmpXDGRuntimeDir, "containers")
 	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
@@ -338,17 +318,8 @@ func TestGetAuth(t *testing.T) {
 }
 
 func TestGetAuthFromLegacyFile(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tmpDir := t.TempDir()
 	t.Logf("using temporary home directory: %q", tmpDir)
-	defer func() {
-		err := os.RemoveAll(tmpDir)
-		if err != nil {
-			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir, err)
-		}
-	}()
 
 	configPath := filepath.Join(tmpDir, ".dockercfg")
 	contents, err := ioutil.ReadFile(filepath.Join("testdata", "legacy.json"))
@@ -397,17 +368,8 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 }
 
 func TestGetAuthPreferNewConfig(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tmpDir := t.TempDir()
 	t.Logf("using temporary home directory: %q", tmpDir)
-	defer func() {
-		err := os.RemoveAll(tmpDir)
-		if err != nil {
-			t.Logf("failed to cleanup temporary home directory %q: %v", tmpDir, err)
-		}
-	}()
 
 	configDir := filepath.Join(tmpDir, ".docker")
 	if err := os.Mkdir(configDir, 0750); err != nil {
@@ -445,32 +407,14 @@ func TestGetAuthPreferNewConfig(t *testing.T) {
 
 func TestGetAuthFailsOnBadInput(t *testing.T) {
 	origXDG := os.Getenv("XDG_RUNTIME_DIR")
-	tmpXDGRuntimeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tmpXDGRuntimeDir := t.TempDir()
 	t.Logf("using temporary XDG_RUNTIME_DIR directory: %q", tmpXDGRuntimeDir)
 	// override XDG_RUNTIME_DIR
 	os.Setenv("XDG_RUNTIME_DIR", tmpXDGRuntimeDir)
-	defer func() {
-		err := os.RemoveAll(tmpXDGRuntimeDir)
-		if err != nil {
-			t.Logf("failed to cleanup temporary home directory %q: %v", tmpXDGRuntimeDir, err)
-		}
-		os.Setenv("XDG_RUNTIME_DIR", origXDG)
-	}()
+	defer os.Setenv("XDG_RUNTIME_DIR", origXDG)
 
-	tmpHomeDir, err := ioutil.TempDir("", "test_docker_client_get_auth")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tmpHomeDir := t.TempDir()
 	t.Logf("using temporary home directory: %q", tmpHomeDir)
-	defer func() {
-		err := os.RemoveAll(tmpHomeDir)
-		if err != nil {
-			t.Logf("failed to cleanup temporary home directory %q: %v", tmpHomeDir, err)
-		}
-	}()
 
 	configDir := filepath.Join(tmpXDGRuntimeDir, "containers")
 	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
@@ -890,9 +834,7 @@ func TestSetGetCredentials(t *testing.T) {
 		password = "password"
 	)
 
-	tmpDir, err := ioutil.TempDir("", "auth-test-")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	for _, tc := range []struct {
 		name            string

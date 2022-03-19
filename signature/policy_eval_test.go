@@ -3,7 +3,6 @@ package signature
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/containers/image/v5/docker"
@@ -215,8 +214,7 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 }
 
 // pcImageMock returns a types.UnparsedImage for a directory, claiming a specified dockerReference and implementing PolicyConfigurationIdentity/PolicyConfigurationNamespaces.
-// The caller must call the returned close callback when done.
-func pcImageMock(t *testing.T, dir, dockerReference string) (types.UnparsedImage, func()) {
+func pcImageMock(t *testing.T, dir, dockerReference string) types.UnparsedImage {
 	ref, err := reference.ParseNormalizedNamed(dockerReference)
 	require.NoError(t, err)
 	return dirImageMockWithRef(t, dir, pcImageReferenceMock{"docker", ref})
@@ -268,85 +266,73 @@ func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
 	}()
 
 	// Success
-	img, closer := pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
-	defer closer()
+	img := pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
 	sigs, err := pc.GetSignaturesWithAcceptedAuthor(context.Background(), img)
 	require.NoError(t, err)
 	assert.Equal(t, []*Signature{expectedSig}, sigs)
 
 	// Two signatures
 	// FIXME? Use really different signatures for this?
-	img, closer = pcImageMock(t, "fixtures/dir-img-valid-2", "testing/manifest:latest")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-valid-2", "testing/manifest:latest")
 	sigs, err = pc.GetSignaturesWithAcceptedAuthor(context.Background(), img)
 	require.NoError(t, err)
 	assert.Equal(t, []*Signature{expectedSig, expectedSig}, sigs)
 
 	// No signatures
-	img, closer = pcImageMock(t, "fixtures/dir-img-unsigned", "testing/manifest:latest")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-unsigned", "testing/manifest:latest")
 	sigs, err = pc.GetSignaturesWithAcceptedAuthor(context.Background(), img)
 	require.NoError(t, err)
 	assert.Empty(t, sigs)
 
 	// Only invalid signatures
-	img, closer = pcImageMock(t, "fixtures/dir-img-modified-manifest", "testing/manifest:latest")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-modified-manifest", "testing/manifest:latest")
 	sigs, err = pc.GetSignaturesWithAcceptedAuthor(context.Background(), img)
 	require.NoError(t, err)
 	assert.Empty(t, sigs)
 
 	// 1 invalid, 1 valid signature (in this order)
-	img, closer = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:latest")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:latest")
 	sigs, err = pc.GetSignaturesWithAcceptedAuthor(context.Background(), img)
 	require.NoError(t, err)
 	assert.Equal(t, []*Signature{expectedSig}, sigs)
 
 	// Two sarAccepted results for one signature
-	img, closer = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:twoAccepts")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:twoAccepts")
 	sigs, err = pc.GetSignaturesWithAcceptedAuthor(context.Background(), img)
 	require.NoError(t, err)
 	assert.Equal(t, []*Signature{expectedSig}, sigs)
 
 	// sarAccepted+sarRejected for a signature
-	img, closer = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:acceptReject")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:acceptReject")
 	sigs, err = pc.GetSignaturesWithAcceptedAuthor(context.Background(), img)
 	require.NoError(t, err)
 	assert.Empty(t, sigs)
 
 	// sarAccepted+sarUnknown for a signature
-	img, closer = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:acceptUnknown")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:acceptUnknown")
 	sigs, err = pc.GetSignaturesWithAcceptedAuthor(context.Background(), img)
 	require.NoError(t, err)
 	assert.Equal(t, []*Signature{expectedSig}, sigs)
 
 	// sarRejected+sarUnknown for a signature
-	img, closer = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:rejectUnknown")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:rejectUnknown")
 	sigs, err = pc.GetSignaturesWithAcceptedAuthor(context.Background(), img)
 	require.NoError(t, err)
 	assert.Empty(t, sigs)
 
 	// sarUnknown only
-	img, closer = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:unknown")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:unknown")
 	sigs, err = pc.GetSignaturesWithAcceptedAuthor(context.Background(), img)
 	require.NoError(t, err)
 	assert.Empty(t, sigs)
 
-	img, closer = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:unknown2")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:unknown2")
 	sigs, err = pc.GetSignaturesWithAcceptedAuthor(context.Background(), img)
 	require.NoError(t, err)
 	assert.Empty(t, sigs)
 
 	// Empty list of requirements (invalid)
-	img, closer = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:invalidEmptyRequirements")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:invalidEmptyRequirements")
 	sigs, err = pc.GetSignaturesWithAcceptedAuthor(context.Background(), img)
 	require.NoError(t, err)
 	assert.Empty(t, sigs)
@@ -358,8 +344,7 @@ func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
 	require.NoError(t, err)
 	err = destroyedPC.Destroy()
 	require.NoError(t, err)
-	img, closer = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
 	sigs, err = destroyedPC.GetSignaturesWithAcceptedAuthor(context.Background(), img)
 	assert.Error(t, err)
 	assert.Nil(t, sigs)
@@ -369,9 +354,7 @@ func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
 
 	// Error reading signatures.
 	invalidSigDir := createInvalidSigDir(t)
-	defer os.RemoveAll(invalidSigDir)
-	img, closer = pcImageMock(t, invalidSigDir, "testing/manifest:latest")
-	defer closer()
+	img = pcImageMock(t, invalidSigDir, "testing/manifest:latest")
 	sigs, err = pc.GetSignaturesWithAcceptedAuthor(context.Background(), img)
 	assert.Error(t, err)
 	assert.Nil(t, sigs)
@@ -410,63 +393,53 @@ func TestPolicyContextIsRunningImageAllowed(t *testing.T) {
 	}()
 
 	// Success
-	img, closer := pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
-	defer closer()
+	img := pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
 	res, err := pc.IsRunningImageAllowed(context.Background(), img)
 	assertRunningAllowed(t, res, err)
 
 	// Two signatures
 	// FIXME? Use really different signatures for this?
-	img, closer = pcImageMock(t, "fixtures/dir-img-valid-2", "testing/manifest:latest")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-valid-2", "testing/manifest:latest")
 	res, err = pc.IsRunningImageAllowed(context.Background(), img)
 	assertRunningAllowed(t, res, err)
 
 	// No signatures
-	img, closer = pcImageMock(t, "fixtures/dir-img-unsigned", "testing/manifest:latest")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-unsigned", "testing/manifest:latest")
 	res, err = pc.IsRunningImageAllowed(context.Background(), img)
 	assertRunningRejectedPolicyRequirement(t, res, err)
 
 	// Only invalid signatures
-	img, closer = pcImageMock(t, "fixtures/dir-img-modified-manifest", "testing/manifest:latest")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-modified-manifest", "testing/manifest:latest")
 	res, err = pc.IsRunningImageAllowed(context.Background(), img)
 	assertRunningRejectedPolicyRequirement(t, res, err)
 
 	// 1 invalid, 1 valid signature (in this order)
-	img, closer = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:latest")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:latest")
 	res, err = pc.IsRunningImageAllowed(context.Background(), img)
 	assertRunningAllowed(t, res, err)
 
 	// Two allowed results
-	img, closer = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:twoAllows")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:twoAllows")
 	res, err = pc.IsRunningImageAllowed(context.Background(), img)
 	assertRunningAllowed(t, res, err)
 
 	// Allow + deny results
-	img, closer = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:allowDeny")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:allowDeny")
 	res, err = pc.IsRunningImageAllowed(context.Background(), img)
 	assertRunningRejectedPolicyRequirement(t, res, err)
 
 	// prReject works
-	img, closer = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:reject")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:reject")
 	res, err = pc.IsRunningImageAllowed(context.Background(), img)
 	assertRunningRejectedPolicyRequirement(t, res, err)
 
 	// prInsecureAcceptAnything works
-	img, closer = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:acceptAnything")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-mixed", "testing/manifest:acceptAnything")
 	res, err = pc.IsRunningImageAllowed(context.Background(), img)
 	assertRunningAllowed(t, res, err)
 
 	// Empty list of requirements (invalid)
-	img, closer = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:invalidEmptyRequirements")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:invalidEmptyRequirements")
 	res, err = pc.IsRunningImageAllowed(context.Background(), img)
 	assertRunningRejectedPolicyRequirement(t, res, err)
 
@@ -475,8 +448,7 @@ func TestPolicyContextIsRunningImageAllowed(t *testing.T) {
 	require.NoError(t, err)
 	err = destroyedPC.Destroy()
 	require.NoError(t, err)
-	img, closer = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
-	defer closer()
+	img = pcImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
 	res, err = destroyedPC.IsRunningImageAllowed(context.Background(), img)
 	assertRunningRejected(t, res, err)
 	// Not testing the pcInUse->pcReady transition, that would require custom PolicyRequirement

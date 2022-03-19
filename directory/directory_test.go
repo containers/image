@@ -18,7 +18,6 @@ import (
 
 func TestDestinationReference(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
 
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	require.NoError(t, err)
@@ -28,8 +27,7 @@ func TestDestinationReference(t *testing.T) {
 }
 
 func TestGetPutManifest(t *testing.T) {
-	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempDir(t)
 
 	man := []byte("test-manifest")
 	list := []byte("test-manifest-list")
@@ -64,8 +62,7 @@ func TestGetPutBlob(t *testing.T) {
 	providedBlob := []byte("provided-blob")
 	providedDigest := digest.Digest("sha256:provided-test-digest")
 
-	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempDir(t)
 	cache := memory.New()
 
 	dest, err := ref.NewImageDestination(context.Background(), nil)
@@ -114,8 +111,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 	const digestErrorString = "Simulated digest error"
 	const blobDigest = digest.Digest("sha256:test-digest")
 
-	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempDir(t)
 	dirRef, ok := ref.(dirReference)
 	require.True(t, ok)
 	blobPath := dirRef.layerPath(blobDigest)
@@ -152,8 +148,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 }
 
 func TestGetPutSignatures(t *testing.T) {
-	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempDir(t)
 
 	man := []byte("test-manifest")
 	list := []byte("test-manifest-list")
@@ -200,7 +195,6 @@ func TestGetPutSignatures(t *testing.T) {
 
 func TestSourceReference(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
-	defer os.RemoveAll(tmpDir)
 
 	src, err := ref.NewImageSource(context.Background(), nil)
 	require.NoError(t, err)
