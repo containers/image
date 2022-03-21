@@ -211,6 +211,7 @@ Consumers still SHOULD reject any signature where a member of an `optional` obje
 ### `optional.creator`
 
 If present, this MUST be a JSON string, identifying the name and version of the software which has created the signature.
+This should be the low-level software implementation and not the top-level caller.
 
 The contents of this string is not defined in detail; however each implementation creating container signatures:
 
