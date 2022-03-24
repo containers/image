@@ -15,6 +15,7 @@ import (
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/homedir"
+	"github.com/containers/storage/pkg/lockfile"
 	helperclient "github.com/docker/docker-credential-helpers/client"
 	"github.com/docker/docker-credential-helpers/credentials"
 	"github.com/hashicorp/go-multierror"
@@ -541,6 +542,29 @@ func getPathToAuthWithOS(sys *types.SystemContext, goOS string) (string, bool, e
 // or returns an empty dockerConfigFile data structure if auth.json does not exist
 // if the file exists and is empty, readJSONFile returns an error
 func readJSONFile(path string, legacyFormat bool) (dockerConfigFile, error) {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			var auths dockerConfigFile
+			auths.AuthConfigs = map[string]dockerAuthConfig{}
+			return auths, nil
+		}
+		return dockerConfigFile{}, err
+	}
+
+	// Make sure to read-lock the file before reading it.
+	lock, err := lockfile.GetLockfile(path)
+	if err != nil {
+		return dockerConfigFile{}, fmt.Errorf("creating lock: %w", err)
+	}
+	lock.RLock()
+	defer lock.Unlock()
+
+	return readJSONFileLocked(path, legacyFormat)
+}
+
+// Implements readJSONFile but without locking the specified path.
+// The caller is responsible for synchronizing access to the path.
+func readJSONFileLocked(path string, legacyFormat bool) (dockerConfigFile, error) {
 	var auths dockerConfigFile
 
 	raw, err := ioutil.ReadFile(path)
@@ -550,6 +574,14 @@ func readJSONFile(path string, legacyFormat bool) (dockerConfigFile, error) {
 			return auths, nil
 		}
 		return dockerConfigFile{}, err
+	}
+
+	// When creating a file for the first time, it may be empty at this
+	// point as it was created by the write lock. Hence, return early here
+	// to prevent an unmarshal error; an empty file is not valid JSON.
+	if len(raw) == 0 {
+		auths.AuthConfigs = map[string]dockerAuthConfig{}
+		return auths, nil
 	}
 
 	if legacyFormat {
@@ -590,7 +622,15 @@ func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (
 		return "", err
 	}
 
-	auths, err := readJSONFile(path, false)
+	// Make sure to write-lock the file before writing to it.
+	lock, err := lockfile.GetLockfile(path)
+	if err != nil {
+		return "", fmt.Errorf("creating lock: %w", err)
+	}
+	lock.Lock()
+	defer lock.Unlock()
+
+	auths, err := readJSONFileLocked(path, false)
 	if err != nil {
 		return "", errors.Wrapf(err, "reading JSON file %q", path)
 	}
