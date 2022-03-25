@@ -877,9 +877,12 @@ func loadConfigFile(path string, forceV2 bool) (*parsedConfig, error) {
 
 	// Load the tomlConfig. Note that `DecodeFile` will overwrite set fields.
 	var combinedTOML tomlConfig
-	_, err := toml.DecodeFile(path, &combinedTOML)
+	meta, err := toml.DecodeFile(path, &combinedTOML)
 	if err != nil {
 		return nil, err
+	}
+	if keys := meta.Undecoded(); len(keys) > 0 {
+		logrus.Debugf("Failed to decode keys %q from %q", keys, path)
 	}
 
 	if combinedTOML.V1RegistriesConf.Nonempty() {
