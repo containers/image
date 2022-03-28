@@ -10,6 +10,7 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/testing/mocks"
 	"github.com/containers/image/v5/transports"
+	"github.com/containers/image/v5/transports/alltransports"
 	"github.com/containers/image/v5/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -141,6 +142,16 @@ func TestPolicyContextRequirementsForImageRefNotRegisteredTransport(t *testing.T
 }
 
 func TestPolicyContextRequirementsForImageRef(t *testing.T) {
+	testPolicyContextRequirementsForImageRef(t, "docker")
+
+	// The test below fails since the policy is created manually.  The
+	// registry->docker merging happens only when loading a file.  I am
+	// undecided if there's more we can do.
+	//
+	//	testPolicyContextRequirementsForImageRef(t, "registry")
+}
+
+func testPolicyContextRequirementsForImageRef(t *testing.T, transportName string) {
 	ktGPG := SBKeyTypeGPGKeys
 	prm := NewPRMMatchRepoDigestOrExact()
 
@@ -151,16 +162,16 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 	// Just put _something_ into the PolicyTransportScopes map for the keys we care about, and make it pairwise
 	// distinct so that we can compare the values and show them when debugging the tests.
 	for _, t := range []struct{ transport, scope string }{
-		{"docker", ""},
-		{"docker", "unmatched"},
-		{"docker", "deep.com"},
-		{"docker", "*.very.deep.com"},
-		{"docker", "*.deep.com"},
-		{"docker", "deep.com/n1"},
-		{"docker", "deep.com/n1/n2"},
-		{"docker", "deep.com/n1/n2/n3"},
-		{"docker", "deep.com/n1/n2/n3/repo"},
-		{"docker", "deep.com/n1/n2/n3/repo:tag2"},
+		{transportName, ""},
+		{transportName, "unmatched"},
+		{transportName, "deep.com"},
+		{transportName, "*.very.deep.com"},
+		{transportName, "*.deep.com"},
+		{transportName, "deep.com/n1"},
+		{transportName, "deep.com/n1/n2"},
+		{transportName, "deep.com/n1/n2/n3"},
+		{transportName, "deep.com/n1/n2/n3/repo"},
+		{transportName, "deep.com/n1/n2/n3/repo:tag2"},
 		{"atomic", "unmatched"},
 	} {
 		if _, ok := policy.Transports[t.transport]; !ok {
@@ -175,18 +186,27 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 	for _, c := range []struct{ inputTransport, input, matchedTransport, matched string }{
 		// Full match
 		{"docker", "deep.com/n1/n2/n3/repo:tag2", "docker", "deep.com/n1/n2/n3/repo:tag2"},
+		{"registry", "deep.com/n1/n2/n3/repo:tag2", "docker", "deep.com/n1/n2/n3/repo:tag2"},
 		// Namespace matches
 		{"docker", "deep.com/n1/n2/n3/repo:nottag2", "docker", "deep.com/n1/n2/n3/repo"},
+		{"registry", "deep.com/n1/n2/n3/repo:nottag2", "docker", "deep.com/n1/n2/n3/repo"},
 		{"docker", "deep.com/n1/n2/n3/notrepo:tag2", "docker", "deep.com/n1/n2/n3"},
+		{"registry", "deep.com/n1/n2/n3/notrepo:tag2", "docker", "deep.com/n1/n2/n3"},
 		{"docker", "deep.com/n1/n2/notn3/repo:tag2", "docker", "deep.com/n1/n2"},
+		{"registry", "deep.com/n1/n2/notn3/repo:tag2", "docker", "deep.com/n1/n2"},
 		{"docker", "deep.com/n1/notn2/n3/repo:tag2", "docker", "deep.com/n1"},
+		{"registry", "deep.com/n1/notn2/n3/repo:tag2", "docker", "deep.com/n1"},
 		// Host name match
 		{"docker", "deep.com/notn1/n2/n3/repo:tag2", "docker", "deep.com"},
+		{"registry", "deep.com/notn1/n2/n3/repo:tag2", "docker", "deep.com"},
 		// Sub domain match
 		{"docker", "very.deep.com/n1/n2/n3/repo:tag2", "docker", "*.deep.com"},
+		{"registry", "very.deep.com/n1/n2/n3/repo:tag2", "docker", "*.deep.com"},
 		{"docker", "not.very.deep.com/n1/n2/n3/repo:tag2", "docker", "*.very.deep.com"},
+		{"registry", "not.very.deep.com/n1/n2/n3/repo:tag2", "docker", "*.very.deep.com"},
 		// Default
 		{"docker", "this.does-not/match:anything", "docker", ""},
+		{"registry", "this.does-not/match:anything", "docker", ""},
 		// No match within a matched transport which doesn't have a "" scope
 		{"atomic", "this.does-not/match:anything", "", ""},
 		// No configuration available for this transport at all
@@ -201,9 +221,19 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 			expected = policy.Default
 		}
 
-		ref, err := reference.ParseNormalizedNamed(c.input)
-		require.NoError(t, err)
-		reqs := pc.requirementsForImageRef(pcImageReferenceMock{c.inputTransport, ref})
+		var imgRef types.ImageReference
+		switch c.inputTransport {
+		case "docker", "registry":
+			ref, err := alltransports.ParseImageName(fmt.Sprintf("%s://%s", c.inputTransport, c.input))
+			require.NoError(t, err)
+			imgRef = pcImageReferenceMock{ref.Transport().Name(), ref.DockerReference()}
+		default:
+			ref, err := reference.ParseNormalizedNamed(c.input)
+			require.NoError(t, err)
+			imgRef = pcImageReferenceMock{c.inputTransport, ref}
+		}
+
+		reqs := pc.requirementsForImageRef(imgRef)
 		comment := fmt.Sprintf("case %s:%s: %#v", c.inputTransport, c.input, reqs[0])
 		// Do not use assert.Equal, which would do a deep contents comparison; we want to compare
 		// the pointers. Also, == does not work on slices; so test that the slices start at the

@@ -1,0 +1,44 @@
+{
+    "default": [
+        {
+            "type": "reject"
+        }
+    ],
+    "transports": {
+        "dir": {
+            "": [
+                {
+                    "type": "insecureAcceptAnything"
+                }
+            ]
+        },
+       "registry": {
+            "example.com/playground": [
+                {
+                    "type": "insecureAcceptAnything"
+                }
+            ],
+            "example.com/production": [
+                {
+                    "type": "signedBy",
+                    "keyType": "GPGKeys",
+                    "keyPath": "/keys/employee-gpg-keyring"
+                }
+            ]
+        },
+        "docker": {
+            "example.com/playground": [
+                {
+                    "type": "insecureAcceptAnything"
+                }
+            ],
+            "example.com/production": [
+                {
+                    "type": "signedBy",
+                    "keyType": "GPGKeys",
+                    "keyPath": "/keys/employee-gpg-keyring"
+                }
+            ]
+        }
+    }
+}

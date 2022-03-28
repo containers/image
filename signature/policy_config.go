@@ -20,6 +20,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strings"
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/transports"
@@ -158,6 +160,57 @@ func (m *policyTransportsMap) UnmarshalJSON(data []byte) error {
 	for key, ptr := range tmpMap {
 		(*m)[key] = *ptr
 	}
+	return m.mergeTransports()
+}
+
+// Merge entries representing the same transport. The "registry" transport, for
+// instance, is an alias for the "docker" one.  The scopes of both should be
+// merged.
+//
+// Return an error when two scopes collide when merging.
+func (m *policyTransportsMap) mergeTransports() error {
+	var toDelete []string
+
+	for alias := range *m {
+		t := transports.Get(alias)
+		if t == nil {
+			continue
+		}
+		target := t.Name()
+		if alias == target { // no alias, nothing to do
+			continue
+		}
+		aliasScopes := (*m)[alias]
+
+		// Make sure that the target has scopes.
+		targetScopes := (*m)[target]
+		if targetScopes == nil {
+			targetScopes = make(PolicyTransportScopes)
+		}
+
+		// Merge the aliasScopes into the targetScopes.
+		// Throw an error if a given key already exists.
+		var duplicates []string
+		for scopeKey := range aliasScopes {
+			if _, conflict := targetScopes[scopeKey]; conflict {
+				duplicates = append(duplicates, scopeKey)
+				continue
+			}
+			targetScopes[scopeKey] = aliasScopes[scopeKey]
+		}
+		if len(duplicates) > 0 {
+			sort.Strings(duplicates)
+			return InvalidPolicyFormatError(fmt.Sprintf("transport %q is an alias for %q and both have a scope for %s", alias, target, strings.Join(duplicates, ", ")))
+		}
+		(*m)[target] = targetScopes
+		toDelete = append(toDelete, alias)
+	}
+
+	// Now remove the aliases.
+	for _, key := range toDelete {
+		delete((*m), key)
+	}
+
 	return nil
 }
 

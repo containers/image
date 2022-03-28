@@ -71,6 +71,11 @@ An image compliant with the "Open Container Image Layout Specification" stored a
 An image in the local ostree(1) repository.
 _/absolute/repo/path_ defaults to _/ostree/repo_.
 
+### **registry://**_docker-reference_
+
+The **registry** transport is an alias for the **docker** transport.  Once parsed, the transport of a reference will be returned as **docker**.
+
+
 ## Examples
 
 The following examples demonstrate how some of the containers transports can be used.
@@ -78,7 +83,7 @@ The examples use skopeo-copy(1) for copying container images.
 
 **Copying an image from one registry to another**:
 ```
-$ skopeo copy docker://docker.io/library/alpine:latest docker://localhost:5000/alpine:latest
+$ skopeo copy registry://docker.io/library/alpine:latest registry://localhost:5000/alpine:latest
 ```
 
 **Copying an image from a running Docker daemon to a directory in the OCI layout**:
@@ -100,7 +105,7 @@ test-oci/
 
 **Copying an image from a registry to the local storage**:
 ```
-$ skopeo copy docker://docker.io/library/alpine:latest containers-storage:alpine:latest
+$ skopeo copy registry://docker.io/library/alpine:latest containers-storage:alpine:latest
 ```
 
 ## SEE ALSO

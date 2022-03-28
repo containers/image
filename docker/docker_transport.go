@@ -14,6 +14,7 @@ import (
 
 func init() {
 	transports.Register(Transport)
+	transports.RegisterAlias(Transport, "registry")
 }
 
 // Transport is an ImageTransport for container registry-hosted images.

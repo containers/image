@@ -12,7 +12,7 @@
                 }
             ]
         },
-        "docker": {
+        "registry": {
             "example.com/playground": [
                 {
                     "type": "insecureAcceptAnything"
@@ -24,7 +24,9 @@
                     "keyType": "GPGKeys",
                     "keyPath": "/keys/employee-gpg-keyring"
                 }
-            ],
+            ]
+        },
+        "docker": {
             "example.com/hardened": [
                 {
                     "type": "signedBy",

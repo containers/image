@@ -27,10 +27,13 @@ func (kt *knownTransports) Remove(k string) {
 	kt.mu.Unlock()
 }
 
-func (kt *knownTransports) Add(t types.ImageTransport) {
+func (kt *knownTransports) Add(t types.ImageTransport, alias string) {
 	kt.mu.Lock()
 	defer kt.mu.Unlock()
 	name := t.Name()
+	if alias != "" {
+		name = alias
+	}
 	if t := kt.transports[name]; t != nil {
 		panic(fmt.Sprintf("Duplicate image transport name %s", name))
 	}
@@ -57,7 +60,12 @@ func Delete(name string) {
 
 // Register registers a transport.
 func Register(t types.ImageTransport) {
-	kt.Add(t)
+	kt.Add(t, "")
+}
+
+// Register registers a transport with the specified alias.
+func RegisterAlias(t types.ImageTransport, alias string) {
+	kt.Add(t, alias)
 }
 
 // ImageName converts a types.ImageReference into an URL-like image name, which MUST be such that

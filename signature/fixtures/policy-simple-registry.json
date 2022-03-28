@@ -1,0 +1,35 @@
+{
+    "default": [
+        {
+            "type": "reject"
+        }
+    ],
+    "transports": {
+        "dir": {
+            "": [
+                {
+                    "type": "insecureAcceptAnything"
+                }
+            ]
+        },
+        "docker": {
+            "example.com/playground": [
+                {
+                    "type": "insecureAcceptAnything"
+                }
+            ],
+            "example.com/production": [
+                {
+                    "type": "signedBy",
+                    "keyType": "GPGKeys",
+                    "keyPath": "/keys/employee-gpg-keyring"
+                }
+            ],
+            "example.com/another/playground": [
+                {
+                    "type": "insecureAcceptAnything"
+                }
+            ]
+        }
+    }
+}

@@ -89,11 +89,83 @@ var policyFixtureContents = &Policy{
 	},
 }
 
+// policyFixtureContents is a data structure equal to the contents of "fixtures/policy.json"
+var policyFixtureContentsMergeSimple = &Policy{
+	Default: PolicyRequirements{NewPRReject()},
+	Transports: map[string]PolicyTransportScopes{
+		"dir": {
+			"": PolicyRequirements{NewPRInsecureAcceptAnything()},
+		},
+		"docker": {
+			"example.com/playground": {
+				NewPRInsecureAcceptAnything(),
+			},
+			"example.com/production": {
+				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys,
+					"/keys/employee-gpg-keyring",
+					NewPRMMatchRepoDigestOrExact()),
+			},
+			"example.com/another/playground": {
+				NewPRInsecureAcceptAnything(),
+			},
+		},
+	},
+}
+
 func TestInvalidPolicyFormatError(t *testing.T) {
 	// A stupid test just to keep code coverage
 	s := "test"
-	err := InvalidPolicyFormatError(s)
-	assert.Equal(t, s, err.Error())
+	assert.Equal(t, s, InvalidPolicyFormatError(s).Error())
+}
+
+func TestMergeTransports(t *testing.T) {
+	tests := []struct {
+		path           string
+		expectedResult *Policy
+		expectedError  string
+	}{
+		{
+			"./fixtures/policy-simple-merge.json",
+			policyFixtureContentsMergeSimple,
+			"",
+		},
+		{
+			"./fixtures/policy-simple-docker.json",
+			policyFixtureContentsMergeSimple,
+			"",
+		},
+		{
+			"./fixtures/policy-simple-registry.json",
+			policyFixtureContentsMergeSimple,
+			"",
+		},
+		{
+			"./fixtures/policy-unknown-transport.json",
+			nil,
+			"",
+		},
+		{
+			"./fixtures/policy-merge-overlap.json",
+			nil,
+			"invalid policy in \"./fixtures/policy-merge-overlap.json\": transport \"registry\" is an alias for \"docker\" and both have a scope for example.com/playground, example.com/production",
+		},
+	}
+
+	for _, test := range tests {
+		policy, err := DefaultPolicy(&types.SystemContext{SignaturePolicyPath: test.path})
+		if test.expectedError != "" {
+			require.Error(t, err)
+			require.Nil(t, policy)
+			require.Equal(t, err.Error(), test.expectedError)
+			continue
+		}
+		require.NoError(t, err)
+		require.NotNil(t, policy)
+		if test.expectedResult != nil {
+			require.Equal(t, test.expectedResult, policy)
+		}
+
+	}
 }
 
 func TestDefaultPolicy(t *testing.T) {

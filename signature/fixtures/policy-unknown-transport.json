@@ -1,0 +1,31 @@
+{
+    "default": [
+        {
+            "type": "reject"
+        }
+    ],
+    "transports": {
+        "dir": {
+            "": [
+                {
+                    "type": "insecureAcceptAnything"
+                }
+            ]
+        },
+        "unknown-transport": {},
+        "registry": {
+            "example.com/playground": [
+                {
+                    "type": "insecureAcceptAnything"
+                }
+            ],
+            "example.com/production": [
+                {
+                    "type": "signedBy",
+                    "keyType": "GPGKeys",
+                    "keyPath": "/keys/employee-gpg-keyring"
+                }
+            ]
+        }
+    }
+}
