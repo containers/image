@@ -49,7 +49,7 @@ func TestCreateSignature(t *testing.T) {
 		dest:         imagedestination.FromPublic(dirDest),
 		reportWriter: ioutil.Discard,
 	}
-	_, err = c.createSignature(manifestBlob, testKeyFingerprint, "")
+	_, err = c.createSignature(manifestBlob, testKeyFingerprint, "", "")
 	assert.Error(t, err)
 
 	// Set up a docker: reference
@@ -65,17 +65,28 @@ func TestCreateSignature(t *testing.T) {
 	}
 
 	// Signing with an unknown key fails
-	_, err = c.createSignature(manifestBlob, "this key does not exist", "")
+	_, err = c.createSignature(manifestBlob, "this key does not exist", "", "")
 	assert.Error(t, err)
 
-	// Success
+	// Signing without overriding the identity uses the docker reference
 	mech, err = signature.NewGPGSigningMechanism()
 	require.NoError(t, err)
 	defer mech.Close()
-	sig, err := c.createSignature(manifestBlob, testKeyFingerprint, "")
+	sig, err := c.createSignature(manifestBlob, testKeyFingerprint, "", "")
 	require.NoError(t, err)
 	verified, err := signature.VerifyDockerManifestSignature(sig, manifestBlob, "docker.io/library/busybox:latest", mech, testKeyFingerprint)
 	require.NoError(t, err)
 	assert.Equal(t, "docker.io/library/busybox:latest", verified.DockerReference)
+	assert.Equal(t, manifestDigest, verified.DockerManifestDigest)
+
+	// Can override the identity with own
+	mech, err = signature.NewGPGSigningMechanism()
+	require.NoError(t, err)
+	defer mech.Close()
+	sig, err = c.createSignature(manifestBlob, testKeyFingerprint, "", "myregistry.io/myrepo:mytag")
+	require.NoError(t, err)
+	verified, err = signature.VerifyDockerManifestSignature(sig, manifestBlob, "myregistry.io/myrepo:mytag", mech, testKeyFingerprint)
+	require.NoError(t, err)
+	assert.Equal(t, "myregistry.io/myrepo:mytag", verified.DockerReference)
 	assert.Equal(t, manifestDigest, verified.DockerManifestDigest)
 }

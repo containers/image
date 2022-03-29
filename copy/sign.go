@@ -7,7 +7,7 @@ import (
 )
 
 // createSignature creates a new signature of manifest using keyIdentity.
-func (c *copier) createSignature(manifest []byte, keyIdentity string, passphrase string) ([]byte, error) {
+func (c *copier) createSignature(manifest []byte, keyIdentity string, passphrase string, identity string) ([]byte, error) {
 	mech, err := signature.NewGPGSigningMechanism()
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing GPG")
@@ -17,13 +17,16 @@ func (c *copier) createSignature(manifest []byte, keyIdentity string, passphrase
 		return nil, errors.Wrap(err, "Signing not supported")
 	}
 
-	dockerReference := c.dest.Reference().DockerReference()
-	if dockerReference == nil {
-		return nil, errors.Errorf("Cannot determine canonical Docker reference for destination %s", transports.ImageName(c.dest.Reference()))
+	if identity == "" {
+		dockerReference := c.dest.Reference().DockerReference()
+		if dockerReference == nil {
+			return nil, errors.Errorf("Cannot determine canonical Docker reference for destination %s", transports.ImageName(c.dest.Reference()))
+		}
+		identity = dockerReference.String()
 	}
 
 	c.Printf("Signing manifest\n")
-	newSig, err := signature.SignDockerManifestWithOptions(manifest, dockerReference.String(), mech, keyIdentity, &signature.SignOptions{Passphrase: passphrase})
+	newSig, err := signature.SignDockerManifestWithOptions(manifest, identity, mech, keyIdentity, &signature.SignOptions{Passphrase: passphrase})
 	if err != nil {
 		return nil, errors.Wrap(err, "creating signature")
 	}
