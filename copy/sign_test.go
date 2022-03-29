@@ -12,6 +12,7 @@ import (
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/types"
+	"github.com/docker/distribution/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +50,7 @@ func TestCreateSignature(t *testing.T) {
 		dest:         imagedestination.FromPublic(dirDest),
 		reportWriter: ioutil.Discard,
 	}
-	_, err = c.createSignature(manifestBlob, testKeyFingerprint, "", "")
+	_, err = c.createSignature(manifestBlob, testKeyFingerprint, "", nil)
 	assert.Error(t, err)
 
 	// Set up a docker: reference
@@ -65,14 +66,22 @@ func TestCreateSignature(t *testing.T) {
 	}
 
 	// Signing with an unknown key fails
-	_, err = c.createSignature(manifestBlob, "this key does not exist", "", "")
+	_, err = c.createSignature(manifestBlob, "this key does not exist", "", nil)
 	assert.Error(t, err)
 
-	// Signing without overriding the identity uses the docker reference
+	// Can't sign without a full reference
+	ref, err := reference.ParseNamed("myregistry.io/myrepo")
+	require.NoError(t, err)
+	_, err = c.createSignature(manifestBlob, testKeyFingerprint, "", ref)
+	assert.Error(t, err)
+
+	// Mechanism for verifying the signatures
 	mech, err = signature.NewGPGSigningMechanism()
 	require.NoError(t, err)
 	defer mech.Close()
-	sig, err := c.createSignature(manifestBlob, testKeyFingerprint, "", "")
+
+	// Signing without overriding the identity uses the docker reference
+	sig, err := c.createSignature(manifestBlob, testKeyFingerprint, "", nil)
 	require.NoError(t, err)
 	verified, err := signature.VerifyDockerManifestSignature(sig, manifestBlob, "docker.io/library/busybox:latest", mech, testKeyFingerprint)
 	require.NoError(t, err)
@@ -80,10 +89,9 @@ func TestCreateSignature(t *testing.T) {
 	assert.Equal(t, manifestDigest, verified.DockerManifestDigest)
 
 	// Can override the identity with own
-	mech, err = signature.NewGPGSigningMechanism()
+	ref, err = reference.ParseNamed("myregistry.io/myrepo:mytag")
 	require.NoError(t, err)
-	defer mech.Close()
-	sig, err = c.createSignature(manifestBlob, testKeyFingerprint, "", "myregistry.io/myrepo:mytag")
+	sig, err = c.createSignature(manifestBlob, testKeyFingerprint, "", ref)
 	require.NoError(t, err)
 	verified, err = signature.VerifyDockerManifestSignature(sig, manifestBlob, "myregistry.io/myrepo:mytag", mech, testKeyFingerprint)
 	require.NoError(t, err)
