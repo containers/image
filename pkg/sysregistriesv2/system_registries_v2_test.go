@@ -671,6 +671,122 @@ func TestPullSourcesFromReference(t *testing.T) {
 	assert.Equal(t, 1, len(pullSources))
 }
 
+func TestPullSourcesMirrorFromReference(t *testing.T) {
+	sys := &types.SystemContext{
+		SystemRegistriesConfPath:    "testdata/pull-sources-mirror-reference.conf",
+		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+	}
+	registries, err := GetRegistries(sys)
+	require.NoError(t, err)
+	assert.Equal(t, 7, len(registries))
+
+	digest := "@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	tag := ":aaa"
+	for _, tc := range []struct {
+		registry      string
+		digestSources []string
+		tagSources    []string
+	}{
+		// Registry A has mirrors allow any kind of pull
+		{
+			"registry-a.com/foo/image",
+			[]string{"mirror-1.registry-a.com", "mirror-2.registry-a.com", "registry-a.com/bar"},
+			[]string{"mirror-1.registry-a.com", "mirror-2.registry-a.com", "registry-a.com/bar"},
+		},
+		// Registry B has mirrors allow digests pull only
+		{
+			"registry-b.com/foo/image",
+			[]string{"mirror-1.registry-b.com", "mirror-2.registry-b.com", "registry-b.com/bar"},
+			[]string{"registry-b.com/bar"},
+		},
+		// Registry C has a mirror allows digest pull only and a mirror allows any kind of pull
+		{
+			"registry-c.com/foo/image",
+			[]string{"mirror-1.registry-c.com", "mirror-2.registry-c.com", "registry-c.com/bar"},
+			[]string{"mirror-1.registry-c.com", "registry-c.com/bar"},
+		},
+		// Registry D set digest-only for registry level, allows only digest pulls
+		// Registry D has no digest-only set for mirrors table
+		{
+			"registry-d.com/foo/image",
+			[]string{"mirror-1.registry-d.com", "mirror-2.registry-d.com", "registry-d.com/bar"},
+			[]string{"registry-d.com/bar"},
+		},
+		// Registry E has mirrors only allows tag pull
+		{
+			"registry-e.com/foo/image",
+			[]string{"registry-e.com/bar"},
+			[]string{"mirror-1.registry-e.com", "mirror-2.registry-e.com", "registry-e.com/bar"},
+		},
+		// Registry F has one tag only mirror does not allow digest pull
+		{
+			"registry-f.com/foo/image",
+			[]string{"mirror-1.registry-f.com", "registry-f.com/bar"},
+			[]string{"mirror-1.registry-f.com", "mirror-2.registry-f.com", "registry-f.com/bar"},
+		},
+		// Registry G has one digest-only pull and one tag only pull
+		{
+			"registry-g.com/foo/image",
+			[]string{"mirror-1.registry-g.com", "mirror-3.registry-g.com", "mirror-4.registry-g.com", "registry-g.com/bar"},
+			[]string{"mirror-2.registry-g.com", "mirror-3.registry-g.com", "mirror-4.registry-g.com", "registry-g.com/bar"},
+		},
+	} {
+		// Digest
+		digestedRef := toNamedRef(t, tc.registry+digest)
+		registry, err := FindRegistry(sys, digestedRef.Name())
+		require.NoError(t, err)
+		require.NotNil(t, registry)
+		pullSource, err := registry.PullSourcesFromReference(digestedRef)
+		require.NoError(t, err)
+		for i, s := range tc.digestSources {
+			assert.Equal(t, s, pullSource[i].Endpoint.Location)
+		}
+		// Tag
+		taggedRef := toNamedRef(t, tc.registry+tag)
+		registry, err = FindRegistry(sys, taggedRef.Name())
+		require.NoError(t, err)
+		require.NotNil(t, registry)
+		pullSource, err = registry.PullSourcesFromReference(taggedRef)
+		require.NoError(t, err)
+		for i, s := range tc.tagSources {
+			assert.Equal(t, s, pullSource[i].Endpoint.Location)
+		}
+	}
+}
+
+func TestInvalidMirrorConfig(t *testing.T) {
+	for _, tc := range []struct {
+		sys       *types.SystemContext
+		expectErr string
+	}{
+		{
+			sys: &types.SystemContext{
+				SystemRegistriesConfPath:    "testdata/invalid-config-level-mirror.conf",
+				SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+			},
+			expectErr: fmt.Sprintf("pull-from-mirror must not be set for a non-mirror registry %q", "registry-a.com/foo"),
+		},
+		{
+			sys: &types.SystemContext{
+				SystemRegistriesConfPath:    "testdata/invalid-conflict-mirror.conf",
+				SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+			},
+			expectErr: fmt.Sprintf("cannot set mirror usage mirror-by-digest-only for the registry (%q) and pull-from-mirror for per-mirror (%q) at the same time", "registry-a.com/foo", "mirror-1.registry-a.com"),
+		},
+		{
+			sys: &types.SystemContext{
+				SystemRegistriesConfPath:    "testdata/invalid-value-mirror.conf",
+				SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+			},
+			expectErr: fmt.Sprintf("unsupported pull-from-mirror value %q for mirror %q", "notvalid", "mirror-1.registry-a.com"),
+		},
+	} {
+		_, err := GetRegistries(tc.sys)
+		assert.ErrorContains(t, err, tc.expectErr)
+	}
+
+}
+
 func TestTryUpdatingCache(t *testing.T) {
 	ctx := &types.SystemContext{
 		SystemRegistriesConfPath:    "testdata/try-update-cache-valid.conf",
