@@ -31,7 +31,7 @@ require (
 	github.com/pquerna/ffjson v0.0.0-20190813045741-dac163c6c0a9 // indirect
 	github.com/sirupsen/logrus v1.7.0
 	github.com/stretchr/testify v1.7.0
-	github.com/ulikunitz/xz v0.5.9
+	github.com/ulikunitz/xz v0.5.10
 	github.com/vbatts/tar-split v0.11.1
 	github.com/vbauerster/mpb/v5 v5.4.0
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190809123943-df4f5c81cb3b // indirect
@@ -44,3 +44,5 @@ require (
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )
+
+replace github.com/containers/storage => github.com/flouthoc/storage v1.24.9-0.20220406143351-b050a8141d8d
