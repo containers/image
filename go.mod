@@ -29,7 +29,7 @@ require (
 	github.com/proglottis/gpgme v0.1.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.1
-	github.com/sylabs/sif/v2 v2.4.2
+	github.com/sylabs/sif/v2 v2.5.0
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbatts/tar-split v0.11.2
 	github.com/vbauerster/mpb/v7 v7.3.2
