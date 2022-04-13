@@ -3,6 +3,7 @@ package layout
 import (
 	"bytes"
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -142,7 +143,7 @@ func putTestConfig(t *testing.T, ociRef ociReference, tmpDir string) {
 	assert.NoError(t, err)
 
 	paths := []string{}
-	err = filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.WalkDir(tmpDir, func(path string, _ fs.DirEntry, err error) error {
 		paths = append(paths, path)
 		return nil
 	})
@@ -165,7 +166,7 @@ func putTestManifest(t *testing.T, ociRef ociReference, tmpDir string) {
 	assert.NoError(t, err)
 
 	paths := []string{}
-	err = filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.WalkDir(tmpDir, func(path string, _ fs.DirEntry, err error) error {
 		paths = append(paths, path)
 		return nil
 	})
