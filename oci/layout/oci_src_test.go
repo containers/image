@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -57,7 +57,7 @@ func TestGetBlobForRemoteLayers(t *testing.T) {
 	require.NoError(t, err)
 	defer reader.Close()
 
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "Hello world")
 }
@@ -73,7 +73,7 @@ func TestGetBlobForRemoteLayersWithTLS(t *testing.T) {
 	}, cache)
 	require.NoError(t, err)
 
-	layerContent, _ := ioutil.ReadAll(layer)
+	layerContent, _ := io.ReadAll(layer)
 	assert.Equal(t, RemoteLayerContent, string(layerContent))
 	assert.Equal(t, int64(len(RemoteLayerContent)), size)
 }
@@ -97,7 +97,7 @@ func remoteLayerContent(w http.ResponseWriter, req *http.Request) {
 }
 
 func startRemoteLayerServer() (*httptest.Server, error) {
-	certBytes, err := ioutil.ReadFile("fixtures/accepted_certs/cert.cert")
+	certBytes, err := os.ReadFile("fixtures/accepted_certs/cert.cert")
 	if err != nil {
 		return nil, err
 	}

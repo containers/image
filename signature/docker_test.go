@@ -1,7 +1,6 @@
 package signature
 
 import (
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"testing"
@@ -27,7 +26,7 @@ func TestSignDockerManifest(t *testing.T) {
 		t.Skipf("Signing not supported: %v", err)
 	}
 
-	manifest, err := ioutil.ReadFile("fixtures/image.manifest.json")
+	manifest, err := os.ReadFile("fixtures/image.manifest.json")
 	require.NoError(t, err)
 
 	// Successful signing
@@ -40,7 +39,7 @@ func TestSignDockerManifest(t *testing.T) {
 	assert.Equal(t, TestImageManifestDigest, verified.DockerManifestDigest)
 
 	// Error computing Docker manifest
-	invalidManifest, err := ioutil.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
+	invalidManifest, err := os.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
 	require.NoError(t, err)
 	_, err = SignDockerManifest(invalidManifest, TestImageSignatureReference, mech, TestKeyFingerprint)
 	assert.Error(t, err)
@@ -65,7 +64,7 @@ func TestSignDockerManifestWithPassphrase(t *testing.T) {
 		t.Skipf("Signing not supported: %v", err)
 	}
 
-	manifest, err := ioutil.ReadFile("fixtures/image.manifest.json")
+	manifest, err := os.ReadFile("fixtures/image.manifest.json")
 	require.NoError(t, err)
 
 	// Invalid passphrase
@@ -90,7 +89,7 @@ func TestSignDockerManifestWithPassphrase(t *testing.T) {
 	assert.Equal(t, TestImageManifestDigest, verified.DockerManifestDigest)
 
 	// Error computing Docker manifest
-	invalidManifest, err := ioutil.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
+	invalidManifest, err := os.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
 	require.NoError(t, err)
 	_, err = SignDockerManifest(invalidManifest, TestImageSignatureReference, mech, TestKeyFingerprintWithPassphrase)
 	assert.Error(t, err)
@@ -108,9 +107,9 @@ func TestVerifyDockerManifestSignature(t *testing.T) {
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
 	require.NoError(t, err)
 	defer mech.Close()
-	manifest, err := ioutil.ReadFile("fixtures/image.manifest.json")
+	manifest, err := os.ReadFile("fixtures/image.manifest.json")
 	require.NoError(t, err)
-	signature, err := ioutil.ReadFile("fixtures/image.signature")
+	signature, err := os.ReadFile("fixtures/image.signature")
 	require.NoError(t, err)
 
 	// Successful verification
@@ -133,14 +132,14 @@ func TestVerifyDockerManifestSignature(t *testing.T) {
 	assert.Nil(t, sig)
 
 	// Error computing Docker manifest
-	invalidManifest, err := ioutil.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
+	invalidManifest, err := os.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
 	require.NoError(t, err)
 	sig, err = VerifyDockerManifestSignature(signature, invalidManifest, TestImageSignatureReference, mech, TestKeyFingerprint)
 	assert.Error(t, err)
 	assert.Nil(t, sig)
 
 	// Error verifying signature
-	corruptSignature, err := ioutil.ReadFile("fixtures/corrupt.signature")
+	corruptSignature, err := os.ReadFile("fixtures/corrupt.signature")
 	require.NoError(t, err)
 	sig, err = VerifyDockerManifestSignature(corruptSignature, manifest, TestImageSignatureReference, mech, TestKeyFingerprint)
 	assert.Error(t, err)
@@ -152,7 +151,7 @@ func TestVerifyDockerManifestSignature(t *testing.T) {
 	assert.Nil(t, sig)
 
 	// Invalid reference in the signature
-	invalidReferenceSignature, err := ioutil.ReadFile("fixtures/invalid-reference.signature")
+	invalidReferenceSignature, err := os.ReadFile("fixtures/invalid-reference.signature")
 	require.NoError(t, err)
 	sig, err = VerifyDockerManifestSignature(invalidReferenceSignature, manifest, TestImageSignatureReference, mech, TestKeyFingerprint)
 	assert.Error(t, err)

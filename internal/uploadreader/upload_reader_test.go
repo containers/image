@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,19 +16,19 @@ func TestUploadReader(t *testing.T) {
 	data := bytes.Repeat([]byte{0x01}, 65535)
 	// No termination
 	ur := NewUploadReader(bytes.NewReader(data))
-	read, err := ioutil.ReadAll(ur)
+	read, err := io.ReadAll(ur)
 	require.NoError(t, err)
 	assert.Equal(t, data, read)
 
 	// Terminated
 	ur = NewUploadReader(bytes.NewReader(data))
 	readLen := len(data) / 2
-	read, err = ioutil.ReadAll(io.LimitReader(ur, int64(readLen)))
+	read, err = io.ReadAll(io.LimitReader(ur, int64(readLen)))
 	require.NoError(t, err)
 	assert.Equal(t, data[:readLen], read)
 	terminationErr := errors.New("Terminated")
 	ur.Terminate(terminationErr)
-	read, err = ioutil.ReadAll(ur)
+	read, err = io.ReadAll(ur)
 	assert.Equal(t, terminationErr, err)
 	assert.Len(t, read, 0)
 }

@@ -1,7 +1,6 @@
 package shortnames
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -95,7 +94,7 @@ func TestSplitUserInput(t *testing.T) {
 }
 
 func TestResolve(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "aliases.conf")
+	tmp, err := os.CreateTemp("", "aliases.conf")
 	require.NoError(t, err)
 	defer os.Remove(tmp.Name())
 
@@ -261,7 +260,7 @@ func removeAlias(t *testing.T, sys *types.SystemContext, name string, mustFail b
 }
 
 func TestResolveWithDropInConfigs(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "aliases.conf")
+	tmp, err := os.CreateTemp("", "aliases.conf")
 	require.NoError(t, err)
 	defer os.Remove(tmp.Name())
 
@@ -394,7 +393,7 @@ func TestResolveWithDropInConfigs(t *testing.T) {
 }
 
 func TestResolveWithVaryingShortNameModes(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "aliases.conf")
+	tmp, err := os.CreateTemp("", "aliases.conf")
 	require.NoError(t, err)
 	defer os.Remove(tmp.Name())
 
@@ -459,7 +458,7 @@ func TestResolveWithVaryingShortNameModes(t *testing.T) {
 }
 
 func TestResolveAndRecord(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "aliases.conf")
+	tmp, err := os.CreateTemp("", "aliases.conf")
 	require.NoError(t, err)
 	defer os.Remove(tmp.Name())
 
@@ -522,7 +521,7 @@ func TestResolveAndRecord(t *testing.T) {
 }
 
 func TestResolveLocally(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "aliases.conf")
+	tmp, err := os.CreateTemp("", "aliases.conf")
 	require.NoError(t, err)
 	defer os.Remove(tmp.Name())
 

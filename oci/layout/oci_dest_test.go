@@ -3,7 +3,6 @@ package layout
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -129,7 +128,7 @@ func TestPutTwoDifferentTags(t *testing.T) {
 }
 
 func putTestConfig(t *testing.T, ociRef ociReference, tmpDir string) {
-	data, err := ioutil.ReadFile("../../image/fixtures/oci1-config.json")
+	data, err := os.ReadFile("../../image/fixtures/oci1-config.json")
 	assert.NoError(t, err)
 	imageDest, err := newImageDestination(nil, ociRef)
 	assert.NoError(t, err)
@@ -154,7 +153,7 @@ func putTestConfig(t *testing.T, ociRef ociReference, tmpDir string) {
 }
 
 func putTestManifest(t *testing.T, ociRef ociReference, tmpDir string) {
-	data, err := ioutil.ReadFile("../../image/fixtures/oci1.json")
+	data, err := os.ReadFile("../../image/fixtures/oci1.json")
 	assert.NoError(t, err)
 	imageDest, err := newImageDestination(nil, ociRef)
 	assert.NoError(t, err)

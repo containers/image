@@ -3,7 +3,7 @@ package image
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -96,7 +96,7 @@ var schema1WithThrowawaysFixtureLayerDiffIDs = []digest.Digest{
 }
 
 func manifestSchema1FromFixture(t *testing.T, fixture string) genericManifest {
-	manifest, err := ioutil.ReadFile(filepath.Join("fixtures", fixture))
+	manifest, err := os.ReadFile(filepath.Join("fixtures", fixture))
 	require.NoError(t, err)
 
 	m, err := manifestSchema1FromManifest(manifest)
@@ -157,7 +157,7 @@ func TestManifestSchema1Serialize(t *testing.T) {
 		err = json.Unmarshal(serialized, &contents)
 		require.NoError(t, err)
 
-		original, err := ioutil.ReadFile("fixtures/schema1.json")
+		original, err := os.ReadFile("fixtures/schema1.json")
 		require.NoError(t, err)
 		var originalContents map[string]interface{}
 		err = json.Unmarshal(original, &originalContents)
@@ -428,7 +428,7 @@ func TestManifestSchema1ConvertToSchema2(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, manifest.DockerV2Schema2MediaType, mt)
 
-	byHandJSON, err := ioutil.ReadFile("fixtures/schema1-to-schema2.json")
+	byHandJSON, err := os.ReadFile("fixtures/schema1-to-schema2.json")
 	require.NoError(t, err)
 	var converted, byHand map[string]interface{}
 	err = json.Unmarshal(byHandJSON, &byHand)
@@ -442,7 +442,7 @@ func TestManifestSchema1ConvertToSchema2(t *testing.T) {
 	convertedConfig, err := res.ConfigBlob(context.Background())
 	require.NoError(t, err)
 
-	byHandConfig, err := ioutil.ReadFile("fixtures/schema1-to-schema2-config.json")
+	byHandConfig, err := os.ReadFile("fixtures/schema1-to-schema2-config.json")
 	require.NoError(t, err)
 	converted = map[string]interface{}{}
 	byHand = map[string]interface{}{}
@@ -521,7 +521,7 @@ func TestManifestSchema1ConvertToManifestOCI1(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, imgspecv1.MediaTypeImageManifest, mt)
 
-	byHandJSON, err := ioutil.ReadFile("fixtures/schema1-to-oci1.json")
+	byHandJSON, err := os.ReadFile("fixtures/schema1-to-oci1.json")
 	require.NoError(t, err)
 	var converted, byHand map[string]interface{}
 	err = json.Unmarshal(byHandJSON, &byHand)
@@ -535,7 +535,7 @@ func TestManifestSchema1ConvertToManifestOCI1(t *testing.T) {
 	convertedConfig, err := res.ConfigBlob(context.Background())
 	require.NoError(t, err)
 
-	byHandConfig, err := ioutil.ReadFile("fixtures/schema1-to-oci1-config.json")
+	byHandConfig, err := os.ReadFile("fixtures/schema1-to-oci1-config.json")
 	require.NoError(t, err)
 	converted = map[string]interface{}{}
 	byHand = map[string]interface{}{}

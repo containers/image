@@ -1,7 +1,7 @@
 package streamdigest
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"testing"
 
@@ -30,7 +30,7 @@ func TestComputeBlobInfo(t *testing.T) {
 	assert.Equal(t, inputInfo, fixtureInfo)
 
 	// ensure streamCopy is the same as fixture
-	b, err := ioutil.ReadAll(streamCopy)
+	b, err := io.ReadAll(streamCopy)
 	require.NoError(t, err)
 	assert.Equal(t, b, fixtureBytes)
 }

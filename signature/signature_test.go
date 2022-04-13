@@ -2,7 +2,7 @@ package signature
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -300,7 +300,7 @@ func TestVerifyAndExtractSignature(t *testing.T) {
 		},
 	}
 
-	signature, err := ioutil.ReadFile("./fixtures/image.signature")
+	signature, err := os.ReadFile("./fixtures/image.signature")
 	require.NoError(t, err)
 	signatureData := triple{
 		keyIdentity:                TestKeyFingerprint,
@@ -333,7 +333,7 @@ func TestVerifyAndExtractSignature(t *testing.T) {
 	assert.Equal(t, triple{}, recorded)
 
 	// Valid signature of non-JSON: asked for keyIdentity, only
-	invalidBlobSignature, err := ioutil.ReadFile("./fixtures/invalid-blob.signature")
+	invalidBlobSignature, err := os.ReadFile("./fixtures/invalid-blob.signature")
 	require.NoError(t, err)
 	recorded = triple{}
 	sig, err = verifyAndExtractSignature(mech, invalidBlobSignature, recordingRules)
@@ -373,7 +373,7 @@ func TestVerifyAndExtractSignature(t *testing.T) {
 }
 
 func TestGetUntrustedSignatureInformationWithoutVerifying(t *testing.T) {
-	signature, err := ioutil.ReadFile("./fixtures/image.signature")
+	signature, err := os.ReadFile("./fixtures/image.signature")
 	require.NoError(t, err)
 	// Successful parsing, all optional fields present
 	info, err := GetUntrustedSignatureInformationWithoutVerifying(signature)
@@ -386,7 +386,7 @@ func TestGetUntrustedSignatureInformationWithoutVerifying(t *testing.T) {
 	assert.Equal(t, time.Unix(1458239713, 0), *info.UntrustedTimestamp)
 	assert.Equal(t, TestKeyShortID, info.UntrustedShortKeyIdentifier)
 	// Successful parsing, no optional fields present
-	signature, err = ioutil.ReadFile("./fixtures/no-optional-fields.signature")
+	signature, err = os.ReadFile("./fixtures/no-optional-fields.signature")
 	require.NoError(t, err)
 	// Successful parsing
 	info, err = GetUntrustedSignatureInformationWithoutVerifying(signature)
@@ -405,7 +405,7 @@ func TestGetUntrustedSignatureInformationWithoutVerifying(t *testing.T) {
 	assert.Error(t, err)
 
 	// Valid signature of non-JSON
-	invalidBlobSignature, err := ioutil.ReadFile("./fixtures/invalid-blob.signature")
+	invalidBlobSignature, err := os.ReadFile("./fixtures/invalid-blob.signature")
 	require.NoError(t, err)
 	_, err = GetUntrustedSignatureInformationWithoutVerifying(invalidBlobSignature)
 	assert.Error(t, err)

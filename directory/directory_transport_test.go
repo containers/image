@@ -2,7 +2,6 @@ package directory
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -145,7 +144,7 @@ func TestReferenceNewImage(t *testing.T) {
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	require.NoError(t, err)
 	defer dest.Close()
-	mFixture, err := ioutil.ReadFile("../manifest/fixtures/v2s1.manifest.json")
+	mFixture, err := os.ReadFile("../manifest/fixtures/v2s1.manifest.json")
 	require.NoError(t, err)
 	err = dest.PutManifest(context.Background(), mFixture, nil)
 	assert.NoError(t, err)

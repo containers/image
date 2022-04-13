@@ -2,7 +2,6 @@ package sif
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -51,7 +50,7 @@ func TestNewReference(t *testing.T) {
 func testNewReference(t *testing.T, fn func(string) (types.ImageReference, error)) {
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "image.sif")
-	err := ioutil.WriteFile(tmpFile, nil, 0600)
+	err := os.WriteFile(tmpFile, nil, 0600)
 	require.NoError(t, err)
 
 	for _, file := range []string{
@@ -75,7 +74,7 @@ func testNewReference(t *testing.T, fn func(string) (types.ImageReference, error
 // The caller should
 //   defer os.Remove(tmpFile)
 func refToTempFile(t *testing.T) (ref types.ImageReference, tmpDir string) {
-	f, err := ioutil.TempFile("", "sif-transport-test")
+	f, err := os.CreateTemp("", "sif-transport-test")
 	require.NoError(t, err)
 	tmpFile := f.Name()
 	err = f.Close()

@@ -3,7 +3,7 @@ package manifest
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -69,7 +69,7 @@ func TestValidateUnambiguousManifestFormat(t *testing.T) {
 // Intended to help test manifest parsers' detection of schema mismatches.
 func testManifestFixturesAreRejected(t *testing.T, parser func([]byte) error, fixtures []string) {
 	for _, fixture := range fixtures {
-		manifest, err := ioutil.ReadFile(filepath.Join("fixtures", fixture))
+		manifest, err := os.ReadFile(filepath.Join("fixtures", fixture))
 		require.NoError(t, err, fixture)
 		err = parser(manifest)
 		assert.Error(t, err, fixture)

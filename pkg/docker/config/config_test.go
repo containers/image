@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -282,12 +281,12 @@ func TestGetAuth(t *testing.T) {
 				}
 
 				if tc.path != "" {
-					contents, err := ioutil.ReadFile(tc.path)
+					contents, err := os.ReadFile(tc.path)
 					if err != nil {
 						t.Fatal(err)
 					}
 
-					if err := ioutil.WriteFile(configPath, contents, 0640); err != nil {
+					if err := os.WriteFile(configPath, contents, 0640); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -322,7 +321,7 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 	t.Logf("using temporary home directory: %q", tmpDir)
 
 	configPath := filepath.Join(tmpDir, ".dockercfg")
-	contents, err := ioutil.ReadFile(filepath.Join("testdata", "legacy.json"))
+	contents, err := os.ReadFile(filepath.Join("testdata", "legacy.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,7 +349,7 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := ioutil.WriteFile(configPath, contents, 0640); err != nil {
+			if err := os.WriteFile(configPath, contents, 0640); err != nil {
 				t.Fatal(err)
 			}
 
@@ -389,12 +388,12 @@ func TestGetAuthPreferNewConfig(t *testing.T) {
 			target: filepath.Join(tmpDir, ".dockercfg"),
 		},
 	} {
-		contents, err := ioutil.ReadFile(data.source)
+		contents, err := os.ReadFile(data.source)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if err := ioutil.WriteFile(data.target, contents, 0640); err != nil {
+		if err := os.WriteFile(data.target, contents, 0640); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -432,7 +431,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	}
 	assert.Equal(t, types.DockerAuthConfig{}, auth)
 
-	if err := ioutil.WriteFile(configPath, []byte("Json rocks! Unless it doesn't."), 0640); err != nil {
+	if err := os.WriteFile(configPath, []byte("Json rocks! Unless it doesn't."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
 	_, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
@@ -448,7 +447,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	assert.Equal(t, types.DockerAuthConfig{}, auth)
 
 	configPath = filepath.Join(tmpHomeDir, ".dockercfg")
-	if err := ioutil.WriteFile(configPath, []byte("I'm certainly not a json string."), 0640); err != nil {
+	if err := os.WriteFile(configPath, []byte("I'm certainly not a json string."), 0640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
 	_, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
@@ -457,7 +456,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 
 func TestGetAllCredentials(t *testing.T) {
 	// Create a temporary authentication file.
-	tmpFile, err := ioutil.TempFile("", "auth.json.")
+	tmpFile, err := os.CreateTemp("", "auth.json.")
 	require.NoError(t, err)
 	authFilePath := tmpFile.Name()
 	defer tmpFile.Close()
@@ -541,7 +540,7 @@ func TestGetAllCredentials(t *testing.T) {
 		},
 	} {
 		// Write the credentials to the authfile.
-		err := ioutil.WriteFile(authFilePath, []byte{'{', '}'}, 0700)
+		err := os.WriteFile(authFilePath, []byte{'{', '}'}, 0700)
 		require.NoError(t, err)
 
 		for _, d := range data {
@@ -650,7 +649,7 @@ func TestSetCredentials(t *testing.T) {
 			"docker.io/library",
 		},
 	} {
-		tmpFile, err := ioutil.TempFile("", "auth.json.set")
+		tmpFile, err := os.CreateTemp("", "auth.json.set")
 		require.NoError(t, err)
 		defer os.RemoveAll(tmpFile.Name())
 
@@ -773,7 +772,7 @@ func TestRemoveAuthentication(t *testing.T) {
 		content, err := json.Marshal(&tc.config)
 		require.NoError(t, err)
 
-		tmpFile, err := ioutil.TempFile("", "auth.json")
+		tmpFile, err := os.CreateTemp("", "auth.json")
 		require.NoError(t, err)
 		defer os.RemoveAll(tmpFile.Name())
 
@@ -877,7 +876,7 @@ func TestSetGetCredentials(t *testing.T) {
 	} {
 
 		// Create a new empty SystemContext referring an empty auth.json
-		tmpFile, err := ioutil.TempFile("", "auth.json-")
+		tmpFile, err := os.CreateTemp("", "auth.json-")
 		require.NoError(t, err)
 		defer os.RemoveAll(tmpFile.Name())
 

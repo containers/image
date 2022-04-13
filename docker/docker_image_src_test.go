@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -51,11 +50,11 @@ location = "with-mirror.example.com"
 [[registry.mirror]]
 location = "@REGISTRY@/with-mirror"
 `, "@REGISTRY@", registry, -1)
-	registriesConf, err := ioutil.TempFile("", "docker-image-src")
+	registriesConf, err := os.CreateTemp("", "docker-image-src")
 	require.NoError(t, err)
 	defer registriesConf.Close()
 	defer os.Remove(registriesConf.Name())
-	err = ioutil.WriteFile(registriesConf.Name(), []byte(mirrorConfiguration), 0600)
+	err = os.WriteFile(registriesConf.Name(), []byte(mirrorConfiguration), 0600)
 	require.NoError(t, err)
 
 	for _, c := range []struct{ input, physical string }{
@@ -108,7 +107,7 @@ func readNextStream(streams chan io.ReadCloser, errs chan error) ([]byte, error)
 			return nil, nil
 		}
 		defer r.Close()
-		return ioutil.ReadAll(r)
+		return io.ReadAll(r)
 	case err := <-errs:
 		return nil, err
 	}
@@ -128,7 +127,7 @@ func verifyGetBlobAtOutput(t *testing.T, streams chan io.ReadCloser, errs chan e
 }
 
 func TestSplitHTTP200ResponseToPartial(t *testing.T) {
-	body := ioutil.NopCloser(bytes.NewReader([]byte("123456789")))
+	body := io.NopCloser(bytes.NewReader([]byte("123456789")))
 	defer body.Close()
 	streams := make(chan io.ReadCloser)
 	errs := make(chan error)
@@ -148,7 +147,7 @@ func TestSplitHTTP200ResponseToPartial(t *testing.T) {
 }
 
 func TestHandle206Response(t *testing.T) {
-	body := ioutil.NopCloser(bytes.NewReader([]byte("--AAA\r\n\r\n23\r\n--AAA\r\n\r\n5\r\n--AAA--")))
+	body := io.NopCloser(bytes.NewReader([]byte("--AAA\r\n\r\n23\r\n--AAA\r\n\r\n5\r\n--AAA--")))
 	defer body.Close()
 	streams := make(chan io.ReadCloser)
 	errs := make(chan error)
@@ -169,7 +168,7 @@ func TestHandle206Response(t *testing.T) {
 	}
 	verifyGetBlobAtOutput(t, streams, errs, expected)
 
-	body = ioutil.NopCloser(bytes.NewReader([]byte("HELLO")))
+	body = io.NopCloser(bytes.NewReader([]byte("HELLO")))
 	defer body.Close()
 	streams = make(chan io.ReadCloser)
 	errs = make(chan error)

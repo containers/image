@@ -12,7 +12,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -1102,7 +1101,7 @@ func TestDuplicateBlob(t *testing.T) {
 		if err != nil {
 			t.Fatalf("getBlobAndLayerID(%q) returned error %v", layerInfo.Digest, err)
 		}
-		_, err = io.Copy(ioutil.Discard, rc)
+		_, err = io.Copy(io.Discard, rc)
 		require.NoError(t, err)
 		rc.Close()
 		layers = append(layers, layerID)

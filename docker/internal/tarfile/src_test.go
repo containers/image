@@ -3,7 +3,7 @@ package tarfile
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/containers/image/v5/manifest"
@@ -55,7 +55,7 @@ func TestSourcePrepareLayerData(t *testing.T) {
 		}, cache)
 		if !c.shouldFail {
 			require.NoError(t, err, c.config)
-			config2, err := ioutil.ReadAll(configStream)
+			config2, err := io.ReadAll(configStream)
 			require.NoError(t, err, c.config)
 			assert.Equal(t, []byte(c.config), config2, c.config)
 		} else {

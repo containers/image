@@ -1,7 +1,7 @@
 package manifest
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -74,7 +74,7 @@ func TestSupportedOCI1MediaType(t *testing.T) {
 }
 
 func TestOCI1FromManifest(t *testing.T) {
-	validManifest, err := ioutil.ReadFile(filepath.Join("fixtures", "ociv1.manifest.json"))
+	validManifest, err := os.ReadFile(filepath.Join("fixtures", "ociv1.manifest.json"))
 	require.NoError(t, err)
 
 	parser := func(m []byte) error {
@@ -93,7 +93,7 @@ func TestOCI1FromManifest(t *testing.T) {
 }
 
 func TestUpdateLayerInfosOCIGzipToZstd(t *testing.T) {
-	bytes, err := ioutil.ReadFile("fixtures/ociv1.manifest.json")
+	bytes, err := os.ReadFile("fixtures/ociv1.manifest.json")
 	assert.Nil(t, err)
 
 	manifest, err := OCI1FromManifest(bytes)
@@ -127,7 +127,7 @@ func TestUpdateLayerInfosOCIGzipToZstd(t *testing.T) {
 	updatedManifestBytes, err := manifest.Serialize()
 	assert.Nil(t, err)
 
-	bytes, err = ioutil.ReadFile("fixtures/ociv1.zstd.manifest.json")
+	bytes, err = os.ReadFile("fixtures/ociv1.zstd.manifest.json")
 	assert.Nil(t, err)
 
 	expectedManifest, err := OCI1FromManifest(bytes)
@@ -140,7 +140,7 @@ func TestUpdateLayerInfosOCIGzipToZstd(t *testing.T) {
 }
 
 func TestUpdateLayerInfosOCIZstdToGzip(t *testing.T) {
-	bytes, err := ioutil.ReadFile("fixtures/ociv1.zstd.manifest.json")
+	bytes, err := os.ReadFile("fixtures/ociv1.zstd.manifest.json")
 	assert.Nil(t, err)
 
 	manifest, err := OCI1FromManifest(bytes)
@@ -174,7 +174,7 @@ func TestUpdateLayerInfosOCIZstdToGzip(t *testing.T) {
 	updatedManifestBytes, err := manifest.Serialize()
 	assert.Nil(t, err)
 
-	bytes, err = ioutil.ReadFile("fixtures/ociv1.manifest.json")
+	bytes, err = os.ReadFile("fixtures/ociv1.manifest.json")
 	assert.Nil(t, err)
 
 	expectedManifest, err := OCI1FromManifest(bytes)
@@ -187,7 +187,7 @@ func TestUpdateLayerInfosOCIZstdToGzip(t *testing.T) {
 }
 
 func TestUpdateLayerInfosOCIZstdToUncompressed(t *testing.T) {
-	bytes, err := ioutil.ReadFile("fixtures/ociv1.zstd.manifest.json")
+	bytes, err := os.ReadFile("fixtures/ociv1.zstd.manifest.json")
 	assert.Nil(t, err)
 
 	manifest, err := OCI1FromManifest(bytes)
@@ -218,7 +218,7 @@ func TestUpdateLayerInfosOCIZstdToUncompressed(t *testing.T) {
 	updatedManifestBytes, err := manifest.Serialize()
 	assert.Nil(t, err)
 
-	bytes, err = ioutil.ReadFile("fixtures/ociv1.uncompressed.manifest.json")
+	bytes, err = os.ReadFile("fixtures/ociv1.uncompressed.manifest.json")
 	assert.Nil(t, err)
 
 	expectedManifest, err := OCI1FromManifest(bytes)
@@ -231,7 +231,7 @@ func TestUpdateLayerInfosOCIZstdToUncompressed(t *testing.T) {
 }
 
 func TestUpdateLayerInfosInvalidCompressionOperation(t *testing.T) {
-	bytes, err := ioutil.ReadFile("fixtures/ociv1.zstd.manifest.json")
+	bytes, err := os.ReadFile("fixtures/ociv1.zstd.manifest.json")
 	assert.Nil(t, err)
 
 	manifest, err := OCI1FromManifest(bytes)
@@ -264,7 +264,7 @@ func TestUpdateLayerInfosInvalidCompressionOperation(t *testing.T) {
 }
 
 func TestUpdateLayerInfosInvalidCompressionAlgorithm(t *testing.T) {
-	bytes, err := ioutil.ReadFile("fixtures/ociv1.zstd.manifest.json")
+	bytes, err := os.ReadFile("fixtures/ociv1.zstd.manifest.json")
 	assert.Nil(t, err)
 
 	manifest, err := OCI1FromManifest(bytes)
@@ -298,7 +298,7 @@ func TestUpdateLayerInfosInvalidCompressionAlgorithm(t *testing.T) {
 }
 
 func TestUpdateLayerInfosOCIGzipToUncompressed(t *testing.T) {
-	bytes, err := ioutil.ReadFile("fixtures/ociv1.manifest.json")
+	bytes, err := os.ReadFile("fixtures/ociv1.manifest.json")
 	assert.Nil(t, err)
 
 	manifest, err := OCI1FromManifest(bytes)
@@ -329,7 +329,7 @@ func TestUpdateLayerInfosOCIGzipToUncompressed(t *testing.T) {
 	updatedManifestBytes, err := manifest.Serialize()
 	assert.Nil(t, err)
 
-	bytes, err = ioutil.ReadFile("fixtures/ociv1.uncompressed.manifest.json")
+	bytes, err = os.ReadFile("fixtures/ociv1.uncompressed.manifest.json")
 	assert.Nil(t, err)
 
 	expectedManifest, err := OCI1FromManifest(bytes)
@@ -342,7 +342,7 @@ func TestUpdateLayerInfosOCIGzipToUncompressed(t *testing.T) {
 }
 
 func TestUpdateLayerInfosOCINondistributableToGzip(t *testing.T) {
-	bytes, err := ioutil.ReadFile("fixtures/ociv1.nondistributable.manifest.json")
+	bytes, err := os.ReadFile("fixtures/ociv1.nondistributable.manifest.json")
 	assert.Nil(t, err)
 
 	manifest, err := OCI1FromManifest(bytes)
@@ -362,7 +362,7 @@ func TestUpdateLayerInfosOCINondistributableToGzip(t *testing.T) {
 	updatedManifestBytes, err := manifest.Serialize()
 	assert.Nil(t, err)
 
-	bytes, err = ioutil.ReadFile("fixtures/ociv1.nondistributable.gzip.manifest.json")
+	bytes, err = os.ReadFile("fixtures/ociv1.nondistributable.gzip.manifest.json")
 	assert.Nil(t, err)
 
 	expectedManifest, err := OCI1FromManifest(bytes)
@@ -375,7 +375,7 @@ func TestUpdateLayerInfosOCINondistributableToGzip(t *testing.T) {
 }
 
 func TestUpdateLayerInfosOCINondistributableToZstd(t *testing.T) {
-	bytes, err := ioutil.ReadFile("fixtures/ociv1.nondistributable.manifest.json")
+	bytes, err := os.ReadFile("fixtures/ociv1.nondistributable.manifest.json")
 	assert.Nil(t, err)
 
 	manifest, err := OCI1FromManifest(bytes)
@@ -395,7 +395,7 @@ func TestUpdateLayerInfosOCINondistributableToZstd(t *testing.T) {
 	updatedManifestBytes, err := manifest.Serialize()
 	assert.Nil(t, err)
 
-	bytes, err = ioutil.ReadFile("fixtures/ociv1.nondistributable.zstd.manifest.json")
+	bytes, err = os.ReadFile("fixtures/ociv1.nondistributable.zstd.manifest.json")
 	assert.Nil(t, err)
 
 	expectedManifest, err := OCI1FromManifest(bytes)
@@ -408,7 +408,7 @@ func TestUpdateLayerInfosOCINondistributableToZstd(t *testing.T) {
 }
 
 func TestUpdateLayerInfosOCINondistributableGzipToUncompressed(t *testing.T) {
-	bytes, err := ioutil.ReadFile("fixtures/ociv1.nondistributable.gzip.manifest.json")
+	bytes, err := os.ReadFile("fixtures/ociv1.nondistributable.gzip.manifest.json")
 	assert.Nil(t, err)
 
 	manifest, err := OCI1FromManifest(bytes)
@@ -427,7 +427,7 @@ func TestUpdateLayerInfosOCINondistributableGzipToUncompressed(t *testing.T) {
 	updatedManifestBytes, err := manifest.Serialize()
 	assert.Nil(t, err)
 
-	bytes, err = ioutil.ReadFile("fixtures/ociv1.nondistributable.manifest.json")
+	bytes, err = os.ReadFile("fixtures/ociv1.nondistributable.manifest.json")
 	assert.Nil(t, err)
 
 	expectedManifest, err := OCI1FromManifest(bytes)

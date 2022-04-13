@@ -1,7 +1,7 @@
 package manifest
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -38,7 +38,7 @@ func TestGuessMIMEType(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		manifest, err := ioutil.ReadFile(filepath.Join("fixtures", c.path))
+		manifest, err := os.ReadFile(filepath.Join("fixtures", c.path))
 		require.NoError(t, err)
 		mimeType := GuessMIMEType(manifest)
 		assert.Equal(t, c.mimeType, mimeType, c.path)
@@ -55,14 +55,14 @@ func TestDigest(t *testing.T) {
 		{"v2s1-unsigned.manifest.json", TestDockerV2S1UnsignedManifestDigest},
 	}
 	for _, c := range cases {
-		manifest, err := ioutil.ReadFile(filepath.Join("fixtures", c.path))
+		manifest, err := os.ReadFile(filepath.Join("fixtures", c.path))
 		require.NoError(t, err)
 		actualDigest, err := Digest(manifest)
 		require.NoError(t, err)
 		assert.Equal(t, c.expectedDigest, actualDigest)
 	}
 
-	manifest, err := ioutil.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
+	manifest, err := os.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
 	require.NoError(t, err)
 	_, err = Digest(manifest)
 	assert.Error(t, err)
@@ -92,14 +92,14 @@ func TestMatchesDigest(t *testing.T) {
 		{"v2s2.manifest.json", digest.Digest(""), false},
 	}
 	for _, c := range cases {
-		manifest, err := ioutil.ReadFile(filepath.Join("fixtures", c.path))
+		manifest, err := os.ReadFile(filepath.Join("fixtures", c.path))
 		require.NoError(t, err)
 		res, err := MatchesDigest(manifest, c.expectedDigest)
 		require.NoError(t, err)
 		assert.Equal(t, c.result, res)
 	}
 
-	manifest, err := ioutil.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
+	manifest, err := os.ReadFile("fixtures/v2s1-invalid-signatures.manifest.json")
 	require.NoError(t, err)
 	// Even a correct SHA256 hash is rejected if we can't strip the JSON signature.
 	res, err := MatchesDigest(manifest, digest.FromBytes(manifest))
@@ -112,7 +112,7 @@ func TestMatchesDigest(t *testing.T) {
 }
 
 func TestAddDummyV2S1Signature(t *testing.T) {
-	manifest, err := ioutil.ReadFile("fixtures/v2s1-unsigned.manifest.json")
+	manifest, err := os.ReadFile("fixtures/v2s1-unsigned.manifest.json")
 	require.NoError(t, err)
 
 	signedManifest, err := AddDummyV2S1Signature(manifest)

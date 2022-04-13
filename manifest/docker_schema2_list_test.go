@@ -1,7 +1,7 @@
 package manifest
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -9,7 +9,7 @@ import (
 )
 
 func TestSchema2ListFromManifest(t *testing.T) {
-	validManifest, err := ioutil.ReadFile(filepath.Join("fixtures", "v2list.manifest.json"))
+	validManifest, err := os.ReadFile(filepath.Join("fixtures", "v2list.manifest.json"))
 	require.NoError(t, err)
 
 	parser := func(m []byte) error {
