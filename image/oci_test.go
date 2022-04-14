@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -21,7 +21,7 @@ import (
 )
 
 func manifestOCI1FromFixture(t *testing.T, src types.ImageSource, fixture string) genericManifest {
-	manifest, err := ioutil.ReadFile(filepath.Join("fixtures", fixture))
+	manifest, err := os.ReadFile(filepath.Join("fixtures", fixture))
 	require.NoError(t, err)
 
 	m, err := manifestOCI1FromManifest(src, manifest)
@@ -98,7 +98,7 @@ func TestManifestOCI1Serialize(t *testing.T) {
 		err = json.Unmarshal(serialized, &contents)
 		require.NoError(t, err)
 
-		original, err := ioutil.ReadFile("fixtures/oci1.json")
+		original, err := os.ReadFile("fixtures/oci1.json")
 		require.NoError(t, err)
 		var originalContents map[string]interface{}
 		err = json.Unmarshal(original, &originalContents)
@@ -137,7 +137,7 @@ func TestManifestOCI1ConfigInfo(t *testing.T) {
 }
 
 func TestManifestOCI1ConfigBlob(t *testing.T) {
-	realConfigJSON, err := ioutil.ReadFile("fixtures/oci1-config.json")
+	realConfigJSON, err := os.ReadFile("fixtures/oci1-config.json")
 	require.NoError(t, err)
 
 	for _, c := range []struct {
@@ -146,7 +146,7 @@ func TestManifestOCI1ConfigBlob(t *testing.T) {
 	}{
 		// Success
 		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
-			return ioutil.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
+			return io.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
 		}, realConfigJSON},
 		// Various kinds of failures
 		{nil, nil},
@@ -161,7 +161,7 @@ func TestManifestOCI1ConfigBlob(t *testing.T) {
 		}, nil},
 		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
 			nonmatchingJSON := []byte("This does not match ConfigDescriptor.Digest")
-			return ioutil.NopCloser(bytes.NewReader(nonmatchingJSON)), int64(len(nonmatchingJSON)), nil
+			return io.NopCloser(bytes.NewReader(nonmatchingJSON)), int64(len(nonmatchingJSON)), nil
 		}, nil},
 	} {
 		var src types.ImageSource
@@ -248,7 +248,7 @@ func TestManifestOCI1EmbeddedDockerReferenceConflicts(t *testing.T) {
 }
 
 func TestManifestOCI1Inspect(t *testing.T) {
-	configJSON, err := ioutil.ReadFile("fixtures/oci1-config.json")
+	configJSON, err := os.ReadFile("fixtures/oci1-config.json")
 	require.NoError(t, err)
 
 	m := manifestOCI1FromComponentsLikeFixture(configJSON)
@@ -311,7 +311,7 @@ func (OCIis *oci1ImageSource) Reference() types.ImageReference {
 }
 
 func newOCI1ImageSource(t *testing.T, dockerRef string) *oci1ImageSource {
-	realConfigJSON, err := ioutil.ReadFile("fixtures/oci1-config.json")
+	realConfigJSON, err := os.ReadFile("fixtures/oci1-config.json")
 	require.NoError(t, err)
 
 	ref, err := reference.ParseNormalizedNamed(dockerRef)
@@ -320,7 +320,7 @@ func newOCI1ImageSource(t *testing.T, dockerRef string) *oci1ImageSource {
 	return &oci1ImageSource{
 		configBlobImageSource: configBlobImageSource{
 			f: func(digest digest.Digest) (io.ReadCloser, int64, error) {
-				return ioutil.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
+				return io.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
 			},
 		},
 		ref: ref,
@@ -404,7 +404,7 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, manifest.DockerV2Schema1SignedMediaType, mt)
 
-	byHandJSON, err := ioutil.ReadFile("fixtures/oci1-to-schema1.json")
+	byHandJSON, err := os.ReadFile("fixtures/oci1-to-schema1.json")
 	require.NoError(t, err)
 	var converted, byHand map[string]interface{}
 	err = json.Unmarshal(byHandJSON, &byHand)
@@ -468,7 +468,7 @@ func TestConvertToManifestSchema2(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, manifest.DockerV2Schema2MediaType, mt)
 
-	byHandJSON, err := ioutil.ReadFile("fixtures/oci1-to-schema2.json")
+	byHandJSON, err := os.ReadFile("fixtures/oci1-to-schema2.json")
 	require.NoError(t, err)
 	var converted, byHand map[string]interface{}
 	err = json.Unmarshal(byHandJSON, &byHand)
@@ -491,7 +491,7 @@ func TestConvertToManifestSchema2AllMediaTypes(t *testing.T) {
 
 func TestConvertToV2S2WithInvalidMIMEType(t *testing.T) {
 	originalSrc := newOCI1ImageSource(t, "httpd-copy:latest")
-	manifest, err := ioutil.ReadFile(filepath.Join("fixtures", "oci1-invalid-media-type.json"))
+	manifest, err := os.ReadFile(filepath.Join("fixtures", "oci1-invalid-media-type.json"))
 	require.NoError(t, err)
 
 	_, err = manifestOCI1FromManifest(originalSrc, manifest)

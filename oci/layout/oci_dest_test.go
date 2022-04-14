@@ -3,7 +3,7 @@ package layout
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -129,7 +129,7 @@ func TestPutTwoDifferentTags(t *testing.T) {
 }
 
 func putTestConfig(t *testing.T, ociRef ociReference, tmpDir string) {
-	data, err := ioutil.ReadFile("../../image/fixtures/oci1-config.json")
+	data, err := os.ReadFile("../../image/fixtures/oci1-config.json")
 	assert.NoError(t, err)
 	imageDest, err := newImageDestination(nil, ociRef)
 	assert.NoError(t, err)
@@ -143,7 +143,7 @@ func putTestConfig(t *testing.T, ociRef ociReference, tmpDir string) {
 	assert.NoError(t, err)
 
 	paths := []string{}
-	err = filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.WalkDir(tmpDir, func(path string, _ fs.DirEntry, err error) error {
 		paths = append(paths, path)
 		return nil
 	})
@@ -154,7 +154,7 @@ func putTestConfig(t *testing.T, ociRef ociReference, tmpDir string) {
 }
 
 func putTestManifest(t *testing.T, ociRef ociReference, tmpDir string) {
-	data, err := ioutil.ReadFile("../../image/fixtures/oci1.json")
+	data, err := os.ReadFile("../../image/fixtures/oci1.json")
 	assert.NoError(t, err)
 	imageDest, err := newImageDestination(nil, ociRef)
 	assert.NoError(t, err)
@@ -166,7 +166,7 @@ func putTestManifest(t *testing.T, ociRef ociReference, tmpDir string) {
 	assert.NoError(t, err)
 
 	paths := []string{}
-	err = filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.WalkDir(tmpDir, func(path string, _ fs.DirEntry, err error) error {
 		paths = append(paths, path)
 		return nil
 	})

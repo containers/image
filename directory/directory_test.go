@@ -3,7 +3,7 @@ package directory
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"os"
 	"testing"
 
@@ -92,7 +92,7 @@ func TestGetPutBlob(t *testing.T) {
 		rc, size, err := src.GetBlob(context.Background(), types.BlobInfo{Digest: digest, Size: int64(len(expectedBlob))}, cache)
 		assert.NoError(t, err)
 		defer rc.Close()
-		b, err := ioutil.ReadAll(rc)
+		b, err := io.ReadAll(rc)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedBlob, b)
 		assert.Equal(t, int64(len(expectedBlob)), size)

@@ -2,7 +2,7 @@ package manifest
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -33,7 +33,7 @@ func TestParseLists(t *testing.T) {
 		{"v2list.manifest.json", DockerV2ListMediaType},
 	}
 	for _, c := range cases {
-		manifest, err := ioutil.ReadFile(filepath.Join("fixtures", c.path))
+		manifest, err := os.ReadFile(filepath.Join("fixtures", c.path))
 		require.NoError(t, err, "error reading file %q", filepath.Join("fixtures", c.path))
 		assert.Equal(t, GuessMIMEType(manifest), c.mimeType)
 
@@ -113,7 +113,7 @@ func TestChooseInstance(t *testing.T) {
 			},
 		},
 	} {
-		rawManifest, err := ioutil.ReadFile(filepath.Join("..", "image", "fixtures", manifestList.listFile))
+		rawManifest, err := os.ReadFile(filepath.Join("..", "image", "fixtures", manifestList.listFile))
 		require.NoError(t, err)
 		list, err := ListFromBlob(rawManifest, GuessMIMEType(rawManifest))
 		require.NoError(t, err)

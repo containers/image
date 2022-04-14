@@ -1,7 +1,7 @@
 package manifest
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -9,7 +9,7 @@ import (
 )
 
 func TestOCI1IndexFromManifest(t *testing.T) {
-	validManifest, err := ioutil.ReadFile(filepath.Join("fixtures", "ociv1.image.index.json"))
+	validManifest, err := os.ReadFile(filepath.Join("fixtures", "ociv1.image.index.json"))
 	require.NoError(t, err)
 
 	parser := func(m []byte) error {

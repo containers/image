@@ -2,7 +2,6 @@ package archive
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -131,7 +130,7 @@ func refToTempOCI(t *testing.T) (types.ImageReference, string) {
 		]
 	}
 `
-	err := ioutil.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
+	err := os.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
 	require.NoError(t, err)
 	ref, err := NewReference(tmpDir, "imageValue")
 	require.NoError(t, err)
@@ -160,9 +159,9 @@ func refToTempOCIArchive(t *testing.T) (ref types.ImageReference, tmpTarFile str
 		]
 	}
 `
-	err := ioutil.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
+	err := os.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
 	require.NoError(t, err)
-	tarFile, err := ioutil.TempFile("", "oci-transport-test.tar")
+	tarFile, err := os.CreateTemp("", "oci-transport-test.tar")
 	require.NoError(t, err)
 	err = tarDirectory(tmpDir, tarFile.Name())
 	require.NoError(t, err)

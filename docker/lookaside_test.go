@@ -2,7 +2,6 @@ package docker
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -137,9 +136,9 @@ func TestLoadAndMergeConfig(t *testing.T) {
 	unreadableFileDir := filepath.Join(tmpDir, "unreadableFile")
 	err = os.Mkdir(unreadableFileDir, 0755)
 	require.NoError(t, err)
-	err = ioutil.WriteFile(filepath.Join(unreadableFileDir, "0.yaml"), []byte("{}"), 0644)
+	err = os.WriteFile(filepath.Join(unreadableFileDir, "0.yaml"), []byte("{}"), 0644)
 	require.NoError(t, err)
-	err = ioutil.WriteFile(filepath.Join(unreadableFileDir, "1.yaml"), nil, 0000)
+	err = os.WriteFile(filepath.Join(unreadableFileDir, "1.yaml"), nil, 0000)
 	require.NoError(t, err)
 	_, err = loadAndMergeConfig(unreadableFileDir)
 	assert.Error(t, err)
@@ -148,7 +147,7 @@ func TestLoadAndMergeConfig(t *testing.T) {
 	invalidYAMLDir := filepath.Join(tmpDir, "invalidYAML")
 	err = os.Mkdir(invalidYAMLDir, 0755)
 	require.NoError(t, err)
-	err = ioutil.WriteFile(filepath.Join(invalidYAMLDir, "0.yaml"), []byte("}"), 0644)
+	err = os.WriteFile(filepath.Join(invalidYAMLDir, "0.yaml"), []byte("}"), 0644)
 	require.NoError(t, err)
 	_, err = loadAndMergeConfig(invalidYAMLDir)
 	assert.Error(t, err)
@@ -157,10 +156,10 @@ func TestLoadAndMergeConfig(t *testing.T) {
 	duplicateDefault := filepath.Join(tmpDir, "duplicateDefault")
 	err = os.Mkdir(duplicateDefault, 0755)
 	require.NoError(t, err)
-	err = ioutil.WriteFile(filepath.Join(duplicateDefault, "0.yaml"),
+	err = os.WriteFile(filepath.Join(duplicateDefault, "0.yaml"),
 		[]byte("default-docker:\n sigstore: file:////tmp/something"), 0644)
 	require.NoError(t, err)
-	err = ioutil.WriteFile(filepath.Join(duplicateDefault, "1.yaml"),
+	err = os.WriteFile(filepath.Join(duplicateDefault, "1.yaml"),
 		[]byte("default-docker:\n sigstore: file:////tmp/different"), 0644)
 	require.NoError(t, err)
 	_, err = loadAndMergeConfig(duplicateDefault)
@@ -171,10 +170,10 @@ func TestLoadAndMergeConfig(t *testing.T) {
 	duplicateNS := filepath.Join(tmpDir, "duplicateNS")
 	err = os.Mkdir(duplicateNS, 0755)
 	require.NoError(t, err)
-	err = ioutil.WriteFile(filepath.Join(duplicateNS, "0.yaml"),
+	err = os.WriteFile(filepath.Join(duplicateNS, "0.yaml"),
 		[]byte("docker:\n example.com:\n  sigstore: file:////tmp/something"), 0644)
 	require.NoError(t, err)
-	err = ioutil.WriteFile(filepath.Join(duplicateNS, "1.yaml"),
+	err = os.WriteFile(filepath.Join(duplicateNS, "1.yaml"),
 		[]byte("docker:\n example.com:\n  sigstore: file:////tmp/different"), 0644)
 	require.NoError(t, err)
 	_, err = loadAndMergeConfig(duplicateNS)

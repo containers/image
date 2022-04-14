@@ -1,7 +1,7 @@
 package manifest
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -12,7 +12,7 @@ import (
 )
 
 func manifestSchema1FromFixture(t *testing.T, fixture string) *Schema1 {
-	manifest, err := ioutil.ReadFile(filepath.Join("fixtures", fixture))
+	manifest, err := os.ReadFile(filepath.Join("fixtures", fixture))
 	require.NoError(t, err)
 
 	m, err := Schema1FromManifest(manifest)
@@ -21,7 +21,7 @@ func manifestSchema1FromFixture(t *testing.T, fixture string) *Schema1 {
 }
 
 func TestSchema1FromManifest(t *testing.T) {
-	validManifest, err := ioutil.ReadFile(filepath.Join("fixtures", "schema2-to-schema1-by-docker.json"))
+	validManifest, err := os.ReadFile(filepath.Join("fixtures", "schema2-to-schema1-by-docker.json"))
 	require.NoError(t, err)
 
 	// Invalid manifest version is rejected

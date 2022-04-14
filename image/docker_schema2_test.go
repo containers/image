@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -47,7 +47,7 @@ func (f unusedImageSource) LayerInfosForCopy(context.Context, *digest.Digest) ([
 }
 
 func manifestSchema2FromFixture(t *testing.T, src types.ImageSource, fixture string, mustFail bool) genericManifest {
-	manifest, err := ioutil.ReadFile(filepath.Join("fixtures", fixture))
+	manifest, err := os.ReadFile(filepath.Join("fixtures", fixture))
 	require.NoError(t, err)
 
 	m, err := manifestSchema2FromManifest(src, manifest)
@@ -119,7 +119,7 @@ func TestManifestSchema2Serialize(t *testing.T) {
 		err = json.Unmarshal(serialized, &contents)
 		require.NoError(t, err)
 
-		original, err := ioutil.ReadFile("fixtures/schema2.json")
+		original, err := os.ReadFile("fixtures/schema2.json")
 		require.NoError(t, err)
 		var originalContents map[string]interface{}
 		err = json.Unmarshal(original, &originalContents)
@@ -168,7 +168,7 @@ func (f configBlobImageSource) GetBlob(ctx context.Context, info types.BlobInfo,
 }
 
 func TestManifestSchema2ConfigBlob(t *testing.T) {
-	realConfigJSON, err := ioutil.ReadFile("fixtures/schema2-config.json")
+	realConfigJSON, err := os.ReadFile("fixtures/schema2-config.json")
 	require.NoError(t, err)
 
 	for _, c := range []struct {
@@ -177,7 +177,7 @@ func TestManifestSchema2ConfigBlob(t *testing.T) {
 	}{
 		// Success
 		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
-			return ioutil.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
+			return io.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
 		}, realConfigJSON},
 		// Various kinds of failures
 		{nil, nil},
@@ -192,7 +192,7 @@ func TestManifestSchema2ConfigBlob(t *testing.T) {
 		}, nil},
 		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
 			nonmatchingJSON := []byte("This does not match ConfigDescriptor.Digest")
-			return ioutil.NopCloser(bytes.NewReader(nonmatchingJSON)), int64(len(nonmatchingJSON)), nil
+			return io.NopCloser(bytes.NewReader(nonmatchingJSON)), int64(len(nonmatchingJSON)), nil
 		}, nil},
 	} {
 		var src types.ImageSource
@@ -273,7 +273,7 @@ func TestManifestSchema2EmbeddedDockerReferenceConflicts(t *testing.T) {
 }
 
 func TestManifestSchema2Inspect(t *testing.T) {
-	configJSON, err := ioutil.ReadFile("fixtures/schema2-config.json")
+	configJSON, err := os.ReadFile("fixtures/schema2-config.json")
 	require.NoError(t, err)
 
 	m := manifestSchema2FromComponentsLikeFixture(configJSON)
@@ -367,7 +367,7 @@ func (ref refImageReferenceMock) DeleteImage(ctx context.Context, sys *types.Sys
 }
 
 func newSchema2ImageSource(t *testing.T, dockerRef string) *schema2ImageSource {
-	realConfigJSON, err := ioutil.ReadFile("fixtures/schema2-config.json")
+	realConfigJSON, err := os.ReadFile("fixtures/schema2-config.json")
 	require.NoError(t, err)
 
 	ref, err := reference.ParseNormalizedNamed(dockerRef)
@@ -376,7 +376,7 @@ func newSchema2ImageSource(t *testing.T, dockerRef string) *schema2ImageSource {
 	return &schema2ImageSource{
 		configBlobImageSource: configBlobImageSource{
 			f: func(digest digest.Digest) (io.ReadCloser, int64, error) {
-				return ioutil.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
+				return io.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
 			},
 		},
 		ref: ref,
@@ -422,7 +422,7 @@ func (d *memoryImageDest) PutBlob(ctx context.Context, stream io.Reader, inputIn
 	if inputInfo.Digest == "" {
 		panic("inputInfo.Digest unexpectedly empty")
 	}
-	contents, err := ioutil.ReadAll(stream)
+	contents, err := io.ReadAll(stream)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
@@ -535,7 +535,7 @@ func TestConvertToManifestOCI(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, imgspecv1.MediaTypeImageManifest, mt)
 
-	byHandJSON, err := ioutil.ReadFile("fixtures/schema2-to-oci1.json")
+	byHandJSON, err := os.ReadFile("fixtures/schema2-to-oci1.json")
 	require.NoError(t, err)
 	var converted, byHand map[string]interface{}
 	err = json.Unmarshal(byHandJSON, &byHand)
@@ -556,7 +556,7 @@ func TestConvertToManifestOCIAllMediaTypes(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, imgspecv1.MediaTypeImageManifest, mt)
 
-	byHandJSON, err := ioutil.ReadFile("fixtures/schema2-all-media-types-to-oci1.json")
+	byHandJSON, err := os.ReadFile("fixtures/schema2-all-media-types-to-oci1.json")
 	require.NoError(t, err)
 	var converted, byHand map[string]interface{}
 	err = json.Unmarshal(byHandJSON, &byHand)
@@ -590,7 +590,7 @@ func TestConvertToManifestSchema1(t *testing.T) {
 	// byDockerJSON is the result of asking the Docker Hub for a schema1 manifest,
 	// except that we have replaced "name" to verify that the ref from
 	// memoryDest, not from originalSrc, is used.
-	byDockerJSON, err := ioutil.ReadFile("fixtures/schema2-to-schema1-by-docker.json")
+	byDockerJSON, err := os.ReadFile("fixtures/schema2-to-schema1-by-docker.json")
 	require.NoError(t, err)
 	var converted, byDocker map[string]interface{}
 	err = json.Unmarshal(byDockerJSON, &byDocker)

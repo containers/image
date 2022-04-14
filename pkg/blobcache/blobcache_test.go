@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -176,7 +175,7 @@ func TestBlobCache(t *testing.T) {
 				for _, cachedName := range cachedNames {
 					if digest.Digest(cachedName).Validate() == nil {
 						cacheMember := filepath.Join(cacheDir, cachedName)
-						cacheMemberBytes, err := ioutil.ReadFile(cacheMember)
+						cacheMemberBytes, err := os.ReadFile(cacheMember)
 						if err != nil {
 							t.Fatalf("error reading cache member %q: %v", cacheMember, err)
 						}

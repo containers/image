@@ -2,7 +2,6 @@ package sysregistriesv2
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -484,12 +483,12 @@ func TestMixingV1andV2(t *testing.T) {
 }
 
 func TestConfigCache(t *testing.T) {
-	configFile, err := ioutil.TempFile("", "sysregistriesv2-test")
+	configFile, err := os.CreateTemp("", "sysregistriesv2-test")
 	require.NoError(t, err)
 	defer os.Remove(configFile.Name())
 	defer configFile.Close()
 
-	err = ioutil.WriteFile(configFile.Name(), []byte(`
+	err = os.WriteFile(configFile.Name(), []byte(`
 [[registry]]
 location = "registry.com"
 
@@ -524,7 +523,7 @@ insecure = true`), 0600)
 
 	// empty the config, but use the same SystemContext to show that the
 	// previously specified registries are in the cache
-	err = ioutil.WriteFile(configFile.Name(), []byte{}, 0600)
+	err = os.WriteFile(configFile.Name(), []byte{}, 0600)
 	require.NoError(t, err)
 	registries, err = GetRegistries(ctx)
 	assert.Nil(t, err)

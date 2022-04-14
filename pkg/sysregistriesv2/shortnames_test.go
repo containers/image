@@ -1,7 +1,6 @@
 package sysregistriesv2
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -107,7 +106,7 @@ func TestValidateShortName(t *testing.T) {
 }
 
 func TestResolveShortNameAlias(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "aliases.conf")
+	tmp, err := os.CreateTemp("", "aliases.conf")
 	require.NoError(t, err)
 	defer os.Remove(tmp.Name())
 
@@ -162,7 +161,7 @@ func TestResolveShortNameAlias(t *testing.T) {
 }
 
 func TestAliasesWithDropInConfigs(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "aliases.conf")
+	tmp, err := os.CreateTemp("", "aliases.conf")
 	require.NoError(t, err)
 	defer os.Remove(tmp.Name())
 
@@ -274,7 +273,7 @@ func TestAliasesWithDropInConfigs(t *testing.T) {
 }
 
 func TestInvalidAliases(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "aliases.conf")
+	tmp, err := os.CreateTemp("", "aliases.conf")
 	require.NoError(t, err)
 	defer os.Remove(tmp.Name())
 

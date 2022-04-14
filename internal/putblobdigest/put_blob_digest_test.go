@@ -3,7 +3,6 @@ package putblobdigest
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"testing"
 
 	"github.com/containers/image/v5/types"
@@ -26,7 +25,7 @@ func testDigester(t *testing.T, constructor func(io.Reader, types.BlobInfo) (Dig
 		stream := bytes.NewReader(testData)
 		digester, newStream := constructor(stream, types.BlobInfo{Digest: c.inputDigest})
 		assert.Equal(t, c.computesDigest, newStream != stream, c.inputDigest)
-		data, err := ioutil.ReadAll(newStream)
+		data, err := io.ReadAll(newStream)
 		require.NoError(t, err, c.inputDigest)
 		assert.Equal(t, testData, data, c.inputDigest)
 		digest := digester.Digest()

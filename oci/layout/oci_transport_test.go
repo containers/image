@@ -2,7 +2,6 @@ package layout
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -143,7 +142,7 @@ func refToTempOCI(t *testing.T) (types.ImageReference, string) {
 		]
 	}
 `
-	err := ioutil.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
+	err := os.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
 	require.NoError(t, err)
 	ref, err := NewReference(tmpDir, "imageValue")
 	require.NoError(t, err)

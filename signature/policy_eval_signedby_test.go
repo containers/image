@@ -2,7 +2,6 @@ package signature
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -52,7 +51,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	ktGPG := SBKeyTypeGPGKeys
 	prm := NewPRMMatchExact()
 	testImage := dirImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
-	testImageSig, err := ioutil.ReadFile("fixtures/dir-img-valid/signature-1")
+	testImageSig, err := os.ReadFile("fixtures/dir-img-valid/signature-1")
 	require.NoError(t, err)
 
 	// Successful validation, with KeyData and KeyPath
@@ -64,7 +63,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 		DockerReference:      "testing/manifest:latest",
 	})
 
-	keyData, err := ioutil.ReadFile("fixtures/public-key.gpg")
+	keyData, err := os.ReadFile("fixtures/public-key.gpg")
 	require.NoError(t, err)
 	pr, err = NewPRSignedByKeyData(ktGPG, keyData, prm)
 	require.NoError(t, err)
@@ -130,7 +129,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	// because we use a temporary directory and only import the trusted keys.)
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
-	sig, err := ioutil.ReadFile("fixtures/unknown-key.signature")
+	sig, err := os.ReadFile("fixtures/unknown-key.signature")
 	require.NoError(t, err)
 	// Pass a nil pointer to, kind of, test that the return value does not depend on the image parameter..
 	sar, parsedSig, err = pr.isSignatureAuthorAccepted(context.Background(), nil, sig)
@@ -139,7 +138,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	// A valid signature of an invalid JSON.
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
-	sig, err = ioutil.ReadFile("fixtures/invalid-blob.signature")
+	sig, err = os.ReadFile("fixtures/invalid-blob.signature")
 	require.NoError(t, err)
 	// Pass a nil pointer to, kind of, test that the return value does not depend on the image parameter..
 	sar, parsedSig, err = pr.isSignatureAuthorAccepted(context.Background(), nil, sig)
@@ -156,7 +155,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 
 	// Error reading image manifest
 	image := dirImageMock(t, "fixtures/dir-img-no-manifest", "testing/manifest:latest")
-	sig, err = ioutil.ReadFile("fixtures/dir-img-no-manifest/signature-1")
+	sig, err = os.ReadFile("fixtures/dir-img-no-manifest/signature-1")
 	require.NoError(t, err)
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
@@ -165,7 +164,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 
 	// Error computing manifest digest
 	image = dirImageMock(t, "fixtures/dir-img-manifest-digest-error", "testing/manifest:latest")
-	sig, err = ioutil.ReadFile("fixtures/dir-img-manifest-digest-error/signature-1")
+	sig, err = os.ReadFile("fixtures/dir-img-manifest-digest-error/signature-1")
 	require.NoError(t, err)
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
@@ -174,7 +173,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 
 	// A valid signature with a non-matching manifest
 	image = dirImageMock(t, "fixtures/dir-img-modified-manifest", "testing/manifest:latest")
-	sig, err = ioutil.ReadFile("fixtures/dir-img-modified-manifest/signature-1")
+	sig, err = os.ReadFile("fixtures/dir-img-modified-manifest/signature-1")
 	require.NoError(t, err)
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
 	require.NoError(t, err)
@@ -186,7 +185,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 // fails.
 func createInvalidSigDir(t *testing.T) string {
 	dir := t.TempDir()
-	err := ioutil.WriteFile(path.Join(dir, "manifest.json"), []byte("{}"), 0644)
+	err := os.WriteFile(path.Join(dir, "manifest.json"), []byte("{}"), 0644)
 	require.NoError(t, err)
 	// Creating a 000-permissions file would work for unprivileged accounts, but root (in particular,
 	// in the Docker container we use for testing) would still have access.  So, create a symlink

@@ -2,7 +2,7 @@ package copy
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"os"
 	"testing"
 
@@ -48,7 +48,7 @@ func TestCreateSignature(t *testing.T) {
 	defer dirDest.Close()
 	c := &copier{
 		dest:         imagedestination.FromPublic(dirDest),
-		reportWriter: ioutil.Discard,
+		reportWriter: io.Discard,
 	}
 	_, err = c.createSignature(manifestBlob, testKeyFingerprint, "", nil)
 	assert.Error(t, err)
@@ -62,7 +62,7 @@ func TestCreateSignature(t *testing.T) {
 	defer dockerDest.Close()
 	c = &copier{
 		dest:         imagedestination.FromPublic(dockerDest),
-		reportWriter: ioutil.Discard,
+		reportWriter: io.Discard,
 	}
 
 	// Signing with an unknown key fails

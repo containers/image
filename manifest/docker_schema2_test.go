@@ -1,7 +1,7 @@
 package manifest
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -61,7 +61,7 @@ func TestSupportedSchema2MediaType(t *testing.T) {
 }
 
 func TestSchema2FromManifest(t *testing.T) {
-	validManifest, err := ioutil.ReadFile(filepath.Join("fixtures", "v2s2.manifest.json"))
+	validManifest, err := os.ReadFile(filepath.Join("fixtures", "v2s2.manifest.json"))
 	require.NoError(t, err)
 
 	parser := func(m []byte) error {
@@ -79,7 +79,7 @@ func TestSchema2FromManifest(t *testing.T) {
 }
 
 func TestUpdateLayerInfosV2S2GzipToZstd(t *testing.T) {
-	bytes, err := ioutil.ReadFile("fixtures/v2s2.manifest.json")
+	bytes, err := os.ReadFile("fixtures/v2s2.manifest.json")
 	assert.Nil(t, err)
 
 	origManifest, err := Schema2FromManifest(bytes)
@@ -112,7 +112,7 @@ func TestUpdateLayerInfosV2S2GzipToZstd(t *testing.T) {
 }
 
 func TestUpdateLayerInfosV2S2InvalidCompressionOperation(t *testing.T) {
-	bytes, err := ioutil.ReadFile("fixtures/v2s2.manifest.json")
+	bytes, err := os.ReadFile("fixtures/v2s2.manifest.json")
 	assert.Nil(t, err)
 
 	origManifest, err := Schema2FromManifest(bytes)
@@ -142,7 +142,7 @@ func TestUpdateLayerInfosV2S2InvalidCompressionOperation(t *testing.T) {
 }
 
 func TestUpdateLayerInfosV2S2InvalidCompressionAlgorithm(t *testing.T) {
-	bytes, err := ioutil.ReadFile("fixtures/v2s2.manifest.json")
+	bytes, err := os.ReadFile("fixtures/v2s2.manifest.json")
 	assert.Nil(t, err)
 
 	origManifest, err := Schema2FromManifest(bytes)
@@ -175,7 +175,7 @@ func TestUpdateLayerInfosV2S2InvalidCompressionAlgorithm(t *testing.T) {
 }
 
 func TestUpdateLayerInfosV2S2NondistributableToGzip(t *testing.T) {
-	bytes, err := ioutil.ReadFile("fixtures/v2s2.nondistributable.manifest.json")
+	bytes, err := os.ReadFile("fixtures/v2s2.nondistributable.manifest.json")
 	assert.Nil(t, err)
 
 	origManifest, err := Schema2FromManifest(bytes)
@@ -195,7 +195,7 @@ func TestUpdateLayerInfosV2S2NondistributableToGzip(t *testing.T) {
 	updatedManifestBytes, err := origManifest.Serialize()
 	assert.Nil(t, err)
 
-	bytes, err = ioutil.ReadFile("fixtures/v2s2.nondistributable.gzip.manifest.json")
+	bytes, err = os.ReadFile("fixtures/v2s2.nondistributable.gzip.manifest.json")
 	assert.Nil(t, err)
 
 	expectedManifest, err := Schema2FromManifest(bytes)
@@ -208,7 +208,7 @@ func TestUpdateLayerInfosV2S2NondistributableToGzip(t *testing.T) {
 }
 
 func TestUpdateLayerInfosV2S2NondistributableGzipToUncompressed(t *testing.T) {
-	bytes, err := ioutil.ReadFile("fixtures/v2s2.nondistributable.gzip.manifest.json")
+	bytes, err := os.ReadFile("fixtures/v2s2.nondistributable.gzip.manifest.json")
 	assert.Nil(t, err)
 
 	origManifest, err := Schema2FromManifest(bytes)
@@ -227,7 +227,7 @@ func TestUpdateLayerInfosV2S2NondistributableGzipToUncompressed(t *testing.T) {
 	updatedManifestBytes, err := origManifest.Serialize()
 	assert.Nil(t, err)
 
-	bytes, err = ioutil.ReadFile("fixtures/v2s2.nondistributable.manifest.json")
+	bytes, err = os.ReadFile("fixtures/v2s2.nondistributable.manifest.json")
 	assert.Nil(t, err)
 
 	expectedManifest, err := Schema2FromManifest(bytes)

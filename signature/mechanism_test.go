@@ -4,7 +4,6 @@ package signature
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -21,10 +20,10 @@ const (
 
 // fixtureVariants loads V3 and V4 signature fixture variants based on the v4 fixture path, and returns a map which makes it easy to test both.
 func fixtureVariants(t *testing.T, v4Path string) map[string][]byte {
-	v4, err := ioutil.ReadFile(v4Path)
+	v4, err := os.ReadFile(v4Path)
 	require.NoError(t, err)
 	v3Path := v4Path + "-v3"
-	v3, err := ioutil.ReadFile(v3Path)
+	v3, err := os.ReadFile(v3Path)
 	require.NoError(t, err)
 	return map[string][]byte{v4Path: v4, v3Path: v3}
 }
@@ -124,7 +123,7 @@ func TestNewEphemeralGPGSigningMechanism(t *testing.T) {
 	}
 
 	// Successful import
-	keyBlob, err := ioutil.ReadFile("./fixtures/public-key.gpg")
+	keyBlob, err := os.ReadFile("./fixtures/public-key.gpg")
 	require.NoError(t, err)
 	mech, keyIdentities, err = NewEphemeralGPGSigningMechanism(keyBlob)
 	require.NoError(t, err)
@@ -141,7 +140,7 @@ func TestNewEphemeralGPGSigningMechanism(t *testing.T) {
 	// Two keys: Read the binary-format pubring.gpg, and concatenate it twice.
 	// (Using two copies of public-key.gpg, in the ASCII-armored format, works with
 	// gpgmeSigningMechanism but not openpgpSigningMechanism.)
-	keyBlob, err = ioutil.ReadFile("./fixtures/pubring.gpg")
+	keyBlob, err = os.ReadFile("./fixtures/pubring.gpg")
 	require.NoError(t, err)
 	mech, keyIdentities, err = NewEphemeralGPGSigningMechanism(bytes.Join([][]byte{keyBlob, keyBlob}, nil))
 	require.NoError(t, err)
@@ -226,13 +225,13 @@ func TestGPGSigningMechanismVerify(t *testing.T) {
 	assertSigningError(t, content, signingFingerprint, err)
 
 	// Literal packet, not a signature
-	signature, err := ioutil.ReadFile("./fixtures/unsigned-literal.signature") // Not fixtureVariants, the “literal data” packet does not have V3/V4 versions.
+	signature, err := os.ReadFile("./fixtures/unsigned-literal.signature") // Not fixtureVariants, the “literal data” packet does not have V3/V4 versions.
 	require.NoError(t, err)
 	content, signingFingerprint, err = mech.Verify(signature)
 	assertSigningError(t, content, signingFingerprint, err)
 
 	// Encrypted data, not a signature.
-	signature, err = ioutil.ReadFile("./fixtures/unsigned-encrypted.signature") // Not fixtureVariants, the “public-key encrypted session key” does not have V3/V4 versions.
+	signature, err = os.ReadFile("./fixtures/unsigned-encrypted.signature") // Not fixtureVariants, the “public-key encrypted session key” does not have V3/V4 versions.
 	require.NoError(t, err)
 	content, signingFingerprint, err = mech.Verify(signature)
 	assertSigningError(t, content, signingFingerprint, err)
@@ -240,7 +239,7 @@ func TestGPGSigningMechanismVerify(t *testing.T) {
 	// FIXME? Is there a way to create a multi-signature so that gpgme_op_verify returns multiple signatures?
 
 	// Expired signature
-	signature, err = ioutil.ReadFile("./fixtures/expired.signature") // Not fixtureVariants, V3 signature packets don’t support expiration.
+	signature, err = os.ReadFile("./fixtures/expired.signature") // Not fixtureVariants, V3 signature packets don’t support expiration.
 	require.NoError(t, err)
 	content, signingFingerprint, err = mech.Verify(signature)
 	assertSigningError(t, content, signingFingerprint, err)
@@ -284,19 +283,19 @@ func TestGPGSigningMechanismUntrustedSignatureContents(t *testing.T) {
 	assert.Error(t, err)
 
 	// Literal packet, not a signature
-	signature, err := ioutil.ReadFile("./fixtures/unsigned-literal.signature") // Not fixtureVariants, the “literal data” packet does not have V3/V4 versions.
+	signature, err := os.ReadFile("./fixtures/unsigned-literal.signature") // Not fixtureVariants, the “literal data” packet does not have V3/V4 versions.
 	require.NoError(t, err)
 	_, _, err = mech.UntrustedSignatureContents(signature)
 	assert.Error(t, err)
 
 	// Encrypted data, not a signature.
-	signature, err = ioutil.ReadFile("./fixtures/unsigned-encrypted.signature") // Not fixtureVariants, the “public-key encrypted session key” does not have V3/V4 versions.
+	signature, err = os.ReadFile("./fixtures/unsigned-encrypted.signature") // Not fixtureVariants, the “public-key encrypted session key” does not have V3/V4 versions.
 	require.NoError(t, err)
 	_, _, err = mech.UntrustedSignatureContents(signature)
 	assert.Error(t, err)
 
 	// Expired signature
-	signature, err = ioutil.ReadFile("./fixtures/expired.signature") // Not fixtureVariants, V3 signature packets don’t support expiration.
+	signature, err = os.ReadFile("./fixtures/expired.signature") // Not fixtureVariants, V3 signature packets don’t support expiration.
 	require.NoError(t, err)
 	content, shortKeyID, err := mech.UntrustedSignatureContents(signature)
 	require.NoError(t, err)

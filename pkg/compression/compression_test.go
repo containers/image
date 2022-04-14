@@ -3,7 +3,6 @@ package compression
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -24,7 +23,7 @@ func TestDetectCompression(t *testing.T) {
 
 	// The original stream is preserved.
 	for _, c := range cases {
-		originalContents, err := ioutil.ReadFile(c)
+		originalContents, err := os.ReadFile(c)
 		require.NoError(t, err, c)
 
 		stream, err := os.Open(c)
@@ -34,7 +33,7 @@ func TestDetectCompression(t *testing.T) {
 		_, updatedStream, err := DetectCompression(stream)
 		require.NoError(t, err, c)
 
-		updatedContents, err := ioutil.ReadAll(updatedStream)
+		updatedContents, err := io.ReadAll(updatedStream)
 		require.NoError(t, err, c)
 		assert.Equal(t, originalContents, updatedContents, c)
 	}
@@ -58,7 +57,7 @@ func TestDetectCompression(t *testing.T) {
 			uncompressedStream = s
 		}
 
-		uncompressedContents, err := ioutil.ReadAll(uncompressedStream)
+		uncompressedContents, err := io.ReadAll(uncompressedStream)
 		require.NoError(t, err, c)
 		assert.Equal(t, []byte("Hello"), uncompressedContents, c)
 	}
@@ -67,7 +66,7 @@ func TestDetectCompression(t *testing.T) {
 	decompressor, updatedStream, err := DetectCompression(bytes.NewReader([]byte{}))
 	require.NoError(t, err)
 	assert.Nil(t, decompressor)
-	updatedContents, err := ioutil.ReadAll(updatedStream)
+	updatedContents, err := io.ReadAll(updatedStream)
 	require.NoError(t, err)
 	assert.Equal(t, []byte{}, updatedContents)
 
@@ -103,7 +102,7 @@ func TestAutoDecompress(t *testing.T) {
 
 		assert.Equal(t, c.isCompressed, isCompressed)
 
-		uncompressedContents, err := ioutil.ReadAll(uncompressedStream)
+		uncompressedContents, err := io.ReadAll(uncompressedStream)
 		require.NoError(t, err, c.filename)
 		assert.Equal(t, []byte("Hello"), uncompressedContents, c.filename)
 	}
@@ -112,7 +111,7 @@ func TestAutoDecompress(t *testing.T) {
 	uncompressedStream, isCompressed, err := AutoDecompress(bytes.NewReader([]byte{}))
 	require.NoError(t, err)
 	assert.False(t, isCompressed)
-	uncompressedContents, err := ioutil.ReadAll(uncompressedStream)
+	uncompressedContents, err := io.ReadAll(uncompressedStream)
 	require.NoError(t, err)
 	assert.Equal(t, []byte{}, uncompressedContents)
 

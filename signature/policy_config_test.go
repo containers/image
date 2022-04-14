@@ -3,7 +3,6 @@ package signature
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -213,7 +212,7 @@ func TestNewPolicyFromFile(t *testing.T) {
 
 func TestNewPolicyFromBytes(t *testing.T) {
 	// Success
-	bytes, err := ioutil.ReadFile("./fixtures/policy.json")
+	bytes, err := os.ReadFile("./fixtures/policy.json")
 	require.NoError(t, err)
 	policy, err := NewPolicyFromBytes(bytes)
 	require.NoError(t, err)
