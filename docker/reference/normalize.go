@@ -33,7 +33,7 @@ func ParseNormalizedNamed(s string) (Named, error) {
 	if ok := anchoredIdentifierRegexp.MatchString(s); ok {
 		return nil, fmt.Errorf("invalid repository name (%s), cannot specify 64-byte hexadecimal strings", s)
 	}
-	domain, remainder := splitDockerDomain(s)
+	domain, remainder := SplitDockerDomain(s)
 	var remoteName string
 	if tagSep := strings.IndexRune(remainder, ':'); tagSep > -1 {
 		remoteName = remainder[:tagSep]
@@ -84,10 +84,10 @@ func ParseDockerRef(ref string) (Named, error) {
 	return TagNameOnly(named), nil
 }
 
-// splitDockerDomain splits a repository name to domain and remotename string.
+// SplitDockerDomain splits a repository name to domain and remotename string.
 // If no valid domain is found, the default domain is used. Repository name
 // needs to be already validated before.
-func splitDockerDomain(name string) (domain, remainder string) {
+func SplitDockerDomain(name string) (domain, remainder string) {
 	i := strings.IndexRune(name, '/')
 	if i == -1 || (!strings.ContainsAny(name[:i], ".:") && name[:i] != "localhost") {
 		domain, remainder = defaultDomain, name
