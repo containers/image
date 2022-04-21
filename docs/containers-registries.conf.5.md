@@ -99,7 +99,7 @@ as-is. But other settings like insecure/blocked/mirrors will be applied to match
 
 `mirror`
 : An array of TOML tables specifying (possibly-partial) mirrors for the
-`prefix`-rooted namespace.
+`prefix`-rooted namespace (i.e., the current `[[registry]]` TOML table).
 
 The mirrors are attempted in the specified order; the first one that can be
 contacted and contains the image will be used (and if none of the mirrors contains the image,
@@ -236,6 +236,12 @@ location = "example-mirror-0.local/mirror-for-foo"
 [[registry.mirror]]
 location = "example-mirror-1.local/mirrors/foo"
 insecure = true
+
+[[registry]]
+location = "registry.com"
+
+[[registry.mirror]]
+location = "mirror.registry.com"
 ```
 Given the above, a pull of `example.com/foo/image:latest` will try:
     1. `example-mirror-0.local/mirror-for-foo/image:latest`
@@ -243,6 +249,8 @@ Given the above, a pull of `example.com/foo/image:latest` will try:
     3. `internal-registry-for-example.net/bar/image:latest`
 
 in order, and use the first one that exists.
+
+Note that a mirror is associated only with the current `[[registry]]` TOML table. If using the example above, pulling the image `registry.com/image:latest` will hence only reach out to `mirror.registry.com`, and the mirrors associated with `example.com/foo` will not be considered.
 
 ## VERSION 1 FORMAT - DEPRECATED
 VERSION 1 format is still supported but it does not support
