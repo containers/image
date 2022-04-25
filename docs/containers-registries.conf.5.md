@@ -244,9 +244,10 @@ location = "registry.com"
 location = "mirror.registry.com"
 ```
 Given the above, a pull of `example.com/foo/image:latest` will try:
-    1. `example-mirror-0.local/mirror-for-foo/image:latest`
-    2. `example-mirror-1.local/mirrors/foo/image:latest`
-    3. `internal-registry-for-example.net/bar/image:latest`
+
+1. `example-mirror-0.local/mirror-for-foo/image:latest`
+2. `example-mirror-1.local/mirrors/foo/image:latest`
+3. `internal-registry-for-example.net/bar/image:latest`
 
 in order, and use the first one that exists.
 
