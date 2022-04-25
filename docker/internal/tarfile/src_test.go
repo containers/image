@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/containers/image/v5/manifest"
@@ -29,7 +30,7 @@ func TestSourcePrepareLayerData(t *testing.T) {
 		writer := NewWriter(&tarfileBuffer)
 		dest := NewDestination(nil, writer, nil)
 		// No layers
-		configInfo, err := dest.PutBlob(ctx, bytes.NewBufferString(c.config),
+		configInfo, err := dest.PutBlob(ctx, strings.NewReader(c.config),
 			types.BlobInfo{Size: -1}, cache, true)
 		require.NoError(t, err, c.config)
 		manifest, err := manifest.Schema2FromComponents(
