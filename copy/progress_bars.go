@@ -34,13 +34,19 @@ func customPartialBlobDecorFunc(s decor.Statistics) string {
 // progressBar wraps a *mpb.Bar, allowing us to add extra state and methods.
 type progressBar struct {
 	*mpb.Bar
+	originalSize int64 // or -1 if unknown
 }
 
 // createProgressBar creates a progressBar in pool.  Note that if the copier's reportWriter
 // is io.Discard, the progress bar's output will be discarded
+//
 // NOTE: Every progress bar created within a progress pool must either successfully
 // complete or be aborted, or pool.Wait() will hang. That is typically done
 // using "defer bar.Abort(false)", which must happen BEFORE pool.Wait() is called.
+//
+// As a convention, most users of progress bars should call mark100PercentComplete on full success;
+// by convention, we don't leave progress bars in partial state when fully done
+// (even if we copied much less data than anticipated).
 func (c *copier) createProgressBar(pool *mpb.Progress, partial bool, info types.BlobInfo, kind string, onComplete string) *progressBar {
 	// shortDigestLen is the length of the digest used for blobs.
 	const shortDigestLen = 12
@@ -93,7 +99,27 @@ func (c *copier) createProgressBar(pool *mpb.Progress, partial bool, info types.
 		c.Printf("Copying %s %s\n", kind, info.Digest)
 	}
 	return &progressBar{
-		Bar: bar,
+		Bar:          bar,
+		originalSize: info.Size,
+	}
+}
+
+// mark100PercentComplete marks the progres bars as 100% complete;
+// it may do so by possibly advancing the current state if it is below the known total.
+func (bar *progressBar) mark100PercentComplete() {
+	if bar.originalSize > 0 {
+		// We can't call bar.SetTotal even if we wanted to; the total can not be changed
+		// after a progress bar is created with a definite total.
+		bar.SetCurrent(bar.originalSize) // This triggers the completion condition.
+	} else {
+		// -1 = unknown size
+		// 0 is somewhat of a a special case: Unlike c/image, where 0 is a definite known
+		// size (possible at least in theory), in mpb, zero-sized progress bars are treated
+		// as unknown size, in particular they are not configured to be marked as
+		// complete on bar.Current() reaching bar.total (because that would happen already
+		// when creating the progress bar).
+		// That means that we are both _allowed_ to call SetTotal, and we _have to_.
+		bar.SetTotal(-1, true) // total < 0 = set it to bar.Current(), report it; and mark the bar as complete.
 	}
 }
 
