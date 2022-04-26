@@ -1,13 +1,10 @@
 package copy
 
 import (
-	"context"
 	"io"
 	"time"
 
-	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
-	"github.com/vbauerster/mpb/v7"
 )
 
 // progressReader is a reader that reports its progress to a types.ProgressProperties channel on an interval.
@@ -79,28 +76,4 @@ func (r *progressReader) Read(p []byte) (int, error) {
 		r.offsetUpdate = 0
 	}
 	return n, err
-}
-
-// blobChunkAccessorProxy wraps a BlobChunkAccessor and updates a *mpb.Bar
-// with the number of received bytes.
-type blobChunkAccessorProxy struct {
-	wrapped private.BlobChunkAccessor // The underlying BlobChunkAccessor
-	bar     *mpb.Bar                  // A progress bar updated with the number of bytes read so far
-}
-
-// GetBlobAt returns a sequential channel of readers that contain data for the requested
-// blob chunks, and a channel that might get a single error value.
-// The specified chunks must be not overlapping and sorted by their offset.
-// The readers must be fully consumed, in the order they are returned, before blocking
-// to read the next chunk.
-func (s *blobChunkAccessorProxy) GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []private.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
-	rc, errs, err := s.wrapped.GetBlobAt(ctx, info, chunks)
-	if err == nil {
-		total := int64(0)
-		for _, c := range chunks {
-			total += int64(c.Length)
-		}
-		s.bar.IncrInt64(total)
-	}
-	return rc, errs, err
 }
