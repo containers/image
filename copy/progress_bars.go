@@ -31,12 +31,17 @@ func customPartialBlobDecorFunc(s decor.Statistics) string {
 	return fmt.Sprintf(pairFmt, decor.SizeB1024(s.Current), decor.SizeB1024(s.Total), decor.SizeB1024(s.Refill), percentage)
 }
 
-// createProgressBar creates a mpb.Bar in pool.  Note that if the copier's reportWriter
+// progressBar wraps a *mpb.Bar, allowing us to add extra state and methods.
+type progressBar struct {
+	*mpb.Bar
+}
+
+// createProgressBar creates a progressBar in pool.  Note that if the copier's reportWriter
 // is io.Discard, the progress bar's output will be discarded
 // NOTE: Every progress bar created within a progress pool must either successfully
 // complete or be aborted, or pool.Wait() will hang. That is typically done
 // using "defer bar.Abort(false)", which must happen BEFORE pool.Wait() is called.
-func (c *copier) createProgressBar(pool *mpb.Progress, partial bool, info types.BlobInfo, kind string, onComplete string) *mpb.Bar {
+func (c *copier) createProgressBar(pool *mpb.Progress, partial bool, info types.BlobInfo, kind string, onComplete string) *progressBar {
 	// shortDigestLen is the length of the digest used for blobs.
 	const shortDigestLen = 12
 
@@ -87,14 +92,16 @@ func (c *copier) createProgressBar(pool *mpb.Progress, partial bool, info types.
 	if c.progressOutput == io.Discard {
 		c.Printf("Copying %s %s\n", kind, info.Digest)
 	}
-	return bar
+	return &progressBar{
+		Bar: bar,
+	}
 }
 
-// blobChunkAccessorProxy wraps a BlobChunkAccessor and updates a *mpb.Bar
+// blobChunkAccessorProxy wraps a BlobChunkAccessor and updates a *progressBar
 // with the number of received bytes.
 type blobChunkAccessorProxy struct {
 	wrapped private.BlobChunkAccessor // The underlying BlobChunkAccessor
-	bar     *mpb.Bar                  // A progress bar updated with the number of bytes read so far
+	bar     *progressBar              // A progress bar updated with the number of bytes read so far
 }
 
 // GetBlobAt returns a sequential channel of readers that contain data for the requested
