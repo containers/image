@@ -1363,6 +1363,9 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 	}
 	var destStream io.Reader = digestingReader
 
+	// === Update progress bars
+	destStream = bar.ProxyReader(destStream)
+
 	// === Decrypt the stream, if required.
 	var decrypted bool
 	if isOciEncrypted(srcInfo.MediaType) && c.ociDecryptConfig != nil {
@@ -1396,9 +1399,6 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 	if expectedCompressionFormat, known := expectedCompressionFormats[srcInfo.MediaType]; known && isCompressed && compressionFormat.Name() != expectedCompressionFormat.Name() {
 		logrus.Debugf("blob %s with type %s should be compressed with %s, but compressor appears to be %s", srcInfo.Digest.String(), srcInfo.MediaType, expectedCompressionFormat.Name(), compressionFormat.Name())
 	}
-
-	// === Update progress bars
-	destStream = bar.ProxyReader(destStream)
 
 	// === Send a copy of the original, uncompressed, stream, to a separate path if necessary.
 	var originalLayerReader io.Reader // DO NOT USE this other than to drain the input if no other consumer in the pipeline has done so.
