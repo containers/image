@@ -1207,7 +1207,6 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 				wrapped: ic.c.rawSource,
 				bar:     bar,
 			}
-			bar.SetTotal(srcInfo.Size, false)
 			info, err := ic.c.dest.PutBlobPartial(ctx, &proxy, srcInfo, ic.c.blobInfoCache)
 			if err == nil {
 				bar.SetRefill(srcInfo.Size - bar.Current())
