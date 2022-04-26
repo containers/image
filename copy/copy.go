@@ -1210,7 +1210,9 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 			}
 			info, err := ic.c.dest.PutBlobPartial(ctx, &proxy, srcInfo, ic.c.blobInfoCache)
 			if err == nil {
-				bar.SetRefill(srcInfo.Size - bar.Current())
+				if srcInfo.Size != -1 {
+					bar.SetRefill(srcInfo.Size - bar.Current())
+				}
 				bar.mark100PercentComplete()
 				hideProgressBar = false
 				logrus.Debugf("Retrieved partial blob %v", srcInfo.Digest)
