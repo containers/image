@@ -10,7 +10,7 @@ import (
 	"github.com/vbauerster/mpb/v7"
 )
 
-// progressReader is a reader that reports its progress on an interval.
+// progressReader is a reader that reports its progress to a types.ProgressProperties channel on an interval.
 type progressReader struct {
 	source       io.Reader
 	channel      chan<- types.ProgressProperties
@@ -81,8 +81,8 @@ func (r *progressReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-// blobChunkAccessorProxy wraps a BlobChunkAccessor and keeps track of how many bytes
-// are received.
+// blobChunkAccessorProxy wraps a BlobChunkAccessor and updates a *mpb.Bar
+// with the number of received bytes.
 type blobChunkAccessorProxy struct {
 	wrapped private.BlobChunkAccessor // The underlying BlobChunkAccessor
 	bar     *mpb.Bar                  // A progress bar updated with the number of bytes read so far
