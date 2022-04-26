@@ -1078,16 +1078,16 @@ func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 		}
 		defer c.concurrentBlobCopiesSemaphore.Release(1)
 
-		configBlob, err := src.ConfigBlob(ctx)
-		if err != nil {
-			return errors.Wrapf(err, "reading config blob %s", srcInfo.Digest)
-		}
-
 		destInfo, err := func() (types.BlobInfo, error) { // A scope for defer
 			progressPool := c.newProgressPool()
 			defer progressPool.Wait()
 			bar := c.createProgressBar(progressPool, false, srcInfo, "config", "done")
 			defer bar.Abort(false)
+
+			configBlob, err := src.ConfigBlob(ctx)
+			if err != nil {
+				return types.BlobInfo{}, errors.Wrapf(err, "reading config blob %s", srcInfo.Digest)
+			}
 
 			destInfo, err := c.copyBlobFromStream(ctx, bytes.NewReader(configBlob), srcInfo, nil, false, true, false, bar, -1, false)
 			if err != nil {
@@ -1224,15 +1224,15 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 	}
 
 	// Fallback: copy the layer, computing the diffID if we need to do so
-	srcStream, srcBlobSize, err := ic.c.rawSource.GetBlob(ctx, srcInfo, ic.c.blobInfoCache)
-	if err != nil {
-		return types.BlobInfo{}, "", errors.Wrapf(err, "reading blob %s", srcInfo.Digest)
-	}
-	defer srcStream.Close()
-
 	return func() (types.BlobInfo, digest.Digest, error) { // A scope for defer
 		bar := ic.c.createProgressBar(pool, false, srcInfo, "blob", "done")
 		defer bar.Abort(false)
+
+		srcStream, srcBlobSize, err := ic.c.rawSource.GetBlob(ctx, srcInfo, ic.c.blobInfoCache)
+		if err != nil {
+			return types.BlobInfo{}, "", errors.Wrapf(err, "reading blob %s", srcInfo.Digest)
+		}
+		defer srcStream.Close()
 
 		blobInfo, diffIDChan, err := ic.copyLayerFromStream(ctx, srcStream, types.BlobInfo{Digest: srcInfo.Digest, Size: srcBlobSize, MediaType: srcInfo.MediaType, Annotations: srcInfo.Annotations}, diffIDIsNeeded, toEncrypt, bar, layerIndex, emptyLayer)
 		if err != nil {
