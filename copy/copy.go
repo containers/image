@@ -1253,9 +1253,17 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 					return types.BlobInfo{}, "", errors.Wrap(diffIDResult.err, "computing layer DiffID")
 				}
 				logrus.Debugf("Computed DiffID %s for layer %s", diffIDResult.digest, srcInfo.Digest)
-				// This is safe because we have just computed diffIDResult.Digest ourselves, and in the process
-				// we have read all of the input blob, so srcInfo.Digest must have been validated by digestingReader.
-				ic.c.blobInfoCache.RecordDigestUncompressedPair(srcInfo.Digest, diffIDResult.digest)
+				// Don’t record any associations that involve encrypted data. This is a bit crude,
+				// some blob substitutions (replacing pulls of encrypted data with local reuse of known decryption outcomes)
+				// might be safe, but it’s not trivially obvious, so let’s be conservative for now.
+				// This crude approach also means we don’t need to record whether a blob is encrypted
+				// in the blob info cache (which would probably be necessary for any more complex logic),
+				// and the simplicity is attractive.
+				if !encryptingOrDecrypting {
+					// This is safe because we have just computed diffIDResult.Digest ourselves, and in the process
+					// we have read all of the input blob, so srcInfo.Digest must have been validated by digestingReader.
+					ic.c.blobInfoCache.RecordDigestUncompressedPair(srcInfo.Digest, diffIDResult.digest)
+				}
 				diffID = diffIDResult.digest
 			}
 		}
@@ -1604,19 +1612,27 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 		return types.BlobInfo{}, errors.Errorf("Internal error writing blob %s, blob with digest %s saved with digest %s", srcInfo.Digest, inputInfo.Digest, uploadedInfo.Digest)
 	}
 	if digestingReader.validationSucceeded {
-		// If compressionOperation != types.PreserveOriginal, we now have two reliable digest values:
-		// srcinfo.Digest describes the pre-compressionOperation input, verified by digestingReader
-		// uploadedInfo.Digest describes the post-compressionOperation output, computed by PutBlob
-		// (because inputInfo.Digest == "", this must have been computed afresh).
-		switch compressionOperation {
-		case types.PreserveOriginal:
-			break // Do nothing, we have only one digest and we might not have even verified it.
-		case types.Compress:
-			c.blobInfoCache.RecordDigestUncompressedPair(uploadedInfo.Digest, srcInfo.Digest)
-		case types.Decompress:
-			c.blobInfoCache.RecordDigestUncompressedPair(srcInfo.Digest, uploadedInfo.Digest)
-		default:
-			return types.BlobInfo{}, errors.Errorf("Internal error: Unexpected compressionOperation value %#v", compressionOperation)
+		// Don’t record any associations that involve encrypted data. This is a bit crude,
+		// some blob substitutions (replacing pulls of encrypted data with local reuse of known decryption outcomes)
+		// might be safe, but it’s not trivially obvious, so let’s be conservative for now.
+		// This crude approach also means we don’t need to record whether a blob is encrypted
+		// in the blob info cache (which would probably be necessary for any more complex logic),
+		// and the simplicity is attractive.
+		if !encrypted && !decrypted {
+			// If compressionOperation != types.PreserveOriginal, we now have two reliable digest values:
+			// srcinfo.Digest describes the pre-compressionOperation input, verified by digestingReader
+			// uploadedInfo.Digest describes the post-compressionOperation output, computed by PutBlob
+			// (because inputInfo.Digest == "", this must have been computed afresh).
+			switch compressionOperation {
+			case types.PreserveOriginal:
+				break // Do nothing, we have only one digest and we might not have even verified it.
+			case types.Compress:
+				c.blobInfoCache.RecordDigestUncompressedPair(uploadedInfo.Digest, srcInfo.Digest)
+			case types.Decompress:
+				c.blobInfoCache.RecordDigestUncompressedPair(srcInfo.Digest, uploadedInfo.Digest)
+			default:
+				return types.BlobInfo{}, errors.Errorf("Internal error: Unexpected compressionOperation value %#v", compressionOperation)
+			}
 		}
 		if uploadCompressorName != "" && uploadCompressorName != internalblobinfocache.UnknownCompression {
 			c.blobInfoCache.RecordDigestCompressorName(uploadedInfo.Digest, uploadCompressorName)
