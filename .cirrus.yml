@@ -8,7 +8,7 @@ env:
     # Name of the ultimate destination branch for this CI run
     DEST_BRANCH: "main"
     # CI container image tag (c/skopeo branch name)
-    SKOPEO_CI_TAG: "main"
+    SKOPEO_CI_TAG: "release-1.6"
     # Use GO module mirror (reason unknown, travis did it this way)
     GOPROXY: https://proxy.golang.org
     # Overrides default location (/tmp/cirrus) for repo clone
@@ -32,12 +32,12 @@ env:
     ####
     #### Cache-image names to test with (double-quotes around names are critical)
     ####
-    FEDORA_NAME: "fedora-35"
-    PRIOR_FEDORA_NAME: "fedora-34"
+    FEDORA_NAME: "fedora-36"
+    PRIOR_FEDORA_NAME: "fedora-35"
     UBUNTU_NAME: "ubuntu-2110"
 
     # Google-cloud VM Images
-    IMAGE_SUFFIX: "c6226133906620416"
+    IMAGE_SUFFIX: "c4955393725038592"
     FEDORA_CACHE_IMAGE_NAME: "fedora-${IMAGE_SUFFIX}"
     PRIOR_FEDORA_CACHE_IMAGE_NAME: "prior-fedora-${IMAGE_SUFFIX}"
     UBUNTU_CACHE_IMAGE_NAME: "ubuntu-${IMAGE_SUFFIX}"
