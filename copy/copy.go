@@ -711,8 +711,6 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 
 	// If src.UpdatedImageNeedsLayerDiffIDs(ic.manifestUpdates) will be true, it needs to be true by the time we get here.
 	ic.diffIDsAreNeeded = src.UpdatedImageNeedsLayerDiffIDs(*ic.manifestUpdates)
-	// If encrypted and decryption keys provided, we should try to decrypt
-	ic.diffIDsAreNeeded = ic.diffIDsAreNeeded || (isEncrypted(src) && ic.c.ociDecryptConfig != nil) || ic.c.ociEncryptConfig != nil
 
 	// If enabled, fetch and compare the destination's manifest. And as an optimization skip updating the destination iff equal
 	if options.OptimizeDestinationImageAlreadyExists {
@@ -1139,11 +1137,15 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 	}
 
 	cachedDiffID := ic.c.blobInfoCache.UncompressedDigest(srcInfo.Digest) // May be ""
-	// Diffs are needed if we are encrypting an image or trying to decrypt an image
-	diffIDIsNeeded := ic.diffIDsAreNeeded && cachedDiffID == "" || toEncrypt || (isOciEncrypted(srcInfo.MediaType) && ic.c.ociDecryptConfig != nil)
+	diffIDIsNeeded := ic.diffIDsAreNeeded && cachedDiffID == ""
+	// When encrypting to decrypting, only use the simple code path. We might be able to optimize more
+	// (e.g. if we know the DiffID of an encrypted compressed layer, it might not be necessary to pull, decrypt and decompress again),
+	// but it’s not trivially safe to do such things, so until someone takes the effort to make a comprehensive argument, let’s not.
+	encryptingOrDecrypting := toEncrypt || (isOciEncrypted(srcInfo.MediaType) && ic.c.ociDecryptConfig != nil)
+	canAvoidProcessingCompleteLayer := !diffIDIsNeeded && !encryptingOrDecrypting
 
-	// If we already have the blob, and we don't need to compute the diffID, then we don't need to read it from the source.
-	if !diffIDIsNeeded {
+	// Don’t read the layer from the source if we already have the blob, and optimizations are acceptable.
+	if canAvoidProcessingCompleteLayer {
 		// TODO: at this point we don't know whether or not a blob we end up reusing is compressed using an algorithm
 		// that is acceptable for use on layers in the manifest that we'll be writing later, so if we end up reusing
 		// a blob that's compressed with e.g. zstd, but we're only allowed to write a v2s2 manifest, this will cause
@@ -1196,7 +1198,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 	// of the source file are not known yet and must be fetched.
 	// Attempt a partial only when the source allows to retrieve a blob partially and
 	// the destination has support for it.
-	if ic.c.rawSource.SupportsGetBlobAt() && ic.c.dest.SupportsPutBlobPartial() && !diffIDIsNeeded {
+	if canAvoidProcessingCompleteLayer && ic.c.rawSource.SupportsGetBlobAt() && ic.c.dest.SupportsPutBlobPartial() {
 		if reused, blobInfo := func() (bool, types.BlobInfo) { // A scope for defer
 			bar := ic.c.createProgressBar(pool, true, srcInfo, "blob", "done")
 			hideProgressBar := true
@@ -1251,9 +1253,17 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 					return types.BlobInfo{}, "", errors.Wrap(diffIDResult.err, "computing layer DiffID")
 				}
 				logrus.Debugf("Computed DiffID %s for layer %s", diffIDResult.digest, srcInfo.Digest)
-				// This is safe because we have just computed diffIDResult.Digest ourselves, and in the process
-				// we have read all of the input blob, so srcInfo.Digest must have been validated by digestingReader.
-				ic.c.blobInfoCache.RecordDigestUncompressedPair(srcInfo.Digest, diffIDResult.digest)
+				// Don’t record any associations that involve encrypted data. This is a bit crude,
+				// some blob substitutions (replacing pulls of encrypted data with local reuse of known decryption outcomes)
+				// might be safe, but it’s not trivially obvious, so let’s be conservative for now.
+				// This crude approach also means we don’t need to record whether a blob is encrypted
+				// in the blob info cache (which would probably be necessary for any more complex logic),
+				// and the simplicity is attractive.
+				if !encryptingOrDecrypting {
+					// This is safe because we have just computed diffIDResult.Digest ourselves, and in the process
+					// we have read all of the input blob, so srcInfo.Digest must have been validated by digestingReader.
+					ic.c.blobInfoCache.RecordDigestUncompressedPair(srcInfo.Digest, diffIDResult.digest)
+				}
 				diffID = diffIDResult.digest
 			}
 		}
@@ -1602,19 +1612,27 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 		return types.BlobInfo{}, errors.Errorf("Internal error writing blob %s, blob with digest %s saved with digest %s", srcInfo.Digest, inputInfo.Digest, uploadedInfo.Digest)
 	}
 	if digestingReader.validationSucceeded {
-		// If compressionOperation != types.PreserveOriginal, we now have two reliable digest values:
-		// srcinfo.Digest describes the pre-compressionOperation input, verified by digestingReader
-		// uploadedInfo.Digest describes the post-compressionOperation output, computed by PutBlob
-		// (because inputInfo.Digest == "", this must have been computed afresh).
-		switch compressionOperation {
-		case types.PreserveOriginal:
-			break // Do nothing, we have only one digest and we might not have even verified it.
-		case types.Compress:
-			c.blobInfoCache.RecordDigestUncompressedPair(uploadedInfo.Digest, srcInfo.Digest)
-		case types.Decompress:
-			c.blobInfoCache.RecordDigestUncompressedPair(srcInfo.Digest, uploadedInfo.Digest)
-		default:
-			return types.BlobInfo{}, errors.Errorf("Internal error: Unexpected compressionOperation value %#v", compressionOperation)
+		// Don’t record any associations that involve encrypted data. This is a bit crude,
+		// some blob substitutions (replacing pulls of encrypted data with local reuse of known decryption outcomes)
+		// might be safe, but it’s not trivially obvious, so let’s be conservative for now.
+		// This crude approach also means we don’t need to record whether a blob is encrypted
+		// in the blob info cache (which would probably be necessary for any more complex logic),
+		// and the simplicity is attractive.
+		if !encrypted && !decrypted {
+			// If compressionOperation != types.PreserveOriginal, we now have two reliable digest values:
+			// srcinfo.Digest describes the pre-compressionOperation input, verified by digestingReader
+			// uploadedInfo.Digest describes the post-compressionOperation output, computed by PutBlob
+			// (because inputInfo.Digest == "", this must have been computed afresh).
+			switch compressionOperation {
+			case types.PreserveOriginal:
+				break // Do nothing, we have only one digest and we might not have even verified it.
+			case types.Compress:
+				c.blobInfoCache.RecordDigestUncompressedPair(uploadedInfo.Digest, srcInfo.Digest)
+			case types.Decompress:
+				c.blobInfoCache.RecordDigestUncompressedPair(srcInfo.Digest, uploadedInfo.Digest)
+			default:
+				return types.BlobInfo{}, errors.Errorf("Internal error: Unexpected compressionOperation value %#v", compressionOperation)
+			}
 		}
 		if uploadCompressorName != "" && uploadCompressorName != internalblobinfocache.UnknownCompression {
 			c.blobInfoCache.RecordDigestCompressorName(uploadedInfo.Digest, uploadCompressorName)
