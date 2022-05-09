@@ -7,7 +7,7 @@ require (
 	github.com/BurntSushi/toml v1.0.0
 	github.com/containerd/containerd v1.5.9 // indirect
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
-	github.com/containers/ocicrypt v1.1.2
+	github.com/containers/ocicrypt v1.1.4
 	github.com/containers/storage v1.38.3
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v20.10.12+incompatible
@@ -39,6 +39,5 @@ require (
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
 	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
 )
