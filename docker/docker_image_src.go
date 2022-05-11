@@ -343,11 +343,15 @@ func handle206Response(streams chan io.ReadCloser, errs chan error, body io.Read
 	buffered := makeBufferedNetworkReader(body, 64, 16384)
 	defer buffered.Close()
 	mr := multipart.NewReader(buffered, boundary)
+	parts := 0
 	for {
 		p, err := mr.NextPart()
 		if err != nil {
 			if err != io.EOF {
 				errs <- err
+			}
+			if parts != len(chunks) {
+				errs <- errors.Errorf("invalid number of chunks returned by the server")
 			}
 			return
 		}
@@ -359,6 +363,7 @@ func handle206Response(streams chan io.ReadCloser, errs chan error, body io.Read
 		// NextPart() cannot be called while the current part
 		// is being read, so wait until it is closed
 		<-s.closed
+		parts++
 	}
 }
 
