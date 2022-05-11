@@ -5,7 +5,7 @@ export GOPROXY=https://proxy.golang.org
 
 GOBIN := $(shell go env GOBIN)
 ifeq ($(GOBIN),)
-GOBIN := $(GOPATH)/bin
+GOBIN := $(shell go env GOPATH)/bin
 endif
 
 # when cross compiling _for_ a Darwin or windows host, then we must use openpgp
