@@ -31,7 +31,7 @@ require (
 	github.com/opencontainers/selinux v1.10.1
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f
 	github.com/pkg/errors v0.9.1
-	github.com/proglottis/gpgme v0.1.1
+	github.com/proglottis/gpgme v0.1.2
 	github.com/prometheus/common v0.30.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/sirupsen/logrus v1.8.1
