@@ -43,7 +43,7 @@ also include wildcarded subdomains in the format `*.example.com`.
 The wildcard should only be present at the beginning as shown in the formats
 above. Other cases will not work. For example, `*.example.com` is valid but
 `example.*.com`, `*.example.com/foo` and `*.example.com:5000/foo/bar:baz` are not.
-Note that `*` matches an arbitary number of subdomains. `*.example.com` will hence
+Note that `*` matches an arbitrary number of subdomains. `*.example.com` will hence
 match `bar.example.com`, `foo.bar.example.com` and so on.
 
 As a special case, the `prefix` field can be missing; if so, it defaults to the value
