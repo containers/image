@@ -486,7 +486,7 @@ func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader,
 }
 
 // putBlobToPendingFile implements ImageDestination.PutBlobWithOptions, storing stream into an on-disk file.
-// The caller must arrange the blob to be eventually commited using s.commitLayer().
+// The caller must arrange the blob to be eventually committed using s.commitLayer().
 func (s *storageImageDestination) putBlobToPendingFile(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, options *private.PutBlobOptions) (types.BlobInfo, error) {
 	// Stores a layer or data blob in our temporary directory, checking that any information
 	// in the blobinfo matches the incoming data.
@@ -641,7 +641,7 @@ func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo t
 }
 
 // tryReusingBlobAsPending implements TryReusingBlobWithOptions, filling s.blobDiffIDs and other metadata.
-// The caller must arrange the blob to be eventually commited using s.commitLayer().
+// The caller must arrange the blob to be eventually committed using s.commitLayer().
 func (s *storageImageDestination) tryReusingBlobAsPending(ctx context.Context, blobinfo types.BlobInfo, options *private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
 	// lock the entire method as it executes fairly quickly
 	s.lock.Lock()
