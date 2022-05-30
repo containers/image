@@ -22,7 +22,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/imdario/mergo v0.3.13
-	github.com/klauspost/compress v1.15.4
+	github.com/klauspost/compress v1.15.5
 	github.com/klauspost/pgzip v1.2.5
 	github.com/manifoldco/promptui v0.9.0
 	github.com/moby/term v0.0.0-20210610120745-9d4ed1856297 // indirect
