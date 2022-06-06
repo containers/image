@@ -235,8 +235,8 @@ github.com/containers/libtrust v0.0.0-20200511145503-9c3a6c22cd9a/go.mod h1:9rfv
 github.com/containers/ocicrypt v1.0.1/go.mod h1:MeJDzk1RJHv89LjsH0Sp5KTY3ZYkjXO/C+bKAeWFIrc=
 github.com/containers/ocicrypt v1.1.0/go.mod h1:b8AOe0YR67uU8OqfVNcznfFpAzu3rdgUV4GP9qXPfu4=
 github.com/containers/ocicrypt v1.1.1/go.mod h1:Dm55fwWm1YZAjYRaJ94z2mfZikIyIN4B0oB3dj3jFxY=
-github.com/containers/ocicrypt v1.1.4-0.20220428134531-566b808bdf6f h1:hffElEaoDQfREHltc2wtFPd68BqDmzW6KkEDpuSRBjs=
-github.com/containers/ocicrypt v1.1.4-0.20220428134531-566b808bdf6f/go.mod h1:xpdkbVAuaH3WzbEabUd5yDsl9SwJA5pABH85425Es2g=
+github.com/containers/ocicrypt v1.1.5 h1:UO+gBnBXvMvC7HTXLh0bPgLslfW8HlY+oxYcoSHBcZQ=
+github.com/containers/ocicrypt v1.1.5/go.mod h1:WgjxPWdTJMqYMjf3M6cuIFFA1/MpyyhIM99YInA+Rvc=
 github.com/containers/storage v1.41.0 h1:IsoAJ1q3s/jfHB7eoiRhvTRTcuV+ywY3CkbbgKtT5Bo=
 github.com/containers/storage v1.41.0/go.mod h1:Pb0l5Sm/89kolX3o2KolKQ5cCHk5vPNpJrhNaLcdS5s=
 github.com/coreos/bbolt v1.3.2/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=

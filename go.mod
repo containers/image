@@ -9,7 +9,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/containerd/cgroups v1.0.3 // indirect
 	github.com/containers/libtrust v0.0.0-20200511145503-9c3a6c22cd9a
-	github.com/containers/ocicrypt v1.1.4-0.20220428134531-566b808bdf6f
+	github.com/containers/ocicrypt v1.1.5
 	github.com/containers/storage v1.41.0
 	github.com/docker/distribution v2.8.1+incompatible
 	github.com/docker/docker v20.10.16+incompatible
