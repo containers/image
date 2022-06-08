@@ -97,9 +97,7 @@ func TestNewGPGSigningMechanismInDirectory(t *testing.T) {
 	}
 
 	// If we use the default directory mechanism, GNUPGHOME is respected.
-	origGNUPGHOME := os.Getenv("GNUPGHOME")
-	defer os.Setenv("GNUPGHOME", origGNUPGHOME)
-	os.Setenv("GNUPGHOME", testGPGHomeDirectory)
+	t.Setenv("GNUPGHOME", testGPGHomeDirectory)
 	mech, err = newGPGSigningMechanismInDirectory("")
 	require.NoError(t, err)
 	defer mech.Close()

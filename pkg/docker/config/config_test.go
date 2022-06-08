@@ -25,18 +25,7 @@ func TestGetPathToAuth(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	// Environment is per-process, so this looks very unsafe; actually it seems fine because tests are not
-	// run in parallel unless they opt in by calling t.Parallel().  So don’t do that.
-	oldXRD, hasXRD := os.LookupEnv("XDG_RUNTIME_DIR")
-	defer func() {
-		if hasXRD {
-			os.Setenv("XDG_RUNTIME_DIR", oldXRD)
-		} else {
-			os.Unsetenv("XDG_RUNTIME_DIR")
-		}
-	}()
-
-	for _, c := range []struct {
+	for caseIndex, c := range []struct {
 		sys          *types.SystemContext
 		os           string
 		xrd          string
@@ -61,40 +50,38 @@ func TestGetPathToAuth(t *testing.T) {
 		{nil, linux, tmpDir + "/thisdoesnotexist", "", false},
 		{nil, darwin, tmpDir + "/thisdoesnotexist", darwinDefault, false},
 	} {
-		if c.xrd != "" {
-			os.Setenv("XDG_RUNTIME_DIR", c.xrd)
-		} else {
-			os.Unsetenv("XDG_RUNTIME_DIR")
-		}
-		res, lf, err := getPathToAuthWithOS(c.sys, c.os)
-		if c.expected == "" {
-			assert.Error(t, err)
-		} else {
-			require.NoError(t, err)
-			assert.Equal(t, c.expected, res)
-			assert.Equal(t, c.legacyFormat, lf)
-		}
+		t.Run(fmt.Sprintf("%d", caseIndex), func(t *testing.T) {
+			// Always use t.Setenv() to ensure XDG_RUNTIME_DIR is restored to the original value after the test.
+			// Then, in cases where the test needs XDG_RUNTIME_DIR unset (not just set to empty), use a raw os.Unsetenv()
+			// to override the situation. (Sadly there isn’t a t.Unsetenv() as of Go 1.17.)
+			t.Setenv("XDG_RUNTIME_DIR", c.xrd)
+			if c.xrd == "" {
+				os.Unsetenv("XDG_RUNTIME_DIR")
+			}
+			res, lf, err := getPathToAuthWithOS(c.sys, c.os)
+			if c.expected == "" {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, c.expected, res)
+				assert.Equal(t, c.legacyFormat, lf)
+			}
+		})
 	}
 }
 
 func TestGetAuth(t *testing.T) {
-	origXDG := os.Getenv("XDG_RUNTIME_DIR")
 	tmpXDGRuntimeDir := t.TempDir()
 	t.Logf("using temporary XDG_RUNTIME_DIR directory: %q", tmpXDGRuntimeDir)
-	// override XDG_RUNTIME_DIR
-	os.Setenv("XDG_RUNTIME_DIR", tmpXDGRuntimeDir)
-	defer os.Setenv("XDG_RUNTIME_DIR", origXDG)
+	t.Setenv("XDG_RUNTIME_DIR", tmpXDGRuntimeDir)
 
 	// override PATH for executing credHelper
 	curtDir, err := os.Getwd()
 	require.NoError(t, err)
 	origPath := os.Getenv("PATH")
 	newPath := fmt.Sprintf("%s:%s", filepath.Join(curtDir, "testdata"), origPath)
-	os.Setenv("PATH", newPath)
+	t.Setenv("PATH", newPath)
 	t.Logf("using PATH: %q", newPath)
-	defer func() {
-		os.Setenv("PATH", origPath)
-	}()
 
 	tmpHomeDir := t.TempDir()
 	t.Logf("using temporary home directory: %q", tmpHomeDir)
@@ -405,12 +392,9 @@ func TestGetAuthPreferNewConfig(t *testing.T) {
 }
 
 func TestGetAuthFailsOnBadInput(t *testing.T) {
-	origXDG := os.Getenv("XDG_RUNTIME_DIR")
 	tmpXDGRuntimeDir := t.TempDir()
 	t.Logf("using temporary XDG_RUNTIME_DIR directory: %q", tmpXDGRuntimeDir)
-	// override XDG_RUNTIME_DIR
-	os.Setenv("XDG_RUNTIME_DIR", tmpXDGRuntimeDir)
-	defer os.Setenv("XDG_RUNTIME_DIR", origXDG)
+	t.Setenv("XDG_RUNTIME_DIR", tmpXDGRuntimeDir)
 
 	tmpHomeDir := t.TempDir()
 	t.Logf("using temporary home directory: %q", tmpHomeDir)
@@ -466,11 +450,8 @@ func TestGetAllCredentials(t *testing.T) {
 	require.NoError(t, err)
 	origPath := os.Getenv("PATH")
 	newPath := fmt.Sprintf("%s:%s", filepath.Join(path, "testdata"), origPath)
-	os.Setenv("PATH", newPath)
+	t.Setenv("PATH", newPath)
 	t.Logf("using PATH: %q", newPath)
-	defer func() {
-		os.Setenv("PATH", origPath)
-	}()
 	err = os.Chmod(filepath.Join(path, "testdata", "docker-credential-helper-registry"), os.ModePerm)
 	require.NoError(t, err)
 	sys := types.SystemContext{
@@ -480,11 +461,12 @@ func TestGetAllCredentials(t *testing.T) {
 	}
 
 	// Make sure that we can handle no-creds-found errors.
-	os.Setenv("DOCKER_CONFIG", filepath.Join(path, "testdata"))
-	authConfigs, err := GetAllCredentials(nil)
-	require.NoError(t, err)
-	require.Empty(t, authConfigs)
-	os.Unsetenv("DOCKER_CONFIG")
+	t.Run("no credentials found", func(t *testing.T) {
+		t.Setenv("DOCKER_CONFIG", filepath.Join(path, "testdata"))
+		authConfigs, err := GetAllCredentials(nil)
+		require.NoError(t, err)
+		require.Empty(t, authConfigs)
+	})
 
 	for _, data := range [][]struct {
 		writeKey    string
