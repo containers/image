@@ -61,16 +61,16 @@ type bpCompressionStepData struct {
 // srcInfo is only used for error messages.
 // Returns data for other steps; the caller should eventually call updateCompressionEdits and perhaps recordValidatedBlobData,
 // and must eventually call close.
-func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob bool,
+func (ic *imageCopier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob bool,
 	detected bpDetectCompressionStepData) (*bpCompressionStepData, error) {
 	// WARNING: If you are adding new reasons to change the blob, update also the OptimizeDestinationImageAlreadyExists
 	// short-circuit conditions
 	if canModifyBlob {
 		for _, fn := range []func(*sourceStream, bpDetectCompressionStepData) (*bpCompressionStepData, error){
-			c.bpcPreserveEncrypted,
-			c.bpcCompressUncompressed,
-			c.bpcRecompressCompressed,
-			c.bpcDecompressCompressed,
+			ic.bpcPreserveEncrypted,
+			ic.bpcCompressUncompressed,
+			ic.bpcRecompressCompressed,
+			ic.bpcDecompressCompressed,
 		} {
 			res, err := fn(stream, detected)
 			if err != nil {
@@ -81,11 +81,11 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 			}
 		}
 	}
-	return c.bpcPreserveOriginal(stream, detected), nil
+	return ic.bpcPreserveOriginal(stream, detected), nil
 }
 
 // bpcPreserveEncrypted checks if the input is encrypted, and returns a *bpCompressionStepData if so.
-func (c *copier) bpcPreserveEncrypted(stream *sourceStream, _ bpDetectCompressionStepData) (*bpCompressionStepData, error) {
+func (ic *imageCopier) bpcPreserveEncrypted(stream *sourceStream, _ bpDetectCompressionStepData) (*bpCompressionStepData, error) {
 	if isOciEncrypted(stream.info.MediaType) {
 		logrus.Debugf("Using original blob without modification for encrypted blob")
 		// PreserveOriginal due to any compression not being able to be done on an encrypted blob unless decrypted
@@ -100,17 +100,17 @@ func (c *copier) bpcPreserveEncrypted(stream *sourceStream, _ bpDetectCompressio
 }
 
 // bpcCompressUncompressed checks if we should be compressing an uncompressed input, and returns a *bpCompressionStepData if so.
-func (c *copier) bpcCompressUncompressed(stream *sourceStream, detected bpDetectCompressionStepData) (*bpCompressionStepData, error) {
-	if c.dest.DesiredLayerCompression() == types.Compress && !detected.isCompressed {
+func (ic *imageCopier) bpcCompressUncompressed(stream *sourceStream, detected bpDetectCompressionStepData) (*bpCompressionStepData, error) {
+	if ic.c.dest.DesiredLayerCompression() == types.Compress && !detected.isCompressed {
 		logrus.Debugf("Compressing blob on the fly")
 		var uploadedAlgorithm *compressiontypes.Algorithm
-		if c.compressionFormat != nil {
-			uploadedAlgorithm = c.compressionFormat
+		if ic.c.compressionFormat != nil {
+			uploadedAlgorithm = ic.c.compressionFormat
 		} else {
 			uploadedAlgorithm = defaultCompressionFormat
 		}
 
-		reader, annotations := c.compressedStream(stream.reader, *uploadedAlgorithm)
+		reader, annotations := ic.c.compressedStream(stream.reader, *uploadedAlgorithm)
 		// Note: reader must be closed on all return paths.
 		stream.reader = reader
 		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
@@ -130,9 +130,9 @@ func (c *copier) bpcCompressUncompressed(stream *sourceStream, detected bpDetect
 }
 
 // bpcRecompressCompressed checks if we should be recompressing a compressed input to another format, and returns a *bpCompressionStepData if so.
-func (c *copier) bpcRecompressCompressed(stream *sourceStream, detected bpDetectCompressionStepData) (*bpCompressionStepData, error) {
-	if c.dest.DesiredLayerCompression() == types.Compress && detected.isCompressed &&
-		c.compressionFormat != nil && c.compressionFormat.Name() != detected.format.Name() {
+func (ic *imageCopier) bpcRecompressCompressed(stream *sourceStream, detected bpDetectCompressionStepData) (*bpCompressionStepData, error) {
+	if ic.c.dest.DesiredLayerCompression() == types.Compress && detected.isCompressed &&
+		ic.c.compressionFormat != nil && ic.c.compressionFormat.Name() != detected.format.Name() {
 		// When the blob is compressed, but the desired format is different, it first needs to be decompressed and finally
 		// re-compressed using the desired format.
 		logrus.Debugf("Blob will be converted")
@@ -148,7 +148,7 @@ func (c *copier) bpcRecompressCompressed(stream *sourceStream, detected bpDetect
 			}
 		}()
 
-		recompressed, annotations := c.compressedStream(decompressed, *c.compressionFormat)
+		recompressed, annotations := ic.c.compressedStream(decompressed, *ic.c.compressionFormat)
 		// Note: recompressed must be closed on all return paths.
 		stream.reader = recompressed
 		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
@@ -158,10 +158,10 @@ func (c *copier) bpcRecompressCompressed(stream *sourceStream, detected bpDetect
 		succeeded = true
 		return &bpCompressionStepData{
 			operation:              types.PreserveOriginal,
-			uploadedAlgorithm:      c.compressionFormat,
+			uploadedAlgorithm:      ic.c.compressionFormat,
 			uploadedAnnotations:    annotations,
 			srcCompressorName:      detected.srcCompressorName,
-			uploadedCompressorName: c.compressionFormat.Name(),
+			uploadedCompressorName: ic.c.compressionFormat.Name(),
 			closers:                []io.Closer{decompressed, recompressed},
 		}, nil
 	}
@@ -169,8 +169,8 @@ func (c *copier) bpcRecompressCompressed(stream *sourceStream, detected bpDetect
 }
 
 // bpcDecompressCompressed checks if we should be decompressing a compressed input, and returns a *bpCompressionStepData if so.
-func (c *copier) bpcDecompressCompressed(stream *sourceStream, detected bpDetectCompressionStepData) (*bpCompressionStepData, error) {
-	if c.dest.DesiredLayerCompression() == types.Decompress && detected.isCompressed {
+func (ic *imageCopier) bpcDecompressCompressed(stream *sourceStream, detected bpDetectCompressionStepData) (*bpCompressionStepData, error) {
+	if ic.c.dest.DesiredLayerCompression() == types.Decompress && detected.isCompressed {
 		logrus.Debugf("Blob will be decompressed")
 		s, err := detected.decompressor(stream.reader)
 		if err != nil {
@@ -194,7 +194,7 @@ func (c *copier) bpcDecompressCompressed(stream *sourceStream, detected bpDetect
 }
 
 // bpcPreserveOriginal returns a *bpCompressionStepData for not changing the original blob.
-func (c *copier) bpcPreserveOriginal(stream *sourceStream, detected bpDetectCompressionStepData) *bpCompressionStepData {
+func (ic *imageCopier) bpcPreserveOriginal(stream *sourceStream, detected bpDetectCompressionStepData) *bpCompressionStepData {
 	logrus.Debugf("Using original blob without modification")
 	// Remember if the original blob was compressed, and if so how, so that if
 	// LayerInfosForCopy() returned something that differs from what was in the

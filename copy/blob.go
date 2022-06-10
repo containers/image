@@ -15,7 +15,7 @@ import (
 // perhaps sending a copy to an io.Writer if getOriginalLayerCopyWriter != nil,
 // perhaps (de/re/)compressing it if canModifyBlob,
 // and returns a complete blobInfo of the copied blob.
-func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, srcInfo types.BlobInfo,
+func (ic *imageCopier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, srcInfo types.BlobInfo,
 	getOriginalLayerCopyWriter func(decompressor compressiontypes.DecompressorFunc) io.Writer,
 	canModifyBlob bool, isConfig bool, toEncrypt bool, bar *progressBar, layerIndex int, emptyLayer bool) (types.BlobInfo, error) {
 	if isConfig { // This is guaranteed by the caller, but set it here to be explicit.
@@ -46,7 +46,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 	stream.reader = bar.ProxyReader(stream.reader)
 
 	// === Decrypt the stream, if required.
-	decryptionStep, err := c.blobPipelineDecryptionStep(&stream, srcInfo)
+	decryptionStep, err := ic.c.blobPipelineDecryptionStep(&stream, srcInfo)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
@@ -68,7 +68,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 	// === Deal with layer compression/decompression if necessary
 	// WARNING: If you are adding new reasons to change the blob, update also the OptimizeDestinationImageAlreadyExists
 	// short-circuit conditions
-	compressionStep, err := c.blobPipelineCompressionStep(&stream, canModifyBlob, detectedCompression)
+	compressionStep, err := ic.blobPipelineCompressionStep(&stream, canModifyBlob, detectedCompression)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
@@ -80,17 +80,17 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		// Before relaxing this, see the original pull request’s review if there are other reasons to reject this.
 		return types.BlobInfo{}, errors.New("Unable to support both decryption and encryption in the same copy")
 	}
-	encryptionStep, err := c.blobPipelineEncryptionStep(&stream, toEncrypt, srcInfo, decryptionStep)
+	encryptionStep, err := ic.c.blobPipelineEncryptionStep(&stream, toEncrypt, srcInfo, decryptionStep)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
 
-	// === Report progress using the c.progress channel, if required.
-	if c.progress != nil && c.progressInterval > 0 {
+	// === Report progress using the ic.c.progress channel, if required.
+	if ic.c.progress != nil && ic.c.progressInterval > 0 {
 		progressReader := newProgressReader(
 			stream.reader,
-			c.progress,
-			c.progressInterval,
+			ic.c.progress,
+			ic.c.progressInterval,
 			srcInfo,
 		)
 		defer progressReader.reportDone()
@@ -99,14 +99,14 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 
 	// === Finally, send the layer stream to dest.
 	options := private.PutBlobOptions{
-		Cache:      c.blobInfoCache,
+		Cache:      ic.c.blobInfoCache,
 		IsConfig:   isConfig,
 		EmptyLayer: emptyLayer,
 	}
 	if !isConfig {
 		options.LayerIndex = &layerIndex
 	}
-	uploadedInfo, err := c.dest.PutBlobWithOptions(ctx, &errorAnnotationReader{stream.reader}, stream.info, options)
+	uploadedInfo, err := ic.c.dest.PutBlobWithOptions(ctx, &errorAnnotationReader{stream.reader}, stream.info, options)
 	if err != nil {
 		return types.BlobInfo{}, errors.Wrap(err, "writing blob")
 	}
@@ -138,7 +138,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		return types.BlobInfo{}, errors.Errorf("Internal error writing blob %s, blob with digest %s saved with digest %s", srcInfo.Digest, stream.info.Digest, uploadedInfo.Digest)
 	}
 	if digestingReader.validationSucceeded {
-		if err := compressionStep.recordValidatedDigestData(c, uploadedInfo, srcInfo, encryptionStep, decryptionStep); err != nil {
+		if err := compressionStep.recordValidatedDigestData(ic.c, uploadedInfo, srcInfo, encryptionStep, decryptionStep); err != nil {
 			return types.BlobInfo{}, err
 		}
 	}

@@ -1044,7 +1044,7 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest(ctx context.Context, instanc
 		return nil, "", errors.Wrap(err, "reading manifest")
 	}
 
-	if err := ic.c.copyConfig(ctx, pendingImage); err != nil {
+	if err := ic.copyConfig(ctx, pendingImage); err != nil {
 		return nil, "", err
 	}
 
@@ -1064,19 +1064,19 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest(ctx context.Context, instanc
 }
 
 // copyConfig copies config.json, if any, from src to dest.
-func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
+func (ic *imageCopier) copyConfig(ctx context.Context, src types.Image) error {
 	srcInfo := src.ConfigInfo()
 	if srcInfo.Digest != "" {
-		if err := c.concurrentBlobCopiesSemaphore.Acquire(ctx, 1); err != nil {
+		if err := ic.c.concurrentBlobCopiesSemaphore.Acquire(ctx, 1); err != nil {
 			// This can only fail with ctx.Err(), so no need to blame acquiring the semaphore.
 			return fmt.Errorf("copying config: %w", err)
 		}
-		defer c.concurrentBlobCopiesSemaphore.Release(1)
+		defer ic.c.concurrentBlobCopiesSemaphore.Release(1)
 
 		destInfo, err := func() (types.BlobInfo, error) { // A scope for defer
-			progressPool := c.newProgressPool()
+			progressPool := ic.c.newProgressPool()
 			defer progressPool.Wait()
-			bar := c.createProgressBar(progressPool, false, srcInfo, "config", "done")
+			bar := ic.c.createProgressBar(progressPool, false, srcInfo, "config", "done")
 			defer bar.Abort(false)
 
 			configBlob, err := src.ConfigBlob(ctx)
@@ -1084,7 +1084,7 @@ func (c *copier) copyConfig(ctx context.Context, src types.Image) error {
 				return types.BlobInfo{}, errors.Wrapf(err, "reading config blob %s", srcInfo.Digest)
 			}
 
-			destInfo, err := c.copyBlobFromStream(ctx, bytes.NewReader(configBlob), srcInfo, nil, false, true, false, bar, -1, false)
+			destInfo, err := ic.copyBlobFromStream(ctx, bytes.NewReader(configBlob), srcInfo, nil, false, true, false, bar, -1, false)
 			if err != nil {
 				return types.BlobInfo{}, err
 			}
@@ -1300,7 +1300,7 @@ func (ic *imageCopier) copyLayerFromStream(ctx context.Context, srcStream io.Rea
 		}
 	}
 
-	blobInfo, err := ic.c.copyBlobFromStream(ctx, srcStream, srcInfo, getDiffIDRecorder, ic.cannotModifyManifestReason == "", false, toEncrypt, bar, layerIndex, emptyLayer) // Sets err to nil on success
+	blobInfo, err := ic.copyBlobFromStream(ctx, srcStream, srcInfo, getDiffIDRecorder, ic.cannotModifyManifestReason == "", false, toEncrypt, bar, layerIndex, emptyLayer) // Sets err to nil on success
 	return blobInfo, diffIDChan, err
 	// We need the defer … pipeWriter.CloseWithError() to happen HERE so that the caller can block on reading from diffIDChan
 }
