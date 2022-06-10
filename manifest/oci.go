@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	internalManifest "github.com/containers/image/v5/internal/manifest"
 	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
 	ociencspec "github.com/containers/ocicrypt/spec"
@@ -213,6 +214,26 @@ func (m *OCI1) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*type
 
 // ImageID computes an ID which can uniquely identify this image by its contents.
 func (m *OCI1) ImageID([]digest.Digest) (string, error) {
+	// The way m.Config.Digest “uniquely identifies” an image is
+	// by containing RootFS.DiffIDs, which identify the layers of the image.
+	// For non-image artifacts, the we can’t expect the config to change
+	// any time the other layers (semantically) change, so this approach of
+	// distinguishing objects only by m.Config.Digest doesn’t work in general.
+	//
+	// Any caller of this method presumably wants to disambiguate the same
+	// images with a different representation, but doesn’t want to disambiguate
+	// representations (by using a manifest digest).  So, submitting a non-image
+	// artifact to such a caller indicates an expectation mismatch.
+	// So, we just fail here instead of inventing some other ID value (e.g.
+	// by combining the config and blob layer digests).  That still
+	// gives us the option to not fail, and return some value, in the future,
+	// without committing to that approach now.
+	// (The only known caller of ImageID is storage/storageImageDestination.computeID,
+	// which can’t work with non-image artifacts.)
+	if m.Config.MediaType != imgspecv1.MediaTypeImageConfig {
+		return "", internalManifest.NewNonImageArtifactError(m.Config.MediaType)
+	}
+
 	if err := m.Config.Digest.Validate(); err != nil {
 		return "", err
 	}

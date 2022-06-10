@@ -7,6 +7,7 @@ import (
 
 	"github.com/containers/image/v5/pkg/compression"
 	"github.com/containers/image/v5/types"
+	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -341,4 +342,21 @@ func TestUpdateLayerInfosOCINondistributableGzipToUncompressed(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t, string(expectedManifestBytes), string(updatedManifestBytes))
+}
+
+func TestOCI1ImageID(t *testing.T) {
+	m := manifestOCI1FromFixture(t, "ociv1.manifest.json")
+	// These are not the real DiffID values, but they don’t actually matter in our implementation.
+	id, err := m.ImageID([]digest.Digest{
+		"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "b5b2b2c507a0944348e0303114d8d93aaaa081732b86451d9bce1f432a537bc7", id)
+
+	m = manifestOCI1FromFixture(t, "ociv1.artifact.json")
+	_, err = m.ImageID([]digest.Digest{})
+	var expected NonImageArtifactError
+	assert.ErrorAs(t, err, &expected)
 }
