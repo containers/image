@@ -10,7 +10,7 @@ import (
 
 // nameOnlyImageMock is a mock of types.UnparsedImage which only allows transports.ImageName to work
 type nameOnlyImageMock struct {
-	forbiddenImageMock
+	mocks.ForbiddenUnparsedImage
 }
 
 func (nameOnlyImageMock) Reference() types.ImageReference {
