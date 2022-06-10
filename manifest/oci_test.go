@@ -18,50 +18,17 @@ func TestSupportedOCI1MediaType(t *testing.T) {
 		mustFail bool
 	}
 	data := []testData{
-		{
-			imgspecv1.MediaTypeDescriptor,
-			false,
-		},
-		{
-			imgspecv1.MediaTypeImageConfig,
-			false,
-		},
-		{
-			imgspecv1.MediaTypeImageLayer,
-			false,
-		},
-		{
-			imgspecv1.MediaTypeImageLayerGzip,
-			false,
-		},
-		{
-			imgspecv1.MediaTypeImageLayerNonDistributable,
-			false,
-		},
-		{
-			imgspecv1.MediaTypeImageLayerNonDistributableGzip,
-			false,
-		},
-		{
-			imgspecv1.MediaTypeImageLayerNonDistributableZstd,
-			false,
-		},
-		{
-			imgspecv1.MediaTypeImageLayerZstd,
-			false,
-		},
-		{
-			imgspecv1.MediaTypeImageManifest,
-			false,
-		},
-		{
-			imgspecv1.MediaTypeLayoutHeader,
-			false,
-		},
-		{
-			"application/vnd.oci.image.layer.nondistributable.v1.tar+unknown",
-			true,
-		},
+		{imgspecv1.MediaTypeDescriptor, false},
+		{imgspecv1.MediaTypeImageConfig, false},
+		{imgspecv1.MediaTypeImageLayer, false},
+		{imgspecv1.MediaTypeImageLayerGzip, false},
+		{imgspecv1.MediaTypeImageLayerNonDistributable, false},
+		{imgspecv1.MediaTypeImageLayerNonDistributableGzip, false},
+		{imgspecv1.MediaTypeImageLayerNonDistributableZstd, false},
+		{imgspecv1.MediaTypeImageLayerZstd, false},
+		{imgspecv1.MediaTypeImageManifest, false},
+		{imgspecv1.MediaTypeLayoutHeader, false},
+		{"application/vnd.oci.image.layer.nondistributable.v1.tar+unknown", true},
 	}
 	for _, d := range data {
 		err := SupportedOCI1MediaType(d.m)

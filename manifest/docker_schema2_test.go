@@ -17,38 +17,14 @@ func TestSupportedSchema2MediaType(t *testing.T) {
 		mustFail bool
 	}
 	data := []testData{
-		{
-			DockerV2Schema2MediaType,
-			false,
-		},
-		{
-			DockerV2Schema2ConfigMediaType,
-			false,
-		},
-		{
-			DockerV2Schema2LayerMediaType,
-			false,
-		},
-		{
-			DockerV2SchemaLayerMediaTypeUncompressed,
-			false,
-		},
-		{
-			DockerV2ListMediaType,
-			false,
-		},
-		{
-			DockerV2Schema2ForeignLayerMediaType,
-			false,
-		},
-		{
-			DockerV2Schema2ForeignLayerMediaTypeGzip,
-			false,
-		},
-		{
-			"application/vnd.docker.image.rootfs.foreign.diff.unknown",
-			true,
-		},
+		{DockerV2Schema2MediaType, false},
+		{DockerV2Schema2ConfigMediaType, false},
+		{DockerV2Schema2LayerMediaType, false},
+		{DockerV2SchemaLayerMediaTypeUncompressed, false},
+		{DockerV2ListMediaType, false},
+		{DockerV2Schema2ForeignLayerMediaType, false},
+		{DockerV2Schema2ForeignLayerMediaTypeGzip, false},
+		{"application/vnd.docker.image.rootfs.foreign.diff.unknown", true},
 	}
 	for _, d := range data {
 		err := SupportedSchema2MediaType(d.m)
