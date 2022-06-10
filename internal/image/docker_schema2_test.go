@@ -308,38 +308,17 @@ type schema2ImageSource struct {
 }
 
 func (s2is *schema2ImageSource) Reference() types.ImageReference {
-	return refImageReferenceMock{s2is.ref}
+	return refImageReferenceMock{ref: s2is.ref}
 }
 
 // refImageReferenceMock is a mock of types.ImageReference which returns itself in DockerReference.
-type refImageReferenceMock struct{ reference.Named }
+type refImageReferenceMock struct {
+	mocks.ForbiddenImageReference // We inherit almost all of the methods, which just panic()
+	ref                           reference.Named
+}
 
-func (ref refImageReferenceMock) Transport() types.ImageTransport {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) StringWithinTransport() string {
-	panic("unexpected call to a mock function")
-}
 func (ref refImageReferenceMock) DockerReference() reference.Named {
-	return ref.Named
-}
-func (ref refImageReferenceMock) PolicyConfigurationIdentity() string {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) PolicyConfigurationNamespaces() []string {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) NewImage(ctx context.Context, sys *types.SystemContext) (types.ImageCloser, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
-	panic("unexpected call to a mock function")
+	return ref.ref
 }
 
 func newSchema2ImageSource(t *testing.T, dockerRef string) *schema2ImageSource {
@@ -365,7 +344,7 @@ type memoryImageDest struct {
 }
 
 func (d *memoryImageDest) Reference() types.ImageReference {
-	return refImageReferenceMock{d.ref}
+	return refImageReferenceMock{ref: d.ref}
 }
 func (d *memoryImageDest) Close() error {
 	panic("Unexpected call to a mock function")

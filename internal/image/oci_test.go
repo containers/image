@@ -308,7 +308,7 @@ type oci1ImageSource struct {
 }
 
 func (OCIis *oci1ImageSource) Reference() types.ImageReference {
-	return refImageReferenceMock{OCIis.ref}
+	return refImageReferenceMock{ref: OCIis.ref}
 }
 
 func newOCI1ImageSource(t *testing.T, dockerRef string) *oci1ImageSource {

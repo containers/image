@@ -54,10 +54,10 @@ func TestParseImageAndDockerReference(t *testing.T) {
 }
 
 // refImageMock is a mock of types.UnparsedImage which returns itself in Reference().DockerReference.
-type refImageMock struct{ reference.Named }
+type refImageMock struct{ ref reference.Named }
 
 func (ref refImageMock) Reference() types.ImageReference {
-	return refImageReferenceMock(ref)
+	return refImageReferenceMock{ref: ref.ref}
 }
 func (ref refImageMock) Close() error {
 	panic("unexpected call to a mock function")
@@ -73,42 +73,27 @@ func (ref refImageMock) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo
 }
 
 // refImageReferenceMock is a mock of types.ImageReference which returns itself in DockerReference.
-type refImageReferenceMock struct{ reference.Named }
+type refImageReferenceMock struct {
+	mocks.ForbiddenImageReference
+	ref reference.Named
+}
 
 func (ref refImageReferenceMock) Transport() types.ImageTransport {
 	// We use this in error messages, so sady we must return something. But right now we do so only when DockerReference is nil, so restrict to that.
-	if ref.Named == nil {
+	if ref.ref == nil {
 		return mocks.NameImageTransport("== Transport mock")
 	}
 	panic("unexpected call to a mock function")
 }
 func (ref refImageReferenceMock) StringWithinTransport() string {
 	// We use this in error messages, so sadly we must return something. But right now we do so only when DockerReference is nil, so restrict to that.
-	if ref.Named == nil {
+	if ref.ref == nil {
 		return "== StringWithinTransport for an image with no Docker support"
 	}
 	panic("unexpected call to a mock function")
 }
 func (ref refImageReferenceMock) DockerReference() reference.Named {
-	return ref.Named
-}
-func (ref refImageReferenceMock) PolicyConfigurationIdentity() string {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) PolicyConfigurationNamespaces() []string {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) NewImage(ctx context.Context, sys *types.SystemContext) (types.ImageCloser, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
-	panic("unexpected call to a mock function")
+	return ref.ref
 }
 
 type prmSymmetricTableTest struct {
