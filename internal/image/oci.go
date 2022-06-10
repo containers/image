@@ -7,6 +7,7 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/iolimits"
+	internalManifest "github.com/containers/image/v5/internal/manifest"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache/none"
 	"github.com/containers/image/v5/types"
@@ -194,10 +195,15 @@ func (m *manifestOCI1) convertToManifestSchema2Generic(ctx context.Context, opti
 // value.
 // This does not change the state of the original manifestOCI1 object.
 func (m *manifestOCI1) convertToManifestSchema2(_ context.Context, _ *types.ManifestUpdateOptions) (*manifestSchema2, error) {
+	if m.m.Config.MediaType != imgspecv1.MediaTypeImageConfig {
+		return nil, internalManifest.NewNonImageArtifactError(m.m.Config.MediaType)
+	}
+
 	// Create a copy of the descriptor.
 	config := schema2DescriptorFromOCI1Descriptor(m.m.Config)
 
-	// The only difference between OCI and DockerSchema2 is the mediatypes. The
+	// Above, we have already checked that this manifest refers to an image, not an OCI artifact,
+	// so the only difference between OCI and DockerSchema2 is the mediatypes. The
 	// media type of the manifest is handled by manifestSchema2FromComponents.
 	config.MediaType = manifest.DockerV2Schema2ConfigMediaType
 
@@ -233,7 +239,11 @@ func (m *manifestOCI1) convertToManifestSchema2(_ context.Context, _ *types.Mani
 // value.
 // This does not change the state of the original manifestOCI1 object.
 func (m *manifestOCI1) convertToManifestSchema1(ctx context.Context, options *types.ManifestUpdateOptions) (genericManifest, error) {
-	// We can't directly convert to V1, but we can transitively convert via a V2 image
+	if m.m.Config.MediaType != imgspecv1.MediaTypeImageConfig {
+		return nil, internalManifest.NewNonImageArtifactError(m.m.Config.MediaType)
+	}
+
+	// We can't directly convert images to V1, but we can transitively convert via a V2 image
 	m2, err := m.convertToManifestSchema2(ctx, options)
 	if err != nil {
 		return nil, err

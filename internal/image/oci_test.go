@@ -454,7 +454,18 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 		{Digest: GzippedEmptyLayerDigest, Size: -1},
 	}, s1Manifest.LayerInfos())
 
-	// FIXME? Test also the various failure cases, if only to see that we don't crash?
+	// This can share originalSrc because the config digest is the same between oci1-artifact.json and oci1.json
+	artifact := manifestOCI1FromFixture(t, originalSrc, "oci1-artifact.json")
+	_, err = artifact.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
+		InformationOnly: types.ManifestUpdateInformation{
+			Destination: memoryDest,
+		},
+	})
+	var expected manifest.NonImageArtifactError
+	assert.ErrorAs(t, err, &expected)
+
+	// FIXME? Test also the other failure cases, if only to see that we don't crash?
 }
 
 func TestConvertToManifestSchema2(t *testing.T) {
@@ -478,7 +489,15 @@ func TestConvertToManifestSchema2(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, byHand, converted)
 
-	// FIXME? Test also the various failure cases, if only to see that we don't crash?
+	// This can share originalSrc because the config digest is the same between oci1-artifact.json and oci1.json
+	artifact := manifestOCI1FromFixture(t, originalSrc, "oci1-artifact.json")
+	_, err = artifact.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
+	})
+	var expected manifest.NonImageArtifactError
+	assert.ErrorAs(t, err, &expected)
+
+	// FIXME? Test also the other failure cases, if only to see that we don't crash?
 }
 
 func TestConvertToManifestSchema2AllMediaTypes(t *testing.T) {
