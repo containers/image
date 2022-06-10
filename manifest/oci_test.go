@@ -344,6 +344,19 @@ func TestUpdateLayerInfosOCINondistributableGzipToUncompressed(t *testing.T) {
 	assert.Equal(t, string(expectedManifestBytes), string(updatedManifestBytes))
 }
 
+func TestOCI1Inspect(t *testing.T) {
+	// Success is tested in image.TestManifestOCI1Inspect .
+	m := manifestOCI1FromFixture(t, "ociv1.artifact.json")
+	_, err := m.Inspect(func(info types.BlobInfo) ([]byte, error) {
+		require.Equal(t, m.Config.Digest, info.Digest)
+		// This just-enough-artifact contains a zero-byte config, sanity-check that’s till the case.
+		require.Equal(t, int64(0), m.Config.Size)
+		return []byte{}, nil
+	})
+	var expected NonImageArtifactError
+	assert.ErrorAs(t, err, &expected)
+}
+
 func TestOCI1ImageID(t *testing.T) {
 	m := manifestOCI1FromFixture(t, "ociv1.manifest.json")
 	// These are not the real DiffID values, but they don’t actually matter in our implementation.
