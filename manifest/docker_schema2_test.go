@@ -11,6 +11,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func manifestSchema2FromFixture(t *testing.T, fixture string) *Schema2 {
+	manifest, err := os.ReadFile(filepath.Join("fixtures", fixture))
+	require.NoError(t, err)
+
+	m, err := Schema2FromManifest(manifest)
+	require.NoError(t, err)
+	return m
+}
+
 func TestSupportedSchema2MediaType(t *testing.T) {
 	type testData struct {
 		m        string
@@ -55,13 +64,8 @@ func TestSchema2FromManifest(t *testing.T) {
 }
 
 func TestUpdateLayerInfosV2S2GzipToZstd(t *testing.T) {
-	bytes, err := os.ReadFile("fixtures/v2s2.manifest.json")
-	assert.Nil(t, err)
-
-	origManifest, err := Schema2FromManifest(bytes)
-	assert.Nil(t, err)
-
-	err = origManifest.UpdateLayerInfos([]types.BlobInfo{
+	origManifest := manifestSchema2FromFixture(t, "v2s2.manifest.json")
+	err := origManifest.UpdateLayerInfos([]types.BlobInfo{
 		{
 			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
 			Size:                 32654,
@@ -88,13 +92,8 @@ func TestUpdateLayerInfosV2S2GzipToZstd(t *testing.T) {
 }
 
 func TestUpdateLayerInfosV2S2InvalidCompressionOperation(t *testing.T) {
-	bytes, err := os.ReadFile("fixtures/v2s2.manifest.json")
-	assert.Nil(t, err)
-
-	origManifest, err := Schema2FromManifest(bytes)
-	assert.Nil(t, err)
-
-	err = origManifest.UpdateLayerInfos([]types.BlobInfo{
+	origManifest := manifestSchema2FromFixture(t, "v2s2.manifest.json")
+	err := origManifest.UpdateLayerInfos([]types.BlobInfo{
 		{
 			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
 			Size:                 32654,
@@ -118,13 +117,8 @@ func TestUpdateLayerInfosV2S2InvalidCompressionOperation(t *testing.T) {
 }
 
 func TestUpdateLayerInfosV2S2InvalidCompressionAlgorithm(t *testing.T) {
-	bytes, err := os.ReadFile("fixtures/v2s2.manifest.json")
-	assert.Nil(t, err)
-
-	origManifest, err := Schema2FromManifest(bytes)
-	assert.Nil(t, err)
-
-	err = origManifest.UpdateLayerInfos([]types.BlobInfo{
+	origManifest := manifestSchema2FromFixture(t, "v2s2.manifest.json")
+	err := origManifest.UpdateLayerInfos([]types.BlobInfo{
 		{
 			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
 			Size:                 32654,
@@ -151,13 +145,9 @@ func TestUpdateLayerInfosV2S2InvalidCompressionAlgorithm(t *testing.T) {
 }
 
 func TestUpdateLayerInfosV2S2NondistributableToGzip(t *testing.T) {
-	bytes, err := os.ReadFile("fixtures/v2s2.nondistributable.manifest.json")
-	assert.Nil(t, err)
+	origManifest := manifestSchema2FromFixture(t, "v2s2.nondistributable.manifest.json")
 
-	origManifest, err := Schema2FromManifest(bytes)
-	assert.Nil(t, err)
-
-	err = origManifest.UpdateLayerInfos([]types.BlobInfo{
+	err := origManifest.UpdateLayerInfos([]types.BlobInfo{
 		{
 			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
 			Size:                 32654,
@@ -171,12 +161,7 @@ func TestUpdateLayerInfosV2S2NondistributableToGzip(t *testing.T) {
 	updatedManifestBytes, err := origManifest.Serialize()
 	assert.Nil(t, err)
 
-	bytes, err = os.ReadFile("fixtures/v2s2.nondistributable.gzip.manifest.json")
-	assert.Nil(t, err)
-
-	expectedManifest, err := Schema2FromManifest(bytes)
-	assert.Nil(t, err)
-
+	expectedManifest := manifestSchema2FromFixture(t, "v2s2.nondistributable.gzip.manifest.json")
 	expectedManifestBytes, err := expectedManifest.Serialize()
 	assert.Nil(t, err)
 
@@ -184,13 +169,9 @@ func TestUpdateLayerInfosV2S2NondistributableToGzip(t *testing.T) {
 }
 
 func TestUpdateLayerInfosV2S2NondistributableGzipToUncompressed(t *testing.T) {
-	bytes, err := os.ReadFile("fixtures/v2s2.nondistributable.gzip.manifest.json")
-	assert.Nil(t, err)
+	origManifest := manifestSchema2FromFixture(t, "v2s2.nondistributable.gzip.manifest.json")
 
-	origManifest, err := Schema2FromManifest(bytes)
-	assert.Nil(t, err)
-
-	err = origManifest.UpdateLayerInfos([]types.BlobInfo{
+	err := origManifest.UpdateLayerInfos([]types.BlobInfo{
 		{
 			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
 			Size:                 32654,
@@ -203,12 +184,7 @@ func TestUpdateLayerInfosV2S2NondistributableGzipToUncompressed(t *testing.T) {
 	updatedManifestBytes, err := origManifest.Serialize()
 	assert.Nil(t, err)
 
-	bytes, err = os.ReadFile("fixtures/v2s2.nondistributable.manifest.json")
-	assert.Nil(t, err)
-
-	expectedManifest, err := Schema2FromManifest(bytes)
-	assert.Nil(t, err)
-
+	expectedManifest := manifestSchema2FromFixture(t, "v2s2.nondistributable.manifest.json")
 	expectedManifestBytes, err := expectedManifest.Serialize()
 	assert.Nil(t, err)
 
