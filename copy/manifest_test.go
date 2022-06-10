@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/testing/mocks"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -198,6 +199,20 @@ func TestDetermineManifestConversion(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// fakeUnparsedImage is an implementation of types.UnparsedImage which only returns itself as a MIME type in Manifest,
+// except that "" means “reading the manifest should fail”
+type fakeUnparsedImage struct {
+	mocks.ForbiddenUnparsedImage
+	mt string
+}
+
+func (f fakeUnparsedImage) Manifest(ctx context.Context) ([]byte, string, error) {
+	if f.mt == "" {
+		return nil, "", errors.New("Manifest() directed to fail")
+	}
+	return nil, f.mt, nil
+}
+
 func TestIsMultiImage(t *testing.T) {
 	// MIME type is available; more or less a smoke test, other cases are handled in manifest.MIMETypeIsMultiImage
 	for _, c := range []struct {
@@ -209,14 +224,14 @@ func TestIsMultiImage(t *testing.T) {
 		{v1.MediaTypeImageManifest, false},
 		{v1.MediaTypeImageIndex, true},
 	} {
-		src := fakeImageSource(c.mt)
+		src := fakeUnparsedImage{mocks.ForbiddenUnparsedImage{}, c.mt}
 		res, err := isMultiImage(context.Background(), src)
 		require.NoError(t, err)
 		assert.Equal(t, c.expected, res, c.mt)
 	}
 
 	// Error getting manifest MIME type
-	src := fakeImageSource("")
+	src := fakeUnparsedImage{mocks.ForbiddenUnparsedImage{}, ""}
 	_, err := isMultiImage(context.Background(), src)
 	assert.Error(t, err)
 }
