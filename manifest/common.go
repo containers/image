@@ -218,3 +218,13 @@ type ManifestLayerCompressionIncompatibilityError struct {
 func (m ManifestLayerCompressionIncompatibilityError) Error() string {
 	return m.text
 }
+
+// compressionVariantsRecognizeMIMEType returns true if variantTable contains data about compressing/decompressing layers with mimeType
+// Note that the caller still needs to worry about a specific algorithm not being supported.
+func compressionVariantsRecognizeMIMEType(variantTable []compressionMIMETypeSet, mimeType string) bool {
+	if mimeType == mtsUnsupportedMIMEType { // Prevent matching against the {algo:mtsUnsupportedMIMEType} entries
+		return false
+	}
+	variants := findCompressionMIMETypeSet(variantTable, mimeType)
+	return variants != nil // Alternatively, this could be len(variants) > 1, but really the caller should ask about a specific algorithm.
+}

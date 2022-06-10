@@ -542,3 +542,17 @@ func TestConvertToV2S2WithInvalidMIMEType(t *testing.T) {
 	_, err = manifestOCI1FromManifest(originalSrc, manifest)
 	require.NoError(t, err)
 }
+
+func TestManifestOCI1CanChangeLayerCompression(t *testing.T) {
+	for _, m := range []genericManifest{
+		manifestOCI1FromFixture(t, mocks.ForbiddenImageSource{}, "oci1.json"),
+		manifestOCI1FromComponentsLikeFixture(nil),
+	} {
+		assert.True(t, m.CanChangeLayerCompression(imgspecv1.MediaTypeImageLayerGzip))
+		// Some projects like to use squashfs and other unspecified formats for layers; don’t touch those.
+		assert.False(t, m.CanChangeLayerCompression("a completely unknown and quite possibly invalid MIME type"))
+	}
+
+	artifact := manifestOCI1FromFixture(t, mocks.ForbiddenImageSource{}, "oci1-artifact.json")
+	assert.False(t, artifact.CanChangeLayerCompression(imgspecv1.MediaTypeImageLayerGzip))
+}

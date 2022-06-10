@@ -373,3 +373,14 @@ func TestOCI1ImageID(t *testing.T) {
 	var expected NonImageArtifactError
 	assert.ErrorAs(t, err, &expected)
 }
+
+func TestOCI1CanChangeLayerCompression(t *testing.T) {
+	m := manifestOCI1FromFixture(t, "ociv1.manifest.json")
+
+	assert.True(t, m.CanChangeLayerCompression(imgspecv1.MediaTypeImageLayerGzip))
+	// Some projects like to use squashfs and other unspecified formats for layers; don’t touch those.
+	assert.False(t, m.CanChangeLayerCompression("a completely unknown and quite possibly invalid MIME type"))
+
+	artifact := manifestOCI1FromFixture(t, "ociv1.artifact.json")
+	assert.False(t, artifact.CanChangeLayerCompression(imgspecv1.MediaTypeImageLayerGzip))
+}

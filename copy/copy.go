@@ -678,12 +678,14 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 		cannotModifyManifestReason: cannotModifyManifestReason,
 		ociEncryptLayers:           options.OciEncryptLayers,
 	}
-	// Ensure _this_ copy sees exactly the intended data when either processing a signed image or signing it.
-	// This may be too conservative, but for now, better safe than sorry, _especially_ on the SignBy path:
-	// The signature makes the content non-repudiable, so it very much matters that the signature is made over exactly what the user intended.
-	// We do intend the RecordDigestUncompressedPair calls to only work with reliable data, but at least there’s a risk
-	// that the compressed version coming from a third party may be designed to attack some other decompressor implementation,
-	// and we would reuse and sign it.
+	// Decide whether we can substitute blobs with semantic equivalents:
+	// - Don’t do that if we can’t modify the manifest at all
+	// - Ensure _this_ copy sees exactly the intended data when either processing a signed image or signing it.
+	//   This may be too conservative, but for now, better safe than sorry, _especially_ on the SignBy path:
+	//   The signature makes the content non-repudiable, so it very much matters that the signature is made over exactly what the user intended.
+	//   We do intend the RecordDigestUncompressedPair calls to only work with reliable data, but at least there’s a risk
+	//   that the compressed version coming from a third party may be designed to attack some other decompressor implementation,
+	//   and we would reuse and sign it.
 	ic.canSubstituteBlobs = ic.cannotModifyManifestReason == "" && options.SignBy == ""
 
 	if err := ic.updateEmbeddedDockerReference(); err != nil {
@@ -1143,6 +1145,10 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 
 	// Don’t read the layer from the source if we already have the blob, and optimizations are acceptable.
 	if canAvoidProcessingCompleteLayer {
+		canChangeLayerCompression := ic.src.CanChangeLayerCompression(srcInfo.MediaType)
+		logrus.Debugf("Checking if we can reuse blob %s: general substitution = %v, compression for MIME type %q = %v",
+			srcInfo.Digest, ic.canSubstituteBlobs, srcInfo.MediaType, canChangeLayerCompression)
+		canSubstitute := ic.canSubstituteBlobs && ic.src.CanChangeLayerCompression(srcInfo.MediaType)
 		// TODO: at this point we don't know whether or not a blob we end up reusing is compressed using an algorithm
 		// that is acceptable for use on layers in the manifest that we'll be writing later, so if we end up reusing
 		// a blob that's compressed with e.g. zstd, but we're only allowed to write a v2s2 manifest, this will cause
@@ -1151,7 +1157,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 		// the ImageDestination interface lets us pass in.
 		reused, blobInfo, err := ic.c.dest.TryReusingBlobWithOptions(ctx, srcInfo, private.TryReusingBlobOptions{
 			Cache:         ic.c.blobInfoCache,
-			CanSubstitute: ic.canSubstituteBlobs,
+			CanSubstitute: canSubstitute,
 			EmptyLayer:    emptyLayer,
 			LayerIndex:    &layerIndex,
 			SrcRef:        srcRef,

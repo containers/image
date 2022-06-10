@@ -65,7 +65,11 @@ func (ic *imageCopier) blobPipelineCompressionStep(stream *sourceStream, canModi
 	detected bpDetectCompressionStepData) (*bpCompressionStepData, error) {
 	// WARNING: If you are adding new reasons to change the blob, update also the OptimizeDestinationImageAlreadyExists
 	// short-circuit conditions
-	if canModifyBlob {
+	layerCompressionChangeSupported := ic.src.CanChangeLayerCompression(stream.info.MediaType)
+	if !layerCompressionChangeSupported {
+		logrus.Debugf("Compression change for blob %s (%q) not supported", srcInfo.Digest, stream.info.MediaType)
+	}
+	if canModifyBlob && layerCompressionChangeSupported {
 		for _, fn := range []func(*sourceStream, bpDetectCompressionStepData) (*bpCompressionStepData, error){
 			ic.bpcPreserveEncrypted,
 			ic.bpcCompressUncompressed,
@@ -81,7 +85,7 @@ func (ic *imageCopier) blobPipelineCompressionStep(stream *sourceStream, canModi
 			}
 		}
 	}
-	return ic.bpcPreserveOriginal(stream, detected), nil
+	return ic.bpcPreserveOriginal(stream, detected, layerCompressionChangeSupported), nil
 }
 
 // bpcPreserveEncrypted checks if the input is encrypted, and returns a *bpCompressionStepData if so.
@@ -194,14 +198,19 @@ func (ic *imageCopier) bpcDecompressCompressed(stream *sourceStream, detected bp
 }
 
 // bpcPreserveOriginal returns a *bpCompressionStepData for not changing the original blob.
-func (ic *imageCopier) bpcPreserveOriginal(stream *sourceStream, detected bpDetectCompressionStepData) *bpCompressionStepData {
+func (ic *imageCopier) bpcPreserveOriginal(stream *sourceStream, detected bpDetectCompressionStepData,
+	layerCompressionChangeSupported bool) *bpCompressionStepData {
 	logrus.Debugf("Using original blob without modification")
 	// Remember if the original blob was compressed, and if so how, so that if
 	// LayerInfosForCopy() returned something that differs from what was in the
 	// source's manifest, and UpdatedImage() needs to call UpdateLayerInfos(),
 	// it will be able to correctly derive the MediaType for the copied blob.
+	//
+	// But don’t touch blobs in objects where we can’t change compression,
+	// so that src.UpdatedImage() doesn’t fail; assume that for such blobs
+	// LayerInfosForCopy() should not be making any changes in the first place.
 	var algorithm *compressiontypes.Algorithm
-	if detected.isCompressed {
+	if layerCompressionChangeSupported && detected.isCompressed {
 		algorithm = &detected.format
 	} else {
 		algorithm = nil

@@ -116,6 +116,12 @@ var oci1CompressionMIMETypeSets = []compressionMIMETypeSet{
 // UpdateLayerInfos replaces the original layers with the specified BlobInfos (size+digest+urls+mediatype), in order (the root layer first, and then successive layered layers)
 // The returned error will be a manifest.ManifestLayerCompressionIncompatibilityError if any of the layerInfos includes a combination of CompressionOperation and
 // CompressionAlgorithm that isn't supported by OCI.
+//
+// It’s generally the caller’s responsibility to determine whether a particular edit is acceptable, rather than relying on
+// failures of this function, because the layer is typically created _before_ UpdateLayerInfos is called, because UpdateLayerInfos needs
+// to know the final digest). See OCI1.CanChangeLayerCompression for some help in determining this; other aspects like compression
+// algorithms that might not be supported by a format, or the limited set of MIME types accepted for encryption, are not currently
+// handled — that logic should eventually also be provided as OCI1 methods, not hard-coded in callers.
 func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 	if len(m.Layers) != len(layerInfos) {
 		return errors.Errorf("Error preparing updated manifest: layer count changed from %d to %d", len(m.Layers), len(layerInfos))
@@ -246,4 +252,15 @@ func (m *OCI1) ImageID([]digest.Digest) (string, error) {
 		return "", err
 	}
 	return m.Config.Digest.Hex(), nil
+}
+
+// CanChangeLayerCompression returns true if we can compress/decompress layers with mimeType in the current image
+// (and the code can handle that).
+// NOTE: Even if this returns true, the relevant format might not accept all compression algorithms; the set of accepted
+// algorithms depends not on the current format, but possibly on the target of a conversion.
+func (m *OCI1) CanChangeLayerCompression(mimeType string) bool {
+	if m.Config.MediaType != imgspecv1.MediaTypeImageConfig {
+		return false
+	}
+	return compressionVariantsRecognizeMIMEType(oci1CompressionMIMETypeSets, mimeType)
 }

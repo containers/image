@@ -203,3 +203,11 @@ func TestSchema2ImageID(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "b5b2b2c507a0944348e0303114d8d93aaaa081732b86451d9bce1f432a537bc7", id)
 }
+
+func TestSchema2CanChangeLayerCompression(t *testing.T) {
+	m := manifestSchema2FromFixture(t, "v2s2.manifest.json")
+
+	assert.True(t, m.CanChangeLayerCompression(DockerV2Schema2LayerMediaType))
+	// Some projects like to use squashfs and other unspecified formats for layers; don’t touch those.
+	assert.False(t, m.CanChangeLayerCompression("a completely unknown and quite possibly invalid MIME type"))
+}

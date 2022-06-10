@@ -653,3 +653,14 @@ func TestConvertSchema2ToManifestOCIWithAnnotations(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, res.LayerInfos(), layerInfoOverwrites)
 }
+
+func TestManifestSchema2CanChangeLayerCompression(t *testing.T) {
+	for _, m := range []genericManifest{
+		manifestSchema2FromFixture(t, mocks.ForbiddenImageSource{}, "schema2.json", false),
+		manifestSchema2FromComponentsLikeFixture(nil),
+	} {
+		assert.True(t, m.CanChangeLayerCompression(manifest.DockerV2Schema2LayerMediaType))
+		// Some projects like to use squashfs and other unspecified formats for layers; don’t touch those.
+		assert.False(t, m.CanChangeLayerCompression("a completely unknown and quite possibly invalid MIME type"))
+	}
+}
