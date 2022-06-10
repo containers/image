@@ -17,10 +17,8 @@ import (
 // and returns a complete blobInfo of the copied blob.
 func (ic *imageCopier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, srcInfo types.BlobInfo,
 	getOriginalLayerCopyWriter func(decompressor compressiontypes.DecompressorFunc) io.Writer,
-	canModifyBlob bool, isConfig bool, toEncrypt bool, bar *progressBar, layerIndex int, emptyLayer bool) (types.BlobInfo, error) {
-	if isConfig { // This is guaranteed by the caller, but set it here to be explicit.
-		canModifyBlob = false
-	}
+	isConfig bool, toEncrypt bool, bar *progressBar, layerIndex int, emptyLayer bool) (types.BlobInfo, error) {
+	canModifyBlob := !isConfig && ic.cannotModifyManifestReason == ""
 
 	// The copying happens through a pipeline of connected io.Readers;
 	// that pipeline is built by updating stream.
