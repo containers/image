@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/testing/mocks"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
@@ -20,31 +21,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// unusedImageSource is used when we don't expect the ImageSource to be used in our tests.
-type unusedImageSource struct{}
-
-func (f unusedImageSource) Reference() types.ImageReference {
-	panic("Unexpected call to a mock function")
-}
-func (f unusedImageSource) Close() error {
-	panic("Unexpected call to a mock function")
-}
-func (f unusedImageSource) GetManifest(context.Context, *digest.Digest) ([]byte, string, error) {
-	panic("Unexpected call to a mock function")
-}
-func (f unusedImageSource) HasThreadSafeGetBlob() bool {
-	panic("Unexpected call to a mock function")
-}
-func (f unusedImageSource) GetBlob(context.Context, types.BlobInfo, types.BlobInfoCache) (io.ReadCloser, int64, error) {
-	panic("Unexpected call to a mock function")
-}
-func (f unusedImageSource) GetSignatures(context.Context, *digest.Digest) ([][]byte, error) {
-	panic("Unexpected call to a mock function")
-}
-func (f unusedImageSource) LayerInfosForCopy(context.Context, *digest.Digest) ([]types.BlobInfo, error) {
-	panic("Unexpected call to a mock function")
-}
 
 func manifestSchema2FromFixture(t *testing.T, src types.ImageSource, fixture string, mustFail bool) genericManifest {
 	manifest, err := os.ReadFile(filepath.Join("fixtures", fixture))
@@ -96,7 +72,7 @@ func manifestSchema2FromComponentsLikeFixture(configBlob []byte) genericManifest
 func TestManifestSchema2FromManifest(t *testing.T) {
 	// This just tests that the JSON can be loaded; we test that the parsed
 	// values are correctly returned in tests for the individual getter methods.
-	_ = manifestSchema2FromFixture(t, unusedImageSource{}, "schema2.json", false)
+	_ = manifestSchema2FromFixture(t, mocks.ForbiddenImageSource{}, "schema2.json", false)
 
 	_, err := manifestSchema2FromManifest(nil, []byte{})
 	assert.Error(t, err)
@@ -110,7 +86,7 @@ func TestManifestSchema2FromComponents(t *testing.T) {
 
 func TestManifestSchema2Serialize(t *testing.T) {
 	for _, m := range []genericManifest{
-		manifestSchema2FromFixture(t, unusedImageSource{}, "schema2.json", false),
+		manifestSchema2FromFixture(t, mocks.ForbiddenImageSource{}, "schema2.json", false),
 		manifestSchema2FromComponentsLikeFixture(nil),
 	} {
 		serialized, err := m.serialize()
@@ -134,7 +110,7 @@ func TestManifestSchema2Serialize(t *testing.T) {
 
 func TestManifestSchema2ManifestMIMEType(t *testing.T) {
 	for _, m := range []genericManifest{
-		manifestSchema2FromFixture(t, unusedImageSource{}, "schema2.json", false),
+		manifestSchema2FromFixture(t, mocks.ForbiddenImageSource{}, "schema2.json", false),
 		manifestSchema2FromComponentsLikeFixture(nil),
 	} {
 		assert.Equal(t, manifest.DockerV2Schema2MediaType, m.manifestMIMEType())
@@ -143,7 +119,7 @@ func TestManifestSchema2ManifestMIMEType(t *testing.T) {
 
 func TestManifestSchema2ConfigInfo(t *testing.T) {
 	for _, m := range []genericManifest{
-		manifestSchema2FromFixture(t, unusedImageSource{}, "schema2.json", false),
+		manifestSchema2FromFixture(t, mocks.ForbiddenImageSource{}, "schema2.json", false),
 		manifestSchema2FromComponentsLikeFixture(nil),
 	} {
 		assert.Equal(t, types.BlobInfo{
@@ -156,8 +132,8 @@ func TestManifestSchema2ConfigInfo(t *testing.T) {
 
 // configBlobImageSource allows testing various GetBlob behaviors in .ConfigBlob()
 type configBlobImageSource struct {
-	unusedImageSource // We inherit almost all of the methods, which just panic()
-	f                 func(digest digest.Digest) (io.ReadCloser, int64, error)
+	mocks.ForbiddenImageSource // We inherit almost all of the methods, which just panic()
+	f                          func(digest digest.Digest) (io.ReadCloser, int64, error)
 }
 
 func (f configBlobImageSource) GetBlob(ctx context.Context, info types.BlobInfo, _ types.BlobInfoCache) (io.ReadCloser, int64, error) {
@@ -197,7 +173,7 @@ func TestManifestSchema2ConfigBlob(t *testing.T) {
 	} {
 		var src types.ImageSource
 		if c.cbISfn != nil {
-			src = configBlobImageSource{unusedImageSource{}, c.cbISfn}
+			src = configBlobImageSource{f: c.cbISfn}
 		} else {
 			src = nil
 		}
@@ -225,7 +201,7 @@ func TestManifestSchema2ConfigBlob(t *testing.T) {
 
 func TestManifestSchema2LayerInfo(t *testing.T) {
 	for _, m := range []genericManifest{
-		manifestSchema2FromFixture(t, unusedImageSource{}, "schema2.json", false),
+		manifestSchema2FromFixture(t, mocks.ForbiddenImageSource{}, "schema2.json", false),
 		manifestSchema2FromComponentsLikeFixture(nil),
 	} {
 		assert.Equal(t, []types.BlobInfo{
@@ -260,7 +236,7 @@ func TestManifestSchema2LayerInfo(t *testing.T) {
 
 func TestManifestSchema2EmbeddedDockerReferenceConflicts(t *testing.T) {
 	for _, m := range []genericManifest{
-		manifestSchema2FromFixture(t, unusedImageSource{}, "schema2.json", false),
+		manifestSchema2FromFixture(t, mocks.ForbiddenImageSource{}, "schema2.json", false),
 		manifestSchema2FromComponentsLikeFixture(nil),
 	} {
 		for _, name := range []string{"busybox", "example.com:5555/ns/repo:tag"} {
@@ -316,7 +292,7 @@ func TestManifestSchema2Inspect(t *testing.T) {
 
 func TestManifestSchema2UpdatedImageNeedsLayerDiffIDs(t *testing.T) {
 	for _, m := range []genericManifest{
-		manifestSchema2FromFixture(t, unusedImageSource{}, "schema2.json", false),
+		manifestSchema2FromFixture(t, mocks.ForbiddenImageSource{}, "schema2.json", false),
 		manifestSchema2FromComponentsLikeFixture(nil),
 	} {
 		assert.False(t, m.UpdatedImageNeedsLayerDiffIDs(types.ManifestUpdateOptions{
