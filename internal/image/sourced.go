@@ -9,6 +9,27 @@ import (
 	"github.com/containers/image/v5/types"
 )
 
+// FromReference returns a types.ImageCloser implementation for the default instance reading from reference.
+// If reference poitns to a manifest list, .Manifest() still returns the manifest list,
+// but other methods transparently return data from an appropriate image instance.
+//
+// The caller must call .Close() on the returned ImageCloser.
+//
+// NOTE: If any kind of signature verification should happen, build an UnparsedImage from the value returned by NewImageSource,
+// verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage instead of calling this function.
+func FromReference(ctx context.Context, sys *types.SystemContext, ref types.ImageReference) (types.ImageCloser, error) {
+	src, err := ref.NewImageSource(ctx, sys)
+	if err != nil {
+		return nil, err
+	}
+	img, err := FromSource(ctx, sys, src)
+	if err != nil {
+		src.Close()
+		return nil, err
+	}
+	return img, nil
+}
+
 // imageCloser implements types.ImageCloser, perhaps allowing simple users
 // to use a single object without having keep a reference to a types.ImageSource
 // only to call types.ImageSource.Close().
@@ -30,6 +51,8 @@ type imageCloser struct {
 //
 // NOTE: If any kind of signature verification should happen, build an UnparsedImage from the value returned by NewImageSource,
 // verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage instead of calling this function.
+//
+// Most callers can use either FromUnparsedImage or FromReference instead.
 //
 // This is publicly visible as c/image/image.FromSource.
 func FromSource(ctx context.Context, sys *types.SystemContext, src types.ImageSource) (types.ImageCloser, error) {

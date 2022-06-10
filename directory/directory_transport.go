@@ -140,8 +140,7 @@ func (ref dirReference) PolicyConfigurationNamespaces() []string {
 // verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage.
 // WARNING: This may not do the right thing for a manifest list, see image.FromSource for details.
 func (ref dirReference) NewImage(ctx context.Context, sys *types.SystemContext) (types.ImageCloser, error) {
-	src := newImageSource(ref)
-	return image.FromSource(ctx, sys, src)
+	return image.FromReference(ctx, sys, ref)
 }
 
 // NewImageSource returns a types.ImageSource for this reference.

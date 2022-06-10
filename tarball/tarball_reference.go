@@ -67,16 +67,7 @@ func (r *tarballReference) PolicyConfigurationNamespaces() []string {
 // verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage.
 // WARNING: This may not do the right thing for a manifest list, see image.FromSource for details.
 func (r *tarballReference) NewImage(ctx context.Context, sys *types.SystemContext) (types.ImageCloser, error) {
-	src, err := r.NewImageSource(ctx, sys)
-	if err != nil {
-		return nil, err
-	}
-	img, err := image.FromSource(ctx, sys, src)
-	if err != nil {
-		src.Close()
-		return nil, err
-	}
-	return img, nil
+	return image.FromReference(ctx, sys, r)
 }
 
 func (r *tarballReference) DeleteImage(ctx context.Context, sys *types.SystemContext) error {

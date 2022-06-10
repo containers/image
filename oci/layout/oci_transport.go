@@ -154,11 +154,7 @@ func (ref ociReference) PolicyConfigurationNamespaces() []string {
 // verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage.
 // WARNING: This may not do the right thing for a manifest list, see image.FromSource for details.
 func (ref ociReference) NewImage(ctx context.Context, sys *types.SystemContext) (types.ImageCloser, error) {
-	src, err := newImageSource(sys, ref)
-	if err != nil {
-		return nil, err
-	}
-	return image.FromSource(ctx, sys, src)
+	return image.FromReference(ctx, sys, ref)
 }
 
 // getIndex returns a pointer to the index references by this ociReference. If an error occurs opening an index nil is returned together

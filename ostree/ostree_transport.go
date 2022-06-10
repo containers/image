@@ -184,17 +184,7 @@ func (s *ostreeImageCloser) Size() (int64, error) {
 // NOTE: If any kind of signature verification should happen, build an UnparsedImage from the value returned by NewImageSource,
 // verify that UnparsedImage, and convert it into a real Image via image.FromUnparsedImage.
 func (ref ostreeReference) NewImage(ctx context.Context, sys *types.SystemContext) (types.ImageCloser, error) {
-	var tmpDir string
-	if sys == nil || sys.OSTreeTmpDirPath == "" {
-		tmpDir = os.TempDir()
-	} else {
-		tmpDir = sys.OSTreeTmpDirPath
-	}
-	src, err := newImageSource(tmpDir, ref)
-	if err != nil {
-		return nil, err
-	}
-	return image.FromSource(ctx, sys, src)
+	return image.FromReference(ctx, sys, ref)
 }
 
 // NewImageSource returns a types.ImageSource for this reference.
