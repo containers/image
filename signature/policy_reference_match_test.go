@@ -353,16 +353,10 @@ type forbiddenImageMock struct{}
 func (ref forbiddenImageMock) Reference() types.ImageReference {
 	panic("unexpected call to a mock function")
 }
-func (ref forbiddenImageMock) Close() error {
-	panic("unexpected call to a mock function")
-}
 func (ref forbiddenImageMock) Manifest(ctx context.Context) ([]byte, string, error) {
 	panic("unexpected call to a mock function")
 }
 func (ref forbiddenImageMock) Signatures(context.Context) ([][]byte, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref forbiddenImageMock) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
 	panic("unexpected call to a mock function")
 }
 
