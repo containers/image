@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/containers/image/v5/docker/reference"
-	"github.com/containers/image/v5/image"
+	"github.com/containers/image/v5/internal/image"
 	"github.com/containers/image/v5/types"
 
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
