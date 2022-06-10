@@ -18,8 +18,6 @@ import (
 func (ic *imageCopier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, srcInfo types.BlobInfo,
 	getOriginalLayerCopyWriter func(decompressor compressiontypes.DecompressorFunc) io.Writer,
 	isConfig bool, toEncrypt bool, bar *progressBar, layerIndex int, emptyLayer bool) (types.BlobInfo, error) {
-	canModifyBlob := !isConfig && ic.cannotModifyManifestReason == ""
-
 	// The copying happens through a pipeline of connected io.Readers;
 	// that pipeline is built by updating stream.
 	// === Input: srcReader
@@ -63,9 +61,10 @@ func (ic *imageCopier) copyBlobFromStream(ctx context.Context, srcReader io.Read
 		originalLayerReader = stream.reader
 	}
 
-	// === Deal with layer compression/decompression if necessary
 	// WARNING: If you are adding new reasons to change the blob, update also the OptimizeDestinationImageAlreadyExists
 	// short-circuit conditions
+	canModifyBlob := !isConfig && ic.cannotModifyManifestReason == ""
+	// === Deal with layer compression/decompression if necessary
 	compressionStep, err := ic.blobPipelineCompressionStep(&stream, canModifyBlob, detectedCompression)
 	if err != nil {
 		return types.BlobInfo{}, err
