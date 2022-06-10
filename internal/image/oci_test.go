@@ -193,6 +193,31 @@ func TestManifestOCI1ConfigBlob(t *testing.T) {
 	assert.Equal(t, configBlob, cb)
 }
 
+func TestManifestOCI1OCIConfig(t *testing.T) {
+	// Just a smoke-test that the code can read the data…
+	configJSON, err := os.ReadFile("fixtures/oci1-config.json")
+	require.NoError(t, err)
+	expectedConfig := imgspecv1.Image{}
+	err = json.Unmarshal(configJSON, &expectedConfig)
+	require.NoError(t, err)
+
+	originalSrc := newOCI1ImageSource(t, "httpd:latest")
+	for _, m := range []genericManifest{
+		manifestOCI1FromFixture(t, originalSrc, "oci1.json"),
+		manifestOCI1FromComponentsLikeFixture(configJSON),
+	} {
+		config, err := m.OCIConfig(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, &expectedConfig, config)
+	}
+
+	// This can share originalSrc because the config digest is the same between oci1-artifact.json and oci1.json
+	artifact := manifestOCI1FromFixture(t, originalSrc, "oci1-artifact.json")
+	_, err = artifact.OCIConfig(context.Background())
+	var expected manifest.NonImageArtifactError
+	assert.ErrorAs(t, err, &expected)
+}
+
 func TestManifestOCI1LayerInfo(t *testing.T) {
 	for _, m := range []genericManifest{
 		manifestOCI1FromFixture(t, mocks.ForbiddenImageSource{}, "oci1.json"),
