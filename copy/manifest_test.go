@@ -148,15 +148,15 @@ func TestDetermineManifestConversion(t *testing.T) {
 			src:                        src,
 			cannotModifyManifestReason: "",
 		}
-		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
+		res, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
 		require.NoError(t, err, c.description)
 		assert.Equal(t, c.expectedUpdate, ic.manifestUpdates.ManifestMIMEType, c.description)
 		if c.expectedUpdate == "" {
-			assert.Equal(t, manifest.NormalizedMIMEType(c.sourceType), preferredMIMEType, c.description)
+			assert.Equal(t, manifest.NormalizedMIMEType(c.sourceType), res.preferredMIMEType, c.description)
 		} else {
-			assert.Equal(t, c.expectedUpdate, preferredMIMEType, c.description)
+			assert.Equal(t, c.expectedUpdate, res.preferredMIMEType, c.description)
 		}
-		assert.Equal(t, c.expectedOtherCandidates, otherCandidates, c.description)
+		assert.Equal(t, c.expectedOtherCandidates, res.otherMIMETypeCandidates, c.description)
 	}
 
 	// Whatever the input is, with !canModifyManifest we return "keep the original as is"
@@ -167,11 +167,11 @@ func TestDetermineManifestConversion(t *testing.T) {
 			src:                        src,
 			cannotModifyManifestReason: "Preserving digests",
 		}
-		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
+		res, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
 		require.NoError(t, err, c.description)
 		assert.Equal(t, "", ic.manifestUpdates.ManifestMIMEType, c.description)
-		assert.Equal(t, manifest.NormalizedMIMEType(c.sourceType), preferredMIMEType, c.description)
-		assert.Equal(t, []string{}, otherCandidates, c.description)
+		assert.Equal(t, manifest.NormalizedMIMEType(c.sourceType), res.preferredMIMEType, c.description)
+		assert.Equal(t, []string{}, res.otherMIMETypeCandidates, c.description)
 	}
 
 	// With forceManifestMIMEType, the output is always the forced manifest type (in this case oci manifest)
@@ -182,11 +182,11 @@ func TestDetermineManifestConversion(t *testing.T) {
 			src:                        src,
 			cannotModifyManifestReason: "",
 		}
-		preferredMIMEType, otherCandidates, err := ic.determineManifestConversion(context.Background(), c.destTypes, v1.MediaTypeImageManifest, false)
+		res, err := ic.determineManifestConversion(context.Background(), c.destTypes, v1.MediaTypeImageManifest, false)
 		require.NoError(t, err, c.description)
 		assert.Equal(t, v1.MediaTypeImageManifest, ic.manifestUpdates.ManifestMIMEType, c.description)
-		assert.Equal(t, v1.MediaTypeImageManifest, preferredMIMEType, c.description)
-		assert.Equal(t, []string{}, otherCandidates, c.description)
+		assert.Equal(t, v1.MediaTypeImageManifest, res.preferredMIMEType, c.description)
+		assert.Equal(t, []string{}, res.otherMIMETypeCandidates, c.description)
 	}
 
 	// Error reading the manifest — smoke test only.
@@ -195,7 +195,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 		src:                        fakeImageSource(""),
 		cannotModifyManifestReason: "",
 	}
-	_, _, err := ic.determineManifestConversion(context.Background(), supportS1S2, "", false)
+	_, err := ic.determineManifestConversion(context.Background(), supportS1S2, "", false)
 	assert.Error(t, err)
 }
 

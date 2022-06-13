@@ -38,14 +38,22 @@ func (os *orderedSet) append(s string) {
 	}
 }
 
+// manifestConversionPlan contains the decisions made by determineManifestConversion.
+type manifestConversionPlan struct {
+	// The preferred manifest MIME type (whether we are converting to it or using it unmodified).
+	// We compute this only to show it in error messages; without having to add this context
+	// in an error message, we would be happy enough to know only that no conversion is needed.
+	preferredMIMEType       string
+	otherMIMETypeCandidates []string // Other possible alternatives, in order
+}
+
 // determineManifestConversion updates ic.manifestUpdates to convert manifest to a supported MIME type, if necessary and ic.canModifyManifest.
 // Note that the conversion will only happen later, through ic.src.UpdatedImage
-// Returns the preferred manifest MIME type (whether we are converting to it or using it unmodified),
-// and a list of other possible alternatives, in order.
-func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupportedManifestMIMETypes []string, forceManifestMIMEType string, requiresOciEncryption bool) (string, []string, error) {
+// Returns a plan for what formats, and possibly conversions, to use for the manifest in ic.
+func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupportedManifestMIMETypes []string, forceManifestMIMEType string, requiresOciEncryption bool) (manifestConversionPlan, error) {
 	_, srcType, err := ic.src.Manifest(ctx)
 	if err != nil { // This should have been cached?!
-		return "", nil, errors.Wrap(err, "reading manifest")
+		return manifestConversionPlan{}, errors.Wrap(err, "reading manifest")
 	}
 	normalizedSrcType := manifest.NormalizedMIMEType(srcType)
 	if srcType != normalizedSrcType {
@@ -58,7 +66,10 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 	}
 
 	if len(destSupportedManifestMIMETypes) == 0 && (!requiresOciEncryption || manifest.MIMETypeSupportsEncryption(srcType)) {
-		return srcType, []string{}, nil // Anything goes; just use the original as is, do not try any conversions.
+		return manifestConversionPlan{ // Anything goes; just use the original as is, do not try any conversions.
+			preferredMIMEType:       srcType,
+			otherMIMETypeCandidates: []string{},
+		}, nil
 	}
 	supportedByDest := map[string]struct{}{}
 	for _, t := range destSupportedManifestMIMETypes {
@@ -85,7 +96,10 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 		// messages.  But it is nice to hide the “if we can't modify, do no conversion”
 		// special case in here; the caller can then worry (or not) only about a good UI.
 		logrus.Debugf("We can't modify the manifest, hoping for the best...")
-		return srcType, []string{}, nil // Take our chances - FIXME? Or should we fail without trying?
+		return manifestConversionPlan{ // Take our chances - FIXME? Or should we fail without trying?
+			preferredMIMEType:       srcType,
+			otherMIMETypeCandidates: []string{},
+		}, nil
 	}
 
 	// Then use our list of preferred types.
@@ -102,15 +116,18 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 
 	logrus.Debugf("Manifest has MIME type %s, ordered candidate list [%s]", srcType, strings.Join(prioritizedTypes.list, ", "))
 	if len(prioritizedTypes.list) == 0 { // Coverage: destSupportedManifestMIMETypes is not empty (or we would have exited in the “Anything goes” case above), so this should never happen.
-		return "", nil, errors.New("Internal error: no candidate MIME types")
+		return manifestConversionPlan{}, errors.New("Internal error: no candidate MIME types")
 	}
-	preferredType := prioritizedTypes.list[0]
-	if preferredType != srcType {
-		ic.manifestUpdates.ManifestMIMEType = preferredType
+	res := manifestConversionPlan{
+		preferredMIMEType:       prioritizedTypes.list[0],
+		otherMIMETypeCandidates: prioritizedTypes.list[1:],
+	}
+	if res.preferredMIMEType != srcType {
+		ic.manifestUpdates.ManifestMIMEType = res.preferredMIMEType
 	} else {
 		logrus.Debugf("... will first try using the original manifest unmodified")
 	}
-	return preferredType, prioritizedTypes.list[1:], nil
+	return res, nil
 }
 
 // isMultiImage returns true if img is a list of images
