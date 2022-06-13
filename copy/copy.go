@@ -706,6 +706,13 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 	if err != nil {
 		return nil, "", "", err
 	}
+	// We set up this part of ic.manifestUpdates quite early, not just around the
+	// code that calls copyUpdatedConfigAndManifest, so that other parts of the copy code
+	// (e.g. the UpdatedImageNeedsLayerDiffIDs check just below) can make decisions based
+	// on the expected destination format.
+	if manifestConversionPlan.preferredMIMETypeNeedsConversion {
+		ic.manifestUpdates.ManifestMIMEType = manifestConversionPlan.preferredMIMEType
+	}
 
 	// If src.UpdatedImageNeedsLayerDiffIDs(ic.manifestUpdates) will be true, it needs to be true by the time we get here.
 	ic.diffIDsAreNeeded = src.UpdatedImageNeedsLayerDiffIDs(*ic.manifestUpdates)

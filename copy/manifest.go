@@ -43,13 +43,12 @@ type manifestConversionPlan struct {
 	// The preferred manifest MIME type (whether we are converting to it or using it unmodified).
 	// We compute this only to show it in error messages; without having to add this context
 	// in an error message, we would be happy enough to know only that no conversion is needed.
-	preferredMIMEType       string
-	otherMIMETypeCandidates []string // Other possible alternatives, in order
+	preferredMIMEType                string
+	preferredMIMETypeNeedsConversion bool     // True if using preferredMIMEType requires a conversion step.
+	otherMIMETypeCandidates          []string // Other possible alternatives, in order
 }
 
-// determineManifestConversion updates ic.manifestUpdates to convert manifest to a supported MIME type, if necessary and ic.canModifyManifest.
-// Note that the conversion will only happen later, through ic.src.UpdatedImage
-// Returns a plan for what formats, and possibly conversions, to use for the manifest in ic.
+// determineManifestConversion returns a plan for what formats, and possibly conversions, to use for the manifest in ic.
 func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupportedManifestMIMETypes []string, forceManifestMIMEType string, requiresOciEncryption bool) (manifestConversionPlan, error) {
 	_, srcType, err := ic.src.Manifest(ctx)
 	if err != nil { // This should have been cached?!
@@ -122,9 +121,8 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 		preferredMIMEType:       prioritizedTypes.list[0],
 		otherMIMETypeCandidates: prioritizedTypes.list[1:],
 	}
-	if res.preferredMIMEType != srcType {
-		ic.manifestUpdates.ManifestMIMEType = res.preferredMIMEType
-	} else {
+	res.preferredMIMETypeNeedsConversion = res.preferredMIMEType != srcType
+	if !res.preferredMIMETypeNeedsConversion {
 		logrus.Debugf("... will first try using the original manifest unmodified")
 	}
 	return res, nil

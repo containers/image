@@ -144,13 +144,12 @@ func TestDetermineManifestConversion(t *testing.T) {
 	for _, c := range cases {
 		src := fakeImageSource(c.sourceType)
 		ic := &imageCopier{
-			manifestUpdates:            &types.ManifestUpdateOptions{},
 			src:                        src,
 			cannotModifyManifestReason: "",
 		}
 		res, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
 		require.NoError(t, err, c.description)
-		assert.Equal(t, c.expectedUpdate, ic.manifestUpdates.ManifestMIMEType, c.description)
+		assert.Equal(t, c.expectedUpdate != "", res.preferredMIMETypeNeedsConversion, c.description)
 		if c.expectedUpdate == "" {
 			assert.Equal(t, manifest.NormalizedMIMEType(c.sourceType), res.preferredMIMEType, c.description)
 		} else {
@@ -163,13 +162,12 @@ func TestDetermineManifestConversion(t *testing.T) {
 	for _, c := range cases {
 		src := fakeImageSource(c.sourceType)
 		ic := &imageCopier{
-			manifestUpdates:            &types.ManifestUpdateOptions{},
 			src:                        src,
 			cannotModifyManifestReason: "Preserving digests",
 		}
 		res, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
 		require.NoError(t, err, c.description)
-		assert.Equal(t, "", ic.manifestUpdates.ManifestMIMEType, c.description)
+		assert.False(t, res.preferredMIMETypeNeedsConversion, c.description)
 		assert.Equal(t, manifest.NormalizedMIMEType(c.sourceType), res.preferredMIMEType, c.description)
 		assert.Equal(t, []string{}, res.otherMIMETypeCandidates, c.description)
 	}
@@ -178,20 +176,18 @@ func TestDetermineManifestConversion(t *testing.T) {
 	for _, c := range cases {
 		src := fakeImageSource(c.sourceType)
 		ic := &imageCopier{
-			manifestUpdates:            &types.ManifestUpdateOptions{},
 			src:                        src,
 			cannotModifyManifestReason: "",
 		}
 		res, err := ic.determineManifestConversion(context.Background(), c.destTypes, v1.MediaTypeImageManifest, false)
 		require.NoError(t, err, c.description)
-		assert.Equal(t, v1.MediaTypeImageManifest, ic.manifestUpdates.ManifestMIMEType, c.description)
+		assert.True(t, res.preferredMIMETypeNeedsConversion, c.description)
 		assert.Equal(t, v1.MediaTypeImageManifest, res.preferredMIMEType, c.description)
 		assert.Equal(t, []string{}, res.otherMIMETypeCandidates, c.description)
 	}
 
 	// Error reading the manifest — smoke test only.
 	ic := imageCopier{
-		manifestUpdates:            &types.ManifestUpdateOptions{},
 		src:                        fakeImageSource(""),
 		cannotModifyManifestReason: "",
 	}
