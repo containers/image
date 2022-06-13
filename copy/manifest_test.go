@@ -102,42 +102,123 @@ func TestDetermineManifestConversion(t *testing.T) {
 	}
 
 	cases := []struct {
-		description             string
-		sourceType              string
-		destTypes               []string
-		expectedUpdate          string
-		expectedOtherCandidates []string
+		description string
+		sourceType  string
+		destTypes   []string
+		expected    manifestConversionPlan
 	}{
 		// Destination accepts anything — no conversion necessary
-		{"s1→anything", manifest.DockerV2Schema1SignedMediaType, nil, "", []string{}},
-		{"s2→anything", manifest.DockerV2Schema2MediaType, nil, "", []string{}},
+		{
+			"s1→anything", manifest.DockerV2Schema1SignedMediaType, nil,
+			manifestConversionPlan{
+				preferredMIMEType:                manifest.DockerV2Schema1SignedMediaType,
+				preferredMIMETypeNeedsConversion: false,
+				otherMIMETypeCandidates:          []string{},
+			},
+		},
+		{
+			"s2→anything", manifest.DockerV2Schema2MediaType, nil,
+			manifestConversionPlan{
+				preferredMIMEType:                manifest.DockerV2Schema2MediaType,
+				preferredMIMETypeNeedsConversion: false,
+				otherMIMETypeCandidates:          []string{},
+			},
+		},
 		// Destination accepts the unmodified original
-		{"s1→s1s2", manifest.DockerV2Schema1SignedMediaType, supportS1S2, "", []string{manifest.DockerV2Schema2MediaType, manifest.DockerV2Schema1MediaType}},
-		{"s2→s1s2", manifest.DockerV2Schema2MediaType, supportS1S2, "", supportOnlyS1},
-		{"s1→s1", manifest.DockerV2Schema1SignedMediaType, supportOnlyS1, "", []string{manifest.DockerV2Schema1MediaType}},
+		{
+			"s1→s1s2", manifest.DockerV2Schema1SignedMediaType, supportS1S2,
+			manifestConversionPlan{
+				preferredMIMEType:                manifest.DockerV2Schema1SignedMediaType,
+				preferredMIMETypeNeedsConversion: false,
+				otherMIMETypeCandidates:          []string{manifest.DockerV2Schema2MediaType, manifest.DockerV2Schema1MediaType},
+			},
+		},
+		{
+			"s2→s1s2", manifest.DockerV2Schema2MediaType, supportS1S2,
+			manifestConversionPlan{
+				preferredMIMEType:                manifest.DockerV2Schema2MediaType,
+				preferredMIMETypeNeedsConversion: false,
+				otherMIMETypeCandidates:          supportOnlyS1,
+			},
+		},
+		{
+			"s1→s1", manifest.DockerV2Schema1SignedMediaType, supportOnlyS1,
+			manifestConversionPlan{
+				preferredMIMEType:                manifest.DockerV2Schema1SignedMediaType,
+				preferredMIMETypeNeedsConversion: false,
+				otherMIMETypeCandidates:          []string{manifest.DockerV2Schema1MediaType},
+			},
+		},
 		// text/plain is normalized to s1, and if the destination accepts s1, no conversion happens.
-		{"text→s1s2", "text/plain", supportS1S2, "", []string{manifest.DockerV2Schema2MediaType, manifest.DockerV2Schema1MediaType}},
-		{"text→s1", "text/plain", supportOnlyS1, "", []string{manifest.DockerV2Schema1MediaType}},
+		{
+			"text→s1s2", "text/plain", supportS1S2,
+			manifestConversionPlan{
+				preferredMIMEType:                manifest.DockerV2Schema1SignedMediaType,
+				preferredMIMETypeNeedsConversion: false,
+				otherMIMETypeCandidates:          []string{manifest.DockerV2Schema2MediaType, manifest.DockerV2Schema1MediaType},
+			},
+		},
+		{
+			"text→s1", "text/plain", supportOnlyS1,
+			manifestConversionPlan{
+				preferredMIMEType:                manifest.DockerV2Schema1SignedMediaType,
+				preferredMIMETypeNeedsConversion: false,
+				otherMIMETypeCandidates:          []string{manifest.DockerV2Schema1MediaType},
+			},
+		},
 		// Conversion necessary, a preferred format is acceptable
-		{"s2→s1", manifest.DockerV2Schema2MediaType, supportOnlyS1, manifest.DockerV2Schema1SignedMediaType, []string{manifest.DockerV2Schema1MediaType}},
+		{
+			"s2→s1", manifest.DockerV2Schema2MediaType, supportOnlyS1,
+			manifestConversionPlan{
+				preferredMIMEType:                manifest.DockerV2Schema1SignedMediaType,
+				preferredMIMETypeNeedsConversion: true,
+				otherMIMETypeCandidates:          []string{manifest.DockerV2Schema1MediaType},
+			},
+		},
 		// Conversion necessary, a preferred format is not acceptable
-		{"s2→OCI", manifest.DockerV2Schema2MediaType, []string{v1.MediaTypeImageManifest}, v1.MediaTypeImageManifest, []string{}},
+		{
+			"s2→OCI", manifest.DockerV2Schema2MediaType, []string{v1.MediaTypeImageManifest},
+			manifestConversionPlan{
+				preferredMIMEType:                v1.MediaTypeImageManifest,
+				preferredMIMETypeNeedsConversion: true,
+				otherMIMETypeCandidates:          []string{},
+			},
+		},
 		// text/plain is converted if the destination does not accept s1
-		{"text→s2", "text/plain", []string{manifest.DockerV2Schema2MediaType}, manifest.DockerV2Schema2MediaType, []string{}},
+		{
+			"text→s2", "text/plain", []string{manifest.DockerV2Schema2MediaType},
+			manifestConversionPlan{
+				preferredMIMEType:                manifest.DockerV2Schema2MediaType,
+				preferredMIMETypeNeedsConversion: true,
+				otherMIMETypeCandidates:          []string{},
+			},
+		},
 		// Conversion necessary, try the preferred formats in order.
 		// We abuse manifest.DockerV2ListMediaType here as a MIME type which is not in supportS1S2OCI,
 		// but is still recognized by manifest.NormalizedMIMEType and not normalized to s1
 		{
-			"special→s2", manifest.DockerV2ListMediaType, supportS1S2OCI, manifest.DockerV2Schema2MediaType,
-			[]string{manifest.DockerV2Schema1SignedMediaType, v1.MediaTypeImageManifest, manifest.DockerV2Schema1MediaType},
+			"special→s2", manifest.DockerV2ListMediaType, supportS1S2OCI,
+			manifestConversionPlan{
+				preferredMIMEType:                manifest.DockerV2Schema2MediaType,
+				preferredMIMETypeNeedsConversion: true,
+				otherMIMETypeCandidates:          []string{manifest.DockerV2Schema1SignedMediaType, v1.MediaTypeImageManifest, manifest.DockerV2Schema1MediaType},
+			},
 		},
 		{
-			"special→s1", manifest.DockerV2ListMediaType, supportS1OCI, manifest.DockerV2Schema1SignedMediaType,
-			[]string{v1.MediaTypeImageManifest, manifest.DockerV2Schema1MediaType},
+			"special→s1", manifest.DockerV2ListMediaType, supportS1OCI,
+			manifestConversionPlan{
+				preferredMIMEType:                manifest.DockerV2Schema1SignedMediaType,
+				preferredMIMETypeNeedsConversion: true,
+				otherMIMETypeCandidates:          []string{v1.MediaTypeImageManifest, manifest.DockerV2Schema1MediaType},
+			},
 		},
 		{
-			"special→OCI", manifest.DockerV2ListMediaType, []string{v1.MediaTypeImageManifest, "other options", "with lower priority"}, v1.MediaTypeImageManifest,
-			[]string{"other options", "with lower priority"},
+			"special→OCI", manifest.DockerV2ListMediaType, []string{v1.MediaTypeImageManifest, "other options", "with lower priority"},
+			manifestConversionPlan{
+				preferredMIMEType:                v1.MediaTypeImageManifest,
+				preferredMIMETypeNeedsConversion: true,
+				otherMIMETypeCandidates:          []string{"other options", "with lower priority"},
+			},
 		},
 	}
 
@@ -149,13 +230,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 		}
 		res, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
 		require.NoError(t, err, c.description)
-		assert.Equal(t, c.expectedUpdate != "", res.preferredMIMETypeNeedsConversion, c.description)
-		if c.expectedUpdate == "" {
-			assert.Equal(t, manifest.NormalizedMIMEType(c.sourceType), res.preferredMIMEType, c.description)
-		} else {
-			assert.Equal(t, c.expectedUpdate, res.preferredMIMEType, c.description)
-		}
-		assert.Equal(t, c.expectedOtherCandidates, res.otherMIMETypeCandidates, c.description)
+		assert.Equal(t, c.expected, res, c.description)
 	}
 
 	// Whatever the input is, with !canModifyManifest we return "keep the original as is"
@@ -167,9 +242,11 @@ func TestDetermineManifestConversion(t *testing.T) {
 		}
 		res, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
 		require.NoError(t, err, c.description)
-		assert.False(t, res.preferredMIMETypeNeedsConversion, c.description)
-		assert.Equal(t, manifest.NormalizedMIMEType(c.sourceType), res.preferredMIMEType, c.description)
-		assert.Equal(t, []string{}, res.otherMIMETypeCandidates, c.description)
+		assert.Equal(t, manifestConversionPlan{
+			preferredMIMEType:                manifest.NormalizedMIMEType(c.sourceType),
+			preferredMIMETypeNeedsConversion: false,
+			otherMIMETypeCandidates:          []string{},
+		}, res, c.description)
 	}
 
 	// With forceManifestMIMEType, the output is always the forced manifest type (in this case oci manifest)
@@ -181,9 +258,11 @@ func TestDetermineManifestConversion(t *testing.T) {
 		}
 		res, err := ic.determineManifestConversion(context.Background(), c.destTypes, v1.MediaTypeImageManifest, false)
 		require.NoError(t, err, c.description)
-		assert.True(t, res.preferredMIMETypeNeedsConversion, c.description)
-		assert.Equal(t, v1.MediaTypeImageManifest, res.preferredMIMEType, c.description)
-		assert.Equal(t, []string{}, res.otherMIMETypeCandidates, c.description)
+		assert.Equal(t, manifestConversionPlan{
+			preferredMIMEType:                v1.MediaTypeImageManifest,
+			preferredMIMETypeNeedsConversion: true,
+			otherMIMETypeCandidates:          []string{},
+		}, res, c.description)
 	}
 
 	// Error reading the manifest — smoke test only.
