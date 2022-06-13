@@ -80,8 +80,8 @@ func (ic *imageCloser) Close() error {
 // Internal users may depend on methods available in SourcedImage but not (yet?) in types.Image.
 type SourcedImage struct {
 	*UnparsedImage
-	manifestBlob     []byte
-	manifestMIMEType string
+	ManifestBlob     []byte // The manifest of the relevant instance
+	ManifestMIMEType string // MIME type of ManifestBlob
 	// genericManifest contains data corresponding to manifestBlob.
 	// NOTE: The manifest may have been modified in the process; DO NOT reserialize and store genericManifest
 	// if you want to preserve the original manifest; use manifestBlob directly.
@@ -113,8 +113,8 @@ func FromUnparsedImage(ctx context.Context, sys *types.SystemContext, unparsed *
 
 	return &SourcedImage{
 		UnparsedImage:    unparsed,
-		manifestBlob:     manifestBlob,
-		manifestMIMEType: manifestMIMEType,
+		ManifestBlob:     manifestBlob,
+		ManifestMIMEType: manifestMIMEType,
 		genericManifest:  parsedManifest,
 	}, nil
 }
@@ -126,7 +126,7 @@ func (i *SourcedImage) Size() (int64, error) {
 
 // Manifest overrides the UnparsedImage.Manifest to always use the fields which we have already fetched.
 func (i *SourcedImage) Manifest(ctx context.Context) ([]byte, string, error) {
-	return i.manifestBlob, i.manifestMIMEType, nil
+	return i.ManifestBlob, i.ManifestMIMEType, nil
 }
 
 func (i *SourcedImage) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
