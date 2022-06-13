@@ -349,13 +349,8 @@ func supportsMultipleImages(dest types.ImageDestination) bool {
 
 // compareImageDestinationManifestEqual compares the `src` and `dest` image manifests (reading the manifest from the
 // (possibly remote) destination). Returning true and the destination's manifest, type and digest if they compare equal.
-func compareImageDestinationManifestEqual(ctx context.Context, options *Options, src types.Image, targetInstance *digest.Digest, dest types.ImageDestination) (bool, []byte, string, digest.Digest, error) {
-	srcManifest, _, err := src.Manifest(ctx)
-	if err != nil {
-		return false, nil, "", "", errors.Wrapf(err, "reading manifest from image")
-	}
-
-	srcManifestDigest, err := manifest.Digest(srcManifest)
+func compareImageDestinationManifestEqual(ctx context.Context, options *Options, src *image.SourcedImage, targetInstance *digest.Digest, dest types.ImageDestination) (bool, []byte, string, digest.Digest, error) {
+	srcManifestDigest, err := manifest.Digest(src.ManifestBlob)
 	if err != nil {
 		return false, nil, "", "", errors.Wrapf(err, "calculating manifest digest")
 	}
@@ -620,11 +615,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 	if named := c.dest.Reference().DockerReference(); named != nil {
 		if digested, ok := named.(reference.Digested); ok {
 			destIsDigestedReference = true
-			sourceManifest, _, err := src.Manifest(ctx)
-			if err != nil {
-				return nil, "", "", errors.Wrapf(err, "reading manifest from source image")
-			}
-			matches, err := manifest.MatchesDigest(sourceManifest, digested.Digest())
+			matches, err := manifest.MatchesDigest(src.ManifestBlob, digested.Digest())
 			if err != nil {
 				return nil, "", "", errors.Wrapf(err, "computing digest of source image's manifest")
 			}
@@ -913,11 +904,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 
 	// The manifest is used to extract the information whether a given
 	// layer is empty.
-	manifestBlob, manifestType, err := ic.src.Manifest(ctx)
-	if err != nil {
-		return err
-	}
-	man, err := manifest.FromBlob(manifestBlob, manifestType)
+	man, err := manifest.FromBlob(ic.src.ManifestBlob, ic.src.ManifestMIMEType)
 	if err != nil {
 		return err
 	}
