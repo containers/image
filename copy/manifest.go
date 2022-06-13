@@ -60,13 +60,9 @@ type manifestConversionPlan struct {
 }
 
 // determineManifestConversion returns a plan for what formats, and possibly conversions, to use for the manifest in ic.
-func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupportedManifestMIMETypes []string, forceManifestMIMEType string, requiresOciEncryption bool) (manifestConversionPlan, error) {
-	_, srcType, err := ic.src.Manifest(ctx)
-	if err != nil { // This should have been cached?!
-		return manifestConversionPlan{}, errors.Wrap(err, "reading manifest")
-	}
+func (ic *imageCopier) determineManifestConversion(destSupportedManifestMIMETypes []string, forceManifestMIMEType string, requiresOciEncryption bool) (manifestConversionPlan, error) {
 	return determineManifestConversion(determineManifestConversionInputs{
-		srcMIMEType:                    srcType,
+		srcMIMEType:                    ic.src.ManifestMIMEType,
 		destSupportedManifestMIMETypes: destSupportedManifestMIMETypes,
 		forceManifestMIMEType:          forceManifestMIMEType,
 		requiresOCIEncryption:          requiresOciEncryption,

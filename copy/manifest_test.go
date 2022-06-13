@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/testing/mocks"
 	"github.com/containers/image/v5/manifest"
-	"github.com/containers/image/v5/types"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,56 +25,6 @@ func TestOrderedSet(t *testing.T) {
 		}
 		assert.Equal(t, c.expected, os.list, fmt.Sprintf("%#v", c.input))
 	}
-}
-
-// fakeImageSource is an implementation of types.Image which only returns itself as a MIME type in Manifest
-// except that "" means “reading the manifest should fail”
-type fakeImageSource string
-
-func (f fakeImageSource) Reference() types.ImageReference {
-	panic("Unexpected call to a mock function")
-}
-func (f fakeImageSource) Manifest(ctx context.Context) ([]byte, string, error) {
-	if string(f) == "" {
-		return nil, "", errors.New("Manifest() directed to fail")
-	}
-	return nil, string(f), nil
-}
-func (f fakeImageSource) Signatures(context.Context) ([][]byte, error) {
-	panic("Unexpected call to a mock function")
-}
-func (f fakeImageSource) ConfigInfo() types.BlobInfo {
-	panic("Unexpected call to a mock function")
-}
-func (f fakeImageSource) ConfigBlob(context.Context) ([]byte, error) {
-	panic("Unexpected call to a mock function")
-}
-func (f fakeImageSource) OCIConfig(context.Context) (*v1.Image, error) {
-	panic("Unexpected call to a mock function")
-}
-func (f fakeImageSource) LayerInfos() []types.BlobInfo {
-	panic("Unexpected call to a mock function")
-}
-func (f fakeImageSource) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
-	panic("Unexpected call to a mock function")
-}
-func (f fakeImageSource) EmbeddedDockerReferenceConflicts(ref reference.Named) bool {
-	panic("Unexpected call to a mock function")
-}
-func (f fakeImageSource) Inspect(context.Context) (*types.ImageInspectInfo, error) {
-	panic("Unexpected call to a mock function")
-}
-func (f fakeImageSource) UpdatedImageNeedsLayerDiffIDs(options types.ManifestUpdateOptions) bool {
-	panic("Unexpected call to a mock function")
-}
-func (f fakeImageSource) UpdatedImage(ctx context.Context, options types.ManifestUpdateOptions) (types.Image, error) {
-	panic("Unexpected call to a mock function")
-}
-func (f fakeImageSource) SupportsEncryption(ctx context.Context) bool {
-	panic("Unexpected call to a mock function")
-}
-func (f fakeImageSource) Size() (int64, error) {
-	panic("Unexpected call to a mock function")
 }
 
 func TestDetermineManifestConversion(t *testing.T) {
@@ -267,14 +215,6 @@ func TestDetermineManifestConversion(t *testing.T) {
 			otherMIMETypeCandidates:          []string{},
 		}, res, c.description)
 	}
-
-	// Error reading the manifest — smoke test only.
-	ic := imageCopier{
-		src:                        fakeImageSource(""),
-		cannotModifyManifestReason: "",
-	}
-	_, err := ic.determineManifestConversion(context.Background(), supportS1S2, "", false)
-	assert.Error(t, err)
 }
 
 // fakeUnparsedImage is an implementation of types.UnparsedImage which only returns itself as a MIME type in Manifest,
