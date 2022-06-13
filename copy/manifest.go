@@ -38,6 +38,17 @@ func (os *orderedSet) append(s string) {
 	}
 }
 
+// determineManifestConversionInputs contains the inputs for determineManifestConversion.
+type determineManifestConversionInputs struct {
+	srcMIMEType string // MIME type of the input manifest
+
+	destSupportedManifestMIMETypes []string // MIME types supported by the destination, per types.ImageDestination.SupportedManifestMIMETypes()
+
+	forceManifestMIMEType      string // User’s choice of forced manifest MIME type
+	requiresOCIEncryption      bool   // Restrict to manifest formats that can support OCI encryption
+	cannotModifyManifestReason string // The reason the manifest cannot be modified, or an empty string if it can
+}
+
 // manifestConversionPlan contains the decisions made by determineManifestConversion.
 type manifestConversionPlan struct {
 	// The preferred manifest MIME type (whether we are converting to it or using it unmodified).
@@ -54,17 +65,30 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 	if err != nil { // This should have been cached?!
 		return manifestConversionPlan{}, errors.Wrap(err, "reading manifest")
 	}
+	return determineManifestConversion(determineManifestConversionInputs{
+		srcMIMEType:                    srcType,
+		destSupportedManifestMIMETypes: destSupportedManifestMIMETypes,
+		forceManifestMIMEType:          forceManifestMIMEType,
+		requiresOCIEncryption:          requiresOciEncryption,
+		cannotModifyManifestReason:     ic.cannotModifyManifestReason,
+	})
+}
+
+// determineManifestConversion returns a plan for what formats, and possibly conversions, to use based on in.
+func determineManifestConversion(in determineManifestConversionInputs) (manifestConversionPlan, error) {
+	srcType := in.srcMIMEType
 	normalizedSrcType := manifest.NormalizedMIMEType(srcType)
 	if srcType != normalizedSrcType {
 		logrus.Debugf("Source manifest MIME type %s, treating it as %s", srcType, normalizedSrcType)
 		srcType = normalizedSrcType
 	}
 
-	if forceManifestMIMEType != "" {
-		destSupportedManifestMIMETypes = []string{forceManifestMIMEType}
+	destSupportedManifestMIMETypes := in.destSupportedManifestMIMETypes
+	if in.forceManifestMIMEType != "" {
+		destSupportedManifestMIMETypes = []string{in.forceManifestMIMEType}
 	}
 
-	if len(destSupportedManifestMIMETypes) == 0 && (!requiresOciEncryption || manifest.MIMETypeSupportsEncryption(srcType)) {
+	if len(destSupportedManifestMIMETypes) == 0 && (!in.requiresOCIEncryption || manifest.MIMETypeSupportsEncryption(srcType)) {
 		return manifestConversionPlan{ // Anything goes; just use the original as is, do not try any conversions.
 			preferredMIMEType:       srcType,
 			otherMIMETypeCandidates: []string{},
@@ -72,7 +96,7 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 	}
 	supportedByDest := map[string]struct{}{}
 	for _, t := range destSupportedManifestMIMETypes {
-		if !requiresOciEncryption || manifest.MIMETypeSupportsEncryption(t) {
+		if !in.requiresOCIEncryption || manifest.MIMETypeSupportsEncryption(t) {
 			supportedByDest[t] = struct{}{}
 		}
 	}
@@ -89,7 +113,7 @@ func (ic *imageCopier) determineManifestConversion(ctx context.Context, destSupp
 	if _, ok := supportedByDest[srcType]; ok {
 		prioritizedTypes.append(srcType)
 	}
-	if ic.cannotModifyManifestReason != "" {
+	if in.cannotModifyManifestReason != "" {
 		// We could also drop this check and have the caller
 		// make the choice; it is already doing that to an extent, to improve error
 		// messages.  But it is nice to hide the “if we can't modify, do no conversion”
