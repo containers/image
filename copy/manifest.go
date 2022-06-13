@@ -59,17 +59,6 @@ type manifestConversionPlan struct {
 	otherMIMETypeCandidates          []string // Other possible alternatives, in order
 }
 
-// determineManifestConversion returns a plan for what formats, and possibly conversions, to use for the manifest in ic.
-func (ic *imageCopier) determineManifestConversion(destSupportedManifestMIMETypes []string, forceManifestMIMEType string, requiresOciEncryption bool) (manifestConversionPlan, error) {
-	return determineManifestConversion(determineManifestConversionInputs{
-		srcMIMEType:                    ic.src.ManifestMIMEType,
-		destSupportedManifestMIMETypes: destSupportedManifestMIMETypes,
-		forceManifestMIMEType:          forceManifestMIMEType,
-		requiresOCIEncryption:          requiresOciEncryption,
-		cannotModifyManifestReason:     ic.cannotModifyManifestReason,
-	})
-}
-
 // determineManifestConversion returns a plan for what formats, and possibly conversions, to use based on in.
 func determineManifestConversion(in determineManifestConversionInputs) (manifestConversionPlan, error) {
 	srcType := in.srcMIMEType

@@ -693,7 +693,13 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 
 	destRequiresOciEncryption := (isEncrypted(src) && ic.c.ociDecryptConfig != nil) || options.OciEncryptLayers != nil
 
-	manifestConversionPlan, err := ic.determineManifestConversion(c.dest.SupportedManifestMIMETypes(), options.ForceManifestMIMEType, destRequiresOciEncryption)
+	manifestConversionPlan, err := determineManifestConversion(determineManifestConversionInputs{
+		srcMIMEType:                    ic.src.ManifestMIMEType,
+		destSupportedManifestMIMETypes: ic.c.dest.SupportedManifestMIMETypes(),
+		forceManifestMIMEType:          options.ForceManifestMIMEType,
+		requiresOCIEncryption:          destRequiresOciEncryption,
+		cannotModifyManifestReason:     ic.cannotModifyManifestReason,
+	})
 	if err != nil {
 		return nil, "", "", err
 	}
