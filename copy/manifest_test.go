@@ -223,24 +223,26 @@ func TestDetermineManifestConversion(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		src := fakeImageSource(c.sourceType)
-		ic := &imageCopier{
-			src:                        src,
-			cannotModifyManifestReason: "",
-		}
-		res, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
+		res, err := determineManifestConversion(determineManifestConversionInputs{
+			srcMIMEType:                    c.sourceType,
+			destSupportedManifestMIMETypes: c.destTypes,
+			forceManifestMIMEType:          "",
+			requiresOCIEncryption:          false,
+			cannotModifyManifestReason:     "",
+		})
 		require.NoError(t, err, c.description)
 		assert.Equal(t, c.expected, res, c.description)
 	}
 
-	// Whatever the input is, with !canModifyManifest we return "keep the original as is"
+	// Whatever the input is, with cannotModifyManifestReason we return "keep the original as is"
 	for _, c := range cases {
-		src := fakeImageSource(c.sourceType)
-		ic := &imageCopier{
-			src:                        src,
-			cannotModifyManifestReason: "Preserving digests",
-		}
-		res, err := ic.determineManifestConversion(context.Background(), c.destTypes, "", false)
+		res, err := determineManifestConversion(determineManifestConversionInputs{
+			srcMIMEType:                    c.sourceType,
+			destSupportedManifestMIMETypes: c.destTypes,
+			forceManifestMIMEType:          "",
+			requiresOCIEncryption:          false,
+			cannotModifyManifestReason:     "Preserving digests",
+		})
 		require.NoError(t, err, c.description)
 		assert.Equal(t, manifestConversionPlan{
 			preferredMIMEType:                manifest.NormalizedMIMEType(c.sourceType),
@@ -251,12 +253,13 @@ func TestDetermineManifestConversion(t *testing.T) {
 
 	// With forceManifestMIMEType, the output is always the forced manifest type (in this case oci manifest)
 	for _, c := range cases {
-		src := fakeImageSource(c.sourceType)
-		ic := &imageCopier{
-			src:                        src,
-			cannotModifyManifestReason: "",
-		}
-		res, err := ic.determineManifestConversion(context.Background(), c.destTypes, v1.MediaTypeImageManifest, false)
+		res, err := determineManifestConversion(determineManifestConversionInputs{
+			srcMIMEType:                    c.sourceType,
+			destSupportedManifestMIMETypes: c.destTypes,
+			forceManifestMIMEType:          v1.MediaTypeImageManifest,
+			requiresOCIEncryption:          false,
+			cannotModifyManifestReason:     "",
+		})
 		require.NoError(t, err, c.description)
 		assert.Equal(t, manifestConversionPlan{
 			preferredMIMEType:                v1.MediaTypeImageManifest,
