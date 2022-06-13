@@ -14,7 +14,7 @@ import (
 
 	cp "github.com/containers/image/v5/copy"
 	"github.com/containers/image/v5/directory"
-	"github.com/containers/image/v5/image"
+	"github.com/containers/image/v5/internal/image"
 	"github.com/containers/image/v5/pkg/blobinfocache/none"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/types"
