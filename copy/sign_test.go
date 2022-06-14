@@ -3,7 +3,6 @@ package copy
 import (
 	"context"
 	"io"
-	"os"
 	"testing"
 
 	"github.com/containers/image/v5/directory"
@@ -36,8 +35,7 @@ func TestCreateSignature(t *testing.T) {
 		t.Skipf("Signing not supported: %v", err)
 	}
 
-	os.Setenv("GNUPGHOME", testGPGHomeDirectory)
-	defer os.Unsetenv("GNUPGHOME")
+	t.Setenv("GNUPGHOME", testGPGHomeDirectory)
 
 	// Signing a directory: reference, which does not have a DockerReference(), fails.
 	tempDir := t.TempDir()
