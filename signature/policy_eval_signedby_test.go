@@ -18,7 +18,7 @@ import (
 func dirImageMock(t *testing.T, dir, dockerReference string) types.UnparsedImage {
 	ref, err := reference.ParseNormalizedNamed(dockerReference)
 	require.NoError(t, err)
-	return dirImageMockWithRef(t, dir, refImageReferenceMock{ref})
+	return dirImageMockWithRef(t, dir, refImageReferenceMock{ref: ref})
 }
 
 // dirImageMockWithRef returns a types.UnparsedImage for a directory, claiming a specified ref.

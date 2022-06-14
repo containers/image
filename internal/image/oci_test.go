@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/testing/mocks"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
@@ -75,7 +76,7 @@ func manifestOCI1FromComponentsLikeFixture(configBlob []byte) genericManifest {
 func TestManifestOCI1FromManifest(t *testing.T) {
 	// This just tests that the JSON can be loaded; we test that the parsed
 	// values are correctly returned in tests for the individual getter methods.
-	_ = manifestOCI1FromFixture(t, unusedImageSource{}, "oci1.json")
+	_ = manifestOCI1FromFixture(t, mocks.ForbiddenImageSource{}, "oci1.json")
 
 	_, err := manifestOCI1FromManifest(nil, []byte{})
 	assert.Error(t, err)
@@ -89,7 +90,7 @@ func TestManifestOCI1FromComponents(t *testing.T) {
 
 func TestManifestOCI1Serialize(t *testing.T) {
 	for _, m := range []genericManifest{
-		manifestOCI1FromFixture(t, unusedImageSource{}, "oci1.json"),
+		manifestOCI1FromFixture(t, mocks.ForbiddenImageSource{}, "oci1.json"),
 		manifestOCI1FromComponentsLikeFixture(nil),
 	} {
 		serialized, err := m.serialize()
@@ -113,7 +114,7 @@ func TestManifestOCI1Serialize(t *testing.T) {
 
 func TestManifestOCI1ManifestMIMEType(t *testing.T) {
 	for _, m := range []genericManifest{
-		manifestOCI1FromFixture(t, unusedImageSource{}, "oci1.json"),
+		manifestOCI1FromFixture(t, mocks.ForbiddenImageSource{}, "oci1.json"),
 		manifestOCI1FromComponentsLikeFixture(nil),
 	} {
 		assert.Equal(t, imgspecv1.MediaTypeImageManifest, m.manifestMIMEType())
@@ -122,7 +123,7 @@ func TestManifestOCI1ManifestMIMEType(t *testing.T) {
 
 func TestManifestOCI1ConfigInfo(t *testing.T) {
 	for _, m := range []genericManifest{
-		manifestOCI1FromFixture(t, unusedImageSource{}, "oci1.json"),
+		manifestOCI1FromFixture(t, mocks.ForbiddenImageSource{}, "oci1.json"),
 		manifestOCI1FromComponentsLikeFixture(nil),
 	} {
 		assert.Equal(t, types.BlobInfo{
@@ -166,7 +167,7 @@ func TestManifestOCI1ConfigBlob(t *testing.T) {
 	} {
 		var src types.ImageSource
 		if c.cbISfn != nil {
-			src = configBlobImageSource{unusedImageSource{}, c.cbISfn}
+			src = configBlobImageSource{f: c.cbISfn}
 		} else {
 			src = nil
 		}
@@ -194,7 +195,7 @@ func TestManifestOCI1ConfigBlob(t *testing.T) {
 
 func TestManifestOCI1LayerInfo(t *testing.T) {
 	for _, m := range []genericManifest{
-		manifestOCI1FromFixture(t, unusedImageSource{}, "oci1.json"),
+		manifestOCI1FromFixture(t, mocks.ForbiddenImageSource{}, "oci1.json"),
 		manifestOCI1FromComponentsLikeFixture(nil),
 	} {
 		assert.Equal(t, []types.BlobInfo{
@@ -235,7 +236,7 @@ func TestManifestOCI1LayerInfo(t *testing.T) {
 
 func TestManifestOCI1EmbeddedDockerReferenceConflicts(t *testing.T) {
 	for _, m := range []genericManifest{
-		manifestOCI1FromFixture(t, unusedImageSource{}, "oci1.json"),
+		manifestOCI1FromFixture(t, mocks.ForbiddenImageSource{}, "oci1.json"),
 		manifestOCI1FromComponentsLikeFixture(nil),
 	} {
 		for _, name := range []string{"busybox", "example.com:5555/ns/repo:tag"} {
@@ -291,7 +292,7 @@ func TestManifestOCI1Inspect(t *testing.T) {
 
 func TestManifestOCI1UpdatedImageNeedsLayerDiffIDs(t *testing.T) {
 	for _, m := range []genericManifest{
-		manifestOCI1FromFixture(t, unusedImageSource{}, "oci1.json"),
+		manifestOCI1FromFixture(t, mocks.ForbiddenImageSource{}, "oci1.json"),
 		manifestOCI1FromComponentsLikeFixture(nil),
 	} {
 		assert.False(t, m.UpdatedImageNeedsLayerDiffIDs(types.ManifestUpdateOptions{
@@ -307,7 +308,7 @@ type oci1ImageSource struct {
 }
 
 func (OCIis *oci1ImageSource) Reference() types.ImageReference {
-	return refImageReferenceMock{OCIis.ref}
+	return refImageReferenceMock{ref: OCIis.ref}
 }
 
 func newOCI1ImageSource(t *testing.T, dockerRef string) *oci1ImageSource {

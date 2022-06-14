@@ -1,7 +1,6 @@
 package signature
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -29,13 +28,13 @@ func TestParseImageAndDockerReference(t *testing.T) {
 	// Success
 	ref, err := reference.ParseNormalizedNamed(ok1)
 	require.NoError(t, err)
-	r1, r2, err := parseImageAndDockerReference(refImageMock{ref}, ok2)
+	r1, r2, err := parseImageAndDockerReference(refImageMock{ref: ref}, ok2)
 	require.NoError(t, err)
 	assert.Equal(t, ok1, reference.FamiliarString(r1))
 	assert.Equal(t, ok2, reference.FamiliarString(r2))
 
 	// Unidentified images are rejected.
-	_, _, err = parseImageAndDockerReference(refImageMock{nil}, ok2)
+	_, _, err = parseImageAndDockerReference(refImageMock{ref: nil}, ok2)
 	require.Error(t, err)
 	assert.IsType(t, PolicyRequirementError(""), err)
 
@@ -47,68 +46,44 @@ func TestParseImageAndDockerReference(t *testing.T) {
 	} {
 		ref, err := reference.ParseNormalizedNamed(refs[0])
 		if err == nil {
-			_, _, err := parseImageAndDockerReference(refImageMock{ref}, refs[1])
+			_, _, err := parseImageAndDockerReference(refImageMock{ref: ref}, refs[1])
 			assert.Error(t, err)
 		}
 	}
 }
 
 // refImageMock is a mock of types.UnparsedImage which returns itself in Reference().DockerReference.
-type refImageMock struct{ reference.Named }
+type refImageMock struct {
+	mocks.ForbiddenUnparsedImage
+	ref reference.Named
+}
 
 func (ref refImageMock) Reference() types.ImageReference {
-	return refImageReferenceMock(ref)
-}
-func (ref refImageMock) Close() error {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageMock) Manifest(ctx context.Context) ([]byte, string, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageMock) Signatures(context.Context) ([][]byte, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageMock) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
-	panic("unexpected call to a mock function")
+	return refImageReferenceMock{ref: ref.ref}
 }
 
 // refImageReferenceMock is a mock of types.ImageReference which returns itself in DockerReference.
-type refImageReferenceMock struct{ reference.Named }
+type refImageReferenceMock struct {
+	mocks.ForbiddenImageReference
+	ref reference.Named
+}
 
 func (ref refImageReferenceMock) Transport() types.ImageTransport {
 	// We use this in error messages, so sady we must return something. But right now we do so only when DockerReference is nil, so restrict to that.
-	if ref.Named == nil {
+	if ref.ref == nil {
 		return mocks.NameImageTransport("== Transport mock")
 	}
 	panic("unexpected call to a mock function")
 }
 func (ref refImageReferenceMock) StringWithinTransport() string {
 	// We use this in error messages, so sadly we must return something. But right now we do so only when DockerReference is nil, so restrict to that.
-	if ref.Named == nil {
+	if ref.ref == nil {
 		return "== StringWithinTransport for an image with no Docker support"
 	}
 	panic("unexpected call to a mock function")
 }
 func (ref refImageReferenceMock) DockerReference() reference.Named {
-	return ref.Named
-}
-func (ref refImageReferenceMock) PolicyConfigurationIdentity() string {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) PolicyConfigurationNamespaces() []string {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) NewImage(ctx context.Context, sys *types.SystemContext) (types.ImageCloser, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref refImageReferenceMock) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
-	panic("unexpected call to a mock function")
+	return ref.ref
 }
 
 type prmSymmetricTableTest struct {
@@ -233,7 +208,7 @@ func testImageAndSig(t *testing.T, prm PolicyReferenceMatch, imageRef, sigRef st
 	// and therefore values refused by reference.ParseNormalizedNamed can not happen in practice.
 	parsedImageRef, err := reference.ParseNormalizedNamed(imageRef)
 	require.NoError(t, err)
-	res := prm.matchesDockerReference(refImageMock{parsedImageRef}, sigRef)
+	res := prm.matchesDockerReference(refImageMock{ref: parsedImageRef}, sigRef)
 	assert.Equal(t, result, res, fmt.Sprintf("%s vs. %s", imageRef, sigRef))
 }
 
@@ -297,7 +272,7 @@ func TestPRMMatchExactMatchesDockerReference(t *testing.T) {
 		testPossiblyInvalidImageAndSig(t, prm, test.refB, test.refA, test.result)
 	}
 	// Even if they are signed with an empty string as a reference, unidentified images are rejected.
-	res := prm.matchesDockerReference(refImageMock{nil}, "")
+	res := prm.matchesDockerReference(refImageMock{ref: nil}, "")
 	assert.False(t, res, `unidentified vs. ""`)
 }
 
@@ -333,7 +308,7 @@ func TestPRMMatchRepositoryMatchesDockerReference(t *testing.T) {
 		testPossiblyInvalidImageAndSig(t, prm, test.refB, test.refA, test.result)
 	}
 	// Even if they are signed with an empty string as a reference, unidentified images are rejected.
-	res := prm.matchesDockerReference(refImageMock{nil}, "")
+	res := prm.matchesDockerReference(refImageMock{ref: nil}, "")
 	assert.False(t, res, `unidentified vs. ""`)
 }
 
@@ -362,28 +337,9 @@ func TestParseDockerReferences(t *testing.T) {
 	}
 }
 
-// forbiddenImageMock is a mock of types.UnparsedImage which ensures Reference is not called
-type forbiddenImageMock struct{}
-
-func (ref forbiddenImageMock) Reference() types.ImageReference {
-	panic("unexpected call to a mock function")
-}
-func (ref forbiddenImageMock) Close() error {
-	panic("unexpected call to a mock function")
-}
-func (ref forbiddenImageMock) Manifest(ctx context.Context) ([]byte, string, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref forbiddenImageMock) Signatures(context.Context) ([][]byte, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref forbiddenImageMock) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
-	panic("unexpected call to a mock function")
-}
-
 func testExactPRMAndSig(t *testing.T, prmFactory func(string) PolicyReferenceMatch, imageRef, sigRef string, result bool) {
 	prm := prmFactory(imageRef)
-	res := prm.matchesDockerReference(forbiddenImageMock{}, sigRef)
+	res := prm.matchesDockerReference(mocks.ForbiddenUnparsedImage{}, sigRef)
 	assert.Equal(t, result, res, fmt.Sprintf("%s vs. %s", imageRef, sigRef))
 }
 
@@ -577,7 +533,7 @@ func TestPRMRemapIdentityMatchesDockerReference(t *testing.T) {
 	// Even if they are signed with an empty string as a reference, unidentified images are rejected.
 	prm, err := NewPRMRemapIdentity("docker.io", "docker.io")
 	require.NoError(t, err)
-	res := prm.matchesDockerReference(refImageMock{nil}, "")
+	res := prm.matchesDockerReference(refImageMock{ref: nil}, "")
 	assert.False(t, res, `unidentified vs. ""`)
 
 	// Verify that the behavior is otherwise the same as for prmMatchRepoDigestOrExact:

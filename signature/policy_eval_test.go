@@ -69,6 +69,7 @@ func TestPolicyContextNewDestroy(t *testing.T) {
 // pcImageReferenceMock is a mock of types.ImageReference which returns itself in DockerReference
 // and handles PolicyConfigurationIdentity and PolicyConfigurationReference consistently.
 type pcImageReferenceMock struct {
+	mocks.ForbiddenImageReference
 	transportName string
 	ref           reference.Named
 }
@@ -96,18 +97,6 @@ func (ref pcImageReferenceMock) PolicyConfigurationNamespaces() []string {
 	}
 	return policyconfiguration.DockerReferenceNamespaces(ref.ref)
 }
-func (ref pcImageReferenceMock) NewImage(ctx context.Context, sys *types.SystemContext) (types.ImageCloser, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref pcImageReferenceMock) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref pcImageReferenceMock) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
-	panic("unexpected call to a mock function")
-}
-func (ref pcImageReferenceMock) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
-	panic("unexpected call to a mock function")
-}
 
 func TestPolicyContextRequirementsForImageRefNotRegisteredTransport(t *testing.T) {
 	transports.Delete("docker")
@@ -134,7 +123,7 @@ func TestPolicyContextRequirementsForImageRefNotRegisteredTransport(t *testing.T
 	require.NoError(t, err)
 	ref, err := reference.ParseNormalizedNamed("registry.access.redhat.com/rhel7:latest")
 	require.NoError(t, err)
-	reqs := pc.requirementsForImageRef(pcImageReferenceMock{"docker", ref})
+	reqs := pc.requirementsForImageRef(pcImageReferenceMock{transportName: "docker", ref: ref})
 	assert.True(t, &(reqs[0]) == &(pr[0]))
 	assert.True(t, len(reqs) == len(pr))
 
@@ -203,7 +192,7 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 
 		ref, err := reference.ParseNormalizedNamed(c.input)
 		require.NoError(t, err)
-		reqs := pc.requirementsForImageRef(pcImageReferenceMock{c.inputTransport, ref})
+		reqs := pc.requirementsForImageRef(pcImageReferenceMock{transportName: c.inputTransport, ref: ref})
 		comment := fmt.Sprintf("case %s:%s: %#v", c.inputTransport, c.input, reqs[0])
 		// Do not use assert.Equal, which would do a deep contents comparison; we want to compare
 		// the pointers. Also, == does not work on slices; so test that the slices start at the
@@ -217,7 +206,7 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 func pcImageMock(t *testing.T, dir, dockerReference string) types.UnparsedImage {
 	ref, err := reference.ParseNormalizedNamed(dockerReference)
 	require.NoError(t, err)
-	return dirImageMockWithRef(t, dir, pcImageReferenceMock{"docker", ref})
+	return dirImageMockWithRef(t, dir, pcImageReferenceMock{transportName: "docker", ref: ref})
 }
 
 func TestPolicyContextGetSignaturesWithAcceptedAuthor(t *testing.T) {
