@@ -111,18 +111,20 @@ func (c *copier) blobPipelineEncryptionStep(stream *sourceStream, toEncrypt bool
 
 // updateCryptoOperationAndAnnotations sets *operation and updates *annotations, if necessary.
 func (d *bpEncryptionStepData) updateCryptoOperationAndAnnotations(operation *types.LayerCrypto, annotations *map[string]string) error {
-	if d.encrypting {
-		encryptAnnotations, err := d.finalizer()
-		if err != nil {
-			return errors.Wrap(err, "Unable to finalize encryption")
-		}
-		*operation = types.Encrypt
-		if *annotations == nil {
-			*annotations = map[string]string{}
-		}
-		for k, v := range encryptAnnotations {
-			(*annotations)[k] = v
-		}
+	if !d.encrypting {
+		return nil
+	}
+
+	encryptAnnotations, err := d.finalizer()
+	if err != nil {
+		return errors.Wrap(err, "Unable to finalize encryption")
+	}
+	*operation = types.Encrypt
+	if *annotations == nil {
+		*annotations = map[string]string{}
+	}
+	for k, v := range encryptAnnotations {
+		(*annotations)[k] = v
 	}
 	return nil
 }
