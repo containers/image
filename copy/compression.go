@@ -149,23 +149,19 @@ func (c *copier) bpcRecompressCompressed(stream *sourceStream, detected bpDetect
 		// re-compressed using the desired format.
 		logrus.Debugf("Blob will be converted")
 
-		var closers []io.Closer
-		succeeded := false
-		defer func() {
-			if !succeeded {
-				for _, c := range closers {
-					c.Close()
-				}
-			}
-		}()
 		decompressed, err := detected.decompressor(stream.reader)
 		if err != nil {
 			return nil, err
 		}
-		closers = append(closers, decompressed)
+		succeeded := false
+		defer func() {
+			if !succeeded {
+				decompressed.Close()
+			}
+		}()
 
 		recompressed, annotations := c.compressedStream(decompressed, *c.compressionFormat)
-		closers = append(closers, recompressed)
+		// Note: recompressed must be closed on all return paths.
 		stream.reader = recompressed
 		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
 			Digest: "",
@@ -178,7 +174,7 @@ func (c *copier) bpcRecompressCompressed(stream *sourceStream, detected bpDetect
 			uploadedAnnotations:    annotations,
 			srcCompressorName:      detected.srcCompressorName,
 			uploadedCompressorName: c.compressionFormat.Name(),
-			closers:                closers,
+			closers:                []io.Closer{decompressed, recompressed},
 		}, nil
 	}
 	return nil, nil
