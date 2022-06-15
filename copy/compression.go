@@ -122,17 +122,17 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		// re-compressed using the desired format.
 		logrus.Debugf("Blob will be converted")
 
-		s, err := detected.decompressor(stream.reader)
+		decompressed, err := detected.decompressor(stream.reader)
 		if err != nil {
 			return nil, err
 		}
-		closers = append(closers, s)
+		closers = append(closers, decompressed)
 
 		pipeReader, pipeWriter := io.Pipe()
 		closers = append(closers, pipeReader)
 
 		annotations := map[string]string{}
-		go c.compressGoroutine(pipeWriter, s, annotations, *c.compressionFormat) // Closes pipeWriter
+		go c.compressGoroutine(pipeWriter, decompressed, annotations, *c.compressionFormat) // Closes pipeWriter
 
 		stream.reader = pipeReader
 		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
