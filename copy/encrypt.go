@@ -67,3 +67,65 @@ func (d *bpDecryptionStepData) updateCryptoOperation(operation *types.LayerCrypt
 		*operation = types.Decrypt
 	}
 }
+
+// bpdData contains data that the copy pipeline needs about the encryption step.
+type bpEncryptionStepData struct {
+	encrypting bool // We are actually encrypting the stream
+	finalizer  ocicrypt.EncryptLayerFinalizer
+}
+
+// blobPipelineEncryptionStep updates *stream to encrypt if, it required by toEncrypt.
+// srcInfo is primarily used for error messages.
+// Returns data for other steps; the caller should eventually call updateCryptoOperationAndAnnotations.
+func (c *copier) blobPipelineEncryptionStep(stream *sourceStream, toEncrypt bool, srcInfo types.BlobInfo,
+	decryptionStep *bpDecryptionStepData) (*bpEncryptionStepData, error) {
+	var (
+		encrypted bool
+		finalizer ocicrypt.EncryptLayerFinalizer
+	)
+	if toEncrypt && !isOciEncrypted(srcInfo.MediaType) && c.ociEncryptConfig != nil {
+		var annotations map[string]string
+		if !decryptionStep.decrypting {
+			annotations = srcInfo.Annotations
+		}
+		desc := imgspecv1.Descriptor{
+			MediaType:   srcInfo.MediaType,
+			Digest:      srcInfo.Digest,
+			Size:        srcInfo.Size,
+			Annotations: annotations,
+		}
+
+		s, fin, err := ocicrypt.EncryptLayer(c.ociEncryptConfig, stream.reader, desc)
+		if err != nil {
+			return nil, errors.Wrapf(err, "encrypting blob %s", srcInfo.Digest)
+		}
+
+		finalizer = fin
+		stream.reader = s
+		stream.info.Digest = ""
+		stream.info.Size = -1
+		encrypted = true
+	}
+	return &bpEncryptionStepData{
+		encrypting: encrypted,
+		finalizer:  finalizer,
+	}, nil
+}
+
+// updateCryptoOperationAndAnnotations sets *operation and updates *annotations, if necessary.
+func (d *bpEncryptionStepData) updateCryptoOperationAndAnnotations(operation *types.LayerCrypto, annotations *map[string]string) error {
+	if d.encrypting {
+		encryptAnnotations, err := d.finalizer()
+		if err != nil {
+			return errors.Wrap(err, "Unable to finalize encryption")
+		}
+		*operation = types.Encrypt
+		if *annotations == nil {
+			*annotations = map[string]string{}
+		}
+		for k, v := range encryptAnnotations {
+			(*annotations)[k] = v
+		}
+	}
+	return nil
+}
