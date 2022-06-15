@@ -36,7 +36,6 @@ type bpDecryptionStepData struct {
 // srcInfo is only used for error messages.
 // Returns data for other steps; the caller should eventually use updateCryptoOperation.
 func (c *copier) blobPipelineDecryptionStep(stream *sourceStream, srcInfo types.BlobInfo) (*bpDecryptionStepData, error) {
-	var decrypted bool
 	if isOciEncrypted(stream.info.MediaType) && c.ociDecryptConfig != nil {
 		newDesc := imgspecv1.Descriptor{
 			Annotations: stream.info.Annotations,
@@ -56,10 +55,12 @@ func (c *copier) blobPipelineDecryptionStep(stream *sourceStream, srcInfo types.
 				delete(stream.info.Annotations, k)
 			}
 		}
-		decrypted = true
+		return &bpDecryptionStepData{
+			decrypting: true,
+		}, nil
 	}
 	return &bpDecryptionStepData{
-		decrypting: decrypted,
+		decrypting: false,
 	}, nil
 }
 
