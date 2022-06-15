@@ -79,10 +79,6 @@ type bpEncryptionStepData struct {
 // Returns data for other steps; the caller should eventually call updateCryptoOperationAndAnnotations.
 func (c *copier) blobPipelineEncryptionStep(stream *sourceStream, toEncrypt bool, srcInfo types.BlobInfo,
 	decryptionStep *bpDecryptionStepData) (*bpEncryptionStepData, error) {
-	var (
-		encrypted bool
-		finalizer ocicrypt.EncryptLayerFinalizer
-	)
 	if toEncrypt && !isOciEncrypted(srcInfo.MediaType) && c.ociEncryptConfig != nil {
 		var annotations map[string]string
 		if !decryptionStep.decrypting {
@@ -95,20 +91,21 @@ func (c *copier) blobPipelineEncryptionStep(stream *sourceStream, toEncrypt bool
 			Annotations: annotations,
 		}
 
-		s, fin, err := ocicrypt.EncryptLayer(c.ociEncryptConfig, stream.reader, desc)
+		s, finalizer, err := ocicrypt.EncryptLayer(c.ociEncryptConfig, stream.reader, desc)
 		if err != nil {
 			return nil, errors.Wrapf(err, "encrypting blob %s", srcInfo.Digest)
 		}
 
-		finalizer = fin
 		stream.reader = s
 		stream.info.Digest = ""
 		stream.info.Size = -1
-		encrypted = true
+		return &bpEncryptionStepData{
+			encrypting: true,
+			finalizer:  finalizer,
+		}, nil
 	}
 	return &bpEncryptionStepData{
-		encrypting: encrypted,
-		finalizer:  finalizer,
+		encrypting: false,
 	}, nil
 }
 
