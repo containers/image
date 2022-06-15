@@ -28,8 +28,13 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		canModifyBlob = false
 	}
 
-	// The copying happens through a pipeline of connected io.Readers.
+	// The copying happens through a pipeline of connected io.Readers;
+	// that pipeline is built by updating stream.
 	// === Input: srcReader
+	stream := sourceStream{
+		reader: srcReader,
+		info:   srcInfo,
+	}
 
 	// === Process input through digestingReader to validate against the expected digest.
 	// Be paranoid; in case PutBlob somehow managed to ignore an error from digestingReader,
@@ -37,7 +42,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 	// Note that for this check we don't use the stronger "validationSucceeded" indicator, because
 	// dest.PutBlob may detect that the layer already exists, in which case we don't
 	// read stream to the end, and validation does not happen.
-	digestingReader, err := newDigestingReader(srcReader, srcInfo.Digest)
+	digestingReader, err := newDigestingReader(stream.reader, srcInfo.Digest)
 	if err != nil {
 		return types.BlobInfo{}, errors.Wrapf(err, "preparing to verify blob %s", srcInfo.Digest)
 	}
@@ -48,9 +53,9 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 
 	// === Decrypt the stream, if required.
 	var decrypted bool
-	if isOciEncrypted(srcInfo.MediaType) && c.ociDecryptConfig != nil {
+	if isOciEncrypted(stream.info.MediaType) && c.ociDecryptConfig != nil {
 		newDesc := imgspecv1.Descriptor{
-			Annotations: srcInfo.Annotations,
+			Annotations: stream.info.Annotations,
 		}
 
 		var d digest.Digest
@@ -59,11 +64,11 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 			return types.BlobInfo{}, errors.Wrapf(err, "decrypting layer %s", srcInfo.Digest)
 		}
 
-		srcInfo.Digest = d
-		srcInfo.Size = -1
-		for k := range srcInfo.Annotations {
+		stream.info.Digest = d
+		stream.info.Size = -1
+		for k := range stream.info.Annotations {
 			if strings.HasPrefix(k, "org.opencontainers.image.enc") {
-				delete(srcInfo.Annotations, k)
+				delete(stream.info.Annotations, k)
 			}
 		}
 		decrypted = true
@@ -76,7 +81,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		return types.BlobInfo{}, errors.Wrapf(err, "reading blob %s", srcInfo.Digest)
 	}
 	isCompressed := decompressor != nil
-	if expectedCompressionFormat, known := expectedCompressionFormats[srcInfo.MediaType]; known && isCompressed && compressionFormat.Name() != expectedCompressionFormat.Name() {
+	if expectedCompressionFormat, known := expectedCompressionFormats[stream.info.MediaType]; known && isCompressed && compressionFormat.Name() != expectedCompressionFormat.Name() {
 		logrus.Debugf("blob %s with type %s should be compressed with %s, but compressor appears to be %s", srcInfo.Digest.String(), srcInfo.MediaType, expectedCompressionFormat.Name(), compressionFormat.Name())
 	}
 
@@ -99,11 +104,11 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		srcCompressorName = compressionFormat.Name()
 	}
 	var uploadCompressorName string
-	if canModifyBlob && isOciEncrypted(srcInfo.MediaType) {
+	if canModifyBlob && isOciEncrypted(stream.info.MediaType) {
 		// PreserveOriginal due to any compression not being able to be done on an encrypted blob unless decrypted
 		logrus.Debugf("Using original blob without modification for encrypted blob")
 		compressionOperation = types.PreserveOriginal
-		inputInfo = srcInfo
+		inputInfo = stream.info
 		srcCompressorName = internalblobinfocache.UnknownCompression
 		uploadCompressionFormat = nil
 		uploadCompressorName = internalblobinfocache.UnknownCompression
@@ -166,7 +171,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		// PreserveOriginal might also need to recompress the original blob if the desired compression format is different.
 		logrus.Debugf("Using original blob without modification")
 		compressionOperation = types.PreserveOriginal
-		inputInfo = srcInfo
+		inputInfo = stream.info
 		// Remember if the original blob was compressed, and if so how, so that if
 		// LayerInfosForCopy() returned something that differs from what was in the
 		// source's manifest, and UpdatedImage() needs to call UpdateLayerInfos(),
@@ -240,7 +245,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		return types.BlobInfo{}, errors.Wrap(err, "writing blob")
 	}
 
-	uploadedInfo.Annotations = srcInfo.Annotations
+	uploadedInfo.Annotations = stream.info.Annotations
 
 	uploadedInfo.CompressionOperation = compressionOperation
 	// If we can modify the layer's blob, set the desired algorithm for it to be set in the manifest.
@@ -319,6 +324,17 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 	}
 
 	return uploadedInfo, nil
+}
+
+// sourceStream encapsulates an input consumed by copyBlobFromStream, in progress of being built.
+// This allows handles of individual aspects to build the copy pipeline without _too much_
+// specific cooperation by the caller.
+//
+// We are currently very far from a generalized plug-and-play API for building/consuming the pipeline
+// without specific knowledge of various aspects in copyBlobFromStream; that may come one day.
+type sourceStream struct {
+	reader io.Reader
+	info   types.BlobInfo // corresponding to the data available in reader.
 }
 
 // errorAnnotationReader wraps the io.Reader passed to PutBlob for annotating the error happened during read.
