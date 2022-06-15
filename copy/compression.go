@@ -44,7 +44,7 @@ func blobPipelineDetectCompressionStep(stream *sourceStream, srcInfo types.BlobI
 type bpCompressionStepData struct {
 	operation              types.LayerCompression      // Operation to use for updating the blob metadata.
 	uploadedAlgorithm      *compressiontypes.Algorithm // An algorithm parameter for the compressionOperation edits.
-	compressionMetadata    map[string]string           // Annotations that should be set on the uploaded blob. WARNING: This is only set after the srcStream.reader is fully consumed.
+	uploadedAnnotations    map[string]string           // Annotations that should be set on the uploaded blob. WARNING: This is only set after the srcStream.reader is fully consumed.
 	srcCompressorName      string                      // Compressor name to record in the blob info cache for the source blob.
 	uploadedCompressorName string                      // Compressor name to record in the blob info cache for the uploaded blob.
 	closers                []io.Closer                 // Objects to close after the upload is done, if any.
@@ -58,7 +58,7 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 	detected bpDetectCompressionStepData) (*bpCompressionStepData, error) {
 	// WARNING: If you are adding new reasons to change the blob, update also the OptimizeDestinationImageAlreadyExists
 	// short-circuit conditions
-	compressionMetadata := map[string]string{}
+	uploadedAnnotations := map[string]string{}
 	var operation types.LayerCompression
 	var uploadedAlgorithm *compressiontypes.Algorithm
 	srcCompressorName := internalblobinfocache.Uncompressed
@@ -96,7 +96,7 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		// If this fails while writing data, it will do pipeWriter.CloseWithError(); if it fails otherwise,
 		// e.g. because we have exited and due to pipeReader.Close() above further writing to the pipe has failed,
 		// we don’t care.
-		go c.compressGoroutine(pipeWriter, stream.reader, compressionMetadata, *uploadedAlgorithm) // Closes pipeWriter
+		go c.compressGoroutine(pipeWriter, stream.reader, uploadedAnnotations, *uploadedAlgorithm) // Closes pipeWriter
 		stream.reader = pipeReader
 		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
 			Digest: "",
@@ -120,7 +120,7 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		closers = append(closers, pipeReader)
 
 		uploadedAlgorithm = c.compressionFormat
-		go c.compressGoroutine(pipeWriter, s, compressionMetadata, *uploadedAlgorithm) // Closes pipeWriter
+		go c.compressGoroutine(pipeWriter, s, uploadedAnnotations, *uploadedAlgorithm) // Closes pipeWriter
 
 		stream.reader = pipeReader
 		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
@@ -162,7 +162,7 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 	return &bpCompressionStepData{
 		operation:              operation,
 		uploadedAlgorithm:      uploadedAlgorithm,
-		compressionMetadata:    compressionMetadata,
+		uploadedAnnotations:    uploadedAnnotations,
 		srcCompressorName:      srcCompressorName,
 		uploadedCompressorName: uploadedCompressorName,
 		closers:                closers,
@@ -177,7 +177,7 @@ func (d *bpCompressionStepData) updateCompressionEdits(operation *types.LayerCom
 	if *annotations == nil {
 		*annotations = map[string]string{}
 	}
-	for k, v := range d.compressionMetadata {
+	for k, v := range d.uploadedAnnotations {
 		(*annotations)[k] = v
 	}
 }
