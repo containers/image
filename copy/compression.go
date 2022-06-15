@@ -13,9 +13,10 @@ import (
 
 // bpDetectCompressionStepData contains data that the copy pipeline needs about the “detect compression” step.
 type bpDetectCompressionStepData struct {
-	isCompressed bool
-	format       compressiontypes.Algorithm        // Valid if isCompressed
-	decompressor compressiontypes.DecompressorFunc // Valid if isCompressed
+	isCompressed      bool
+	format            compressiontypes.Algorithm        // Valid if isCompressed
+	decompressor      compressiontypes.DecompressorFunc // Valid if isCompressed
+	srcCompressorName string                            // Compressor name to possibly record in the blob info cache for the source blob.
 }
 
 // blobPipelineDetectCompressionStep updates *stream to detect its current compression format.
@@ -34,6 +35,12 @@ func blobPipelineDetectCompressionStep(stream *sourceStream, srcInfo types.BlobI
 		format:       format,
 		decompressor: decompressor,
 	}
+	if res.isCompressed {
+		res.srcCompressorName = format.Name()
+	} else {
+		res.srcCompressorName = internalblobinfocache.Uncompressed
+	}
+
 	if expectedFormat, known := expectedCompressionFormats[stream.info.MediaType]; known && res.isCompressed && format.Name() != expectedFormat.Name() {
 		logrus.Debugf("blob %s with type %s should be compressed with %s, but compressor appears to be %s", srcInfo.Digest.String(), srcInfo.MediaType, expectedFormat.Name(), format.Name())
 	}
@@ -61,10 +68,7 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 	uploadedAnnotations := map[string]string{}
 	var operation types.LayerCompression
 	var uploadedAlgorithm *compressiontypes.Algorithm
-	srcCompressorName := internalblobinfocache.Uncompressed
-	if detected.isCompressed {
-		srcCompressorName = detected.format.Name()
-	}
+	srcCompressorName := detected.srcCompressorName
 	var uploadedCompressorName string
 	var closers []io.Closer
 	succeeded := false
