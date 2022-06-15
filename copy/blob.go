@@ -46,10 +46,10 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 	if err != nil {
 		return types.BlobInfo{}, errors.Wrapf(err, "preparing to verify blob %s", srcInfo.Digest)
 	}
-	var destStream io.Reader = digestingReader
+	stream.reader = digestingReader
 
 	// === Update progress bars
-	destStream = bar.ProxyReader(destStream)
+	stream.reader = bar.ProxyReader(stream.reader)
 
 	// === Decrypt the stream, if required.
 	var decrypted bool
@@ -59,7 +59,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		}
 
 		var d digest.Digest
-		destStream, d, err = ocicrypt.DecryptLayer(c.ociDecryptConfig, destStream, newDesc, false)
+		stream.reader, d, err = ocicrypt.DecryptLayer(c.ociDecryptConfig, stream.reader, newDesc, false)
 		if err != nil {
 			return types.BlobInfo{}, errors.Wrapf(err, "decrypting layer %s", srcInfo.Digest)
 		}
@@ -76,10 +76,11 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 
 	// === Detect compression of the input stream.
 	// This requires us to “peek ahead” into the stream to read the initial part, which requires us to chain through another io.Reader returned by DetectCompression.
-	compressionFormat, decompressor, destStream, err := compression.DetectCompressionFormat(destStream) // We could skip this in some cases, but let's keep the code path uniform
+	compressionFormat, decompressor, detectCompressionFormatReader, err := compression.DetectCompressionFormat(stream.reader) // We could skip this in some cases, but let's keep the code path uniform
 	if err != nil {
 		return types.BlobInfo{}, errors.Wrapf(err, "reading blob %s", srcInfo.Digest)
 	}
+	stream.reader = detectCompressionFormatReader
 	isCompressed := decompressor != nil
 	if expectedCompressionFormat, known := expectedCompressionFormats[stream.info.MediaType]; known && isCompressed && compressionFormat.Name() != expectedCompressionFormat.Name() {
 		logrus.Debugf("blob %s with type %s should be compressed with %s, but compressor appears to be %s", srcInfo.Digest.String(), srcInfo.MediaType, expectedCompressionFormat.Name(), compressionFormat.Name())
@@ -88,8 +89,8 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 	// === Send a copy of the original, uncompressed, stream, to a separate path if necessary.
 	var originalLayerReader io.Reader // DO NOT USE this other than to drain the input if no other consumer in the pipeline has done so.
 	if getOriginalLayerCopyWriter != nil {
-		destStream = io.TeeReader(destStream, getOriginalLayerCopyWriter(decompressor))
-		originalLayerReader = destStream
+		stream.reader = io.TeeReader(stream.reader, getOriginalLayerCopyWriter(decompressor))
+		originalLayerReader = stream.reader
 	}
 
 	compressionMetadata := map[string]string{}
@@ -126,8 +127,8 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		// If this fails while writing data, it will do pipeWriter.CloseWithError(); if it fails otherwise,
 		// e.g. because we have exited and due to pipeReader.Close() above further writing to the pipe has failed,
 		// we don’t care.
-		go c.compressGoroutine(pipeWriter, destStream, compressionMetadata, *uploadCompressionFormat) // Closes pipeWriter
-		destStream = pipeReader
+		go c.compressGoroutine(pipeWriter, stream.reader, compressionMetadata, *uploadCompressionFormat) // Closes pipeWriter
+		stream.reader = pipeReader
 		inputInfo.Digest = ""
 		inputInfo.Size = -1
 		uploadCompressorName = uploadCompressionFormat.Name()
@@ -138,7 +139,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		logrus.Debugf("Blob will be converted")
 
 		compressionOperation = types.PreserveOriginal
-		s, err := decompressor(destStream)
+		s, err := decompressor(stream.reader)
 		if err != nil {
 			return types.BlobInfo{}, err
 		}
@@ -150,19 +151,19 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		uploadCompressionFormat = c.compressionFormat
 		go c.compressGoroutine(pipeWriter, s, compressionMetadata, *uploadCompressionFormat) // Closes pipeWriter
 
-		destStream = pipeReader
+		stream.reader = pipeReader
 		inputInfo.Digest = ""
 		inputInfo.Size = -1
 		uploadCompressorName = uploadCompressionFormat.Name()
 	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Decompress && isCompressed {
 		logrus.Debugf("Blob will be decompressed")
 		compressionOperation = types.Decompress
-		s, err := decompressor(destStream)
+		s, err := decompressor(stream.reader)
 		if err != nil {
 			return types.BlobInfo{}, err
 		}
 		defer s.Close()
-		destStream = s
+		stream.reader = s
 		inputInfo.Digest = ""
 		inputInfo.Size = -1
 		uploadCompressionFormat = nil
@@ -206,12 +207,12 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 				Annotations: annotations,
 			}
 
-			s, fin, err := ocicrypt.EncryptLayer(c.ociEncryptConfig, destStream, desc)
+			s, fin, err := ocicrypt.EncryptLayer(c.ociEncryptConfig, stream.reader, desc)
 			if err != nil {
 				return types.BlobInfo{}, errors.Wrapf(err, "encrypting blob %s", srcInfo.Digest)
 			}
 
-			destStream = s
+			stream.reader = s
 			finalizer = fin
 			inputInfo.Digest = ""
 			inputInfo.Size = -1
@@ -222,13 +223,13 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 	// === Report progress using the c.progress channel, if required.
 	if c.progress != nil && c.progressInterval > 0 {
 		progressReader := newProgressReader(
-			destStream,
+			stream.reader,
 			c.progress,
 			c.progressInterval,
 			srcInfo,
 		)
 		defer progressReader.reportDone()
-		destStream = progressReader
+		stream.reader = progressReader
 	}
 
 	// === Finally, send the layer stream to dest.
@@ -240,7 +241,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 	if !isConfig {
 		options.LayerIndex = &layerIndex
 	}
-	uploadedInfo, err := c.dest.PutBlobWithOptions(ctx, &errorAnnotationReader{destStream}, inputInfo, options)
+	uploadedInfo, err := c.dest.PutBlobWithOptions(ctx, &errorAnnotationReader{stream.reader}, inputInfo, options)
 	if err != nil {
 		return types.BlobInfo{}, errors.Wrap(err, "writing blob")
 	}
