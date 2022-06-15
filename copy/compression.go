@@ -87,21 +87,15 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		}, nil
 	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && !detected.isCompressed {
 		logrus.Debugf("Compressing blob on the fly")
-		pipeReader, pipeWriter := io.Pipe()
-		closers = append(closers, pipeReader)
-
 		var uploadedAlgorithm *compressiontypes.Algorithm
 		if c.compressionFormat != nil {
 			uploadedAlgorithm = c.compressionFormat
 		} else {
 			uploadedAlgorithm = defaultCompressionFormat
 		}
-		annotations := map[string]string{}
-		// If this fails while writing data, it will do pipeWriter.CloseWithError(); if it fails otherwise,
-		// e.g. because we have exited and due to pipeReader.Close() above further writing to the pipe has failed,
-		// we don’t care.
-		go c.compressGoroutine(pipeWriter, stream.reader, annotations, *uploadedAlgorithm) // Closes pipeWriter
-		stream.reader = pipeReader
+		reader, annotations := c.compressedStream(stream.reader, *uploadedAlgorithm)
+		closers = append(closers, reader)
+		stream.reader = reader
 		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
 			Digest: "",
 			Size:   -1,
@@ -128,13 +122,9 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		}
 		closers = append(closers, decompressed)
 
-		pipeReader, pipeWriter := io.Pipe()
-		closers = append(closers, pipeReader)
-
-		annotations := map[string]string{}
-		go c.compressGoroutine(pipeWriter, decompressed, annotations, *c.compressionFormat) // Closes pipeWriter
-
-		stream.reader = pipeReader
+		recompressed, annotations := c.compressedStream(decompressed, *c.compressionFormat)
+		closers = append(closers, recompressed)
+		stream.reader = recompressed
 		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
 			Digest: "",
 			Size:   -1,
@@ -273,4 +263,17 @@ func (c *copier) compressGoroutine(dest *io.PipeWriter, src io.Reader, metadata 
 	}()
 
 	err = doCompression(dest, src, metadata, compressionFormat, c.compressionLevel)
+}
+
+// compressedStream returns a stream the input reader compressed using format, and a metadata map.
+// The caller must close the returned reader.
+// AFTER the stream is consumed, metadata will be updated with annotations to use on the data.
+func (c *copier) compressedStream(reader io.Reader, algorithm compressiontypes.Algorithm) (io.ReadCloser, map[string]string) {
+	pipeReader, pipeWriter := io.Pipe()
+	annotations := map[string]string{}
+	// If this fails while writing data, it will do pipeWriter.CloseWithError(); if it fails otherwise,
+	// e.g. because we have exited and due to pipeReader.Close() above further writing to the pipe has failed,
+	// we don’t care.
+	go c.compressGoroutine(pipeWriter, reader, annotations, algorithm) // Closes pipeWriter
+	return pipeReader, annotations
 }
