@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 
-	internalblobinfocache "github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/private"
 	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
@@ -66,100 +65,14 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		originalLayerReader = stream.reader
 	}
 
-	compressionMetadata := map[string]string{}
 	// === Deal with layer compression/decompression if necessary
 	// WARNING: If you are adding new reasons to change the blob, update also the OptimizeDestinationImageAlreadyExists
 	// short-circuit conditions
-	var compressionOperation types.LayerCompression
-	var uploadCompressionFormat *compressiontypes.Algorithm
-	srcCompressorName := internalblobinfocache.Uncompressed
-	if detectedCompression.isCompressed {
-		srcCompressorName = detectedCompression.format.Name()
+	compressionStep, err := c.blobPipelineCompressionStep(&stream, canModifyBlob, detectedCompression)
+	if err != nil {
+		return types.BlobInfo{}, err
 	}
-	var uploadCompressorName string
-	if canModifyBlob && isOciEncrypted(stream.info.MediaType) {
-		// PreserveOriginal due to any compression not being able to be done on an encrypted blob unless decrypted
-		logrus.Debugf("Using original blob without modification for encrypted blob")
-		compressionOperation = types.PreserveOriginal
-		srcCompressorName = internalblobinfocache.UnknownCompression
-		uploadCompressionFormat = nil
-		uploadCompressorName = internalblobinfocache.UnknownCompression
-	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && !detectedCompression.isCompressed {
-		logrus.Debugf("Compressing blob on the fly")
-		compressionOperation = types.Compress
-		pipeReader, pipeWriter := io.Pipe()
-		defer pipeReader.Close()
-
-		if c.compressionFormat != nil {
-			uploadCompressionFormat = c.compressionFormat
-		} else {
-			uploadCompressionFormat = defaultCompressionFormat
-		}
-		// If this fails while writing data, it will do pipeWriter.CloseWithError(); if it fails otherwise,
-		// e.g. because we have exited and due to pipeReader.Close() above further writing to the pipe has failed,
-		// we don’t care.
-		go c.compressGoroutine(pipeWriter, stream.reader, compressionMetadata, *uploadCompressionFormat) // Closes pipeWriter
-		stream.reader = pipeReader
-		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
-			Digest: "",
-			Size:   -1,
-		}
-		uploadCompressorName = uploadCompressionFormat.Name()
-	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && detectedCompression.isCompressed &&
-		c.compressionFormat != nil && c.compressionFormat.Name() != detectedCompression.format.Name() {
-		// When the blob is compressed, but the desired format is different, it first needs to be decompressed and finally
-		// re-compressed using the desired format.
-		logrus.Debugf("Blob will be converted")
-
-		compressionOperation = types.PreserveOriginal
-		s, err := detectedCompression.decompressor(stream.reader)
-		if err != nil {
-			return types.BlobInfo{}, err
-		}
-		defer s.Close()
-
-		pipeReader, pipeWriter := io.Pipe()
-		defer pipeReader.Close()
-
-		uploadCompressionFormat = c.compressionFormat
-		go c.compressGoroutine(pipeWriter, s, compressionMetadata, *uploadCompressionFormat) // Closes pipeWriter
-
-		stream.reader = pipeReader
-		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
-			Digest: "",
-			Size:   -1,
-		}
-		uploadCompressorName = uploadCompressionFormat.Name()
-	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Decompress && detectedCompression.isCompressed {
-		logrus.Debugf("Blob will be decompressed")
-		compressionOperation = types.Decompress
-		s, err := detectedCompression.decompressor(stream.reader)
-		if err != nil {
-			return types.BlobInfo{}, err
-		}
-		defer s.Close()
-		stream.reader = s
-		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
-			Digest: "",
-			Size:   -1,
-		}
-		uploadCompressionFormat = nil
-		uploadCompressorName = internalblobinfocache.Uncompressed
-	} else {
-		// PreserveOriginal might also need to recompress the original blob if the desired compression format is different.
-		logrus.Debugf("Using original blob without modification")
-		compressionOperation = types.PreserveOriginal
-		// Remember if the original blob was compressed, and if so how, so that if
-		// LayerInfosForCopy() returned something that differs from what was in the
-		// source's manifest, and UpdatedImage() needs to call UpdateLayerInfos(),
-		// it will be able to correctly derive the MediaType for the copied blob.
-		if detectedCompression.isCompressed {
-			uploadCompressionFormat = &detectedCompression.format
-		} else {
-			uploadCompressionFormat = nil
-		}
-		uploadCompressorName = srcCompressorName
-	}
+	defer compressionStep.close()
 
 	// === Encrypt the stream for valid mediatypes if ociEncryptConfig provided
 	if decryptionStep.decrypting && toEncrypt {
@@ -200,16 +113,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 
 	uploadedInfo.Annotations = stream.info.Annotations
 
-	uploadedInfo.CompressionOperation = compressionOperation
-	// If we can modify the layer's blob, set the desired algorithm for it to be set in the manifest.
-	uploadedInfo.CompressionAlgorithm = uploadCompressionFormat
-	// Copy all the metadata generated by the compressor into the annotations.
-	if uploadedInfo.Annotations == nil {
-		uploadedInfo.Annotations = map[string]string{}
-	}
-	for k, v := range compressionMetadata {
-		uploadedInfo.Annotations[k] = v
-	}
+	compressionStep.updateCompressionEdits(&uploadedInfo.CompressionOperation, &uploadedInfo.CompressionAlgorithm, &uploadedInfo.Annotations)
 	decryptionStep.updateCryptoOperation(&uploadedInfo.CryptoOperation)
 	if err := encryptionStep.updateCryptoOperationAndAnnotations(&uploadedInfo.CryptoOperation, &uploadedInfo.Annotations); err != nil {
 		return types.BlobInfo{}, err
@@ -234,33 +138,8 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		return types.BlobInfo{}, errors.Errorf("Internal error writing blob %s, blob with digest %s saved with digest %s", srcInfo.Digest, stream.info.Digest, uploadedInfo.Digest)
 	}
 	if digestingReader.validationSucceeded {
-		// Don’t record any associations that involve encrypted data. This is a bit crude,
-		// some blob substitutions (replacing pulls of encrypted data with local reuse of known decryption outcomes)
-		// might be safe, but it’s not trivially obvious, so let’s be conservative for now.
-		// This crude approach also means we don’t need to record whether a blob is encrypted
-		// in the blob info cache (which would probably be necessary for any more complex logic),
-		// and the simplicity is attractive.
-		if !encryptionStep.encrypting && !decryptionStep.decrypting {
-			// If compressionOperation != types.PreserveOriginal, we now have two reliable digest values:
-			// srcinfo.Digest describes the pre-compressionOperation input, verified by digestingReader
-			// uploadedInfo.Digest describes the post-compressionOperation output, computed by PutBlob
-			// (because stream.info.Digest == "", this must have been computed afresh).
-			switch compressionOperation {
-			case types.PreserveOriginal:
-				break // Do nothing, we have only one digest and we might not have even verified it.
-			case types.Compress:
-				c.blobInfoCache.RecordDigestUncompressedPair(uploadedInfo.Digest, srcInfo.Digest)
-			case types.Decompress:
-				c.blobInfoCache.RecordDigestUncompressedPair(srcInfo.Digest, uploadedInfo.Digest)
-			default:
-				return types.BlobInfo{}, errors.Errorf("Internal error: Unexpected compressionOperation value %#v", compressionOperation)
-			}
-		}
-		if uploadCompressorName != "" && uploadCompressorName != internalblobinfocache.UnknownCompression {
-			c.blobInfoCache.RecordDigestCompressorName(uploadedInfo.Digest, uploadCompressorName)
-		}
-		if srcInfo.Digest != "" && srcCompressorName != "" && srcCompressorName != internalblobinfocache.UnknownCompression {
-			c.blobInfoCache.RecordDigestCompressorName(srcInfo.Digest, srcCompressorName)
+		if err := compressionStep.recordValidatedDigestData(c, uploadedInfo, srcInfo, encryptionStep, decryptionStep); err != nil {
+			return types.BlobInfo{}, err
 		}
 	}
 
