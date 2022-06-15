@@ -42,12 +42,12 @@ func blobPipelineDetectCompressionStep(stream *sourceStream, srcInfo types.BlobI
 
 // bpCompressionStepData contains data that the copy pipeline needs about the compression step.
 type bpCompressionStepData struct {
-	operation            types.LayerCompression      // Operation to use for updating the blob metadata.
-	uploadedAlgorithm    *compressiontypes.Algorithm // An algorithm parameter for the compressionOperation edits.
-	compressionMetadata  map[string]string           // Annotations that should be set on the uploaded blob. WARNING: This is only set after the srcStream.reader is fully consumed.
-	srcCompressorName    string                      // Compressor name to record in the blob info cache for the source blob.
-	uploadCompressorName string                      // Compressor name to record in the blob info cache for the uploaded blob.
-	closers              []io.Closer                 // Objects to close after the upload is done, if any.
+	operation              types.LayerCompression      // Operation to use for updating the blob metadata.
+	uploadedAlgorithm      *compressiontypes.Algorithm // An algorithm parameter for the compressionOperation edits.
+	compressionMetadata    map[string]string           // Annotations that should be set on the uploaded blob. WARNING: This is only set after the srcStream.reader is fully consumed.
+	srcCompressorName      string                      // Compressor name to record in the blob info cache for the source blob.
+	uploadedCompressorName string                      // Compressor name to record in the blob info cache for the uploaded blob.
+	closers                []io.Closer                 // Objects to close after the upload is done, if any.
 }
 
 // blobPipelineCompressionStep updates *stream to compress and/or decompress it.
@@ -65,7 +65,7 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 	if detected.isCompressed {
 		srcCompressorName = detected.format.Name()
 	}
-	var uploadCompressorName string
+	var uploadedCompressorName string
 	var closers []io.Closer
 	succeeded := false
 	defer func() {
@@ -81,7 +81,7 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		operation = types.PreserveOriginal
 		srcCompressorName = internalblobinfocache.UnknownCompression
 		uploadedAlgorithm = nil
-		uploadCompressorName = internalblobinfocache.UnknownCompression
+		uploadedCompressorName = internalblobinfocache.UnknownCompression
 	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && !detected.isCompressed {
 		logrus.Debugf("Compressing blob on the fly")
 		operation = types.Compress
@@ -102,7 +102,7 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 			Digest: "",
 			Size:   -1,
 		}
-		uploadCompressorName = uploadedAlgorithm.Name()
+		uploadedCompressorName = uploadedAlgorithm.Name()
 	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && detected.isCompressed &&
 		c.compressionFormat != nil && c.compressionFormat.Name() != detected.format.Name() {
 		// When the blob is compressed, but the desired format is different, it first needs to be decompressed and finally
@@ -127,7 +127,7 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 			Digest: "",
 			Size:   -1,
 		}
-		uploadCompressorName = uploadedAlgorithm.Name()
+		uploadedCompressorName = uploadedAlgorithm.Name()
 	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Decompress && detected.isCompressed {
 		logrus.Debugf("Blob will be decompressed")
 		operation = types.Decompress
@@ -142,7 +142,7 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 			Size:   -1,
 		}
 		uploadedAlgorithm = nil
-		uploadCompressorName = internalblobinfocache.Uncompressed
+		uploadedCompressorName = internalblobinfocache.Uncompressed
 	} else {
 		// PreserveOriginal might also need to recompress the original blob if the desired compression format is different.
 		logrus.Debugf("Using original blob without modification")
@@ -156,16 +156,16 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		} else {
 			uploadedAlgorithm = nil
 		}
-		uploadCompressorName = srcCompressorName
+		uploadedCompressorName = srcCompressorName
 	}
 	succeeded = true
 	return &bpCompressionStepData{
-		operation:            operation,
-		uploadedAlgorithm:    uploadedAlgorithm,
-		compressionMetadata:  compressionMetadata,
-		srcCompressorName:    srcCompressorName,
-		uploadCompressorName: uploadCompressorName,
-		closers:              closers,
+		operation:              operation,
+		uploadedAlgorithm:      uploadedAlgorithm,
+		compressionMetadata:    compressionMetadata,
+		srcCompressorName:      srcCompressorName,
+		uploadedCompressorName: uploadedCompressorName,
+		closers:                closers,
 	}, nil
 }
 
@@ -208,8 +208,8 @@ func (d *bpCompressionStepData) recordValidatedDigestData(c *copier, uploadedInf
 			return errors.Errorf("Internal error: Unexpected d.operation value %#v", d.operation)
 		}
 	}
-	if d.uploadCompressorName != "" && d.uploadCompressorName != internalblobinfocache.UnknownCompression {
-		c.blobInfoCache.RecordDigestCompressorName(uploadedInfo.Digest, d.uploadCompressorName)
+	if d.uploadedCompressorName != "" && d.uploadedCompressorName != internalblobinfocache.UnknownCompression {
+		c.blobInfoCache.RecordDigestCompressorName(uploadedInfo.Digest, d.uploadedCompressorName)
 	}
 	if srcInfo.Digest != "" && d.srcCompressorName != "" && d.srcCompressorName != internalblobinfocache.UnknownCompression {
 		c.blobInfoCache.RecordDigestCompressorName(srcInfo.Digest, d.srcCompressorName)
