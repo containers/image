@@ -55,15 +55,15 @@ type bpCompressionStepData struct {
 // Returns data for other steps; the caller should eventually call updateCompressionEdits and perhaps recordValidatedBlobData,
 // and must eventually call close.
 func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob bool,
-	detectedCompression bpDetectCompressionStepData) (*bpCompressionStepData, error) {
+	detected bpDetectCompressionStepData) (*bpCompressionStepData, error) {
 	// WARNING: If you are adding new reasons to change the blob, update also the OptimizeDestinationImageAlreadyExists
 	// short-circuit conditions
 	compressionMetadata := map[string]string{}
 	var compressionOperation types.LayerCompression
 	var uploadCompressionFormat *compressiontypes.Algorithm
 	srcCompressorName := internalblobinfocache.Uncompressed
-	if detectedCompression.isCompressed {
-		srcCompressorName = detectedCompression.format.Name()
+	if detected.isCompressed {
+		srcCompressorName = detected.format.Name()
 	}
 	var uploadCompressorName string
 	var closers []io.Closer
@@ -82,7 +82,7 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		srcCompressorName = internalblobinfocache.UnknownCompression
 		uploadCompressionFormat = nil
 		uploadCompressorName = internalblobinfocache.UnknownCompression
-	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && !detectedCompression.isCompressed {
+	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && !detected.isCompressed {
 		logrus.Debugf("Compressing blob on the fly")
 		compressionOperation = types.Compress
 		pipeReader, pipeWriter := io.Pipe()
@@ -103,14 +103,14 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 			Size:   -1,
 		}
 		uploadCompressorName = uploadCompressionFormat.Name()
-	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && detectedCompression.isCompressed &&
-		c.compressionFormat != nil && c.compressionFormat.Name() != detectedCompression.format.Name() {
+	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && detected.isCompressed &&
+		c.compressionFormat != nil && c.compressionFormat.Name() != detected.format.Name() {
 		// When the blob is compressed, but the desired format is different, it first needs to be decompressed and finally
 		// re-compressed using the desired format.
 		logrus.Debugf("Blob will be converted")
 
 		compressionOperation = types.PreserveOriginal
-		s, err := detectedCompression.decompressor(stream.reader)
+		s, err := detected.decompressor(stream.reader)
 		if err != nil {
 			return nil, err
 		}
@@ -128,10 +128,10 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 			Size:   -1,
 		}
 		uploadCompressorName = uploadCompressionFormat.Name()
-	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Decompress && detectedCompression.isCompressed {
+	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Decompress && detected.isCompressed {
 		logrus.Debugf("Blob will be decompressed")
 		compressionOperation = types.Decompress
-		s, err := detectedCompression.decompressor(stream.reader)
+		s, err := detected.decompressor(stream.reader)
 		if err != nil {
 			return nil, err
 		}
@@ -151,8 +151,8 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		// LayerInfosForCopy() returned something that differs from what was in the
 		// source's manifest, and UpdatedImage() needs to call UpdateLayerInfos(),
 		// it will be able to correctly derive the MediaType for the copied blob.
-		if detectedCompression.isCompressed {
-			uploadCompressionFormat = &detectedCompression.format
+		if detected.isCompressed {
+			uploadCompressionFormat = &detected.format
 		} else {
 			uploadCompressionFormat = nil
 		}
