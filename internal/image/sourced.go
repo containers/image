@@ -70,15 +70,18 @@ func (ic *imageCloser) Close() error {
 	return ic.src.Close()
 }
 
-// sourcedImage is a general set of utilities for working with container images,
-// whatever is their underlying location (i.e. dockerImageSource-independent).
-// Note the existence of skopeo/docker.Image: some instances of a `types.Image`
-// may not be a `sourcedImage` directly. However, most users of `types.Image`
-// do not care, and those who care about `skopeo/docker.Image` know they do.
-type sourcedImage struct {
+// SourcedImage is a general set of utilities for working with container images,
+// whatever is their underlying transport (i.e. ImageSource-independent).
+// Note the existence of docker.Image and image.memoryImage: various instances
+// of a types.Image may not be a SourcedImage directly.
+//
+// Most external users of `types.Image` do not care, and those who care about `docker.Image` know they do.
+//
+// Internal users may depend on methods available in SourcedImage but not (yet?) in types.Image.
+type SourcedImage struct {
 	*UnparsedImage
-	manifestBlob     []byte
-	manifestMIMEType string
+	ManifestBlob     []byte // The manifest of the relevant instance
+	ManifestMIMEType string // MIME type of ManifestBlob
 	// genericManifest contains data corresponding to manifestBlob.
 	// NOTE: The manifest may have been modified in the process; DO NOT reserialize and store genericManifest
 	// if you want to preserve the original manifest; use manifestBlob directly.
@@ -92,7 +95,7 @@ type sourcedImage struct {
 // The Image must not be used after the underlying ImageSource is Close()d.
 //
 // This is publicly visible as c/image/image.FromUnparsedImage.
-func FromUnparsedImage(ctx context.Context, sys *types.SystemContext, unparsed *UnparsedImage) (types.Image, error) {
+func FromUnparsedImage(ctx context.Context, sys *types.SystemContext, unparsed *UnparsedImage) (*SourcedImage, error) {
 	// Note that the input parameter above is specifically *image.UnparsedImage, not types.UnparsedImage:
 	// we want to be able to use unparsed.src.  We could make that an explicit interface, but, well,
 	// this is the only UnparsedImage implementation around, anyway.
@@ -108,24 +111,24 @@ func FromUnparsedImage(ctx context.Context, sys *types.SystemContext, unparsed *
 		return nil, err
 	}
 
-	return &sourcedImage{
+	return &SourcedImage{
 		UnparsedImage:    unparsed,
-		manifestBlob:     manifestBlob,
-		manifestMIMEType: manifestMIMEType,
+		ManifestBlob:     manifestBlob,
+		ManifestMIMEType: manifestMIMEType,
 		genericManifest:  parsedManifest,
 	}, nil
 }
 
 // Size returns the size of the image as stored, if it's known, or -1 if it isn't.
-func (i *sourcedImage) Size() (int64, error) {
+func (i *SourcedImage) Size() (int64, error) {
 	return -1, nil
 }
 
 // Manifest overrides the UnparsedImage.Manifest to always use the fields which we have already fetched.
-func (i *sourcedImage) Manifest(ctx context.Context) ([]byte, string, error) {
-	return i.manifestBlob, i.manifestMIMEType, nil
+func (i *SourcedImage) Manifest(ctx context.Context) ([]byte, string, error) {
+	return i.ManifestBlob, i.ManifestMIMEType, nil
 }
 
-func (i *sourcedImage) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
+func (i *SourcedImage) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {
 	return i.UnparsedImage.src.LayerInfosForCopy(ctx, i.UnparsedImage.instanceDigest)
 }
