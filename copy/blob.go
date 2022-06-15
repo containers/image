@@ -17,11 +17,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// copyBlobFromStream copies a blob with srcInfo (with known Digest and Annotations and possibly known Size) from srcStream to dest,
+// copyBlobFromStream copies a blob with srcInfo (with known Digest and Annotations and possibly known Size) from srcReader to dest,
 // perhaps sending a copy to an io.Writer if getOriginalLayerCopyWriter != nil,
 // perhaps (de/re/)compressing it if canModifyBlob,
 // and returns a complete blobInfo of the copied blob.
-func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, srcInfo types.BlobInfo,
+func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, srcInfo types.BlobInfo,
 	getOriginalLayerCopyWriter func(decompressor compressiontypes.DecompressorFunc) io.Writer,
 	canModifyBlob bool, isConfig bool, toEncrypt bool, bar *progressBar, layerIndex int, emptyLayer bool) (types.BlobInfo, error) {
 	if isConfig { // This is guaranteed by the caller, but set it here to be explicit.
@@ -29,7 +29,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 	}
 
 	// The copying happens through a pipeline of connected io.Readers.
-	// === Input: srcStream
+	// === Input: srcReader
 
 	// === Process input through digestingReader to validate against the expected digest.
 	// Be paranoid; in case PutBlob somehow managed to ignore an error from digestingReader,
@@ -37,7 +37,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 	// Note that for this check we don't use the stronger "validationSucceeded" indicator, because
 	// dest.PutBlob may detect that the layer already exists, in which case we don't
 	// read stream to the end, and validation does not happen.
-	digestingReader, err := newDigestingReader(srcStream, srcInfo.Digest)
+	digestingReader, err := newDigestingReader(srcReader, srcInfo.Digest)
 	if err != nil {
 		return types.BlobInfo{}, errors.Wrapf(err, "preparing to verify blob %s", srcInfo.Digest)
 	}
