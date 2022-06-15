@@ -6,7 +6,6 @@ import (
 
 	internalblobinfocache "github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/private"
-	"github.com/containers/image/v5/pkg/compression"
 	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
 	"github.com/pkg/errors"
@@ -292,32 +291,4 @@ func (r errorAnnotationReader) Read(b []byte) (n int, err error) {
 		return n, errors.Wrapf(err, "happened during read")
 	}
 	return n, err
-}
-
-// doCompression reads all input from src and writes its compressed equivalent to dest.
-func doCompression(dest io.Writer, src io.Reader, metadata map[string]string, compressionFormat compressiontypes.Algorithm, compressionLevel *int) error {
-	compressor, err := compression.CompressStreamWithMetadata(dest, metadata, compressionFormat, compressionLevel)
-	if err != nil {
-		return err
-	}
-
-	buf := make([]byte, compressionBufferSize)
-
-	_, err = io.CopyBuffer(compressor, src, buf) // Sets err to nil, i.e. causes dest.Close()
-	if err != nil {
-		compressor.Close()
-		return err
-	}
-
-	return compressor.Close()
-}
-
-// compressGoroutine reads all input from src and writes its compressed equivalent to dest.
-func (c *copier) compressGoroutine(dest *io.PipeWriter, src io.Reader, metadata map[string]string, compressionFormat compressiontypes.Algorithm) {
-	err := errors.New("Internal error: unexpected panic in compressGoroutine")
-	defer func() { // Note that this is not the same as {defer dest.CloseWithError(err)}; we need err to be evaluated lazily.
-		_ = dest.CloseWithError(err) // CloseWithError(nil) is equivalent to Close(), always returns nil
-	}()
-
-	err = doCompression(dest, src, metadata, compressionFormat, c.compressionLevel)
 }
