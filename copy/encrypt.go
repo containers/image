@@ -5,7 +5,6 @@ import (
 
 	"github.com/containers/image/v5/types"
 	"github.com/containers/ocicrypt"
-	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
@@ -40,15 +39,13 @@ func (c *copier) blobPipelineDecryptionStep(stream *sourceStream, srcInfo types.
 		desc := imgspecv1.Descriptor{
 			Annotations: stream.info.Annotations,
 		}
-
-		var d digest.Digest
-		reader, d, err := ocicrypt.DecryptLayer(c.ociDecryptConfig, stream.reader, desc, false)
+		reader, decryptedDigest, err := ocicrypt.DecryptLayer(c.ociDecryptConfig, stream.reader, desc, false)
 		if err != nil {
 			return nil, errors.Wrapf(err, "decrypting layer %s", srcInfo.Digest)
 		}
-		stream.reader = reader
 
-		stream.info.Digest = d
+		stream.reader = reader
+		stream.info.Digest = decryptedDigest
 		stream.info.Size = -1
 		for k := range stream.info.Annotations {
 			if strings.HasPrefix(k, "org.opencontainers.image.enc") {
