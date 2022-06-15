@@ -3,7 +3,6 @@ package copy
 import (
 	"context"
 	"io"
-	"strings"
 
 	internalblobinfocache "github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/private"
@@ -11,7 +10,6 @@ import (
 	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/ocicrypt"
-	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -52,26 +50,9 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 	stream.reader = bar.ProxyReader(stream.reader)
 
 	// === Decrypt the stream, if required.
-	var decrypted bool
-	if isOciEncrypted(stream.info.MediaType) && c.ociDecryptConfig != nil {
-		newDesc := imgspecv1.Descriptor{
-			Annotations: stream.info.Annotations,
-		}
-
-		var d digest.Digest
-		stream.reader, d, err = ocicrypt.DecryptLayer(c.ociDecryptConfig, stream.reader, newDesc, false)
-		if err != nil {
-			return types.BlobInfo{}, errors.Wrapf(err, "decrypting layer %s", srcInfo.Digest)
-		}
-
-		stream.info.Digest = d
-		stream.info.Size = -1
-		for k := range stream.info.Annotations {
-			if strings.HasPrefix(k, "org.opencontainers.image.enc") {
-				delete(stream.info.Annotations, k)
-			}
-		}
-		decrypted = true
+	decryptionStep, err := c.blobPipelineDecryptionStep(&stream, srcInfo)
+	if err != nil {
+		return types.BlobInfo{}, err
 	}
 
 	// === Detect compression of the input stream.
@@ -194,13 +175,13 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		finalizer ocicrypt.EncryptLayerFinalizer
 	)
 	if toEncrypt {
-		if decrypted {
+		if decryptionStep.decrypting {
 			return types.BlobInfo{}, errors.New("Unable to support both decryption and encryption in the same copy")
 		}
 
 		if !isOciEncrypted(srcInfo.MediaType) && c.ociEncryptConfig != nil {
 			var annotations map[string]string
-			if !decrypted {
+			if !decryptionStep.decrypting {
 				annotations = srcInfo.Annotations
 			}
 			desc := imgspecv1.Descriptor{
@@ -254,9 +235,8 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 	uploadedInfo.CompressionOperation = compressionOperation
 	// If we can modify the layer's blob, set the desired algorithm for it to be set in the manifest.
 	uploadedInfo.CompressionAlgorithm = uploadCompressionFormat
-	if decrypted {
-		uploadedInfo.CryptoOperation = types.Decrypt
-	} else if encrypted {
+	decryptionStep.updateCryptoOperation(&uploadedInfo.CryptoOperation)
+	if encrypted {
 		encryptAnnotations, err := finalizer()
 		if err != nil {
 			return types.BlobInfo{}, errors.Wrap(err, "Unable to finalize encryption")
@@ -295,7 +275,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		// This crude approach also means we don’t need to record whether a blob is encrypted
 		// in the blob info cache (which would probably be necessary for any more complex logic),
 		// and the simplicity is attractive.
-		if !encrypted && !decrypted {
+		if !encrypted && !decryptionStep.decrypting {
 			// If compressionOperation != types.PreserveOriginal, we now have two reliable digest values:
 			// srcinfo.Digest describes the pre-compressionOperation input, verified by digestingReader
 			// uploadedInfo.Digest describes the post-compressionOperation output, computed by PutBlob
