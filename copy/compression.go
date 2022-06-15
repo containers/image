@@ -115,7 +115,8 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 			uploadedCompressorName: uploadedAlgorithm.Name(),
 			closers:                closers,
 		}, nil
-	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && detected.isCompressed &&
+	}
+	if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && detected.isCompressed &&
 		c.compressionFormat != nil && c.compressionFormat.Name() != detected.format.Name() {
 		// When the blob is compressed, but the desired format is different, it first needs to be decompressed and finally
 		// re-compressed using the desired format.
@@ -147,7 +148,8 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 			uploadedCompressorName: c.compressionFormat.Name(),
 			closers:                closers,
 		}, nil
-	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Decompress && detected.isCompressed {
+	}
+	if canModifyBlob && c.dest.DesiredLayerCompression() == types.Decompress && detected.isCompressed {
 		logrus.Debugf("Blob will be decompressed")
 		s, err := detected.decompressor(stream.reader)
 		if err != nil {
@@ -167,28 +169,27 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 			uploadedCompressorName: internalblobinfocache.Uncompressed,
 			closers:                closers,
 		}, nil
-	} else {
-		// PreserveOriginal might also need to recompress the original blob if the desired compression format is different.
-		logrus.Debugf("Using original blob without modification")
-		// Remember if the original blob was compressed, and if so how, so that if
-		// LayerInfosForCopy() returned something that differs from what was in the
-		// source's manifest, and UpdatedImage() needs to call UpdateLayerInfos(),
-		// it will be able to correctly derive the MediaType for the copied blob.
-		var algorithm *compressiontypes.Algorithm
-		if detected.isCompressed {
-			algorithm = &detected.format
-		} else {
-			algorithm = nil
-		}
-		succeeded = true
-		return &bpCompressionStepData{
-			operation:              types.PreserveOriginal,
-			uploadedAlgorithm:      algorithm,
-			srcCompressorName:      detected.srcCompressorName,
-			uploadedCompressorName: detected.srcCompressorName,
-			closers:                closers,
-		}, nil
 	}
+	// PreserveOriginal might also need to recompress the original blob if the desired compression format is different.
+	logrus.Debugf("Using original blob without modification")
+	// Remember if the original blob was compressed, and if so how, so that if
+	// LayerInfosForCopy() returned something that differs from what was in the
+	// source's manifest, and UpdatedImage() needs to call UpdateLayerInfos(),
+	// it will be able to correctly derive the MediaType for the copied blob.
+	var algorithm *compressiontypes.Algorithm
+	if detected.isCompressed {
+		algorithm = &detected.format
+	} else {
+		algorithm = nil
+	}
+	succeeded = true
+	return &bpCompressionStepData{
+		operation:              types.PreserveOriginal,
+		uploadedAlgorithm:      algorithm,
+		srcCompressorName:      detected.srcCompressorName,
+		uploadedCompressorName: detected.srcCompressorName,
+		closers:                closers,
+	}, nil
 }
 
 // updateCompressionEdits sets *operation, *algorithm and updates *annotations, if necessary.
