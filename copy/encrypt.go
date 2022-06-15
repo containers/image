@@ -37,12 +37,12 @@ type bpDecryptionStepData struct {
 // Returns data for other steps; the caller should eventually use updateCryptoOperation.
 func (c *copier) blobPipelineDecryptionStep(stream *sourceStream, srcInfo types.BlobInfo) (*bpDecryptionStepData, error) {
 	if isOciEncrypted(stream.info.MediaType) && c.ociDecryptConfig != nil {
-		newDesc := imgspecv1.Descriptor{
+		desc := imgspecv1.Descriptor{
 			Annotations: stream.info.Annotations,
 		}
 
 		var d digest.Digest
-		reader, d, err := ocicrypt.DecryptLayer(c.ociDecryptConfig, stream.reader, newDesc, false)
+		reader, d, err := ocicrypt.DecryptLayer(c.ociDecryptConfig, stream.reader, desc, false)
 		if err != nil {
 			return nil, errors.Wrapf(err, "decrypting layer %s", srcInfo.Digest)
 		}
