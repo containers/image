@@ -90,13 +90,12 @@ func (c *copier) blobPipelineEncryptionStep(stream *sourceStream, toEncrypt bool
 			Size:        srcInfo.Size,
 			Annotations: annotations,
 		}
-
-		s, finalizer, err := ocicrypt.EncryptLayer(c.ociEncryptConfig, stream.reader, desc)
+		reader, finalizer, err := ocicrypt.EncryptLayer(c.ociEncryptConfig, stream.reader, desc)
 		if err != nil {
 			return nil, errors.Wrapf(err, "encrypting blob %s", srcInfo.Digest)
 		}
 
-		stream.reader = s
+		stream.reader = reader
 		stream.info.Digest = ""
 		stream.info.Size = -1
 		return &bpEncryptionStepData{
