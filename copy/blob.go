@@ -97,7 +97,6 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 	// === Deal with layer compression/decompression if necessary
 	// WARNING: If you are adding new reasons to change the blob, update also the OptimizeDestinationImageAlreadyExists
 	// short-circuit conditions
-	var inputInfo types.BlobInfo
 	var compressionOperation types.LayerCompression
 	var uploadCompressionFormat *compressiontypes.Algorithm
 	srcCompressorName := internalblobinfocache.Uncompressed
@@ -109,7 +108,6 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		// PreserveOriginal due to any compression not being able to be done on an encrypted blob unless decrypted
 		logrus.Debugf("Using original blob without modification for encrypted blob")
 		compressionOperation = types.PreserveOriginal
-		inputInfo = stream.info
 		srcCompressorName = internalblobinfocache.UnknownCompression
 		uploadCompressionFormat = nil
 		uploadCompressorName = internalblobinfocache.UnknownCompression
@@ -129,8 +127,10 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		// we don’t care.
 		go c.compressGoroutine(pipeWriter, stream.reader, compressionMetadata, *uploadCompressionFormat) // Closes pipeWriter
 		stream.reader = pipeReader
-		inputInfo.Digest = ""
-		inputInfo.Size = -1
+		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
+			Digest: "",
+			Size:   -1,
+		}
 		uploadCompressorName = uploadCompressionFormat.Name()
 	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && isCompressed &&
 		c.compressionFormat != nil && c.compressionFormat.Name() != compressionFormat.Name() {
@@ -152,8 +152,10 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		go c.compressGoroutine(pipeWriter, s, compressionMetadata, *uploadCompressionFormat) // Closes pipeWriter
 
 		stream.reader = pipeReader
-		inputInfo.Digest = ""
-		inputInfo.Size = -1
+		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
+			Digest: "",
+			Size:   -1,
+		}
 		uploadCompressorName = uploadCompressionFormat.Name()
 	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Decompress && isCompressed {
 		logrus.Debugf("Blob will be decompressed")
@@ -164,15 +166,16 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		}
 		defer s.Close()
 		stream.reader = s
-		inputInfo.Digest = ""
-		inputInfo.Size = -1
+		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
+			Digest: "",
+			Size:   -1,
+		}
 		uploadCompressionFormat = nil
 		uploadCompressorName = internalblobinfocache.Uncompressed
 	} else {
 		// PreserveOriginal might also need to recompress the original blob if the desired compression format is different.
 		logrus.Debugf("Using original blob without modification")
 		compressionOperation = types.PreserveOriginal
-		inputInfo = stream.info
 		// Remember if the original blob was compressed, and if so how, so that if
 		// LayerInfosForCopy() returned something that differs from what was in the
 		// source's manifest, and UpdatedImage() needs to call UpdateLayerInfos(),
@@ -212,10 +215,10 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 				return types.BlobInfo{}, errors.Wrapf(err, "encrypting blob %s", srcInfo.Digest)
 			}
 
-			stream.reader = s
 			finalizer = fin
-			inputInfo.Digest = ""
-			inputInfo.Size = -1
+			stream.reader = s
+			stream.info.Digest = ""
+			stream.info.Size = -1
 			encrypted = true
 		}
 	}
@@ -241,7 +244,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 	if !isConfig {
 		options.LayerIndex = &layerIndex
 	}
-	uploadedInfo, err := c.dest.PutBlobWithOptions(ctx, &errorAnnotationReader{stream.reader}, inputInfo, options)
+	uploadedInfo, err := c.dest.PutBlobWithOptions(ctx, &errorAnnotationReader{stream.reader}, stream.info, options)
 	if err != nil {
 		return types.BlobInfo{}, errors.Wrap(err, "writing blob")
 	}
@@ -282,8 +285,8 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 	if digestingReader.validationFailed { // Coverage: This should never happen.
 		return types.BlobInfo{}, errors.Errorf("Internal error writing blob %s, digest verification failed but was ignored", srcInfo.Digest)
 	}
-	if inputInfo.Digest != "" && uploadedInfo.Digest != inputInfo.Digest {
-		return types.BlobInfo{}, errors.Errorf("Internal error writing blob %s, blob with digest %s saved with digest %s", srcInfo.Digest, inputInfo.Digest, uploadedInfo.Digest)
+	if stream.info.Digest != "" && uploadedInfo.Digest != stream.info.Digest {
+		return types.BlobInfo{}, errors.Errorf("Internal error writing blob %s, blob with digest %s saved with digest %s", srcInfo.Digest, stream.info.Digest, uploadedInfo.Digest)
 	}
 	if digestingReader.validationSucceeded {
 		// Don’t record any associations that involve encrypted data. This is a bit crude,
@@ -296,7 +299,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 			// If compressionOperation != types.PreserveOriginal, we now have two reliable digest values:
 			// srcinfo.Digest describes the pre-compressionOperation input, verified by digestingReader
 			// uploadedInfo.Digest describes the post-compressionOperation output, computed by PutBlob
-			// (because inputInfo.Digest == "", this must have been computed afresh).
+			// (because stream.info.Digest == "", this must have been computed afresh).
 			switch compressionOperation {
 			case types.PreserveOriginal:
 				break // Do nothing, we have only one digest and we might not have even verified it.
