@@ -65,7 +65,6 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 	detected bpDetectCompressionStepData) (*bpCompressionStepData, error) {
 	// WARNING: If you are adding new reasons to change the blob, update also the OptimizeDestinationImageAlreadyExists
 	// short-circuit conditions
-	uploadedAnnotations := map[string]string{}
 	var uploadedAlgorithm *compressiontypes.Algorithm
 	var closers []io.Closer
 	succeeded := false
@@ -97,10 +96,11 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		} else {
 			uploadedAlgorithm = defaultCompressionFormat
 		}
+		annotations := map[string]string{}
 		// If this fails while writing data, it will do pipeWriter.CloseWithError(); if it fails otherwise,
 		// e.g. because we have exited and due to pipeReader.Close() above further writing to the pipe has failed,
 		// we don’t care.
-		go c.compressGoroutine(pipeWriter, stream.reader, uploadedAnnotations, *uploadedAlgorithm) // Closes pipeWriter
+		go c.compressGoroutine(pipeWriter, stream.reader, annotations, *uploadedAlgorithm) // Closes pipeWriter
 		stream.reader = pipeReader
 		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
 			Digest: "",
@@ -110,6 +110,7 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		return &bpCompressionStepData{
 			operation:              types.Compress,
 			uploadedAlgorithm:      uploadedAlgorithm,
+			uploadedAnnotations:    annotations,
 			srcCompressorName:      detected.srcCompressorName,
 			uploadedCompressorName: uploadedAlgorithm.Name(),
 			closers:                closers,
@@ -129,7 +130,8 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		pipeReader, pipeWriter := io.Pipe()
 		closers = append(closers, pipeReader)
 
-		go c.compressGoroutine(pipeWriter, s, uploadedAnnotations, *c.compressionFormat) // Closes pipeWriter
+		annotations := map[string]string{}
+		go c.compressGoroutine(pipeWriter, s, annotations, *c.compressionFormat) // Closes pipeWriter
 
 		stream.reader = pipeReader
 		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
@@ -140,7 +142,7 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		return &bpCompressionStepData{
 			operation:              types.PreserveOriginal,
 			uploadedAlgorithm:      c.compressionFormat,
-			uploadedAnnotations:    uploadedAnnotations,
+			uploadedAnnotations:    annotations,
 			srcCompressorName:      detected.srcCompressorName,
 			uploadedCompressorName: c.compressionFormat.Name(),
 			closers:                closers,
