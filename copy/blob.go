@@ -17,21 +17,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// errorAnnotationReader wraps the io.Reader passed to PutBlob for annotating the error happened during read.
-// These errors are reported as PutBlob errors, so we would otherwise misleadingly attribute them to the copy destination.
-type errorAnnotationReader struct {
-	reader io.Reader
-}
-
-// Read annotates the error happened during read
-func (r errorAnnotationReader) Read(b []byte) (n int, err error) {
-	n, err = r.reader.Read(b)
-	if err != io.EOF {
-		return n, errors.Wrapf(err, "happened during read")
-	}
-	return n, err
-}
-
 // copyBlobFromStream copies a blob with srcInfo (with known Digest and Annotations and possibly known Size) from srcStream to dest,
 // perhaps sending a copy to an io.Writer if getOriginalLayerCopyWriter != nil,
 // perhaps (de/re/)compressing it if canModifyBlob,
@@ -334,6 +319,21 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcStream io.Reader, sr
 	}
 
 	return uploadedInfo, nil
+}
+
+// errorAnnotationReader wraps the io.Reader passed to PutBlob for annotating the error happened during read.
+// These errors are reported as PutBlob errors, so we would otherwise misleadingly attribute them to the copy destination.
+type errorAnnotationReader struct {
+	reader io.Reader
+}
+
+// Read annotates the error happened during read
+func (r errorAnnotationReader) Read(b []byte) (n int, err error) {
+	n, err = r.reader.Read(b)
+	if err != io.EOF {
+		return n, errors.Wrapf(err, "happened during read")
+	}
+	return n, err
 }
 
 // doCompression reads all input from src and writes its compressed equivalent to dest.
