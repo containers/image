@@ -55,20 +55,15 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 
 	// === Detect compression of the input stream.
 	// This requires us to “peek ahead” into the stream to read the initial part, which requires us to chain through another io.Reader returned by DetectCompression.
-	compressionFormat, decompressor, detectCompressionFormatReader, err := compression.DetectCompressionFormat(stream.reader) // We could skip this in some cases, but let's keep the code path uniform
+	detectedCompression, err := blobPipelineDetectCompressionStep(&stream, srcInfo)
 	if err != nil {
-		return types.BlobInfo{}, errors.Wrapf(err, "reading blob %s", srcInfo.Digest)
-	}
-	stream.reader = detectCompressionFormatReader
-	isCompressed := decompressor != nil
-	if expectedCompressionFormat, known := expectedCompressionFormats[stream.info.MediaType]; known && isCompressed && compressionFormat.Name() != expectedCompressionFormat.Name() {
-		logrus.Debugf("blob %s with type %s should be compressed with %s, but compressor appears to be %s", srcInfo.Digest.String(), srcInfo.MediaType, expectedCompressionFormat.Name(), compressionFormat.Name())
+		return types.BlobInfo{}, err
 	}
 
 	// === Send a copy of the original, uncompressed, stream, to a separate path if necessary.
 	var originalLayerReader io.Reader // DO NOT USE this other than to drain the input if no other consumer in the pipeline has done so.
 	if getOriginalLayerCopyWriter != nil {
-		stream.reader = io.TeeReader(stream.reader, getOriginalLayerCopyWriter(decompressor))
+		stream.reader = io.TeeReader(stream.reader, getOriginalLayerCopyWriter(detectedCompression.decompressor))
 		originalLayerReader = stream.reader
 	}
 
@@ -79,8 +74,8 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 	var compressionOperation types.LayerCompression
 	var uploadCompressionFormat *compressiontypes.Algorithm
 	srcCompressorName := internalblobinfocache.Uncompressed
-	if isCompressed {
-		srcCompressorName = compressionFormat.Name()
+	if detectedCompression.isCompressed {
+		srcCompressorName = detectedCompression.format.Name()
 	}
 	var uploadCompressorName string
 	if canModifyBlob && isOciEncrypted(stream.info.MediaType) {
@@ -90,7 +85,7 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		srcCompressorName = internalblobinfocache.UnknownCompression
 		uploadCompressionFormat = nil
 		uploadCompressorName = internalblobinfocache.UnknownCompression
-	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && !isCompressed {
+	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && !detectedCompression.isCompressed {
 		logrus.Debugf("Compressing blob on the fly")
 		compressionOperation = types.Compress
 		pipeReader, pipeWriter := io.Pipe()
@@ -111,14 +106,14 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 			Size:   -1,
 		}
 		uploadCompressorName = uploadCompressionFormat.Name()
-	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && isCompressed &&
-		c.compressionFormat != nil && c.compressionFormat.Name() != compressionFormat.Name() {
+	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && detectedCompression.isCompressed &&
+		c.compressionFormat != nil && c.compressionFormat.Name() != detectedCompression.format.Name() {
 		// When the blob is compressed, but the desired format is different, it first needs to be decompressed and finally
 		// re-compressed using the desired format.
 		logrus.Debugf("Blob will be converted")
 
 		compressionOperation = types.PreserveOriginal
-		s, err := decompressor(stream.reader)
+		s, err := detectedCompression.decompressor(stream.reader)
 		if err != nil {
 			return types.BlobInfo{}, err
 		}
@@ -136,10 +131,10 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 			Size:   -1,
 		}
 		uploadCompressorName = uploadCompressionFormat.Name()
-	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Decompress && isCompressed {
+	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Decompress && detectedCompression.isCompressed {
 		logrus.Debugf("Blob will be decompressed")
 		compressionOperation = types.Decompress
-		s, err := decompressor(stream.reader)
+		s, err := detectedCompression.decompressor(stream.reader)
 		if err != nil {
 			return types.BlobInfo{}, err
 		}
@@ -159,8 +154,8 @@ func (c *copier) copyBlobFromStream(ctx context.Context, srcReader io.Reader, sr
 		// LayerInfosForCopy() returned something that differs from what was in the
 		// source's manifest, and UpdatedImage() needs to call UpdateLayerInfos(),
 		// it will be able to correctly derive the MediaType for the copied blob.
-		if isCompressed {
-			uploadCompressionFormat = &compressionFormat
+		if detectedCompression.isCompressed {
+			uploadCompressionFormat = &detectedCompression.format
 		} else {
 			uploadCompressionFormat = nil
 		}
