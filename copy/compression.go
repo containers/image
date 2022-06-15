@@ -65,7 +65,6 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 	detected bpDetectCompressionStepData) (*bpCompressionStepData, error) {
 	// WARNING: If you are adding new reasons to change the blob, update also the OptimizeDestinationImageAlreadyExists
 	// short-circuit conditions
-	var uploadedAlgorithm *compressiontypes.Algorithm
 	var closers []io.Closer
 	succeeded := false
 	defer func() {
@@ -91,6 +90,7 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		pipeReader, pipeWriter := io.Pipe()
 		closers = append(closers, pipeReader)
 
+		var uploadedAlgorithm *compressiontypes.Algorithm
 		if c.compressionFormat != nil {
 			uploadedAlgorithm = c.compressionFormat
 		} else {
@@ -174,15 +174,16 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		// LayerInfosForCopy() returned something that differs from what was in the
 		// source's manifest, and UpdatedImage() needs to call UpdateLayerInfos(),
 		// it will be able to correctly derive the MediaType for the copied blob.
+		var algorithm *compressiontypes.Algorithm
 		if detected.isCompressed {
-			uploadedAlgorithm = &detected.format
+			algorithm = &detected.format
 		} else {
-			uploadedAlgorithm = nil
+			algorithm = nil
 		}
 		succeeded = true
 		return &bpCompressionStepData{
 			operation:              types.PreserveOriginal,
-			uploadedAlgorithm:      uploadedAlgorithm,
+			uploadedAlgorithm:      algorithm,
 			srcCompressorName:      detected.srcCompressorName,
 			uploadedCompressorName: detected.srcCompressorName,
 			closers:                closers,
