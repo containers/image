@@ -66,10 +66,7 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 	// WARNING: If you are adding new reasons to change the blob, update also the OptimizeDestinationImageAlreadyExists
 	// short-circuit conditions
 	uploadedAnnotations := map[string]string{}
-	var operation types.LayerCompression
 	var uploadedAlgorithm *compressiontypes.Algorithm
-	srcCompressorName := detected.srcCompressorName
-	var uploadedCompressorName string
 	var closers []io.Closer
 	succeeded := false
 	defer func() {
@@ -82,13 +79,16 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 	if canModifyBlob && isOciEncrypted(stream.info.MediaType) {
 		// PreserveOriginal due to any compression not being able to be done on an encrypted blob unless decrypted
 		logrus.Debugf("Using original blob without modification for encrypted blob")
-		operation = types.PreserveOriginal
-		srcCompressorName = internalblobinfocache.UnknownCompression
-		uploadedAlgorithm = nil
-		uploadedCompressorName = internalblobinfocache.UnknownCompression
+		succeeded = true
+		return &bpCompressionStepData{
+			operation:              types.PreserveOriginal,
+			uploadedAlgorithm:      nil,
+			srcCompressorName:      internalblobinfocache.UnknownCompression,
+			uploadedCompressorName: internalblobinfocache.UnknownCompression,
+			closers:                closers,
+		}, nil
 	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && !detected.isCompressed {
 		logrus.Debugf("Compressing blob on the fly")
-		operation = types.Compress
 		pipeReader, pipeWriter := io.Pipe()
 		closers = append(closers, pipeReader)
 
@@ -106,14 +106,20 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 			Digest: "",
 			Size:   -1,
 		}
-		uploadedCompressorName = uploadedAlgorithm.Name()
+		succeeded = true
+		return &bpCompressionStepData{
+			operation:              types.Compress,
+			uploadedAlgorithm:      uploadedAlgorithm,
+			srcCompressorName:      detected.srcCompressorName,
+			uploadedCompressorName: uploadedAlgorithm.Name(),
+			closers:                closers,
+		}, nil
 	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Compress && detected.isCompressed &&
 		c.compressionFormat != nil && c.compressionFormat.Name() != detected.format.Name() {
 		// When the blob is compressed, but the desired format is different, it first needs to be decompressed and finally
 		// re-compressed using the desired format.
 		logrus.Debugf("Blob will be converted")
 
-		operation = types.PreserveOriginal
 		s, err := detected.decompressor(stream.reader)
 		if err != nil {
 			return nil, err
@@ -123,18 +129,24 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		pipeReader, pipeWriter := io.Pipe()
 		closers = append(closers, pipeReader)
 
-		uploadedAlgorithm = c.compressionFormat
-		go c.compressGoroutine(pipeWriter, s, uploadedAnnotations, *uploadedAlgorithm) // Closes pipeWriter
+		go c.compressGoroutine(pipeWriter, s, uploadedAnnotations, *c.compressionFormat) // Closes pipeWriter
 
 		stream.reader = pipeReader
 		stream.info = types.BlobInfo{ // FIXME? Should we preserve more data in src.info?
 			Digest: "",
 			Size:   -1,
 		}
-		uploadedCompressorName = uploadedAlgorithm.Name()
+		succeeded = true
+		return &bpCompressionStepData{
+			operation:              types.PreserveOriginal,
+			uploadedAlgorithm:      c.compressionFormat,
+			uploadedAnnotations:    uploadedAnnotations,
+			srcCompressorName:      detected.srcCompressorName,
+			uploadedCompressorName: c.compressionFormat.Name(),
+			closers:                closers,
+		}, nil
 	} else if canModifyBlob && c.dest.DesiredLayerCompression() == types.Decompress && detected.isCompressed {
 		logrus.Debugf("Blob will be decompressed")
-		operation = types.Decompress
 		s, err := detected.decompressor(stream.reader)
 		if err != nil {
 			return nil, err
@@ -145,12 +157,17 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 			Digest: "",
 			Size:   -1,
 		}
-		uploadedAlgorithm = nil
-		uploadedCompressorName = internalblobinfocache.Uncompressed
+		succeeded = true
+		return &bpCompressionStepData{
+			operation:              types.Decompress,
+			uploadedAlgorithm:      nil,
+			srcCompressorName:      detected.srcCompressorName,
+			uploadedCompressorName: internalblobinfocache.Uncompressed,
+			closers:                closers,
+		}, nil
 	} else {
 		// PreserveOriginal might also need to recompress the original blob if the desired compression format is different.
 		logrus.Debugf("Using original blob without modification")
-		operation = types.PreserveOriginal
 		// Remember if the original blob was compressed, and if so how, so that if
 		// LayerInfosForCopy() returned something that differs from what was in the
 		// source's manifest, and UpdatedImage() needs to call UpdateLayerInfos(),
@@ -160,17 +177,15 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 		} else {
 			uploadedAlgorithm = nil
 		}
-		uploadedCompressorName = srcCompressorName
+		succeeded = true
+		return &bpCompressionStepData{
+			operation:              types.PreserveOriginal,
+			uploadedAlgorithm:      uploadedAlgorithm,
+			srcCompressorName:      detected.srcCompressorName,
+			uploadedCompressorName: detected.srcCompressorName,
+			closers:                closers,
+		}, nil
 	}
-	succeeded = true
-	return &bpCompressionStepData{
-		operation:              operation,
-		uploadedAlgorithm:      uploadedAlgorithm,
-		uploadedAnnotations:    uploadedAnnotations,
-		srcCompressorName:      srcCompressorName,
-		uploadedCompressorName: uploadedCompressorName,
-		closers:                closers,
-	}, nil
 }
 
 // updateCompressionEdits sets *operation, *algorithm and updates *annotations, if necessary.
