@@ -65,7 +65,7 @@ func (ic *imageCopier) copyBlobFromStream(ctx context.Context, srcReader io.Read
 	// short-circuit conditions
 	canModifyBlob := !isConfig && ic.cannotModifyManifestReason == ""
 	// === Deal with layer compression/decompression if necessary
-	compressionStep, err := ic.blobPipelineCompressionStep(&stream, canModifyBlob, detectedCompression)
+	compressionStep, err := ic.blobPipelineCompressionStep(&stream, canModifyBlob, srcInfo, detectedCompression)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}

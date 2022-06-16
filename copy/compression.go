@@ -58,10 +58,10 @@ type bpCompressionStepData struct {
 }
 
 // blobPipelineCompressionStep updates *stream to compress and/or decompress it.
-// srcInfo is only used for error messages.
+// srcInfo is primarily used for error messages.
 // Returns data for other steps; the caller should eventually call updateCompressionEdits and perhaps recordValidatedBlobData,
 // and must eventually call close.
-func (ic *imageCopier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob bool,
+func (ic *imageCopier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob bool, srcInfo types.BlobInfo,
 	detected bpDetectCompressionStepData) (*bpCompressionStepData, error) {
 	// WARNING: If you are adding new reasons to change the blob, update also the OptimizeDestinationImageAlreadyExists
 	// short-circuit conditions
