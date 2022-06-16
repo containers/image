@@ -941,7 +941,7 @@ func (s *storageImageDestination) commitLayer(ctx context.Context, blob manifest
 	s.lock.Unlock()
 	if ok {
 		layer, err := al.PutAs(id, lastLayer, nil)
-		if err != nil {
+		if err != nil && errors.Cause(err) != storage.ErrDuplicateID {
 			return errors.Wrapf(err, "failed to put layer from digest and labels")
 		}
 		lastLayer = layer.ID
