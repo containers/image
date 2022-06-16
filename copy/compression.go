@@ -87,8 +87,8 @@ func (c *copier) blobPipelineCompressionStep(stream *sourceStream, canModifyBlob
 // bpcPreserveEncrypted checks if the input is encrypted, and returns a *bpCompressionStepData if so.
 func (c *copier) bpcPreserveEncrypted(stream *sourceStream, _ bpDetectCompressionStepData) (*bpCompressionStepData, error) {
 	if isOciEncrypted(stream.info.MediaType) {
-		// PreserveOriginal due to any compression not being able to be done on an encrypted blob unless decrypted
 		logrus.Debugf("Using original blob without modification for encrypted blob")
+		// PreserveOriginal due to any compression not being able to be done on an encrypted blob unless decrypted
 		return &bpCompressionStepData{
 			operation:              types.PreserveOriginal,
 			uploadedAlgorithm:      nil,
@@ -195,7 +195,6 @@ func (c *copier) bpcDecompressCompressed(stream *sourceStream, detected bpDetect
 
 // bpcPreserveOriginal returns a *bpCompressionStepData for not changing the original blob.
 func (c *copier) bpcPreserveOriginal(stream *sourceStream, detected bpDetectCompressionStepData) *bpCompressionStepData {
-	// PreserveOriginal might also need to recompress the original blob if the desired compression format is different.
 	logrus.Debugf("Using original blob without modification")
 	// Remember if the original blob was compressed, and if so how, so that if
 	// LayerInfosForCopy() returned something that differs from what was in the
