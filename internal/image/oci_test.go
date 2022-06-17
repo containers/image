@@ -193,6 +193,31 @@ func TestManifestOCI1ConfigBlob(t *testing.T) {
 	assert.Equal(t, configBlob, cb)
 }
 
+func TestManifestOCI1OCIConfig(t *testing.T) {
+	// Just a smoke-test that the code can read the data…
+	configJSON, err := os.ReadFile("fixtures/oci1-config.json")
+	require.NoError(t, err)
+	expectedConfig := imgspecv1.Image{}
+	err = json.Unmarshal(configJSON, &expectedConfig)
+	require.NoError(t, err)
+
+	originalSrc := newOCI1ImageSource(t, "httpd:latest")
+	for _, m := range []genericManifest{
+		manifestOCI1FromFixture(t, originalSrc, "oci1.json"),
+		manifestOCI1FromComponentsLikeFixture(configJSON),
+	} {
+		config, err := m.OCIConfig(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, &expectedConfig, config)
+	}
+
+	// This can share originalSrc because the config digest is the same between oci1-artifact.json and oci1.json
+	artifact := manifestOCI1FromFixture(t, originalSrc, "oci1-artifact.json")
+	_, err = artifact.OCIConfig(context.Background())
+	var expected manifest.NonImageArtifactError
+	assert.ErrorAs(t, err, &expected)
+}
+
 func TestManifestOCI1LayerInfo(t *testing.T) {
 	for _, m := range []genericManifest{
 		manifestOCI1FromFixture(t, mocks.ForbiddenImageSource{}, "oci1.json"),
@@ -454,7 +479,18 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 		{Digest: GzippedEmptyLayerDigest, Size: -1},
 	}, s1Manifest.LayerInfos())
 
-	// FIXME? Test also the various failure cases, if only to see that we don't crash?
+	// This can share originalSrc because the config digest is the same between oci1-artifact.json and oci1.json
+	artifact := manifestOCI1FromFixture(t, originalSrc, "oci1-artifact.json")
+	_, err = artifact.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
+		InformationOnly: types.ManifestUpdateInformation{
+			Destination: memoryDest,
+		},
+	})
+	var expected manifest.NonImageArtifactError
+	assert.ErrorAs(t, err, &expected)
+
+	// FIXME? Test also the other failure cases, if only to see that we don't crash?
 }
 
 func TestConvertToManifestSchema2(t *testing.T) {
@@ -478,7 +514,15 @@ func TestConvertToManifestSchema2(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, byHand, converted)
 
-	// FIXME? Test also the various failure cases, if only to see that we don't crash?
+	// This can share originalSrc because the config digest is the same between oci1-artifact.json and oci1.json
+	artifact := manifestOCI1FromFixture(t, originalSrc, "oci1-artifact.json")
+	_, err = artifact.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
+	})
+	var expected manifest.NonImageArtifactError
+	assert.ErrorAs(t, err, &expected)
+
+	// FIXME? Test also the other failure cases, if only to see that we don't crash?
 }
 
 func TestConvertToManifestSchema2AllMediaTypes(t *testing.T) {
@@ -497,4 +541,18 @@ func TestConvertToV2S2WithInvalidMIMEType(t *testing.T) {
 
 	_, err = manifestOCI1FromManifest(originalSrc, manifest)
 	require.NoError(t, err)
+}
+
+func TestManifestOCI1CanChangeLayerCompression(t *testing.T) {
+	for _, m := range []genericManifest{
+		manifestOCI1FromFixture(t, mocks.ForbiddenImageSource{}, "oci1.json"),
+		manifestOCI1FromComponentsLikeFixture(nil),
+	} {
+		assert.True(t, m.CanChangeLayerCompression(imgspecv1.MediaTypeImageLayerGzip))
+		// Some projects like to use squashfs and other unspecified formats for layers; don’t touch those.
+		assert.False(t, m.CanChangeLayerCompression("a completely unknown and quite possibly invalid MIME type"))
+	}
+
+	artifact := manifestOCI1FromFixture(t, mocks.ForbiddenImageSource{}, "oci1-artifact.json")
+	assert.False(t, artifact.CanChangeLayerCompression(imgspecv1.MediaTypeImageLayerGzip))
 }

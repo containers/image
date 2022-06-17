@@ -667,3 +667,12 @@ func TestConvertSchema1ToManifestOCIWithAnnotations(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, res.LayerInfos(), layerInfoOverwrites)
 }
+
+func TestManifestSchema1CanChangeLayerCompression(t *testing.T) {
+	for _, m := range []genericManifest{
+		manifestSchema1FromFixture(t, "schema1.json"),
+		manifestSchema1FromComponentsLikeFixture(t),
+	} {
+		assert.True(t, m.CanChangeLayerCompression(""))
+	}
+}

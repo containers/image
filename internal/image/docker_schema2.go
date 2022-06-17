@@ -402,3 +402,12 @@ func v1ConfigFromConfigJSON(configJSON []byte, v1ID, parentV1ID string, throwawa
 func (m *manifestSchema2) SupportsEncryption(context.Context) bool {
 	return false
 }
+
+// CanChangeLayerCompression returns true if we can compress/decompress layers with mimeType in the current image
+// (and the code can handle that).
+// NOTE: Even if this returns true, the relevant format might not accept all compression algorithms; the set of accepted
+// algorithms depends not on the current format, but possibly on the target of a conversion (if UpdatedImage converts
+// to a different manifest format).
+func (m *manifestSchema2) CanChangeLayerCompression(mimeType string) bool {
+	return m.m.CanChangeLayerCompression(mimeType)
+}
