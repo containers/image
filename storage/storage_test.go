@@ -392,13 +392,13 @@ func TestWriteRead(t *testing.T) {
 		if _, err := dest.PutBlob(context.Background(), strings.NewReader(config), configInfo, cache, false); err != nil {
 			t.Fatalf("Error saving config to destination: %v", err)
 		}
-		manifest := strings.Replace(manifestFmt, "%lh", digest.String(), -1)
-		manifest = strings.Replace(manifest, "%ch", configInfo.Digest.String(), -1)
-		manifest = strings.Replace(manifest, "%ls", fmt.Sprintf("%d", size), -1)
-		manifest = strings.Replace(manifest, "%cs", fmt.Sprintf("%d", configInfo.Size), -1)
+		manifest := strings.ReplaceAll(manifestFmt, "%lh", digest.String())
+		manifest = strings.ReplaceAll(manifest, "%ch", configInfo.Digest.String())
+		manifest = strings.ReplaceAll(manifest, "%ls", fmt.Sprintf("%d", size))
+		manifest = strings.ReplaceAll(manifest, "%cs", fmt.Sprintf("%d", configInfo.Size))
 		li := digest.Hex()
-		manifest = strings.Replace(manifest, "%li", li, -1)
-		manifest = strings.Replace(manifest, "%ci", sum.Hex(), -1)
+		manifest = strings.ReplaceAll(manifest, "%li", li)
+		manifest = strings.ReplaceAll(manifest, "%ci", sum.Hex())
 		t.Logf("this manifest is %q", manifest)
 		if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
 			t.Fatalf("Error saving manifest to destination: %v", err)

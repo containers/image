@@ -39,7 +39,7 @@ func TestDockerImageSourceReference(t *testing.T) {
 	require.NoError(t, err)
 	registry := registryURL.Host
 
-	mirrorConfiguration := strings.Replace(
+	mirrorConfiguration := strings.ReplaceAll(
 		`[[registry]]
 prefix = "primary-override.example.com"
 location = "@REGISTRY@/primary-override"
@@ -49,7 +49,7 @@ location = "with-mirror.example.com"
 
 [[registry.mirror]]
 location = "@REGISTRY@/with-mirror"
-`, "@REGISTRY@", registry, -1)
+`, "@REGISTRY@", registry)
 	registriesConf, err := os.CreateTemp("", "docker-image-src")
 	require.NoError(t, err)
 	defer registriesConf.Close()
