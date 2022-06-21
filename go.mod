@@ -24,7 +24,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/proglottis/gpgme v0.1.2
 	github.com/sirupsen/logrus v1.8.1
-	github.com/stretchr/testify v1.7.2
+	github.com/stretchr/testify v1.7.4
 	github.com/sylabs/sif/v2 v2.7.1
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbatts/tar-split v0.11.2
