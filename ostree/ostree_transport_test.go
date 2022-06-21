@@ -28,7 +28,7 @@ func TestTransportName(t *testing.T) {
 
 // A helper to replace $TMP in a repo path with a real temporary directory
 func withTmpDir(repo string, tmpDir string) string {
-	return strings.Replace(repo, "$TMP", tmpDir, -1)
+	return strings.ReplaceAll(repo, "$TMP", tmpDir)
 }
 
 // A common list of repo suffixes to test for the various ImageReference methods.
