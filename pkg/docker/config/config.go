@@ -469,14 +469,13 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 					// It's okay if the helper doesn't exist.
 					continue
 				} else {
-					// fall through
+					break
 				}
-			} else {
-				for registry := range creds {
-					err = deleteAuthFromCredHelper(helper, registry)
-					if err != nil {
-						break
-					}
+			}
+			for registry := range creds {
+				err = deleteAuthFromCredHelper(helper, registry)
+				if err != nil {
+					break
 				}
 			}
 		}
