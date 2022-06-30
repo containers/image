@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -118,13 +119,13 @@ func (c *openshiftClient) doRequest(ctx context.Context, method, path string, re
 	switch {
 	case res.StatusCode == http.StatusSwitchingProtocols: // FIXME?! No idea why this weird case exists in k8s.io/kubernetes/pkg/client/restclient.
 		if statusValid && status.Status != "Success" {
-			return nil, perrors.New(status.Message)
+			return nil, errors.New(status.Message)
 		}
 	case res.StatusCode >= http.StatusOK && res.StatusCode <= http.StatusPartialContent:
 		// OK.
 	default:
 		if statusValid {
-			return nil, perrors.New(status.Message)
+			return nil, errors.New(status.Message)
 		}
 		return nil, fmt.Errorf("HTTP error: status code: %d (%s), body: %s", res.StatusCode, http.StatusText(res.StatusCode), string(body))
 	}
@@ -292,7 +293,7 @@ func (s *openshiftImageSource) ensureImageIsResolved(ctx context.Context) error 
 		}
 	}
 	if te == nil {
-		return perrors.New("No matching tag found")
+		return errors.New("No matching tag found")
 	}
 	logrus.Debugf("tag event %#v", te)
 	dockerRefString, err := s.client.convertDockerImageReference(te.DockerImageReference)
@@ -437,7 +438,7 @@ func (d *openshiftImageDestination) PutSignatures(ctx context.Context, signature
 	var imageStreamImageName string
 	if instanceDigest == nil {
 		if d.imageStreamImageName == "" {
-			return perrors.New("Internal error: Unknown manifest digest, can't add signatures")
+			return errors.New("Internal error: Unknown manifest digest, can't add signatures")
 		}
 		imageStreamImageName = d.imageStreamImageName
 	} else {

@@ -1,6 +1,7 @@
 package shortnames
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -188,7 +189,7 @@ func (r *Resolved) FormatPullErrors(pullErrors []error) error {
 			sb.WriteString("\n * ")
 			sb.WriteString(e.Error())
 		}
-		return perrors.New(sb.String())
+		return errors.New(sb.String())
 	}
 }
 
@@ -361,7 +362,7 @@ func Resolve(ctx *types.SystemContext, name string) (*Resolved, error) {
 			return resolved, nil
 		case types.ShortNameModeEnforcing:
 			// Enforcing errors out without a prompt.
-			return nil, perrors.New("short-name resolution enforced but cannot prompt without a TTY")
+			return nil, errors.New("short-name resolution enforced but cannot prompt without a TTY")
 		default:
 			// We should not end up here.
 			return nil, fmt.Errorf("unexpected short-name mode (%v) during resolution", mode)

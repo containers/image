@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -47,9 +48,9 @@ var (
 
 	// ErrNotLoggedIn is returned for users not logged into a registry
 	// that they are trying to logout of
-	ErrNotLoggedIn = perrors.New("not logged in")
+	ErrNotLoggedIn = errors.New("not logged in")
 	// ErrNotSupported is returned for unsupported methods
-	ErrNotSupported = perrors.New("not supported")
+	ErrNotSupported = errors.New("not supported")
 )
 
 // SetCredentials stores the username and password in a location

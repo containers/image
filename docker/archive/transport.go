@@ -2,6 +2,7 @@ package archive
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -38,7 +39,7 @@ func (t archiveTransport) ParseReference(reference string) (types.ImageReference
 // scope passed to this function will not be "", that value is always allowed.
 func (t archiveTransport) ValidatePolicyConfigurationScope(scope string) error {
 	// See the explanation in archiveReference.PolicyConfigurationIdentity.
-	return perrors.New(`docker-archive: does not support any scopes except the default "" one`)
+	return errors.New(`docker-archive: does not support any scopes except the default "" one`)
 }
 
 // archiveReference is an ImageReference for Docker images.
@@ -203,5 +204,5 @@ func (ref archiveReference) NewImageDestination(ctx context.Context, sys *types.
 // DeleteImage deletes the named image from the registry, if supported.
 func (ref archiveReference) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
 	// Not really supported, for safety reasons.
-	return perrors.New("Deleting images not implemented for docker-archive: images")
+	return errors.New("Deleting images not implemented for docker-archive: images")
 }

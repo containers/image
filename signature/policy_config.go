@@ -15,6 +15,7 @@ package signature
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -162,7 +163,7 @@ var _ json.Unmarshaler = (*PolicyTransportScopes)(nil)
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (m *PolicyTransportScopes) UnmarshalJSON(data []byte) error {
-	return perrors.New("Do not try to unmarshal PolicyTransportScopes directly")
+	return errors.New("Do not try to unmarshal PolicyTransportScopes directly")
 }
 
 // policyTransportScopesWithTransport is a way to unmarshal a PolicyTransportScopes

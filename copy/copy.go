@@ -3,6 +3,7 @@ package copy
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -37,7 +38,7 @@ import (
 
 var (
 	// ErrDecryptParamsMissing is returned if there is missing decryption parameters
-	ErrDecryptParamsMissing = perrors.New("Necessary DecryptParameters not present")
+	ErrDecryptParamsMissing = errors.New("Necessary DecryptParameters not present")
 
 	// maxParallelDownloads is used to limit the maximum number of parallel
 	// downloads.  Let's follow Firefox by limiting it to 6.
@@ -424,7 +425,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 				return nil, perrors.Wrapf(err, "computing digest of source image's manifest")
 			}
 			if !matches {
-				return nil, perrors.New("Digest of source image's manifest would not match destination reference")
+				return nil, errors.New("Digest of source image's manifest would not match destination reference")
 			}
 		}
 	}
@@ -628,7 +629,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 					return nil, "", "", perrors.Wrapf(err, "computing digest of source image's manifest")
 				}
 				if !matches {
-					return nil, "", "", perrors.New("Digest of source image's manifest would not match destination reference")
+					return nil, "", "", errors.New("Digest of source image's manifest would not match destination reference")
 				}
 			}
 		}
@@ -930,7 +931,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 			// In which case src.LayerInfos will not have URLs because schema1
 			// does not support them.
 			if ic.diffIDsAreNeeded {
-				cld.err = perrors.New("getting DiffID for foreign layers is unimplemented")
+				cld.err = errors.New("getting DiffID for foreign layers is unimplemented")
 			} else {
 				cld.destInfo = srcLayer
 				logrus.Debugf("Skipping foreign layer %q copy to %s", cld.destInfo.Digest, ic.c.dest.Reference().Transport().Name())
@@ -1285,7 +1286,7 @@ func (ic *imageCopier) copyLayerFromStream(ctx context.Context, srcStream io.Rea
 	var getDiffIDRecorder func(compressiontypes.DecompressorFunc) io.Writer // = nil
 	var diffIDChan chan diffIDResult
 
-	err := perrors.New("Internal error: unexpected panic in copyLayer") // For pipeWriter.CloseWithbelow
+	err := errors.New("Internal error: unexpected panic in copyLayer") // For pipeWriter.CloseWithbelow
 	if diffIDIsNeeded {
 		diffIDChan = make(chan diffIDResult, 1) // Buffered, so that sending a value after this or our caller has failed and exited does not block.
 		pipeReader, pipeWriter := io.Pipe()
@@ -1315,7 +1316,7 @@ func (ic *imageCopier) copyLayerFromStream(ctx context.Context, srcStream io.Rea
 func diffIDComputationGoroutine(dest chan<- diffIDResult, layerStream io.ReadCloser, decompressor compressiontypes.DecompressorFunc) {
 	result := diffIDResult{
 		digest: "",
-		err:    perrors.New("Internal error: unexpected panic in diffIDComputationGoroutine"),
+		err:    errors.New("Internal error: unexpected panic in diffIDComputationGoroutine"),
 	}
 	defer func() { dest <- result }()
 	defer layerStream.Close() // We do not care to bother the other end of the pipe with other failures; we send them to dest instead.

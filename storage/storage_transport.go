@@ -4,6 +4,7 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -32,10 +33,10 @@ var (
 	Transport StoreTransport = &storageTransport{}
 	// ErrInvalidReference is returned when ParseReference() is passed an
 	// empty reference.
-	ErrInvalidReference = perrors.New("invalid reference")
+	ErrInvalidReference = errors.New("invalid reference")
 	// ErrPathNotAbsolute is returned when a graph root is not an absolute
 	// path name.
-	ErrPathNotAbsolute = perrors.New("path name is not absolute")
+	ErrPathNotAbsolute = errors.New("path name is not absolute")
 )
 
 // StoreTransport is an ImageTransport that uses a storage.Store to parse
@@ -372,7 +373,7 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 			return err
 		}
 	default: // Coverage: This should never happen
-		return perrors.New("Internal error: unexpected number of fields form strings.SplitN")
+		return errors.New("Internal error: unexpected number of fields form strings.SplitN")
 	}
 	// As for field[0], if it is non-empty at all:
 	// FIXME? We could be verifying the various character set and length restrictions

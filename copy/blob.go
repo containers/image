@@ -2,6 +2,7 @@ package copy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -76,7 +77,7 @@ func (ic *imageCopier) copyBlobFromStream(ctx context.Context, srcReader io.Read
 	if decryptionStep.decrypting && toEncrypt {
 		// If nothing else, we can only set uploadedInfo.CryptoOperation to a single value.
 		// Before relaxing this, see the original pull request’s review if there are other reasons to reject this.
-		return types.BlobInfo{}, perrors.New("Unable to support both decryption and encryption in the same copy")
+		return types.BlobInfo{}, errors.New("Unable to support both decryption and encryption in the same copy")
 	}
 	encryptionStep, err := ic.c.blobPipelineEncryptionStep(&stream, toEncrypt, srcInfo, decryptionStep)
 	if err != nil {

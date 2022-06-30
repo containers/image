@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -327,9 +328,9 @@ func (config *directClientConfig) getContext() clientcmdContext {
 }
 
 var (
-	errEmptyConfig = perrors.New("no configuration has been provided")
+	errEmptyConfig = errors.New("no configuration has been provided")
 	// message is for consistency with old behavior
-	errEmptyCluster = perrors.New("cluster has no server defined")
+	errEmptyCluster = errors.New("cluster has no server defined")
 )
 
 //helper for checking certificate/key/CA
@@ -354,7 +355,7 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdCluster) []err
 
 	if len(clusterInfo.Server) == 0 {
 		if len(clusterName) == 0 {
-			validationErrors = append(validationErrors, perrors.New("default cluster has no server defined"))
+			validationErrors = append(validationErrors, errors.New("default cluster has no server defined"))
 		} else {
 			validationErrors = append(validationErrors, fmt.Errorf("no server found for cluster %q", clusterName))
 		}
@@ -774,7 +775,7 @@ func restClientFor(config *restConfig) (*url.URL, *http.Client, error) {
 // Kubernetes API.
 func defaultServerURL(host string, defaultTLS bool) (*url.URL, error) {
 	if host == "" {
-		return nil, perrors.New("host must be a URL or a host:port pair")
+		return nil, errors.New("host must be a URL or a host:port pair")
 	}
 	base := host
 	hostURL, err := url.Parse(base)
@@ -861,7 +862,7 @@ func transportNew(config *restConfig) (http.RoundTripper, error) {
 
 	// REMOVED: HTTPWrappersForConfig(config, rt) in favor of the caller setting HTTP headers itself based on restConfig. Only this inlined check remains.
 	if len(config.Username) != 0 && len(config.BearerToken) != 0 {
-		return nil, perrors.New("username/password or bearer token may be set, but not both")
+		return nil, errors.New("username/password or bearer token may be set, but not both")
 	}
 
 	return rt, nil
@@ -954,7 +955,7 @@ func tlsConfigFor(c *restConfig) (*tls.Config, error) {
 		return nil, nil
 	}
 	if c.HasCA() && c.Insecure {
-		return nil, perrors.New("specifying a root certificates file with the insecure flag is not allowed")
+		return nil, errors.New("specifying a root certificates file with the insecure flag is not allowed")
 	}
 	if err := loadTLSFiles(c); err != nil {
 		return nil, err

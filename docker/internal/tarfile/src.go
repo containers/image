@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -180,7 +181,7 @@ func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manif
 		}
 	}
 	if len(unknownLayerSizes) != 0 {
-		return nil, perrors.New("Some layer tarfiles are missing in the tarball") // This could do with a better error reporting, if this ever happened in practice.
+		return nil, errors.New("Some layer tarfiles are missing in the tarball") // This could do with a better error reporting, if this ever happened in practice.
 	}
 
 	return knownLayers, nil
@@ -195,7 +196,7 @@ func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manif
 func (s *Source) GetManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error) {
 	if instanceDigest != nil {
 		// How did we even get here? GetManifest(ctx, nil) has returned a manifest.DockerV2Schema2MediaType.
-		return nil, "", perrors.New(`Manifest lists are not supported by "docker-daemon:"`)
+		return nil, "", errors.New(`Manifest lists are not supported by "docker-daemon:"`)
 	}
 	if s.generatedManifest == nil {
 		if err := s.ensureCachedDataIsPresent(); err != nil {
@@ -314,7 +315,7 @@ func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo, cache types.B
 func (s *Source) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
 	if instanceDigest != nil {
 		// How did we even get here? GetManifest(ctx, nil) has returned a manifest.DockerV2Schema2MediaType.
-		return nil, perrors.New(`Manifest lists are not supported by "docker-daemon:"`)
+		return nil, errors.New(`Manifest lists are not supported by "docker-daemon:"`)
 	}
 	return [][]byte{}, nil
 }

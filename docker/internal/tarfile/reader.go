@@ -3,6 +3,7 @@ package tarfile
 import (
 	"archive/tar"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -189,7 +190,7 @@ func (r *Reader) openTarComponent(componentPath string) (io.ReadCloser, error) {
 	// This is only a sanity check; if anyone did concurrently close ra, this access is technically
 	// racy against the write in .Close().
 	if r.path == "" {
-		return nil, perrors.New("Internal error: trying to read an already closed tarfile.Reader")
+		return nil, errors.New("Internal error: trying to read an already closed tarfile.Reader")
 	}
 
 	f, err := os.Open(r.path)

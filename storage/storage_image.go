@@ -286,7 +286,7 @@ func (s *storageImageSource) LayerInfosForCopy(ctx context.Context, instanceDige
 		return nil, perrors.Wrapf(err, "reading image manifest for %q", s.image.ID)
 	}
 	if manifest.MIMETypeIsMultiImage(manifestType) {
-		return nil, perrors.New("can't copy layers for a manifest list (shouldn't be attempted)")
+		return nil, errors.New("can't copy layers for a manifest list (shouldn't be attempted)")
 	}
 	man, err := manifest.FromBlob(manifestBlob, manifestType)
 	if err != nil {
@@ -665,7 +665,7 @@ func (s *storageImageDestination) tryReusingBlobAsPending(ctx context.Context, b
 	}
 
 	if blobinfo.Digest == "" {
-		return false, types.BlobInfo{}, perrors.New(`Can not check for a blob with unknown digest`)
+		return false, types.BlobInfo{}, errors.New(`Can not check for a blob with unknown digest`)
 	}
 	if err := blobinfo.Digest.Validate(); err != nil {
 		return false, types.BlobInfo{}, perrors.Wrapf(err, `Can not check for a blob with invalid digest`)
@@ -783,7 +783,7 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 // information out of it for Inspect().
 func (s *storageImageDestination) getConfigBlob(info types.BlobInfo) ([]byte, error) {
 	if info.Digest == "" {
-		return nil, perrors.New(`no digest supplied when reading blob`)
+		return nil, errors.New(`no digest supplied when reading blob`)
 	}
 	if err := info.Digest.Validate(); err != nil {
 		return nil, perrors.Wrapf(err, `invalid digest supplied when reading blob`)
@@ -797,7 +797,7 @@ func (s *storageImageDestination) getConfigBlob(info types.BlobInfo) ([]byte, er
 		return contents, nil
 	}
 	// If it's not a file, it's a bug, because we're not expecting to be asked for a layer.
-	return nil, perrors.New("blob not found")
+	return nil, errors.New("blob not found")
 }
 
 // queueOrCommit queues in the specified blob to be committed to the storage.
@@ -1032,7 +1032,7 @@ func (s *storageImageDestination) commitLayer(ctx context.Context, blob manifest
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {
 	if len(s.manifest) == 0 {
-		return perrors.New("Internal error: storageImageDestination.Commit() called without PutManifest()")
+		return errors.New("Internal error: storageImageDestination.Commit() called without PutManifest()")
 	}
 	toplevelManifest, _, err := unparsedToplevel.Manifest(ctx)
 	if err != nil {

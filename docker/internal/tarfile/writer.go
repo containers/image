@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -54,7 +55,7 @@ func (w *Writer) lock() error {
 	w.mutex.Lock()
 	if w.tar == nil {
 		w.mutex.Unlock()
-		return perrors.New("Internal error: trying to use an already closed tarfile.Writer")
+		return errors.New("Internal error: trying to use an already closed tarfile.Writer")
 	}
 	return nil
 }
@@ -72,7 +73,7 @@ func (w *Writer) unlock() {
 // The caller must have locked the Writer.
 func (w *Writer) tryReusingBlobLocked(info types.BlobInfo) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
-		return false, types.BlobInfo{}, perrors.New("Can not check for a blob with unknown digest")
+		return false, types.BlobInfo{}, errors.New("Can not check for a blob with unknown digest")
 	}
 	if blob, ok := w.blobs[info.Digest]; ok {
 		return true, types.BlobInfo{Digest: info.Digest, Size: blob.Size}, nil

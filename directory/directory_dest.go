@@ -2,6 +2,7 @@ package directory
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -19,7 +20,7 @@ const version = "Directory Transport Version: 1.1\n"
 
 // ErrNotContainerImageDir indicates that the directory doesn't match the expected contents of a directory created
 // using the 'dir' transport
-var ErrNotContainerImageDir = perrors.New("not a containers image directory, don't want to overwrite important data")
+var ErrNotContainerImageDir = errors.New("not a containers image directory, don't want to overwrite important data")
 
 type dirImageDestination struct {
 	ref                     dirReference

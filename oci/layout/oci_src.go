@@ -2,6 +2,7 @@ package layout
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -150,10 +151,10 @@ func (s *ociImageSource) GetSignatures(ctx context.Context, instanceDigest *dige
 // should fallback to fetch the non-external blob (i.e. pull from the registry).
 func (s *ociImageSource) getExternalBlob(ctx context.Context, urls []string) (io.ReadCloser, int64, error) {
 	if len(urls) == 0 {
-		return nil, 0, perrors.New("internal error: getExternalBlob called with no URLs")
+		return nil, 0, errors.New("internal error: getExternalBlob called with no URLs")
 	}
 
-	errWrap := perrors.New("failed fetching external blob from all urls")
+	errWrap := errors.New("failed fetching external blob from all urls")
 	hasSupportedURL := false
 	for _, u := range urls {
 		if u, err := url.Parse(u); err != nil || (u.Scheme != "http" && u.Scheme != "https") {

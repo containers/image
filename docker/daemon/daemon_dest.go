@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -68,7 +69,7 @@ func newImageDestination(ctx context.Context, sys *types.SystemContext, ref daem
 
 // imageLoadGoroutine accepts tar stream on reader, sends it to c, and reports error or success by writing to statusChannel
 func imageLoadGoroutine(ctx context.Context, c *client.Client, reader *io.PipeReader, statusChannel chan<- error) {
-	err := perrors.New("Internal error: unexpected panic in imageLoadGoroutine")
+	err := errors.New("Internal error: unexpected panic in imageLoadGoroutine")
 	defer func() {
 		logrus.Debugf("docker-daemon: sending done, status %v", err)
 		statusChannel <- err
@@ -115,7 +116,7 @@ func (d *daemonImageDestination) Close() error {
 		// immediately, and hopefully, through terminating the sending which uses "Transfer-Encoding: chunked"" without sending
 		// the terminating zero-length chunk, prevent the docker daemon from processing the tar stream at all.
 		// Whether that works or not, closing the PipeWriter seems desirable in any case.
-		if err := d.writer.CloseWithError(perrors.New("Aborting upload, daemonImageDestination closed without a previous .Commit()")); err != nil {
+		if err := d.writer.CloseWithError(errors.New("Aborting upload, daemonImageDestination closed without a previous .Commit()")); err != nil {
 			return err
 		}
 	}

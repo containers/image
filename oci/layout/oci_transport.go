@@ -3,6 +3,7 @@ package layout
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,7 +30,7 @@ var (
 
 	// ErrMoreThanOneImage is an error returned when the manifest includes
 	// more than one image and the user should choose which one to use.
-	ErrMoreThanOneImage = perrors.New("more than one image in oci, choose an image")
+	ErrMoreThanOneImage = errors.New("more than one image in oci, choose an image")
 )
 
 type ociTransport struct{}
@@ -215,7 +216,7 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 func LoadManifestDescriptor(imgRef types.ImageReference) (imgspecv1.Descriptor, error) {
 	ociRef, ok := imgRef.(ociReference)
 	if !ok {
-		return imgspecv1.Descriptor{}, perrors.New("error typecasting, need type ociRef")
+		return imgspecv1.Descriptor{}, errors.New("error typecasting, need type ociRef")
 	}
 	return ociRef.getManifestDescriptor()
 }
@@ -234,7 +235,7 @@ func (ref ociReference) NewImageDestination(ctx context.Context, sys *types.Syst
 
 // DeleteImage deletes the named image from the registry, if supported.
 func (ref ociReference) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
-	return perrors.New("Deleting images not implemented for oci: images")
+	return errors.New("Deleting images not implemented for oci: images")
 }
 
 // ociLayoutPath returns a path for the oci-layout within a directory using OCI conventions.

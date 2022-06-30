@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -61,7 +62,7 @@ type signatureStorageBase *url.URL
 func SignatureStorageBaseURL(sys *types.SystemContext, ref types.ImageReference, write bool) (*url.URL, error) {
 	dr, ok := ref.(dockerReference)
 	if !ok {
-		return nil, perrors.New("ref must be a dockerReference")
+		return nil, errors.New("ref must be a dockerReference")
 	}
 	// FIXME? Loading and parsing the config could be cached across calls.
 	dirPath := registriesDirPath(sys)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -83,7 +84,7 @@ func (d *dockerImageDestination) SupportsSignatures(ctx context.Context) error {
 	case d.c.signatureBase != nil:
 		return nil
 	default:
-		return perrors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
+		return errors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
 	}
 }
 
@@ -180,7 +181,7 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 		uploadReader := uploadreader.NewUploadReader(stream)
 		// This error text should never be user-visible, we terminate only after makeRequestToResolvedURL
 		// returns, so there isn’t a way for the error text to be provided to any of our callers.
-		defer uploadReader.Terminate(perrors.New("Reading data from an already terminated upload"))
+		defer uploadReader.Terminate(errors.New("Reading data from an already terminated upload"))
 		res, err = d.c.makeRequestToResolvedURL(ctx, http.MethodPatch, uploadLocation, map[string][]string{"Content-Type": {"application/octet-stream"}}, uploadReader, inputInfo.Size, v2Auth, nil)
 		if err != nil {
 			logrus.Debugf("Error uploading layer chunked %v", err)
@@ -318,7 +319,7 @@ func (d *dockerImageDestination) tryReusingExactBlob(ctx context.Context, info t
 // May use and/or update cache.
 func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
-		return false, types.BlobInfo{}, perrors.New("Can not check for a blob with unknown digest")
+		return false, types.BlobInfo{}, errors.New("Can not check for a blob with unknown digest")
 	}
 
 	// First, check whether the blob happens to already exist at the destination.
@@ -525,7 +526,7 @@ func (d *dockerImageDestination) PutSignatures(ctx context.Context, signatures [
 	if instanceDigest == nil {
 		if d.manifestDigest == "" {
 			// This shouldn’t happen, ImageDestination users are required to call PutManifest before PutSignatures
-			return perrors.New("Unknown manifest digest, can't add signatures")
+			return errors.New("Unknown manifest digest, can't add signatures")
 		}
 		instanceDigest = &d.manifestDigest
 	}
@@ -539,7 +540,7 @@ func (d *dockerImageDestination) PutSignatures(ctx context.Context, signatures [
 	case d.c.signatureBase != nil:
 		return d.putSignaturesToLookaside(signatures, *instanceDigest)
 	default:
-		return perrors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
+		return errors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
 	}
 }
 

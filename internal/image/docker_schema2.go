@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -138,7 +139,7 @@ func (m *manifestSchema2) Inspect(ctx context.Context) (*types.ImageInspectInfo,
 	getter := func(info types.BlobInfo) ([]byte, error) {
 		if info.Digest != m.ConfigInfo().Digest {
 			// Shouldn't ever happen
-			return nil, perrors.New("asked for a different config blob")
+			return nil, errors.New("asked for a different config blob")
 		}
 		config, err := m.ConfigBlob(ctx)
 		if err != nil {

@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"errors"
 	"io"
 	"os"
 
@@ -74,7 +75,7 @@ func openArchiveForWriting(path string) (*os.File, error) {
 	}
 
 	if fhStat.Mode().IsRegular() && fhStat.Size() != 0 {
-		return nil, perrors.New("docker-archive doesn't support modifying existing images")
+		return nil, errors.New("docker-archive doesn't support modifying existing images")
 	}
 
 	succeeded = true

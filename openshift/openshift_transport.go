@@ -2,6 +2,7 @@ package openshift
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -149,5 +150,5 @@ func (ref openshiftReference) NewImageDestination(ctx context.Context, sys *type
 
 // DeleteImage deletes the named image from the registry, if supported.
 func (ref openshiftReference) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
-	return perrors.New("Deleting images not implemented for atomic: images")
+	return errors.New("Deleting images not implemented for atomic: images")
 }

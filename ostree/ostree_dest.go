@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -388,7 +389,7 @@ func (d *ostreeImageDestination) TryReusingBlob(ctx context.Context, info types.
 // but may accept a different manifest type, the returned error must be an ManifestTypeRejectedError.
 func (d *ostreeImageDestination) PutManifest(ctx context.Context, manifestBlob []byte, instanceDigest *digest.Digest) error {
 	if instanceDigest != nil {
-		return perrors.New(`Manifest lists are not supported by "ostree:"`)
+		return errors.New(`Manifest lists are not supported by "ostree:"`)
 	}
 
 	d.manifest = string(manifestBlob)
@@ -416,7 +417,7 @@ func (d *ostreeImageDestination) PutManifest(ctx context.Context, manifestBlob [
 // there can be no secondary manifests.
 func (d *ostreeImageDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
 	if instanceDigest != nil {
-		return perrors.New(`Manifest lists are not supported by "ostree:"`)
+		return errors.New(`Manifest lists are not supported by "ostree:"`)
 	}
 
 	path := filepath.Join(d.tmpDirPath, d.ref.signaturePath(0))

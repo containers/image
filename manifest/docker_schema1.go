@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -106,10 +107,10 @@ func Schema1Clone(src *Schema1) *Schema1 {
 // initialize initializes ExtractedV1Compatibility and verifies invariants, so that the rest of this code can assume a minimally healthy manifest.
 func (m *Schema1) initialize() error {
 	if len(m.FSLayers) != len(m.History) {
-		return perrors.New("length of history not equal to number of layers")
+		return errors.New("length of history not equal to number of layers")
 	}
 	if len(m.FSLayers) == 0 {
-		return perrors.New("no FSLayers in manifest")
+		return errors.New("no FSLayers in manifest")
 	}
 	m.ExtractedV1Compatibility = make([]Schema1V1Compatibility, len(m.History))
 	for i, h := range m.History {
@@ -180,7 +181,7 @@ func (m *Schema1) fixManifestLayers() error {
 		}
 	}
 	if m.ExtractedV1Compatibility[len(m.ExtractedV1Compatibility)-1].Parent != "" {
-		return perrors.New("Invalid parent ID in the base layer of the image")
+		return errors.New("Invalid parent ID in the base layer of the image")
 	}
 	// check general duplicates to error instead of a deadlock
 	idmap := make(map[string]struct{})
@@ -241,7 +242,7 @@ func (m *Schema1) ToSchema2Config(diffIDs []digest.Digest) ([]byte, error) {
 	// Convert the schema 1 compat info into a schema 2 config, constructing some of the fields
 	// that aren't directly comparable using info from the manifest.
 	if len(m.History) == 0 {
-		return nil, perrors.New("image has no layers")
+		return nil, errors.New("image has no layers")
 	}
 	s1 := Schema2V1Image{}
 	config := []byte(m.History[0].V1Compatibility)

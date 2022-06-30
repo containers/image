@@ -2,6 +2,7 @@ package docker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -84,7 +85,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 	}
 	switch len(attempts) {
 	case 0:
-		return nil, perrors.New("Internal error: newImageSource returned without trying any endpoint")
+		return nil, errors.New("Internal error: newImageSource returned without trying any endpoint")
 	case 1:
 		return nil, attempts[0].err // If no mirrors are used, perfectly preserve the error type and add no noise.
 	default:
@@ -250,7 +251,7 @@ func (s *dockerImageSource) getExternalBlob(ctx context.Context, urls []string) 
 		err  error
 	)
 	if len(urls) == 0 {
-		return nil, 0, perrors.New("internal error: getExternalBlob called with no URLs")
+		return nil, 0, errors.New("internal error: getExternalBlob called with no URLs")
 	}
 	for _, u := range urls {
 		url, err := url.Parse(u)
@@ -337,7 +338,7 @@ func handle206Response(streams chan io.ReadCloser, errs chan error, body io.Read
 	}
 	boundary, found := params["boundary"]
 	if !found {
-		errs <- perrors.New("could not find boundary")
+		errs <- errors.New("could not find boundary")
 		body.Close()
 		return
 	}
@@ -352,7 +353,7 @@ func handle206Response(streams chan io.ReadCloser, errs chan error, body io.Read
 				errs <- err
 			}
 			if parts != len(chunks) {
-				errs <- perrors.New("invalid number of chunks returned by the server")
+				errs <- errors.New("invalid number of chunks returned by the server")
 			}
 			return
 		}
@@ -491,7 +492,7 @@ func (s *dockerImageSource) GetSignatures(ctx context.Context, instanceDigest *d
 	case s.c.signatureBase != nil:
 		return s.getSignaturesFromLookaside(ctx, instanceDigest)
 	default:
-		return nil, perrors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
+		return nil, errors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
 	}
 }
 
