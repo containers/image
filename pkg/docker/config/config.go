@@ -172,15 +172,17 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 			if err != nil {
 				logrus.Debugf("Error listing credentials stored in credential helper %s: %v", helper, err)
 			}
-			switch perrors.Cause(err) {
-			case nil:
+			if err != nil {
+				switch perrors.Cause(err) {
+				case exec.ErrNotFound:
+					// It's okay if the helper doesn't exist.
+				default:
+					return nil, err
+				}
+			} else {
 				for registry := range creds {
 					addKey(registry)
 				}
-			case exec.ErrNotFound:
-				// It's okay if the helper doesn't exist.
-			default:
-				return nil, err
 			}
 		}
 	}
@@ -466,19 +468,21 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 		default:
 			var creds map[string]string
 			creds, err = listAuthsFromCredHelper(helper)
-			switch perrors.Cause(err) {
-			case nil:
+			if err != nil {
+				switch perrors.Cause(err) {
+				case exec.ErrNotFound:
+					// It's okay if the helper doesn't exist.
+					continue
+				default:
+					// fall through
+				}
+			} else {
 				for registry := range creds {
 					err = deleteAuthFromCredHelper(helper, registry)
 					if err != nil {
 						break
 					}
 				}
-			case exec.ErrNotFound:
-				// It's okay if the helper doesn't exist.
-				continue
-			default:
-				// fall through
 			}
 		}
 		if err != nil {
