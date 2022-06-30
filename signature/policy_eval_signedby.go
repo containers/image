@@ -19,10 +19,10 @@ func (pr *prSignedBy) isSignatureAuthorAccepted(ctx context.Context, image types
 	case SBKeyTypeGPGKeys:
 	case SBKeyTypeSignedByGPGKeys, SBKeyTypeX509Certificates, SBKeyTypeSignedByX509CAs:
 		// FIXME? Reject this at policy parsing time already?
-		return sarRejected, nil, errors.Errorf(`"Unimplemented "keyType" value "%s"`, string(pr.KeyType))
+		return sarRejected, nil, fmt.Errorf(`"Unimplemented "keyType" value "%s"`, string(pr.KeyType))
 	default:
 		// This should never happen, newPRSignedBy ensures KeyType.IsValid()
-		return sarRejected, nil, errors.Errorf(`"Unknown "keyType" value "%s"`, string(pr.KeyType))
+		return sarRejected, nil, fmt.Errorf(`"Unknown "keyType" value "%s"`, string(pr.KeyType))
 	}
 
 	if pr.KeyPath != "" && pr.KeyData != nil {
@@ -108,7 +108,7 @@ func (pr *prSignedBy) isRunningImageAllowed(ctx context.Context, image types.Unp
 			// Huh?! This should not happen at all; treat it as any other invalid value.
 			fallthrough
 		default:
-			reason = errors.Errorf(`Internal error: Unexpected signature verification result "%s"`, string(res))
+			reason = fmt.Errorf(`Internal error: Unexpected signature verification result "%s"`, string(res))
 		}
 		rejections = append(rejections, reason)
 	}

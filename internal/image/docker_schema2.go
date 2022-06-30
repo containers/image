@@ -99,7 +99,7 @@ func (m *manifestSchema2) OCIConfig(ctx context.Context) (*imgspecv1.Image, erro
 func (m *manifestSchema2) ConfigBlob(ctx context.Context) ([]byte, error) {
 	if m.configBlob == nil {
 		if m.src == nil {
-			return nil, errors.Errorf("Internal error: neither src nor configBlob set in manifestSchema2")
+			return nil, fmt.Errorf("Internal error: neither src nor configBlob set in manifestSchema2")
 		}
 		stream, _, err := m.src.GetBlob(ctx, manifest.BlobInfoFromSchema2Descriptor(m.m.ConfigDescriptor), none.NoCache)
 		if err != nil {
@@ -112,7 +112,7 @@ func (m *manifestSchema2) ConfigBlob(ctx context.Context) ([]byte, error) {
 		}
 		computedDigest := digest.FromBytes(blob)
 		if computedDigest != m.m.ConfigDescriptor.Digest {
-			return nil, errors.Errorf("Download config.json digest %s does not match expected %s", computedDigest, m.m.ConfigDescriptor.Digest)
+			return nil, fmt.Errorf("Download config.json digest %s does not match expected %s", computedDigest, m.m.ConfigDescriptor.Digest)
 		}
 		m.configBlob = blob
 	}
@@ -277,7 +277,7 @@ func (m *manifestSchema2) convertToManifestSchema1(ctx context.Context, options 
 	haveGzippedEmptyLayer := false
 	if len(imageConfig.History) == 0 {
 		// What would this even mean?! Anyhow, the rest of the code depends on fsLayers[0] and history[0] existing.
-		return nil, errors.Errorf("Cannot convert an image with 0 history entries to %s", manifest.DockerV2Schema1SignedMediaType)
+		return nil, fmt.Errorf("Cannot convert an image with 0 history entries to %s", manifest.DockerV2Schema1SignedMediaType)
 	}
 	for v2Index, historyEntry := range imageConfig.History {
 		parentV1ID = v1ID
@@ -296,7 +296,7 @@ func (m *manifestSchema2) convertToManifestSchema1(ctx context.Context, options 
 					return nil, errors.Wrap(err, "uploading empty layer")
 				}
 				if info.Digest != emptyLayerBlobInfo.Digest {
-					return nil, errors.Errorf("Internal error: Uploaded empty layer has digest %#v instead of %s", info.Digest, emptyLayerBlobInfo.Digest)
+					return nil, fmt.Errorf("Internal error: Uploaded empty layer has digest %#v instead of %s", info.Digest, emptyLayerBlobInfo.Digest)
 				}
 				haveGzippedEmptyLayer = true
 			}
@@ -306,7 +306,7 @@ func (m *manifestSchema2) convertToManifestSchema1(ctx context.Context, options 
 			blobDigest = emptyLayerBlobInfo.Digest
 		} else {
 			if nonemptyLayerIndex >= len(m.m.LayersDescriptors) {
-				return nil, errors.Errorf("Invalid image configuration, needs more than the %d distributed layers", len(m.m.LayersDescriptors))
+				return nil, fmt.Errorf("Invalid image configuration, needs more than the %d distributed layers", len(m.m.LayersDescriptors))
 			}
 			if options.LayerInfos != nil {
 				convertedLayerUpdates = append(convertedLayerUpdates, options.LayerInfos[nonemptyLayerIndex])
@@ -333,7 +333,7 @@ func (m *manifestSchema2) convertToManifestSchema1(ctx context.Context, options 
 		fakeImage.ContainerConfig.Cmd = []string{historyEntry.CreatedBy}
 		v1CompatibilityBytes, err := json.Marshal(&fakeImage)
 		if err != nil {
-			return nil, errors.Errorf("Internal error: Error creating v1compatibility for %#v", fakeImage)
+			return nil, fmt.Errorf("Internal error: Error creating v1compatibility for %#v", fakeImage)
 		}
 
 		fsLayers[v1Index] = manifest.Schema1FSLayers{BlobSum: blobDigest}

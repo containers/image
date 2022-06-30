@@ -61,7 +61,7 @@ type signatureStorageBase *url.URL
 func SignatureStorageBaseURL(sys *types.SystemContext, ref types.ImageReference, write bool) (*url.URL, error) {
 	dr, ok := ref.(dockerReference)
 	if !ok {
-		return nil, errors.Errorf("ref must be a dockerReference")
+		return nil, errors.New("ref must be a dockerReference")
 	}
 	// FIXME? Loading and parsing the config could be cached across calls.
 	dirPath := registriesDirPath(sys)
@@ -87,7 +87,7 @@ func SignatureStorageBaseURL(sys *types.SystemContext, ref types.ImageReference,
 	// FIXME? Restrict to explicitly supported schemes?
 	repo := reference.Path(dr.ref) // Note that this is without a tag or digest.
 	if path.Clean(repo) != repo {  // Coverage: This should not be reachable because /./ and /../ components are not valid in docker references
-		return nil, errors.Errorf("Unexpected path elements in Docker reference %s for signature storage", dr.ref.String())
+		return nil, fmt.Errorf("Unexpected path elements in Docker reference %s for signature storage", dr.ref.String())
 	}
 	url.Path = url.Path + "/" + repo
 	return url, nil
@@ -158,7 +158,7 @@ func loadAndMergeConfig(dirPath string) (*registryConfiguration, error) {
 
 		if config.DefaultDocker != nil {
 			if mergedConfig.DefaultDocker != nil {
-				return nil, errors.Errorf(`Error parsing signature storage configuration: "default-docker" defined both in "%s" and "%s"`,
+				return nil, fmt.Errorf(`Error parsing signature storage configuration: "default-docker" defined both in "%s" and "%s"`,
 					dockerDefaultMergedFrom, configPath)
 			}
 			mergedConfig.DefaultDocker = config.DefaultDocker
@@ -167,7 +167,7 @@ func loadAndMergeConfig(dirPath string) (*registryConfiguration, error) {
 
 		for nsName, nsConfig := range config.Docker { // includes config.Docker == nil
 			if _, ok := mergedConfig.Docker[nsName]; ok {
-				return nil, errors.Errorf(`Error parsing signature storage configuration: "docker" namespace "%s" defined both in "%s" and "%s"`,
+				return nil, fmt.Errorf(`Error parsing signature storage configuration: "docker" namespace "%s" defined both in "%s" and "%s"`,
 					nsName, nsMergedFrom[nsName], configPath)
 			}
 			mergedConfig.Docker[nsName] = nsConfig

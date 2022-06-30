@@ -111,7 +111,7 @@ func SetCredentials(sys *types.SystemContext, key, username, password string) (s
 }
 
 func unsupportedNamespaceErr(helper string) error {
-	return errors.Errorf("namespaced key is not supported for credential helper %s", helper)
+	return fmt.Errorf("namespaced key is not supported for credential helper %s", helper)
 }
 
 // SetAuthentication stores the username and password in the credential helper or file
@@ -781,7 +781,7 @@ func normalizeRegistry(registry string) string {
 // allowed and returns an indicator if the key is namespaced.
 func validateKey(key string) (bool, error) {
 	if strings.HasPrefix(key, "http://") || strings.HasPrefix(key, "https://") {
-		return false, errors.Errorf("key %s contains http[s]:// prefix", key)
+		return false, fmt.Errorf("key %s contains http[s]:// prefix", key)
 	}
 
 	// Ideally this should only accept explicitly valid keys, compare

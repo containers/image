@@ -3,6 +3,7 @@ package tarfile
 import (
 	"archive/tar"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -136,7 +137,7 @@ func (r *Reader) Close() error {
 func (r *Reader) ChooseManifestItem(ref reference.NamedTagged, sourceIndex int) (*ManifestItem, int, error) {
 	switch {
 	case ref != nil && sourceIndex != -1:
-		return nil, -1, errors.Errorf("Internal error: Cannot have both ref %s and source index @%d",
+		return nil, -1, fmt.Errorf("Internal error: Cannot have both ref %s and source index @%d",
 			ref.String(), sourceIndex)
 
 	case ref != nil:
@@ -152,18 +153,18 @@ func (r *Reader) ChooseManifestItem(ref reference.NamedTagged, sourceIndex int) 
 				}
 			}
 		}
-		return nil, -1, errors.Errorf("Tag %#v not found", refString)
+		return nil, -1, fmt.Errorf("Tag %#v not found", refString)
 
 	case sourceIndex != -1:
 		if sourceIndex >= len(r.Manifest) {
-			return nil, -1, errors.Errorf("Invalid source index @%d, only %d manifest items available",
+			return nil, -1, fmt.Errorf("Invalid source index @%d, only %d manifest items available",
 				sourceIndex, len(r.Manifest))
 		}
 		return &r.Manifest[sourceIndex], -1, nil
 
 	default:
 		if len(r.Manifest) != 1 {
-			return nil, -1, errors.Errorf("Unexpected tar manifest.json: expected 1 item, got %d", len(r.Manifest))
+			return nil, -1, fmt.Errorf("Unexpected tar manifest.json: expected 1 item, got %d", len(r.Manifest))
 		}
 		return &r.Manifest[0], -1, nil
 	}
@@ -226,7 +227,7 @@ func (r *Reader) openTarComponent(componentPath string) (io.ReadCloser, error) {
 	}
 
 	if !header.FileInfo().Mode().IsRegular() {
-		return nil, errors.Errorf("Error reading tar archive component %s: not a regular file", header.Name)
+		return nil, fmt.Errorf("Error reading tar archive component %s: not a regular file", header.Name)
 	}
 	succeeded = true
 	return &tarReadCloser{Reader: tarReader, backingFile: f}, nil

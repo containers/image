@@ -2,6 +2,7 @@ package image
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
@@ -27,7 +28,7 @@ func manifestOCI1FromImageIndex(ctx context.Context, sys *types.SystemContext, s
 		return nil, errors.Wrap(err, "computing manifest digest")
 	}
 	if !matches {
-		return nil, errors.Errorf("Image manifest does not match selected manifest digest %s", targetManifestDigest)
+		return nil, fmt.Errorf("Image manifest does not match selected manifest digest %s", targetManifestDigest)
 	}
 
 	return manifestInstanceFromBlob(ctx, sys, src, manblob, mt)

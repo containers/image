@@ -1,6 +1,7 @@
 package copy
 
 import (
+	"fmt"
 	"hash"
 	"io"
 
@@ -23,11 +24,11 @@ type digestingReader struct {
 func newDigestingReader(source io.Reader, expectedDigest digest.Digest) (*digestingReader, error) {
 	var digester digest.Digester
 	if err := expectedDigest.Validate(); err != nil {
-		return nil, errors.Errorf("Invalid digest specification %s", expectedDigest)
+		return nil, fmt.Errorf("Invalid digest specification %s", expectedDigest)
 	}
 	digestAlgorithm := expectedDigest.Algorithm()
 	if !digestAlgorithm.Available() {
-		return nil, errors.Errorf("Invalid digest specification %s: unsupported digest algorithm %s", expectedDigest, digestAlgorithm)
+		return nil, fmt.Errorf("Invalid digest specification %s: unsupported digest algorithm %s", expectedDigest, digestAlgorithm)
 	}
 	digester = digestAlgorithm.Digester()
 
@@ -54,7 +55,7 @@ func (d *digestingReader) Read(p []byte) (int, error) {
 		actualDigest := d.digester.Digest()
 		if actualDigest != d.expectedDigest {
 			d.validationFailed = true
-			return 0, errors.Errorf("Digest did not match, expected %s, got %s", d.expectedDigest, actualDigest)
+			return 0, fmt.Errorf("Digest did not match, expected %s, got %s", d.expectedDigest, actualDigest)
 		}
 		d.validationSucceeded = true
 	}

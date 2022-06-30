@@ -59,7 +59,7 @@ type archiveReference struct {
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an Docker ImageReference.
 func ParseReference(refString string) (types.ImageReference, error) {
 	if refString == "" {
-		return nil, errors.Errorf("docker-archive reference %s isn't of the form <path>[:<reference>]", refString)
+		return nil, fmt.Errorf("docker-archive reference %s isn't of the form <path>[:<reference>]", refString)
 	}
 
 	parts := strings.SplitN(refString, ":", 2)
@@ -75,7 +75,7 @@ func ParseReference(refString string) (types.ImageReference, error) {
 				return nil, errors.Wrapf(err, "Invalid source index %s", parts[1])
 			}
 			if i < 0 {
-				return nil, errors.Errorf("Invalid source index @%d: must not be negative", i)
+				return nil, fmt.Errorf("Invalid source index @%d: must not be negative", i)
 			}
 			sourceIndex = i
 		} else {
@@ -86,7 +86,7 @@ func ParseReference(refString string) (types.ImageReference, error) {
 			ref = reference.TagNameOnly(ref)
 			refTagged, isTagged := ref.(reference.NamedTagged)
 			if !isTagged { // If ref contains a digest, TagNameOnly does not change it
-				return nil, errors.Errorf("reference does not include a tag: %s", ref.String())
+				return nil, fmt.Errorf("reference does not include a tag: %s", ref.String())
 			}
 			nt = refTagged
 		}
@@ -110,16 +110,16 @@ func NewIndexReference(path string, sourceIndex int) (types.ImageReference, erro
 func newReference(path string, ref reference.NamedTagged, sourceIndex int,
 	archiveReader *tarfile.Reader, archiveWriter *tarfile.Writer) (types.ImageReference, error) {
 	if strings.Contains(path, ":") {
-		return nil, errors.Errorf("Invalid docker-archive: reference: colon in path %q is not supported", path)
+		return nil, fmt.Errorf("Invalid docker-archive: reference: colon in path %q is not supported", path)
 	}
 	if ref != nil && sourceIndex != -1 {
-		return nil, errors.Errorf("Invalid docker-archive: reference: cannot use both a tag and a source index")
+		return nil, fmt.Errorf("Invalid docker-archive: reference: cannot use both a tag and a source index")
 	}
 	if _, isDigest := ref.(reference.Canonical); isDigest {
-		return nil, errors.Errorf("docker-archive doesn't support digest references: %s", ref.String())
+		return nil, fmt.Errorf("docker-archive doesn't support digest references: %s", ref.String())
 	}
 	if sourceIndex != -1 && sourceIndex < 0 {
-		return nil, errors.Errorf("Invalid docker-archive: reference: index @%d must not be negative", sourceIndex)
+		return nil, fmt.Errorf("Invalid docker-archive: reference: index @%d must not be negative", sourceIndex)
 	}
 	return archiveReference{
 		path:          path,

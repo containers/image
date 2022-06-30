@@ -139,7 +139,7 @@ func (ref ociArchiveReference) NewImageDestination(ctx context.Context, sys *typ
 
 // DeleteImage deletes the named image from the registry, if supported.
 func (ref ociArchiveReference) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
-	return errors.Errorf("Deleting images not implemented for oci: images")
+	return errors.New("Deleting images not implemented for oci: images")
 }
 
 // struct to store the ociReference and temporary directory returned by createOCIRef

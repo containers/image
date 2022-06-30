@@ -54,7 +54,7 @@ func (d *Destination) SupportedManifestMIMETypes() []string {
 // SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
 // Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
 func (d *Destination) SupportsSignatures(ctx context.Context) error {
-	return errors.Errorf("Storing signatures for docker tar files is not supported")
+	return errors.New("Storing signatures for docker tar files is not supported")
 }
 
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
@@ -171,7 +171,7 @@ func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest 
 		return errors.Wrap(err, "parsing manifest")
 	}
 	if man.SchemaVersion != 2 || man.MediaType != manifest.DockerV2Schema2MediaType {
-		return errors.Errorf("Unsupported manifest type, need a Docker schema 2 manifest")
+		return errors.New("Unsupported manifest type, need a Docker schema 2 manifest")
 	}
 
 	if err := d.archive.lock(); err != nil {
@@ -191,10 +191,10 @@ func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest 
 // there can be no secondary manifests.  MUST be called after PutManifest (signatures reference manifest contents).
 func (d *Destination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
 	if instanceDigest != nil {
-		return errors.Errorf(`Manifest lists are not supported for docker tar files`)
+		return errors.New(`Manifest lists are not supported for docker tar files`)
 	}
 	if len(signatures) != 0 {
-		return errors.Errorf("Storing signatures for docker tar files is not supported")
+		return errors.New("Storing signatures for docker tar files is not supported")
 	}
 	return nil
 }

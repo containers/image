@@ -286,7 +286,7 @@ func (s *storageImageSource) LayerInfosForCopy(ctx context.Context, instanceDige
 		return nil, errors.Wrapf(err, "reading image manifest for %q", s.image.ID)
 	}
 	if manifest.MIMETypeIsMultiImage(manifestType) {
-		return nil, errors.Errorf("can't copy layers for a manifest list (shouldn't be attempted)")
+		return nil, errors.New("can't copy layers for a manifest list (shouldn't be attempted)")
 	}
 	man, err := manifest.FromBlob(manifestBlob, manifestType)
 	if err != nil {
@@ -309,10 +309,10 @@ func (s *storageImageSource) LayerInfosForCopy(ctx context.Context, instanceDige
 			return nil, errors.Wrapf(err, "reading layer %q in image %q", layerID, s.image.ID)
 		}
 		if layer.UncompressedDigest == "" {
-			return nil, errors.Errorf("uncompressed digest for layer %q is unknown", layerID)
+			return nil, fmt.Errorf("uncompressed digest for layer %q is unknown", layerID)
 		}
 		if layer.UncompressedSize < 0 {
-			return nil, errors.Errorf("uncompressed size for layer %q is unknown", layerID)
+			return nil, fmt.Errorf("uncompressed size for layer %q is unknown", layerID)
 		}
 		blobInfo := types.BlobInfo{
 			Digest:    layer.UncompressedDigest,
@@ -386,7 +386,7 @@ func (s *storageImageSource) GetSignatures(ctx context.Context, instanceDigest *
 		offset += length
 	}
 	if offset != len(signature) {
-		return nil, errors.Errorf("signatures data (%s) contained %d extra bytes", instance, len(signatures)-offset)
+		return nil, fmt.Errorf("signatures data (%s) contained %d extra bytes", instance, len(signatures)-offset)
 	}
 	return sigslice, nil
 }
@@ -665,7 +665,7 @@ func (s *storageImageDestination) tryReusingBlobAsPending(ctx context.Context, b
 	}
 
 	if blobinfo.Digest == "" {
-		return false, types.BlobInfo{}, errors.Errorf(`Can not check for a blob with unknown digest`)
+		return false, types.BlobInfo{}, errors.New(`Can not check for a blob with unknown digest`)
 	}
 	if err := blobinfo.Digest.Validate(); err != nil {
 		return false, types.BlobInfo{}, errors.Wrapf(err, `Can not check for a blob with invalid digest`)
@@ -783,7 +783,7 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 // information out of it for Inspect().
 func (s *storageImageDestination) getConfigBlob(info types.BlobInfo) ([]byte, error) {
 	if info.Digest == "" {
-		return nil, errors.Errorf(`no digest supplied when reading blob`)
+		return nil, errors.New(`no digest supplied when reading blob`)
 	}
 	if err := info.Digest.Validate(); err != nil {
 		return nil, errors.Wrapf(err, `invalid digest supplied when reading blob`)
@@ -897,11 +897,11 @@ func (s *storageImageDestination) commitLayer(ctx context.Context, blob manifest
 			return errors.Wrapf(err, "checking for a layer based on blob %q", blob.Digest.String())
 		}
 		if !has {
-			return errors.Errorf("error determining uncompressed digest for blob %q", blob.Digest.String())
+			return fmt.Errorf("error determining uncompressed digest for blob %q", blob.Digest.String())
 		}
 		diffID, haveDiffID = s.blobDiffIDs[blob.Digest]
 		if !haveDiffID {
-			return errors.Errorf("we have blob %q, but don't know its uncompressed digest", blob.Digest.String())
+			return fmt.Errorf("we have blob %q, but don't know its uncompressed digest", blob.Digest.String())
 		}
 	}
 	id := diffID.Hex()
@@ -1075,7 +1075,7 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	if len(layerBlobs) > 0 { // Can happen when using caches
 		prev := s.indexToStorageID[len(layerBlobs)-1]
 		if prev == nil {
-			return errors.Errorf("Internal error: StorageImageDestination.Commit(): previous layer %d hasn't been committed (lastLayer == nil)", len(layerBlobs)-1)
+			return fmt.Errorf("Internal error: StorageImageDestination.Commit(): previous layer %d hasn't been committed (lastLayer == nil)", len(layerBlobs)-1)
 		}
 		lastLayer = *prev
 	}
@@ -1316,7 +1316,7 @@ func (s *storageImageSource) getSize() (int64, error) {
 			return -1, err
 		}
 		if layer.UncompressedDigest == "" || layer.UncompressedSize < 0 {
-			return -1, errors.Errorf("size for layer %q is unknown, failing getSize()", layerID)
+			return -1, fmt.Errorf("size for layer %q is unknown, failing getSize()", layerID)
 		}
 		sum += layer.UncompressedSize
 		if layer.Parent == "" {

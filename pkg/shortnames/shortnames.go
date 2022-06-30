@@ -38,7 +38,7 @@ func parseUnnormalizedShortName(input string) (bool, reference.Named, error) {
 
 	named, ok := ref.(reference.Named)
 	if !ok {
-		return true, nil, errors.Errorf("%q is not a named reference", input)
+		return true, nil, fmt.Errorf("%q is not a named reference", input)
 	}
 
 	registry := reference.Domain(named)
@@ -87,7 +87,7 @@ func Add(ctx *types.SystemContext, name string, value reference.Named) error {
 		return err
 	}
 	if !isShort {
-		return errors.Errorf("%q is not a short name", name)
+		return fmt.Errorf("%q is not a short name", name)
 	}
 	return sysregistriesv2.AddShortNameAlias(ctx, name, value.String())
 }
@@ -102,7 +102,7 @@ func Remove(ctx *types.SystemContext, name string) error {
 		return err
 	}
 	if !isShort {
-		return errors.Errorf("%q is not a short name", name)
+		return fmt.Errorf("%q is not a short name", name)
 	}
 	return sysregistriesv2.RemoveShortNameAlias(ctx, name)
 }
@@ -172,7 +172,7 @@ func (r *Resolved) Description() string {
 func (r *Resolved) FormatPullErrors(pullErrors []error) error {
 	if len(pullErrors) >= 0 && len(pullErrors) != len(r.PullCandidates) {
 		pullErrors = append(pullErrors,
-			errors.Errorf("internal error: expected %d instead of %d errors for %d pull candidates",
+			fmt.Errorf("internal error: expected %d instead of %d errors for %d pull candidates",
 				len(r.PullCandidates), len(pullErrors), len(r.PullCandidates)))
 	}
 
@@ -262,7 +262,7 @@ func Resolve(ctx *types.SystemContext, name string) (*Resolved, error) {
 	case types.ShortNameModeDisabled, types.ShortNameModePermissive, types.ShortNameModeEnforcing:
 		// We're good.
 	default:
-		return nil, errors.Errorf("unsupported short-name mode (%v)", mode)
+		return nil, fmt.Errorf("unsupported short-name mode (%v)", mode)
 	}
 
 	isShort, shortRef, err := parseUnnormalizedShortName(name)
@@ -328,9 +328,9 @@ func Resolve(ctx *types.SystemContext, name string) (*Resolved, error) {
 	// Error out if there's no matching alias and no search registries.
 	if len(unqualifiedSearchRegistries) == 0 {
 		if usrConfig != "" {
-			return nil, errors.Errorf("short-name %q did not resolve to an alias and no unqualified-search registries are defined in %q", name, usrConfig)
+			return nil, fmt.Errorf("short-name %q did not resolve to an alias and no unqualified-search registries are defined in %q", name, usrConfig)
 		}
-		return nil, errors.Errorf("short-name %q did not resolve to an alias and no containers-registries.conf(5) was found", name)
+		return nil, fmt.Errorf("short-name %q did not resolve to an alias and no containers-registries.conf(5) was found", name)
 	}
 	resolved.originDescription = usrConfig
 
@@ -364,7 +364,7 @@ func Resolve(ctx *types.SystemContext, name string) (*Resolved, error) {
 			return nil, errors.New("short-name resolution enforced but cannot prompt without a TTY")
 		default:
 			// We should not end up here.
-			return nil, errors.Errorf("unexpected short-name mode (%v) during resolution", mode)
+			return nil, fmt.Errorf("unexpected short-name mode (%v) during resolution", mode)
 		}
 	}
 

@@ -3,6 +3,7 @@ package directory
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"testing"
@@ -11,7 +12,6 @@ import (
 	"github.com/containers/image/v5/pkg/blobinfocache/memory"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -131,7 +131,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 			}
 			return len(p), nil
 		}
-		return 0, errors.Errorf(digestErrorString)
+		return 0, errors.New(digestErrorString)
 	})
 
 	dest, err := ref.NewImageDestination(context.Background(), nil)

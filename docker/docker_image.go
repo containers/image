@@ -56,7 +56,7 @@ func (i *Image) GetRepositoryTags(ctx context.Context) ([]string, error) {
 func GetRepositoryTags(ctx context.Context, sys *types.SystemContext, ref types.ImageReference) ([]string, error) {
 	dr, ok := ref.(dockerReference)
 	if !ok {
-		return nil, errors.Errorf("ref must be a dockerReference")
+		return nil, errors.New("ref must be a dockerReference")
 	}
 
 	path := fmt.Sprintf(tagsPath, reference.Path(dr.ref))
@@ -116,7 +116,7 @@ func GetRepositoryTags(ctx context.Context, sys *types.SystemContext, ref types.
 func GetDigest(ctx context.Context, sys *types.SystemContext, ref types.ImageReference) (digest.Digest, error) {
 	dr, ok := ref.(dockerReference)
 	if !ok {
-		return "", errors.Errorf("ref must be a dockerReference")
+		return "", errors.New("ref must be a dockerReference")
 	}
 
 	tagOrDigest, err := dr.tagOrDigest()

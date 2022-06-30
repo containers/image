@@ -72,7 +72,7 @@ func (w *Writer) unlock() {
 // The caller must have locked the Writer.
 func (w *Writer) tryReusingBlobLocked(info types.BlobInfo) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
-		return false, types.BlobInfo{}, errors.Errorf("Can not check for a blob with unknown digest")
+		return false, types.BlobInfo{}, errors.New("Can not check for a blob with unknown digest")
 	}
 	if blob, ok := w.blobs[info.Digest]; ok {
 		return true, types.BlobInfo{Digest: info.Digest, Size: blob.Size}, nil
@@ -375,7 +375,7 @@ func (w *Writer) sendFileLocked(path string, expectedSize int64, stream io.Reade
 		return err
 	}
 	if size != expectedSize {
-		return errors.Errorf("Size mismatch when copying %s, expected %d, got %d", path, expectedSize, size)
+		return fmt.Errorf("Size mismatch when copying %s, expected %d, got %d", path, expectedSize, size)
 	}
 	return nil
 }

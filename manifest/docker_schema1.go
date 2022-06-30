@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -58,7 +59,7 @@ func Schema1FromManifest(manifest []byte) (*Schema1, error) {
 		return nil, err
 	}
 	if s1.SchemaVersion != 1 {
-		return nil, errors.Errorf("unsupported schema version %d", s1.SchemaVersion)
+		return nil, fmt.Errorf("unsupported schema version %d", s1.SchemaVersion)
 	}
 	if err := validateUnambiguousManifestFormat(manifest, DockerV2Schema1SignedMediaType,
 		allowedFieldFSLayers|allowedFieldHistory); err != nil {
@@ -142,7 +143,7 @@ func (m *Schema1) LayerInfos() []LayerInfo {
 func (m *Schema1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 	// Our LayerInfos includes empty layers (where m.ExtractedV1Compatibility[].ThrowAway), so expect them to be included here as well.
 	if len(m.FSLayers) != len(layerInfos) {
-		return errors.Errorf("Error preparing updated manifest: layer count changed from %d to %d", len(m.FSLayers), len(layerInfos))
+		return fmt.Errorf("Error preparing updated manifest: layer count changed from %d to %d", len(m.FSLayers), len(layerInfos))
 	}
 	m.FSLayers = make([]Schema1FSLayers, len(layerInfos))
 	for i, info := range layerInfos {
@@ -187,7 +188,7 @@ func (m *Schema1) fixManifestLayers() error {
 	for _, img := range m.ExtractedV1Compatibility {
 		// skip IDs that appear after each other, we handle those later
 		if _, exists := idmap[img.ID]; img.ID != lastID && exists {
-			return errors.Errorf("ID %+v appears multiple times in manifest", img.ID)
+			return fmt.Errorf("ID %+v appears multiple times in manifest", img.ID)
 		}
 		lastID = img.ID
 		idmap[lastID] = struct{}{}
@@ -199,7 +200,7 @@ func (m *Schema1) fixManifestLayers() error {
 			m.History = append(m.History[:i], m.History[i+1:]...)
 			m.ExtractedV1Compatibility = append(m.ExtractedV1Compatibility[:i], m.ExtractedV1Compatibility[i+1:]...)
 		} else if m.ExtractedV1Compatibility[i].Parent != m.ExtractedV1Compatibility[i+1].ID {
-			return errors.Errorf("Invalid parent ID. Expected %v, got %v", m.ExtractedV1Compatibility[i+1].ID, m.ExtractedV1Compatibility[i].Parent)
+			return fmt.Errorf("Invalid parent ID. Expected %v, got %v", m.ExtractedV1Compatibility[i+1].ID, m.ExtractedV1Compatibility[i].Parent)
 		}
 	}
 	return nil
@@ -209,7 +210,7 @@ var validHex = regexp.MustCompile(`^([a-f0-9]{64})$`)
 
 func validateV1ID(id string) error {
 	if ok := validHex.MatchString(id); !ok {
-		return errors.Errorf("image ID %q is invalid", id)
+		return fmt.Errorf("image ID %q is invalid", id)
 	}
 	return nil
 }
@@ -292,20 +293,20 @@ func (m *Schema1) ToSchema2Config(diffIDs []digest.Digest) ([]byte, error) {
 	// Add the history and rootfs information.
 	rootfs, err := json.Marshal(rootFS)
 	if err != nil {
-		return nil, errors.Errorf("error encoding rootfs information %#v: %v", rootFS, err)
+		return nil, fmt.Errorf("error encoding rootfs information %#v: %v", rootFS, err)
 	}
 	rawRootfs := json.RawMessage(rootfs)
 	raw["rootfs"] = &rawRootfs
 	history, err := json.Marshal(convertedHistory)
 	if err != nil {
-		return nil, errors.Errorf("error encoding history information %#v: %v", convertedHistory, err)
+		return nil, fmt.Errorf("error encoding history information %#v: %v", convertedHistory, err)
 	}
 	rawHistory := json.RawMessage(history)
 	raw["history"] = &rawHistory
 	// Encode the result.
 	config, err = json.Marshal(raw)
 	if err != nil {
-		return nil, errors.Errorf("error re-encoding compat image config %#v: %v", s1, err)
+		return nil, fmt.Errorf("error re-encoding compat image config %#v: %v", s1, err)
 	}
 	return config, nil
 }

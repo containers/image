@@ -1,6 +1,8 @@
 package copy
 
 import (
+	"fmt"
+
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/transports"
@@ -20,12 +22,12 @@ func (c *copier) createSignature(manifest []byte, keyIdentity string, passphrase
 
 	if identity != nil {
 		if reference.IsNameOnly(identity) {
-			return nil, errors.Errorf("Sign identity must be a fully specified reference %s", identity)
+			return nil, fmt.Errorf("Sign identity must be a fully specified reference %s", identity)
 		}
 	} else {
 		identity = c.dest.Reference().DockerReference()
 		if identity == nil {
-			return nil, errors.Errorf("Cannot determine canonical Docker reference for destination %s", transports.ImageName(c.dest.Reference()))
+			return nil, fmt.Errorf("Cannot determine canonical Docker reference for destination %s", transports.ImageName(c.dest.Reference()))
 		}
 	}
 

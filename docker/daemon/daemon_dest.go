@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/containers/image/v5/docker/internal/tarfile"
@@ -28,11 +29,11 @@ type daemonImageDestination struct {
 // newImageDestination returns a types.ImageDestination for the specified image reference.
 func newImageDestination(ctx context.Context, sys *types.SystemContext, ref daemonReference) (types.ImageDestination, error) {
 	if ref.ref == nil {
-		return nil, errors.Errorf("Invalid destination docker-daemon:%s: a destination must be a name:tag", ref.StringWithinTransport())
+		return nil, fmt.Errorf("Invalid destination docker-daemon:%s: a destination must be a name:tag", ref.StringWithinTransport())
 	}
 	namedTaggedRef, ok := ref.ref.(reference.NamedTagged)
 	if !ok {
-		return nil, errors.Errorf("Invalid destination docker-daemon:%s: a destination must be a name:tag", ref.StringWithinTransport())
+		return nil, fmt.Errorf("Invalid destination docker-daemon:%s: a destination must be a name:tag", ref.StringWithinTransport())
 	}
 
 	var mustMatchRuntimeOS = true

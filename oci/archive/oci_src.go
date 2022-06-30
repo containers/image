@@ -48,7 +48,7 @@ func LoadManifestDescriptor(imgRef types.ImageReference) (imgspecv1.Descriptor, 
 func LoadManifestDescriptorWithContext(sys *types.SystemContext, imgRef types.ImageReference) (imgspecv1.Descriptor, error) {
 	ociArchRef, ok := imgRef.(ociArchiveReference)
 	if !ok {
-		return imgspecv1.Descriptor{}, errors.Errorf("error typecasting, need type ociArchiveReference")
+		return imgspecv1.Descriptor{}, errors.New("error typecasting, need type ociArchiveReference")
 	}
 	tempDirRef, err := createUntarTempDir(sys, ociArchRef)
 	if err != nil {

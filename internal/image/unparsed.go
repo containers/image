@@ -2,6 +2,7 @@ package image
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/manifest"
@@ -60,7 +61,7 @@ func (i *UnparsedImage) Manifest(ctx context.Context) ([]byte, string, error) {
 				return nil, "", errors.Wrap(err, "computing manifest digest")
 			}
 			if !matches {
-				return nil, "", errors.Errorf("Manifest does not match provided manifest digest %s", digest)
+				return nil, "", fmt.Errorf("Manifest does not match provided manifest digest %s", digest)
 			}
 		}
 

@@ -7,9 +7,9 @@ package signature
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/containers/image/v5/types"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -95,7 +95,7 @@ const (
 // changeContextState changes pc.state, or fails if the state is unexpected
 func (pc *PolicyContext) changeState(expected, new policyContextState) error {
 	if pc.state != expected {
-		return errors.Errorf(`"Invalid PolicyContext state, expected "%s", found "%s"`, expected, pc.state)
+		return fmt.Errorf(`"Invalid PolicyContext state, expected "%s", found "%s"`, expected, pc.state)
 	}
 	pc.state = new
 	return nil

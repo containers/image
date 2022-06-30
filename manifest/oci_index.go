@@ -44,14 +44,14 @@ func (index *OCI1Index) Instance(instanceDigest digest.Digest) (ListUpdate, erro
 			}, nil
 		}
 	}
-	return ListUpdate{}, errors.Errorf("unable to find instance %s in OCI1Index", instanceDigest)
+	return ListUpdate{}, fmt.Errorf("unable to find instance %s in OCI1Index", instanceDigest)
 }
 
 // UpdateInstances updates the sizes, digests, and media types of the manifests
 // which the list catalogs.
 func (index *OCI1Index) UpdateInstances(updates []ListUpdate) error {
 	if len(updates) != len(index.Manifests) {
-		return errors.Errorf("incorrect number of update entries passed to OCI1Index.UpdateInstances: expected %d, got %d", len(index.Manifests), len(updates))
+		return fmt.Errorf("incorrect number of update entries passed to OCI1Index.UpdateInstances: expected %d, got %d", len(index.Manifests), len(updates))
 	}
 	for i := range updates {
 		if err := updates[i].Digest.Validate(); err != nil {
@@ -59,11 +59,11 @@ func (index *OCI1Index) UpdateInstances(updates []ListUpdate) error {
 		}
 		index.Manifests[i].Digest = updates[i].Digest
 		if updates[i].Size < 0 {
-			return errors.Errorf("update %d of %d passed to OCI1Index.UpdateInstances had an invalid size (%d)", i+1, len(updates), updates[i].Size)
+			return fmt.Errorf("update %d of %d passed to OCI1Index.UpdateInstances had an invalid size (%d)", i+1, len(updates), updates[i].Size)
 		}
 		index.Manifests[i].Size = updates[i].Size
 		if updates[i].MediaType == "" {
-			return errors.Errorf("update %d of %d passed to OCI1Index.UpdateInstances had no media type (was %q)", i+1, len(updates), index.Manifests[i].MediaType)
+			return fmt.Errorf("update %d of %d passed to OCI1Index.UpdateInstances had no media type (was %q)", i+1, len(updates), index.Manifests[i].MediaType)
 		}
 		index.Manifests[i].MediaType = updates[i].MediaType
 	}

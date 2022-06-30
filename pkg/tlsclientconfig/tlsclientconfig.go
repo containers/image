@@ -2,6 +2,7 @@ package tlsclientconfig
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -60,7 +61,7 @@ func SetupCertificates(dir string, tlsc *tls.Config) error {
 			keyName := certName[:len(certName)-5] + ".key"
 			logrus.Debugf(" cert: %s", fullPath)
 			if !hasFile(fs, keyName) {
-				return errors.Errorf("missing key %s for client certificate %s. Note that CA certificates should use the extension .crt", keyName, certName)
+				return fmt.Errorf("missing key %s for client certificate %s. Note that CA certificates should use the extension .crt", keyName, certName)
 			}
 			cert, err := tls.LoadX509KeyPair(filepath.Join(dir, certName), filepath.Join(dir, keyName))
 			if err != nil {
@@ -73,7 +74,7 @@ func SetupCertificates(dir string, tlsc *tls.Config) error {
 			certName := keyName[:len(keyName)-4] + ".cert"
 			logrus.Debugf(" key: %s", fullPath)
 			if !hasFile(fs, certName) {
-				return errors.Errorf("missing client certificate %s for key %s", certName, keyName)
+				return fmt.Errorf("missing client certificate %s for key %s", certName, keyName)
 			}
 		}
 	}

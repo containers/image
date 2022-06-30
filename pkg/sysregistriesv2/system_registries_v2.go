@@ -782,7 +782,7 @@ func parseShortNameMode(mode string) (types.ShortNameMode, error) {
 	case "permissive":
 		return types.ShortNameModePermissive, nil
 	default:
-		return types.ShortNameModeInvalid, errors.Errorf("invalid short-name mode: %q", mode)
+		return types.ShortNameModeInvalid, fmt.Errorf("invalid short-name mode: %q", mode)
 	}
 }
 

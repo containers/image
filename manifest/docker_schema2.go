@@ -234,7 +234,7 @@ var schema2CompressionMIMETypeSets = []compressionMIMETypeSet{
 // CompressionAlgorithm that would result in anything other than gzip compression.
 func (m *Schema2) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 	if len(m.LayersDescriptors) != len(layerInfos) {
-		return errors.Errorf("Error preparing updated manifest: layer count changed from %d to %d", len(m.LayersDescriptors), len(layerInfos))
+		return fmt.Errorf("Error preparing updated manifest: layer count changed from %d to %d", len(m.LayersDescriptors), len(layerInfos))
 	}
 	original := m.LayersDescriptors
 	m.LayersDescriptors = make([]Schema2Descriptor, len(layerInfos))

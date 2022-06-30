@@ -60,14 +60,14 @@ func (list *Schema2List) Instance(instanceDigest digest.Digest) (ListUpdate, err
 			}, nil
 		}
 	}
-	return ListUpdate{}, errors.Errorf("unable to find instance %s passed to Schema2List.Instances", instanceDigest)
+	return ListUpdate{}, fmt.Errorf("unable to find instance %s passed to Schema2List.Instances", instanceDigest)
 }
 
 // UpdateInstances updates the sizes, digests, and media types of the manifests
 // which the list catalogs.
 func (list *Schema2List) UpdateInstances(updates []ListUpdate) error {
 	if len(updates) != len(list.Manifests) {
-		return errors.Errorf("incorrect number of update entries passed to Schema2List.UpdateInstances: expected %d, got %d", len(list.Manifests), len(updates))
+		return fmt.Errorf("incorrect number of update entries passed to Schema2List.UpdateInstances: expected %d, got %d", len(list.Manifests), len(updates))
 	}
 	for i := range updates {
 		if err := updates[i].Digest.Validate(); err != nil {
@@ -75,11 +75,11 @@ func (list *Schema2List) UpdateInstances(updates []ListUpdate) error {
 		}
 		list.Manifests[i].Digest = updates[i].Digest
 		if updates[i].Size < 0 {
-			return errors.Errorf("update %d of %d passed to Schema2List.UpdateInstances had an invalid size (%d)", i+1, len(updates), updates[i].Size)
+			return fmt.Errorf("update %d of %d passed to Schema2List.UpdateInstances had an invalid size (%d)", i+1, len(updates), updates[i].Size)
 		}
 		list.Manifests[i].Size = updates[i].Size
 		if updates[i].MediaType == "" {
-			return errors.Errorf("update %d of %d passed to Schema2List.UpdateInstances had no media type (was %q)", i+1, len(updates), list.Manifests[i].MediaType)
+			return fmt.Errorf("update %d of %d passed to Schema2List.UpdateInstances had no media type (was %q)", i+1, len(updates), list.Manifests[i].MediaType)
 		}
 		list.Manifests[i].MediaType = updates[i].MediaType
 	}

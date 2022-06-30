@@ -83,7 +83,7 @@ func (d *dockerImageDestination) SupportsSignatures(ctx context.Context) error {
 	case d.c.signatureBase != nil:
 		return nil
 	default:
-		return errors.Errorf("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
+		return errors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
 	}
 }
 
@@ -243,7 +243,7 @@ func (d *dockerImageDestination) blobExists(ctx context.Context, repo reference.
 		logrus.Debugf("... not present")
 		return false, -1, nil
 	default:
-		return false, -1, errors.Errorf("failed to read from destination repository %s: %d (%s)", reference.Path(d.ref.ref), res.StatusCode, http.StatusText(res.StatusCode))
+		return false, -1, fmt.Errorf("failed to read from destination repository %s: %d (%s)", reference.Path(d.ref.ref), res.StatusCode, http.StatusText(res.StatusCode))
 	}
 }
 
@@ -318,7 +318,7 @@ func (d *dockerImageDestination) tryReusingExactBlob(ctx context.Context, info t
 // May use and/or update cache.
 func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
-		return false, types.BlobInfo{}, errors.Errorf(`"Can not check for a blob with unknown digest`)
+		return false, types.BlobInfo{}, errors.New(`"Can not check for a blob with unknown digest`)
 	}
 
 	// First, check whether the blob happens to already exist at the destination.
@@ -424,7 +424,7 @@ func (d *dockerImageDestination) PutManifest(ctx context.Context, m []byte, inst
 			if merr != nil {
 				return errors.Wrapf(err, "Attempted to PutManifest using an explicitly specified digest (%q) that didn't match the manifest's digest (%v attempting to compute it)", instanceDigest.String(), merr)
 			}
-			return errors.Errorf("Attempted to PutManifest using an explicitly specified digest (%q) that didn't match the manifest's digest (%q)", instanceDigest.String(), manifestDigest.String())
+			return fmt.Errorf("Attempted to PutManifest using an explicitly specified digest (%q) that didn't match the manifest's digest (%q)", instanceDigest.String(), manifestDigest.String())
 		}
 	} else {
 		// Compute the digest of the main manifest, or the list if it's a list, so that we
@@ -525,7 +525,7 @@ func (d *dockerImageDestination) PutSignatures(ctx context.Context, signatures [
 	if instanceDigest == nil {
 		if d.manifestDigest == "" {
 			// This shouldn’t happen, ImageDestination users are required to call PutManifest before PutSignatures
-			return errors.Errorf("Unknown manifest digest, can't add signatures")
+			return errors.New("Unknown manifest digest, can't add signatures")
 		}
 		instanceDigest = &d.manifestDigest
 	}
@@ -539,7 +539,7 @@ func (d *dockerImageDestination) PutSignatures(ctx context.Context, signatures [
 	case d.c.signatureBase != nil:
 		return d.putSignaturesToLookaside(signatures, *instanceDigest)
 	default:
-		return errors.Errorf("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
+		return errors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
 	}
 }
 
@@ -598,9 +598,9 @@ func (d *dockerImageDestination) putOneSignature(url *url.URL, signature []byte)
 		return nil
 
 	case "http", "https":
-		return errors.Errorf("Writing directly to a %s sigstore %s is not supported. Configure a sigstore-staging: location", url.Scheme, url.Redacted())
+		return fmt.Errorf("Writing directly to a %s sigstore %s is not supported. Configure a sigstore-staging: location", url.Scheme, url.Redacted())
 	default:
-		return errors.Errorf("Unsupported scheme when writing signature to %s", url.Redacted())
+		return fmt.Errorf("Unsupported scheme when writing signature to %s", url.Redacted())
 	}
 }
 
@@ -618,9 +618,9 @@ func (c *dockerClient) deleteOneSignature(url *url.URL) (missing bool, err error
 		return false, err
 
 	case "http", "https":
-		return false, errors.Errorf("Writing directly to a %s sigstore %s is not supported. Configure a sigstore-staging: location", url.Scheme, url.Redacted())
+		return false, fmt.Errorf("Writing directly to a %s sigstore %s is not supported. Configure a sigstore-staging: location", url.Scheme, url.Redacted())
 	default:
-		return false, errors.Errorf("Unsupported scheme when deleting signature from %s", url.Redacted())
+		return false, fmt.Errorf("Unsupported scheme when deleting signature from %s", url.Redacted())
 	}
 }
 

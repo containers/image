@@ -1,6 +1,7 @@
 package sysregistriesv2
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -166,7 +167,7 @@ func editShortNameAlias(ctx *types.SystemContext, name string, value *string) er
 	} else {
 		// If the name does not exist, throw an error.
 		if _, exists := conf.Aliases[name]; !exists {
-			return errors.Errorf("short-name alias %q not found in %q: please check registries.conf files", name, confPath)
+			return fmt.Errorf("short-name alias %q not found in %q: please check registries.conf files", name, confPath)
 		}
 
 		delete(conf.Aliases, name)
@@ -214,21 +215,21 @@ func parseShortNameValue(alias string) (reference.Named, error) {
 	}
 
 	if _, ok := ref.(reference.Digested); ok {
-		return nil, errors.Errorf("invalid alias %q: must not contain digest", alias)
+		return nil, fmt.Errorf("invalid alias %q: must not contain digest", alias)
 	}
 
 	if _, ok := ref.(reference.Tagged); ok {
-		return nil, errors.Errorf("invalid alias %q: must not contain tag", alias)
+		return nil, fmt.Errorf("invalid alias %q: must not contain tag", alias)
 	}
 
 	named, ok := ref.(reference.Named)
 	if !ok {
-		return nil, errors.Errorf("invalid alias %q: must contain registry and repository", alias)
+		return nil, fmt.Errorf("invalid alias %q: must contain registry and repository", alias)
 	}
 
 	registry := reference.Domain(named)
 	if !(strings.ContainsAny(registry, ".:") || registry == "localhost") {
-		return nil, errors.Errorf("invalid alias %q: must contain registry and repository", alias)
+		return nil, fmt.Errorf("invalid alias %q: must contain registry and repository", alias)
 	}
 
 	// A final parse to make sure that docker.io references are correctly
@@ -246,21 +247,21 @@ func validateShortName(name string) error {
 	}
 
 	if _, ok := repo.(reference.Digested); ok {
-		return errors.Errorf("invalid short name %q: must not contain digest", name)
+		return fmt.Errorf("invalid short name %q: must not contain digest", name)
 	}
 
 	if _, ok := repo.(reference.Tagged); ok {
-		return errors.Errorf("invalid short name %q: must not contain tag", name)
+		return fmt.Errorf("invalid short name %q: must not contain tag", name)
 	}
 
 	named, ok := repo.(reference.Named)
 	if !ok {
-		return errors.Errorf("invalid short name %q: no name", name)
+		return fmt.Errorf("invalid short name %q: no name", name)
 	}
 
 	registry := reference.Domain(named)
 	if strings.ContainsAny(registry, ".:") || registry == "localhost" {
-		return errors.Errorf("invalid short name %q: must not contain registry", name)
+		return fmt.Errorf("invalid short name %q: must not contain registry", name)
 	}
 	return nil
 }

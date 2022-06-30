@@ -2,6 +2,7 @@ package copy
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/containers/image/v5/internal/private"
@@ -129,10 +130,10 @@ func (ic *imageCopier) copyBlobFromStream(ctx context.Context, srcReader io.Read
 	}
 
 	if digestingReader.validationFailed { // Coverage: This should never happen.
-		return types.BlobInfo{}, errors.Errorf("Internal error writing blob %s, digest verification failed but was ignored", srcInfo.Digest)
+		return types.BlobInfo{}, fmt.Errorf("Internal error writing blob %s, digest verification failed but was ignored", srcInfo.Digest)
 	}
 	if stream.info.Digest != "" && uploadedInfo.Digest != stream.info.Digest {
-		return types.BlobInfo{}, errors.Errorf("Internal error writing blob %s, blob with digest %s saved with digest %s", srcInfo.Digest, stream.info.Digest, uploadedInfo.Digest)
+		return types.BlobInfo{}, fmt.Errorf("Internal error writing blob %s, blob with digest %s saved with digest %s", srcInfo.Digest, stream.info.Digest, uploadedInfo.Digest)
 	}
 	if digestingReader.validationSucceeded {
 		if err := compressionStep.recordValidatedDigestData(ic.c, uploadedInfo, srcInfo, encryptionStep, decryptionStep); err != nil {

@@ -175,7 +175,7 @@ func validateImageListSelection(selection ImageListSelection) error {
 	case CopySystemImage, CopyAllImages, CopySpecificImages:
 		return nil
 	default:
-		return errors.Errorf("Invalid value for options.ImageListSelection: %d", selection)
+		return fmt.Errorf("Invalid value for options.ImageListSelection: %d", selection)
 	}
 }
 
@@ -309,7 +309,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 	} else { /* options.ImageListSelection == CopyAllImages or options.ImageListSelection == CopySpecificImages, */
 		// If we were asked to copy multiple images and can't, that's an error.
 		if !supportsMultipleImages(c.dest) {
-			return nil, errors.Errorf("copying multiple images: destination transport %q does not support copying multiple images as a group", destRef.Transport().Name())
+			return nil, fmt.Errorf("copying multiple images: destination transport %q does not support copying multiple images as a group", destRef.Transport().Name())
 		}
 		// Copy some or all of the images.
 		switch options.ImageListSelection {
@@ -457,7 +457,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	}
 	if selectedListType != originalList.MIMEType() {
 		if cannotModifyManifestListReason != "" {
-			return nil, errors.Errorf("Manifest list must be converted to type %q to be written to destination, but we cannot modify it: %q", selectedListType, cannotModifyManifestListReason)
+			return nil, fmt.Errorf("Manifest list must be converted to type %q to be written to destination, but we cannot modify it: %q", selectedListType, cannotModifyManifestListReason)
 		}
 	}
 
@@ -542,7 +542,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 		// If we can't just use the original value, but we have to change it, flag an error.
 		if !bytes.Equal(attemptedManifestList, originalManifestList) {
 			if cannotModifyManifestListReason != "" {
-				return nil, errors.Errorf("Manifest list must be converted to type %q to be written to destination, but we cannot modify it: %q", thisListType, cannotModifyManifestListReason)
+				return nil, fmt.Errorf("Manifest list must be converted to type %q to be written to destination, but we cannot modify it: %q", thisListType, cannotModifyManifestListReason)
 			}
 			logrus.Debugf("Manifest list has been updated")
 		} else {
@@ -866,7 +866,7 @@ func (ic *imageCopier) updateEmbeddedDockerReference() error {
 	}
 
 	if ic.cannotModifyManifestReason != "" {
-		return errors.Errorf("Copying a schema1 image with an embedded Docker reference to %s (Docker reference %s) would change the manifest, which we cannot do: %q",
+		return fmt.Errorf("Copying a schema1 image with an embedded Docker reference to %s (Docker reference %s) would change the manifest, which we cannot do: %q",
 			transports.ImageName(ic.c.dest.Reference()), destRef.String(), ic.cannotModifyManifestReason)
 	}
 	ic.manifestUpdates.EmbeddedDockerReference = destRef
@@ -897,7 +897,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	// If we only need to check authorization, no updates required.
 	if updatedSrcInfos != nil && !reflect.DeepEqual(srcInfos, updatedSrcInfos) {
 		if ic.cannotModifyManifestReason != "" {
-			return errors.Errorf("Copying this image would require changing layer representation, which we cannot do: %q", ic.cannotModifyManifestReason)
+			return fmt.Errorf("Copying this image would require changing layer representation, which we cannot do: %q", ic.cannotModifyManifestReason)
 		}
 		srcInfos = updatedSrcInfos
 		srcInfosUpdated = true
@@ -1024,7 +1024,7 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest(ctx context.Context, instanc
 	var pendingImage types.Image = ic.src
 	if !ic.noPendingManifestUpdates() {
 		if ic.cannotModifyManifestReason != "" {
-			return nil, "", errors.Errorf("Internal error: copy needs an updated manifest but that was known to be forbidden: %q", ic.cannotModifyManifestReason)
+			return nil, "", fmt.Errorf("Internal error: copy needs an updated manifest but that was known to be forbidden: %q", ic.cannotModifyManifestReason)
 		}
 		if !ic.diffIDsAreNeeded && ic.src.UpdatedImageNeedsLayerDiffIDs(*ic.manifestUpdates) {
 			// We have set ic.diffIDsAreNeeded based on the preferred MIME type returned by determineManifestConversion.
@@ -1033,7 +1033,7 @@ func (ic *imageCopier) copyUpdatedConfigAndManifest(ctx context.Context, instanc
 			// when ic.c.dest.SupportedManifestMIMETypes() includes both s1 and s2, the upload using s1 failed, and we are now trying s2.
 			// Supposedly s2-only registries do not exist or are extremely rare, so failing with this error message is good enough for now.
 			// If handling such registries turns out to be necessary, we could compute ic.diffIDsAreNeeded based on the full list of manifest MIME type candidates.
-			return nil, "", errors.Errorf("Can not convert image to %s, preparing DiffIDs for this case is not supported", ic.manifestUpdates.ManifestMIMEType)
+			return nil, "", fmt.Errorf("Can not convert image to %s, preparing DiffIDs for this case is not supported", ic.manifestUpdates.ManifestMIMEType)
 		}
 		pi, err := ic.src.UpdatedImage(ctx, *ic.manifestUpdates)
 		if err != nil {
@@ -1098,7 +1098,7 @@ func (ic *imageCopier) copyConfig(ctx context.Context, src types.Image) error {
 			return err
 		}
 		if destInfo.Digest != srcInfo.Digest {
-			return errors.Errorf("Internal error: copying uncompressed config blob %s changed digest to %s", srcInfo.Digest, destInfo.Digest)
+			return fmt.Errorf("Internal error: copying uncompressed config blob %s changed digest to %s", srcInfo.Digest, destInfo.Digest)
 		}
 	}
 	return nil

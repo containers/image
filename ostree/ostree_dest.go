@@ -167,7 +167,7 @@ func (d *ostreeImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	}
 	blobDigest := digester.Digest()
 	if inputInfo.Size != -1 && size != inputInfo.Size {
-		return types.BlobInfo{}, errors.Errorf("Size mismatch when copying %s, expected %d, got %d", blobDigest, inputInfo.Size, size)
+		return types.BlobInfo{}, fmt.Errorf("Size mismatch when copying %s, expected %d, got %d", blobDigest, inputInfo.Size, size)
 	}
 	if err := blobFile.Sync(); err != nil {
 		return types.BlobInfo{}, err

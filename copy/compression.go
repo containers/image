@@ -1,6 +1,7 @@
 package copy
 
 import (
+	"fmt"
 	"io"
 
 	internalblobinfocache "github.com/containers/image/v5/internal/blobinfocache"
@@ -259,7 +260,7 @@ func (d *bpCompressionStepData) recordValidatedDigestData(c *copier, uploadedInf
 		case types.Decompress:
 			c.blobInfoCache.RecordDigestUncompressedPair(srcInfo.Digest, uploadedInfo.Digest)
 		default:
-			return errors.Errorf("Internal error: Unexpected d.operation value %#v", d.operation)
+			return fmt.Errorf("Internal error: Unexpected d.operation value %#v", d.operation)
 		}
 	}
 	if d.uploadedCompressorName != "" && d.uploadedCompressorName != internalblobinfocache.UnknownCompression {

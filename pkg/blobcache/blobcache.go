@@ -3,6 +3,7 @@ package blobcache
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -76,13 +77,13 @@ func makeFilename(blobSum digest.Digest, isConfig bool) string {
 // or different version of a blob when preparing the list of layers when reading an image.
 func NewBlobCache(ref types.ImageReference, directory string, compress types.LayerCompression) (*BlobCache, error) {
 	if directory == "" {
-		return nil, errors.Errorf("error creating cache around reference %q: no directory specified", transports.ImageName(ref))
+		return nil, fmt.Errorf("error creating cache around reference %q: no directory specified", transports.ImageName(ref))
 	}
 	switch compress {
 	case types.Compress, types.Decompress, types.PreserveOriginal:
 		// valid value, accept it
 	default:
-		return nil, errors.Errorf("unhandled LayerCompression value %v", compress)
+		return nil, fmt.Errorf("unhandled LayerCompression value %v", compress)
 	}
 	return &BlobCache{
 		reference: ref,

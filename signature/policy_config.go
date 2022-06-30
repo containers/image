@@ -406,7 +406,7 @@ func (pr *prSignedBy) UnmarshalJSON(data []byte) error {
 	case !gotKeyPath && !gotKeyData:
 		return InvalidPolicyFormatError("At least one of keyPath and keyData mus be specified")
 	default: // Coverage: This should never happen
-		return errors.Errorf("Impossible keyPath/keyData presence combination!?")
+		return fmt.Errorf("Impossible keyPath/keyData presence combination!?")
 	}
 	if err != nil {
 		return err

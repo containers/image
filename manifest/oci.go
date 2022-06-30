@@ -124,7 +124,7 @@ var oci1CompressionMIMETypeSets = []compressionMIMETypeSet{
 // handled — that logic should eventually also be provided as OCI1 methods, not hard-coded in callers.
 func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 	if len(m.Layers) != len(layerInfos) {
-		return errors.Errorf("Error preparing updated manifest: layer count changed from %d to %d", len(m.Layers), len(layerInfos))
+		return fmt.Errorf("Error preparing updated manifest: layer count changed from %d to %d", len(m.Layers), len(layerInfos))
 	}
 	original := m.Layers
 	m.Layers = make([]imgspecv1.Descriptor, len(layerInfos))
@@ -163,7 +163,7 @@ func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 func getEncryptedMediaType(mediatype string) (string, error) {
 	for _, s := range strings.Split(mediatype, "+")[1:] {
 		if s == "encrypted" {
-			return "", errors.Errorf("unsupportedmediatype: %v already encrypted", mediatype)
+			return "", fmt.Errorf("unsupportedmediatype: %v already encrypted", mediatype)
 		}
 	}
 	unsuffixedMediatype := strings.Split(mediatype, "+")[0]
@@ -172,14 +172,14 @@ func getEncryptedMediaType(mediatype string) (string, error) {
 		return mediatype + "+encrypted", nil
 	}
 
-	return "", errors.Errorf("unsupported mediatype to encrypt: %v", mediatype)
+	return "", fmt.Errorf("unsupported mediatype to encrypt: %v", mediatype)
 }
 
 // getEncryptedMediaType will return the mediatype to its encrypted counterpart and return
 // an error if the mediatype does not support decryption
 func getDecryptedMediaType(mediatype string) (string, error) {
 	if !strings.HasSuffix(mediatype, "+encrypted") {
-		return "", errors.Errorf("unsupported mediatype to decrypt %v:", mediatype)
+		return "", fmt.Errorf("unsupported mediatype to decrypt %v:", mediatype)
 	}
 
 	return strings.TrimSuffix(mediatype, "+encrypted"), nil

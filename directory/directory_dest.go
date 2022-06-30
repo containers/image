@@ -2,6 +2,7 @@ package directory
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -33,7 +34,7 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (types.Imag
 			desiredLayerCompression = types.Compress
 
 			if sys.DirForceDecompress {
-				return nil, errors.Errorf("Cannot compress and decompress at the same time")
+				return nil, fmt.Errorf("Cannot compress and decompress at the same time")
 			}
 		}
 		if sys.DirForceDecompress {
@@ -171,7 +172,7 @@ func (d *dirImageDestination) PutBlob(ctx context.Context, stream io.Reader, inp
 	}
 	blobDigest := digester.Digest()
 	if inputInfo.Size != -1 && size != inputInfo.Size {
-		return types.BlobInfo{}, errors.Errorf("Size mismatch when copying %s, expected %d, got %d", blobDigest, inputInfo.Size, size)
+		return types.BlobInfo{}, fmt.Errorf("Size mismatch when copying %s, expected %d, got %d", blobDigest, inputInfo.Size, size)
 	}
 	if err := blobFile.Sync(); err != nil {
 		return types.BlobInfo{}, err
@@ -209,7 +210,7 @@ func (d *dirImageDestination) PutBlob(ctx context.Context, stream io.Reader, inp
 // May use and/or update cache.
 func (d *dirImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
-		return false, types.BlobInfo{}, errors.Errorf(`"Can not check for a blob with unknown digest`)
+		return false, types.BlobInfo{}, fmt.Errorf(`"Can not check for a blob with unknown digest`)
 	}
 	blobPath := d.ref.layerPath(info.Digest)
 	finfo, err := os.Stat(blobPath)

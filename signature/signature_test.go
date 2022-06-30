@@ -232,19 +232,19 @@ func TestSign(t *testing.T) {
 	verified, err := verifyAndExtractSignature(mech, signature, signatureAcceptanceRules{
 		validateKeyIdentity: func(keyIdentity string) error {
 			if keyIdentity != TestKeyFingerprint {
-				return errors.Errorf("Unexpected keyIdentity")
+				return errors.New("Unexpected keyIdentity")
 			}
 			return nil
 		},
 		validateSignedDockerReference: func(signedDockerReference string) error {
 			if signedDockerReference != sig.UntrustedDockerReference {
-				return errors.Errorf("Unexpected signedDockerReference")
+				return errors.New("Unexpected signedDockerReference")
 			}
 			return nil
 		},
 		validateSignedDockerManifestDigest: func(signedDockerManifestDigest digest.Digest) error {
 			if signedDockerManifestDigest != sig.UntrustedDockerManifestDigest {
-				return errors.Errorf("Unexpected signedDockerManifestDigest")
+				return errors.New("Unexpected signedDockerManifestDigest")
 			}
 			return nil
 		},
@@ -280,21 +280,21 @@ func TestVerifyAndExtractSignature(t *testing.T) {
 		validateKeyIdentity: func(keyIdentity string) error {
 			recorded.keyIdentity = keyIdentity
 			if keyIdentity != wanted.keyIdentity {
-				return errors.Errorf("keyIdentity mismatch")
+				return errors.New("keyIdentity mismatch")
 			}
 			return nil
 		},
 		validateSignedDockerReference: func(signedDockerReference string) error {
 			recorded.signedDockerReference = signedDockerReference
 			if signedDockerReference != wanted.signedDockerReference {
-				return errors.Errorf("signedDockerReference mismatch")
+				return errors.New("signedDockerReference mismatch")
 			}
 			return nil
 		},
 		validateSignedDockerManifestDigest: func(signedDockerManifestDigest digest.Digest) error {
 			recorded.signedDockerManifestDigest = signedDockerManifestDigest
 			if signedDockerManifestDigest != wanted.signedDockerManifestDigest {
-				return errors.Errorf("signedDockerManifestDigest mismatch")
+				return errors.New("signedDockerManifestDigest mismatch")
 			}
 			return nil
 		},
