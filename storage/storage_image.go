@@ -650,7 +650,7 @@ func (s *storageImageDestination) tryReusingBlobAsPending(ctx context.Context, b
 	if options.SrcRef != nil {
 		// Check if we have the layer in the underlying additional layer store.
 		aLayer, err := s.imageRef.transport.store.LookupAdditionalLayer(blobinfo.Digest, options.SrcRef.String())
-		if err != nil && perrors.Cause(err) != storage.ErrLayerUnknown {
+		if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
 			return false, types.BlobInfo{}, perrors.Wrapf(err, `looking for compressed layers with digest %q and labels`, blobinfo.Digest)
 		} else if err == nil {
 			// Record the uncompressed value so that we can use it to calculate layer IDs.
@@ -682,7 +682,7 @@ func (s *storageImageDestination) tryReusingBlobAsPending(ctx context.Context, b
 
 	// Check if we have a wasn't-compressed layer in storage that's based on that blob.
 	layers, err := s.imageRef.transport.store.LayersByUncompressedDigest(blobinfo.Digest)
-	if err != nil && perrors.Cause(err) != storage.ErrLayerUnknown {
+	if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
 		return false, types.BlobInfo{}, perrors.Wrapf(err, `looking for layers with digest %q`, blobinfo.Digest)
 	}
 	if len(layers) > 0 {
@@ -697,7 +697,7 @@ func (s *storageImageDestination) tryReusingBlobAsPending(ctx context.Context, b
 
 	// Check if we have a was-compressed layer in storage that's based on that blob.
 	layers, err = s.imageRef.transport.store.LayersByCompressedDigest(blobinfo.Digest)
-	if err != nil && perrors.Cause(err) != storage.ErrLayerUnknown {
+	if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
 		return false, types.BlobInfo{}, perrors.Wrapf(err, `looking for compressed layers with digest %q`, blobinfo.Digest)
 	}
 	if len(layers) > 0 {
@@ -716,7 +716,7 @@ func (s *storageImageDestination) tryReusingBlobAsPending(ctx context.Context, b
 	if options.CanSubstitute || blobinfo.Size != -1 {
 		if uncompressedDigest := options.Cache.UncompressedDigest(blobinfo.Digest); uncompressedDigest != "" && uncompressedDigest != blobinfo.Digest {
 			layers, err := s.imageRef.transport.store.LayersByUncompressedDigest(uncompressedDigest)
-			if err != nil && perrors.Cause(err) != storage.ErrLayerUnknown {
+			if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
 				return false, types.BlobInfo{}, perrors.Wrapf(err, `looking for layers with digest %q`, uncompressedDigest)
 			}
 			if len(layers) > 0 {
@@ -941,7 +941,7 @@ func (s *storageImageDestination) commitLayer(ctx context.Context, blob manifest
 	s.lock.Unlock()
 	if ok {
 		layer, err := al.PutAs(id, lastLayer, nil)
-		if err != nil && perrors.Cause(err) != storage.ErrDuplicateID {
+		if err != nil && !errors.Is(err, storage.ErrDuplicateID) {
 			return perrors.Wrapf(err, "failed to put layer from digest and labels")
 		}
 		lastLayer = layer.ID
@@ -1015,7 +1015,7 @@ func (s *storageImageDestination) commitLayer(ctx context.Context, blob manifest
 		OriginalDigest:     blob.Digest,
 		UncompressedDigest: diffID,
 	}, file)
-	if err != nil && perrors.Cause(err) != storage.ErrDuplicateID {
+	if err != nil && !errors.Is(err, storage.ErrDuplicateID) {
 		return perrors.Wrapf(err, "adding layer with blob %q", blob.Digest)
 	}
 
@@ -1095,7 +1095,7 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	oldNames := []string{}
 	img, err := s.imageRef.transport.store.CreateImage(intendedID, nil, lastLayer, "", options)
 	if err != nil {
-		if perrors.Cause(err) != storage.ErrDuplicateID {
+		if !errors.Is(err, storage.ErrDuplicateID) {
 			logrus.Debugf("error creating image: %q", err)
 			return perrors.Wrapf(err, "creating image %q", intendedID)
 		}
