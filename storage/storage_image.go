@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	stderrors "errors"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -39,10 +39,10 @@ var (
 	// with a digest-based name that doesn't match its contents.
 	// Deprecated: PutBlob() doesn't do this any more (it just accepts the caller’s value),
 	// and there is no known user of this error.
-	ErrBlobDigestMismatch = stderrors.New("blob digest mismatch")
+	ErrBlobDigestMismatch = errors.New("blob digest mismatch")
 	// ErrBlobSizeMismatch is returned when PutBlob() is given a blob
 	// with an expected size that doesn't match the reader.
-	ErrBlobSizeMismatch = stderrors.New("blob size mismatch")
+	ErrBlobSizeMismatch = errors.New("blob size mismatch")
 	// ErrNoSuchImage is returned when we attempt to access an image which
 	// doesn't exist in the storage area.
 	ErrNoSuchImage = storage.ErrNotAnImage
