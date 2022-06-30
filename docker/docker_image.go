@@ -13,7 +13,7 @@ import (
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 )
 
 // Image is a Docker-specific implementation of types.ImageCloser with a few extra methods
@@ -56,13 +56,13 @@ func (i *Image) GetRepositoryTags(ctx context.Context) ([]string, error) {
 func GetRepositoryTags(ctx context.Context, sys *types.SystemContext, ref types.ImageReference) ([]string, error) {
 	dr, ok := ref.(dockerReference)
 	if !ok {
-		return nil, errors.New("ref must be a dockerReference")
+		return nil, perrors.New("ref must be a dockerReference")
 	}
 
 	path := fmt.Sprintf(tagsPath, reference.Path(dr.ref))
 	client, err := newDockerClientFromRef(sys, dr, false, "pull")
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create client")
+		return nil, perrors.Wrap(err, "failed to create client")
 	}
 
 	tags := make([]string, 0)
@@ -116,7 +116,7 @@ func GetRepositoryTags(ctx context.Context, sys *types.SystemContext, ref types.
 func GetDigest(ctx context.Context, sys *types.SystemContext, ref types.ImageReference) (digest.Digest, error) {
 	dr, ok := ref.(dockerReference)
 	if !ok {
-		return "", errors.New("ref must be a dockerReference")
+		return "", perrors.New("ref must be a dockerReference")
 	}
 
 	tagOrDigest, err := dr.tagOrDigest()
@@ -126,7 +126,7 @@ func GetDigest(ctx context.Context, sys *types.SystemContext, ref types.ImageRef
 
 	client, err := newDockerClientFromRef(sys, dr, false, "pull")
 	if err != nil {
-		return "", errors.Wrap(err, "failed to create client")
+		return "", perrors.Wrap(err, "failed to create client")
 	}
 
 	path := fmt.Sprintf(manifestPath, reference.Path(dr.ref), tagOrDigest)
@@ -141,7 +141,7 @@ func GetDigest(ctx context.Context, sys *types.SystemContext, ref types.ImageRef
 
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return "", errors.Wrapf(registryHTTPResponseToError(res), "reading digest %s in %s", tagOrDigest, dr.ref.Name())
+		return "", perrors.Wrapf(registryHTTPResponseToError(res), "reading digest %s in %s", tagOrDigest, dr.ref.Name())
 	}
 
 	dig, err := digest.Parse(res.Header.Get("Docker-Content-Digest"))

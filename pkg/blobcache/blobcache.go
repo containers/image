@@ -19,7 +19,7 @@ import (
 	"github.com/containers/storage/pkg/ioutils"
 	digest "github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -128,7 +128,7 @@ func (b *BlobCache) HasBlob(blobinfo types.BlobInfo) (bool, int64, error) {
 			return true, fileInfo.Size(), nil
 		}
 		if !os.IsNotExist(err) {
-			return false, -1, errors.Wrap(err, "checking size")
+			return false, -1, perrors.Wrap(err, "checking size")
 		}
 	}
 
@@ -147,12 +147,12 @@ func (b *BlobCache) ClearCache() error {
 	defer f.Close()
 	names, err := f.Readdirnames(-1)
 	if err != nil {
-		return errors.Wrapf(err, "error reading directory %q", b.directory)
+		return perrors.Wrapf(err, "error reading directory %q", b.directory)
 	}
 	for _, name := range names {
 		pathname := filepath.Join(b.directory, name)
 		if err = os.RemoveAll(pathname); err != nil {
-			return errors.Wrapf(err, "clearing cache for %q", transports.ImageName(b))
+			return perrors.Wrapf(err, "clearing cache for %q", transports.ImageName(b))
 		}
 	}
 	return nil
@@ -165,7 +165,7 @@ func (b *BlobCache) NewImage(ctx context.Context, sys *types.SystemContext) (typ
 func (b *BlobCache) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
 	src, err := b.reference.NewImageSource(ctx, sys)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error creating new image source %q", transports.ImageName(b.reference))
+		return nil, perrors.Wrapf(err, "error creating new image source %q", transports.ImageName(b.reference))
 	}
 	logrus.Debugf("starting to read from image %q using blob cache in %q (compression=%v)", transports.ImageName(b.reference), b.directory, b.compress)
 	return &blobCacheSource{reference: b, source: src, sys: *sys}, nil
@@ -174,7 +174,7 @@ func (b *BlobCache) NewImageSource(ctx context.Context, sys *types.SystemContext
 func (b *BlobCache) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
 	dest, err := b.reference.NewImageDestination(ctx, sys)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error creating new image destination %q", transports.ImageName(b.reference))
+		return nil, perrors.Wrapf(err, "error creating new image destination %q", transports.ImageName(b.reference))
 	}
 	logrus.Debugf("starting to write to image %q using blob cache in %q", transports.ImageName(b.reference), b.directory)
 	return &blobCacheDestination{reference: b, destination: dest}, nil
@@ -199,7 +199,7 @@ func (s *blobCacheSource) GetManifest(ctx context.Context, instanceDigest *diges
 		}
 		if !os.IsNotExist(err) {
 			s.cacheErrors++
-			return nil, "", errors.Wrap(err, "checking for manifest file")
+			return nil, "", perrors.Wrap(err, "checking for manifest file")
 		}
 	}
 	s.cacheMisses++
@@ -229,7 +229,7 @@ func (s *blobCacheSource) GetBlob(ctx context.Context, blobinfo types.BlobInfo, 
 				s.mu.Lock()
 				s.cacheErrors++
 				s.mu.Unlock()
-				return nil, -1, errors.Wrap(err, "checking for cache")
+				return nil, -1, perrors.Wrap(err, "checking for cache")
 			}
 		}
 	}
@@ -238,7 +238,7 @@ func (s *blobCacheSource) GetBlob(ctx context.Context, blobinfo types.BlobInfo, 
 	s.mu.Unlock()
 	rc, size, err := s.source.GetBlob(ctx, blobinfo, cache)
 	if err != nil {
-		return rc, size, errors.Wrapf(err, "error reading blob from source image %q", transports.ImageName(s.reference))
+		return rc, size, perrors.Wrapf(err, "error reading blob from source image %q", transports.ImageName(s.reference))
 	}
 	return rc, size, nil
 }
@@ -250,18 +250,18 @@ func (s *blobCacheSource) GetSignatures(ctx context.Context, instanceDigest *dig
 func (s *blobCacheSource) LayerInfosForCopy(ctx context.Context, instanceDigest *digest.Digest) ([]types.BlobInfo, error) {
 	signatures, err := s.source.GetSignatures(ctx, instanceDigest)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error checking if image %q has signatures", transports.ImageName(s.reference))
+		return nil, perrors.Wrapf(err, "error checking if image %q has signatures", transports.ImageName(s.reference))
 	}
 	canReplaceBlobs := !(len(signatures) > 0 && len(signatures[0]) > 0)
 
 	infos, err := s.source.LayerInfosForCopy(ctx, instanceDigest)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error getting layer infos for copying image %q through cache", transports.ImageName(s.reference))
+		return nil, perrors.Wrapf(err, "error getting layer infos for copying image %q through cache", transports.ImageName(s.reference))
 	}
 	if infos == nil {
 		img, err := image.FromUnparsedImage(ctx, &s.sys, image.UnparsedInstance(s.source, instanceDigest))
 		if err != nil {
-			return nil, errors.Wrapf(err, "error opening image to get layer infos for copying image %q through cache", transports.ImageName(s.reference))
+			return nil, perrors.Wrapf(err, "error opening image to get layer infos for copying image %q through cache", transports.ImageName(s.reference))
 		}
 		infos = img.LayerInfos()
 	}
@@ -428,7 +428,7 @@ func (d *blobCacheDestination) PutBlob(ctx context.Context, stream io.Reader, in
 						if err2 := os.Remove(tempfile.Name()); err2 != nil {
 							logrus.Debugf("error cleaning up temporary file %q for blob %q: %v", tempfile.Name(), inputInfo.Digest.String(), err2)
 						}
-						err = errors.Wrapf(err, "error renaming new layer for blob %q into place at %q", inputInfo.Digest.String(), filename)
+						err = perrors.Wrapf(err, "error renaming new layer for blob %q into place at %q", inputInfo.Digest.String(), filename)
 					}
 				} else {
 					if err2 := os.Remove(tempfile.Name()); err2 != nil {
@@ -481,7 +481,7 @@ func (d *blobCacheDestination) PutBlob(ctx context.Context, stream io.Reader, in
 		wg.Wait()
 	}
 	if err != nil {
-		return newBlobInfo, errors.Wrapf(err, "error storing blob to image destination for cache %q", transports.ImageName(d.reference))
+		return newBlobInfo, perrors.Wrapf(err, "error storing blob to image destination for cache %q", transports.ImageName(d.reference))
 	}
 	if alternateDigest.Validate() == nil {
 		logrus.Debugf("added blob %q (also %q) to the cache at %q", inputInfo.Digest.String(), alternateDigest.String(), d.reference.directory)

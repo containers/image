@@ -21,7 +21,7 @@ import (
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -39,7 +39,7 @@ type dockerImageSource struct {
 func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerReference) (*dockerImageSource, error) {
 	registry, err := sysregistriesv2.FindRegistry(sys, ref.ref.Name())
 	if err != nil {
-		return nil, errors.Wrapf(err, "loading registries configuration")
+		return nil, perrors.Wrapf(err, "loading registries configuration")
 	}
 	if registry == nil {
 		// No configuration was found for the provided reference, so use the
@@ -84,7 +84,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 	}
 	switch len(attempts) {
 	case 0:
-		return nil, errors.New("Internal error: newImageSource returned without trying any endpoint")
+		return nil, perrors.New("Internal error: newImageSource returned without trying any endpoint")
 	case 1:
 		return nil, attempts[0].err // If no mirrors are used, perfectly preserve the error type and add no noise.
 	default:
@@ -96,7 +96,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 			// The paired [] at least have some chance of being unambiguous.
 			extras = append(extras, fmt.Sprintf("[%s: %v]", attempts[i].ref.String(), attempts[i].err))
 		}
-		return nil, errors.Wrapf(primary.err, "(Mirrors also failed: %s): %s", strings.Join(extras, "\n"), primary.ref.String())
+		return nil, perrors.Wrapf(primary.err, "(Mirrors also failed: %s): %s", strings.Join(extras, "\n"), primary.ref.String())
 	}
 }
 
@@ -204,7 +204,7 @@ func (s *dockerImageSource) fetchManifest(ctx context.Context, tagOrDigest strin
 	logrus.Debugf("Content-Type from manifest GET is %q", res.Header.Get("Content-Type"))
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return nil, "", errors.Wrapf(registryHTTPResponseToError(res), "reading manifest %s in %s", tagOrDigest, s.physicalRef.ref.Name())
+		return nil, "", perrors.Wrapf(registryHTTPResponseToError(res), "reading manifest %s in %s", tagOrDigest, s.physicalRef.ref.Name())
 	}
 
 	manblob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxManifestBodySize)
@@ -250,7 +250,7 @@ func (s *dockerImageSource) getExternalBlob(ctx context.Context, urls []string) 
 		err  error
 	)
 	if len(urls) == 0 {
-		return nil, 0, errors.New("internal error: getExternalBlob called with no URLs")
+		return nil, 0, perrors.New("internal error: getExternalBlob called with no URLs")
 	}
 	for _, u := range urls {
 		url, err := url.Parse(u)
@@ -337,7 +337,7 @@ func handle206Response(streams chan io.ReadCloser, errs chan error, body io.Read
 	}
 	boundary, found := params["boundary"]
 	if !found {
-		errs <- errors.New("could not find boundary")
+		errs <- perrors.New("could not find boundary")
 		body.Close()
 		return
 	}
@@ -352,7 +352,7 @@ func handle206Response(streams chan io.ReadCloser, errs chan error, body io.Read
 				errs <- err
 			}
 			if parts != len(chunks) {
-				errs <- errors.New("invalid number of chunks returned by the server")
+				errs <- perrors.New("invalid number of chunks returned by the server")
 			}
 			return
 		}
@@ -491,7 +491,7 @@ func (s *dockerImageSource) GetSignatures(ctx context.Context, instanceDigest *d
 	case s.c.signatureBase != nil:
 		return s.getSignaturesFromLookaside(ctx, instanceDigest)
 	default:
-		return nil, errors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
+		return nil, perrors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
 	}
 }
 

@@ -18,7 +18,7 @@ import (
 	"github.com/containers/storage/pkg/homedir"
 	"github.com/ghodss/yaml"
 	"github.com/imdario/mergo"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
 )
@@ -327,9 +327,9 @@ func (config *directClientConfig) getContext() clientcmdContext {
 }
 
 var (
-	errEmptyConfig = errors.New("no configuration has been provided")
+	errEmptyConfig = perrors.New("no configuration has been provided")
 	// message is for consistency with old behavior
-	errEmptyCluster = errors.New("cluster has no server defined")
+	errEmptyCluster = perrors.New("cluster has no server defined")
 )
 
 //helper for checking certificate/key/CA
@@ -354,7 +354,7 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdCluster) []err
 
 	if len(clusterInfo.Server) == 0 {
 		if len(clusterName) == 0 {
-			validationErrors = append(validationErrors, errors.New("default cluster has no server defined"))
+			validationErrors = append(validationErrors, perrors.New("default cluster has no server defined"))
 		} else {
 			validationErrors = append(validationErrors, fmt.Errorf("no server found for cluster %q", clusterName))
 		}
@@ -578,7 +578,7 @@ func (rules *clientConfigLoadingRules) Load() (*clientcmdConfig, error) {
 			continue
 		}
 		if err != nil {
-			errlist = append(errlist, errors.Wrapf(err, "loading config file \"%s\"", filename))
+			errlist = append(errlist, perrors.Wrapf(err, "loading config file \"%s\"", filename))
 			continue
 		}
 
@@ -691,7 +691,7 @@ func resolveLocalPaths(config *clientcmdConfig) error {
 		}
 		base, err := filepath.Abs(filepath.Dir(cluster.LocationOfOrigin))
 		if err != nil {
-			return errors.Wrapf(err, "Could not determine the absolute path of config file %s", cluster.LocationOfOrigin)
+			return perrors.Wrapf(err, "Could not determine the absolute path of config file %s", cluster.LocationOfOrigin)
 		}
 
 		if err := resolvePaths(getClusterFileReferences(cluster), base); err != nil {
@@ -704,7 +704,7 @@ func resolveLocalPaths(config *clientcmdConfig) error {
 		}
 		base, err := filepath.Abs(filepath.Dir(authInfo.LocationOfOrigin))
 		if err != nil {
-			return errors.Wrapf(err, "Could not determine the absolute path of config file %s", authInfo.LocationOfOrigin)
+			return perrors.Wrapf(err, "Could not determine the absolute path of config file %s", authInfo.LocationOfOrigin)
 		}
 
 		if err := resolvePaths(getAuthInfoFileReferences(authInfo), base); err != nil {
@@ -774,7 +774,7 @@ func restClientFor(config *restConfig) (*url.URL, *http.Client, error) {
 // Kubernetes API.
 func defaultServerURL(host string, defaultTLS bool) (*url.URL, error) {
 	if host == "" {
-		return nil, errors.New("host must be a URL or a host:port pair")
+		return nil, perrors.New("host must be a URL or a host:port pair")
 	}
 	base := host
 	hostURL, err := url.Parse(base)
@@ -861,7 +861,7 @@ func transportNew(config *restConfig) (http.RoundTripper, error) {
 
 	// REMOVED: HTTPWrappersForConfig(config, rt) in favor of the caller setting HTTP headers itself based on restConfig. Only this inlined check remains.
 	if len(config.Username) != 0 && len(config.BearerToken) != 0 {
-		return nil, errors.New("username/password or bearer token may be set, but not both")
+		return nil, perrors.New("username/password or bearer token may be set, but not both")
 	}
 
 	return rt, nil
@@ -954,7 +954,7 @@ func tlsConfigFor(c *restConfig) (*tls.Config, error) {
 		return nil, nil
 	}
 	if c.HasCA() && c.Insecure {
-		return nil, errors.New("specifying a root certificates file with the insecure flag is not allowed")
+		return nil, perrors.New("specifying a root certificates file with the insecure flag is not allowed")
 	}
 	if err := loadTLSFiles(c); err != nil {
 		return nil, err

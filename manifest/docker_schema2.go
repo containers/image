@@ -9,7 +9,7 @@ import (
 	"github.com/containers/image/v5/pkg/strslice"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 )
 
 // Schema2Descriptor is a “descriptor” in docker/distribution schema 2.
@@ -246,7 +246,7 @@ func (m *Schema2) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 		}
 		mimeType, err := updatedMIMEType(schema2CompressionMIMETypeSets, mimeType, info)
 		if err != nil {
-			return errors.Wrapf(err, "preparing updated manifest, layer %q", info.Digest)
+			return perrors.Wrapf(err, "preparing updated manifest, layer %q", info.Digest)
 		}
 		m.LayersDescriptors[i].MediaType = mimeType
 		m.LayersDescriptors[i].Digest = info.Digest

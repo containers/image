@@ -13,7 +13,7 @@ import (
 	"github.com/containers/image/v5/internal/tmpdir"
 	"github.com/containers/image/v5/pkg/compression"
 	"github.com/containers/image/v5/types"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 )
 
 // Reader is a ((docker save)-formatted) tar archive that allows random access to any component.
@@ -30,7 +30,7 @@ type Reader struct {
 func NewReaderFromFile(sys *types.SystemContext, path string) (*Reader, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "opening file %q", path)
+		return nil, perrors.Wrapf(err, "opening file %q", path)
 	}
 	defer file.Close()
 
@@ -38,7 +38,7 @@ func NewReaderFromFile(sys *types.SystemContext, path string) (*Reader, error) {
 	// as a source. Otherwise we pass the stream to NewReaderFromStream.
 	stream, isCompressed, err := compression.AutoDecompress(file)
 	if err != nil {
-		return nil, errors.Wrapf(err, "detecting compression for file %q", path)
+		return nil, perrors.Wrapf(err, "detecting compression for file %q", path)
 	}
 	defer stream.Close()
 	if !isCompressed {
@@ -55,7 +55,7 @@ func NewReaderFromStream(sys *types.SystemContext, inputStream io.Reader) (*Read
 	// Save inputStream to a temporary file
 	tarCopyFile, err := os.CreateTemp(tmpdir.TemporaryDirectoryForBigFiles(sys), "docker-tar")
 	if err != nil {
-		return nil, errors.Wrap(err, "creating temporary file")
+		return nil, perrors.Wrap(err, "creating temporary file")
 	}
 	defer tarCopyFile.Close()
 
@@ -71,7 +71,7 @@ func NewReaderFromStream(sys *types.SystemContext, inputStream io.Reader) (*Read
 	// giving users really confusing "invalid tar header" errors).
 	uncompressedStream, _, err := compression.AutoDecompress(inputStream)
 	if err != nil {
-		return nil, errors.Wrap(err, "auto-decompressing input")
+		return nil, perrors.Wrap(err, "auto-decompressing input")
 	}
 	defer uncompressedStream.Close()
 
@@ -80,7 +80,7 @@ func NewReaderFromStream(sys *types.SystemContext, inputStream io.Reader) (*Read
 	// TODO: This can take quite some time, and should ideally be cancellable
 	//       using a context.Context.
 	if _, err := io.Copy(tarCopyFile, uncompressedStream); err != nil {
-		return nil, errors.Wrapf(err, "copying contents to temporary file %q", tarCopyFile.Name())
+		return nil, perrors.Wrapf(err, "copying contents to temporary file %q", tarCopyFile.Name())
 	}
 	succeeded = true
 
@@ -113,7 +113,7 @@ func newReader(path string, removeOnClose bool) (*Reader, error) {
 		return nil, err
 	}
 	if err := json.Unmarshal(bytes, &r.Manifest); err != nil {
-		return nil, errors.Wrap(err, "decoding tar manifest.json")
+		return nil, perrors.Wrap(err, "decoding tar manifest.json")
 	}
 
 	succeeded = true
@@ -146,7 +146,7 @@ func (r *Reader) ChooseManifestItem(ref reference.NamedTagged, sourceIndex int) 
 			for tagIndex, tag := range r.Manifest[i].RepoTags {
 				parsedTag, err := reference.ParseNormalizedNamed(tag)
 				if err != nil {
-					return nil, -1, errors.Wrapf(err, "Invalid tag %#v in manifest.json item @%d", tag, i)
+					return nil, -1, perrors.Wrapf(err, "Invalid tag %#v in manifest.json item @%d", tag, i)
 				}
 				if parsedTag.String() == refString {
 					return &r.Manifest[i], tagIndex, nil
@@ -189,7 +189,7 @@ func (r *Reader) openTarComponent(componentPath string) (io.ReadCloser, error) {
 	// This is only a sanity check; if anyone did concurrently close ra, this access is technically
 	// racy against the write in .Close().
 	if r.path == "" {
-		return nil, errors.New("Internal error: trying to read an already closed tarfile.Reader")
+		return nil, perrors.New("Internal error: trying to read an already closed tarfile.Reader")
 	}
 
 	f, err := os.Open(r.path)
@@ -258,7 +258,7 @@ func findTarComponent(inputFile io.Reader, componentPath string) (*tar.Reader, *
 func (r *Reader) readTarComponent(path string, limit int) ([]byte, error) {
 	file, err := r.openTarComponent(path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "loading tar component %s", path)
+		return nil, perrors.Wrapf(err, "loading tar component %s", path)
 	}
 	defer file.Close()
 	bytes, err := iolimits.ReadAtMost(file, limit)

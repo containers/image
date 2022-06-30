@@ -13,7 +13,7 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/homedir"
 	"github.com/containers/storage/pkg/lockfile"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -211,7 +211,7 @@ func RemoveShortNameAlias(ctx *types.SystemContext, name string) error {
 func parseShortNameValue(alias string) (reference.Named, error) {
 	ref, err := reference.Parse(alias)
 	if err != nil {
-		return nil, errors.Wrapf(err, "parsing alias %q", alias)
+		return nil, perrors.Wrapf(err, "parsing alias %q", alias)
 	}
 
 	if _, ok := ref.(reference.Digested); ok {
@@ -243,7 +243,7 @@ func parseShortNameValue(alias string) (reference.Named, error) {
 func validateShortName(name string) error {
 	repo, err := reference.Parse(name)
 	if err != nil {
-		return errors.Wrapf(err, "cannot parse short name: %q", name)
+		return perrors.Wrapf(err, "cannot parse short name: %q", name)
 	}
 
 	if _, ok := repo.(reference.Digested); ok {
@@ -299,7 +299,7 @@ func newShortNameAliasCache(path string, conf *shortNameAliasConf) (*shortNameAl
 	if len(errs) > 0 {
 		err := errs[0]
 		for i := 1; i < len(errs); i++ {
-			err = errors.Wrapf(err, "%v\n", errs[i])
+			err = perrors.Wrapf(err, "%v\n", errs[i])
 		}
 		return nil, err
 	}
@@ -320,7 +320,7 @@ func loadShortNameAliasConf(confPath string) (*shortNameAliasConf, *shortNameAli
 	meta, err := toml.DecodeFile(confPath, &conf)
 	if err != nil && !os.IsNotExist(err) {
 		// It's okay if the config doesn't exist.  Other errors are not.
-		return nil, nil, errors.Wrapf(err, "loading short-name aliases config file %q", confPath)
+		return nil, nil, perrors.Wrapf(err, "loading short-name aliases config file %q", confPath)
 	}
 	if keys := meta.Undecoded(); len(keys) > 0 {
 		logrus.Debugf("Failed to decode keys %q from %q", keys, confPath)
@@ -330,7 +330,7 @@ func loadShortNameAliasConf(confPath string) (*shortNameAliasConf, *shortNameAli
 	// file could still be corrupted by another process or user.
 	cache, err := newShortNameAliasCache(confPath, &conf)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "loading short-name aliases config file %q", confPath)
+		return nil, nil, perrors.Wrapf(err, "loading short-name aliases config file %q", confPath)
 	}
 
 	return &conf, cache, nil

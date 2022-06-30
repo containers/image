@@ -12,7 +12,7 @@ import (
 
 	"github.com/docker/go-connections/sockets"
 	"github.com/docker/go-connections/tlsconfig"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -50,7 +50,7 @@ func SetupCertificates(dir string, tlsc *tls.Config) error {
 			if tlsc.RootCAs == nil {
 				systemPool, err := tlsconfig.SystemCertPool()
 				if err != nil {
-					return errors.Wrap(err, "unable to get system cert pool")
+					return perrors.Wrap(err, "unable to get system cert pool")
 				}
 				tlsc.RootCAs = systemPool
 			}

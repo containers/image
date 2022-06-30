@@ -11,7 +11,7 @@ import (
 	genericImage "github.com/containers/image/v5/internal/image"
 	"github.com/containers/image/v5/transports"
 	"github.com/containers/image/v5/types"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 )
 
 func init() {
@@ -59,7 +59,7 @@ type openshiftReference struct {
 func ParseReference(ref string) (types.ImageReference, error) {
 	r, err := reference.ParseNormalizedNamed(ref)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse image reference %q", ref)
+		return nil, perrors.Wrapf(err, "failed to parse image reference %q", ref)
 	}
 	tagged, ok := r.(reference.NamedTagged)
 	if !ok {
@@ -149,5 +149,5 @@ func (ref openshiftReference) NewImageDestination(ctx context.Context, sys *type
 
 // DeleteImage deletes the named image from the registry, if supported.
 func (ref openshiftReference) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
-	return errors.New("Deleting images not implemented for atomic: images")
+	return perrors.New("Deleting images not implemented for atomic: images")
 }

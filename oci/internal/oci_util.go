@@ -1,13 +1,12 @@
 package internal
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // annotation spex from https://github.com/opencontainers/image-spec/blob/master/annotations.md#pre-defined-annotation-keys

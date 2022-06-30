@@ -6,12 +6,12 @@ package signature
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/containers/image/v5/version"
 	digest "github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
 )
 
 const (

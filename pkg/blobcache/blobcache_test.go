@@ -22,7 +22,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -221,7 +221,7 @@ func TestBlobCache(t *testing.T) {
 				if err == nil {
 					t.Fatalf("expected an error copying the image, but got success")
 				} else {
-					if os.IsNotExist(errors.Cause(err)) {
+					if os.IsNotExist(perrors.Cause(err)) {
 						t.Logf("ok: got expected does-not-exist error copying the image with blobs missing: %v", err)
 					} else {
 						t.Logf("got an error copying the image with missing blobs, but not sure which error: %v", err)

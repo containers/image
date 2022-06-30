@@ -1,11 +1,11 @@
 package policyconfiguration
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/containers/image/v5/docker/reference"
-	"github.com/pkg/errors"
 )
 
 // DockerReferenceIdentity returns a string representation of the reference, suitable for policy lookup,

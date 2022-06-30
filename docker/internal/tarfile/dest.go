@@ -12,7 +12,7 @@ import (
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -54,7 +54,7 @@ func (d *Destination) SupportedManifestMIMETypes() []string {
 // SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
 // Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
 func (d *Destination) SupportsSignatures(ctx context.Context) error {
-	return errors.New("Storing signatures for docker tar files is not supported")
+	return perrors.New("Storing signatures for docker tar files is not supported")
 }
 
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
@@ -121,11 +121,11 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 	if isConfig {
 		buf, err := iolimits.ReadAtMost(stream, iolimits.MaxConfigBodySize)
 		if err != nil {
-			return types.BlobInfo{}, errors.Wrap(err, "reading Config file stream")
+			return types.BlobInfo{}, perrors.Wrap(err, "reading Config file stream")
 		}
 		d.config = buf
 		if err := d.archive.sendFileLocked(d.archive.configPath(inputInfo.Digest), inputInfo.Size, bytes.NewReader(buf)); err != nil {
-			return types.BlobInfo{}, errors.Wrap(err, "writing Config file")
+			return types.BlobInfo{}, perrors.Wrap(err, "writing Config file")
 		}
 	} else {
 		if err := d.archive.sendFileLocked(d.archive.physicalLayerPath(inputInfo.Digest), inputInfo.Size, stream); err != nil {
@@ -162,16 +162,16 @@ func (d *Destination) TryReusingBlob(ctx context.Context, info types.BlobInfo, c
 // but may accept a different manifest type, the returned error must be an ManifestTypeRejectedError.
 func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest *digest.Digest) error {
 	if instanceDigest != nil {
-		return errors.New(`Manifest lists are not supported for docker tar files`)
+		return perrors.New(`Manifest lists are not supported for docker tar files`)
 	}
 	// We do not bother with types.ManifestTypeRejectedError; our .SupportedManifestMIMETypes() above is already providing only one alternative,
 	// so the caller trying a different manifest kind would be pointless.
 	var man manifest.Schema2
 	if err := json.Unmarshal(m, &man); err != nil {
-		return errors.Wrap(err, "parsing manifest")
+		return perrors.Wrap(err, "parsing manifest")
 	}
 	if man.SchemaVersion != 2 || man.MediaType != manifest.DockerV2Schema2MediaType {
-		return errors.New("Unsupported manifest type, need a Docker schema 2 manifest")
+		return perrors.New("Unsupported manifest type, need a Docker schema 2 manifest")
 	}
 
 	if err := d.archive.lock(); err != nil {
@@ -191,10 +191,10 @@ func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest 
 // there can be no secondary manifests.  MUST be called after PutManifest (signatures reference manifest contents).
 func (d *Destination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
 	if instanceDigest != nil {
-		return errors.New(`Manifest lists are not supported for docker tar files`)
+		return perrors.New(`Manifest lists are not supported for docker tar files`)
 	}
 	if len(signatures) != 0 {
-		return errors.New("Storing signatures for docker tar files is not supported")
+		return perrors.New("Storing signatures for docker tar files is not supported")
 	}
 	return nil
 }

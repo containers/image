@@ -9,7 +9,7 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/types"
 	"github.com/docker/docker/client"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -43,7 +43,7 @@ func newImageDestination(ctx context.Context, sys *types.SystemContext, ref daem
 
 	c, err := newDockerClient(sys)
 	if err != nil {
-		return nil, errors.Wrap(err, "initializing docker engine client")
+		return nil, perrors.Wrap(err, "initializing docker engine client")
 	}
 
 	reader, writer := io.Pipe()
@@ -68,7 +68,7 @@ func newImageDestination(ctx context.Context, sys *types.SystemContext, ref daem
 
 // imageLoadGoroutine accepts tar stream on reader, sends it to c, and reports error or success by writing to statusChannel
 func imageLoadGoroutine(ctx context.Context, c *client.Client, reader *io.PipeReader, statusChannel chan<- error) {
-	err := errors.New("Internal error: unexpected panic in imageLoadGoroutine")
+	err := perrors.New("Internal error: unexpected panic in imageLoadGoroutine")
 	defer func() {
 		logrus.Debugf("docker-daemon: sending done, status %v", err)
 		statusChannel <- err
@@ -85,7 +85,7 @@ func imageLoadGoroutine(ctx context.Context, c *client.Client, reader *io.PipeRe
 
 	resp, err := c.ImageLoad(ctx, reader, true)
 	if err != nil {
-		err = errors.Wrap(err, "saving image to docker engine")
+		err = perrors.Wrap(err, "saving image to docker engine")
 		return
 	}
 	defer resp.Body.Close()
@@ -115,7 +115,7 @@ func (d *daemonImageDestination) Close() error {
 		// immediately, and hopefully, through terminating the sending which uses "Transfer-Encoding: chunked"" without sending
 		// the terminating zero-length chunk, prevent the docker daemon from processing the tar stream at all.
 		// Whether that works or not, closing the PipeWriter seems desirable in any case.
-		if err := d.writer.CloseWithError(errors.New("Aborting upload, daemonImageDestination closed without a previous .Commit()")); err != nil {
+		if err := d.writer.CloseWithError(perrors.New("Aborting upload, daemonImageDestination closed without a previous .Commit()")); err != nil {
 			return err
 		}
 	}

@@ -11,7 +11,7 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 )
 
 // Schema1FSLayers is an entry of the "fsLayers" array in docker/distribution schema 1.
@@ -106,15 +106,15 @@ func Schema1Clone(src *Schema1) *Schema1 {
 // initialize initializes ExtractedV1Compatibility and verifies invariants, so that the rest of this code can assume a minimally healthy manifest.
 func (m *Schema1) initialize() error {
 	if len(m.FSLayers) != len(m.History) {
-		return errors.New("length of history not equal to number of layers")
+		return perrors.New("length of history not equal to number of layers")
 	}
 	if len(m.FSLayers) == 0 {
-		return errors.New("no FSLayers in manifest")
+		return perrors.New("no FSLayers in manifest")
 	}
 	m.ExtractedV1Compatibility = make([]Schema1V1Compatibility, len(m.History))
 	for i, h := range m.History {
 		if err := json.Unmarshal([]byte(h.V1Compatibility), &m.ExtractedV1Compatibility[i]); err != nil {
-			return errors.Wrapf(err, "parsing v2s1 history entry %d", i)
+			return perrors.Wrapf(err, "parsing v2s1 history entry %d", i)
 		}
 	}
 	return nil
@@ -180,7 +180,7 @@ func (m *Schema1) fixManifestLayers() error {
 		}
 	}
 	if m.ExtractedV1Compatibility[len(m.ExtractedV1Compatibility)-1].Parent != "" {
-		return errors.New("Invalid parent ID in the base layer of the image")
+		return perrors.New("Invalid parent ID in the base layer of the image")
 	}
 	// check general duplicates to error instead of a deadlock
 	idmap := make(map[string]struct{})
@@ -241,20 +241,20 @@ func (m *Schema1) ToSchema2Config(diffIDs []digest.Digest) ([]byte, error) {
 	// Convert the schema 1 compat info into a schema 2 config, constructing some of the fields
 	// that aren't directly comparable using info from the manifest.
 	if len(m.History) == 0 {
-		return nil, errors.New("image has no layers")
+		return nil, perrors.New("image has no layers")
 	}
 	s1 := Schema2V1Image{}
 	config := []byte(m.History[0].V1Compatibility)
 	err := json.Unmarshal(config, &s1)
 	if err != nil {
-		return nil, errors.Wrapf(err, "decoding configuration")
+		return nil, perrors.Wrapf(err, "decoding configuration")
 	}
 	// Images created with versions prior to 1.8.3 require us to re-encode the encoded object,
 	// adding some fields that aren't "omitempty".
 	if s1.DockerVersion != "" && versions.LessThan(s1.DockerVersion, "1.8.3") {
 		config, err = json.Marshal(&s1)
 		if err != nil {
-			return nil, errors.Wrapf(err, "re-encoding compat image config %#v", s1)
+			return nil, perrors.Wrapf(err, "re-encoding compat image config %#v", s1)
 		}
 	}
 	// Build the history.
@@ -281,7 +281,7 @@ func (m *Schema1) ToSchema2Config(diffIDs []digest.Digest) ([]byte, error) {
 	raw := make(map[string]*json.RawMessage)
 	err = json.Unmarshal(config, &raw)
 	if err != nil {
-		return nil, errors.Wrapf(err, "re-decoding compat image config %#v", s1)
+		return nil, perrors.Wrapf(err, "re-decoding compat image config %#v", s1)
 	}
 	// Drop some fields.
 	delete(raw, "id")

@@ -28,7 +28,7 @@ import (
 	"github.com/opencontainers/go-digest"
 	selinux "github.com/opencontainers/selinux/go-selinux"
 	"github.com/ostreedev/ostree-go/pkg/otbuiltin"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/vbatts/tar-split/tar/asm"
 	"github.com/vbatts/tar-split/tar/storage"
 )
@@ -213,7 +213,7 @@ func fixFiles(selinuxHnd *C.struct_selabel_handle, root string, dir string, user
 
 			res, err := C.selabel_lookup_raw(selinuxHnd, &context, relPathC, C.int(info.Mode()&os.ModePerm))
 			if int(res) < 0 && err != syscall.ENOENT {
-				return errors.Wrapf(err, "cannot selabel_lookup_raw %s", relPath)
+				return perrors.Wrapf(err, "cannot selabel_lookup_raw %s", relPath)
 			}
 			if int(res) == 0 {
 				defer C.freecon(context)
@@ -221,7 +221,7 @@ func fixFiles(selinuxHnd *C.struct_selabel_handle, root string, dir string, user
 				defer C.free(unsafe.Pointer(fullpathC))
 				res, err = C.lsetfilecon_raw(fullpathC, context)
 				if int(res) < 0 {
-					return errors.Wrapf(err, "cannot setfilecon_raw %s to %s", fullpath, C.GoString(context))
+					return perrors.Wrapf(err, "cannot setfilecon_raw %s to %s", fullpath, C.GoString(context))
 				}
 			}
 		}
@@ -388,7 +388,7 @@ func (d *ostreeImageDestination) TryReusingBlob(ctx context.Context, info types.
 // but may accept a different manifest type, the returned error must be an ManifestTypeRejectedError.
 func (d *ostreeImageDestination) PutManifest(ctx context.Context, manifestBlob []byte, instanceDigest *digest.Digest) error {
 	if instanceDigest != nil {
-		return errors.New(`Manifest lists are not supported by "ostree:"`)
+		return perrors.New(`Manifest lists are not supported by "ostree:"`)
 	}
 
 	d.manifest = string(manifestBlob)
@@ -416,7 +416,7 @@ func (d *ostreeImageDestination) PutManifest(ctx context.Context, manifestBlob [
 // there can be no secondary manifests.
 func (d *ostreeImageDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
 	if instanceDigest != nil {
-		return errors.New(`Manifest lists are not supported by "ostree:"`)
+		return perrors.New(`Manifest lists are not supported by "ostree:"`)
 	}
 
 	path := filepath.Join(d.tmpDirPath, d.ref.signaturePath(0))
@@ -453,7 +453,7 @@ func (d *ostreeImageDestination) Commit(context.Context, types.UnparsedImage) er
 	if os.Getuid() == 0 && selinux.GetEnabled() {
 		selinuxHnd, err = C.selabel_open(C.SELABEL_CTX_FILE, nil, 0)
 		if selinuxHnd == nil {
-			return errors.Wrapf(err, "cannot open the SELinux DB")
+			return perrors.Wrapf(err, "cannot open the SELinux DB")
 		}
 
 		defer C.selabel_close(selinuxHnd)

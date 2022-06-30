@@ -11,7 +11,7 @@ import (
 	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -19,7 +19,7 @@ const version = "Directory Transport Version: 1.1\n"
 
 // ErrNotContainerImageDir indicates that the directory doesn't match the expected contents of a directory created
 // using the 'dir' transport
-var ErrNotContainerImageDir = errors.New("not a containers image directory, don't want to overwrite important data")
+var ErrNotContainerImageDir = perrors.New("not a containers image directory, don't want to overwrite important data")
 
 type dirImageDestination struct {
 	ref                     dirReference
@@ -48,7 +48,7 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (types.Imag
 	// if the contents don't match throw an error
 	dirExists, err := pathExists(d.ref.resolvedPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "checking for path %q", d.ref.resolvedPath)
+		return nil, perrors.Wrapf(err, "checking for path %q", d.ref.resolvedPath)
 	}
 	if dirExists {
 		isEmpty, err := isDirEmpty(d.ref.resolvedPath)
@@ -59,7 +59,7 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (types.Imag
 		if !isEmpty {
 			versionExists, err := pathExists(d.ref.versionPath())
 			if err != nil {
-				return nil, errors.Wrapf(err, "checking if path exists %q", d.ref.versionPath())
+				return nil, perrors.Wrapf(err, "checking if path exists %q", d.ref.versionPath())
 			}
 			if versionExists {
 				contents, err := os.ReadFile(d.ref.versionPath())
@@ -75,20 +75,20 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (types.Imag
 			}
 			// delete directory contents so that only one image is in the directory at a time
 			if err = removeDirContents(d.ref.resolvedPath); err != nil {
-				return nil, errors.Wrapf(err, "erasing contents in %q", d.ref.resolvedPath)
+				return nil, perrors.Wrapf(err, "erasing contents in %q", d.ref.resolvedPath)
 			}
 			logrus.Debugf("overwriting existing container image directory %q", d.ref.resolvedPath)
 		}
 	} else {
 		// create directory if it doesn't exist
 		if err := os.MkdirAll(d.ref.resolvedPath, 0755); err != nil {
-			return nil, errors.Wrapf(err, "unable to create directory %q", d.ref.resolvedPath)
+			return nil, perrors.Wrapf(err, "unable to create directory %q", d.ref.resolvedPath)
 		}
 	}
 	// create version file
 	err = os.WriteFile(d.ref.versionPath(), []byte(version), 0644)
 	if err != nil {
-		return nil, errors.Wrapf(err, "creating version file %q", d.ref.versionPath())
+		return nil, perrors.Wrapf(err, "creating version file %q", d.ref.versionPath())
 	}
 	return d, nil
 }

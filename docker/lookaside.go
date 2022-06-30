@@ -14,7 +14,7 @@ import (
 	"github.com/containers/storage/pkg/homedir"
 	"github.com/ghodss/yaml"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -61,7 +61,7 @@ type signatureStorageBase *url.URL
 func SignatureStorageBaseURL(sys *types.SystemContext, ref types.ImageReference, write bool) (*url.URL, error) {
 	dr, ok := ref.(dockerReference)
 	if !ok {
-		return nil, errors.New("ref must be a dockerReference")
+		return nil, perrors.New("ref must be a dockerReference")
 	}
 	// FIXME? Loading and parsing the config could be cached across calls.
 	dirPath := registriesDirPath(sys)
@@ -76,7 +76,7 @@ func SignatureStorageBaseURL(sys *types.SystemContext, ref types.ImageReference,
 	if topLevel != "" {
 		url, err = url.Parse(topLevel)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Invalid signature storage URL %s", topLevel)
+			return nil, perrors.Wrapf(err, "Invalid signature storage URL %s", topLevel)
 		}
 	} else {
 		// returns default directory if no sigstore specified in configuration file
@@ -153,7 +153,7 @@ func loadAndMergeConfig(dirPath string) (*registryConfiguration, error) {
 		var config registryConfiguration
 		err = yaml.Unmarshal(configBytes, &config)
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing %s", configPath)
+			return nil, perrors.Wrapf(err, "parsing %s", configPath)
 		}
 
 		if config.DefaultDocker != nil {

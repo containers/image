@@ -11,7 +11,7 @@ import (
 	ctrImage "github.com/containers/image/v5/internal/image"
 	"github.com/containers/image/v5/transports"
 	"github.com/containers/image/v5/types"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 )
 
 func init() {
@@ -38,7 +38,7 @@ func (t archiveTransport) ParseReference(reference string) (types.ImageReference
 // scope passed to this function will not be "", that value is always allowed.
 func (t archiveTransport) ValidatePolicyConfigurationScope(scope string) error {
 	// See the explanation in archiveReference.PolicyConfigurationIdentity.
-	return errors.New(`docker-archive: does not support any scopes except the default "" one`)
+	return perrors.New(`docker-archive: does not support any scopes except the default "" one`)
 }
 
 // archiveReference is an ImageReference for Docker images.
@@ -72,7 +72,7 @@ func ParseReference(refString string) (types.ImageReference, error) {
 		if len(parts[1]) > 0 && parts[1][0] == '@' {
 			i, err := strconv.Atoi(parts[1][1:])
 			if err != nil {
-				return nil, errors.Wrapf(err, "Invalid source index %s", parts[1])
+				return nil, perrors.Wrapf(err, "Invalid source index %s", parts[1])
 			}
 			if i < 0 {
 				return nil, fmt.Errorf("Invalid source index @%d: must not be negative", i)
@@ -81,7 +81,7 @@ func ParseReference(refString string) (types.ImageReference, error) {
 		} else {
 			ref, err := reference.ParseNormalizedNamed(parts[1])
 			if err != nil {
-				return nil, errors.Wrapf(err, "docker-archive parsing reference")
+				return nil, perrors.Wrapf(err, "docker-archive parsing reference")
 			}
 			ref = reference.TagNameOnly(ref)
 			refTagged, isTagged := ref.(reference.NamedTagged)
@@ -203,5 +203,5 @@ func (ref archiveReference) NewImageDestination(ctx context.Context, sys *types.
 // DeleteImage deletes the named image from the registry, if supported.
 func (ref archiveReference) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
 	// Not really supported, for safety reasons.
-	return errors.New("Deleting images not implemented for docker-archive: images")
+	return perrors.New("Deleting images not implemented for docker-archive: images")
 }

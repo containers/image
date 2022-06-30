@@ -14,7 +14,7 @@ import (
 	"github.com/containers/storage"
 	"github.com/containers/storage/pkg/idtools"
 	digest "github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -32,10 +32,10 @@ var (
 	Transport StoreTransport = &storageTransport{}
 	// ErrInvalidReference is returned when ParseReference() is passed an
 	// empty reference.
-	ErrInvalidReference = errors.New("invalid reference")
+	ErrInvalidReference = perrors.New("invalid reference")
 	// ErrPathNotAbsolute is returned when a graph root is not an absolute
 	// path name.
-	ErrPathNotAbsolute = errors.New("path name is not absolute")
+	ErrPathNotAbsolute = perrors.New("path name is not absolute")
 )
 
 // StoreTransport is an ImageTransport that uses a storage.Store to parse
@@ -117,13 +117,13 @@ func (s *storageTransport) DefaultGIDMap() []idtools.IDMap {
 // relative to the given store, and returns it in a reference object.
 func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (*storageReference, error) {
 	if ref == "" {
-		return nil, errors.Wrapf(ErrInvalidReference, "%q is an empty reference", ref)
+		return nil, perrors.Wrapf(ErrInvalidReference, "%q is an empty reference", ref)
 	}
 	if ref[0] == '[' {
 		// Ignore the store specifier.
 		closeIndex := strings.IndexRune(ref, ']')
 		if closeIndex < 1 {
-			return nil, errors.Wrapf(ErrInvalidReference, "store specifier in %q did not end", ref)
+			return nil, perrors.Wrapf(ErrInvalidReference, "store specifier in %q did not end", ref)
 		}
 		ref = ref[closeIndex+1:]
 	}
@@ -135,7 +135,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 	if split != -1 {
 		possibleID := ref[split+1:]
 		if possibleID == "" {
-			return nil, errors.Wrapf(ErrInvalidReference, "empty trailing digest or ID in %q", ref)
+			return nil, perrors.Wrapf(ErrInvalidReference, "empty trailing digest or ID in %q", ref)
 		}
 		// If it looks like a digest, leave it alone for now.
 		if _, err := digest.Parse(possibleID); err != nil {
@@ -147,7 +147,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 				// so we might as well use the expanded value.
 				id = img.ID
 			} else {
-				return nil, errors.Wrapf(ErrInvalidReference, "%q does not look like an image ID or digest", possibleID)
+				return nil, perrors.Wrapf(ErrInvalidReference, "%q does not look like an image ID or digest", possibleID)
 			}
 			// We have recognized an image ID; peel it off.
 			ref = ref[:split]
@@ -173,7 +173,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		var err error
 		named, err = reference.ParseNormalizedNamed(ref)
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing named reference %q", ref)
+			return nil, perrors.Wrapf(err, "parsing named reference %q", ref)
 		}
 		named = reference.TagNameOnly(named)
 	}
@@ -372,7 +372,7 @@ func (s storageTransport) ValidatePolicyConfigurationScope(scope string) error {
 			return err
 		}
 	default: // Coverage: This should never happen
-		return errors.New("Internal error: unexpected number of fields form strings.SplitN")
+		return perrors.New("Internal error: unexpected number of fields form strings.SplitN")
 	}
 	// As for field[0], if it is non-empty at all:
 	// FIXME? We could be verifying the various character set and length restrictions

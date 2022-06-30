@@ -16,7 +16,7 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 )
 
 func init() {
@@ -29,7 +29,7 @@ var (
 
 	// ErrMoreThanOneImage is an error returned when the manifest includes
 	// more than one image and the user should choose which one to use.
-	ErrMoreThanOneImage = errors.New("more than one image in oci, choose an image")
+	ErrMoreThanOneImage = perrors.New("more than one image in oci, choose an image")
 )
 
 type ociTransport struct{}
@@ -215,7 +215,7 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 func LoadManifestDescriptor(imgRef types.ImageReference) (imgspecv1.Descriptor, error) {
 	ociRef, ok := imgRef.(ociReference)
 	if !ok {
-		return imgspecv1.Descriptor{}, errors.New("error typecasting, need type ociRef")
+		return imgspecv1.Descriptor{}, perrors.New("error typecasting, need type ociRef")
 	}
 	return ociRef.getManifestDescriptor()
 }
@@ -234,7 +234,7 @@ func (ref ociReference) NewImageDestination(ctx context.Context, sys *types.Syst
 
 // DeleteImage deletes the named image from the registry, if supported.
 func (ref ociReference) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
-	return errors.New("Deleting images not implemented for oci: images")
+	return perrors.New("Deleting images not implemented for oci: images")
 }
 
 // ociLayoutPath returns a path for the oci-layout within a directory using OCI conventions.
@@ -250,7 +250,7 @@ func (ref ociReference) indexPath() string {
 // blobPath returns a path for a blob within a directory using OCI image-layout conventions.
 func (ref ociReference) blobPath(digest digest.Digest, sharedBlobDir string) (string, error) {
 	if err := digest.Validate(); err != nil {
-		return "", errors.Wrapf(err, "unexpected digest reference %s", digest)
+		return "", perrors.Wrapf(err, "unexpected digest reference %s", digest)
 	}
 	blobDir := filepath.Join(ref.dir, "blobs")
 	if sharedBlobDir != "" {

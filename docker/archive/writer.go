@@ -7,7 +7,7 @@ import (
 	"github.com/containers/image/v5/docker/internal/tarfile"
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/types"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 )
 
 // Writer manages a single in-progress Docker archive and allows adding images to it.
@@ -60,7 +60,7 @@ func openArchiveForWriting(path string) (*os.File, error) {
 	// only in a different way. Either way, it’s up to the user to not have two writers to the same path.)
 	fh, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		return nil, errors.Wrapf(err, "opening file %q", path)
+		return nil, perrors.Wrapf(err, "opening file %q", path)
 	}
 	succeeded := false
 	defer func() {
@@ -70,11 +70,11 @@ func openArchiveForWriting(path string) (*os.File, error) {
 	}()
 	fhStat, err := fh.Stat()
 	if err != nil {
-		return nil, errors.Wrapf(err, "statting file %q", path)
+		return nil, perrors.Wrapf(err, "statting file %q", path)
 	}
 
 	if fhStat.Mode().IsRegular() && fhStat.Size() != 0 {
-		return nil, errors.New("docker-archive doesn't support modifying existing images")
+		return nil, perrors.New("docker-archive doesn't support modifying existing images")
 	}
 
 	succeeded = true

@@ -24,7 +24,7 @@ import (
 	"github.com/containers/image/v5/transports"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/homedir"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 )
 
 // systemDefaultPolicyPath is the policy path used for DefaultPolicy().
@@ -81,7 +81,7 @@ func NewPolicyFromFile(fileName string) (*Policy, error) {
 	}
 	policy, err := NewPolicyFromBytes(contents)
 	if err != nil {
-		return nil, errors.Wrapf(err, "invalid policy in %q", fileName)
+		return nil, perrors.Wrapf(err, "invalid policy in %q", fileName)
 	}
 	return policy, nil
 }
@@ -162,7 +162,7 @@ var _ json.Unmarshaler = (*PolicyTransportScopes)(nil)
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (m *PolicyTransportScopes) UnmarshalJSON(data []byte) error {
-	return errors.New("Do not try to unmarshal PolicyTransportScopes directly")
+	return perrors.New("Do not try to unmarshal PolicyTransportScopes directly")
 }
 
 // policyTransportScopesWithTransport is a way to unmarshal a PolicyTransportScopes

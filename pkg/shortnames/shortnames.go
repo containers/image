@@ -10,7 +10,7 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/manifoldco/promptui"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"golang.org/x/term"
 )
 
@@ -33,7 +33,7 @@ func IsShortName(input string) bool {
 func parseUnnormalizedShortName(input string) (bool, reference.Named, error) {
 	ref, err := reference.Parse(input)
 	if err != nil {
-		return false, nil, errors.Wrapf(err, "cannot parse input: %q", input)
+		return false, nil, perrors.Wrapf(err, "cannot parse input: %q", input)
 	}
 
 	named, ok := ref.(reference.Named)
@@ -47,7 +47,7 @@ func parseUnnormalizedShortName(input string) (bool, reference.Named, error) {
 		// normalized (e.g., docker.io/alpine to docker.io/library/alpine.
 		named, err = reference.ParseNormalizedNamed(input)
 		if err != nil {
-			return false, nil, errors.Wrapf(err, "cannot normalize input: %q", input)
+			return false, nil, perrors.Wrapf(err, "cannot normalize input: %q", input)
 		}
 		return false, named, nil
 	}
@@ -188,7 +188,7 @@ func (r *Resolved) FormatPullErrors(pullErrors []error) error {
 			sb.WriteString("\n * ")
 			sb.WriteString(e.Error())
 		}
-		return errors.New(sb.String())
+		return perrors.New(sb.String())
 	}
 }
 
@@ -216,7 +216,7 @@ func (c *PullCandidate) Record() error {
 	value := reference.TrimNamed(c.Value)
 
 	if err := Add(c.resolved.systemContext, name.String(), value); err != nil {
-		return errors.Wrapf(err, "recording short-name alias (%q=%q)", c.resolved.userInput, c.Value)
+		return perrors.Wrapf(err, "recording short-name alias (%q=%q)", c.resolved.userInput, c.Value)
 	}
 	return nil
 }
@@ -279,7 +279,7 @@ func Resolve(ctx *types.SystemContext, name string) (*Resolved, error) {
 	if ctx != nil && ctx.PodmanOnlyShortNamesIgnoreRegistriesConfAndForceDockerHub {
 		named, err := reference.ParseNormalizedNamed(name)
 		if err != nil {
-			return nil, errors.Wrapf(err, "cannot normalize input: %q", name)
+			return nil, perrors.Wrapf(err, "cannot normalize input: %q", name)
 		}
 		resolved.addCandidate(named)
 		resolved.rationale = rationaleEnforcedDockerHub
@@ -337,7 +337,7 @@ func Resolve(ctx *types.SystemContext, name string) (*Resolved, error) {
 	for _, reg := range unqualifiedSearchRegistries {
 		named, err := reference.ParseNormalizedNamed(fmt.Sprintf("%s/%s", reg, name))
 		if err != nil {
-			return nil, errors.Wrapf(err, "creating reference with unqualified-search registry %q", reg)
+			return nil, perrors.Wrapf(err, "creating reference with unqualified-search registry %q", reg)
 		}
 		resolved.addCandidate(named)
 	}
@@ -361,7 +361,7 @@ func Resolve(ctx *types.SystemContext, name string) (*Resolved, error) {
 			return resolved, nil
 		case types.ShortNameModeEnforcing:
 			// Enforcing errors out without a prompt.
-			return nil, errors.New("short-name resolution enforced but cannot prompt without a TTY")
+			return nil, perrors.New("short-name resolution enforced but cannot prompt without a TTY")
 		default:
 			// We should not end up here.
 			return nil, fmt.Errorf("unexpected short-name mode (%v) during resolution", mode)
@@ -387,7 +387,7 @@ func Resolve(ctx *types.SystemContext, name string) (*Resolved, error) {
 
 	named, err := reference.ParseNormalizedNamed(selection)
 	if err != nil {
-		return nil, errors.Wrapf(err, "selection %q is not a valid reference", selection)
+		return nil, perrors.Wrapf(err, "selection %q is not a valid reference", selection)
 	}
 
 	resolved.PullCandidates = nil
@@ -428,7 +428,7 @@ func ResolveLocally(ctx *types.SystemContext, name string) ([]reference.Named, e
 		for _, reg := range registries {
 			named, err := reference.ParseNormalizedNamed(fmt.Sprintf("%s/%s", reg, name))
 			if err != nil {
-				return nil, errors.Wrapf(err, "creating reference with unqualified-search registry %q", reg)
+				return nil, perrors.Wrapf(err, "creating reference with unqualified-search registry %q", reg)
 			}
 			named = reference.TagNameOnly(named) // Make sure to add ":latest" if needed
 			candidates = append(candidates, named)

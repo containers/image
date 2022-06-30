@@ -8,7 +8,7 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/archive"
 	digest "github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,12 +22,12 @@ type ociArchiveImageDestination struct {
 func newImageDestination(ctx context.Context, sys *types.SystemContext, ref ociArchiveReference) (types.ImageDestination, error) {
 	tempDirRef, err := createOCIRef(sys, ref.image)
 	if err != nil {
-		return nil, errors.Wrapf(err, "creating oci reference")
+		return nil, perrors.Wrapf(err, "creating oci reference")
 	}
 	unpackedDest, err := tempDirRef.ociRefExtracted.NewImageDestination(ctx, sys)
 	if err != nil {
 		if err := tempDirRef.deleteTempDir(); err != nil {
-			return nil, errors.Wrapf(err, "deleting temp directory %q", tempDirRef.tempDirectory)
+			return nil, perrors.Wrapf(err, "deleting temp directory %q", tempDirRef.tempDirectory)
 		}
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (d *ociArchiveImageDestination) PutSignatures(ctx context.Context, signatur
 // after the directory is made, it is tarred up into a file and the directory is deleted
 func (d *ociArchiveImageDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {
 	if err := d.unpackedDest.Commit(ctx, unparsedToplevel); err != nil {
-		return errors.Wrapf(err, "storing image %q", d.ref.image)
+		return perrors.Wrapf(err, "storing image %q", d.ref.image)
 	}
 
 	// path of directory to tar up
@@ -150,13 +150,13 @@ func tarDirectory(src, dst string) error {
 	// input is a stream of bytes from the archive of the directory at path
 	input, err := archive.Tar(src, archive.Uncompressed)
 	if err != nil {
-		return errors.Wrapf(err, "retrieving stream of bytes from %q", src)
+		return perrors.Wrapf(err, "retrieving stream of bytes from %q", src)
 	}
 
 	// creates the tar file
 	outFile, err := os.Create(dst)
 	if err != nil {
-		return errors.Wrapf(err, "creating tar file %q", dst)
+		return perrors.Wrapf(err, "creating tar file %q", dst)
 	}
 	defer outFile.Close()
 

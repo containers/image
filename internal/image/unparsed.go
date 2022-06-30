@@ -8,7 +8,7 @@ import (
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 )
 
 // UnparsedImage implements types.UnparsedImage .
@@ -58,7 +58,7 @@ func (i *UnparsedImage) Manifest(ctx context.Context) ([]byte, string, error) {
 		if digest, haveDigest := i.expectedManifestDigest(); haveDigest {
 			matches, err := manifest.MatchesDigest(m, digest)
 			if err != nil {
-				return nil, "", errors.Wrap(err, "computing manifest digest")
+				return nil, "", perrors.Wrap(err, "computing manifest digest")
 			}
 			if !matches {
 				return nil, "", fmt.Errorf("Manifest does not match provided manifest digest %s", digest)

@@ -8,7 +8,7 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 )
 
 // Schema2PlatformSpec describes the platform which a particular manifest is
@@ -71,7 +71,7 @@ func (list *Schema2List) UpdateInstances(updates []ListUpdate) error {
 	}
 	for i := range updates {
 		if err := updates[i].Digest.Validate(); err != nil {
-			return errors.Wrapf(err, "update %d of %d passed to Schema2List.UpdateInstances contained an invalid digest", i+1, len(updates))
+			return perrors.Wrapf(err, "update %d of %d passed to Schema2List.UpdateInstances contained an invalid digest", i+1, len(updates))
 		}
 		list.Manifests[i].Digest = updates[i].Digest
 		if updates[i].Size < 0 {
@@ -91,7 +91,7 @@ func (list *Schema2List) UpdateInstances(updates []ListUpdate) error {
 func (list *Schema2List) ChooseInstance(ctx *types.SystemContext) (digest.Digest, error) {
 	wantedPlatforms, err := platform.WantedPlatforms(ctx)
 	if err != nil {
-		return "", errors.Wrapf(err, "getting platform information %#v", ctx)
+		return "", perrors.Wrapf(err, "getting platform information %#v", ctx)
 	}
 	for _, wantedPlatform := range wantedPlatforms {
 		for _, d := range list.Manifests {
@@ -115,7 +115,7 @@ func (list *Schema2List) ChooseInstance(ctx *types.SystemContext) (digest.Digest
 func (list *Schema2List) Serialize() ([]byte, error) {
 	buf, err := json.Marshal(list)
 	if err != nil {
-		return nil, errors.Wrapf(err, "marshaling Schema2List %#v", list)
+		return nil, perrors.Wrapf(err, "marshaling Schema2List %#v", list)
 	}
 	return buf, nil
 }
@@ -190,7 +190,7 @@ func Schema2ListFromManifest(manifest []byte) (*Schema2List, error) {
 		Manifests: []Schema2ManifestDescriptor{},
 	}
 	if err := json.Unmarshal(manifest, &list); err != nil {
-		return nil, errors.Wrapf(err, "unmarshaling Schema2List %q", string(manifest))
+		return nil, perrors.Wrapf(err, "unmarshaling Schema2List %q", string(manifest))
 	}
 	if err := validateUnambiguousManifestFormat(manifest, DockerV2ListMediaType,
 		allowedFieldManifests); err != nil {

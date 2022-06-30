@@ -6,7 +6,7 @@ import (
 	"io"
 
 	digest "github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 )
 
 type digestingReader struct {
@@ -48,7 +48,7 @@ func (d *digestingReader) Read(p []byte) (int, error) {
 			// Coverage: This should not happen, the hash.Hash interface requires
 			// d.digest.Write to never return an error, and the io.Writer interface
 			// requires n2 == len(input) if no error is returned.
-			return 0, errors.Wrapf(err, "updating digest during verification: %d vs. %d", n2, n)
+			return 0, perrors.Wrapf(err, "updating digest during verification: %d vs. %d", n2, n)
 		}
 	}
 	if err == io.EOF {

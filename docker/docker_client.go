@@ -26,7 +26,7 @@ import (
 	clientLib "github.com/docker/distribution/registry/client"
 	"github.com/docker/go-connections/tlsconfig"
 	digest "github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -212,7 +212,7 @@ func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
 func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write bool, actions string) (*dockerClient, error) {
 	auth, err := config.GetCredentialsForRef(sys, ref.ref)
 	if err != nil {
-		return nil, errors.Wrapf(err, "getting username and password")
+		return nil, perrors.Wrapf(err, "getting username and password")
 	}
 
 	sigBase, err := SignatureStorageBaseURL(sys, ref, write)
@@ -266,7 +266,7 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 	skipVerify := false
 	reg, err := sysregistriesv2.FindRegistry(sys, reference)
 	if err != nil {
-		return nil, errors.Wrapf(err, "loading registries")
+		return nil, perrors.Wrapf(err, "loading registries")
 	}
 	if reg != nil {
 		if reg.Blocked {
@@ -294,7 +294,7 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 func CheckAuth(ctx context.Context, sys *types.SystemContext, username, password, registry string) error {
 	client, err := newDockerClient(sys, registry, registry)
 	if err != nil {
-		return errors.Wrapf(err, "creating new docker client")
+		return perrors.Wrapf(err, "creating new docker client")
 	}
 	client.auth = types.DockerAuthConfig{
 		Username: username,
@@ -343,7 +343,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 	// We can't use GetCredentialsForRef here because we want to search the whole registry.
 	auth, err := config.GetCredentials(sys, registry)
 	if err != nil {
-		return nil, errors.Wrapf(err, "getting username and password")
+		return nil, perrors.Wrapf(err, "getting username and password")
 	}
 
 	// The /v2/_catalog endpoint has been disabled for docker.io therefore
@@ -357,7 +357,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 
 	client, err := newDockerClient(sys, hostname, registry)
 	if err != nil {
-		return nil, errors.Wrapf(err, "creating new docker client")
+		return nil, perrors.Wrapf(err, "creating new docker client")
 	}
 	client.auth = auth
 	if sys != nil {
@@ -400,13 +400,13 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 		resp, err := client.makeRequest(ctx, http.MethodGet, path, nil, nil, v2Auth, nil)
 		if err != nil {
 			logrus.Debugf("error getting search results from v2 endpoint %q: %v", registry, err)
-			return nil, errors.Wrapf(err, "couldn't search registry %q", registry)
+			return nil, perrors.Wrapf(err, "couldn't search registry %q", registry)
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			err := httpResponseToError(resp, "")
 			logrus.Errorf("error getting search results from v2 endpoint %q: %v", registry, err)
-			return nil, errors.Wrapf(err, "couldn't search registry %q", registry)
+			return nil, perrors.Wrapf(err, "couldn't search registry %q", registry)
 		}
 		v2Res := &V2Results{}
 		if err := json.NewDecoder(resp.Body).Decode(v2Res); err != nil {
@@ -628,7 +628,7 @@ func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge chall
 	scopes []authScope) (*bearerToken, error) {
 	realm, ok := challenge.Parameters["realm"]
 	if !ok {
-		return nil, errors.New("missing realm in bearer auth challenge")
+		return nil, perrors.New("missing realm in bearer auth challenge")
 	}
 
 	authReq, err := http.NewRequestWithContext(ctx, http.MethodPost, realm, nil)
@@ -676,7 +676,7 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
 	scopes []authScope) (*bearerToken, error) {
 	realm, ok := challenge.Parameters["realm"]
 	if !ok {
-		return nil, errors.New("missing realm in bearer auth challenge")
+		return nil, perrors.New("missing realm in bearer auth challenge")
 	}
 
 	authReq, err := http.NewRequestWithContext(ctx, http.MethodGet, realm, nil)
@@ -760,7 +760,7 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 		err = ping("http")
 	}
 	if err != nil {
-		err = errors.Wrapf(err, "pinging container registry %s", c.registry)
+		err = perrors.Wrapf(err, "pinging container registry %s", c.registry)
 		if c.sys != nil && c.sys.DockerDisableV1Ping {
 			return err
 		}
@@ -811,7 +811,7 @@ func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerRe
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return nil, errors.Wrapf(clientLib.HandleErrorResponse(res), "downloading signatures for %s in %s", manifestDigest, ref.ref.Name())
+		return nil, perrors.Wrapf(clientLib.HandleErrorResponse(res), "downloading signatures for %s in %s", manifestDigest, ref.ref.Name())
 	}
 
 	body, err := iolimits.ReadAtMost(res.Body, iolimits.MaxSignatureListBodySize)
@@ -821,7 +821,7 @@ func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerRe
 
 	var parsedBody extensionSignatureList
 	if err := json.Unmarshal(body, &parsedBody); err != nil {
-		return nil, errors.Wrapf(err, "decoding signature list")
+		return nil, perrors.Wrapf(err, "decoding signature list")
 	}
 	return &parsedBody, nil
 }
