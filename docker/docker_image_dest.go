@@ -318,7 +318,7 @@ func (d *dockerImageDestination) tryReusingExactBlob(ctx context.Context, info t
 // May use and/or update cache.
 func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
-		return false, types.BlobInfo{}, errors.New(`"Can not check for a blob with unknown digest`)
+		return false, types.BlobInfo{}, errors.New("Can not check for a blob with unknown digest")
 	}
 
 	// First, check whether the blob happens to already exist at the destination.

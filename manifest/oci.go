@@ -163,7 +163,7 @@ func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 func getEncryptedMediaType(mediatype string) (string, error) {
 	for _, s := range strings.Split(mediatype, "+")[1:] {
 		if s == "encrypted" {
-			return "", fmt.Errorf("unsupportedmediatype: %v already encrypted", mediatype)
+			return "", fmt.Errorf("unsupported mediaType: %v already encrypted", mediatype)
 		}
 	}
 	unsuffixedMediatype := strings.Split(mediatype, "+")[0]
@@ -172,14 +172,14 @@ func getEncryptedMediaType(mediatype string) (string, error) {
 		return mediatype + "+encrypted", nil
 	}
 
-	return "", fmt.Errorf("unsupported mediatype to encrypt: %v", mediatype)
+	return "", fmt.Errorf("unsupported mediaType to encrypt: %v", mediatype)
 }
 
 // getEncryptedMediaType will return the mediatype to its encrypted counterpart and return
 // an error if the mediatype does not support decryption
 func getDecryptedMediaType(mediatype string) (string, error) {
 	if !strings.HasSuffix(mediatype, "+encrypted") {
-		return "", fmt.Errorf("unsupported mediatype to decrypt %v:", mediatype)
+		return "", fmt.Errorf("unsupported mediaType to decrypt %v:", mediatype)
 	}
 
 	return strings.TrimSuffix(mediatype, "+encrypted"), nil

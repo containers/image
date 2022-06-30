@@ -19,10 +19,10 @@ func (pr *prSignedBy) isSignatureAuthorAccepted(ctx context.Context, image types
 	case SBKeyTypeGPGKeys:
 	case SBKeyTypeSignedByGPGKeys, SBKeyTypeX509Certificates, SBKeyTypeSignedByX509CAs:
 		// FIXME? Reject this at policy parsing time already?
-		return sarRejected, nil, fmt.Errorf(`"Unimplemented "keyType" value "%s"`, string(pr.KeyType))
+		return sarRejected, nil, fmt.Errorf(`Unimplemented "keyType" value "%s"`, string(pr.KeyType))
 	default:
 		// This should never happen, newPRSignedBy ensures KeyType.IsValid()
-		return sarRejected, nil, fmt.Errorf(`"Unknown "keyType" value "%s"`, string(pr.KeyType))
+		return sarRejected, nil, fmt.Errorf(`Unknown "keyType" value "%s"`, string(pr.KeyType))
 	}
 
 	if pr.KeyPath != "" && pr.KeyData != nil {

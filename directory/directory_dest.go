@@ -210,7 +210,7 @@ func (d *dirImageDestination) PutBlob(ctx context.Context, stream io.Reader, inp
 // May use and/or update cache.
 func (d *dirImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
-		return false, types.BlobInfo{}, fmt.Errorf(`"Can not check for a blob with unknown digest`)
+		return false, types.BlobInfo{}, fmt.Errorf("Can not check for a blob with unknown digest")
 	}
 	blobPath := d.ref.layerPath(info.Digest)
 	finfo, err := os.Stat(blobPath)

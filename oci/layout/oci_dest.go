@@ -192,7 +192,7 @@ func (d *ociImageDestination) PutBlob(ctx context.Context, stream io.Reader, inp
 // May use and/or update cache.
 func (d *ociImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
-		return false, types.BlobInfo{}, errors.New(`"Can not check for a blob with unknown digest`)
+		return false, types.BlobInfo{}, errors.New("Can not check for a blob with unknown digest")
 	}
 	blobPath, err := d.ref.blobPath(info.Digest, d.sharedBlobDir)
 	if err != nil {
