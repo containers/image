@@ -465,11 +465,10 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 			var creds map[string]string
 			creds, err = listAuthsFromCredHelper(helper)
 			if err != nil {
-				switch perrors.Cause(err) {
-				case exec.ErrNotFound:
+				if errors.Is(err, exec.ErrNotFound) {
 					// It's okay if the helper doesn't exist.
 					continue
-				default:
+				} else {
 					// fall through
 				}
 			} else {
