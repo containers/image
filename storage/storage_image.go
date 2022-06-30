@@ -531,7 +531,7 @@ func (s *storageImageDestination) putBlobToPendingFile(ctx context.Context, stre
 	if blobSize < 0 {
 		blobSize = counter.Count
 	} else if blobinfo.Size != counter.Count {
-		return errorBlobInfo, errors.WithStack(ErrBlobSizeMismatch)
+		return errorBlobInfo, ErrBlobSizeMismatch
 	}
 
 	// Record information about the blob.

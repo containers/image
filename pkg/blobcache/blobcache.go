@@ -141,7 +141,7 @@ func (b *BlobCache) Directory() string {
 func (b *BlobCache) ClearCache() error {
 	f, err := os.Open(b.directory)
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	defer f.Close()
 	names, err := f.Readdirnames(-1)
