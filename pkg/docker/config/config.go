@@ -173,10 +173,9 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 				logrus.Debugf("Error listing credentials stored in credential helper %s: %v", helper, err)
 			}
 			if err != nil {
-				switch perrors.Cause(err) {
-				case exec.ErrNotFound:
+				if errors.Is(err, exec.ErrNotFound) {
 					// It's okay if the helper doesn't exist.
-				default:
+				} else {
 					return nil, err
 				}
 			} else {
