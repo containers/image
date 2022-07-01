@@ -14,7 +14,11 @@ import (
 
 	"github.com/containers/image/v5/docker"
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/blobinfocache"
+	"github.com/containers/image/v5/internal/imagedestination"
+	"github.com/containers/image/v5/internal/imagedestination/impl"
 	"github.com/containers/image/v5/internal/iolimits"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/image/v5/version"
@@ -315,14 +319,16 @@ func (s *openshiftImageSource) ensureImageIsResolved(ctx context.Context) error 
 }
 
 type openshiftImageDestination struct {
+	impl.Compat
+
 	client *openshiftClient
-	docker types.ImageDestination // The docker/distribution API endpoint
+	docker private.ImageDestination // The docker/distribution API endpoint
 	// State
 	imageStreamImageName string // "" if not yet known
 }
 
 // newImageDestination creates a new ImageDestination for the specified reference.
-func newImageDestination(ctx context.Context, sys *types.SystemContext, ref openshiftReference) (types.ImageDestination, error) {
+func newImageDestination(ctx context.Context, sys *types.SystemContext, ref openshiftReference) (private.ImageDestination, error) {
 	client, err := newOpenshiftClient(ref)
 	if err != nil {
 		return nil, err
@@ -341,10 +347,12 @@ func newImageDestination(ctx context.Context, sys *types.SystemContext, ref open
 		return nil, err
 	}
 
-	return &openshiftImageDestination{
+	d := &openshiftImageDestination{
 		client: client,
-		docker: docker,
-	}, nil
+		docker: imagedestination.FromPublic(docker),
+	}
+	d.Compat = impl.AddCompat(d)
+	return d, nil
 }
 
 // Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
@@ -395,28 +403,40 @@ func (d *openshiftImageDestination) HasThreadSafePutBlob() bool {
 	return false
 }
 
-// PutBlob writes contents of stream and returns data representing the result (with all data filled in).
+// SupportsPutBlobPartial returns true if PutBlobPartial is supported.
+func (d *openshiftImageDestination) SupportsPutBlobPartial() bool {
+	return d.docker.SupportsPutBlobPartial()
+}
+
+// PutBlobWithOptions writes contents of stream and returns data representing the result.
 // inputInfo.Digest can be optionally provided if known; if provided, and stream is read to the end without error, the digest MUST match the stream contents.
 // inputInfo.Size is the expected length of stream, if known.
-// May update cache.
+// inputInfo.MediaType describes the blob format, if known.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (d *openshiftImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
-	return d.docker.PutBlob(ctx, stream, inputInfo, cache, isConfig)
+func (d *openshiftImageDestination) PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options private.PutBlobOptions) (types.BlobInfo, error) {
+	return d.docker.PutBlobWithOptions(ctx, stream, inputInfo, options)
 }
 
-// TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
+// PutBlobPartial attempts to create a blob using the data that is already present
+// at the destination. chunkAccessor is accessed in a non-sequential way to retrieve the missing chunks.
+// It is available only if SupportsPutBlobPartial().
+// Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
+// should fall back to PutBlobWithOptions.
+func (d *openshiftImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, cache blobinfocache.BlobInfoCache2) (types.BlobInfo, error) {
+	return d.docker.PutBlobPartial(ctx, chunkAccessor, srcInfo, cache)
+}
+
+// TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 // (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
 // info.Digest must not be empty.
-// If canSubstitute, TryReusingBlob can use an equivalent equivalent of the desired blob; in that case the returned info may not match the input.
 // If the blob has been successfully reused, returns (true, info, nil); info must contain at least a digest and size, and may
 // include CompressionOperation and CompressionAlgorithm fields to indicate that a change to the compression type should be
 // reflected in the manifest that will be written.
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
-// May use and/or update cache.
-func (d *openshiftImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
-	return d.docker.TryReusingBlob(ctx, info, cache, canSubstitute)
+func (d *openshiftImageDestination) TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
+	return d.docker.TryReusingBlobWithOptions(ctx, info, options)
 }
 
 // PutManifest writes manifest to the destination.
