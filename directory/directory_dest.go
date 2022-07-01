@@ -42,28 +42,27 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (types.Imag
 			desiredLayerCompression = types.Decompress
 		}
 	}
-	d := &dirImageDestination{ref: ref, desiredLayerCompression: desiredLayerCompression}
 
 	// If directory exists check if it is empty
 	// if not empty, check whether the contents match that of a container image directory and overwrite the contents
 	// if the contents don't match throw an error
-	dirExists, err := pathExists(d.ref.resolvedPath)
+	dirExists, err := pathExists(ref.resolvedPath)
 	if err != nil {
-		return nil, perrors.Wrapf(err, "checking for path %q", d.ref.resolvedPath)
+		return nil, perrors.Wrapf(err, "checking for path %q", ref.resolvedPath)
 	}
 	if dirExists {
-		isEmpty, err := isDirEmpty(d.ref.resolvedPath)
+		isEmpty, err := isDirEmpty(ref.resolvedPath)
 		if err != nil {
 			return nil, err
 		}
 
 		if !isEmpty {
-			versionExists, err := pathExists(d.ref.versionPath())
+			versionExists, err := pathExists(ref.versionPath())
 			if err != nil {
-				return nil, perrors.Wrapf(err, "checking if path exists %q", d.ref.versionPath())
+				return nil, perrors.Wrapf(err, "checking if path exists %q", ref.versionPath())
 			}
 			if versionExists {
-				contents, err := os.ReadFile(d.ref.versionPath())
+				contents, err := os.ReadFile(ref.versionPath())
 				if err != nil {
 					return nil, err
 				}
@@ -75,22 +74,24 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (types.Imag
 				return nil, ErrNotContainerImageDir
 			}
 			// delete directory contents so that only one image is in the directory at a time
-			if err = removeDirContents(d.ref.resolvedPath); err != nil {
-				return nil, perrors.Wrapf(err, "erasing contents in %q", d.ref.resolvedPath)
+			if err = removeDirContents(ref.resolvedPath); err != nil {
+				return nil, perrors.Wrapf(err, "erasing contents in %q", ref.resolvedPath)
 			}
-			logrus.Debugf("overwriting existing container image directory %q", d.ref.resolvedPath)
+			logrus.Debugf("overwriting existing container image directory %q", ref.resolvedPath)
 		}
 	} else {
 		// create directory if it doesn't exist
-		if err := os.MkdirAll(d.ref.resolvedPath, 0755); err != nil {
-			return nil, perrors.Wrapf(err, "unable to create directory %q", d.ref.resolvedPath)
+		if err := os.MkdirAll(ref.resolvedPath, 0755); err != nil {
+			return nil, perrors.Wrapf(err, "unable to create directory %q", ref.resolvedPath)
 		}
 	}
 	// create version file
-	err = os.WriteFile(d.ref.versionPath(), []byte(version), 0644)
+	err = os.WriteFile(ref.versionPath(), []byte(version), 0644)
 	if err != nil {
-		return nil, perrors.Wrapf(err, "creating version file %q", d.ref.versionPath())
+		return nil, perrors.Wrapf(err, "creating version file %q", ref.versionPath())
 	}
+
+	d := &dirImageDestination{ref: ref, desiredLayerCompression: desiredLayerCompression}
 	return d, nil
 }
 
