@@ -27,10 +27,9 @@ type ociImageDestination struct {
 	stubs.NoPutBlobPartialInitialize
 	stubs.NoSignaturesInitialize
 
-	ref                      ociReference
-	index                    imgspecv1.Index
-	sharedBlobDir            string
-	acceptUncompressedLayers bool
+	ref           ociReference
+	index         imgspecv1.Index
+	sharedBlobDir string
 }
 
 // newImageDestination returns an ImageDestination for writing to an existing directory.
@@ -51,12 +50,18 @@ func newImageDestination(sys *types.SystemContext, ref ociReference) (private.Im
 		}
 	}
 
+	desiredLayerCompression := types.Compress
+	if sys != nil && sys.OCIAcceptUncompressedLayers {
+		desiredLayerCompression = types.PreserveOriginal
+	}
+
 	d := &ociImageDestination{
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
 			SupportedManifestMIMETypes: []string{
 				imgspecv1.MediaTypeImageManifest,
 				imgspecv1.MediaTypeImageIndex,
 			},
+			DesiredLayerCompression:        desiredLayerCompression,
 			MustMatchRuntimeOS:             false,
 			IgnoresEmbeddedDockerReference: false, // N/A, DockerReference() returns nil.
 			HasThreadSafePutBlob:           true,
@@ -70,7 +75,6 @@ func newImageDestination(sys *types.SystemContext, ref ociReference) (private.Im
 	d.Compat = impl.AddCompat(d)
 	if sys != nil {
 		d.sharedBlobDir = sys.OCISharedBlobDirPath
-		d.acceptUncompressedLayers = sys.OCIAcceptUncompressedLayers
 	}
 
 	if err := ensureDirectoryExists(d.ref.dir); err != nil {
@@ -94,13 +98,6 @@ func (d *ociImageDestination) Reference() types.ImageReference {
 // Close removes resources associated with an initialized ImageDestination, if any.
 func (d *ociImageDestination) Close() error {
 	return nil
-}
-
-func (d *ociImageDestination) DesiredLayerCompression() types.LayerCompression {
-	if d.acceptUncompressedLayers {
-		return types.PreserveOriginal
-	}
-	return types.Compress
 }
 
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually

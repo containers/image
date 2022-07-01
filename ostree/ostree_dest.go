@@ -93,6 +93,7 @@ func newImageDestination(ref ostreeReference, tmpDirPath string) (private.ImageD
 	d := &ostreeImageDestination{
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
 			SupportedManifestMIMETypes:     []string{manifest.DockerV2Schema2MediaType},
+			DesiredLayerCompression:        types.PreserveOriginal,
 			MustMatchRuntimeOS:             true,
 			IgnoresEmbeddedDockerReference: false, // N/A, DockerReference() returns nil.
 			HasThreadSafePutBlob:           false,
@@ -124,11 +125,6 @@ func (d *ostreeImageDestination) Close() error {
 		C.g_object_unref(C.gpointer(d.repo))
 	}
 	return os.RemoveAll(d.tmpDirPath)
-}
-
-// ShouldCompressLayers returns true iff it is desirable to compress layer blobs written to this destination.
-func (d *ostreeImageDestination) DesiredLayerCompression() types.LayerCompression {
-	return types.PreserveOriginal
 }
 
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually

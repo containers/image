@@ -62,6 +62,7 @@ func newImageDestination(sys *types.SystemContext, ref dockerReference) (private
 	dest := &dockerImageDestination{
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
 			SupportedManifestMIMETypes:     mimeTypes,
+			DesiredLayerCompression:        types.Compress,
 			MustMatchRuntimeOS:             false,
 			IgnoresEmbeddedDockerReference: false, // We do want the manifest updated; older registry versions refuse manifests if the embedded reference does not match.
 			HasThreadSafePutBlob:           true,
@@ -100,10 +101,6 @@ func (d *dockerImageDestination) SupportsSignatures(ctx context.Context) error {
 	default:
 		return errors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
 	}
-}
-
-func (d *dockerImageDestination) DesiredLayerCompression() types.LayerCompression {
-	return types.Compress
 }
 
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually

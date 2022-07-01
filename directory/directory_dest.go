@@ -31,8 +31,7 @@ type dirImageDestination struct {
 	stubs.NoPutBlobPartialInitialize
 	stubs.AlwaysSupportsSignatures
 
-	ref                     dirReference
-	desiredLayerCompression types.LayerCompression
+	ref dirReference
 }
 
 // newImageDestination returns an ImageDestination for writing to a directory.
@@ -102,14 +101,14 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (private.Im
 	d := &dirImageDestination{
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
 			SupportedManifestMIMETypes:     nil,
+			DesiredLayerCompression:        desiredLayerCompression,
 			MustMatchRuntimeOS:             false,
 			IgnoresEmbeddedDockerReference: false, // N/A, DockerReference() returns nil.
 			HasThreadSafePutBlob:           false,
 		}),
 		NoPutBlobPartialInitialize: stubs.NoPutBlobPartial(ref),
 
-		ref:                     ref,
-		desiredLayerCompression: desiredLayerCompression,
+		ref: ref,
 	}
 	d.Compat = impl.AddCompat(d)
 	return d, nil
@@ -124,10 +123,6 @@ func (d *dirImageDestination) Reference() types.ImageReference {
 // Close removes resources associated with an initialized ImageDestination, if any.
 func (d *dirImageDestination) Close() error {
 	return nil
-}
-
-func (d *dirImageDestination) DesiredLayerCompression() types.LayerCompression {
-	return d.desiredLayerCompression
 }
 
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually

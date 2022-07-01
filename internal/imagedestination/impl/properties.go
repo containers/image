@@ -1,11 +1,15 @@
 package impl
 
+import "github.com/containers/image/v5/types"
+
 // Properties collects properties of an ImageDestination that are constant throughout its lifetime
 // (but might differ across instances).
 type Properties struct {
 	// SupportedManifestMIMETypes tells which manifest MIME types the destination supports.
 	// A empty slice or nil means any MIME type can be tried to upload.
 	SupportedManifestMIMETypes []string
+	// DesiredLayerCompression indicates the kind of compression to apply on layers
+	DesiredLayerCompression types.LayerCompression
 	// MustMatchRuntimeOS is set to true if the destination can store only images targeted for the current runtime architecture and OS.
 	MustMatchRuntimeOS bool
 	// IgnoresEmbeddedDockerReference is set to true if the destination does not care about Image.EmbeddedDockerReferenceConflicts(),
@@ -34,6 +38,11 @@ func PropertyMethods(vals Properties) PropertyMethodsInitialize {
 // If an empty slice or nil it's returned, then any mime type can be tried to upload
 func (o PropertyMethodsInitialize) SupportedManifestMIMETypes() []string {
 	return o.vals.SupportedManifestMIMETypes
+}
+
+// DesiredLayerCompression indicates the kind of compression to apply on layers
+func (o PropertyMethodsInitialize) DesiredLayerCompression() types.LayerCompression {
+	return o.vals.DesiredLayerCompression
 }
 
 // MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime architecture and OS. False otherwise.

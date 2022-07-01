@@ -45,6 +45,7 @@ func NewDestination(sys *types.SystemContext, archive *Writer, transportName str
 			SupportedManifestMIMETypes: []string{
 				manifest.DockerV2Schema2MediaType, // We rely on the types.Image.UpdatedImage schema conversion capabilities.
 			},
+			DesiredLayerCompression:        types.Decompress,
 			MustMatchRuntimeOS:             false,
 			IgnoresEmbeddedDockerReference: false, // N/A, we only accept schema2 images where EmbeddedDockerReferenceConflicts() is always false.
 			// The code _is_ actually thread-safe, but apart from computing sizes/digests of layers where

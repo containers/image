@@ -414,6 +414,10 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 				manifest.DockerV2Schema1SignedMediaType,
 				manifest.DockerV2Schema1MediaType,
 			},
+			// We ultimately have to decompress layers to populate trees on disk
+			// and need to explicitly ask for it here, so that the layers' MIME
+			// types can be set accordingly.
+			DesiredLayerCompression:        types.PreserveOriginal,
 			MustMatchRuntimeOS:             true,
 			IgnoresEmbeddedDockerReference: true, // Yes, we want the unmodified manifest
 			HasThreadSafePutBlob:           true,
@@ -453,13 +457,6 @@ func (s *storageImageDestination) Close() error {
 		}
 	}
 	return os.RemoveAll(s.directory)
-}
-
-func (s *storageImageDestination) DesiredLayerCompression() types.LayerCompression {
-	// We ultimately have to decompress layers to populate trees on disk
-	// and need to explicitly ask for it here, so that the layers' MIME
-	// types can be set accordingly.
-	return types.PreserveOriginal
 }
 
 func (s *storageImageDestination) computeNextBlobCacheFile() string {
