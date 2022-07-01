@@ -9,6 +9,12 @@ import (
 	"github.com/containers/image/v5/types"
 )
 
+// wrapped provides the private.ImageSource operations
+// for a source that only implements types.ImageSource
+type wrapped struct {
+	types.ImageSource
+}
+
 // FromPublic(src) returns an object that provides the private.ImageSource API
 //
 // Eventually, we might want to expose this function, and methods of the returned object,
@@ -24,12 +30,6 @@ func FromPublic(src types.ImageSource) private.ImageSource {
 		return src2
 	}
 	return &wrapped{ImageSource: src}
-}
-
-// wrapped provides the private.ImageSource operations
-// for a source that only implements types.ImageSource
-type wrapped struct {
-	types.ImageSource
 }
 
 // SupportsGetBlobAt() returns true if GetBlobAt (BlobChunkAccessor) is supported.
