@@ -21,6 +21,9 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/containers/image/v5/internal/imagedestination/impl"
+	"github.com/containers/image/v5/internal/imagedestination/stubs"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
@@ -66,6 +69,9 @@ type manifestSchema struct {
 }
 
 type ostreeImageDestination struct {
+	compat impl.Compat
+	stubs.NoPutBlobPartialInitialize
+
 	ref           ostreeReference
 	manifest      string
 	schema        manifestSchema
@@ -77,12 +83,25 @@ type ostreeImageDestination struct {
 }
 
 // newImageDestination returns an ImageDestination for writing to an existing ostree.
-func newImageDestination(ref ostreeReference, tmpDirPath string) (types.ImageDestination, error) {
+func newImageDestination(ref ostreeReference, tmpDirPath string) (private.ImageDestination, error) {
 	tmpDirPath = filepath.Join(tmpDirPath, ref.branchName)
 	if err := ensureDirectoryExists(tmpDirPath); err != nil {
 		return nil, err
 	}
-	return &ostreeImageDestination{ref, "", manifestSchema{}, tmpDirPath, map[string]*blobToImport{}, "", 0, nil}, nil
+	d := &ostreeImageDestination{
+		NoPutBlobPartialInitialize: stubs.NoPutBlobPartial(ref),
+
+		ref:           ref,
+		manifest:      "",
+		schema:        manifestSchema{},
+		tmpDirPath:    tmpDirPath,
+		blobs:         map[string]*blobToImport{},
+		digest:        "",
+		signaturesLen: 0,
+		repo:          nil,
+	}
+	d.Compat = impl.AddCompat(d)
+	return d, nil
 }
 
 // Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
@@ -139,15 +158,14 @@ func (d *ostreeImageDestination) HasThreadSafePutBlob() bool {
 	return false
 }
 
-// PutBlob writes contents of stream and returns data representing the result.
+// PutBlobWithOptions writes contents of stream and returns data representing the result.
 // inputInfo.Digest can be optionally provided if known; if provided, and stream is read to the end without error, the digest MUST match the stream contents.
 // inputInfo.Size is the expected length of stream, if known.
 // inputInfo.MediaType describes the blob format, if known.
-// May update cache.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (d *ostreeImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
+func (d *ostreeImageDestination) PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options private.PutBlobOptions) (types.BlobInfo, error) {
 	tmpDir, err := os.MkdirTemp(d.tmpDirPath, "blob")
 	if err != nil {
 		return types.BlobInfo{}, err
@@ -339,16 +357,14 @@ func (d *ostreeImageDestination) importConfig(repo *otbuiltin.Repo, blob *blobTo
 	return d.ostreeCommit(repo, ostreeBranch, destinationPath, []string{fmt.Sprintf("docker.size=%d", blob.Size)})
 }
 
-// TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
+// TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 // (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
 // info.Digest must not be empty.
-// If canSubstitute, TryReusingBlob can use an equivalent equivalent of the desired blob; in that case the returned info may not match the input.
 // If the blob has been successfully reused, returns (true, info, nil); info must contain at least a digest and size, and may
 // include CompressionOperation and CompressionAlgorithm fields to indicate that a change to the compression type should be
 // reflected in the manifest that will be written.
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
-// May use and/or update cache.
-func (d *ostreeImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
+func (d *ostreeImageDestination) TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
 	if d.repo == nil {
 		repo, err := openRepo(d.ref.repo)
 		if err != nil {

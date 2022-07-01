@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/pkg/blobinfocache/memory"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
@@ -16,6 +17,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var _ private.ImageDestination = (*ociImageDestination)(nil)
 
 // readerFromFunc allows implementing Reader by any function, e.g. a closure.
 type readerFromFunc func([]byte) (int, error)

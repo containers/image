@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/containers/image/v5/docker/internal/tarfile"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
 )
 
@@ -16,7 +17,7 @@ type archiveImageDestination struct {
 	writer               io.Closer       // May be nil if the archive is shared
 }
 
-func newImageDestination(sys *types.SystemContext, ref archiveReference) (types.ImageDestination, error) {
+func newImageDestination(sys *types.SystemContext, ref archiveReference) (private.ImageDestination, error) {
 	if ref.sourceIndex != -1 {
 		return nil, fmt.Errorf("Destination reference must not contain a manifest index @%d", ref.sourceIndex)
 	}
