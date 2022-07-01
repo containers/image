@@ -2,6 +2,8 @@ package directory
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,7 +12,7 @@ import (
 	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -33,7 +35,7 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (types.Imag
 			desiredLayerCompression = types.Compress
 
 			if sys.DirForceDecompress {
-				return nil, errors.Errorf("Cannot compress and decompress at the same time")
+				return nil, fmt.Errorf("Cannot compress and decompress at the same time")
 			}
 		}
 		if sys.DirForceDecompress {
@@ -47,7 +49,7 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (types.Imag
 	// if the contents don't match throw an error
 	dirExists, err := pathExists(d.ref.resolvedPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "checking for path %q", d.ref.resolvedPath)
+		return nil, perrors.Wrapf(err, "checking for path %q", d.ref.resolvedPath)
 	}
 	if dirExists {
 		isEmpty, err := isDirEmpty(d.ref.resolvedPath)
@@ -58,7 +60,7 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (types.Imag
 		if !isEmpty {
 			versionExists, err := pathExists(d.ref.versionPath())
 			if err != nil {
-				return nil, errors.Wrapf(err, "checking if path exists %q", d.ref.versionPath())
+				return nil, perrors.Wrapf(err, "checking if path exists %q", d.ref.versionPath())
 			}
 			if versionExists {
 				contents, err := os.ReadFile(d.ref.versionPath())
@@ -74,20 +76,20 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (types.Imag
 			}
 			// delete directory contents so that only one image is in the directory at a time
 			if err = removeDirContents(d.ref.resolvedPath); err != nil {
-				return nil, errors.Wrapf(err, "erasing contents in %q", d.ref.resolvedPath)
+				return nil, perrors.Wrapf(err, "erasing contents in %q", d.ref.resolvedPath)
 			}
 			logrus.Debugf("overwriting existing container image directory %q", d.ref.resolvedPath)
 		}
 	} else {
 		// create directory if it doesn't exist
 		if err := os.MkdirAll(d.ref.resolvedPath, 0755); err != nil {
-			return nil, errors.Wrapf(err, "unable to create directory %q", d.ref.resolvedPath)
+			return nil, perrors.Wrapf(err, "unable to create directory %q", d.ref.resolvedPath)
 		}
 	}
 	// create version file
 	err = os.WriteFile(d.ref.versionPath(), []byte(version), 0644)
 	if err != nil {
-		return nil, errors.Wrapf(err, "creating version file %q", d.ref.versionPath())
+		return nil, perrors.Wrapf(err, "creating version file %q", d.ref.versionPath())
 	}
 	return d, nil
 }
@@ -171,7 +173,7 @@ func (d *dirImageDestination) PutBlob(ctx context.Context, stream io.Reader, inp
 	}
 	blobDigest := digester.Digest()
 	if inputInfo.Size != -1 && size != inputInfo.Size {
-		return types.BlobInfo{}, errors.Errorf("Size mismatch when copying %s, expected %d, got %d", blobDigest, inputInfo.Size, size)
+		return types.BlobInfo{}, fmt.Errorf("Size mismatch when copying %s, expected %d, got %d", blobDigest, inputInfo.Size, size)
 	}
 	if err := blobFile.Sync(); err != nil {
 		return types.BlobInfo{}, err
@@ -209,7 +211,7 @@ func (d *dirImageDestination) PutBlob(ctx context.Context, stream io.Reader, inp
 // May use and/or update cache.
 func (d *dirImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
-		return false, types.BlobInfo{}, errors.Errorf(`"Can not check for a blob with unknown digest`)
+		return false, types.BlobInfo{}, fmt.Errorf("Can not check for a blob with unknown digest")
 	}
 	blobPath := d.ref.layerPath(info.Digest)
 	finfo, err := os.Stat(blobPath)

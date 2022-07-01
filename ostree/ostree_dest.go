@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -28,7 +29,7 @@ import (
 	"github.com/opencontainers/go-digest"
 	selinux "github.com/opencontainers/selinux/go-selinux"
 	"github.com/ostreedev/ostree-go/pkg/otbuiltin"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/vbatts/tar-split/tar/asm"
 	"github.com/vbatts/tar-split/tar/storage"
 )
@@ -167,7 +168,7 @@ func (d *ostreeImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	}
 	blobDigest := digester.Digest()
 	if inputInfo.Size != -1 && size != inputInfo.Size {
-		return types.BlobInfo{}, errors.Errorf("Size mismatch when copying %s, expected %d, got %d", blobDigest, inputInfo.Size, size)
+		return types.BlobInfo{}, fmt.Errorf("Size mismatch when copying %s, expected %d, got %d", blobDigest, inputInfo.Size, size)
 	}
 	if err := blobFile.Sync(); err != nil {
 		return types.BlobInfo{}, err
@@ -213,7 +214,7 @@ func fixFiles(selinuxHnd *C.struct_selabel_handle, root string, dir string, user
 
 			res, err := C.selabel_lookup_raw(selinuxHnd, &context, relPathC, C.int(info.Mode()&os.ModePerm))
 			if int(res) < 0 && err != syscall.ENOENT {
-				return errors.Wrapf(err, "cannot selabel_lookup_raw %s", relPath)
+				return perrors.Wrapf(err, "cannot selabel_lookup_raw %s", relPath)
 			}
 			if int(res) == 0 {
 				defer C.freecon(context)
@@ -221,7 +222,7 @@ func fixFiles(selinuxHnd *C.struct_selabel_handle, root string, dir string, user
 				defer C.free(unsafe.Pointer(fullpathC))
 				res, err = C.lsetfilecon_raw(fullpathC, context)
 				if int(res) < 0 {
-					return errors.Wrapf(err, "cannot setfilecon_raw %s to %s", fullpath, C.GoString(context))
+					return perrors.Wrapf(err, "cannot setfilecon_raw %s to %s", fullpath, C.GoString(context))
 				}
 			}
 		}
@@ -453,7 +454,7 @@ func (d *ostreeImageDestination) Commit(context.Context, types.UnparsedImage) er
 	if os.Getuid() == 0 && selinux.GetEnabled() {
 		selinuxHnd, err = C.selabel_open(C.SELABEL_CTX_FILE, nil, 0)
 		if selinuxHnd == nil {
-			return errors.Wrapf(err, "cannot open the SELinux DB")
+			return perrors.Wrapf(err, "cannot open the SELinux DB")
 		}
 
 		defer C.selabel_close(selinuxHnd)

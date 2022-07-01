@@ -6,7 +6,7 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/containers/ocicrypt"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 )
 
 // isOciEncrypted returns a bool indicating if a mediatype is encrypted
@@ -41,7 +41,7 @@ func (c *copier) blobPipelineDecryptionStep(stream *sourceStream, srcInfo types.
 		}
 		reader, decryptedDigest, err := ocicrypt.DecryptLayer(c.ociDecryptConfig, stream.reader, desc, false)
 		if err != nil {
-			return nil, errors.Wrapf(err, "decrypting layer %s", srcInfo.Digest)
+			return nil, perrors.Wrapf(err, "decrypting layer %s", srcInfo.Digest)
 		}
 
 		stream.reader = reader
@@ -92,7 +92,7 @@ func (c *copier) blobPipelineEncryptionStep(stream *sourceStream, toEncrypt bool
 		}
 		reader, finalizer, err := ocicrypt.EncryptLayer(c.ociEncryptConfig, stream.reader, desc)
 		if err != nil {
-			return nil, errors.Wrapf(err, "encrypting blob %s", srcInfo.Digest)
+			return nil, perrors.Wrapf(err, "encrypting blob %s", srcInfo.Digest)
 		}
 
 		stream.reader = reader
@@ -116,7 +116,7 @@ func (d *bpEncryptionStepData) updateCryptoOperationAndAnnotations(operation *ty
 
 	encryptAnnotations, err := d.finalizer()
 	if err != nil {
-		return errors.Wrap(err, "Unable to finalize encryption")
+		return perrors.Wrap(err, "Unable to finalize encryption")
 	}
 	*operation = types.Encrypt
 	if *annotations == nil {

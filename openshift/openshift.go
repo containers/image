@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,7 +19,7 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/containers/image/v5/version"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -126,7 +127,7 @@ func (c *openshiftClient) doRequest(ctx context.Context, method, path string, re
 		if statusValid {
 			return nil, errors.New(status.Message)
 		}
-		return nil, errors.Errorf("HTTP error: status code: %d (%s), body: %s", res.StatusCode, http.StatusText(res.StatusCode), string(body))
+		return nil, fmt.Errorf("HTTP error: status code: %d (%s), body: %s", res.StatusCode, http.StatusText(res.StatusCode), string(body))
 	}
 
 	return body, nil
@@ -153,7 +154,7 @@ func (c *openshiftClient) getImage(ctx context.Context, imageStreamImageName str
 func (c *openshiftClient) convertDockerImageReference(ref string) (string, error) {
 	parts := strings.SplitN(ref, "/", 2)
 	if len(parts) != 2 {
-		return "", errors.Errorf("Invalid format of docker reference %s: missing '/'", ref)
+		return "", fmt.Errorf("Invalid format of docker reference %s: missing '/'", ref)
 	}
 	return reference.Domain(c.ref.dockerReference) + "/" + parts[1], nil
 }
@@ -292,7 +293,7 @@ func (s *openshiftImageSource) ensureImageIsResolved(ctx context.Context) error 
 		}
 	}
 	if te == nil {
-		return errors.Errorf("No matching tag found")
+		return errors.New("No matching tag found")
 	}
 	logrus.Debugf("tag event %#v", te)
 	dockerRefString, err := s.client.convertDockerImageReference(te.DockerImageReference)
@@ -437,7 +438,7 @@ func (d *openshiftImageDestination) PutSignatures(ctx context.Context, signature
 	var imageStreamImageName string
 	if instanceDigest == nil {
 		if d.imageStreamImageName == "" {
-			return errors.Errorf("Internal error: Unknown manifest digest, can't add signatures")
+			return errors.New("Internal error: Unknown manifest digest, can't add signatures")
 		}
 		imageStreamImageName = d.imageStreamImageName
 	} else {
@@ -474,7 +475,7 @@ sigExists:
 			randBytes := make([]byte, 16)
 			n, err := rand.Read(randBytes)
 			if err != nil || n != 16 {
-				return errors.Wrapf(err, "generating random signature len %d", n)
+				return perrors.Wrapf(err, "generating random signature len %d", n)
 			}
 			signatureName = fmt.Sprintf("%s@%032x", imageStreamImageName, randBytes)
 			if _, ok := existingSigNames[signatureName]; !ok {

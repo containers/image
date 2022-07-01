@@ -2,6 +2,7 @@ package docker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -21,7 +22,7 @@ import (
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -39,7 +40,7 @@ type dockerImageSource struct {
 func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerReference) (*dockerImageSource, error) {
 	registry, err := sysregistriesv2.FindRegistry(sys, ref.ref.Name())
 	if err != nil {
-		return nil, errors.Wrapf(err, "loading registries configuration")
+		return nil, perrors.Wrapf(err, "loading registries configuration")
 	}
 	if registry == nil {
 		// No configuration was found for the provided reference, so use the
@@ -96,7 +97,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 			// The paired [] at least have some chance of being unambiguous.
 			extras = append(extras, fmt.Sprintf("[%s: %v]", attempts[i].ref.String(), attempts[i].err))
 		}
-		return nil, errors.Wrapf(primary.err, "(Mirrors also failed: %s): %s", strings.Join(extras, "\n"), primary.ref.String())
+		return nil, perrors.Wrapf(primary.err, "(Mirrors also failed: %s): %s", strings.Join(extras, "\n"), primary.ref.String())
 	}
 }
 
@@ -204,7 +205,7 @@ func (s *dockerImageSource) fetchManifest(ctx context.Context, tagOrDigest strin
 	logrus.Debugf("Content-Type from manifest GET is %q", res.Header.Get("Content-Type"))
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return nil, "", errors.Wrapf(registryHTTPResponseToError(res), "reading manifest %s in %s", tagOrDigest, s.physicalRef.ref.Name())
+		return nil, "", perrors.Wrapf(registryHTTPResponseToError(res), "reading manifest %s in %s", tagOrDigest, s.physicalRef.ref.Name())
 	}
 
 	manblob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxManifestBodySize)
@@ -263,7 +264,7 @@ func (s *dockerImageSource) getExternalBlob(ctx context.Context, urls []string) 
 		resp, err = s.c.makeRequestToResolvedURL(ctx, http.MethodGet, url, nil, nil, -1, noAuth, nil)
 		if err == nil {
 			if resp.StatusCode != http.StatusOK {
-				err = errors.Errorf("error fetching external blob from %q: %d (%s)", u, resp.StatusCode, http.StatusText(resp.StatusCode))
+				err = fmt.Errorf("error fetching external blob from %q: %d (%s)", u, resp.StatusCode, http.StatusText(resp.StatusCode))
 				logrus.Debug(err)
 				resp.Body.Close()
 				continue
@@ -337,7 +338,7 @@ func handle206Response(streams chan io.ReadCloser, errs chan error, body io.Read
 	}
 	boundary, found := params["boundary"]
 	if !found {
-		errs <- errors.Errorf("could not find boundary")
+		errs <- errors.New("could not find boundary")
 		body.Close()
 		return
 	}
@@ -352,7 +353,7 @@ func handle206Response(streams chan io.ReadCloser, errs chan error, body io.Read
 				errs <- err
 			}
 			if parts != len(chunks) {
-				errs <- errors.Errorf("invalid number of chunks returned by the server")
+				errs <- errors.New("invalid number of chunks returned by the server")
 			}
 			return
 		}
@@ -443,7 +444,7 @@ func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, 
 	default:
 		err := httpResponseToError(res, "Error fetching partial blob")
 		if err == nil {
-			err = errors.Errorf("invalid status code returned when fetching blob %d (%s)", res.StatusCode, http.StatusText(res.StatusCode))
+			err = fmt.Errorf("invalid status code returned when fetching blob %d (%s)", res.StatusCode, http.StatusText(res.StatusCode))
 		}
 		res.Body.Close()
 		return nil, nil, err
@@ -491,7 +492,7 @@ func (s *dockerImageSource) GetSignatures(ctx context.Context, instanceDigest *d
 	case s.c.signatureBase != nil:
 		return s.getSignaturesFromLookaside(ctx, instanceDigest)
 	default:
-		return nil, errors.Errorf("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
+		return nil, errors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
 	}
 }
 
@@ -567,7 +568,7 @@ func (s *dockerImageSource) getOneSignature(ctx context.Context, url *url.URL) (
 		if res.StatusCode == http.StatusNotFound {
 			return nil, true, nil
 		} else if res.StatusCode != http.StatusOK {
-			return nil, false, errors.Errorf("Error reading signature from %s: status %d (%s)", url.Redacted(), res.StatusCode, http.StatusText(res.StatusCode))
+			return nil, false, fmt.Errorf("Error reading signature from %s: status %d (%s)", url.Redacted(), res.StatusCode, http.StatusText(res.StatusCode))
 		}
 		sig, err := iolimits.ReadAtMost(res.Body, iolimits.MaxSignatureBodySize)
 		if err != nil {
@@ -576,7 +577,7 @@ func (s *dockerImageSource) getOneSignature(ctx context.Context, url *url.URL) (
 		return sig, false, nil
 
 	default:
-		return nil, false, errors.Errorf("Unsupported scheme when reading signature from %s", url.Redacted())
+		return nil, false, fmt.Errorf("Unsupported scheme when reading signature from %s", url.Redacted())
 	}
 }
 
@@ -635,9 +636,9 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 	switch get.StatusCode {
 	case http.StatusOK:
 	case http.StatusNotFound:
-		return errors.Errorf("Unable to delete %v. Image may not exist or is not stored with a v2 Schema in a v2 registry", ref.ref)
+		return fmt.Errorf("Unable to delete %v. Image may not exist or is not stored with a v2 Schema in a v2 registry", ref.ref)
 	default:
-		return errors.Errorf("Failed to delete %v: %s (%v)", ref.ref, manifestBody, get.Status)
+		return fmt.Errorf("Failed to delete %v: %s (%v)", ref.ref, manifestBody, get.Status)
 	}
 
 	manifestDigest, err := manifest.Digest(manifestBody)
@@ -659,7 +660,7 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 		return err
 	}
 	if delete.StatusCode != http.StatusAccepted {
-		return errors.Errorf("Failed to delete %v: %s (%v)", deletePath, string(body), delete.Status)
+		return fmt.Errorf("Failed to delete %v: %s (%v)", deletePath, string(body), delete.Status)
 	}
 
 	for i := 0; ; i++ {

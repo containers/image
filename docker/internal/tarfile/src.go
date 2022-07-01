@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -16,7 +18,7 @@ import (
 	"github.com/containers/image/v5/pkg/compression"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 )
 
 // Source is a partial implementation of types.ImageSource for reading from tarPath.
@@ -79,10 +81,10 @@ func (s *Source) ensureCachedDataIsPresentPrivate() error {
 	}
 	var parsedConfig manifest.Schema2Image // There's a lot of info there, but we only really care about layer DiffIDs.
 	if err := json.Unmarshal(configBytes, &parsedConfig); err != nil {
-		return errors.Wrapf(err, "decoding tar config %s", tarManifest.Config)
+		return perrors.Wrapf(err, "decoding tar config %s", tarManifest.Config)
 	}
 	if parsedConfig.RootFS == nil {
-		return errors.Errorf("Invalid image config (rootFS is not set): %s", tarManifest.Config)
+		return fmt.Errorf("Invalid image config (rootFS is not set): %s", tarManifest.Config)
 	}
 
 	knownLayers, err := s.prepareLayerData(tarManifest, &parsedConfig)
@@ -115,7 +117,7 @@ func (s *Source) TarManifest() []ManifestItem {
 func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manifest.Schema2Image) (map[digest.Digest]*layerInfo, error) {
 	// Collect layer data available in manifest and config.
 	if len(tarManifest.Layers) != len(parsedConfig.RootFS.DiffIDs) {
-		return nil, errors.Errorf("Inconsistent layer count: %d in manifest, %d in config", len(tarManifest.Layers), len(parsedConfig.RootFS.DiffIDs))
+		return nil, fmt.Errorf("Inconsistent layer count: %d in manifest, %d in config", len(tarManifest.Layers), len(parsedConfig.RootFS.DiffIDs))
 	}
 	knownLayers := map[digest.Digest]*layerInfo{}
 	unknownLayerSizes := map[string]*layerInfo{} // Points into knownLayers, a "to do list" of items with unknown sizes.
@@ -128,7 +130,7 @@ func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manif
 		}
 		layerPath := path.Clean(tarManifest.Layers[i])
 		if _, ok := unknownLayerSizes[layerPath]; ok {
-			return nil, errors.Errorf("Layer tarfile %s used for two different DiffID values", layerPath)
+			return nil, fmt.Errorf("Layer tarfile %s used for two different DiffID values", layerPath)
 		}
 		li := &layerInfo{ // A new element in each iteration
 			path: layerPath,
@@ -163,7 +165,7 @@ func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manif
 			// the slower method of checking if it's compressed.
 			uncompressedStream, isCompressed, err := compression.AutoDecompress(t)
 			if err != nil {
-				return nil, errors.Wrapf(err, "auto-decompressing %s to determine its size", layerPath)
+				return nil, perrors.Wrapf(err, "auto-decompressing %s to determine its size", layerPath)
 			}
 			defer uncompressedStream.Close()
 
@@ -171,7 +173,7 @@ func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manif
 			if isCompressed {
 				uncompressedSize, err = io.Copy(io.Discard, uncompressedStream)
 				if err != nil {
-					return nil, errors.Wrapf(err, "reading %s to find its size", layerPath)
+					return nil, perrors.Wrapf(err, "reading %s to find its size", layerPath)
 				}
 			}
 			li.size = uncompressedSize
@@ -179,7 +181,7 @@ func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manif
 		}
 	}
 	if len(unknownLayerSizes) != 0 {
-		return nil, errors.Errorf("Some layer tarfiles are missing in the tarball") // This could do with a better error reporting, if this ever happened in practice.
+		return nil, errors.New("Some layer tarfiles are missing in the tarball") // This could do with a better error reporting, if this ever happened in practice.
 	}
 
 	return knownLayers, nil
@@ -213,7 +215,7 @@ func (s *Source) GetManifest(ctx context.Context, instanceDigest *digest.Digest)
 		for _, diffID := range s.orderedDiffIDList {
 			li, ok := s.knownLayers[diffID]
 			if !ok {
-				return nil, "", errors.Errorf("Internal inconsistency: Information about layer %s missing", diffID)
+				return nil, "", fmt.Errorf("Internal inconsistency: Information about layer %s missing", diffID)
 			}
 			m.LayersDescriptors = append(m.LayersDescriptors, manifest.Schema2Descriptor{
 				Digest:    diffID, // diffID is a digest of the uncompressed tarball
@@ -291,7 +293,7 @@ func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo, cache types.B
 
 		uncompressedStream, _, err := compression.AutoDecompress(underlyingStream)
 		if err != nil {
-			return nil, 0, errors.Wrapf(err, "auto-decompressing blob %s", info.Digest)
+			return nil, 0, perrors.Wrapf(err, "auto-decompressing blob %s", info.Digest)
 		}
 
 		newStream := uncompressedReadCloser{
@@ -304,7 +306,7 @@ func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo, cache types.B
 		return newStream, li.size, nil
 	}
 
-	return nil, 0, errors.Errorf("Unknown blob %s", info.Digest)
+	return nil, 0, fmt.Errorf("Unknown blob %s", info.Digest)
 }
 
 // GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
@@ -313,7 +315,7 @@ func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo, cache types.B
 func (s *Source) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
 	if instanceDigest != nil {
 		// How did we even get here? GetManifest(ctx, nil) has returned a manifest.DockerV2Schema2MediaType.
-		return nil, errors.Errorf(`Manifest lists are not supported by "docker-daemon:"`)
+		return nil, errors.New(`Manifest lists are not supported by "docker-daemon:"`)
 	}
 	return [][]byte{}, nil
 }

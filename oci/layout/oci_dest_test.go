@@ -3,6 +3,7 @@ package layout
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -12,7 +13,6 @@ import (
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -50,7 +50,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 			}
 			return len(p), nil
 		}
-		return 0, errors.Errorf(digestErrorString)
+		return 0, errors.New(digestErrorString)
 	})
 
 	dest, err := ref.NewImageDestination(context.Background(), nil)

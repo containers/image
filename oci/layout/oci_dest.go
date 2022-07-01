@@ -3,6 +3,8 @@ package layout
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -14,7 +16,6 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	imgspec "github.com/opencontainers/image-spec/specs-go"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 type ociImageDestination struct {
@@ -81,7 +82,7 @@ func (d *ociImageDestination) SupportedManifestMIMETypes() []string {
 // SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
 // Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
 func (d *ociImageDestination) SupportsSignatures(ctx context.Context) error {
-	return errors.Errorf("Pushing signatures for OCI images is not supported")
+	return errors.New("Pushing signatures for OCI images is not supported")
 }
 
 func (d *ociImageDestination) DesiredLayerCompression() types.LayerCompression {
@@ -146,7 +147,7 @@ func (d *ociImageDestination) PutBlob(ctx context.Context, stream io.Reader, inp
 	}
 	blobDigest := digester.Digest()
 	if inputInfo.Size != -1 && size != inputInfo.Size {
-		return types.BlobInfo{}, errors.Errorf("Size mismatch when copying %s, expected %d, got %d", blobDigest, inputInfo.Size, size)
+		return types.BlobInfo{}, fmt.Errorf("Size mismatch when copying %s, expected %d, got %d", blobDigest, inputInfo.Size, size)
 	}
 	if err := blobFile.Sync(); err != nil {
 		return types.BlobInfo{}, err
@@ -191,7 +192,7 @@ func (d *ociImageDestination) PutBlob(ctx context.Context, stream io.Reader, inp
 // May use and/or update cache.
 func (d *ociImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
-		return false, types.BlobInfo{}, errors.Errorf(`"Can not check for a blob with unknown digest`)
+		return false, types.BlobInfo{}, errors.New("Can not check for a blob with unknown digest")
 	}
 	blobPath, err := d.ref.blobPath(info.Digest, d.sharedBlobDir)
 	if err != nil {
@@ -295,7 +296,7 @@ func (d *ociImageDestination) addManifest(desc *imgspecv1.Descriptor) {
 // (when the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
 func (d *ociImageDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
 	if len(signatures) != 0 {
-		return errors.Errorf("Pushing signatures for OCI images is not supported")
+		return errors.New("Pushing signatures for OCI images is not supported")
 	}
 	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -30,7 +31,6 @@ import (
 	"github.com/containers/storage/pkg/ioutils"
 	"github.com/containers/storage/pkg/reexec"
 	ddigest "github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -728,7 +728,7 @@ func TestDuplicateID(t *testing.T) {
 		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
 		signatures:     nil,
 	}
-	if err := dest.Commit(context.Background(), &unparsedToplevel); errors.Cause(err) != storage.ErrDuplicateID {
+	if err := dest.Commit(context.Background(), &unparsedToplevel); !errors.Is(err, storage.ErrDuplicateID) {
 		if err != nil {
 			t.Fatalf("Wrong error committing changes to destination, second pass: %v", err)
 		}
@@ -830,7 +830,7 @@ func TestDuplicateNameID(t *testing.T) {
 		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
 		signatures:     nil,
 	}
-	if err := dest.Commit(context.Background(), &unparsedToplevel); errors.Cause(err) != storage.ErrDuplicateID {
+	if err := dest.Commit(context.Background(), &unparsedToplevel); !errors.Is(err, storage.ErrDuplicateID) {
 		if err != nil {
 			t.Fatalf("Wrong error committing changes to destination, second pass: %v", err)
 		}

@@ -2,12 +2,14 @@ package copy
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 
 	"github.com/containers/image/v5/internal/private"
 	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,7 +36,7 @@ func (ic *imageCopier) copyBlobFromStream(ctx context.Context, srcReader io.Read
 	// read stream to the end, and validation does not happen.
 	digestingReader, err := newDigestingReader(stream.reader, srcInfo.Digest)
 	if err != nil {
-		return types.BlobInfo{}, errors.Wrapf(err, "preparing to verify blob %s", srcInfo.Digest)
+		return types.BlobInfo{}, perrors.Wrapf(err, "preparing to verify blob %s", srcInfo.Digest)
 	}
 	stream.reader = digestingReader
 
@@ -105,7 +107,7 @@ func (ic *imageCopier) copyBlobFromStream(ctx context.Context, srcReader io.Read
 	}
 	uploadedInfo, err := ic.c.dest.PutBlobWithOptions(ctx, &errorAnnotationReader{stream.reader}, stream.info, options)
 	if err != nil {
-		return types.BlobInfo{}, errors.Wrap(err, "writing blob")
+		return types.BlobInfo{}, perrors.Wrap(err, "writing blob")
 	}
 
 	uploadedInfo.Annotations = stream.info.Annotations
@@ -124,15 +126,15 @@ func (ic *imageCopier) copyBlobFromStream(ctx context.Context, srcReader io.Read
 		logrus.Debugf("Consuming rest of the original blob to satisfy getOriginalLayerCopyWriter")
 		_, err := io.Copy(io.Discard, originalLayerReader)
 		if err != nil {
-			return types.BlobInfo{}, errors.Wrapf(err, "reading input blob %s", srcInfo.Digest)
+			return types.BlobInfo{}, perrors.Wrapf(err, "reading input blob %s", srcInfo.Digest)
 		}
 	}
 
 	if digestingReader.validationFailed { // Coverage: This should never happen.
-		return types.BlobInfo{}, errors.Errorf("Internal error writing blob %s, digest verification failed but was ignored", srcInfo.Digest)
+		return types.BlobInfo{}, fmt.Errorf("Internal error writing blob %s, digest verification failed but was ignored", srcInfo.Digest)
 	}
 	if stream.info.Digest != "" && uploadedInfo.Digest != stream.info.Digest {
-		return types.BlobInfo{}, errors.Errorf("Internal error writing blob %s, blob with digest %s saved with digest %s", srcInfo.Digest, stream.info.Digest, uploadedInfo.Digest)
+		return types.BlobInfo{}, fmt.Errorf("Internal error writing blob %s, blob with digest %s saved with digest %s", srcInfo.Digest, stream.info.Digest, uploadedInfo.Digest)
 	}
 	if digestingReader.validationSucceeded {
 		if err := compressionStep.recordValidatedDigestData(ic.c, uploadedInfo, srcInfo, encryptionStep, decryptionStep); err != nil {
@@ -164,7 +166,7 @@ type errorAnnotationReader struct {
 func (r errorAnnotationReader) Read(b []byte) (n int, err error) {
 	n, err = r.reader.Read(b)
 	if err != io.EOF {
-		return n, errors.Wrapf(err, "happened during read")
+		return n, perrors.Wrapf(err, "happened during read")
 	}
 	return n, err
 }

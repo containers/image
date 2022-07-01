@@ -2,13 +2,15 @@ package daemon
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 
 	"github.com/containers/image/v5/docker/internal/tarfile"
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/types"
 	"github.com/docker/docker/client"
-	"github.com/pkg/errors"
+	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -28,11 +30,11 @@ type daemonImageDestination struct {
 // newImageDestination returns a types.ImageDestination for the specified image reference.
 func newImageDestination(ctx context.Context, sys *types.SystemContext, ref daemonReference) (types.ImageDestination, error) {
 	if ref.ref == nil {
-		return nil, errors.Errorf("Invalid destination docker-daemon:%s: a destination must be a name:tag", ref.StringWithinTransport())
+		return nil, fmt.Errorf("Invalid destination docker-daemon:%s: a destination must be a name:tag", ref.StringWithinTransport())
 	}
 	namedTaggedRef, ok := ref.ref.(reference.NamedTagged)
 	if !ok {
-		return nil, errors.Errorf("Invalid destination docker-daemon:%s: a destination must be a name:tag", ref.StringWithinTransport())
+		return nil, fmt.Errorf("Invalid destination docker-daemon:%s: a destination must be a name:tag", ref.StringWithinTransport())
 	}
 
 	var mustMatchRuntimeOS = true
@@ -42,7 +44,7 @@ func newImageDestination(ctx context.Context, sys *types.SystemContext, ref daem
 
 	c, err := newDockerClient(sys)
 	if err != nil {
-		return nil, errors.Wrap(err, "initializing docker engine client")
+		return nil, perrors.Wrap(err, "initializing docker engine client")
 	}
 
 	reader, writer := io.Pipe()
@@ -84,7 +86,7 @@ func imageLoadGoroutine(ctx context.Context, c *client.Client, reader *io.PipeRe
 
 	resp, err := c.ImageLoad(ctx, reader, true)
 	if err != nil {
-		err = errors.Wrap(err, "saving image to docker engine")
+		err = perrors.Wrap(err, "saving image to docker engine")
 		return
 	}
 	defer resp.Body.Close()
