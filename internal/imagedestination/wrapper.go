@@ -9,6 +9,12 @@ import (
 	"github.com/containers/image/v5/types"
 )
 
+// wrapped provides the private.ImageDestination operations
+// for a destination that only implements types.ImageDestination
+type wrapped struct {
+	types.ImageDestination
+}
+
 // FromPublic(dest) returns an object that provides the private.ImageDestination API
 //
 // Eventually, we might want to expose this function, and methods of the returned object,
@@ -24,12 +30,6 @@ func FromPublic(dest types.ImageDestination) private.ImageDestination {
 		return dest2
 	}
 	return &wrapped{ImageDestination: dest}
-}
-
-// wrapped provides the private.ImageDestination operations
-// for a destination that only implements types.ImageDestination
-type wrapped struct {
-	types.ImageDestination
 }
 
 // SupportsPutBlobPartial returns true if PutBlobPartial is supported.
