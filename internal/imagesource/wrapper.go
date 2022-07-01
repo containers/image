@@ -1,10 +1,7 @@
 package imagesource
 
 import (
-	"context"
-	"fmt"
-	"io"
-
+	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
 )
@@ -12,6 +9,8 @@ import (
 // wrapped provides the private.ImageSource operations
 // for a source that only implements types.ImageSource
 type wrapped struct {
+	stubs.NoGetBlobAtInitialize
+
 	types.ImageSource
 }
 
@@ -29,19 +28,9 @@ func FromPublic(src types.ImageSource) private.ImageSource {
 	if src2, ok := src.(private.ImageSource); ok {
 		return src2
 	}
-	return &wrapped{ImageSource: src}
-}
+	return &wrapped{
+		NoGetBlobAtInitialize: stubs.NoGetBlobAt(src.Reference()),
 
-// SupportsGetBlobAt() returns true if GetBlobAt (BlobChunkAccessor) is supported.
-func (w *wrapped) SupportsGetBlobAt() bool {
-	return false
-}
-
-// GetBlobAt returns a sequential channel of readers that contain data for the requested
-// blob chunks, and a channel that might get a single error value.
-// The specified chunks must be not overlapping and sorted by their offset.
-// The readers must be fully consumed, in the order they are returned, before blocking
-// to read the next chunk.
-func (w *wrapped) GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []private.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
-	return nil, nil, fmt.Errorf("internal error: GetBlobAt is not supported by the %q transport", w.Reference().Transport().Name())
+		ImageSource: src,
+	}
 }
