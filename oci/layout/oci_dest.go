@@ -53,6 +53,10 @@ func newImageDestination(sys *types.SystemContext, ref ociReference) (private.Im
 
 	d := &ociImageDestination{
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			SupportedManifestMIMETypes: []string{
+				imgspecv1.MediaTypeImageManifest,
+				imgspecv1.MediaTypeImageIndex,
+			},
 			MustMatchRuntimeOS:             false,
 			IgnoresEmbeddedDockerReference: false, // N/A, DockerReference() returns nil.
 			HasThreadSafePutBlob:           true,
@@ -90,13 +94,6 @@ func (d *ociImageDestination) Reference() types.ImageReference {
 // Close removes resources associated with an initialized ImageDestination, if any.
 func (d *ociImageDestination) Close() error {
 	return nil
-}
-
-func (d *ociImageDestination) SupportedManifestMIMETypes() []string {
-	return []string{
-		imgspecv1.MediaTypeImageManifest,
-		imgspecv1.MediaTypeImageIndex,
-	}
 }
 
 func (d *ociImageDestination) DesiredLayerCompression() types.LayerCompression {

@@ -42,6 +42,9 @@ func NewDestination(sys *types.SystemContext, archive *Writer, transportName str
 	}
 	dest := &Destination{
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			SupportedManifestMIMETypes: []string{
+				manifest.DockerV2Schema2MediaType, // We rely on the types.Image.UpdatedImage schema conversion capabilities.
+			},
 			MustMatchRuntimeOS:             false,
 			IgnoresEmbeddedDockerReference: false, // N/A, we only accept schema2 images where EmbeddedDockerReferenceConflicts() is always false.
 			// The code _is_ actually thread-safe, but apart from computing sizes/digests of layers where
@@ -63,14 +66,6 @@ func NewDestination(sys *types.SystemContext, archive *Writer, transportName str
 // AddRepoTags adds the specified tags to the destination's repoTags.
 func (d *Destination) AddRepoTags(tags []reference.NamedTagged) {
 	d.repoTags = append(d.repoTags, tags...)
-}
-
-// SupportedManifestMIMETypes tells which manifest mime types the destination supports
-// If an empty slice or nil it's returned, then any mime type can be tried to upload
-func (d *Destination) SupportedManifestMIMETypes() []string {
-	return []string{
-		manifest.DockerV2Schema2MediaType, // We rely on the types.Image.UpdatedImage schema conversion capabilities.
-	}
 }
 
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually

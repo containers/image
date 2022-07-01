@@ -408,6 +408,12 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 	}
 	dest := &storageImageDestination{
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			SupportedManifestMIMETypes: []string{
+				imgspecv1.MediaTypeImageManifest,
+				manifest.DockerV2Schema2MediaType,
+				manifest.DockerV2Schema1SignedMediaType,
+				manifest.DockerV2Schema1MediaType,
+			},
 			MustMatchRuntimeOS:             true,
 			IgnoresEmbeddedDockerReference: true, // Yes, we want the unmodified manifest
 			HasThreadSafePutBlob:           true,
@@ -1186,17 +1192,6 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 
 	commitSucceeded = true
 	return nil
-}
-
-var manifestMIMETypes = []string{
-	imgspecv1.MediaTypeImageManifest,
-	manifest.DockerV2Schema2MediaType,
-	manifest.DockerV2Schema1SignedMediaType,
-	manifest.DockerV2Schema1MediaType,
-}
-
-func (s *storageImageDestination) SupportedManifestMIMETypes() []string {
-	return manifestMIMETypes
 }
 
 // PutManifest writes the manifest to the destination.

@@ -49,8 +49,19 @@ func newImageDestination(sys *types.SystemContext, ref dockerReference) (private
 	if err != nil {
 		return nil, err
 	}
+	mimeTypes := []string{
+		imgspecv1.MediaTypeImageManifest,
+		manifest.DockerV2Schema2MediaType,
+		imgspecv1.MediaTypeImageIndex,
+		manifest.DockerV2ListMediaType,
+	}
+	if c.sys == nil || !c.sys.DockerDisableDestSchema1MIMETypes {
+		mimeTypes = append(mimeTypes, manifest.DockerV2Schema1SignedMediaType, manifest.DockerV2Schema1MediaType)
+	}
+
 	dest := &dockerImageDestination{
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			SupportedManifestMIMETypes:     mimeTypes,
 			MustMatchRuntimeOS:             false,
 			IgnoresEmbeddedDockerReference: false, // We do want the manifest updated; older registry versions refuse manifests if the embedded reference does not match.
 			HasThreadSafePutBlob:           true,
@@ -73,19 +84,6 @@ func (d *dockerImageDestination) Reference() types.ImageReference {
 // Close removes resources associated with an initialized ImageDestination, if any.
 func (d *dockerImageDestination) Close() error {
 	return nil
-}
-
-func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
-	mimeTypes := []string{
-		imgspecv1.MediaTypeImageManifest,
-		manifest.DockerV2Schema2MediaType,
-		imgspecv1.MediaTypeImageIndex,
-		manifest.DockerV2ListMediaType,
-	}
-	if d.c.sys == nil || !d.c.sys.DockerDisableDestSchema1MIMETypes {
-		mimeTypes = append(mimeTypes, manifest.DockerV2Schema1SignedMediaType, manifest.DockerV2Schema1MediaType)
-	}
-	return mimeTypes
 }
 
 // SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.

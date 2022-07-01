@@ -3,6 +3,9 @@ package impl
 // Properties collects properties of an ImageDestination that are constant throughout its lifetime
 // (but might differ across instances).
 type Properties struct {
+	// SupportedManifestMIMETypes tells which manifest MIME types the destination supports.
+	// A empty slice or nil means any MIME type can be tried to upload.
+	SupportedManifestMIMETypes []string
 	// MustMatchRuntimeOS is set to true if the destination can store only images targeted for the current runtime architecture and OS.
 	MustMatchRuntimeOS bool
 	// IgnoresEmbeddedDockerReference is set to true if the destination does not care about Image.EmbeddedDockerReferenceConflicts(),
@@ -25,6 +28,12 @@ func PropertyMethods(vals Properties) PropertyMethodsInitialize {
 	return PropertyMethodsInitialize{
 		vals: vals,
 	}
+}
+
+// SupportedManifestMIMETypes tells which manifest mime types the destination supports
+// If an empty slice or nil it's returned, then any mime type can be tried to upload
+func (o PropertyMethodsInitialize) SupportedManifestMIMETypes() []string {
+	return o.vals.SupportedManifestMIMETypes
 }
 
 // MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime architecture and OS. False otherwise.

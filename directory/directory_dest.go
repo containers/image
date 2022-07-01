@@ -101,6 +101,7 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (private.Im
 
 	d := &dirImageDestination{
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			SupportedManifestMIMETypes:     nil,
 			MustMatchRuntimeOS:             false,
 			IgnoresEmbeddedDockerReference: false, // N/A, DockerReference() returns nil.
 			HasThreadSafePutBlob:           false,
@@ -122,10 +123,6 @@ func (d *dirImageDestination) Reference() types.ImageReference {
 
 // Close removes resources associated with an initialized ImageDestination, if any.
 func (d *dirImageDestination) Close() error {
-	return nil
-}
-
-func (d *dirImageDestination) SupportedManifestMIMETypes() []string {
 	return nil
 }
 
