@@ -27,7 +27,7 @@ type Destination struct {
 }
 
 // NewDestination returns a tarfile.Destination adding images to the specified Writer.
-func NewDestination(sys *types.SystemContext, archive *Writer, ref reference.NamedTagged) *Destination {
+func NewDestination(sys *types.SystemContext, archive *Writer, transportName string, ref reference.NamedTagged) *Destination {
 	repoTags := []reference.NamedTagged{}
 	if ref != nil {
 		repoTags = append(repoTags, ref)
