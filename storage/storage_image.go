@@ -418,6 +418,7 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 			// and need to explicitly ask for it here, so that the layers' MIME
 			// types can be set accordingly.
 			DesiredLayerCompression:        types.PreserveOriginal,
+			AcceptsForeignLayerURLs:        false,
 			MustMatchRuntimeOS:             true,
 			IgnoresEmbeddedDockerReference: true, // Yes, we want the unmodified manifest
 			HasThreadSafePutBlob:           true,
@@ -1202,12 +1203,6 @@ func (s *storageImageDestination) PutManifest(ctx context.Context, manifestBlob 
 	s.manifest = newBlob
 	s.manifestDigest = digest
 	return nil
-}
-
-// AcceptsForeignLayerURLs returns false iff foreign layers in the manifest should actually be
-// uploaded to the image destination, true otherwise.
-func (s *storageImageDestination) AcceptsForeignLayerURLs() bool {
-	return false
 }
 
 // PutSignatures records the image's signatures for committing as a single data blob.

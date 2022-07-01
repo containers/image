@@ -94,6 +94,7 @@ func newImageDestination(ref ostreeReference, tmpDirPath string) (private.ImageD
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
 			SupportedManifestMIMETypes:     []string{manifest.DockerV2Schema2MediaType},
 			DesiredLayerCompression:        types.PreserveOriginal,
+			AcceptsForeignLayerURLs:        false,
 			MustMatchRuntimeOS:             true,
 			IgnoresEmbeddedDockerReference: false, // N/A, DockerReference() returns nil.
 			HasThreadSafePutBlob:           false,
@@ -125,12 +126,6 @@ func (d *ostreeImageDestination) Close() error {
 		C.g_object_unref(C.gpointer(d.repo))
 	}
 	return os.RemoveAll(d.tmpDirPath)
-}
-
-// AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
-// uploaded to the image destination, true otherwise.
-func (d *ostreeImageDestination) AcceptsForeignLayerURLs() bool {
-	return false
 }
 
 // PutBlobWithOptions writes contents of stream and returns data representing the result.

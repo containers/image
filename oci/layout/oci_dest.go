@@ -62,6 +62,7 @@ func newImageDestination(sys *types.SystemContext, ref ociReference) (private.Im
 				imgspecv1.MediaTypeImageIndex,
 			},
 			DesiredLayerCompression:        desiredLayerCompression,
+			AcceptsForeignLayerURLs:        true,
 			MustMatchRuntimeOS:             false,
 			IgnoresEmbeddedDockerReference: false, // N/A, DockerReference() returns nil.
 			HasThreadSafePutBlob:           true,
@@ -98,12 +99,6 @@ func (d *ociImageDestination) Reference() types.ImageReference {
 // Close removes resources associated with an initialized ImageDestination, if any.
 func (d *ociImageDestination) Close() error {
 	return nil
-}
-
-// AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
-// uploaded to the image destination, true otherwise.
-func (d *ociImageDestination) AcceptsForeignLayerURLs() bool {
-	return true
 }
 
 // PutBlobWithOptions writes contents of stream and returns data representing the result.

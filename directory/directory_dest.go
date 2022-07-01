@@ -102,6 +102,7 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (private.Im
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
 			SupportedManifestMIMETypes:     nil,
 			DesiredLayerCompression:        desiredLayerCompression,
+			AcceptsForeignLayerURLs:        false,
 			MustMatchRuntimeOS:             false,
 			IgnoresEmbeddedDockerReference: false, // N/A, DockerReference() returns nil.
 			HasThreadSafePutBlob:           false,
@@ -123,12 +124,6 @@ func (d *dirImageDestination) Reference() types.ImageReference {
 // Close removes resources associated with an initialized ImageDestination, if any.
 func (d *dirImageDestination) Close() error {
 	return nil
-}
-
-// AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
-// uploaded to the image destination, true otherwise.
-func (d *dirImageDestination) AcceptsForeignLayerURLs() bool {
-	return false
 }
 
 // PutBlobWithOptions writes contents of stream and returns data representing the result.

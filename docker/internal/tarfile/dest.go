@@ -46,6 +46,7 @@ func NewDestination(sys *types.SystemContext, archive *Writer, transportName str
 				manifest.DockerV2Schema2MediaType, // We rely on the types.Image.UpdatedImage schema conversion capabilities.
 			},
 			DesiredLayerCompression:        types.Decompress,
+			AcceptsForeignLayerURLs:        false,
 			MustMatchRuntimeOS:             false,
 			IgnoresEmbeddedDockerReference: false, // N/A, we only accept schema2 images where EmbeddedDockerReferenceConflicts() is always false.
 			// The code _is_ actually thread-safe, but apart from computing sizes/digests of layers where
@@ -67,12 +68,6 @@ func NewDestination(sys *types.SystemContext, archive *Writer, transportName str
 // AddRepoTags adds the specified tags to the destination's repoTags.
 func (d *Destination) AddRepoTags(tags []reference.NamedTagged) {
 	d.repoTags = append(d.repoTags, tags...)
-}
-
-// AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
-// uploaded to the image destination, true otherwise.
-func (d *Destination) AcceptsForeignLayerURLs() bool {
-	return false
 }
 
 // PutBlobWithOptions writes contents of stream and returns data representing the result.

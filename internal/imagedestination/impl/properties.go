@@ -10,6 +10,9 @@ type Properties struct {
 	SupportedManifestMIMETypes []string
 	// DesiredLayerCompression indicates the kind of compression to apply on layers
 	DesiredLayerCompression types.LayerCompression
+	// AcceptsForeignLayerURLs is false if foreign layers in manifest should be actually
+	// uploaded to the image destination, true otherwise.
+	AcceptsForeignLayerURLs bool
 	// MustMatchRuntimeOS is set to true if the destination can store only images targeted for the current runtime architecture and OS.
 	MustMatchRuntimeOS bool
 	// IgnoresEmbeddedDockerReference is set to true if the destination does not care about Image.EmbeddedDockerReferenceConflicts(),
@@ -43,6 +46,12 @@ func (o PropertyMethodsInitialize) SupportedManifestMIMETypes() []string {
 // DesiredLayerCompression indicates the kind of compression to apply on layers
 func (o PropertyMethodsInitialize) DesiredLayerCompression() types.LayerCompression {
 	return o.vals.DesiredLayerCompression
+}
+
+// AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
+// uploaded to the image destination, true otherwise.
+func (o PropertyMethodsInitialize) AcceptsForeignLayerURLs() bool {
+	return o.vals.AcceptsForeignLayerURLs
 }
 
 // MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime architecture and OS. False otherwise.
