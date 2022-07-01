@@ -24,6 +24,7 @@ import (
 type ociImageDestination struct {
 	impl.Compat
 	stubs.NoPutBlobPartialInitialize
+	stubs.NoSignaturesInitialize
 
 	ref                      ociReference
 	index                    imgspecv1.Index
@@ -51,6 +52,7 @@ func newImageDestination(sys *types.SystemContext, ref ociReference) (private.Im
 
 	d := &ociImageDestination{
 		NoPutBlobPartialInitialize: stubs.NoPutBlobPartial(ref),
+		NoSignaturesInitialize:     stubs.NoSignatures("Pushing signatures for OCI images is not supported"),
 
 		ref:   ref,
 		index: *index,
@@ -89,12 +91,6 @@ func (d *ociImageDestination) SupportedManifestMIMETypes() []string {
 		imgspecv1.MediaTypeImageManifest,
 		imgspecv1.MediaTypeImageIndex,
 	}
-}
-
-// SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
-// Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
-func (d *ociImageDestination) SupportsSignatures(ctx context.Context) error {
-	return errors.New("Pushing signatures for OCI images is not supported")
 }
 
 func (d *ociImageDestination) DesiredLayerCompression() types.LayerCompression {
@@ -298,16 +294,6 @@ func (d *ociImageDestination) addManifest(desc *imgspecv1.Descriptor) {
 	}
 	// It's a new entry to be added to the index.
 	d.index.Manifests = append(d.index.Manifests, *desc)
-}
-
-// PutSignatures would add the given signatures to the oci layout (currently not supported).
-// If instanceDigest is not nil, it contains a digest of the specific manifest instance to write or overwrite the signatures for
-// (when the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
-func (d *ociImageDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
-	if len(signatures) != 0 {
-		return errors.New("Pushing signatures for OCI images is not supported")
-	}
-	return nil
 }
 
 // Commit marks the process of storing the image as successful and asks for the image to be persisted.

@@ -17,6 +17,7 @@ import (
 	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/imagedestination"
 	"github.com/containers/image/v5/internal/imagedestination/impl"
+	"github.com/containers/image/v5/internal/imagedestination/stubs"
 	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
@@ -320,6 +321,7 @@ func (s *openshiftImageSource) ensureImageIsResolved(ctx context.Context) error 
 
 type openshiftImageDestination struct {
 	impl.Compat
+	stubs.AlwaysSupportsSignatures
 
 	client *openshiftClient
 	docker private.ImageDestination // The docker/distribution API endpoint
@@ -368,12 +370,6 @@ func (d *openshiftImageDestination) Close() error {
 
 func (d *openshiftImageDestination) SupportedManifestMIMETypes() []string {
 	return d.docker.SupportedManifestMIMETypes()
-}
-
-// SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
-// Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
-func (d *openshiftImageDestination) SupportsSignatures(ctx context.Context) error {
-	return nil
 }
 
 func (d *openshiftImageDestination) DesiredLayerCompression() types.LayerCompression {

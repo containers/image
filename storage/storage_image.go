@@ -65,6 +65,7 @@ type storageImageSource struct {
 type storageImageDestination struct {
 	impl.Compat
 	stubs.ImplementsPutBlobPartial
+	stubs.AlwaysSupportsSignatures
 
 	imageRef        storageReference
 	directory       string                   // Temporary directory where we store blobs until Commit() time
@@ -1206,12 +1207,6 @@ func (s *storageImageDestination) PutManifest(ctx context.Context, manifestBlob 
 	copy(newBlob, manifestBlob)
 	s.manifest = newBlob
 	s.manifestDigest = digest
-	return nil
-}
-
-// SupportsSignatures returns an error if we can't expect GetSignatures() to return data that was
-// previously supplied to PutSignatures().
-func (s *storageImageDestination) SupportsSignatures(ctx context.Context) error {
 	return nil
 }
 

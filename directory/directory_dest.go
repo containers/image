@@ -28,6 +28,7 @@ var ErrNotContainerImageDir = errors.New("not a containers image directory, don'
 type dirImageDestination struct {
 	impl.Compat
 	stubs.NoPutBlobPartialInitialize
+	stubs.AlwaysSupportsSignatures
 
 	ref                     dirReference
 	desiredLayerCompression types.LayerCompression
@@ -119,12 +120,6 @@ func (d *dirImageDestination) Close() error {
 }
 
 func (d *dirImageDestination) SupportedManifestMIMETypes() []string {
-	return nil
-}
-
-// SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
-// Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
-func (d *dirImageDestination) SupportsSignatures(ctx context.Context) error {
 	return nil
 }
 

@@ -24,6 +24,7 @@ import (
 type Destination struct {
 	impl.Compat
 	stubs.NoPutBlobPartialInitialize
+	stubs.NoSignaturesInitialize
 
 	archive  *Writer
 	repoTags []reference.NamedTagged
@@ -40,6 +41,7 @@ func NewDestination(sys *types.SystemContext, archive *Writer, transportName str
 	}
 	dest := &Destination{
 		NoPutBlobPartialInitialize: stubs.NoPutBlobPartialRaw(transportName),
+		NoSignaturesInitialize:     stubs.NoSignatures("Storing signatures for docker tar files is not supported"),
 
 		archive:  archive,
 		repoTags: repoTags,
@@ -60,12 +62,6 @@ func (d *Destination) SupportedManifestMIMETypes() []string {
 	return []string{
 		manifest.DockerV2Schema2MediaType, // We rely on the types.Image.UpdatedImage schema conversion capabilities.
 	}
-}
-
-// SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
-// Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
-func (d *Destination) SupportsSignatures(ctx context.Context) error {
-	return errors.New("Storing signatures for docker tar files is not supported")
 }
 
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
@@ -193,17 +189,4 @@ func (d *Destination) PutManifest(ctx context.Context, m []byte, instanceDigest 
 	}
 
 	return d.archive.ensureManifestItemLocked(man.LayersDescriptors, man.ConfigDescriptor.Digest, d.repoTags)
-}
-
-// PutSignatures would add the given signatures to the docker tarfile (currently not supported).
-// The instanceDigest value is expected to always be nil, because this transport does not support manifest lists, so
-// there can be no secondary manifests.  MUST be called after PutManifest (signatures reference manifest contents).
-func (d *Destination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
-	if instanceDigest != nil {
-		return errors.New(`Manifest lists are not supported for docker tar files`)
-	}
-	if len(signatures) != 0 {
-		return errors.New("Storing signatures for docker tar files is not supported")
-	}
-	return nil
 }

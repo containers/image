@@ -71,6 +71,7 @@ type manifestSchema struct {
 type ostreeImageDestination struct {
 	compat impl.Compat
 	stubs.NoPutBlobPartialInitialize
+	stubs.AlwaysSupportsSignatures
 
 	ref           ostreeReference
 	manifest      string
@@ -122,12 +123,6 @@ func (d *ostreeImageDestination) SupportedManifestMIMETypes() []string {
 	return []string{
 		manifest.DockerV2Schema2MediaType,
 	}
-}
-
-// SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
-// Note: It is still possible for PutSignatures to fail if SupportsSignatures returns nil.
-func (d *ostreeImageDestination) SupportsSignatures(ctx context.Context) error {
-	return nil
 }
 
 // ShouldCompressLayers returns true iff it is desirable to compress layer blobs written to this destination.
