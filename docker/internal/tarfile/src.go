@@ -48,7 +48,7 @@ type layerInfo struct {
 // NewSource returns a tarfile.Source for an image in the specified archive matching ref
 // and sourceIndex (or the only image if they are (nil, -1)).
 // The archive will be closed if closeArchive
-func NewSource(archive *Reader, closeArchive bool, ref reference.NamedTagged, sourceIndex int) *Source {
+func NewSource(archive *Reader, closeArchive bool, transportName string, ref reference.NamedTagged, sourceIndex int) *Source {
 	return &Source{
 		archive:      archive,
 		closeArchive: closeArchive,

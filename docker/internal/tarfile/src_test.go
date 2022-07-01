@@ -47,7 +47,7 @@ func TestSourcePrepareLayerData(t *testing.T) {
 
 		reader, err := NewReaderFromStream(nil, &tarfileBuffer)
 		require.NoError(t, err, c.config)
-		src := NewSource(reader, true, nil, -1)
+		src := NewSource(reader, true, "transport name", nil, -1)
 		require.NoError(t, err, c.config)
 		defer src.Close()
 		configStream, _, err := src.GetBlob(ctx, types.BlobInfo{
