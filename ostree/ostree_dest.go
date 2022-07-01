@@ -70,6 +70,7 @@ type manifestSchema struct {
 
 type ostreeImageDestination struct {
 	compat impl.Compat
+	impl.PropertyMethodsInitialize
 	stubs.NoPutBlobPartialInitialize
 	stubs.AlwaysSupportsSignatures
 
@@ -90,6 +91,11 @@ func newImageDestination(ref ostreeReference, tmpDirPath string) (private.ImageD
 		return nil, err
 	}
 	d := &ostreeImageDestination{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			MustMatchRuntimeOS:             true,
+			IgnoresEmbeddedDockerReference: false, // N/A, DockerReference() returns nil.
+			HasThreadSafePutBlob:           false,
+		}),
 		NoPutBlobPartialInitialize: stubs.NoPutBlobPartial(ref),
 
 		ref:           ref,
@@ -133,23 +139,6 @@ func (d *ostreeImageDestination) DesiredLayerCompression() types.LayerCompressio
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
 // uploaded to the image destination, true otherwise.
 func (d *ostreeImageDestination) AcceptsForeignLayerURLs() bool {
-	return false
-}
-
-// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime architecture and OS. False otherwise.
-func (d *ostreeImageDestination) MustMatchRuntimeOS() bool {
-	return true
-}
-
-// IgnoresEmbeddedDockerReference returns true iff the destination does not care about Image.EmbeddedDockerReferenceConflicts(),
-// and would prefer to receive an unmodified manifest instead of one modified for the destination.
-// Does not make a difference if Reference().DockerReference() is nil.
-func (d *ostreeImageDestination) IgnoresEmbeddedDockerReference() bool {
-	return false // N/A, DockerReference() returns nil.
-}
-
-// HasThreadSafePutBlob indicates whether PutBlob can be executed concurrently.
-func (d *ostreeImageDestination) HasThreadSafePutBlob() bool {
 	return false
 }
 

@@ -27,6 +27,7 @@ var ErrNotContainerImageDir = errors.New("not a containers image directory, don'
 
 type dirImageDestination struct {
 	impl.Compat
+	impl.PropertyMethodsInitialize
 	stubs.NoPutBlobPartialInitialize
 	stubs.AlwaysSupportsSignatures
 
@@ -99,6 +100,11 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (private.Im
 	}
 
 	d := &dirImageDestination{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			MustMatchRuntimeOS:             false,
+			IgnoresEmbeddedDockerReference: false, // N/A, DockerReference() returns nil.
+			HasThreadSafePutBlob:           false,
+		}),
 		NoPutBlobPartialInitialize: stubs.NoPutBlobPartial(ref),
 
 		ref:                     ref,
@@ -130,23 +136,6 @@ func (d *dirImageDestination) DesiredLayerCompression() types.LayerCompression {
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
 // uploaded to the image destination, true otherwise.
 func (d *dirImageDestination) AcceptsForeignLayerURLs() bool {
-	return false
-}
-
-// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime architecture and OS. False otherwise.
-func (d *dirImageDestination) MustMatchRuntimeOS() bool {
-	return false
-}
-
-// IgnoresEmbeddedDockerReference returns true iff the destination does not care about Image.EmbeddedDockerReferenceConflicts(),
-// and would prefer to receive an unmodified manifest instead of one modified for the destination.
-// Does not make a difference if Reference().DockerReference() is nil.
-func (d *dirImageDestination) IgnoresEmbeddedDockerReference() bool {
-	return false // N/A, DockerReference() returns nil.
-}
-
-// HasThreadSafePutBlob indicates whether PutBlob can be executed concurrently.
-func (d *dirImageDestination) HasThreadSafePutBlob() bool {
 	return false
 }
 

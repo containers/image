@@ -34,6 +34,7 @@ import (
 
 type dockerImageDestination struct {
 	impl.Compat
+	impl.PropertyMethodsInitialize
 	stubs.NoPutBlobPartialInitialize
 
 	ref dockerReference
@@ -49,6 +50,11 @@ func newImageDestination(sys *types.SystemContext, ref dockerReference) (private
 		return nil, err
 	}
 	dest := &dockerImageDestination{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			MustMatchRuntimeOS:             false,
+			IgnoresEmbeddedDockerReference: false, // We do want the manifest updated; older registry versions refuse manifests if the embedded reference does not match.
+			HasThreadSafePutBlob:           true,
+		}),
 		NoPutBlobPartialInitialize: stubs.NoPutBlobPartial(ref),
 
 		ref: ref,
@@ -108,29 +114,12 @@ func (d *dockerImageDestination) AcceptsForeignLayerURLs() bool {
 	return true
 }
 
-// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime architecture and OS. False otherwise.
-func (d *dockerImageDestination) MustMatchRuntimeOS() bool {
-	return false
-}
-
-// IgnoresEmbeddedDockerReference returns true iff the destination does not care about Image.EmbeddedDockerReferenceConflicts(),
-// and would prefer to receive an unmodified manifest instead of one modified for the destination.
-// Does not make a difference if Reference().DockerReference() is nil.
-func (d *dockerImageDestination) IgnoresEmbeddedDockerReference() bool {
-	return false // We do want the manifest updated; older registry versions refuse manifests if the embedded reference does not match.
-}
-
 // sizeCounter is an io.Writer which only counts the total size of its input.
 type sizeCounter struct{ size int64 }
 
 func (c *sizeCounter) Write(p []byte) (n int, err error) {
 	c.size += int64(len(p))
 	return len(p), nil
-}
-
-// HasThreadSafePutBlob indicates whether PutBlob can be executed concurrently.
-func (d *dockerImageDestination) HasThreadSafePutBlob() bool {
-	return true
 }
 
 // PutBlobWithOptions writes contents of stream and returns data representing the result.

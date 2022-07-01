@@ -64,6 +64,7 @@ type storageImageSource struct {
 
 type storageImageDestination struct {
 	impl.Compat
+	impl.PropertyMethodsInitialize
 	stubs.ImplementsPutBlobPartial
 	stubs.AlwaysSupportsSignatures
 
@@ -406,6 +407,12 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 		return nil, perrors.Wrapf(err, "creating a temporary directory")
 	}
 	dest := &storageImageDestination{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			MustMatchRuntimeOS:             true,
+			IgnoresEmbeddedDockerReference: true, // Yes, we want the unmodified manifest
+			HasThreadSafePutBlob:           true,
+		}),
+
 		imageRef:               imageRef,
 		directory:              directory,
 		signatureses:           make(map[digest.Digest][]byte),
@@ -451,11 +458,6 @@ func (s *storageImageDestination) DesiredLayerCompression() types.LayerCompressi
 
 func (s *storageImageDestination) computeNextBlobCacheFile() string {
 	return filepath.Join(s.directory, fmt.Sprintf("%d", atomic.AddInt32(&s.nextTempFileID, 1)))
-}
-
-// HasThreadSafePutBlob indicates whether PutBlob can be executed concurrently.
-func (s *storageImageDestination) HasThreadSafePutBlob() bool {
-	return true
 }
 
 // PutBlobWithOptions writes contents of stream and returns data representing the result.
@@ -1214,18 +1216,6 @@ func (s *storageImageDestination) PutManifest(ctx context.Context, manifestBlob 
 // uploaded to the image destination, true otherwise.
 func (s *storageImageDestination) AcceptsForeignLayerURLs() bool {
 	return false
-}
-
-// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime architecture and OS. False otherwise.
-func (s *storageImageDestination) MustMatchRuntimeOS() bool {
-	return true
-}
-
-// IgnoresEmbeddedDockerReference returns true iff the destination does not care about Image.EmbeddedDockerReferenceConflicts(),
-// and would prefer to receive an unmodified manifest instead of one modified for the destination.
-// Does not make a difference if Reference().DockerReference() is nil.
-func (s *storageImageDestination) IgnoresEmbeddedDockerReference() bool {
-	return true // Yes, we want the unmodified manifest
 }
 
 // PutSignatures records the image's signatures for committing as a single data blob.

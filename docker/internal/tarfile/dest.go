@@ -23,6 +23,7 @@ import (
 // Destination is a partial implementation of private.ImageDestination for writing to an io.Writer.
 type Destination struct {
 	impl.Compat
+	impl.PropertyMethodsInitialize
 	stubs.NoPutBlobPartialInitialize
 	stubs.NoSignaturesInitialize
 
@@ -40,6 +41,14 @@ func NewDestination(sys *types.SystemContext, archive *Writer, transportName str
 		repoTags = append(repoTags, ref)
 	}
 	dest := &Destination{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			MustMatchRuntimeOS:             false,
+			IgnoresEmbeddedDockerReference: false, // N/A, we only accept schema2 images where EmbeddedDockerReferenceConflicts() is always false.
+			// The code _is_ actually thread-safe, but apart from computing sizes/digests of layers where
+			// this is unknown in advance, the actual copy is serialized by d.archive, so there probably isn’t
+			// much benefit from concurrency, mostly just extra CPU, memory and I/O contention.
+			HasThreadSafePutBlob: false,
+		}),
 		NoPutBlobPartialInitialize: stubs.NoPutBlobPartialRaw(transportName),
 		NoSignaturesInitialize:     stubs.NoSignatures("Storing signatures for docker tar files is not supported"),
 
@@ -67,26 +76,6 @@ func (d *Destination) SupportedManifestMIMETypes() []string {
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
 // uploaded to the image destination, true otherwise.
 func (d *Destination) AcceptsForeignLayerURLs() bool {
-	return false
-}
-
-// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime architecture and OS. False otherwise.
-func (d *Destination) MustMatchRuntimeOS() bool {
-	return false
-}
-
-// IgnoresEmbeddedDockerReference returns true iff the destination does not care about Image.EmbeddedDockerReferenceConflicts(),
-// and would prefer to receive an unmodified manifest instead of one modified for the destination.
-// Does not make a difference if Reference().DockerReference() is nil.
-func (d *Destination) IgnoresEmbeddedDockerReference() bool {
-	return false // N/A, we only accept schema2 images where EmbeddedDockerReferenceConflicts() is always false.
-}
-
-// HasThreadSafePutBlob indicates whether PutBlob can be executed concurrently.
-func (d *Destination) HasThreadSafePutBlob() bool {
-	// The code _is_ actually thread-safe, but apart from computing sizes/digests of layers where
-	// this is unknown in advance, the actual copy is serialized by d.archive, so there probably isn’t
-	// much benefit from concurrency, mostly just extra CPU, memory and I/O contention.
 	return false
 }
 
