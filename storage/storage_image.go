@@ -19,6 +19,7 @@ import (
 	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/image"
 	"github.com/containers/image/v5/internal/imagedestination/impl"
+	"github.com/containers/image/v5/internal/imagedestination/stubs"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/internal/tmpdir"
@@ -63,6 +64,7 @@ type storageImageSource struct {
 
 type storageImageDestination struct {
 	impl.Compat
+	stubs.ImplementsPutBlobPartial
 
 	imageRef        storageReference
 	directory       string                   // Temporary directory where we store blobs until Commit() time
@@ -1229,11 +1231,6 @@ func (s *storageImageDestination) MustMatchRuntimeOS() bool {
 // Does not make a difference if Reference().DockerReference() is nil.
 func (s *storageImageDestination) IgnoresEmbeddedDockerReference() bool {
 	return true // Yes, we want the unmodified manifest
-}
-
-// SupportsPutBlobPartial returns true if PutBlobPartial is supported.
-func (s *storageImageDestination) SupportsPutBlobPartial() bool {
-	return true
 }
 
 // PutSignatures records the image's signatures for committing as a single data blob.

@@ -42,3 +42,11 @@ func (stub NoPutBlobPartialInitialize) SupportsPutBlobPartial() bool {
 func (stub NoPutBlobPartialInitialize) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, cache blobinfocache.BlobInfoCache2) (types.BlobInfo, error) {
 	return types.BlobInfo{}, fmt.Errorf("internal error: PutBlobPartial is not supported by the %q transport", stub.transportName)
 }
+
+// ImplementsPutBlobPartial implements SupportsPutBlobPartial() that returns true.
+type ImplementsPutBlobPartial struct{}
+
+// SupportsPutBlobPartial returns true if PutBlobPartial is supported.
+func (stub ImplementsPutBlobPartial) SupportsPutBlobPartial() bool {
+	return true
+}
