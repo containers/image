@@ -26,6 +26,7 @@ import (
 // Source is a partial implementation of types.ImageSource for reading from tarPath.
 type Source struct {
 	impl.PropertyMethodsInitialize
+	impl.NoSignatures
 	impl.DoesNotAffectLayerInfosForCopy
 	stubs.NoGetBlobAtInitialize
 
@@ -313,15 +314,4 @@ func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo, cache types.B
 	}
 
 	return nil, 0, fmt.Errorf("Unknown blob %s", info.Digest)
-}
-
-// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
-// This source implementation does not support manifest lists, so the passed-in instanceDigest should always be nil,
-// as there can be no secondary manifests.
-func (s *Source) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
-	if instanceDigest != nil {
-		// How did we even get here? GetManifest(ctx, nil) has returned a manifest.DockerV2Schema2MediaType.
-		return nil, errors.New(`Manifest lists are not supported by "docker-daemon:"`)
-	}
-	return [][]byte{}, nil
 }

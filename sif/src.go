@@ -23,6 +23,7 @@ import (
 
 type sifImageSource struct {
 	impl.PropertyMethodsInitialize
+	impl.NoSignatures
 	impl.DoesNotAffectLayerInfosForCopy
 	stubs.NoGetBlobAtInitialize
 
@@ -197,15 +198,4 @@ func (s *sifImageSource) GetManifest(ctx context.Context, instanceDigest *digest
 		return nil, "", errors.New("manifest lists are not supported by the sif transport")
 	}
 	return s.manifest, imgspecv1.MediaTypeImageManifest, nil
-}
-
-// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
-// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
-// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
-// (e.g. if the source never returns manifest lists).
-func (s *sifImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
-	if instanceDigest != nil {
-		return nil, errors.New("manifest lists are not supported by the sif transport")
-	}
-	return nil, nil
 }

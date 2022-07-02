@@ -22,6 +22,7 @@ import (
 
 type tarballImageSource struct {
 	impl.PropertyMethodsInitialize
+	impl.NoSignatures
 	impl.DoesNotAffectLayerInfosForCopy
 	stubs.NoGetBlobAtInitialize
 
@@ -250,16 +251,6 @@ func (is *tarballImageSource) GetManifest(ctx context.Context, instanceDigest *d
 		return nil, "", fmt.Errorf("manifest lists are not supported by the %q transport", transportName)
 	}
 	return is.manifest, imgspecv1.MediaTypeImageManifest, nil
-}
-
-// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
-// This source implementation does not support manifest lists, so the passed-in instanceDigest should always be nil,
-// as there can be no secondary manifests.
-func (*tarballImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
-	if instanceDigest != nil {
-		return nil, fmt.Errorf("manifest lists are not supported by the %q transport", transportName)
-	}
-	return nil, nil
 }
 
 func (is *tarballImageSource) Reference() types.ImageReference {
