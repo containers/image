@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
@@ -21,6 +22,7 @@ import (
 )
 
 type ociImageSource struct {
+	impl.PropertyMethodsInitialize
 	stubs.NoGetBlobAtInitialize
 
 	ref           ociReference
@@ -53,6 +55,9 @@ func newImageSource(sys *types.SystemContext, ref ociReference) (private.ImageSo
 		return nil, err
 	}
 	d := &ociImageSource{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			HasThreadSafeGetBlob: false,
+		}),
 		NoGetBlobAtInitialize: stubs.NoGetBlobAt(ref),
 
 		ref:        ref,
@@ -113,11 +118,6 @@ func (s *ociImageSource) GetManifest(ctx context.Context, instanceDigest *digest
 	}
 
 	return m, mimeType, nil
-}
-
-// HasThreadSafeGetBlob indicates whether GetBlob can be executed concurrently.
-func (s *ociImageSource) HasThreadSafeGetBlob() bool {
-	return false
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).

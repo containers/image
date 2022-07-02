@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/types"
 	"github.com/klauspost/pgzip"
@@ -20,6 +21,7 @@ import (
 )
 
 type tarballImageSource struct {
+	impl.PropertyMethodsInitialize
 	stubs.NoGetBlobAtInitialize
 
 	reference  tarballReference
@@ -188,6 +190,9 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 
 	// Return the image.
 	src := &tarballImageSource{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			HasThreadSafeGetBlob: false,
+		}),
 		NoGetBlobAtInitialize: stubs.NoGetBlobAt(r),
 
 		reference:  *r,
@@ -208,11 +213,6 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 
 func (is *tarballImageSource) Close() error {
 	return nil
-}
-
-// HasThreadSafeGetBlob indicates whether GetBlob can be executed concurrently.
-func (is *tarballImageSource) HasThreadSafeGetBlob() bool {
-	return false
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).

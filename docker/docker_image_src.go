@@ -16,6 +16,7 @@ import (
 	"sync"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
@@ -27,6 +28,8 @@ import (
 )
 
 type dockerImageSource struct {
+	impl.PropertyMethodsInitialize
+
 	logicalRef  dockerReference // The reference the user requested.
 	physicalRef dockerReference // The actual reference we are accessing (possibly a mirror)
 	c           *dockerClient
@@ -126,6 +129,10 @@ func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, logica
 	client.tlsClientConfig.InsecureSkipVerify = pullSource.Endpoint.Insecure
 
 	s := &dockerImageSource{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			HasThreadSafeGetBlob: true,
+		}),
+
 		logicalRef:  logicalRef,
 		physicalRef: physicalRef,
 		c:           client,
@@ -287,11 +294,6 @@ func getBlobSize(resp *http.Response) int64 {
 		size = -1
 	}
 	return size
-}
-
-// HasThreadSafeGetBlob indicates whether GetBlob can be executed concurrently.
-func (s *dockerImageSource) HasThreadSafeGetBlob() bool {
-	return true
 }
 
 // splitHTTP200ResponseToPartial splits a 200 response in multiple streams as specified by the chunks

@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/tmpdir"
@@ -21,6 +22,7 @@ import (
 )
 
 type sifImageSource struct {
+	impl.PropertyMethodsInitialize
 	stubs.NoGetBlobAtInitialize
 
 	ref          sifReference
@@ -141,6 +143,9 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref sifRefere
 
 	succeeded = true
 	return &sifImageSource{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			HasThreadSafeGetBlob: true,
+		}),
 		NoGetBlobAtInitialize: stubs.NoGetBlobAt(ref),
 
 		ref:          ref,
@@ -162,11 +167,6 @@ func (s *sifImageSource) Reference() types.ImageReference {
 // Close removes resources associated with an initialized ImageSource, if any.
 func (s *sifImageSource) Close() error {
 	return os.RemoveAll(s.workDir)
-}
-
-// HasThreadSafeGetBlob indicates whether GetBlob can be executed concurrently.
-func (s *sifImageSource) HasThreadSafeGetBlob() bool {
-	return true
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).

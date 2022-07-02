@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/manifest"
@@ -24,6 +25,7 @@ import (
 
 // Source is a partial implementation of types.ImageSource for reading from tarPath.
 type Source struct {
+	impl.PropertyMethodsInitialize
 	stubs.NoGetBlobAtInitialize
 
 	archive      *Reader
@@ -53,6 +55,9 @@ type layerInfo struct {
 // The archive will be closed if closeArchive
 func NewSource(archive *Reader, closeArchive bool, transportName string, ref reference.NamedTagged, sourceIndex int) *Source {
 	return &Source{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			HasThreadSafeGetBlob: true,
+		}),
 		NoGetBlobAtInitialize: stubs.NoGetBlobAtRaw(transportName),
 
 		archive:      archive,
@@ -253,11 +258,6 @@ func (r uncompressedReadCloser) Close() error {
 		res = err
 	}
 	return res
-}
-
-// HasThreadSafeGetBlob indicates whether GetBlob can be executed concurrently.
-func (s *Source) HasThreadSafeGetBlob() bool {
-	return true
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).

@@ -15,6 +15,7 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/image"
+	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/tmpdir"
 	"github.com/containers/image/v5/manifest"
@@ -29,6 +30,7 @@ import (
 )
 
 type storageImageSource struct {
+	impl.PropertyMethodsInitialize
 	stubs.NoGetBlobAtInitialize
 
 	imageRef        storageReference
@@ -51,6 +53,9 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, imageRef stor
 
 	// Build the reader object.
 	image := &storageImageSource{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			HasThreadSafeGetBlob: true,
+		}),
 		NoGetBlobAtInitialize: stubs.NoGetBlobAt(imageRef),
 
 		imageRef:        imageRef,
@@ -76,11 +81,6 @@ func (s *storageImageSource) Reference() types.ImageReference {
 // Close cleans up any resources we tied up while reading the image.
 func (s *storageImageSource) Close() error {
 	return nil
-}
-
-// HasThreadSafeGetBlob indicates whether GetBlob can be executed concurrently.
-func (s *storageImageSource) HasThreadSafeGetBlob() bool {
-	return true
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).

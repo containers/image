@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
@@ -13,6 +14,7 @@ import (
 )
 
 type dirImageSource struct {
+	impl.PropertyMethodsInitialize
 	stubs.NoGetBlobAtInitialize
 
 	ref dirReference
@@ -22,6 +24,9 @@ type dirImageSource struct {
 // The caller must call .Close() on the returned ImageSource.
 func newImageSource(ref dirReference) private.ImageSource {
 	return &dirImageSource{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			HasThreadSafeGetBlob: false,
+		}),
 		NoGetBlobAtInitialize: stubs.NoGetBlobAt(ref),
 
 		ref: ref,
@@ -49,11 +54,6 @@ func (s *dirImageSource) GetManifest(ctx context.Context, instanceDigest *digest
 		return nil, "", err
 	}
 	return m, manifest.GuessMIMEType(m), err
-}
-
-// HasThreadSafeGetBlob indicates whether GetBlob can be executed concurrently.
-func (s *dirImageSource) HasThreadSafeGetBlob() bool {
-	return false
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
