@@ -9,6 +9,8 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/containers/image/v5/internal/imagesource/stubs"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/tlsclientconfig"
 	"github.com/containers/image/v5/types"
@@ -19,6 +21,8 @@ import (
 )
 
 type ociImageSource struct {
+	stubs.NoGetBlobAtInitialize
+
 	ref           ociReference
 	index         *imgspecv1.Index
 	descriptor    imgspecv1.Descriptor
@@ -27,7 +31,7 @@ type ociImageSource struct {
 }
 
 // newImageSource returns an ImageSource for reading from an existing directory.
-func newImageSource(sys *types.SystemContext, ref ociReference) (types.ImageSource, error) {
+func newImageSource(sys *types.SystemContext, ref ociReference) (private.ImageSource, error) {
 	tr := tlsclientconfig.NewTransport()
 	tr.TLSClientConfig = tlsconfig.ServerDefault()
 
@@ -48,7 +52,14 @@ func newImageSource(sys *types.SystemContext, ref ociReference) (types.ImageSour
 	if err != nil {
 		return nil, err
 	}
-	d := &ociImageSource{ref: ref, index: index, descriptor: descriptor, client: client}
+	d := &ociImageSource{
+		NoGetBlobAtInitialize: stubs.NoGetBlobAt(ref),
+
+		ref:        ref,
+		index:      index,
+		descriptor: descriptor,
+		client:     client,
+	}
 	if sys != nil {
 		// TODO(jonboulle): check dir existence?
 		d.sharedBlobDir = sys.OCISharedBlobDirPath

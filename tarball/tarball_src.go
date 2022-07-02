@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/types"
 	"github.com/klauspost/pgzip"
 	digest "github.com/opencontainers/go-digest"
@@ -19,6 +20,8 @@ import (
 )
 
 type tarballImageSource struct {
+	stubs.NoGetBlobAtInitialize
+
 	reference  tarballReference
 	filenames  []string
 	diffIDs    []digest.Digest
@@ -185,6 +188,8 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 
 	// Return the image.
 	src := &tarballImageSource{
+		NoGetBlobAtInitialize: stubs.NoGetBlobAt(r),
+
 		reference:  *r,
 		filenames:  filenames,
 		diffIDs:    diffIDs,

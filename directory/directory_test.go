@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var _ private.ImageSource = (*dirImageSource)(nil)
 var _ private.ImageDestination = (*dirImageDestination)(nil)
 
 func TestDestinationReference(t *testing.T) {

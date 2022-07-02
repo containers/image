@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/compression"
@@ -23,6 +24,8 @@ import (
 
 // Source is a partial implementation of types.ImageSource for reading from tarPath.
 type Source struct {
+	stubs.NoGetBlobAtInitialize
+
 	archive      *Reader
 	closeArchive bool // .Close() the archive when the source is closed.
 	// If ref is nil and sourceIndex is -1, indicates the only image in the archive.
@@ -50,6 +53,8 @@ type layerInfo struct {
 // The archive will be closed if closeArchive
 func NewSource(archive *Reader, closeArchive bool, transportName string, ref reference.NamedTagged, sourceIndex int) *Source {
 	return &Source{
+		NoGetBlobAtInitialize: stubs.NoGetBlobAtRaw(transportName),
+
 		archive:      archive,
 		closeArchive: closeArchive,
 		ref:          ref,

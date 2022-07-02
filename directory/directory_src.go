@@ -5,19 +5,27 @@ import (
 	"io"
 	"os"
 
+	"github.com/containers/image/v5/internal/imagesource/stubs"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 )
 
 type dirImageSource struct {
+	stubs.NoGetBlobAtInitialize
+
 	ref dirReference
 }
 
 // newImageSource returns an ImageSource reading from an existing directory.
 // The caller must call .Close() on the returned ImageSource.
-func newImageSource(ref dirReference) types.ImageSource {
-	return &dirImageSource{ref}
+func newImageSource(ref dirReference) private.ImageSource {
+	return &dirImageSource{
+		NoGetBlobAtInitialize: stubs.NoGetBlobAt(ref),
+
+		ref: ref,
+	}
 }
 
 // Reference returns the reference used to set up this source, _as specified by the user_

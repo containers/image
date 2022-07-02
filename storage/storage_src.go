@@ -15,6 +15,7 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/image"
+	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/tmpdir"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
@@ -28,6 +29,8 @@ import (
 )
 
 type storageImageSource struct {
+	stubs.NoGetBlobAtInitialize
+
 	imageRef        storageReference
 	image           *storage.Image
 	systemContext   *types.SystemContext    // SystemContext used in GetBlob() to create temporary files
@@ -48,6 +51,8 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, imageRef stor
 
 	// Build the reader object.
 	image := &storageImageSource{
+		NoGetBlobAtInitialize: stubs.NoGetBlobAt(imageRef),
+
 		imageRef:        imageRef,
 		systemContext:   sys,
 		image:           img,

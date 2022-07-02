@@ -9,6 +9,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/containers/image/v5/internal/imagesource/stubs"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/tmpdir"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
@@ -19,6 +21,8 @@ import (
 )
 
 type sifImageSource struct {
+	stubs.NoGetBlobAtInitialize
+
 	ref          sifReference
 	workDir      string
 	layerDigest  digest.Digest
@@ -55,7 +59,7 @@ func getBlobInfo(path string) (digest.Digest, int64, error) {
 
 // newImageSource returns an ImageSource for reading from an existing directory.
 // newImageSource extracts SIF objects and saves them in a temp directory.
-func newImageSource(ctx context.Context, sys *types.SystemContext, ref sifReference) (types.ImageSource, error) {
+func newImageSource(ctx context.Context, sys *types.SystemContext, ref sifReference) (private.ImageSource, error) {
 	sifImg, err := sif.LoadContainerFromPath(ref.file, sif.OptLoadWithFlag(os.O_RDONLY))
 	if err != nil {
 		return nil, fmt.Errorf("loading SIF file: %w", err)
@@ -137,6 +141,8 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref sifRefere
 
 	succeeded = true
 	return &sifImageSource{
+		NoGetBlobAtInitialize: stubs.NoGetBlobAt(ref),
+
 		ref:          ref,
 		workDir:      workDir,
 		layerDigest:  layerDigest,

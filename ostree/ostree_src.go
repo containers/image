@@ -14,6 +14,8 @@ import (
 	"strings"
 	"unsafe"
 
+	"github.com/containers/image/v5/internal/imagesource/stubs"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/ioutils"
@@ -34,6 +36,8 @@ import (
 import "C"
 
 type ostreeImageSource struct {
+	stubs.NoGetBlobAtInitialize
+
 	ref    ostreeReference
 	tmpDir string
 	repo   *C.struct_OstreeRepo
@@ -42,8 +46,14 @@ type ostreeImageSource struct {
 }
 
 // newImageSource returns an ImageSource for reading from an existing directory.
-func newImageSource(tmpDir string, ref ostreeReference) (types.ImageSource, error) {
-	return &ostreeImageSource{ref: ref, tmpDir: tmpDir, compressed: nil}, nil
+func newImageSource(tmpDir string, ref ostreeReference) (private.ImageSource, error) {
+	return &ostreeImageSource{
+		NoGetBlobAtInitialize: stubs.NoGetBlobAt(ref),
+
+		ref:        ref,
+		tmpDir:     tmpDir,
+		compressed: nil,
+	}, nil
 }
 
 // Reference returns the reference used to set up this source.

@@ -39,6 +39,7 @@ var (
 	_ types.ImageDestination   = &storageImageDestination{}
 	_ private.ImageDestination = (*storageImageDestination)(nil)
 	_ types.ImageSource        = &storageImageSource{}
+	_ private.ImageSource      = (*storageImageSource)(nil)
 	_ types.ImageReference     = &storageReference{}
 	_ types.ImageTransport     = &storageTransport{}
 )
