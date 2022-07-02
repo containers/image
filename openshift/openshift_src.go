@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/containers/image/v5/docker"
+	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
@@ -17,6 +18,7 @@ import (
 )
 
 type openshiftImageSource struct {
+	impl.DoesNotAffectLayerInfosForCopy
 	// This is slightly suboptimal. We could forward GetBlobAt(), but we need to call ensureImageIsResolved in SupportsGetBlobAt(),
 	// and that method doesn’t provide a context for timing out. That could actually be fixed (SupportsGetBlobAt is private and we
 	// can change it), but this is a deprecated transport anyway, so for now we just punt.
@@ -115,18 +117,6 @@ func (s *openshiftImageSource) GetSignatures(ctx context.Context, instanceDigest
 		}
 	}
 	return sigs, nil
-}
-
-// LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer
-// blobsums that are listed in the image's manifest.  If values are returned, they should be used when using GetBlob()
-// to read the image's layers.
-// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve BlobInfos for
-// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
-// (e.g. if the source never returns manifest lists).
-// The Digest field is guaranteed to be provided; Size may be -1.
-// WARNING: The list may contain duplicates, and they are semantically relevant.
-func (s *openshiftImageSource) LayerInfosForCopy(ctx context.Context, instanceDigest *digest.Digest) ([]types.BlobInfo, error) {
-	return nil, nil
 }
 
 // ensureImageIsResolved sets up s.docker and s.imageStreamImageName

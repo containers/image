@@ -26,6 +26,7 @@ import (
 // Source is a partial implementation of types.ImageSource for reading from tarPath.
 type Source struct {
 	impl.PropertyMethodsInitialize
+	impl.DoesNotAffectLayerInfosForCopy
 	stubs.NoGetBlobAtInitialize
 
 	archive      *Reader
@@ -323,15 +324,4 @@ func (s *Source) GetSignatures(ctx context.Context, instanceDigest *digest.Diges
 		return nil, errors.New(`Manifest lists are not supported by "docker-daemon:"`)
 	}
 	return [][]byte{}, nil
-}
-
-// LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer
-// blobsums that are listed in the image's manifest.  If values are returned, they should be used when using GetBlob()
-// to read the image's layers.
-// This source implementation does not support manifest lists, so the passed-in instanceDigest should always be nil,
-// as the primary manifest can not be a list, so there can be no secondary manifests.
-// The Digest field is guaranteed to be provided; Size may be -1.
-// WARNING: The list may contain duplicates, and they are semantically relevant.
-func (s *Source) LayerInfosForCopy(context.Context, *digest.Digest) ([]types.BlobInfo, error) {
-	return nil, nil
 }
