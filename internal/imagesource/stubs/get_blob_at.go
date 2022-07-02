@@ -42,3 +42,11 @@ func (stub NoGetBlobAtInitialize) SupportsGetBlobAt() bool {
 func (stub NoGetBlobAtInitialize) GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []private.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
 	return nil, nil, fmt.Errorf("internal error: GetBlobAt is not supported by the %q transport", stub.transportName)
 }
+
+// ImplementsGetBlobAt implements SupportsGetBlobAt() that returns true.
+type ImplementsGetBlobAt struct{}
+
+// SupportsGetBlobAt() returns true if GetBlobAt (BlobChunkAccessor) is supported.
+func (stub ImplementsGetBlobAt) SupportsGetBlobAt() bool {
+	return true
+}

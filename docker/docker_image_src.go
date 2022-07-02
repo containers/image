@@ -17,6 +17,7 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/imagesource/impl"
+	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
@@ -29,6 +30,7 @@ import (
 
 type dockerImageSource struct {
 	impl.PropertyMethodsInitialize
+	stubs.ImplementsGetBlobAt
 
 	logicalRef  dockerReference // The reference the user requested.
 	physicalRef dockerReference // The actual reference we are accessing (possibly a mirror)
@@ -153,11 +155,6 @@ func (s *dockerImageSource) Reference() types.ImageReference {
 // Close removes resources associated with an initialized ImageSource, if any.
 func (s *dockerImageSource) Close() error {
 	return nil
-}
-
-// SupportsGetBlobAt() returns true if GetBlobAt (BlobChunkAccessor) is supported.
-func (s *dockerImageSource) SupportsGetBlobAt() bool {
-	return true
 }
 
 // LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer
