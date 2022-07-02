@@ -5,6 +5,8 @@ import (
 	"errors"
 	"io"
 
+	"github.com/containers/image/v5/internal/imagesource"
+	"github.com/containers/image/v5/internal/private"
 	ocilayout "github.com/containers/image/v5/oci/layout"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
@@ -15,13 +17,13 @@ import (
 
 type ociArchiveImageSource struct {
 	ref         ociArchiveReference
-	unpackedSrc types.ImageSource
+	unpackedSrc private.ImageSource
 	tempDirRef  tempDirOCIRef
 }
 
 // newImageSource returns an ImageSource for reading from an existing directory.
 // newImageSource untars the file and saves it in a temp directory
-func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiveReference) (types.ImageSource, error) {
+func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiveReference) (private.ImageSource, error) {
 	tempDirRef, err := createUntarTempDir(sys, ref)
 	if err != nil {
 		return nil, perrors.Wrap(err, "creating temp directory")
@@ -34,9 +36,11 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiv
 		}
 		return nil, err
 	}
-	return &ociArchiveImageSource{ref: ref,
-		unpackedSrc: unpackedSrc,
-		tempDirRef:  tempDirRef}, nil
+	return &ociArchiveImageSource{
+		ref:         ref,
+		unpackedSrc: imagesource.FromPublic(unpackedSrc),
+		tempDirRef:  tempDirRef,
+	}, nil
 }
 
 // LoadManifestDescriptor loads the manifest
@@ -100,6 +104,20 @@ func (s *ociArchiveImageSource) HasThreadSafeGetBlob() bool {
 // May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
 func (s *ociArchiveImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
 	return s.unpackedSrc.GetBlob(ctx, info, cache)
+}
+
+// SupportsGetBlobAt() returns true if GetBlobAt (BlobChunkAccessor) is supported.
+func (s *ociArchiveImageSource) SupportsGetBlobAt() bool {
+	return s.unpackedSrc.SupportsGetBlobAt()
+}
+
+// GetBlobAt returns a sequential channel of readers that contain data for the requested
+// blob chunks, and a channel that might get a single error value.
+// The specified chunks must be not overlapping and sorted by their offset.
+// The readers must be fully consumed, in the order they are returned, before blocking
+// to read the next chunk.
+func (s *ociArchiveImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []private.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
+	return s.unpackedSrc.GetBlobAt(ctx, info, chunks)
 }
 
 // GetSignatures returns the image's signatures.  It may use a remote (= slow) service.

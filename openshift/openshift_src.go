@@ -9,12 +9,19 @@ import (
 	"net/http"
 
 	"github.com/containers/image/v5/docker"
+	"github.com/containers/image/v5/internal/imagesource/stubs"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 )
 
 type openshiftImageSource struct {
+	// This is slightly suboptimal. We could forward GetBlobAt(), but we need to call ensureImageIsResolved in SupportsGetBlobAt(),
+	// and that method doesn’t provide a context for timing out. That could actually be fixed (SupportsGetBlobAt is private and we
+	// can change it), but this is a deprecated transport anyway, so for now we just punt.
+	stubs.NoGetBlobAtInitialize
+
 	client *openshiftClient
 	// Values specific to this image
 	sys *types.SystemContext
@@ -25,13 +32,15 @@ type openshiftImageSource struct {
 
 // newImageSource creates a new ImageSource for the specified reference.
 // The caller must call .Close() on the returned ImageSource.
-func newImageSource(sys *types.SystemContext, ref openshiftReference) (types.ImageSource, error) {
+func newImageSource(sys *types.SystemContext, ref openshiftReference) (private.ImageSource, error) {
 	client, err := newOpenshiftClient(ref)
 	if err != nil {
 		return nil, err
 	}
 
 	return &openshiftImageSource{
+		NoGetBlobAtInitialize: stubs.NoGetBlobAt(ref),
+
 		client: client,
 		sys:    sys,
 	}, nil
