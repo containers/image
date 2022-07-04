@@ -167,7 +167,6 @@ func (d *blobCacheDestination) PutBlob(ctx context.Context, stream io.Reader, in
 					decompressedTemp, err2 := os.CreateTemp(d.reference.directory, makeFilename(inputInfo.Digest, isConfig))
 					if err2 != nil {
 						logrus.Debugf("error while creating a temporary file under %q to hold decompressed blob %q: %v", d.reference.directory, inputInfo.Digest.String(), err2)
-						decompressedTemp.Close()
 					} else {
 						// Write a copy of the compressed data to a pipe,
 						// closing the writing end of the pipe after
