@@ -314,7 +314,7 @@ func (s *storageImageSource) GetSignatures(ctx context.Context, instanceDigest *
 	}
 	for _, length := range signatureSizes {
 		if offset+length > len(signatureBlobs) {
-			return nil, perrors.Wrapf(err, "looking up signatures data for image %q (%s): expected at least %d bytes, only found %d", s.image.ID, instance, len(signatureBlobs), offset+length)
+			return nil, fmt.Errorf("looking up signatures data for image %q (%s): expected at least %d bytes, only found %d", s.image.ID, instance, len(signatureBlobs), offset+length)
 		}
 		sigslice = append(sigslice, signatureBlobs[offset:offset+length])
 		offset += length
