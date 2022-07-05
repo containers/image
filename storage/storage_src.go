@@ -296,7 +296,7 @@ func buildLayerInfosForCopy(manifestInfos []manifest.LayerInfo, physicalInfos []
 func (s *storageImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) (signatures [][]byte, err error) {
 	var offset int
 	sigslice := [][]byte{}
-	signature := []byte{}
+	signatureBlobs := []byte{}
 	signatureSizes := s.SignatureSizes
 	key := "signatures"
 	instance := "default instance"
@@ -306,21 +306,21 @@ func (s *storageImageSource) GetSignatures(ctx context.Context, instanceDigest *
 		instance = instanceDigest.Encoded()
 	}
 	if len(signatureSizes) > 0 {
-		signatureBlob, err := s.imageRef.transport.store.ImageBigData(s.image.ID, key)
+		data, err := s.imageRef.transport.store.ImageBigData(s.image.ID, key)
 		if err != nil {
 			return nil, perrors.Wrapf(err, "looking up signatures data for image %q (%s)", s.image.ID, instance)
 		}
-		signature = signatureBlob
+		signatureBlobs = data
 	}
 	for _, length := range signatureSizes {
-		if offset+length > len(signature) {
-			return nil, perrors.Wrapf(err, "looking up signatures data for image %q (%s): expected at least %d bytes, only found %d", s.image.ID, instance, len(signature), offset+length)
+		if offset+length > len(signatureBlobs) {
+			return nil, perrors.Wrapf(err, "looking up signatures data for image %q (%s): expected at least %d bytes, only found %d", s.image.ID, instance, len(signatureBlobs), offset+length)
 		}
-		sigslice = append(sigslice, signature[offset:offset+length])
+		sigslice = append(sigslice, signatureBlobs[offset:offset+length])
 		offset += length
 	}
-	if offset != len(signature) {
-		return nil, fmt.Errorf("signatures data (%s) contained %d extra bytes", instance, len(signatures)-offset)
+	if offset != len(signatureBlobs) {
+		return nil, fmt.Errorf("signatures data (%s) contained %d extra bytes", instance, len(signatureBlobs)-offset)
 	}
 	return sigslice, nil
 }
