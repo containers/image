@@ -46,7 +46,11 @@ type dockerImageDestination struct {
 
 // newImageDestination creates a new ImageDestination for the specified image reference.
 func newImageDestination(sys *types.SystemContext, ref dockerReference) (private.ImageDestination, error) {
-	c, err := newDockerClientFromRef(sys, ref, true, "pull,push")
+	registryConfig, err := loadRegistryConfiguration(sys)
+	if err != nil {
+		return nil, err
+	}
+	c, err := newDockerClientFromRef(sys, ref, registryConfig, true, "pull,push")
 	if err != nil {
 		return nil, err
 	}
