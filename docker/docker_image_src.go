@@ -16,6 +16,8 @@ import (
 	"sync"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/imagesource/impl"
+	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
@@ -27,6 +29,10 @@ import (
 )
 
 type dockerImageSource struct {
+	impl.PropertyMethodsInitialize
+	impl.DoesNotAffectLayerInfosForCopy
+	stubs.ImplementsGetBlobAt
+
 	logicalRef  dockerReference // The reference the user requested.
 	physicalRef dockerReference // The actual reference we are accessing (possibly a mirror)
 	c           *dockerClient
@@ -126,6 +132,10 @@ func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, logica
 	client.tlsClientConfig.InsecureSkipVerify = pullSource.Endpoint.Insecure
 
 	s := &dockerImageSource{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			HasThreadSafeGetBlob: true,
+		}),
+
 		logicalRef:  logicalRef,
 		physicalRef: physicalRef,
 		c:           client,
@@ -146,23 +156,6 @@ func (s *dockerImageSource) Reference() types.ImageReference {
 // Close removes resources associated with an initialized ImageSource, if any.
 func (s *dockerImageSource) Close() error {
 	return nil
-}
-
-// SupportsGetBlobAt() returns true if GetBlobAt (BlobChunkAccessor) is supported.
-func (s *dockerImageSource) SupportsGetBlobAt() bool {
-	return true
-}
-
-// LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer
-// blobsums that are listed in the image's manifest.  If values are returned, they should be used when using GetBlob()
-// to read the image's layers.
-// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve BlobInfos for
-// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
-// (e.g. if the source never returns manifest lists).
-// The Digest field is guaranteed to be provided; Size may be -1.
-// WARNING: The list may contain duplicates, and they are semantically relevant.
-func (s *dockerImageSource) LayerInfosForCopy(context.Context, *digest.Digest) ([]types.BlobInfo, error) {
-	return nil, nil
 }
 
 // simplifyContentType drops parameters from a HTTP media type (see https://tools.ietf.org/html/rfc7231#section-3.1.1.1)
@@ -287,11 +280,6 @@ func getBlobSize(resp *http.Response) int64 {
 		size = -1
 	}
 	return size
-}
-
-// HasThreadSafeGetBlob indicates whether GetBlob can be executed concurrently.
-func (s *dockerImageSource) HasThreadSafeGetBlob() bool {
-	return true
 }
 
 // splitHTTP200ResponseToPartial splits a 200 response in multiple streams as specified by the chunks

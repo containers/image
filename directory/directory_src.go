@@ -5,19 +5,33 @@ import (
 	"io"
 	"os"
 
+	"github.com/containers/image/v5/internal/imagesource/impl"
+	"github.com/containers/image/v5/internal/imagesource/stubs"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 )
 
 type dirImageSource struct {
+	impl.PropertyMethodsInitialize
+	impl.DoesNotAffectLayerInfosForCopy
+	stubs.NoGetBlobAtInitialize
+
 	ref dirReference
 }
 
 // newImageSource returns an ImageSource reading from an existing directory.
 // The caller must call .Close() on the returned ImageSource.
-func newImageSource(ref dirReference) types.ImageSource {
-	return &dirImageSource{ref}
+func newImageSource(ref dirReference) private.ImageSource {
+	return &dirImageSource{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			HasThreadSafeGetBlob: false,
+		}),
+		NoGetBlobAtInitialize: stubs.NoGetBlobAt(ref),
+
+		ref: ref,
+	}
 }
 
 // Reference returns the reference used to set up this source, _as specified by the user_
@@ -41,11 +55,6 @@ func (s *dirImageSource) GetManifest(ctx context.Context, instanceDigest *digest
 		return nil, "", err
 	}
 	return m, manifest.GuessMIMEType(m), err
-}
-
-// HasThreadSafeGetBlob indicates whether GetBlob can be executed concurrently.
-func (s *dirImageSource) HasThreadSafeGetBlob() bool {
-	return false
 }
 
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
@@ -80,16 +89,4 @@ func (s *dirImageSource) GetSignatures(ctx context.Context, instanceDigest *dige
 		signatures = append(signatures, signature)
 	}
 	return signatures, nil
-}
-
-// LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer
-// blobsums that are listed in the image's manifest.  If values are returned, they should be used when using GetBlob()
-// to read the image's layers.
-// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve BlobInfos for
-// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
-// (e.g. if the source never returns manifest lists).
-// The Digest field is guaranteed to be provided; Size may be -1.
-// WARNING: The list may contain duplicates, and they are semantically relevant.
-func (s *dirImageSource) LayerInfosForCopy(context.Context, *digest.Digest) ([]types.BlobInfo, error) {
-	return nil, nil
 }

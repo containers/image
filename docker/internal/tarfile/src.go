@@ -13,6 +13,8 @@ import (
 	"sync"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/imagesource/impl"
+	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/compression"
@@ -23,6 +25,11 @@ import (
 
 // Source is a partial implementation of types.ImageSource for reading from tarPath.
 type Source struct {
+	impl.PropertyMethodsInitialize
+	impl.NoSignatures
+	impl.DoesNotAffectLayerInfosForCopy
+	stubs.NoGetBlobAtInitialize
+
 	archive      *Reader
 	closeArchive bool // .Close() the archive when the source is closed.
 	// If ref is nil and sourceIndex is -1, indicates the only image in the archive.
@@ -48,8 +55,13 @@ type layerInfo struct {
 // NewSource returns a tarfile.Source for an image in the specified archive matching ref
 // and sourceIndex (or the only image if they are (nil, -1)).
 // The archive will be closed if closeArchive
-func NewSource(archive *Reader, closeArchive bool, ref reference.NamedTagged, sourceIndex int) *Source {
+func NewSource(archive *Reader, closeArchive bool, transportName string, ref reference.NamedTagged, sourceIndex int) *Source {
 	return &Source{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			HasThreadSafeGetBlob: true,
+		}),
+		NoGetBlobAtInitialize: stubs.NoGetBlobAtRaw(transportName),
+
 		archive:      archive,
 		closeArchive: closeArchive,
 		ref:          ref,
@@ -250,11 +262,6 @@ func (r uncompressedReadCloser) Close() error {
 	return res
 }
 
-// HasThreadSafeGetBlob indicates whether GetBlob can be executed concurrently.
-func (s *Source) HasThreadSafeGetBlob() bool {
-	return true
-}
-
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 // The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
 // May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
@@ -307,26 +314,4 @@ func (s *Source) GetBlob(ctx context.Context, info types.BlobInfo, cache types.B
 	}
 
 	return nil, 0, fmt.Errorf("Unknown blob %s", info.Digest)
-}
-
-// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
-// This source implementation does not support manifest lists, so the passed-in instanceDigest should always be nil,
-// as there can be no secondary manifests.
-func (s *Source) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
-	if instanceDigest != nil {
-		// How did we even get here? GetManifest(ctx, nil) has returned a manifest.DockerV2Schema2MediaType.
-		return nil, errors.New(`Manifest lists are not supported by "docker-daemon:"`)
-	}
-	return [][]byte{}, nil
-}
-
-// LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer
-// blobsums that are listed in the image's manifest.  If values are returned, they should be used when using GetBlob()
-// to read the image's layers.
-// This source implementation does not support manifest lists, so the passed-in instanceDigest should always be nil,
-// as the primary manifest can not be a list, so there can be no secondary manifests.
-// The Digest field is guaranteed to be provided; Size may be -1.
-// WARNING: The list may contain duplicates, and they are semantically relevant.
-func (s *Source) LayerInfosForCopy(context.Context, *digest.Digest) ([]types.BlobInfo, error) {
-	return nil, nil
 }

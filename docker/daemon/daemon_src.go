@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/containers/image/v5/docker/internal/tarfile"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
 	perrors "github.com/pkg/errors"
 )
@@ -22,7 +23,7 @@ type daemonImageSource struct {
 // (We could, perhaps, expect an exact sequence, assume that the first plaintext file
 // is the config, and that the following len(RootFS) files are the layers, but that feels
 // way too brittle.)
-func newImageSource(ctx context.Context, sys *types.SystemContext, ref daemonReference) (types.ImageSource, error) {
+func newImageSource(ctx context.Context, sys *types.SystemContext, ref daemonReference) (private.ImageSource, error) {
 	c, err := newDockerClient(sys)
 	if err != nil {
 		return nil, perrors.Wrap(err, "initializing docker engine client")
@@ -39,7 +40,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref daemonRef
 	if err != nil {
 		return nil, err
 	}
-	src := tarfile.NewSource(archive, true, nil, -1)
+	src := tarfile.NewSource(archive, true, ref.Transport().Name(), nil, -1)
 	return &daemonImageSource{
 		ref:    ref,
 		Source: src,

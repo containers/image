@@ -28,7 +28,7 @@ func NewSourceFromFileWithContext(sys *types.SystemContext, path string) (*Sourc
 	if err != nil {
 		return nil, err
 	}
-	src := internal.NewSource(archive, true, nil, -1)
+	src := internal.NewSource(archive, true, "[An external docker/tarfile caller]", nil, -1)
 	return &Source{internal: src}, nil
 }
 
@@ -49,7 +49,7 @@ func NewSourceFromStreamWithSystemContext(sys *types.SystemContext, inputStream 
 	if err != nil {
 		return nil, err
 	}
-	src := internal.NewSource(archive, true, nil, -1)
+	src := internal.NewSource(archive, true, "[An external docker/tarfile caller]", nil, -1)
 	return &Source{internal: src}, nil
 }
 
