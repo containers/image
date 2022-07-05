@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -225,53 +224,6 @@ func (s *dockerImageSource) ensureManifestIsLoaded(ctx context.Context) error {
 	return nil
 }
 
-// getExternalBlob returns the reader of the first available blob URL from urls, which must not be empty.
-// This function can return nil reader when no url is supported by this function. In this case, the caller
-// should fallback to fetch the non-external blob (i.e. pull from the registry).
-func (s *dockerImageSource) getExternalBlob(ctx context.Context, urls []string) (io.ReadCloser, int64, error) {
-	var (
-		resp *http.Response
-		err  error
-	)
-	if len(urls) == 0 {
-		return nil, 0, errors.New("internal error: getExternalBlob called with no URLs")
-	}
-	for _, u := range urls {
-		url, err := url.Parse(u)
-		if err != nil || (url.Scheme != "http" && url.Scheme != "https") {
-			continue // unsupported url. skip this url.
-		}
-		// NOTE: we must not authenticate on additional URLs as those
-		//       can be abused to leak credentials or tokens.  Please
-		//       refer to CVE-2020-15157 for more information.
-		resp, err = s.c.makeRequestToResolvedURL(ctx, http.MethodGet, url, nil, nil, -1, noAuth, nil)
-		if err == nil {
-			if resp.StatusCode != http.StatusOK {
-				err = fmt.Errorf("error fetching external blob from %q: %d (%s)", u, resp.StatusCode, http.StatusText(resp.StatusCode))
-				logrus.Debug(err)
-				resp.Body.Close()
-				continue
-			}
-			break
-		}
-	}
-	if resp == nil && err == nil {
-		return nil, 0, nil // fallback to non-external blob
-	}
-	if err != nil {
-		return nil, 0, err
-	}
-	return resp.Body, getBlobSize(resp), nil
-}
-
-func getBlobSize(resp *http.Response) int64 {
-	size, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
-	if err != nil {
-		size = -1
-	}
-	return size
-}
-
 // splitHTTP200ResponseToPartial splits a 200 response in multiple streams as specified by the chunks
 func splitHTTP200ResponseToPartial(streams chan io.ReadCloser, errs chan error, body io.ReadCloser, chunks []private.ImageSourceChunk) {
 	defer close(streams)
@@ -433,27 +385,7 @@ func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, 
 // The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
 // May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
 func (s *dockerImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
-	if len(info.URLs) != 0 {
-		r, s, err := s.getExternalBlob(ctx, info.URLs)
-		if err != nil {
-			return nil, 0, err
-		} else if r != nil {
-			return r, s, nil
-		}
-	}
-
-	path := fmt.Sprintf(blobsPath, reference.Path(s.physicalRef.ref), info.Digest.String())
-	logrus.Debugf("Downloading %s", path)
-	res, err := s.c.makeRequest(ctx, http.MethodGet, path, nil, nil, v2Auth, nil)
-	if err != nil {
-		return nil, 0, err
-	}
-	if err := httpResponseToError(res, "Error fetching blob"); err != nil {
-		res.Body.Close()
-		return nil, 0, err
-	}
-	cache.RecordKnownLocation(s.physicalRef.Transport(), bicTransportScope(s.physicalRef), info.Digest, newBICLocationReference(s.physicalRef))
-	return res.Body, getBlobSize(res), nil
+	return s.c.getBlob(ctx, s.physicalRef, info, cache)
 }
 
 // GetSignaturesWithFormat returns the image's signatures.  It may use a remote (= slow) service.

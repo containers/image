@@ -826,6 +826,80 @@ func (c *dockerClient) fetchManifest(ctx context.Context, ref dockerReference, t
 	return manblob, simplifyContentType(res.Header.Get("Content-Type")), nil
 }
 
+// getExternalBlob returns the reader of the first available blob URL from urls, which must not be empty.
+// This function can return nil reader when no url is supported by this function. In this case, the caller
+// should fallback to fetch the non-external blob (i.e. pull from the registry).
+func (c *dockerClient) getExternalBlob(ctx context.Context, urls []string) (io.ReadCloser, int64, error) {
+	var (
+		resp *http.Response
+		err  error
+	)
+	if len(urls) == 0 {
+		return nil, 0, errors.New("internal error: getExternalBlob called with no URLs")
+	}
+	for _, u := range urls {
+		url, err := url.Parse(u)
+		if err != nil || (url.Scheme != "http" && url.Scheme != "https") {
+			continue // unsupported url. skip this url.
+		}
+		// NOTE: we must not authenticate on additional URLs as those
+		//       can be abused to leak credentials or tokens.  Please
+		//       refer to CVE-2020-15157 for more information.
+		resp, err = c.makeRequestToResolvedURL(ctx, http.MethodGet, url, nil, nil, -1, noAuth, nil)
+		if err == nil {
+			if resp.StatusCode != http.StatusOK {
+				err = fmt.Errorf("error fetching external blob from %q: %d (%s)", u, resp.StatusCode, http.StatusText(resp.StatusCode))
+				logrus.Debug(err)
+				resp.Body.Close()
+				continue
+			}
+			break
+		}
+	}
+	if resp == nil && err == nil {
+		return nil, 0, nil // fallback to non-external blob
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+	return resp.Body, getBlobSize(resp), nil
+}
+
+func getBlobSize(resp *http.Response) int64 {
+	size, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
+	if err != nil {
+		size = -1
+	}
+	return size
+}
+
+// getBlob returns a stream for the specified blob in ref, and the blob’s size (or -1 if unknown).
+// The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
+// May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
+func (c *dockerClient) getBlob(ctx context.Context, ref dockerReference, info types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
+	if len(info.URLs) != 0 {
+		r, s, err := c.getExternalBlob(ctx, info.URLs)
+		if err != nil {
+			return nil, 0, err
+		} else if r != nil {
+			return r, s, nil
+		}
+	}
+
+	path := fmt.Sprintf(blobsPath, reference.Path(ref.ref), info.Digest.String())
+	logrus.Debugf("Downloading %s", path)
+	res, err := c.makeRequest(ctx, http.MethodGet, path, nil, nil, v2Auth, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	if err := httpResponseToError(res, "Error fetching blob"); err != nil {
+		res.Body.Close()
+		return nil, 0, err
+	}
+	cache.RecordKnownLocation(ref.Transport(), bicTransportScope(ref), info.Digest, newBICLocationReference(ref))
+	return res.Body, getBlobSize(res), nil
+}
+
 // getExtensionsSignatures returns signatures from the X-Registry-Supports-Signatures API extension,
 // using the original data structures.
 func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerReference, manifestDigest digest.Digest) (*extensionSignatureList, error) {
