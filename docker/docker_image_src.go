@@ -195,25 +195,7 @@ func (s *dockerImageSource) GetManifest(ctx context.Context, instanceDigest *dig
 }
 
 func (s *dockerImageSource) fetchManifest(ctx context.Context, tagOrDigest string) ([]byte, string, error) {
-	path := fmt.Sprintf(manifestPath, reference.Path(s.physicalRef.ref), tagOrDigest)
-	headers := map[string][]string{
-		"Accept": manifest.DefaultRequestedManifestMIMETypes,
-	}
-	res, err := s.c.makeRequest(ctx, http.MethodGet, path, headers, nil, v2Auth, nil)
-	if err != nil {
-		return nil, "", err
-	}
-	logrus.Debugf("Content-Type from manifest GET is %q", res.Header.Get("Content-Type"))
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, "", perrors.Wrapf(registryHTTPResponseToError(res), "reading manifest %s in %s", tagOrDigest, s.physicalRef.ref.Name())
-	}
-
-	manblob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxManifestBodySize)
-	if err != nil {
-		return nil, "", err
-	}
-	return manblob, simplifyContentType(res.Header.Get("Content-Type")), nil
+	return s.c.fetchManifest(ctx, s.physicalRef, tagOrDigest)
 }
 
 // ensureManifestIsLoaded sets s.cachedManifest and s.cachedManifestMIMEType
