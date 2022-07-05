@@ -64,15 +64,19 @@ func SignatureStorageBaseURL(sys *types.SystemContext, ref types.ImageReference,
 	if !ok {
 		return nil, errors.New("ref must be a dockerReference")
 	}
-	// FIXME? Loading and parsing the config could be cached across calls.
-	dirPath := registriesDirPath(sys)
-	logrus.Debugf(`Using registries.d directory %s for sigstore configuration`, dirPath)
-	config, err := loadAndMergeConfig(dirPath)
+	config, err := loadRegistryConfiguration(sys)
 	if err != nil {
 		return nil, err
 	}
 
 	return config.signatureStorageBaseURL(dr, write)
+}
+
+// loadRegistryConfiguration returns a registryConfiguration appropriate for sys.
+func loadRegistryConfiguration(sys *types.SystemContext) (*registryConfiguration, error) {
+	dirPath := registriesDirPath(sys)
+	logrus.Debugf(`Using registries.d directory %s for sigstore configuration`, dirPath)
+	return loadAndMergeConfig(dirPath)
 }
 
 // registriesDirPath returns a path to registries.d
@@ -98,6 +102,7 @@ func registriesDirPathWithHomeDir(sys *types.SystemContext, homeDir string) stri
 }
 
 // loadAndMergeConfig loads configuration files in dirPath
+// FIXME: Probably rename to loadRegistryConfigurationForPath
 func loadAndMergeConfig(dirPath string) (*registryConfiguration, error) {
 	mergedConfig := registryConfiguration{Docker: map[string]registryNamespace{}}
 	dockerDefaultMergedFrom := ""
