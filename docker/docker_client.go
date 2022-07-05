@@ -18,6 +18,7 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/iolimits"
+	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/docker/config"
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/pkg/tlsclientconfig"
@@ -801,6 +802,28 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 func (c *dockerClient) detectProperties(ctx context.Context) error {
 	c.detectPropertiesOnce.Do(func() { c.detectPropertiesError = c.detectPropertiesHelper(ctx) })
 	return c.detectPropertiesError
+}
+
+func (c *dockerClient) fetchManifest(ctx context.Context, ref dockerReference, tagOrDigest string) ([]byte, string, error) {
+	path := fmt.Sprintf(manifestPath, reference.Path(ref.ref), tagOrDigest)
+	headers := map[string][]string{
+		"Accept": manifest.DefaultRequestedManifestMIMETypes,
+	}
+	res, err := c.makeRequest(ctx, http.MethodGet, path, headers, nil, v2Auth, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	logrus.Debugf("Content-Type from manifest GET is %q", res.Header.Get("Content-Type"))
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil, "", perrors.Wrapf(registryHTTPResponseToError(res), "reading manifest %s in %s", tagOrDigest, ref.ref.Name())
+	}
+
+	manblob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxManifestBodySize)
+	if err != nil {
+		return nil, "", err
+	}
+	return manblob, simplifyContentType(res.Header.Get("Content-Type")), nil
 }
 
 // getExtensionsSignatures returns signatures from the X-Registry-Supports-Signatures API extension,
