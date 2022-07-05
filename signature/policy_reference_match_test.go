@@ -69,11 +69,7 @@ type refImageReferenceMock struct {
 }
 
 func (ref refImageReferenceMock) Transport() types.ImageTransport {
-	// We use this in error messages, so sady we must return something. But right now we do so only when DockerReference is nil, so restrict to that.
-	if ref.ref == nil {
-		return mocks.NameImageTransport("== Transport mock")
-	}
-	panic("unexpected call to a mock function")
+	return mocks.NameImageTransport("== Transport mock")
 }
 func (ref refImageReferenceMock) StringWithinTransport() string {
 	// We use this in error messages, so sadly we must return something. But right now we do so only when DockerReference is nil, so restrict to that.

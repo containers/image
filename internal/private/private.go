@@ -37,6 +37,8 @@ type ImageSource interface {
 type ImageDestinationInternalOnly interface {
 	// SupportsPutBlobPartial returns true if PutBlobPartial is supported.
 	SupportsPutBlobPartial() bool
+	// FIXME: Add SupportsSignaturesWithFormat or something like that, to allow early failures
+	// on unsupported formats.
 
 	// PutBlobWithOptions writes contents of stream and returns data representing the result.
 	// inputInfo.Digest can be optionally provided if known; if provided, and stream is read to the end without error, the digest MUST match the stream contents.
