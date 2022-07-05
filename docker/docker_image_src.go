@@ -46,6 +46,10 @@ type dockerImageSource struct {
 // newImageSource creates a new ImageSource for the specified image reference.
 // The caller must call .Close() on the returned ImageSource.
 func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerReference) (*dockerImageSource, error) {
+	registryConfig, err := loadRegistryConfiguration(sys)
+	if err != nil {
+		return nil, err
+	}
 	registry, err := sysregistriesv2.FindRegistry(sys, ref.ref.Name())
 	if err != nil {
 		return nil, perrors.Wrapf(err, "loading registries configuration")
@@ -81,7 +85,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 		} else {
 			logrus.Debugf("Trying to access %q", pullSource.Reference)
 		}
-		s, err := newImageSourceAttempt(ctx, sys, ref, pullSource)
+		s, err := newImageSourceAttempt(ctx, sys, ref, pullSource, registryConfig)
 		if err == nil {
 			return s, nil
 		}
@@ -112,7 +116,8 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 // newImageSourceAttempt is an internal helper for newImageSource. Everyone else must call newImageSource.
 // Given a logicalReference and a pullSource, return a dockerImageSource if it is reachable.
 // The caller must call .Close() on the returned ImageSource.
-func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, logicalRef dockerReference, pullSource sysregistriesv2.PullSource) (*dockerImageSource, error) {
+func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, logicalRef dockerReference, pullSource sysregistriesv2.PullSource,
+	registryConfig *registryConfiguration) (*dockerImageSource, error) {
 	physicalRef, err := newReference(pullSource.Reference)
 	if err != nil {
 		return nil, err
@@ -127,7 +132,7 @@ func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, logica
 		endpointSys = &copy
 	}
 
-	client, err := newDockerClientFromRef(endpointSys, physicalRef, false, "pull")
+	client, err := newDockerClientFromRef(endpointSys, physicalRef, registryConfig, false, "pull")
 	if err != nil {
 		return nil, err
 	}
@@ -603,6 +608,10 @@ func (s *dockerImageSource) getSignaturesFromAPIExtension(ctx context.Context, i
 
 // deleteImage deletes the named image from the registry, if supported.
 func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerReference) error {
+	registryConfig, err := loadRegistryConfiguration(sys)
+	if err != nil {
+		return err
+	}
 	// docker/distribution does not document what action should be used for deleting images.
 	//
 	// Current docker/distribution requires "pull" for reading the manifest and "delete" for deleting it.
@@ -610,7 +619,7 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 	// OpenShift ignores the action string (both the password and the token is an OpenShift API token identifying a user).
 	//
 	// We have to hard-code a single string, luckily both docker/distribution and quay.io support "*" to mean "everything".
-	c, err := newDockerClientFromRef(sys, ref, true, "*")
+	c, err := newDockerClientFromRef(sys, ref, registryConfig, true, "*")
 	if err != nil {
 		return err
 	}
