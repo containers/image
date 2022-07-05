@@ -72,26 +72,7 @@ func SignatureStorageBaseURL(sys *types.SystemContext, ref types.ImageReference,
 		return nil, err
 	}
 
-	topLevel := config.signatureTopLevel(dr, write)
-	var url *url.URL
-	if topLevel != "" {
-		url, err = url.Parse(topLevel)
-		if err != nil {
-			return nil, perrors.Wrapf(err, "Invalid signature storage URL %s", topLevel)
-		}
-	} else {
-		// returns default directory if no sigstore specified in configuration file
-		url = builtinDefaultSignatureStorageDir(rootless.GetRootlessEUID())
-		logrus.Debugf(" No signature storage configuration found for %s, using built-in default %s", dr.PolicyConfigurationIdentity(), url.Redacted())
-	}
-	// NOTE: Keep this in sync with docs/signature-protocols.md!
-	// FIXME? Restrict to explicitly supported schemes?
-	repo := reference.Path(dr.ref) // Note that this is without a tag or digest.
-	if path.Clean(repo) != repo {  // Coverage: This should not be reachable because /./ and /../ components are not valid in docker references
-		return nil, fmt.Errorf("Unexpected path elements in Docker reference %s for signature storage", dr.ref.String())
-	}
-	url.Path = url.Path + "/" + repo
-	return url, nil
+	return config.signatureStorageBaseURL(dr, write)
 }
 
 // registriesDirPath returns a path to registries.d
@@ -114,14 +95,6 @@ func registriesDirPathWithHomeDir(sys *types.SystemContext, homeDir string) stri
 	}
 
 	return systemRegistriesDirPath
-}
-
-// builtinDefaultSignatureStorageDir returns default signature storage URL as per euid
-func builtinDefaultSignatureStorageDir(euid int) *url.URL {
-	if euid != 0 {
-		return &url.URL{Scheme: "file", Path: filepath.Join(homedir.Get(), defaultUserDockerDir)}
-	}
-	return &url.URL{Scheme: "file", Path: defaultDockerDir}
 }
 
 // loadAndMergeConfig loads configuration files in dirPath
@@ -177,6 +150,40 @@ func loadAndMergeConfig(dirPath string) (*registryConfiguration, error) {
 	}
 
 	return &mergedConfig, nil
+}
+
+// signatureStorageBaseURL returns an appropriate signature storage URL for ref, for write access if “write”.
+// the usage of the BaseURL is defined under docker/distribution registries—separate storage of docs/signature-protocols.md
+func (config *registryConfiguration) signatureStorageBaseURL(dr dockerReference, write bool) (*url.URL, error) {
+	topLevel := config.signatureTopLevel(dr, write)
+	var url *url.URL
+	if topLevel != "" {
+		u, err := url.Parse(topLevel)
+		if err != nil {
+			return nil, perrors.Wrapf(err, "Invalid signature storage URL %s", topLevel)
+		}
+		url = u
+	} else {
+		// returns default directory if no sigstore specified in configuration file
+		url = builtinDefaultSignatureStorageDir(rootless.GetRootlessEUID())
+		logrus.Debugf(" No signature storage configuration found for %s, using built-in default %s", dr.PolicyConfigurationIdentity(), url.Redacted())
+	}
+	// NOTE: Keep this in sync with docs/signature-protocols.md!
+	// FIXME? Restrict to explicitly supported schemes?
+	repo := reference.Path(dr.ref) // Note that this is without a tag or digest.
+	if path.Clean(repo) != repo {  // Coverage: This should not be reachable because /./ and /../ components are not valid in docker references
+		return nil, fmt.Errorf("Unexpected path elements in Docker reference %s for signature storage", dr.ref.String())
+	}
+	url.Path = url.Path + "/" + repo
+	return url, nil
+}
+
+// builtinDefaultSignatureStorageDir returns default signature storage URL as per euid
+func builtinDefaultSignatureStorageDir(euid int) *url.URL {
+	if euid != 0 {
+		return &url.URL{Scheme: "file", Path: filepath.Join(homedir.Get(), defaultUserDockerDir)}
+	}
+	return &url.URL{Scheme: "file", Path: defaultDockerDir}
 }
 
 // config.signatureTopLevel returns an URL string configured in config for ref, for write access if “write”.
