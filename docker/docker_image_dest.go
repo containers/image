@@ -439,7 +439,12 @@ func (d *dockerImageDestination) PutManifest(ctx context.Context, m []byte, inst
 		}
 	}
 
-	path := fmt.Sprintf(manifestPath, reference.Path(d.ref.ref), refTail)
+	return d.uploadManifest(ctx, m, refTail)
+}
+
+// uploadManifest writes manifest to tagOrDigest.
+func (d *dockerImageDestination) uploadManifest(ctx context.Context, m []byte, tagOrDigest string) error {
+	path := fmt.Sprintf(manifestPath, reference.Path(d.ref.ref), tagOrDigest)
 
 	headers := map[string][]string{}
 	mimeType := manifest.GuessMIMEType(m)
@@ -453,7 +458,7 @@ func (d *dockerImageDestination) PutManifest(ctx context.Context, m []byte, inst
 	defer res.Body.Close()
 	if !successStatus(res.StatusCode) {
 		rawErr := registryHTTPResponseToError(res)
-		err := perrors.Wrapf(rawErr, "uploading manifest %s to %s", refTail, d.ref.ref.Name())
+		err := perrors.Wrapf(rawErr, "uploading manifest %s to %s", tagOrDigest, d.ref.ref.Name())
 		if isManifestInvalidError(rawErr) {
 			err = types.ManifestTypeRejectedError{Err: err}
 		}
