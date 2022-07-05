@@ -16,7 +16,10 @@ import (
 	"sync/atomic"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/image"
+	"github.com/containers/image/v5/internal/imagedestination/impl"
+	"github.com/containers/image/v5/internal/imagedestination/stubs"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/internal/tmpdir"
@@ -60,6 +63,11 @@ type storageImageSource struct {
 }
 
 type storageImageDestination struct {
+	impl.Compat
+	impl.PropertyMethodsInitialize
+	stubs.ImplementsPutBlobPartial
+	stubs.AlwaysSupportsSignatures
+
 	imageRef        storageReference
 	directory       string                   // Temporary directory where we store blobs until Commit() time
 	nextTempFileID  int32                    // A counter that we use for computing filenames to assign to blobs
@@ -398,7 +406,24 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 	if err != nil {
 		return nil, perrors.Wrapf(err, "creating a temporary directory")
 	}
-	image := &storageImageDestination{
+	dest := &storageImageDestination{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			SupportedManifestMIMETypes: []string{
+				imgspecv1.MediaTypeImageManifest,
+				manifest.DockerV2Schema2MediaType,
+				manifest.DockerV2Schema1SignedMediaType,
+				manifest.DockerV2Schema1MediaType,
+			},
+			// We ultimately have to decompress layers to populate trees on disk
+			// and need to explicitly ask for it here, so that the layers' MIME
+			// types can be set accordingly.
+			DesiredLayerCompression:        types.PreserveOriginal,
+			AcceptsForeignLayerURLs:        false,
+			MustMatchRuntimeOS:             true,
+			IgnoresEmbeddedDockerReference: true, // Yes, we want the unmodified manifest
+			HasThreadSafePutBlob:           true,
+		}),
+
 		imageRef:               imageRef,
 		directory:              directory,
 		signatureses:           make(map[digest.Digest][]byte),
@@ -412,7 +437,8 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 		indexToPulledLayerInfo: make(map[int]*manifest.LayerInfo),
 		diffOutputs:            make(map[digest.Digest]*graphdriver.DriverWithDifferOutput),
 	}
-	return image, nil
+	dest.Compat = impl.AddCompat(dest)
+	return dest, nil
 }
 
 // Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
@@ -434,20 +460,8 @@ func (s *storageImageDestination) Close() error {
 	return os.RemoveAll(s.directory)
 }
 
-func (s *storageImageDestination) DesiredLayerCompression() types.LayerCompression {
-	// We ultimately have to decompress layers to populate trees on disk
-	// and need to explicitly ask for it here, so that the layers' MIME
-	// types can be set accordingly.
-	return types.PreserveOriginal
-}
-
 func (s *storageImageDestination) computeNextBlobCacheFile() string {
 	return filepath.Join(s.directory, fmt.Sprintf("%d", atomic.AddInt32(&s.nextTempFileID, 1)))
-}
-
-// HasThreadSafePutBlob indicates whether PutBlob can be executed concurrently.
-func (s *storageImageDestination) HasThreadSafePutBlob() bool {
-	return true
 }
 
 // PutBlobWithOptions writes contents of stream and returns data representing the result.
@@ -468,21 +482,6 @@ func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream
 	}
 
 	return info, s.queueOrCommit(ctx, info, *options.LayerIndex, options.EmptyLayer)
-}
-
-// PutBlob writes contents of stream and returns data representing the result.
-// inputInfo.Digest can be optionally provided if known; if provided, and stream is read to the end without error, the digest MUST match the stream contents.
-// inputInfo.Size is the expected length of stream, if known.
-// inputInfo.MediaType describes the blob format, if known.
-// May update cache.
-// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
-// to any other readers for download using the supplied digest.
-// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (s *storageImageDestination) PutBlob(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
-	return s.PutBlobWithOptions(ctx, stream, blobinfo, private.PutBlobOptions{
-		Cache:    cache,
-		IsConfig: isConfig,
-	})
 }
 
 // putBlobToPendingFile implements ImageDestination.PutBlobWithOptions, storing stream into an on-disk file.
@@ -579,7 +578,7 @@ func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.Read
 // It is available only if SupportsPutBlobPartial().
 // Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
 // should fall back to PutBlobWithOptions.
-func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error) {
+func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, cache blobinfocache.BlobInfoCache2) (types.BlobInfo, error) {
 	fetcher := zstdFetcher{
 		chunkAccessor: chunkAccessor,
 		ctx:           ctx,
@@ -622,22 +621,6 @@ func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context,
 	}
 
 	return reused, info, s.queueOrCommit(ctx, info, *options.LayerIndex, options.EmptyLayer)
-}
-
-// TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
-// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
-// info.Digest must not be empty.
-// If canSubstitute, TryReusingBlob can use an equivalent equivalent of the desired blob; in that case the returned info may not match the input.
-// If the blob has been successfully reused, returns (true, info, nil); info must contain at least a digest and size, and may
-// include CompressionOperation and CompressionAlgorithm fields to indicate that a change to the compression type should be
-// reflected in the manifest that will be written.
-// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
-// May use and/or update cache.
-func (s *storageImageDestination) TryReusingBlob(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
-	return s.TryReusingBlobWithOptions(ctx, blobinfo, private.TryReusingBlobOptions{
-		Cache:         cache,
-		CanSubstitute: canSubstitute,
-	})
 }
 
 // tryReusingBlobAsPending implements TryReusingBlobWithOptions, filling s.blobDiffIDs and other metadata.
@@ -1209,17 +1192,6 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	return nil
 }
 
-var manifestMIMETypes = []string{
-	imgspecv1.MediaTypeImageManifest,
-	manifest.DockerV2Schema2MediaType,
-	manifest.DockerV2Schema1SignedMediaType,
-	manifest.DockerV2Schema1MediaType,
-}
-
-func (s *storageImageDestination) SupportedManifestMIMETypes() []string {
-	return manifestMIMETypes
-}
-
 // PutManifest writes the manifest to the destination.
 func (s *storageImageDestination) PutManifest(ctx context.Context, manifestBlob []byte, instanceDigest *digest.Digest) error {
 	digest, err := manifest.Digest(manifestBlob)
@@ -1231,35 +1203,6 @@ func (s *storageImageDestination) PutManifest(ctx context.Context, manifestBlob 
 	s.manifest = newBlob
 	s.manifestDigest = digest
 	return nil
-}
-
-// SupportsSignatures returns an error if we can't expect GetSignatures() to return data that was
-// previously supplied to PutSignatures().
-func (s *storageImageDestination) SupportsSignatures(ctx context.Context) error {
-	return nil
-}
-
-// AcceptsForeignLayerURLs returns false iff foreign layers in the manifest should actually be
-// uploaded to the image destination, true otherwise.
-func (s *storageImageDestination) AcceptsForeignLayerURLs() bool {
-	return false
-}
-
-// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime architecture and OS. False otherwise.
-func (s *storageImageDestination) MustMatchRuntimeOS() bool {
-	return true
-}
-
-// IgnoresEmbeddedDockerReference returns true iff the destination does not care about Image.EmbeddedDockerReferenceConflicts(),
-// and would prefer to receive an unmodified manifest instead of one modified for the destination.
-// Does not make a difference if Reference().DockerReference() is nil.
-func (s *storageImageDestination) IgnoresEmbeddedDockerReference() bool {
-	return true // Yes, we want the unmodified manifest
-}
-
-// SupportsPutBlobPartial returns true if PutBlobPartial is supported.
-func (s *storageImageDestination) SupportsPutBlobPartial() bool {
-	return true
 }
 
 // PutSignatures records the image's signatures for committing as a single data blob.

@@ -8,6 +8,7 @@ import (
 
 	"github.com/containers/image/v5/docker/internal/tarfile"
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
 	"github.com/docker/docker/client"
 	perrors "github.com/pkg/errors"
@@ -28,7 +29,7 @@ type daemonImageDestination struct {
 }
 
 // newImageDestination returns a types.ImageDestination for the specified image reference.
-func newImageDestination(ctx context.Context, sys *types.SystemContext, ref daemonReference) (types.ImageDestination, error) {
+func newImageDestination(ctx context.Context, sys *types.SystemContext, ref daemonReference) (private.ImageDestination, error) {
 	if ref.ref == nil {
 		return nil, fmt.Errorf("Invalid destination docker-daemon:%s: a destination must be a name:tag", ref.StringWithinTransport())
 	}
@@ -58,7 +59,7 @@ func newImageDestination(ctx context.Context, sys *types.SystemContext, ref daem
 	return &daemonImageDestination{
 		ref:                ref,
 		mustMatchRuntimeOS: mustMatchRuntimeOS,
-		Destination:        tarfile.NewDestination(sys, archive, namedTaggedRef),
+		Destination:        tarfile.NewDestination(sys, archive, ref.Transport().Name(), namedTaggedRef),
 		archive:            archive,
 		goroutineCancel:    goroutineCancel,
 		statusChannel:      statusChannel,

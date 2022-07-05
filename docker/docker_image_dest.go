@@ -16,6 +16,9 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/blobinfocache"
+	"github.com/containers/image/v5/internal/imagedestination/impl"
+	"github.com/containers/image/v5/internal/imagedestination/stubs"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/internal/streamdigest"
 	"github.com/containers/image/v5/internal/uploadreader"
@@ -30,6 +33,10 @@ import (
 )
 
 type dockerImageDestination struct {
+	impl.Compat
+	impl.PropertyMethodsInitialize
+	stubs.NoPutBlobPartialInitialize
+
 	ref dockerReference
 	c   *dockerClient
 	// State
@@ -37,15 +44,36 @@ type dockerImageDestination struct {
 }
 
 // newImageDestination creates a new ImageDestination for the specified image reference.
-func newImageDestination(sys *types.SystemContext, ref dockerReference) (types.ImageDestination, error) {
+func newImageDestination(sys *types.SystemContext, ref dockerReference) (private.ImageDestination, error) {
 	c, err := newDockerClientFromRef(sys, ref, true, "pull,push")
 	if err != nil {
 		return nil, err
 	}
-	return &dockerImageDestination{
+	mimeTypes := []string{
+		imgspecv1.MediaTypeImageManifest,
+		manifest.DockerV2Schema2MediaType,
+		imgspecv1.MediaTypeImageIndex,
+		manifest.DockerV2ListMediaType,
+	}
+	if c.sys == nil || !c.sys.DockerDisableDestSchema1MIMETypes {
+		mimeTypes = append(mimeTypes, manifest.DockerV2Schema1SignedMediaType, manifest.DockerV2Schema1MediaType)
+	}
+
+	dest := &dockerImageDestination{
+		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
+			SupportedManifestMIMETypes:     mimeTypes,
+			DesiredLayerCompression:        types.Compress,
+			MustMatchRuntimeOS:             false,
+			IgnoresEmbeddedDockerReference: false, // We do want the manifest updated; older registry versions refuse manifests if the embedded reference does not match.
+			HasThreadSafePutBlob:           true,
+		}),
+		NoPutBlobPartialInitialize: stubs.NoPutBlobPartial(ref),
+
 		ref: ref,
 		c:   c,
-	}, nil
+	}
+	dest.Compat = impl.AddCompat(dest)
+	return dest, nil
 }
 
 // Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
@@ -57,19 +85,6 @@ func (d *dockerImageDestination) Reference() types.ImageReference {
 // Close removes resources associated with an initialized ImageDestination, if any.
 func (d *dockerImageDestination) Close() error {
 	return nil
-}
-
-func (d *dockerImageDestination) SupportedManifestMIMETypes() []string {
-	mimeTypes := []string{
-		imgspecv1.MediaTypeImageManifest,
-		manifest.DockerV2Schema2MediaType,
-		imgspecv1.MediaTypeImageIndex,
-		manifest.DockerV2ListMediaType,
-	}
-	if d.c.sys == nil || !d.c.sys.DockerDisableDestSchema1MIMETypes {
-		mimeTypes = append(mimeTypes, manifest.DockerV2Schema1SignedMediaType, manifest.DockerV2Schema1MediaType)
-	}
-	return mimeTypes
 }
 
 // SupportsSignatures returns an error (to be displayed to the user) if the destination certainly can't store signatures.
@@ -88,26 +103,10 @@ func (d *dockerImageDestination) SupportsSignatures(ctx context.Context) error {
 	}
 }
 
-func (d *dockerImageDestination) DesiredLayerCompression() types.LayerCompression {
-	return types.Compress
-}
-
 // AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
 // uploaded to the image destination, true otherwise.
 func (d *dockerImageDestination) AcceptsForeignLayerURLs() bool {
 	return true
-}
-
-// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime architecture and OS. False otherwise.
-func (d *dockerImageDestination) MustMatchRuntimeOS() bool {
-	return false
-}
-
-// IgnoresEmbeddedDockerReference returns true iff the destination does not care about Image.EmbeddedDockerReferenceConflicts(),
-// and would prefer to receive an unmodified manifest instead of one modified for the destination.
-// Does not make a difference if Reference().DockerReference() is nil.
-func (d *dockerImageDestination) IgnoresEmbeddedDockerReference() bool {
-	return false // We do want the manifest updated; older registry versions refuse manifests if the embedded reference does not match.
 }
 
 // sizeCounter is an io.Writer which only counts the total size of its input.
@@ -118,19 +117,14 @@ func (c *sizeCounter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-// HasThreadSafePutBlob indicates whether PutBlob can be executed concurrently.
-func (d *dockerImageDestination) HasThreadSafePutBlob() bool {
-	return true
-}
-
-// PutBlob writes contents of stream and returns data representing the result (with all data filled in).
+// PutBlobWithOptions writes contents of stream and returns data representing the result.
 // inputInfo.Digest can be optionally provided if known; if provided, and stream is read to the end without error, the digest MUST match the stream contents.
 // inputInfo.Size is the expected length of stream, if known.
-// May update cache.
+// inputInfo.MediaType describes the blob format, if known.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
+func (d *dockerImageDestination) PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options private.PutBlobOptions) (types.BlobInfo, error) {
 	// If requested, precompute the blob digest to prevent uploading layers that already exist on the registry.
 	// This functionality is particularly useful when BlobInfoCache has not been populated with compressed digests,
 	// the source blob is uncompressed, and the destination blob is being compressed "on the fly".
@@ -147,7 +141,7 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	if inputInfo.Digest != "" {
 		// This should not really be necessary, at least the copy code calls TryReusingBlob automatically.
 		// Still, we need to check, if only because the "initiate upload" endpoint does not have a documented "blob already exists" return value.
-		haveBlob, reusedInfo, err := d.tryReusingExactBlob(ctx, inputInfo, cache)
+		haveBlob, reusedInfo, err := d.tryReusingExactBlob(ctx, inputInfo, options.Cache)
 		if err != nil {
 			return types.BlobInfo{}, err
 		}
@@ -218,7 +212,7 @@ func (d *dockerImageDestination) PutBlob(ctx context.Context, stream io.Reader, 
 	}
 
 	logrus.Debugf("Upload of layer %s complete", blobDigest)
-	cache.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), blobDigest, newBICLocationReference(d.ref))
+	options.Cache.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), blobDigest, newBICLocationReference(d.ref))
 	return types.BlobInfo{Digest: blobDigest, Size: sizeCounter.size}, nil
 }
 
@@ -296,7 +290,7 @@ func (d *dockerImageDestination) mountBlob(ctx context.Context, srcRepo referenc
 // tryReusingExactBlob is a subset of TryReusingBlob which _only_ looks for exactly the specified
 // blob in the current repository, with no cross-repo reuse or mounting; cache may be updated, it is not read.
 // The caller must ensure info.Digest is set.
-func (d *dockerImageDestination) tryReusingExactBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (bool, types.BlobInfo, error) {
+func (d *dockerImageDestination) tryReusingExactBlob(ctx context.Context, info types.BlobInfo, cache blobinfocache.BlobInfoCache2) (bool, types.BlobInfo, error) {
 	exists, size, err := d.blobExists(ctx, d.ref.ref, info.Digest, nil)
 	if err != nil {
 		return false, types.BlobInfo{}, err
@@ -308,22 +302,20 @@ func (d *dockerImageDestination) tryReusingExactBlob(ctx context.Context, info t
 	return false, types.BlobInfo{}, nil
 }
 
-// TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
+// TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 // (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
 // info.Digest must not be empty.
-// If canSubstitute, TryReusingBlob can use an equivalent equivalent of the desired blob; in that case the returned info may not match the input.
 // If the blob has been successfully reused, returns (true, info, nil); info must contain at least a digest and size, and may
 // include CompressionOperation and CompressionAlgorithm fields to indicate that a change to the compression type should be
 // reflected in the manifest that will be written.
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
-// May use and/or update cache.
-func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
+func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
 	if info.Digest == "" {
 		return false, types.BlobInfo{}, errors.New("Can not check for a blob with unknown digest")
 	}
 
 	// First, check whether the blob happens to already exist at the destination.
-	haveBlob, reusedInfo, err := d.tryReusingExactBlob(ctx, info, cache)
+	haveBlob, reusedInfo, err := d.tryReusingExactBlob(ctx, info, options.Cache)
 	if err != nil {
 		return false, types.BlobInfo{}, err
 	}
@@ -332,8 +324,7 @@ func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.
 	}
 
 	// Then try reusing blobs from other locations.
-	bic := blobinfocache.FromBlobInfoCache(cache)
-	candidates := bic.CandidateLocations2(d.ref.Transport(), bicTransportScope(d.ref), info.Digest, canSubstitute)
+	candidates := options.Cache.CandidateLocations2(d.ref.Transport(), bicTransportScope(d.ref), info.Digest, options.CanSubstitute)
 	for _, candidate := range candidates {
 		candidateRepo, err := parseBICLocationReference(candidate.Location)
 		if err != nil {
@@ -387,7 +378,7 @@ func (d *dockerImageDestination) TryReusingBlob(ctx context.Context, info types.
 			}
 		}
 
-		bic.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), candidate.Digest, newBICLocationReference(d.ref))
+		options.Cache.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), candidate.Digest, newBICLocationReference(d.ref))
 
 		compressionOperation, compressionAlgorithm, err := blobinfocache.OperationAndAlgorithmForCompressor(candidate.CompressorName)
 		if err != nil {

@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/types"
 )
 
@@ -18,11 +19,9 @@ type ImageSource interface {
 	BlobChunkAccessor
 }
 
-// ImageDestination is an internal extension to the types.ImageDestination
-// interface.
-type ImageDestination interface {
-	types.ImageDestination
-
+// ImageDestinationInternalOnly is the part of private.ImageDestination that is not
+// a part of types.ImageDestination.
+type ImageDestinationInternalOnly interface {
 	// SupportsPutBlobPartial returns true if PutBlobPartial is supported.
 	SupportsPutBlobPartial() bool
 
@@ -40,7 +39,7 @@ type ImageDestination interface {
 	// It is available only if SupportsPutBlobPartial().
 	// Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
 	// should fall back to PutBlobWithOptions.
-	PutBlobPartial(ctx context.Context, chunkAccessor BlobChunkAccessor, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error)
+	PutBlobPartial(ctx context.Context, chunkAccessor BlobChunkAccessor, srcInfo types.BlobInfo, cache blobinfocache.BlobInfoCache2) (types.BlobInfo, error)
 
 	// TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 	// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
@@ -52,13 +51,23 @@ type ImageDestination interface {
 	TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options TryReusingBlobOptions) (bool, types.BlobInfo, error)
 }
 
+// ImageDestination is an internal extension to the types.ImageDestination
+// interface.
+type ImageDestination interface {
+	types.ImageDestination
+	ImageDestinationInternalOnly
+}
+
 // PutBlobOptions are used in PutBlobWithOptions.
 type PutBlobOptions struct {
-	Cache    types.BlobInfoCache // Cache to optionally update with the uploaded bloblook up blob infos.
-	IsConfig bool                // True if the blob is a config
+	Cache    blobinfocache.BlobInfoCache2 // Cache to optionally update with the uploaded bloblook up blob infos.
+	IsConfig bool                         // True if the blob is a config
 
 	// The following fields are new to internal/private.  Users of internal/private MUST fill them in,
 	// but they also must expect that they will be ignored by types.ImageDestination transports.
+	// Transports, OTOH, MUST support these fields being zero-valued for types.ImageDestination callers
+	// if they use internal/imagedestination/impl.Compat;
+	// in that case, they will all be consistently zero-valued.
 
 	EmptyLayer bool // True if the blob is an "empty"/"throwaway" layer, and may not necessarily be physically represented.
 	LayerIndex *int // If the blob is a layer, a zero-based index of the layer within the image; nil otherwise.
@@ -66,13 +75,16 @@ type PutBlobOptions struct {
 
 // TryReusingBlobOptions are used in TryReusingBlobWithOptions.
 type TryReusingBlobOptions struct {
-	Cache types.BlobInfoCache // Cache to use and/or update.
+	Cache blobinfocache.BlobInfoCache2 // Cache to use and/or update.
 	// If true, it is allowed to use an equivalent of the desired blob;
 	// in that case the returned info may not match the input.
 	CanSubstitute bool
 
 	// The following fields are new to internal/private.  Users of internal/private MUST fill them in,
 	// but they also must expect that they will be ignored by types.ImageDestination transports.
+	// Transports, OTOH, MUST support these fields being zero-valued for types.ImageDestination callers
+	// if they use internal/imagedestination/impl.Compat;
+	// in that case, they will all be consistently zero-valued.
 
 	EmptyLayer bool            // True if the blob is an "empty"/"throwaway" layer, and may not necessarily be physically represented.
 	LayerIndex *int            // If the blob is a layer, a zero-based index of the layer within the image; nil otherwise.

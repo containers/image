@@ -2,12 +2,20 @@ package imagedestination
 
 import (
 	"context"
-	"fmt"
 	"io"
 
+	"github.com/containers/image/v5/internal/imagedestination/stubs"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
 )
+
+// wrapped provides the private.ImageDestination operations
+// for a destination that only implements types.ImageDestination
+type wrapped struct {
+	stubs.NoPutBlobPartialInitialize
+
+	types.ImageDestination
+}
 
 // FromPublic(dest) returns an object that provides the private.ImageDestination API
 //
@@ -23,18 +31,11 @@ func FromPublic(dest types.ImageDestination) private.ImageDestination {
 	if dest2, ok := dest.(private.ImageDestination); ok {
 		return dest2
 	}
-	return &wrapped{ImageDestination: dest}
-}
+	return &wrapped{
+		NoPutBlobPartialInitialize: stubs.NoPutBlobPartial(dest.Reference()),
 
-// wrapped provides the private.ImageDestination operations
-// for a destination that only implements types.ImageDestination
-type wrapped struct {
-	types.ImageDestination
-}
-
-// SupportsPutBlobPartial returns true if PutBlobPartial is supported.
-func (w *wrapped) SupportsPutBlobPartial() bool {
-	return false
+		ImageDestination: dest,
+	}
 }
 
 // PutBlobWithOptions writes contents of stream and returns data representing the result.
@@ -46,15 +47,6 @@ func (w *wrapped) SupportsPutBlobPartial() bool {
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (w *wrapped) PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options private.PutBlobOptions) (types.BlobInfo, error) {
 	return w.PutBlob(ctx, stream, inputInfo, options.Cache, options.IsConfig)
-}
-
-// PutBlobPartial attempts to create a blob using the data that is already present
-// at the destination. chunkAccessor is accessed in a non-sequential way to retrieve the missing chunks.
-// It is available only if SupportsPutBlobPartial().
-// Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
-// should fall back to PutBlobWithOptions.
-func (w *wrapped) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, cache types.BlobInfoCache) (types.BlobInfo, error) {
-	return types.BlobInfo{}, fmt.Errorf("internal error: PutBlobPartial is not supported by the %q transport", w.Reference().Transport().Name())
 }
 
 // TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination

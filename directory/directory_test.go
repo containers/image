@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache/memory"
 	"github.com/containers/image/v5/types"
@@ -15,6 +16,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var _ private.ImageDestination = (*dirImageDestination)(nil)
 
 func TestDestinationReference(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
