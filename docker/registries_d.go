@@ -47,8 +47,9 @@ type registryConfiguration struct {
 
 // registryNamespace defines lookaside locations for a single namespace.
 type registryNamespace struct {
-	SigStore        string `json:"sigstore"`         // For reading, and if SigStoreStaging is not present, for writing.
-	SigStoreStaging string `json:"sigstore-staging"` // For writing only.
+	SigStore             string `json:"sigstore"`         // For reading, and if SigStoreStaging is not present, for writing.
+	SigStoreStaging      string `json:"sigstore-staging"` // For writing only.
+	UseCosignAttachments *bool  `json:"use-cosign-attachments,omitempty"`
 }
 
 // signatureStorageBase is an "opaque" type representing a lookaside Docker signature storage.
@@ -75,7 +76,7 @@ func SignatureStorageBaseURL(sys *types.SystemContext, ref types.ImageReference,
 // loadRegistryConfiguration returns a registryConfiguration appropriate for sys.
 func loadRegistryConfiguration(sys *types.SystemContext) (*registryConfiguration, error) {
 	dirPath := registriesDirPath(sys)
-	logrus.Debugf(`Using registries.d directory %s for sigstore configuration`, dirPath)
+	logrus.Debugf(`Using registries.d directory %s`, dirPath)
 	return loadAndMergeConfig(dirPath)
 }
 
@@ -198,7 +199,7 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 		// Look for a full match.
 		identity := ref.PolicyConfigurationIdentity()
 		if ns, ok := config.Docker[identity]; ok {
-			logrus.Debugf(` Using "docker" namespace %s`, identity)
+			logrus.Debugf(` Sigstore configuration: using "docker" namespace %s`, identity)
 			if url := ns.signatureTopLevel(write); url != "" {
 				return url
 			}
@@ -207,7 +208,7 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 		// Look for a match of the possible parent namespaces.
 		for _, name := range ref.PolicyConfigurationNamespaces() {
 			if ns, ok := config.Docker[name]; ok {
-				logrus.Debugf(` Using "docker" namespace %s`, name)
+				logrus.Debugf(` Sigstore configuration: using "docker" namespace %s`, name)
 				if url := ns.signatureTopLevel(write); url != "" {
 					return url
 				}
@@ -216,12 +217,45 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 	}
 	// Look for a default location
 	if config.DefaultDocker != nil {
-		logrus.Debugf(` Using "default-docker" configuration`)
+		logrus.Debugf(` Sigstore configuration: using "default-docker" configuration`)
 		if url := config.DefaultDocker.signatureTopLevel(write); url != "" {
 			return url
 		}
 	}
 	return ""
+}
+
+// config.useCosignAttachments returns whether we should look for and write cosign attachments.
+// for ref.
+func (config *registryConfiguration) useCosignAttachments(ref dockerReference) bool {
+	if config.Docker != nil {
+		// Look for a full match.
+		identity := ref.PolicyConfigurationIdentity()
+		if ns, ok := config.Docker[identity]; ok {
+			logrus.Debugf(` Cosign attachments: using "docker" namespace %s`, identity)
+			if ns.UseCosignAttachments != nil {
+				return *ns.UseCosignAttachments
+			}
+		}
+
+		// Look for a match of the possible parent namespaces.
+		for _, name := range ref.PolicyConfigurationNamespaces() {
+			if ns, ok := config.Docker[name]; ok {
+				logrus.Debugf(` Cosign attachments: using "docker" namespace %s`, name)
+				if ns.UseCosignAttachments != nil {
+					return *ns.UseCosignAttachments
+				}
+			}
+		}
+	}
+	// Look for a default location
+	if config.DefaultDocker != nil {
+		logrus.Debugf(` Cosign attachments: using "default-docker" configuration`)
+		if config.DefaultDocker.UseCosignAttachments != nil {
+			return *config.DefaultDocker.UseCosignAttachments
+		}
+	}
+	return false
 }
 
 // ns.signatureTopLevel returns an URL string configured in ns for ref, for write access if “write”.
