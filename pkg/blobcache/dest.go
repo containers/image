@@ -12,6 +12,7 @@ import (
 	"github.com/containers/image/v5/internal/imagedestination"
 	"github.com/containers/image/v5/internal/imagedestination/impl"
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/transports"
 	"github.com/containers/image/v5/types"
@@ -280,8 +281,12 @@ func (d *blobCacheDestination) PutManifest(ctx context.Context, manifestBytes []
 	return d.destination.PutManifest(ctx, manifestBytes, instanceDigest)
 }
 
-func (d *blobCacheDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
-	return d.destination.PutSignatures(ctx, signatures, instanceDigest)
+// PutSignaturesWithFormat writes a set of signatures to the destination.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to write or overwrite the signatures for
+// (when the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
+// MUST be called after PutManifest (signatures may reference manifest contents).
+func (d *blobCacheDestination) PutSignaturesWithFormat(ctx context.Context, signatures []signature.Signature, instanceDigest *digest.Digest) error {
+	return d.destination.PutSignaturesWithFormat(ctx, signatures, instanceDigest)
 }
 
 func (d *blobCacheDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {

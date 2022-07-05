@@ -6,7 +6,9 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/blobinfocache"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/types"
+	"github.com/opencontainers/go-digest"
 )
 
 // ImageSourceInternalOnly is the part of private.ImageSource that is not
@@ -54,6 +56,12 @@ type ImageDestinationInternalOnly interface {
 	// reflected in the manifest that will be written.
 	// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 	TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options TryReusingBlobOptions) (bool, types.BlobInfo, error)
+
+	// PutSignaturesWithFormat writes a set of signatures to the destination.
+	// If instanceDigest is not nil, it contains a digest of the specific manifest instance to write or overwrite the signatures for
+	// (when the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
+	// MUST be called after PutManifest (signatures may reference manifest contents).
+	PutSignaturesWithFormat(ctx context.Context, signatures []signature.Signature, instanceDigest *digest.Digest) error
 }
 
 // ImageDestination is an internal extension to the types.ImageDestination
