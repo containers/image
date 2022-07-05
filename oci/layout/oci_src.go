@@ -22,6 +22,7 @@ import (
 )
 
 type ociImageSource struct {
+	impl.Compat
 	impl.PropertyMethodsInitialize
 	impl.NoSignatures
 	impl.DoesNotAffectLayerInfosForCopy
@@ -71,6 +72,7 @@ func newImageSource(sys *types.SystemContext, ref ociReference) (private.ImageSo
 		// TODO(jonboulle): check dir existence?
 		s.sharedBlobDir = sys.OCISharedBlobDirPath
 	}
+	s.Compat = impl.AddCompat(s)
 	return s, nil
 }
 

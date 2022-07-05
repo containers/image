@@ -18,6 +18,12 @@ type ImageSourceInternalOnly interface {
 	SupportsGetBlobAt() bool
 	// BlobChunkAccessor.GetBlobAt is available only if SupportsGetBlobAt().
 	BlobChunkAccessor
+
+	// GetSignaturesWithFormat returns the image's signatures.  It may use a remote (= slow) service.
+	// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
+	// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
+	// (e.g. if the source never returns manifest lists).
+	GetSignaturesWithFormat(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error)
 }
 
 // ImageSource is an internal extension to the types.ImageSource interface.

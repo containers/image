@@ -2,18 +2,21 @@ package directory
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 
 	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 )
 
 type dirImageSource struct {
+	impl.Compat
 	impl.PropertyMethodsInitialize
 	impl.DoesNotAffectLayerInfosForCopy
 	stubs.NoGetBlobAtInitialize
@@ -24,7 +27,7 @@ type dirImageSource struct {
 // newImageSource returns an ImageSource reading from an existing directory.
 // The caller must call .Close() on the returned ImageSource.
 func newImageSource(ref dirReference) private.ImageSource {
-	return &dirImageSource{
+	s := &dirImageSource{
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
 			HasThreadSafeGetBlob: false,
 		}),
@@ -32,6 +35,8 @@ func newImageSource(ref dirReference) private.ImageSource {
 
 		ref: ref,
 	}
+	s.Compat = impl.AddCompat(s)
+	return s
 }
 
 // Reference returns the reference used to set up this source, _as specified by the user_
@@ -72,19 +77,24 @@ func (s *dirImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache
 	return r, fi.Size(), nil
 }
 
-// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
+// GetSignaturesWithFormat returns the image's signatures.  It may use a remote (= slow) service.
 // If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
 // (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
 // (e.g. if the source never returns manifest lists).
-func (s *dirImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
-	signatures := [][]byte{}
+func (s *dirImageSource) GetSignaturesWithFormat(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error) {
+	signatures := []signature.Signature{}
 	for i := 0; ; i++ {
-		signature, err := os.ReadFile(s.ref.signaturePath(i, instanceDigest))
+		path := s.ref.signaturePath(i, instanceDigest)
+		sigBlob, err := os.ReadFile(path)
 		if err != nil {
 			if os.IsNotExist(err) {
 				break
 			}
 			return nil, err
+		}
+		signature, err := signature.FromBlob(sigBlob)
+		if err != nil {
+			return nil, fmt.Errorf("parsing signature %q: %w", path, err)
 		}
 		signatures = append(signatures, signature)
 	}
