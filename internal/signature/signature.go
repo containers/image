@@ -81,7 +81,7 @@ func FromBlob(blob []byte) (Signature, error) {
 		case bytes.Equal(formatBytes, []byte(SimpleSigningFormat)):
 			return SimpleSigningFromBlob(blobChunk), nil
 		case bytes.Equal(formatBytes, []byte(CosignFormat)):
-			fallthrough
+			return cosignFromBlobChunk(blobChunk)
 		default:
 			return nil, fmt.Errorf("unrecognized signature format %q", string(formatBytes))
 		}
