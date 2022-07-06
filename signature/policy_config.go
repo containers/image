@@ -22,6 +22,7 @@ import (
 	"regexp"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/signature/internal"
 	"github.com/containers/image/v5/transports"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/homedir"
@@ -104,7 +105,7 @@ var _ json.Unmarshaler = (*Policy)(nil)
 func (p *Policy) UnmarshalJSON(data []byte) error {
 	*p = Policy{}
 	transports := policyTransportsMap{}
-	if err := paranoidUnmarshalJSONObject(data, func(key string) interface{} {
+	if err := internal.ParanoidUnmarshalJSONObject(data, func(key string) interface{} {
 		switch key {
 		case "default":
 			return &p.Default
@@ -135,10 +136,10 @@ func (m *policyTransportsMap) UnmarshalJSON(data []byte) error {
 	// We can't unmarshal directly into map values because it is not possible to take an address of a map value.
 	// So, use a temporary map of pointers-to-slices and convert.
 	tmpMap := map[string]*PolicyTransportScopes{}
-	if err := paranoidUnmarshalJSONObject(data, func(key string) interface{} {
+	if err := internal.ParanoidUnmarshalJSONObject(data, func(key string) interface{} {
 		// transport can be nil
 		transport := transports.Get(key)
-		// paranoidUnmarshalJSONObject detects key duplication for us, check just to be safe.
+		// internal.ParanoidUnmarshalJSONObject detects key duplication for us, check just to be safe.
 		if _, ok := tmpMap[key]; ok {
 			return nil
 		}
@@ -181,8 +182,8 @@ func (m *policyTransportScopesWithTransport) UnmarshalJSON(data []byte) error {
 	// We can't unmarshal directly into map values because it is not possible to take an address of a map value.
 	// So, use a temporary map of pointers-to-slices and convert.
 	tmpMap := map[string]*PolicyRequirements{}
-	if err := paranoidUnmarshalJSONObject(data, func(key string) interface{} {
-		// paranoidUnmarshalJSONObject detects key duplication for us, check just to be safe.
+	if err := internal.ParanoidUnmarshalJSONObject(data, func(key string) interface{} {
+		// internal.ParanoidUnmarshalJSONObject detects key duplication for us, check just to be safe.
 		if _, ok := tmpMap[key]; ok {
 			return nil
 		}
@@ -269,7 +270,7 @@ var _ json.Unmarshaler = (*prInsecureAcceptAnything)(nil)
 func (pr *prInsecureAcceptAnything) UnmarshalJSON(data []byte) error {
 	*pr = prInsecureAcceptAnything{}
 	var tmp prInsecureAcceptAnything
-	if err := paranoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
+	if err := internal.ParanoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
 		"type": &tmp.Type,
 	}); err != nil {
 		return err
@@ -299,7 +300,7 @@ var _ json.Unmarshaler = (*prReject)(nil)
 func (pr *prReject) UnmarshalJSON(data []byte) error {
 	*pr = prReject{}
 	var tmp prReject
-	if err := paranoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
+	if err := internal.ParanoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
 		"type": &tmp.Type,
 	}); err != nil {
 		return err
@@ -361,7 +362,7 @@ func (pr *prSignedBy) UnmarshalJSON(data []byte) error {
 	var tmp prSignedBy
 	var gotKeyPath, gotKeyData = false, false
 	var signedIdentity json.RawMessage
-	if err := paranoidUnmarshalJSONObject(data, func(key string) interface{} {
+	if err := internal.ParanoidUnmarshalJSONObject(data, func(key string) interface{} {
 		switch key {
 		case "type":
 			return &tmp.Type
@@ -469,7 +470,7 @@ func (pr *prSignedBaseLayer) UnmarshalJSON(data []byte) error {
 	*pr = prSignedBaseLayer{}
 	var tmp prSignedBaseLayer
 	var baseLayerIdentity json.RawMessage
-	if err := paranoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
+	if err := internal.ParanoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
 		"type":              &tmp.Type,
 		"baseLayerIdentity": &baseLayerIdentity,
 	}); err != nil {
@@ -538,7 +539,7 @@ var _ json.Unmarshaler = (*prmMatchExact)(nil)
 func (prm *prmMatchExact) UnmarshalJSON(data []byte) error {
 	*prm = prmMatchExact{}
 	var tmp prmMatchExact
-	if err := paranoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
+	if err := internal.ParanoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
 		"type": &tmp.Type,
 	}); err != nil {
 		return err
@@ -568,7 +569,7 @@ var _ json.Unmarshaler = (*prmMatchRepoDigestOrExact)(nil)
 func (prm *prmMatchRepoDigestOrExact) UnmarshalJSON(data []byte) error {
 	*prm = prmMatchRepoDigestOrExact{}
 	var tmp prmMatchRepoDigestOrExact
-	if err := paranoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
+	if err := internal.ParanoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
 		"type": &tmp.Type,
 	}); err != nil {
 		return err
@@ -598,7 +599,7 @@ var _ json.Unmarshaler = (*prmMatchRepository)(nil)
 func (prm *prmMatchRepository) UnmarshalJSON(data []byte) error {
 	*prm = prmMatchRepository{}
 	var tmp prmMatchRepository
-	if err := paranoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
+	if err := internal.ParanoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
 		"type": &tmp.Type,
 	}); err != nil {
 		return err
@@ -638,7 +639,7 @@ var _ json.Unmarshaler = (*prmExactReference)(nil)
 func (prm *prmExactReference) UnmarshalJSON(data []byte) error {
 	*prm = prmExactReference{}
 	var tmp prmExactReference
-	if err := paranoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
+	if err := internal.ParanoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
 		"type":            &tmp.Type,
 		"dockerReference": &tmp.DockerReference,
 	}); err != nil {
@@ -680,7 +681,7 @@ var _ json.Unmarshaler = (*prmExactRepository)(nil)
 func (prm *prmExactRepository) UnmarshalJSON(data []byte) error {
 	*prm = prmExactRepository{}
 	var tmp prmExactRepository
-	if err := paranoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
+	if err := internal.ParanoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
 		"type":             &tmp.Type,
 		"dockerRepository": &tmp.DockerRepository,
 	}); err != nil {
@@ -752,7 +753,7 @@ var _ json.Unmarshaler = (*prmRemapIdentity)(nil)
 func (prm *prmRemapIdentity) UnmarshalJSON(data []byte) error {
 	*prm = prmRemapIdentity{}
 	var tmp prmRemapIdentity
-	if err := paranoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
+	if err := internal.ParanoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
 		"type":         &tmp.Type,
 		"prefix":       &tmp.Prefix,
 		"signedPrefix": &tmp.SignedPrefix,

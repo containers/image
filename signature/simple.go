@@ -106,18 +106,18 @@ var _ json.Unmarshaler = (*untrustedSignature)(nil)
 func (s *untrustedSignature) UnmarshalJSON(data []byte) error {
 	err := s.strictUnmarshalJSON(data)
 	if err != nil {
-		if formatErr, ok := err.(jsonFormatError); ok {
+		if formatErr, ok := err.(internal.JSONFormatError); ok {
 			err = internal.NewInvalidSignatureError(formatErr.Error())
 		}
 	}
 	return err
 }
 
-// strictUnmarshalJSON is UnmarshalJSON, except that it may return the internal jsonFormatError error type.
-// Splitting it into a separate function allows us to do the jsonFormatError → InvalidSignatureError in a single place, the caller.
+// strictUnmarshalJSON is UnmarshalJSON, except that it may return the internal.JSONFormatError error type.
+// Splitting it into a separate function allows us to do the internal.JSONFormatError → InvalidSignatureError in a single place, the caller.
 func (s *untrustedSignature) strictUnmarshalJSON(data []byte) error {
 	var critical, optional json.RawMessage
-	if err := paranoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
+	if err := internal.ParanoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
 		"critical": &critical,
 		"optional": &optional,
 	}); err != nil {
@@ -127,7 +127,7 @@ func (s *untrustedSignature) strictUnmarshalJSON(data []byte) error {
 	var creatorID string
 	var timestamp float64
 	var gotCreatorID, gotTimestamp = false, false
-	if err := paranoidUnmarshalJSONObject(optional, func(key string) interface{} {
+	if err := internal.ParanoidUnmarshalJSONObject(optional, func(key string) interface{} {
 		switch key {
 		case "creator":
 			gotCreatorID = true
@@ -155,7 +155,7 @@ func (s *untrustedSignature) strictUnmarshalJSON(data []byte) error {
 
 	var t string
 	var image, identity json.RawMessage
-	if err := paranoidUnmarshalJSONObjectExactFields(critical, map[string]interface{}{
+	if err := internal.ParanoidUnmarshalJSONObjectExactFields(critical, map[string]interface{}{
 		"type":     &t,
 		"image":    &image,
 		"identity": &identity,
@@ -167,14 +167,14 @@ func (s *untrustedSignature) strictUnmarshalJSON(data []byte) error {
 	}
 
 	var digestString string
-	if err := paranoidUnmarshalJSONObjectExactFields(image, map[string]interface{}{
+	if err := internal.ParanoidUnmarshalJSONObjectExactFields(image, map[string]interface{}{
 		"docker-manifest-digest": &digestString,
 	}); err != nil {
 		return err
 	}
 	s.UntrustedDockerManifestDigest = digest.Digest(digestString)
 
-	return paranoidUnmarshalJSONObjectExactFields(identity, map[string]interface{}{
+	return internal.ParanoidUnmarshalJSONObjectExactFields(identity, map[string]interface{}{
 		"docker-reference": &s.UntrustedDockerReference,
 	})
 }
