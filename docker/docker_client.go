@@ -25,9 +25,12 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/containers/image/v5/version"
 	"github.com/containers/storage/pkg/homedir"
+	"github.com/docker/distribution/registry/api/errcode"
+	v2 "github.com/docker/distribution/registry/api/v2"
 	clientLib "github.com/docker/distribution/registry/client"
 	"github.com/docker/go-connections/tlsconfig"
 	digest "github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -900,6 +903,70 @@ func (c *dockerClient) getBlob(ctx context.Context, ref dockerReference, info ty
 	return res.Body, getBlobSize(res), nil
 }
 
+// getOCIDescriptorContents returns the contents a blob spcified by descriptor in ref, which must fit within limit.
+func (c *dockerClient) getOCIDescriptorContents(ctx context.Context, ref dockerReference, desc imgspecv1.Descriptor, maxSize int, cache types.BlobInfoCache) ([]byte, error) {
+	// Note that this copies all kinds of attachments: attestations, and whatever else is there,
+	// not just signatures. We leave the signature consumers to decide based on the MIME type.
+	reader, _, err := c.getBlob(ctx, ref, manifest.BlobInfoFromOCI1Descriptor(desc), cache)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+	payload, err := iolimits.ReadAtMost(reader, iolimits.MaxSignatureBodySize)
+	if err != nil {
+		return nil, fmt.Errorf("reading blob %s in %s: %w", desc.Digest.String(), ref.ref.Name(), err)
+	}
+	return payload, nil
+}
+
+// isManifestUnknownError returns true iff err from fetchManifest is a “manifest unknown” error.
+func isManifestUnknownError(err error) bool {
+	var errs errcode.Errors
+	if !errors.As(err, &errs) || len(errs) == 0 {
+		return false
+	}
+	err = errs[0]
+	ec, ok := err.(errcode.ErrorCoder)
+	if !ok {
+		return false
+	}
+	return ec.ErrorCode() == v2.ErrorCodeManifestUnknown
+}
+
+// getCosignAttachmentManifest loads and parses the manifest for Cosign attachments for
+// digest in ref.
+// It returns (nil, nil) if the manifest does not exist.
+func (c *dockerClient) getCosignAttachmentManifest(ctx context.Context, ref dockerReference, digest digest.Digest) (*manifest.OCI1, error) {
+	tag := cosignAttachmentTag(digest)
+	cosignRef, err := reference.WithTag(reference.TrimNamed(ref.ref), tag)
+	if err != nil {
+		return nil, err
+	}
+	logrus.Debugf("Looking for Cosign attachments in %s", cosignRef.String())
+	manifestBlob, mimeType, err := c.fetchManifest(ctx, ref, tag)
+	if err != nil {
+		// FIXME: Are we going to need better heuristics??
+		// This alone is probably a good enough reason for Cosign to be opt-in only,
+		// otherwise we would just break ordinary copies.
+		if isManifestUnknownError(err) {
+			logrus.Debugf("Fetching Cosign attachment manifest failed, assuming it does not exist: %v", err)
+			return nil, nil
+		}
+		logrus.Debugf("Fetching Cosign attachment manifest failed: %v", err)
+		return nil, err
+	}
+	if mimeType != imgspecv1.MediaTypeImageManifest {
+		// FIXME: Try anyway??
+		return nil, fmt.Errorf("unexpected MIME type for Cosign attachment manifest %s: %q",
+			cosignRef.String(), mimeType)
+	}
+	res, err := manifest.OCI1FromManifest(manifestBlob)
+	if err != nil {
+		return nil, fmt.Errorf("parsing manifest %s: %w", cosignRef.String(), err)
+	}
+	return res, nil
+}
+
 // getExtensionsSignatures returns signatures from the X-Registry-Supports-Signatures API extension,
 // using the original data structures.
 func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerReference, manifestDigest digest.Digest) (*extensionSignatureList, error) {
@@ -924,4 +991,9 @@ func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerRe
 		return nil, perrors.Wrapf(err, "decoding signature list")
 	}
 	return &parsedBody, nil
+}
+
+// cosignAttachmentTag returns a Cosign attachment tag for the specified digest.
+func cosignAttachmentTag(d digest.Digest) string {
+	return strings.Replace(d.String(), ":", "-", 1) + ".sig"
 }

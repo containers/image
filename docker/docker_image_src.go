@@ -21,6 +21,7 @@ import (
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/manifest"
+	"github.com/containers/image/v5/pkg/blobinfocache/none"
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
@@ -396,14 +397,30 @@ func (s *dockerImageSource) GetSignaturesWithFormat(ctx context.Context, instanc
 	if err := s.c.detectProperties(ctx); err != nil {
 		return nil, err
 	}
+	var res []signature.Signature
 	switch {
 	case s.c.supportsSignatures:
-		return s.getSignaturesFromAPIExtension(ctx, instanceDigest)
+		sigs, err := s.getSignaturesFromAPIExtension(ctx, instanceDigest)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, sigs...)
 	case s.c.signatureBase != nil:
-		return s.getSignaturesFromLookaside(ctx, instanceDigest)
+		sigs, err := s.getSignaturesFromLookaside(ctx, instanceDigest)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, sigs...)
 	default:
 		return nil, errors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
 	}
+
+	cosignSigs, err := s.getSignaturesFromCosignAttachments(ctx, instanceDigest)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, cosignSigs...)
+	return res, nil
 }
 
 // manifestDigest returns a digest of the manifest, from instanceDigest if non-nil; or from the supplied reference,
@@ -518,6 +535,44 @@ func (s *dockerImageSource) getSignaturesFromAPIExtension(ctx context.Context, i
 		}
 	}
 	return sigs, nil
+}
+
+func (s *dockerImageSource) getSignaturesFromCosignAttachments(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error) {
+	if !s.c.useCosignAttachments {
+		logrus.Debugf("Not looking for Cosign attachments: disabled by configuration")
+		return nil, nil
+	}
+
+	manifestDigest, err := s.manifestDigest(ctx, instanceDigest)
+	if err != nil {
+		return nil, err
+	}
+
+	ociManifest, err := s.c.getCosignAttachmentManifest(ctx, s.physicalRef, manifestDigest)
+	if err != nil {
+		return nil, err
+	}
+	if ociManifest == nil {
+		return nil, nil
+	}
+
+	logrus.Debugf("Found a Cosign attachment manifest with %d layers", len(ociManifest.Layers))
+	res := []signature.Signature{}
+	for layerIndex, layer := range ociManifest.Layers {
+		// Note that this copies all kinds of attachments: attestations, and whatever else is there,
+		// not just signatures. We leave the signature consumers to decide based on the MIME type.
+		logrus.Debugf("Fetching Cosign attachment %d/%d: %s", layerIndex+1, len(ociManifest.Layers), layer.Digest.String())
+		// We don’t benefit from a real BlobInfoCache here because we never try to reuse/mount attachment payloads.
+		// That might eventually need to change if payloads grow to be not just signatures, but something
+		// significantly large.
+		payload, err := s.c.getOCIDescriptorContents(ctx, s.physicalRef, layer, iolimits.MaxSignatureBodySize,
+			none.NoCache)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, signature.CosignFromComponents(layer.MediaType, payload, layer.Annotations))
+	}
+	return res, nil
 }
 
 // deleteImage deletes the named image from the registry, if supported.
