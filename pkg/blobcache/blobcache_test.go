@@ -17,6 +17,7 @@ import (
 	cp "github.com/containers/image/v5/copy"
 	"github.com/containers/image/v5/directory"
 	"github.com/containers/image/v5/internal/image"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/pkg/blobinfocache/none"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/types"
@@ -25,6 +26,14 @@ import (
 	specs "github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+)
+
+var (
+	_ types.ImageReference     = &BlobCache{}
+	_ types.ImageSource        = &blobCacheSource{}
+	_ private.ImageSource      = (*blobCacheSource)(nil)
+	_ types.ImageDestination   = &blobCacheDestination{}
+	_ private.ImageDestination = (*blobCacheDestination)(nil)
 )
 
 func TestMain(m *testing.M) {
