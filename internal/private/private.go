@@ -137,3 +137,10 @@ type BadPartialRequestError struct {
 func (e BadPartialRequestError) Error() string {
 	return e.Status
 }
+
+// UnparsedImage is an internal extension to the types.UnparsedImage interface.
+type UnparsedImage interface {
+	types.UnparsedImage
+	// UntrustedSignatures is like ImageSource.GetSignaturesWithFormat, but the result is cached; it is OK to call this however often you need.
+	UntrustedSignatures(ctx context.Context) ([]signature.Signature, error)
+}
