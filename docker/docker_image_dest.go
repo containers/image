@@ -18,12 +18,14 @@ import (
 	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/imagedestination/impl"
 	"github.com/containers/image/v5/internal/imagedestination/stubs"
+	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/internal/streamdigest"
 	"github.com/containers/image/v5/internal/uploadreader"
 	"github.com/containers/image/v5/manifest"
+	"github.com/containers/image/v5/pkg/blobinfocache/none"
 	"github.com/containers/image/v5/types"
 	"github.com/docker/distribution/registry/api/errcode"
 	v2 "github.com/docker/distribution/registry/api/v2"
@@ -521,10 +523,6 @@ func isManifestInvalidError(err error) bool {
 // (when the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
 // MUST be called after PutManifest (signatures may reference manifest contents).
 func (d *dockerImageDestination) PutSignaturesWithFormat(ctx context.Context, signatures []signature.Signature, instanceDigest *digest.Digest) error {
-	// Do not fail if we don’t really need to support signatures.
-	if len(signatures) == 0 {
-		return nil
-	}
 	if instanceDigest == nil {
 		if d.manifestDigest == "" {
 			// This shouldn’t happen, ImageDestination users are required to call PutManifest before PutSignatures
@@ -533,17 +531,45 @@ func (d *dockerImageDestination) PutSignaturesWithFormat(ctx context.Context, si
 		instanceDigest = &d.manifestDigest
 	}
 
-	if err := d.c.detectProperties(ctx); err != nil {
-		return err
+	cosignSignatures := []signature.Cosign{}
+	otherSignatures := []signature.Signature{}
+	for _, sig := range signatures {
+		if cosignSig, ok := sig.(signature.Cosign); ok {
+			cosignSignatures = append(cosignSignatures, cosignSig)
+		} else {
+			otherSignatures = append(otherSignatures, sig)
+		}
 	}
-	switch {
-	case d.c.supportsSignatures:
-		return d.putSignaturesToAPIExtension(ctx, signatures, *instanceDigest)
-	case d.c.signatureBase != nil:
-		return d.putSignaturesToLookaside(signatures, *instanceDigest)
-	default:
-		return errors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
+
+	// Only write Cosign signatures to cosign attachments. We _could_ store them to lookaside
+	// instead, but that would probably be rather surprising.
+	// FIXME: So should we enable cosign in all cases? Or write in all cases, but opt-in to read?
+
+	if len(cosignSignatures) != 0 {
+		if err := d.putSignaturesToCosignAttachments(ctx, cosignSignatures, *instanceDigest); err != nil {
+			return err
+		}
 	}
+
+	if len(otherSignatures) != 0 {
+		if err := d.c.detectProperties(ctx); err != nil {
+			return err
+		}
+		switch {
+		case d.c.supportsSignatures:
+			if err := d.putSignaturesToAPIExtension(ctx, signatures, *instanceDigest); err != nil {
+				return err
+			}
+		case d.c.signatureBase != nil:
+			if err := d.putSignaturesToLookaside(signatures, *instanceDigest); err != nil {
+				return err
+			}
+		default:
+			return errors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
+		}
+	}
+
+	return nil
 }
 
 // putSignaturesToLookaside implements PutSignaturesWithFormat() from the lookaside location configured in s.c.signatureBase,
@@ -609,6 +635,140 @@ func (d *dockerImageDestination) putOneSignature(url *url.URL, sig signature.Sig
 	default:
 		return fmt.Errorf("Unsupported scheme when writing signature to %s", url.Redacted())
 	}
+}
+
+func (d *dockerImageDestination) putSignaturesToCosignAttachments(ctx context.Context, signatures []signature.Cosign, manifestDigest digest.Digest) error {
+	if !d.c.useCosignAttachments {
+		return errors.New("writing Cosign attachments is disabled by configuration")
+	}
+
+	ociManifest, err := d.c.getCosignAttachmentManifest(ctx, d.ref, manifestDigest)
+	if err != nil {
+		return nil
+	}
+	var ociConfig imgspecv1.Image // Most fields empty by default
+	if ociManifest == nil {
+		ociManifest = manifest.OCI1FromComponents(imgspecv1.Descriptor{
+			MediaType: imgspecv1.MediaTypeImageConfig,
+			Digest:    "", // We will fill this in later.
+			Size:      0,
+		}, nil)
+	} else {
+		logrus.Debugf("Fetching Cosign attachment config %s", ociManifest.Config.Digest.String())
+		// We don’t benefit from a real BlobInfoCache here because we never try to reuse/mount configs.
+		configBlob, err := d.c.getOCIDescriptorContents(ctx, d.ref, ociManifest.Config, iolimits.MaxConfigBodySize,
+			none.NoCache)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(configBlob, &ociConfig); err != nil {
+			return fmt.Errorf("parsing Cosign attachment config %s in %s: %w", ociManifest.Config.Digest.String(),
+				d.ref.ref.Name(), err)
+		}
+	}
+
+	for _, sig := range signatures {
+		mimeType := sig.UntrustedMIMEType()
+		payloadBlob := sig.UntrustedPayload()
+		annotations := sig.UntrustedAnnotations()
+
+		alreadyOnRegistry := false
+		for _, layer := range ociManifest.Layers {
+			if layerMatchesCosignSignature(layer, mimeType, payloadBlob, annotations) {
+				logrus.Debugf("Signature with digest %s already exists on the registry", layer.Digest.String())
+				alreadyOnRegistry = true
+				break
+			}
+		}
+		if alreadyOnRegistry {
+			continue
+		}
+
+		// We don’t benefit from a real BlobInfoCache here because we never try to reuse/mount attachment payloads.
+		// That might eventually need to change if payloads grow to be not just signatures, but something
+		// significantly large.
+		sigDesc, err := d.putBlobBytesAsOCI(ctx, payloadBlob, mimeType, private.PutBlobOptions{
+			Cache:      none.NoCache,
+			IsConfig:   false,
+			EmptyLayer: false,
+			LayerIndex: nil,
+		})
+		if err != nil {
+			return err
+		}
+		sigDesc.Annotations = annotations
+		ociManifest.Layers = append(ociManifest.Layers, sigDesc)
+		ociConfig.RootFS.DiffIDs = append(ociConfig.RootFS.DiffIDs, sigDesc.Digest)
+		logrus.Debugf("Adding new signature, digest %s", sigDesc.Digest.String())
+	}
+
+	configBlob, err := json.Marshal(ociConfig)
+	if err != nil {
+		return err
+	}
+	logrus.Debugf("Uploading updated Cosign attachment config")
+	// We don’t benefit from a real BlobInfoCache here because we never try to reuse/mount configs.
+	configDesc, err := d.putBlobBytesAsOCI(ctx, configBlob, imgspecv1.MediaTypeImageConfig, private.PutBlobOptions{
+		Cache:      none.NoCache,
+		IsConfig:   true,
+		EmptyLayer: false,
+		LayerIndex: nil,
+	})
+	if err != nil {
+		return nil
+	}
+	ociManifest.Config = configDesc
+
+	manifestBlob, err := ociManifest.Serialize()
+	if err != nil {
+		return nil
+	}
+	logrus.Debugf("Uploading Cosign attachment manifest")
+	return d.uploadManifest(ctx, manifestBlob, cosignAttachmentTag(manifestDigest))
+}
+
+func layerMatchesCosignSignature(layer imgspecv1.Descriptor, mimeType string,
+	payloadBlob []byte, annotations map[string]string) bool {
+	if layer.MediaType != mimeType ||
+		layer.Size != int64(len(payloadBlob)) ||
+		// This is not quite correct, we should use the layer’s digest algorithm.
+		// But right now we don’t want to deal with corner cases like bad digest formats
+		// or unavailable algorithms; in the worst case we end up with duplicate signature
+		// entries.
+		layer.Digest.String() != digest.FromBytes(payloadBlob).String() {
+		return false
+	}
+	if len(layer.Annotations) != len(annotations) {
+		return false
+	}
+	for k, v1 := range layer.Annotations {
+		if v2, ok := annotations[k]; !ok || v1 != v2 {
+			return false
+		}
+	}
+	// All annotations in layer exist in sig, and the number of annotations is the same, so all annotations
+	// in sig also exist in layer.
+	return true
+}
+
+// putBlobBytesAsOCI uploads a blob with the specified contents, and returns an appropriate
+// OCI descriptior.
+func (d *dockerImageDestination) putBlobBytesAsOCI(ctx context.Context, contents []byte, mimeType string, options private.PutBlobOptions) (imgspecv1.Descriptor, error) {
+	blobDigest := digest.FromBytes(contents)
+	info, err := d.PutBlobWithOptions(ctx, bytes.NewReader(contents),
+		types.BlobInfo{
+			Digest:    blobDigest,
+			Size:      int64(len(contents)),
+			MediaType: mimeType,
+		}, options)
+	if err != nil {
+		return imgspecv1.Descriptor{}, fmt.Errorf("writing blob %s: %w", blobDigest.String(), err)
+	}
+	return imgspecv1.Descriptor{
+		MediaType: mimeType,
+		Digest:    info.Digest,
+		Size:      info.Size,
+	}, nil
 }
 
 // deleteOneSignature deletes a signature from url, if it exists.
