@@ -8,7 +8,7 @@ import (
 	"github.com/containers/image/v5/types"
 )
 
-// nameOnlyImageMock is a mock of types.UnparsedImage which only allows transports.ImageName to work
+// nameOnlyImageMock is a mock of private.UnparsedImage which only allows transports.ImageName to work
 type nameOnlyImageMock struct {
 	mocks.ForbiddenUnparsedImage
 }

@@ -3,6 +3,7 @@ package mocks
 import (
 	"context"
 
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/types"
 )
 
@@ -21,5 +22,10 @@ func (ref ForbiddenUnparsedImage) Manifest(ctx context.Context) ([]byte, string,
 
 // Signatures is a mock that panics.
 func (ref ForbiddenUnparsedImage) Signatures(context.Context) ([][]byte, error) {
+	panic("unexpected call to a mock function")
+}
+
+// UntrustedSignatures is a mock that panics.
+func (ref ForbiddenUnparsedImage) UntrustedSignatures(ctx context.Context) ([]signature.Signature, error) {
 	panic("unexpected call to a mock function")
 }

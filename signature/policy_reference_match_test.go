@@ -52,7 +52,7 @@ func TestParseImageAndDockerReference(t *testing.T) {
 	}
 }
 
-// refImageMock is a mock of types.UnparsedImage which returns itself in Reference().DockerReference.
+// refImageMock is a mock of private.UnparsedImage which returns itself in Reference().DockerReference.
 type refImageMock struct {
 	mocks.ForbiddenUnparsedImage
 	ref reference.Named
