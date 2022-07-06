@@ -9,6 +9,7 @@ import (
 	"github.com/containers/image/v5/directory"
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/image"
+	"github.com/containers/image/v5/internal/imagesource"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
 	"github.com/stretchr/testify/assert"
@@ -33,14 +34,14 @@ func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) pri
 		require.NoError(t, err)
 	})
 	return image.UnparsedInstance(&dirImageSourceMock{
-		ImageSource: src,
+		ImageSource: imagesource.FromPublic(src),
 		ref:         ref,
 	}, nil)
 }
 
 // dirImageSourceMock inherits dirImageSource, but overrides its Reference method.
 type dirImageSourceMock struct {
-	types.ImageSource
+	private.ImageSource
 	ref types.ImageReference
 }
 

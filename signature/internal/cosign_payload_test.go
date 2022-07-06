@@ -1,11 +1,17 @@
 package internal
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/version"
+	digest "github.com/opencontainers/go-digest"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -205,4 +211,133 @@ func TestUntrustedCosignPayloadUnmarshalJSON(t *testing.T) {
 	require.NoError(t, err)
 	s = successfullyUnmarshalUntrustedCosignPayload(t, validJSON)
 	assert.Equal(t, validSig, s)
+}
+
+func TestVerifyCosignPayload(t *testing.T) {
+	publicKeyPEM, err := os.ReadFile("./testdata/cosign.pub")
+	require.NoError(t, err)
+	publicKey, err := cryptoutils.UnmarshalPEMToPublicKey(publicKeyPEM)
+	require.NoError(t, err)
+
+	type acceptanceData struct {
+		signedDockerReference      string
+		signedDockerManifestDigest digest.Digest
+	}
+	var wanted, recorded acceptanceData
+	// recordingRules are a plausible CosignPayloadAcceptanceRules implementations, but equally
+	// importantly record that we are passing the correct values to the rule callbacks.
+	recordingRules := CosignPayloadAcceptanceRules{
+		ValidateSignedDockerReference: func(signedDockerReference string) error {
+			recorded.signedDockerReference = signedDockerReference
+			if signedDockerReference != wanted.signedDockerReference {
+				return errors.New("signedDockerReference mismatch")
+			}
+			return nil
+		},
+		ValidateSignedDockerManifestDigest: func(signedDockerManifestDigest digest.Digest) error {
+			recorded.signedDockerManifestDigest = signedDockerManifestDigest
+			if signedDockerManifestDigest != wanted.signedDockerManifestDigest {
+				return errors.New("signedDockerManifestDigest mismatch")
+			}
+			return nil
+		},
+	}
+
+	sigBlob, err := os.ReadFile("./testdata/valid.signature")
+	require.NoError(t, err)
+	genericSig, err := signature.FromBlob(sigBlob)
+	require.NoError(t, err)
+	cosignSig, ok := genericSig.(signature.Cosign)
+	require.True(t, ok)
+	cryptoBase64Sig, ok := cosignSig.UntrustedAnnotations()[signature.CosignSignatureAnnotationKey]
+	require.True(t, ok)
+	signatureData := acceptanceData{
+		signedDockerReference:      TestCosignSignatureReference,
+		signedDockerManifestDigest: TestCosignManifestDigest,
+	}
+
+	// Successful verification
+	wanted = signatureData
+	recorded = acceptanceData{}
+	res, err := VerifyCosignPayload(publicKey, cosignSig.UntrustedPayload(), cryptoBase64Sig, recordingRules)
+	require.NoError(t, err)
+	assert.Equal(t, res, &UntrustedCosignPayload{
+		UntrustedDockerManifestDigest: TestCosignManifestDigest,
+		UntrustedDockerReference:      TestCosignSignatureReference,
+		UntrustedCreatorID:            nil,
+		UntrustedTimestamp:            nil,
+	})
+	assert.Equal(t, signatureData, recorded)
+
+	// For extra paranoia, test that we return a nil signature object on error.
+
+	// Invalid verifier
+	recorded = acceptanceData{}
+	invalidPublicKey := struct{}{} // crypto.PublicKey is, for some reason, just an interface{}, so this is acceptable.
+	res, err = VerifyCosignPayload(invalidPublicKey, cosignSig.UntrustedPayload(), cryptoBase64Sig, recordingRules)
+	assert.Error(t, err)
+	assert.Nil(t, res)
+	assert.Equal(t, acceptanceData{}, recorded)
+
+	// Invalid base64 encoding
+	for _, invalidBase64Sig := range []string{
+		"&",                                      // Invalid base64 characters
+		cryptoBase64Sig + "=",                    // Extra padding
+		cryptoBase64Sig[:len(cryptoBase64Sig)-1], // Truncated base64 data
+	} {
+		recorded = acceptanceData{}
+		res, err = VerifyCosignPayload(publicKey, cosignSig.UntrustedPayload(), invalidBase64Sig, recordingRules)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assert.Equal(t, acceptanceData{}, recorded)
+	}
+
+	// Invalid signature
+	validSignatureBytes, err := base64.StdEncoding.DecodeString(cryptoBase64Sig)
+	require.NoError(t, err)
+	for _, invalidSig := range [][]byte{
+		{}, // Empty signature
+		[]byte("invalid signature"),
+		append(validSignatureBytes, validSignatureBytes...),
+	} {
+		recorded = acceptanceData{}
+		res, err = VerifyCosignPayload(publicKey, cosignSig.UntrustedPayload(), base64.StdEncoding.EncodeToString(invalidSig), recordingRules)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assert.Equal(t, acceptanceData{}, recorded)
+	}
+
+	// Valid signature of non-JSON
+	recorded = acceptanceData{}
+	res, err = VerifyCosignPayload(publicKey, []byte("&"), "MEUCIARnnxZQPALBfqkB4aNAYXad79Qs6VehcrgIeZ8p7I2FAiEAzq2HXwXlz1iJeh+ucUR3L0zpjynQk6Rk0+/gXYp49RU=", recordingRules)
+	assert.Error(t, err)
+	assert.Nil(t, res)
+	assert.Equal(t, acceptanceData{}, recorded)
+
+	// Valid signature of an unacceptable JSON
+	recorded = acceptanceData{}
+	res, err = VerifyCosignPayload(publicKey, []byte("{}"), "MEUCIQDkySOBGxastVP0+koTA33NH5hXjwosFau4rxTPN6g48QIgb7eWKkGqfEpHMM3aT4xiqyP/170jEkdFuciuwN4mux4=", recordingRules)
+	assert.Error(t, err)
+	assert.Nil(t, res)
+	assert.Equal(t, acceptanceData{}, recorded)
+
+	// Valid signature with a wrong manifest digest: asked for signedDockerManifestDigest
+	wanted = signatureData
+	wanted.signedDockerManifestDigest = "invalid digest"
+	recorded = acceptanceData{}
+	res, err = VerifyCosignPayload(publicKey, cosignSig.UntrustedPayload(), cryptoBase64Sig, recordingRules)
+	assert.Error(t, err)
+	assert.Nil(t, res)
+	assert.Equal(t, acceptanceData{
+		signedDockerManifestDigest: signatureData.signedDockerManifestDigest,
+	}, recorded)
+
+	// Valid signature with a wrong image reference
+	wanted = signatureData
+	wanted.signedDockerReference = "unexpected docker reference"
+	recorded = acceptanceData{}
+	res, err = VerifyCosignPayload(publicKey, cosignSig.UntrustedPayload(), cryptoBase64Sig, recordingRules)
+	assert.Error(t, err)
+	assert.Nil(t, res)
+	assert.Equal(t, signatureData, recorded)
 }

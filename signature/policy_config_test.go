@@ -98,6 +98,14 @@ var policyFixtureContents = &Policy{
 			"bogus/signed-identity-example": {
 				xNewPRSignedBaseLayer(xNewPRMExactReference("registry.access.redhat.com/rhel7/rhel:latest")),
 			},
+			"example.com/cosign/key-data-example": {
+				xNewPRCosignSignedKeyData([]byte("nonsense"),
+					NewPRMMatchRepoDigestOrExact()),
+			},
+			"example.com/cosign/key-Path-example": {
+				xNewPRCosignSignedKeyPath("/keys/public-key",
+					NewPRMMatchRepository()),
+			},
 		},
 	},
 }
@@ -946,6 +954,164 @@ func TestPRSignedBaseLayerUnmarshalJSON(t *testing.T) {
 		},
 		duplicateFields: []string{"type", "baseLayerIdentity"},
 	}.run(t)
+}
+
+// xNewPRCosignSignedKeyPath is like NewPRCosignSignedKeyPath, except it must not fail.
+func xNewPRCosignSignedKeyPath(keyPath string, signedIdentity PolicyReferenceMatch) PolicyRequirement {
+	pr, err := NewPRCosignSignedKeyPath(keyPath, signedIdentity)
+	if err != nil {
+		panic("xNewPRCosignSignedKeyPath failed")
+	}
+	return pr
+}
+
+// xNewPRCosignSignedKeyData is like NewPRCosignSignedKeyData, except it must not fail.
+func xNewPRCosignSignedKeyData(keyData []byte, signedIdentity PolicyReferenceMatch) PolicyRequirement {
+	pr, err := NewPRCosignSignedKeyData(keyData, signedIdentity)
+	if err != nil {
+		panic("xNewPRCosignSignedKeyData failed")
+	}
+	return pr
+}
+
+func TestNewPRCosignSigned(t *testing.T) {
+	const testPath = "/foo/bar"
+	testData := []byte("abc")
+	testIdentity := NewPRMMatchRepoDigestOrExact()
+
+	// Success
+	pr, err := newPRCosignSigned(testPath, nil, testIdentity)
+	require.NoError(t, err)
+	assert.Equal(t, &prCosignSigned{
+		prCommon:       prCommon{prTypeCosignSigned},
+		KeyPath:        testPath,
+		KeyData:        nil,
+		SignedIdentity: testIdentity,
+	}, pr)
+	pr, err = newPRCosignSigned("", testData, testIdentity)
+	require.NoError(t, err)
+	assert.Equal(t, &prCosignSigned{
+		prCommon:       prCommon{prTypeCosignSigned},
+		KeyPath:        "",
+		KeyData:        testData,
+		SignedIdentity: testIdentity,
+	}, pr)
+
+	// Both keyPath and keyData specified
+	_, err = newPRCosignSigned(testPath, testData, testIdentity)
+	assert.Error(t, err)
+
+	// Invalid signedIdentity
+	_, err = newPRCosignSigned(testPath, nil, nil)
+	assert.Error(t, err)
+}
+
+func TestNewPRCosignSignedKeyPath(t *testing.T) {
+	const testPath = "/foo/bar"
+	_pr, err := NewPRCosignSignedKeyPath(testPath, NewPRMMatchRepoDigestOrExact())
+	require.NoError(t, err)
+	pr, ok := _pr.(*prCosignSigned)
+	require.True(t, ok)
+	assert.Equal(t, testPath, pr.KeyPath)
+	// Failure cases tested in TestNewPRCosignSigned.
+}
+
+func TestNewPRCosignSignedKeyData(t *testing.T) {
+	testData := []byte("abc")
+	_pr, err := NewPRCosignSignedKeyData(testData, NewPRMMatchRepoDigestOrExact())
+	require.NoError(t, err)
+	pr, ok := _pr.(*prCosignSigned)
+	require.True(t, ok)
+	assert.Equal(t, testData, pr.KeyData)
+	// Failure cases tested in TestNewPRCosignSigned.
+}
+
+// Return the result of modifying validJSON with fn and unmarshaling it into *pr
+func tryUnmarshalModifiedCosignSigned(t *testing.T, pr *prCosignSigned, validJSON []byte, modifyFn func(mSI)) error {
+	var tmp mSI
+	err := json.Unmarshal(validJSON, &tmp)
+	require.NoError(t, err)
+
+	modifyFn(tmp)
+
+	*pr = prCosignSigned{}
+	return jsonUnmarshalFromObject(t, tmp, &pr)
+}
+
+func TestPRCosignSignedUnmarshalJSON(t *testing.T) {
+	keyDataTests := policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prCosignSigned{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRCosignSignedKeyData([]byte("abc"), NewPRMMatchRepoDigestOrExact())
+		},
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyRequirementFromJSON(validJSON)
+		},
+		breakFns: []func(mSI){
+			// The "type" field is missing
+			func(v mSI) { delete(v, "type") },
+			// Wrong "type" field
+			func(v mSI) { v["type"] = 1 },
+			func(v mSI) { v["type"] = "this is invalid" },
+			// Extra top-level sub-object
+			func(v mSI) { v["unexpected"] = 1 },
+			// Both "keyPath" and "keyData" is missing
+			func(v mSI) { delete(v, "keyData") },
+			// Both "keyPath" and "keyData" is present
+			func(v mSI) { v["keyPath"] = "/foo/bar" },
+			// Invalid "keyPath" field
+			func(v mSI) { delete(v, "keyData"); v["keyPath"] = 1 },
+			func(v mSI) { v["type"] = "this is invalid" },
+			// Invalid "keyData" field
+			func(v mSI) { v["keyData"] = 1 },
+			func(v mSI) { v["keyData"] = "this is invalid base64" },
+			// Invalid "signedIdentity" field
+			func(v mSI) { v["signedIdentity"] = "this is invalid" },
+			// "signedIdentity" an explicit nil
+			func(v mSI) { v["signedIdentity"] = nil },
+		},
+		duplicateFields: []string{"type", "keyData", "signedIdentity"},
+	}
+	keyDataTests.run(t)
+	// Test the keyPath-specific aspects
+	policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prCosignSigned{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRCosignSignedKeyPath("/foo/bar", NewPRMMatchRepoDigestOrExact())
+		},
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyRequirementFromJSON(validJSON)
+		},
+		duplicateFields: []string{"type", "keyPath", "signedIdentity"},
+	}.run(t)
+
+	var pr prCosignSigned
+
+	// Start with a valid JSON.
+	_, validJSON := keyDataTests.validObjectAndJSON(t)
+
+	// Various allowed modifications to the requirement
+	allowedModificationFns := []func(mSI){
+		// Delete the signedIdentity field
+		func(v mSI) { delete(v, "signedIdentity") },
+	}
+	for _, fn := range allowedModificationFns {
+		err := tryUnmarshalModifiedCosignSigned(t, &pr, validJSON, fn)
+		require.NoError(t, err)
+	}
+
+	// Various ways to set signedIdentity to the default value
+	signedIdentityDefaultFns := []func(mSI){
+		// Set signedIdentity to the default explicitly
+		func(v mSI) { v["signedIdentity"] = NewPRMMatchRepoDigestOrExact() },
+		// Delete the signedIdentity field
+		func(v mSI) { delete(v, "signedIdentity") },
+	}
+	for _, fn := range signedIdentityDefaultFns {
+		err := tryUnmarshalModifiedCosignSigned(t, &pr, validJSON, fn)
+		require.NoError(t, err)
+		assert.Equal(t, NewPRMMatchRepoDigestOrExact(), pr.SignedIdentity)
+	}
 }
 
 func TestNewPolicyReferenceMatchFromJSON(t *testing.T) {

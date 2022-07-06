@@ -132,6 +132,21 @@
                         "dockerReference": "registry.access.redhat.com/rhel7/rhel:latest"
                     }
                 }
+            ],
+            "example.com/cosign/key-data-example": [
+                {
+                    "type": "cosignSigned",
+                    "keyData": "bm9uc2Vuc2U="
+                }
+            ],
+            "example.com/cosign/key-Path-example": [
+                {
+                    "type": "cosignSigned",
+                    "keyPath": "/keys/public-key",
+                    "signedIdentity": {
+                        "type": "matchRepository"
+                    }
+                }
             ]
         }
     }
