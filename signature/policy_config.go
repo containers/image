@@ -244,6 +244,8 @@ func newPolicyRequirementFromJSON(data []byte) (PolicyRequirement, error) {
 		res = &prSignedBy{}
 	case prTypeSignedBaseLayer:
 		res = &prSignedBaseLayer{}
+	case prTypeCosignSigned:
+		res = &prCosignSigned{}
 	default:
 		return nil, InvalidPolicyFormatError(fmt.Sprintf("Unknown policy requirement type \"%s\"", typeField.Type))
 	}
@@ -490,6 +492,107 @@ func (pr *prSignedBaseLayer) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*pr = *res
+	return nil
+}
+
+// newPRCosignSigned returns a new prCosignSigned if parameters are valid.
+func newPRCosignSigned(keyPath string, keyData []byte, signedIdentity PolicyReferenceMatch) (*prCosignSigned, error) {
+	if len(keyPath) > 0 && len(keyData) > 0 {
+		return nil, InvalidPolicyFormatError("keyType and keyData cannot be used simultaneously")
+	}
+	if signedIdentity == nil {
+		return nil, InvalidPolicyFormatError("signedIdentity not specified")
+	}
+	return &prCosignSigned{
+		prCommon:       prCommon{Type: prTypeCosignSigned},
+		KeyPath:        keyPath,
+		KeyData:        keyData,
+		SignedIdentity: signedIdentity,
+	}, nil
+}
+
+// newPRCosignSignedKeyPath is NewPRCosignSignedKeyPath, except it returns the private type.
+func newPRCosignSignedKeyPath(keyPath string, signedIdentity PolicyReferenceMatch) (*prCosignSigned, error) {
+	return newPRCosignSigned(keyPath, nil, signedIdentity)
+}
+
+// NewPRCosignSignedKeyPath returns a new "cosignSigned" PolicyRequirement using a KeyPath
+func NewPRCosignSignedKeyPath(keyPath string, signedIdentity PolicyReferenceMatch) (PolicyRequirement, error) {
+	return newPRCosignSignedKeyPath(keyPath, signedIdentity)
+}
+
+// newPRCosignSignedKeyData is NewPRCosignSignedKeyData, except it returns the private type.
+func newPRCosignSignedKeyData(keyData []byte, signedIdentity PolicyReferenceMatch) (*prCosignSigned, error) {
+	return newPRCosignSigned("", keyData, signedIdentity)
+}
+
+// NewPRCosignSignedKeyData returns a new "cosignSigned" PolicyRequirement using a KeyData
+func NewPRCosignSignedKeyData(keyData []byte, signedIdentity PolicyReferenceMatch) (PolicyRequirement, error) {
+	return newPRCosignSignedKeyData(keyData, signedIdentity)
+}
+
+// Compile-time check that prCosignSigned implements json.Unmarshaler.
+var _ json.Unmarshaler = (*prCosignSigned)(nil)
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (pr *prCosignSigned) UnmarshalJSON(data []byte) error {
+	*pr = prCosignSigned{}
+	var tmp prCosignSigned
+	var gotKeyPath, gotKeyData = false, false
+	var signedIdentity json.RawMessage
+	if err := internal.ParanoidUnmarshalJSONObject(data, func(key string) interface{} {
+		switch key {
+		case "type":
+			return &tmp.Type
+		case "keyPath":
+			gotKeyPath = true
+			return &tmp.KeyPath
+		case "keyData":
+			gotKeyData = true
+			return &tmp.KeyData
+		case "signedIdentity":
+			return &signedIdentity
+		default:
+			return nil
+		}
+	}); err != nil {
+		return err
+	}
+
+	if tmp.Type != prTypeCosignSigned {
+		return InvalidPolicyFormatError(fmt.Sprintf("Unexpected policy requirement type \"%s\"", tmp.Type))
+	}
+	if signedIdentity == nil {
+		tmp.SignedIdentity = NewPRMMatchRepoDigestOrExact()
+	} else {
+		si, err := newPolicyReferenceMatchFromJSON(signedIdentity)
+		if err != nil {
+			return err
+		}
+		tmp.SignedIdentity = si
+	}
+
+	var res *prCosignSigned
+	var err error
+	switch {
+	case gotKeyPath && gotKeyData:
+		return InvalidPolicyFormatError("keyPath and keyData cannot be used simultaneously")
+	case gotKeyPath && !gotKeyData:
+		res, err = newPRCosignSignedKeyPath(tmp.KeyPath, tmp.SignedIdentity)
+	case !gotKeyPath && gotKeyData:
+		res, err = newPRCosignSignedKeyData(tmp.KeyData, tmp.SignedIdentity)
+	case !gotKeyPath && !gotKeyData:
+		return InvalidPolicyFormatError("At least one of keyPath and keyData mus be specified")
+	default: // Coverage: This should never happen
+		return fmt.Errorf("Impossible keyPath/keyData presence combination!?")
+	}
+	if err != nil {
+		// Coverage: This cannot currently happen, creating a prCosignSigned only fails
+		// if signedIdentity is nil, which we replace with a default above.
+		return err
+	}
+	*pr = *res
+
 	return nil
 }
 
