@@ -77,7 +77,7 @@ type prSignedBy struct {
 	KeyData []byte `json:"keyData,omitempty"`
 
 	// SignedIdentity specifies what image identity the signature must be claiming about the image.
-	// Defaults to "match-exact" if not specified.
+	// Defaults to "matchRepoDigestOrExact" if not specified.
 	SignedIdentity PolicyReferenceMatch `json:"signedIdentity"`
 }
 
