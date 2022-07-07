@@ -5,6 +5,9 @@ import (
 	"fmt"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/imagesource"
+	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
@@ -16,13 +19,13 @@ import (
 //
 // This is publicly visible as c/image/image.UnparsedImage.
 type UnparsedImage struct {
-	src            types.ImageSource
+	src            private.ImageSource
 	instanceDigest *digest.Digest
 	cachedManifest []byte // A private cache for Manifest(); nil if not yet known.
 	// A private cache for Manifest(), may be the empty string if guessing failed.
 	// Valid iff cachedManifest is not nil.
 	cachedManifestMIMEType string
-	cachedSignatures       [][]byte // A private cache for Signatures(); nil if not yet known.
+	cachedSignatures       []signature.Signature // A private cache for Signatures(); nil if not yet known.
 }
 
 // UnparsedInstance returns a types.UnparsedImage implementation for (source, instanceDigest).
@@ -33,7 +36,7 @@ type UnparsedImage struct {
 // This is publicly visible as c/image/image.UnparsedInstance.
 func UnparsedInstance(src types.ImageSource, instanceDigest *digest.Digest) *UnparsedImage {
 	return &UnparsedImage{
-		src:            src,
+		src:            imagesource.FromPublic(src),
 		instanceDigest: instanceDigest,
 	}
 }
@@ -89,8 +92,23 @@ func (i *UnparsedImage) expectedManifestDigest() (digest.Digest, bool) {
 
 // Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 func (i *UnparsedImage) Signatures(ctx context.Context) ([][]byte, error) {
+	sigs, err := i.signaturesWithFormat(ctx)
+	if err != nil {
+		return nil, err
+	}
+	simpleSigs := [][]byte{}
+	for _, sig := range sigs {
+		if sig, ok := sig.(signature.SimpleSigning); ok {
+			simpleSigs = append(simpleSigs, sig.UntrustedSignature())
+		}
+	}
+	return simpleSigs, nil
+}
+
+// signaturesWithFormat is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
+func (i *UnparsedImage) signaturesWithFormat(ctx context.Context) ([]signature.Signature, error) {
 	if i.cachedSignatures == nil {
-		sigs, err := i.src.GetSignatures(ctx, i.instanceDigest)
+		sigs, err := i.src.GetSignaturesWithFormat(ctx, i.instanceDigest)
 		if err != nil {
 			return nil, err
 		}

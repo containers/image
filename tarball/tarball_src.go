@@ -21,6 +21,7 @@ import (
 )
 
 type tarballImageSource struct {
+	impl.Compat
 	impl.PropertyMethodsInitialize
 	impl.NoSignatures
 	impl.DoesNotAffectLayerInfosForCopy
@@ -209,6 +210,7 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		configSize: configSize,
 		manifest:   manifestBytes,
 	}
+	src.Compat = impl.AddCompat(src)
 
 	return src, nil
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/containers/image/v5/internal/imagesource"
 	"github.com/containers/image/v5/internal/pkg/platform"
 	"github.com/containers/image/v5/internal/private"
+	internalsig "github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache"
 	"github.com/containers/image/v5/pkg/compression"
@@ -396,12 +397,12 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	updatedList := originalList.Clone()
 
 	// Read and/or clear the set of signatures for this list.
-	var sigs [][]byte
+	var sigs []internalsig.Signature
 	if options.RemoveSignatures {
-		sigs = [][]byte{}
+		sigs = []internalsig.Signature{}
 	} else {
 		c.Printf("Getting image list signatures\n")
-		s, err := c.rawSource.GetSignatures(ctx, nil)
+		s, err := c.rawSource.GetSignaturesWithFormat(ctx, nil)
 		if err != nil {
 			return nil, perrors.Wrap(err, "reading signatures")
 		}
@@ -576,7 +577,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	}
 
 	c.Printf("Storing list signatures\n")
-	if err := c.dest.PutSignatures(ctx, sigs, nil); err != nil {
+	if err := c.dest.PutSignaturesWithFormat(ctx, sigs, nil); err != nil {
 		return nil, perrors.Wrap(err, "writing signatures")
 	}
 
@@ -639,12 +640,12 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 		return nil, "", "", err
 	}
 
-	var sigs [][]byte
+	var sigs []internalsig.Signature
 	if options.RemoveSignatures {
-		sigs = [][]byte{}
+		sigs = []internalsig.Signature{}
 	} else {
 		c.Printf("Getting image source signatures\n")
-		s, err := src.Signatures(ctx)
+		s, err := src.SignaturesWithFormat(ctx)
 		if err != nil {
 			return nil, "", "", perrors.Wrap(err, "reading signatures")
 		}
@@ -807,7 +808,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 	}
 
 	c.Printf("Storing signatures\n")
-	if err := c.dest.PutSignatures(ctx, sigs, targetInstance); err != nil {
+	if err := c.dest.PutSignaturesWithFormat(ctx, sigs, targetInstance); err != nil {
 		return nil, "", "", perrors.Wrap(err, "writing signatures")
 	}
 

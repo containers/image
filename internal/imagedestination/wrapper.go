@@ -6,7 +6,9 @@ import (
 
 	"github.com/containers/image/v5/internal/imagedestination/stubs"
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/types"
+	"github.com/opencontainers/go-digest"
 )
 
 // wrapped provides the private.ImageDestination operations
@@ -58,4 +60,20 @@ func (w *wrapped) PutBlobWithOptions(ctx context.Context, stream io.Reader, inpu
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 func (w *wrapped) TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
 	return w.TryReusingBlob(ctx, info, options.Cache, options.CanSubstitute)
+}
+
+// PutSignaturesWithFormat writes a set of signatures to the destination.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to write or overwrite the signatures for
+// (when the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
+// MUST be called after PutManifest (signatures may reference manifest contents).
+func (w *wrapped) PutSignaturesWithFormat(ctx context.Context, signatures []signature.Signature, instanceDigest *digest.Digest) error {
+	simpleSigs := [][]byte{}
+	for _, sig := range signatures {
+		simpleSig, ok := sig.(signature.SimpleSigning)
+		if !ok {
+			return signature.UnsupportedFormatError(sig)
+		}
+		simpleSigs = append(simpleSigs, simpleSig.UntrustedSignature())
+	}
+	return w.PutSignatures(ctx, simpleSigs, instanceDigest)
 }

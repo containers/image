@@ -9,7 +9,9 @@ import (
 
 	"github.com/containers/image/v5/internal/image"
 	"github.com/containers/image/v5/internal/imagesource"
+	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/compression"
 	"github.com/containers/image/v5/transports"
@@ -21,6 +23,8 @@ import (
 )
 
 type blobCacheSource struct {
+	impl.Compat
+
 	reference *BlobCache
 	source    private.ImageSource
 	sys       types.SystemContext
@@ -37,7 +41,9 @@ func (b *BlobCache) NewImageSource(ctx context.Context, sys *types.SystemContext
 		return nil, perrors.Wrapf(err, "error creating new image source %q", transports.ImageName(b.reference))
 	}
 	logrus.Debugf("starting to read from image %q using blob cache in %q (compression=%v)", transports.ImageName(b.reference), b.directory, b.compress)
-	return &blobCacheSource{reference: b, source: imagesource.FromPublic(src), sys: *sys}, nil
+	s := &blobCacheSource{reference: b, source: imagesource.FromPublic(src), sys: *sys}
+	s.Compat = impl.AddCompat(s)
+	return s, nil
 }
 
 func (s *blobCacheSource) Reference() types.ImageReference {
@@ -100,16 +106,20 @@ func (s *blobCacheSource) GetBlob(ctx context.Context, blobinfo types.BlobInfo, 
 	return rc, size, nil
 }
 
-func (s *blobCacheSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
-	return s.source.GetSignatures(ctx, instanceDigest)
+// GetSignaturesWithFormat returns the image's signatures.  It may use a remote (= slow) service.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
+// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
+// (e.g. if the source never returns manifest lists).
+func (s *blobCacheSource) GetSignaturesWithFormat(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error) {
+	return s.source.GetSignaturesWithFormat(ctx, instanceDigest)
 }
 
 func (s *blobCacheSource) LayerInfosForCopy(ctx context.Context, instanceDigest *digest.Digest) ([]types.BlobInfo, error) {
-	signatures, err := s.source.GetSignatures(ctx, instanceDigest)
+	signatures, err := s.source.GetSignaturesWithFormat(ctx, instanceDigest)
 	if err != nil {
 		return nil, perrors.Wrapf(err, "error checking if image %q has signatures", transports.ImageName(s.reference))
 	}
-	canReplaceBlobs := !(len(signatures) > 0 && len(signatures[0]) > 0)
+	canReplaceBlobs := len(signatures) == 0
 
 	infos, err := s.source.LayerInfosForCopy(ctx, instanceDigest)
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"github.com/containers/image/v5/directory"
 	"github.com/containers/image/v5/docker"
 	"github.com/containers/image/v5/internal/imagedestination"
+	internalsig "github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/types"
@@ -81,7 +82,9 @@ func TestCreateSignature(t *testing.T) {
 	// Signing without overriding the identity uses the docker reference
 	sig, err := c.createSignature(manifestBlob, testKeyFingerprint, "", nil)
 	require.NoError(t, err)
-	verified, err := signature.VerifyDockerManifestSignature(sig, manifestBlob, "docker.io/library/busybox:latest", mech, testKeyFingerprint)
+	simpleSig, ok := sig.(internalsig.SimpleSigning)
+	require.True(t, ok)
+	verified, err := signature.VerifyDockerManifestSignature(simpleSig.UntrustedSignature(), manifestBlob, "docker.io/library/busybox:latest", mech, testKeyFingerprint)
 	require.NoError(t, err)
 	assert.Equal(t, "docker.io/library/busybox:latest", verified.DockerReference)
 	assert.Equal(t, manifestDigest, verified.DockerManifestDigest)
@@ -91,7 +94,9 @@ func TestCreateSignature(t *testing.T) {
 	require.NoError(t, err)
 	sig, err = c.createSignature(manifestBlob, testKeyFingerprint, "", ref)
 	require.NoError(t, err)
-	verified, err = signature.VerifyDockerManifestSignature(sig, manifestBlob, "myregistry.io/myrepo:mytag", mech, testKeyFingerprint)
+	simpleSig, ok = sig.(internalsig.SimpleSigning)
+	require.True(t, ok)
+	verified, err = signature.VerifyDockerManifestSignature(simpleSig.UntrustedSignature(), manifestBlob, "myregistry.io/myrepo:mytag", mech, testKeyFingerprint)
 	require.NoError(t, err)
 	assert.Equal(t, "myregistry.io/myrepo:mytag", verified.DockerReference)
 	assert.Equal(t, manifestDigest, verified.DockerManifestDigest)

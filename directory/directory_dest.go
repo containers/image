@@ -13,6 +13,7 @@ import (
 	"github.com/containers/image/v5/internal/imagedestination/stubs"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/putblobdigest"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	perrors "github.com/pkg/errors"
@@ -218,12 +219,17 @@ func (d *dirImageDestination) PutManifest(ctx context.Context, manifest []byte, 
 	return os.WriteFile(d.ref.manifestPath(instanceDigest), manifest, 0644)
 }
 
-// PutSignatures writes a set of signatures to the destination.
+// PutSignaturesWithFormat writes a set of signatures to the destination.
 // If instanceDigest is not nil, it contains a digest of the specific manifest instance to write or overwrite the signatures for
 // (when the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
-func (d *dirImageDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
+// MUST be called after PutManifest (signatures may reference manifest contents).
+func (d *dirImageDestination) PutSignaturesWithFormat(ctx context.Context, signatures []signature.Signature, instanceDigest *digest.Digest) error {
 	for i, sig := range signatures {
-		if err := os.WriteFile(d.ref.signaturePath(i, instanceDigest), sig, 0644); err != nil {
+		blob, err := signature.Blob(sig)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(d.ref.signaturePath(i, instanceDigest), blob, 0644); err != nil {
 			return err
 		}
 	}

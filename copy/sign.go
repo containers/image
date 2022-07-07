@@ -4,13 +4,14 @@ import (
 	"fmt"
 
 	"github.com/containers/image/v5/docker/reference"
+	internalsig "github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/transports"
 	perrors "github.com/pkg/errors"
 )
 
 // createSignature creates a new signature of manifest using keyIdentity.
-func (c *copier) createSignature(manifest []byte, keyIdentity string, passphrase string, identity reference.Named) ([]byte, error) {
+func (c *copier) createSignature(manifest []byte, keyIdentity string, passphrase string, identity reference.Named) (internalsig.Signature, error) {
 	mech, err := signature.NewGPGSigningMechanism()
 	if err != nil {
 		return nil, perrors.Wrap(err, "initializing GPG")
@@ -36,5 +37,5 @@ func (c *copier) createSignature(manifest []byte, keyIdentity string, passphrase
 	if err != nil {
 		return nil, perrors.Wrap(err, "creating signature")
 	}
-	return newSig, nil
+	return internalsig.SimpleSigningFromBlob(newSig), nil
 }

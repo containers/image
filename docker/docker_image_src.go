@@ -20,6 +20,7 @@ import (
 	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/types"
@@ -29,6 +30,7 @@ import (
 )
 
 type dockerImageSource struct {
+	impl.Compat
 	impl.PropertyMethodsInitialize
 	impl.DoesNotAffectLayerInfosForCopy
 	stubs.ImplementsGetBlobAt
@@ -140,6 +142,7 @@ func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, logica
 		physicalRef: physicalRef,
 		c:           client,
 	}
+	s.Compat = impl.AddCompat(s)
 
 	if err := s.ensureManifestIsLoaded(ctx); err != nil {
 		return nil, err
@@ -466,11 +469,11 @@ func (s *dockerImageSource) GetBlob(ctx context.Context, info types.BlobInfo, ca
 	return res.Body, getBlobSize(res), nil
 }
 
-// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
+// GetSignaturesWithFormat returns the image's signatures.  It may use a remote (= slow) service.
 // If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
 // (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
 // (e.g. if the source never returns manifest lists).
-func (s *dockerImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
+func (s *dockerImageSource) GetSignaturesWithFormat(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error) {
 	if err := s.c.detectProperties(ctx); err != nil {
 		return nil, err
 	}
@@ -502,16 +505,16 @@ func (s *dockerImageSource) manifestDigest(ctx context.Context, instanceDigest *
 	return manifest.Digest(s.cachedManifest)
 }
 
-// getSignaturesFromLookaside implements GetSignatures() from the lookaside location configured in s.c.signatureBase,
+// getSignaturesFromLookaside implements GetSignaturesWithFormat() from the lookaside location configured in s.c.signatureBase,
 // which is not nil.
-func (s *dockerImageSource) getSignaturesFromLookaside(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
+func (s *dockerImageSource) getSignaturesFromLookaside(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error) {
 	manifestDigest, err := s.manifestDigest(ctx, instanceDigest)
 	if err != nil {
 		return nil, err
 	}
 
 	// NOTE: Keep this in sync with docs/signature-protocols.md!
-	signatures := [][]byte{}
+	signatures := []signature.Signature{}
 	for i := 0; ; i++ {
 		url := signatureStorageURL(s.c.signatureBase, manifestDigest, i)
 		signature, missing, err := s.getOneSignature(ctx, url)
@@ -526,19 +529,23 @@ func (s *dockerImageSource) getSignaturesFromLookaside(ctx context.Context, inst
 	return signatures, nil
 }
 
-// getOneSignature downloads one signature from url.
-// If it successfully determines that the signature does not exist, returns with missing set to true and error set to nil.
+// getOneSignature downloads one signature from url, and returns (signature, false, nil)
+// If it successfully determines that the signature does not exist, returns (nil, true, nil).
 // NOTE: Keep this in sync with docs/signature-protocols.md!
-func (s *dockerImageSource) getOneSignature(ctx context.Context, url *url.URL) (signature []byte, missing bool, err error) {
+func (s *dockerImageSource) getOneSignature(ctx context.Context, url *url.URL) (signature.Signature, bool, error) {
 	switch url.Scheme {
 	case "file":
 		logrus.Debugf("Reading %s", url.Path)
-		sig, err := os.ReadFile(url.Path)
+		sigBlob, err := os.ReadFile(url.Path)
 		if err != nil {
 			if os.IsNotExist(err) {
 				return nil, true, nil
 			}
 			return nil, false, err
+		}
+		sig, err := signature.FromBlob(sigBlob)
+		if err != nil {
+			return nil, false, fmt.Errorf("parsing signature %q: %w", url.Path, err)
 		}
 		return sig, false, nil
 
@@ -556,11 +563,15 @@ func (s *dockerImageSource) getOneSignature(ctx context.Context, url *url.URL) (
 		if res.StatusCode == http.StatusNotFound {
 			return nil, true, nil
 		} else if res.StatusCode != http.StatusOK {
-			return nil, false, fmt.Errorf("Error reading signature from %s: status %d (%s)", url.Redacted(), res.StatusCode, http.StatusText(res.StatusCode))
+			return nil, false, fmt.Errorf("reading signature from %s: status %d (%s)", url.Redacted(), res.StatusCode, http.StatusText(res.StatusCode))
 		}
-		sig, err := iolimits.ReadAtMost(res.Body, iolimits.MaxSignatureBodySize)
+		sigBlob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxSignatureBodySize)
 		if err != nil {
 			return nil, false, err
+		}
+		sig, err := signature.FromBlob(sigBlob)
+		if err != nil {
+			return nil, false, fmt.Errorf("parsing signature %s: %w", url.Redacted(), err)
 		}
 		return sig, false, nil
 
@@ -569,8 +580,8 @@ func (s *dockerImageSource) getOneSignature(ctx context.Context, url *url.URL) (
 	}
 }
 
-// getSignaturesFromAPIExtension implements GetSignatures() using the X-Registry-Supports-Signatures API extension.
-func (s *dockerImageSource) getSignaturesFromAPIExtension(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
+// getSignaturesFromAPIExtension implements GetSignaturesWithFormat() using the X-Registry-Supports-Signatures API extension.
+func (s *dockerImageSource) getSignaturesFromAPIExtension(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error) {
 	manifestDigest, err := s.manifestDigest(ctx, instanceDigest)
 	if err != nil {
 		return nil, err
@@ -581,10 +592,10 @@ func (s *dockerImageSource) getSignaturesFromAPIExtension(ctx context.Context, i
 		return nil, err
 	}
 
-	var sigs [][]byte
+	var sigs []signature.Signature
 	for _, sig := range parsedBody.Signatures {
 		if sig.Version == extensionSignatureSchemaVersion && sig.Type == extensionSignatureTypeAtomic {
-			sigs = append(sigs, sig.Content)
+			sigs = append(sigs, signature.SimpleSigningFromBlob(sig.Content))
 		}
 	}
 	return sigs, nil
