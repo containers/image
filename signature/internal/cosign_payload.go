@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -96,20 +97,23 @@ func (s *UntrustedCosignPayload) strictUnmarshalJSON(data []byte) error {
 	var creatorID string
 	var timestamp float64
 	var gotCreatorID, gotTimestamp = false, false
-	if err := ParanoidUnmarshalJSONObject(optional, func(key string) interface{} {
-		switch key {
-		case "creator":
-			gotCreatorID = true
-			return &creatorID
-		case "timestamp":
-			gotTimestamp = true
-			return &timestamp
-		default:
-			var ignore interface{}
-			return &ignore
+	// Cosign generates "optional": null if there are no user-specified annotations.
+	if !bytes.Equal(optional, []byte("null")) {
+		if err := ParanoidUnmarshalJSONObject(optional, func(key string) interface{} {
+			switch key {
+			case "creator":
+				gotCreatorID = true
+				return &creatorID
+			case "timestamp":
+				gotTimestamp = true
+				return &timestamp
+			default:
+				var ignore interface{}
+				return &ignore
+			}
+		}); err != nil {
+			return err
 		}
-	}); err != nil {
-		return err
 	}
 	if gotCreatorID {
 		s.UntrustedCreatorID = &creatorID

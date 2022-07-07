@@ -131,6 +131,15 @@ func TestUntrustedCosignPayloadUnmarshalJSON(t *testing.T) {
 	s = successfullyUnmarshalUntrustedCosignPayload(t, validJSON)
 	assert.Equal(t, validSig, s)
 
+	// A Cosign-generated payload is handled correctly
+	s = successfullyUnmarshalUntrustedCosignPayload(t, []byte(`{"critical":{"identity":{"docker-reference":"192.168.64.2:5000/cosign-signed-multi"},"image":{"docker-manifest-digest":"sha256:43955d6857268cc948ae9b370b221091057de83c4962da0826f9a2bdc9bd6b44"},"type":"cosign container image signature"},"optional":null}`))
+	assert.Equal(t, UntrustedCosignPayload{
+		UntrustedDockerManifestDigest: "sha256:43955d6857268cc948ae9b370b221091057de83c4962da0826f9a2bdc9bd6b44",
+		UntrustedDockerReference:      "192.168.64.2:5000/cosign-signed-multi",
+		UntrustedCreatorID:            nil,
+		UntrustedTimestamp:            nil,
+	}, s)
+
 	// Various ways to corrupt the JSON
 	breakFns := []func(mSI){
 		// A top-level field is missing
