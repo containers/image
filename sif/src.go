@@ -22,6 +22,7 @@ import (
 )
 
 type sifImageSource struct {
+	impl.Compat
 	impl.PropertyMethodsInitialize
 	impl.NoSignatures
 	impl.DoesNotAffectLayerInfosForCopy
@@ -144,7 +145,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref sifRefere
 	}
 
 	succeeded = true
-	return &sifImageSource{
+	s := &sifImageSource{
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
 			HasThreadSafeGetBlob: true,
 		}),
@@ -158,7 +159,9 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref sifRefere
 		config:       configBytes,
 		configDigest: configDigest,
 		manifest:     manifestBytes,
-	}, nil
+	}
+	s.Compat = impl.AddCompat(s)
+	return s, nil
 }
 
 // Reference returns the reference used to set up this source.
