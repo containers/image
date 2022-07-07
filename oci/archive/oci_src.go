@@ -6,7 +6,9 @@ import (
 	"io"
 
 	"github.com/containers/image/v5/internal/imagesource"
+	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/signature"
 	ocilayout "github.com/containers/image/v5/oci/layout"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
@@ -16,6 +18,8 @@ import (
 )
 
 type ociArchiveImageSource struct {
+	impl.Compat
+
 	ref         ociArchiveReference
 	unpackedSrc private.ImageSource
 	tempDirRef  tempDirOCIRef
@@ -36,11 +40,13 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiv
 		}
 		return nil, err
 	}
-	return &ociArchiveImageSource{
+	s := &ociArchiveImageSource{
 		ref:         ref,
 		unpackedSrc: imagesource.FromPublic(unpackedSrc),
 		tempDirRef:  tempDirRef,
-	}, nil
+	}
+	s.Compat = impl.AddCompat(s)
+	return s, nil
 }
 
 // LoadManifestDescriptor loads the manifest
@@ -120,12 +126,12 @@ func (s *ociArchiveImageSource) GetBlobAt(ctx context.Context, info types.BlobIn
 	return s.unpackedSrc.GetBlobAt(ctx, info, chunks)
 }
 
-// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
+// GetSignaturesWithFormat returns the image's signatures.  It may use a remote (= slow) service.
 // If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
 // (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
 // (e.g. if the source never returns manifest lists).
-func (s *ociArchiveImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
-	return s.unpackedSrc.GetSignatures(ctx, instanceDigest)
+func (s *ociArchiveImageSource) GetSignaturesWithFormat(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error) {
+	return s.unpackedSrc.GetSignaturesWithFormat(ctx, instanceDigest)
 }
 
 // LayerInfosForCopy returns either nil (meaning the values in the manifest are fine), or updated values for the layer

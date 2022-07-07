@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -27,11 +28,11 @@ func (stub NoSignaturesInitialize) SupportsSignatures(ctx context.Context) error
 	return errors.New(stub.message)
 }
 
-// PutSignatures writes a set of signatures to the destination.
+// PutSignaturesWithFormat writes a set of signatures to the destination.
 // If instanceDigest is not nil, it contains a digest of the specific manifest instance to write or overwrite the signatures for
 // (when the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
 // MUST be called after PutManifest (signatures may reference manifest contents).
-func (stub NoSignaturesInitialize) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
+func (stub NoSignaturesInitialize) PutSignaturesWithFormat(ctx context.Context, signatures []signature.Signature, instanceDigest *digest.Digest) error {
 	if len(signatures) != 0 {
 		return errors.New(stub.message)
 	}

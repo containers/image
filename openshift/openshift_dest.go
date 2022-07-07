@@ -17,6 +17,7 @@ import (
 	"github.com/containers/image/v5/internal/imagedestination/impl"
 	"github.com/containers/image/v5/internal/imagedestination/stubs"
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
@@ -154,7 +155,11 @@ func (d *openshiftImageDestination) PutManifest(ctx context.Context, m []byte, i
 	return d.docker.PutManifest(ctx, m, instanceDigest)
 }
 
-func (d *openshiftImageDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
+// PutSignaturesWithFormat writes a set of signatures to the destination.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to write or overwrite the signatures for
+// (when the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
+// MUST be called after PutManifest (signatures may reference manifest contents).
+func (d *openshiftImageDestination) PutSignaturesWithFormat(ctx context.Context, signatures []signature.Signature, instanceDigest *digest.Digest) error {
 	var imageStreamImageName string
 	if instanceDigest == nil {
 		if d.imageStreamImageName == "" {
@@ -182,7 +187,13 @@ func (d *openshiftImageDestination) PutSignatures(ctx context.Context, signature
 	}
 
 sigExists:
-	for _, newSig := range signatures {
+	for _, newSigWithFormat := range signatures {
+		newSigSimple, ok := newSigWithFormat.(signature.SimpleSigning)
+		if !ok {
+			return signature.UnsupportedFormatError(newSigWithFormat)
+		}
+		newSig := newSigSimple.UntrustedSignature()
+
 		for _, existingSig := range image.Signatures {
 			if existingSig.Type == imageSignatureTypeAtomic && bytes.Equal(existingSig.Content, newSig) {
 				continue sigExists

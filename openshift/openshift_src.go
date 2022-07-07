@@ -12,12 +12,14 @@ import (
 	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 )
 
 type openshiftImageSource struct {
+	impl.Compat
 	impl.DoesNotAffectLayerInfosForCopy
 	// This is slightly suboptimal. We could forward GetBlobAt(), but we need to call ensureImageIsResolved in SupportsGetBlobAt(),
 	// and that method doesn’t provide a context for timing out. That could actually be fixed (SupportsGetBlobAt is private and we
@@ -40,12 +42,14 @@ func newImageSource(sys *types.SystemContext, ref openshiftReference) (private.I
 		return nil, err
 	}
 
-	return &openshiftImageSource{
+	s := &openshiftImageSource{
 		NoGetBlobAtInitialize: stubs.NoGetBlobAt(ref),
 
 		client: client,
 		sys:    sys,
-	}, nil
+	}
+	s.Compat = impl.AddCompat(s)
+	return s, nil
 }
 
 // Reference returns the reference used to set up this source, _as specified by the user_
@@ -92,11 +96,11 @@ func (s *openshiftImageSource) GetBlob(ctx context.Context, info types.BlobInfo,
 	return s.docker.GetBlob(ctx, info, cache)
 }
 
-// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
+// GetSignaturesWithFormat returns the image's signatures.  It may use a remote (= slow) service.
 // If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
 // (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
 // (e.g. if the source never returns manifest lists).
-func (s *openshiftImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
+func (s *openshiftImageSource) GetSignaturesWithFormat(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error) {
 	var imageStreamImageName string
 	if instanceDigest == nil {
 		if err := s.ensureImageIsResolved(ctx); err != nil {
@@ -110,10 +114,10 @@ func (s *openshiftImageSource) GetSignatures(ctx context.Context, instanceDigest
 	if err != nil {
 		return nil, err
 	}
-	var sigs [][]byte
+	var sigs []signature.Signature
 	for _, sig := range image.Signatures {
 		if sig.Type == imageSignatureTypeAtomic {
-			sigs = append(sigs, sig.Content)
+			sigs = append(sigs, signature.SimpleSigningFromBlob(sig.Content))
 		}
 	}
 	return sigs, nil

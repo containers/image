@@ -22,6 +22,7 @@ import (
 )
 
 type ociImageSource struct {
+	impl.Compat
 	impl.PropertyMethodsInitialize
 	impl.NoSignatures
 	impl.DoesNotAffectLayerInfosForCopy
@@ -56,7 +57,7 @@ func newImageSource(sys *types.SystemContext, ref ociReference) (private.ImageSo
 	if err != nil {
 		return nil, err
 	}
-	d := &ociImageSource{
+	s := &ociImageSource{
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
 			HasThreadSafeGetBlob: false,
 		}),
@@ -69,9 +70,10 @@ func newImageSource(sys *types.SystemContext, ref ociReference) (private.ImageSo
 	}
 	if sys != nil {
 		// TODO(jonboulle): check dir existence?
-		d.sharedBlobDir = sys.OCISharedBlobDirPath
+		s.sharedBlobDir = sys.OCISharedBlobDirPath
 	}
-	return d, nil
+	s.Compat = impl.AddCompat(s)
+	return s, nil
 }
 
 // Reference returns the reference used to set up this source.
