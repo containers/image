@@ -158,13 +158,14 @@ func TestGetPutSignatures(t *testing.T) {
 	list := []byte("test-manifest-list")
 	md, err := manifest.Digest(man)
 	require.NoError(t, err)
+	// These signatures are completely invalid; start with 0xA3 just to be minimally plausible to signature.FromBlob.
 	signatures := [][]byte{
-		[]byte("sig1"),
-		[]byte("sig2"),
+		[]byte("\xA3sig1"),
+		[]byte("\xA3sig2"),
 	}
 	listSignatures := [][]byte{
-		[]byte("sig3"),
-		[]byte("sig4"),
+		[]byte("\xA3sig3"),
+		[]byte("\xA3sig4"),
 	}
 
 	dest, err := ref.NewImageDestination(context.Background(), nil)

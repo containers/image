@@ -25,6 +25,7 @@ import (
 	"github.com/containers/image/v5/internal/imagedestination/stubs"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/putblobdigest"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/archive"
@@ -398,10 +399,11 @@ func (d *ostreeImageDestination) PutManifest(ctx context.Context, manifestBlob [
 	return os.WriteFile(manifestPath, manifestBlob, 0644)
 }
 
-// PutSignatures writes signatures to the destination.
-// The instanceDigest value is expected to always be nil, because this transport does not support manifest lists, so
-// there can be no secondary manifests.
-func (d *ostreeImageDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
+// PutSignaturesWithFormat writes a set of signatures to the destination.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to write or overwrite the signatures for
+// (when the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
+// MUST be called after PutManifest (signatures may reference manifest contents).
+func (d *ostreeImageDestination) PutSignaturesWithFormat(ctx context.Context, signatures []signature.Signature, instanceDigest *digest.Digest) error {
 	if instanceDigest != nil {
 		return errors.New(`Manifest lists are not supported by "ostree:"`)
 	}
@@ -413,7 +415,11 @@ func (d *ostreeImageDestination) PutSignatures(ctx context.Context, signatures [
 
 	for i, sig := range signatures {
 		signaturePath := filepath.Join(d.tmpDirPath, d.ref.signaturePath(i))
-		if err := os.WriteFile(signaturePath, sig, 0644); err != nil {
+		blob, err := signature.Blob(sig)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(signaturePath, blob, 0644); err != nil {
 			return err
 		}
 	}

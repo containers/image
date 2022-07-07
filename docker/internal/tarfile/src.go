@@ -25,6 +25,7 @@ import (
 
 // Source is a partial implementation of types.ImageSource for reading from tarPath.
 type Source struct {
+	impl.Compat
 	impl.PropertyMethodsInitialize
 	impl.NoSignatures
 	impl.DoesNotAffectLayerInfosForCopy
@@ -56,7 +57,7 @@ type layerInfo struct {
 // and sourceIndex (or the only image if they are (nil, -1)).
 // The archive will be closed if closeArchive
 func NewSource(archive *Reader, closeArchive bool, transportName string, ref reference.NamedTagged, sourceIndex int) *Source {
-	return &Source{
+	s := &Source{
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
 			HasThreadSafeGetBlob: true,
 		}),
@@ -67,6 +68,8 @@ func NewSource(archive *Reader, closeArchive bool, transportName string, ref ref
 		ref:          ref,
 		sourceIndex:  sourceIndex,
 	}
+	s.Compat = impl.AddCompat(s)
+	return s
 }
 
 // ensureCachedDataIsPresent loads data necessary for any of the public accessors.
