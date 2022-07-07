@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +10,7 @@ import (
 
 	"github.com/containers/image/v5/version"
 	digest "github.com/opencontainers/go-digest"
+	cosignSignature "github.com/sigstore/sigstore/pkg/signature"
 )
 
 const (
@@ -146,4 +149,46 @@ func (s *UntrustedCosignPayload) strictUnmarshalJSON(data []byte) error {
 	return ParanoidUnmarshalJSONObjectExactFields(identity, map[string]interface{}{
 		"docker-reference": &s.UntrustedDockerReference,
 	})
+}
+
+// CosignPayloadAcceptanceRules specifies how to decide whether an untrusted payload is acceptable.
+// We centralize the actual parsing and data extraction in VerifyCosignPayload; this supplies
+// the policy.  We use an object instead of supplying func parameters to verifyAndExtractSignature
+// because the functions have the same or similar types, so there is a risk of exchanging the functions;
+// named members of this struct are more explicit.
+type CosignPayloadAcceptanceRules struct {
+	ValidateSignedDockerReference      func(string) error
+	ValidateSignedDockerManifestDigest func(digest.Digest) error
+}
+
+// VerifyCosignPayload verifies that unverifiedPayload has been signed by unverifiedBase64Signature, and that its principal components
+// match expected values, both as specified by rules, and returns it.
+// We return an *UntrustedCosignPayload, although nothing actually uses it,
+// just to double-check against stupid typos.
+func VerifyCosignPayload(verifier cosignSignature.Verifier, unverifiedPayload []byte, unverifiedBase64Signature string, rules CosignPayloadAcceptanceRules) (*UntrustedCosignPayload, error) {
+	// FIXME: THIS MUST HAVE TOTAL TEST COVERAGE.
+	unverifiedSignature, err := base64.StdEncoding.DecodeString(unverifiedBase64Signature)
+	if err != nil {
+		return nil, NewInvalidSignatureError(fmt.Sprintf("base64 decoding: %v", err))
+	}
+	// FIXME FIXME: Should we support multiple equally-acceptable public keys,
+	// like we do with simple signing keyrings?
+	// github.com/sigstore/cosign/pkg/cosign.verifyOCISignature uses signatureoptions.WithContext(),
+	// which seems to be not used by anything. So we don’t bother.
+	if err := verifier.VerifySignature(bytes.NewReader(unverifiedSignature), bytes.NewReader(unverifiedPayload)); err != nil {
+		return nil, NewInvalidSignatureError(fmt.Sprintf("cryptographic signature verification failed: %v", err))
+	}
+
+	var unmatchedPayload UntrustedCosignPayload
+	if err := json.Unmarshal(unverifiedPayload, &unmatchedPayload); err != nil {
+		return nil, NewInvalidSignatureError(err.Error())
+	}
+	if err := rules.ValidateSignedDockerManifestDigest(unmatchedPayload.UntrustedDockerManifestDigest); err != nil {
+		return nil, err
+	}
+	if err := rules.ValidateSignedDockerReference(unmatchedPayload.UntrustedDockerReference); err != nil {
+		return nil, err
+	}
+	// CosignPayloadAcceptanceRules have accepted this value.
+	return &unmatchedPayload, nil
 }

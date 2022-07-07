@@ -9,12 +9,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
-	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
 )
 
-func (pr *prSignedBy) isSignatureAuthorAccepted(ctx context.Context, image types.UnparsedImage, sig []byte) (signatureAcceptanceResult, *Signature, error) {
+func (pr *prSignedBy) isSignatureAuthorAccepted(ctx context.Context, image private.UnparsedImage, sig []byte) (signatureAcceptanceResult, *Signature, error) {
 	switch pr.KeyType {
 	case SBKeyTypeGPGKeys:
 	case SBKeyTypeSignedByGPGKeys, SBKeyTypeX509Certificates, SBKeyTypeSignedByX509CAs:
@@ -89,8 +89,9 @@ func (pr *prSignedBy) isSignatureAuthorAccepted(ctx context.Context, image types
 	return sarAccepted, signature, nil
 }
 
-func (pr *prSignedBy) isRunningImageAllowed(ctx context.Context, image types.UnparsedImage) (bool, error) {
-	// FIXME: pass context.Context
+func (pr *prSignedBy) isRunningImageAllowed(ctx context.Context, image private.UnparsedImage) (bool, error) {
+	// FIXME: Use image.UntrustedSignatures, use that to improve error messages
+	// (needs tests!)
 	sigs, err := image.Signatures(ctx)
 	if err != nil {
 		return false, err
