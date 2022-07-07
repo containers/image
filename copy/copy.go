@@ -123,15 +123,17 @@ type ImageListSelection int
 
 // Options allows supplying non-default configuration modifying the behavior of CopyImage.
 type Options struct {
-	RemoveSignatures bool            // Remove any pre-existing signatures. SignBy will still add a new signature.
-	SignBy           string          // If non-empty, asks for a signature to be added during the copy, and specifies a key ID, as accepted by signature.NewGPGSigningMechanism().SignDockerManifest(),
-	SignPassphrase   string          // Passphare to use when signing with the key ID from `SignBy`.
-	SignIdentity     reference.Named // Identify to use when signing, defaults to the docker reference of the destination
-	ReportWriter     io.Writer
-	SourceCtx        *types.SystemContext
-	DestinationCtx   *types.SystemContext
-	ProgressInterval time.Duration                 // time to wait between reports to signal the progress channel
-	Progress         chan types.ProgressProperties // Reported to when ProgressInterval has arrived for a single artifact+offset.
+	RemoveSignatures               bool            // Remove any pre-existing signatures. SignBy will still add a new signature.
+	SignBy                         string          // If non-empty, asks for a signature to be added during the copy, and specifies a key ID, as accepted by signature.NewGPGSigningMechanism().SignDockerManifest(),
+	SignPassphrase                 string          // Passphare to use when signing with the key ID from `SignBy`.
+	SignByCosignPrivateKeyFile     string          // If non-empty, asks for a signature to be added during the copy, using a Cosign private key file at the provided path.
+	SignCosignPrivateKeyPassphrase []byte          // Passphare to use when signing with `SignByCosignPrivateKeyFile`.
+	SignIdentity                   reference.Named // Identify to use when signing, defaults to the docker reference of the destination
+	ReportWriter                   io.Writer
+	SourceCtx                      *types.SystemContext
+	DestinationCtx                 *types.SystemContext
+	ProgressInterval               time.Duration                 // time to wait between reports to signal the progress channel
+	Progress                       chan types.ProgressProperties // Reported to when ProgressInterval has arrived for a single artifact+offset.
 
 	// Preserve digests, and fail if we cannot.
 	PreserveDigests bool
@@ -575,6 +577,13 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 		}
 		sigs = append(sigs, newSig)
 	}
+	if options.SignByCosignPrivateKeyFile != "" {
+		newSig, err := c.createCosignSignature(manifestList, options.SignByCosignPrivateKeyFile, options.SignCosignPrivateKeyPassphrase, options.SignIdentity)
+		if err != nil {
+			return nil, err
+		}
+		sigs = append(sigs, newSig)
+	}
 
 	c.Printf("Storing list signatures\n")
 	if err := c.dest.PutSignaturesWithFormat(ctx, sigs, nil); err != nil {
@@ -688,7 +697,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 	//   We do intend the RecordDigestUncompressedPair calls to only work with reliable data, but at least there’s a risk
 	//   that the compressed version coming from a third party may be designed to attack some other decompressor implementation,
 	//   and we would reuse and sign it.
-	ic.canSubstituteBlobs = ic.cannotModifyManifestReason == "" && options.SignBy == ""
+	ic.canSubstituteBlobs = ic.cannotModifyManifestReason == "" && options.SignBy == "" && options.SignByCosignPrivateKeyFile == ""
 
 	if err := ic.updateEmbeddedDockerReference(); err != nil {
 		return nil, "", "", err
@@ -719,7 +728,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 
 	// If enabled, fetch and compare the destination's manifest. And as an optimization skip updating the destination iff equal
 	if options.OptimizeDestinationImageAlreadyExists {
-		shouldUpdateSigs := len(sigs) > 0 || options.SignBy != "" // TODO: Consider allowing signatures updates only and skipping the image's layers/manifest copy if possible
+		shouldUpdateSigs := len(sigs) > 0 || options.SignBy != "" || options.SignByCosignPrivateKeyFile != "" // TODO: Consider allowing signatures updates only and skipping the image's layers/manifest copy if possible
 		noPendingManifestUpdates := ic.noPendingManifestUpdates()
 
 		logrus.Debugf("Checking if we can skip copying: has signatures=%t, OCI encryption=%t, no manifest updates=%t", shouldUpdateSigs, destRequiresOciEncryption, noPendingManifestUpdates)
@@ -801,6 +810,13 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 
 	if options.SignBy != "" {
 		newSig, err := c.createSignature(manifestBytes, options.SignBy, options.SignPassphrase, options.SignIdentity)
+		if err != nil {
+			return nil, "", "", err
+		}
+		sigs = append(sigs, newSig)
+	}
+	if options.SignByCosignPrivateKeyFile != "" {
+		newSig, err := c.createCosignSignature(manifestBytes, options.SignByCosignPrivateKeyFile, options.SignCosignPrivateKeyPassphrase, options.SignIdentity)
 		if err != nil {
 			return nil, "", "", err
 		}
