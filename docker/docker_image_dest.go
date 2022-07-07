@@ -20,6 +20,7 @@ import (
 	"github.com/containers/image/v5/internal/imagedestination/stubs"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/putblobdigest"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/internal/streamdigest"
 	"github.com/containers/image/v5/internal/uploadreader"
 	"github.com/containers/image/v5/manifest"
@@ -506,10 +507,11 @@ func isManifestInvalidError(err error) bool {
 	}
 }
 
-// PutSignatures uploads a set of signatures to the relevant lookaside or API extension point.
-// If instanceDigest is not nil, it contains a digest of the specific manifest instance to upload the signatures for (when
-// the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
-func (d *dockerImageDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
+// PutSignaturesWithFormat writes a set of signatures to the destination.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to write or overwrite the signatures for
+// (when the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
+// MUST be called after PutManifest (signatures may reference manifest contents).
+func (d *dockerImageDestination) PutSignaturesWithFormat(ctx context.Context, signatures []signature.Signature, instanceDigest *digest.Digest) error {
 	// Do not fail if we don’t really need to support signatures.
 	if len(signatures) == 0 {
 		return nil
@@ -535,9 +537,9 @@ func (d *dockerImageDestination) PutSignatures(ctx context.Context, signatures [
 	}
 }
 
-// putSignaturesToLookaside implements PutSignatures() from the lookaside location configured in s.c.signatureBase,
+// putSignaturesToLookaside implements PutSignaturesWithFormat() from the lookaside location configured in s.c.signatureBase,
 // which is not nil, for a manifest with manifestDigest.
-func (d *dockerImageDestination) putSignaturesToLookaside(signatures [][]byte, manifestDigest digest.Digest) error {
+func (d *dockerImageDestination) putSignaturesToLookaside(signatures []signature.Signature, manifestDigest digest.Digest) error {
 	// FIXME? This overwrites files one at a time, definitely not atomic.
 	// A failure when updating signatures with a reordered copy could lose some of them.
 
@@ -573,9 +575,9 @@ func (d *dockerImageDestination) putSignaturesToLookaside(signatures [][]byte, m
 	return nil
 }
 
-// putOneSignature stores one signature to url.
+// putOneSignature stores sig to url.
 // NOTE: Keep this in sync with docs/signature-protocols.md!
-func (d *dockerImageDestination) putOneSignature(url *url.URL, signature []byte) error {
+func (d *dockerImageDestination) putOneSignature(url *url.URL, sig signature.Signature) error {
 	switch url.Scheme {
 	case "file":
 		logrus.Debugf("Writing to %s", url.Path)
@@ -583,7 +585,11 @@ func (d *dockerImageDestination) putOneSignature(url *url.URL, signature []byte)
 		if err != nil {
 			return err
 		}
-		err = os.WriteFile(url.Path, signature, 0644)
+		blob, err := signature.Blob(sig)
+		if err != nil {
+			return err
+		}
+		err = os.WriteFile(url.Path, blob, 0644)
 		if err != nil {
 			return err
 		}
@@ -616,9 +622,9 @@ func (c *dockerClient) deleteOneSignature(url *url.URL) (missing bool, err error
 	}
 }
 
-// putSignaturesToAPIExtension implements PutSignatures() using the X-Registry-Supports-Signatures API extension,
+// putSignaturesToAPIExtension implements PutSignaturesWithFormat() using the X-Registry-Supports-Signatures API extension,
 // for a manifest with manifestDigest.
-func (d *dockerImageDestination) putSignaturesToAPIExtension(ctx context.Context, signatures [][]byte, manifestDigest digest.Digest) error {
+func (d *dockerImageDestination) putSignaturesToAPIExtension(ctx context.Context, signatures []signature.Signature, manifestDigest digest.Digest) error {
 	// Skip dealing with the manifest digest, or reading the old state, if not necessary.
 	if len(signatures) == 0 {
 		return nil
@@ -638,7 +644,13 @@ func (d *dockerImageDestination) putSignaturesToAPIExtension(ctx context.Context
 	}
 
 sigExists:
-	for _, newSig := range signatures {
+	for _, newSigWithFormat := range signatures {
+		newSigSimple, ok := newSigWithFormat.(signature.SimpleSigning)
+		if !ok {
+			return signature.UnsupportedFormatError(newSigWithFormat)
+		}
+		newSig := newSigSimple.UntrustedSignature()
+
 		for _, existingSig := range existingSignatures.Signatures {
 			if existingSig.Version == extensionSignatureSchemaVersion && existingSig.Type == extensionSignatureTypeAtomic && bytes.Equal(existingSig.Content, newSig) {
 				continue sigExists

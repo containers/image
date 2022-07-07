@@ -1,9 +1,13 @@
 package imagesource
 
 import (
+	"context"
+
 	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/types"
+	"github.com/opencontainers/go-digest"
 )
 
 // wrapped provides the private.ImageSource operations
@@ -33,4 +37,20 @@ func FromPublic(src types.ImageSource) private.ImageSource {
 
 		ImageSource: src,
 	}
+}
+
+// GetSignaturesWithFormat returns the image's signatures.  It may use a remote (= slow) service.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
+// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
+// (e.g. if the source never returns manifest lists).
+func (w *wrapped) GetSignaturesWithFormat(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error) {
+	sigs, err := w.GetSignatures(ctx, instanceDigest)
+	if err != nil {
+		return nil, err
+	}
+	res := []signature.Signature{}
+	for _, sig := range sigs {
+		res = append(res, signature.SimpleSigningFromBlob(sig))
+	}
+	return res, nil
 }

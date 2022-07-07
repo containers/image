@@ -17,6 +17,7 @@ import (
 	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/ioutils"
@@ -37,6 +38,7 @@ import (
 import "C"
 
 type ostreeImageSource struct {
+	impl.Compat
 	impl.PropertyMethodsInitialize
 	stubs.NoGetBlobAtInitialize
 
@@ -49,7 +51,7 @@ type ostreeImageSource struct {
 
 // newImageSource returns an ImageSource for reading from an existing directory.
 func newImageSource(tmpDir string, ref ostreeReference) (private.ImageSource, error) {
-	return &ostreeImageSource{
+	s := &ostreeImageSource{
 		PropertyMethodsInitialize: impl.PropertyMethods(impl.Properties{
 			HasThreadSafeGetBlob: false,
 		}),
@@ -58,7 +60,9 @@ func newImageSource(tmpDir string, ref ostreeReference) (private.ImageSource, er
 		ref:        ref,
 		tmpDir:     tmpDir,
 		compressed: nil,
-	}, nil
+	}
+	s.Compat = impl.AddCompat(s)
+	return s, nil
 }
 
 // Reference returns the reference used to set up this source.
@@ -349,10 +353,11 @@ func (s *ostreeImageSource) GetBlob(ctx context.Context, info types.BlobInfo, ca
 	return rc, layerSize, nil
 }
 
-// GetSignatures returns the image's signatures.  It may use a remote (= slow) service.
-// This source implementation does not support manifest lists, so the passed-in instanceDigest should always be nil,
-// as there can be no secondary manifests.
-func (s *ostreeImageSource) GetSignatures(ctx context.Context, instanceDigest *digest.Digest) ([][]byte, error) {
+// GetSignaturesWithFormat returns the image's signatures.  It may use a remote (= slow) service.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to retrieve signatures for
+// (when the primary manifest is a manifest list); this never happens if the primary manifest is not a manifest list
+// (e.g. if the source never returns manifest lists).
+func (s *ostreeImageSource) GetSignaturesWithFormat(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error) {
 	if instanceDigest != nil {
 		return nil, errors.New(`Manifest lists are not supported by "ostree:"`)
 	}
@@ -370,17 +375,22 @@ func (s *ostreeImageSource) GetSignatures(ctx context.Context, instanceDigest *d
 		s.repo = repo
 	}
 
-	signatures := [][]byte{}
+	signatures := []signature.Signature{}
 	for i := int64(1); i <= lenSignatures; i++ {
-		sigReader, err := s.readSingleFile(branch, fmt.Sprintf("/signature-%d", i))
+		path := fmt.Sprintf("/signature-%d", i)
+		sigReader, err := s.readSingleFile(branch, path)
 		if err != nil {
 			return nil, err
 		}
 		defer sigReader.Close()
 
-		sig, err := io.ReadAll(sigReader)
+		sigBlob, err := io.ReadAll(sigReader)
 		if err != nil {
 			return nil, err
+		}
+		sig, err := signature.FromBlob(sigBlob)
+		if err != nil {
+			return nil, fmt.Errorf("parsing signature %q: %w", path, err)
 		}
 		signatures = append(signatures, sig)
 	}
