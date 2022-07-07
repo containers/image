@@ -60,8 +60,12 @@ func GetRepositoryTags(ctx context.Context, sys *types.SystemContext, ref types.
 		return nil, errors.New("ref must be a dockerReference")
 	}
 
+	registryConfig, err := loadRegistryConfiguration(sys)
+	if err != nil {
+		return nil, err
+	}
 	path := fmt.Sprintf(tagsPath, reference.Path(dr.ref))
-	client, err := newDockerClientFromRef(sys, dr, false, "pull")
+	client, err := newDockerClientFromRef(sys, dr, registryConfig, false, "pull")
 	if err != nil {
 		return nil, perrors.Wrap(err, "failed to create client")
 	}
@@ -125,7 +129,11 @@ func GetDigest(ctx context.Context, sys *types.SystemContext, ref types.ImageRef
 		return "", err
 	}
 
-	client, err := newDockerClientFromRef(sys, dr, false, "pull")
+	registryConfig, err := loadRegistryConfiguration(sys)
+	if err != nil {
+		return "", err
+	}
+	client, err := newDockerClientFromRef(sys, dr, registryConfig, false, "pull")
 	if err != nil {
 		return "", perrors.Wrap(err, "failed to create client")
 	}

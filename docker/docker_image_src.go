@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/manifest"
+	"github.com/containers/image/v5/pkg/blobinfocache/none"
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
@@ -46,6 +46,10 @@ type dockerImageSource struct {
 // newImageSource creates a new ImageSource for the specified image reference.
 // The caller must call .Close() on the returned ImageSource.
 func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerReference) (*dockerImageSource, error) {
+	registryConfig, err := loadRegistryConfiguration(sys)
+	if err != nil {
+		return nil, err
+	}
 	registry, err := sysregistriesv2.FindRegistry(sys, ref.ref.Name())
 	if err != nil {
 		return nil, perrors.Wrapf(err, "loading registries configuration")
@@ -81,7 +85,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 		} else {
 			logrus.Debugf("Trying to access %q", pullSource.Reference)
 		}
-		s, err := newImageSourceAttempt(ctx, sys, ref, pullSource)
+		s, err := newImageSourceAttempt(ctx, sys, ref, pullSource, registryConfig)
 		if err == nil {
 			return s, nil
 		}
@@ -112,7 +116,8 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 // newImageSourceAttempt is an internal helper for newImageSource. Everyone else must call newImageSource.
 // Given a logicalReference and a pullSource, return a dockerImageSource if it is reachable.
 // The caller must call .Close() on the returned ImageSource.
-func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, logicalRef dockerReference, pullSource sysregistriesv2.PullSource) (*dockerImageSource, error) {
+func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, logicalRef dockerReference, pullSource sysregistriesv2.PullSource,
+	registryConfig *registryConfiguration) (*dockerImageSource, error) {
 	physicalRef, err := newReference(pullSource.Reference)
 	if err != nil {
 		return nil, err
@@ -127,7 +132,7 @@ func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, logica
 		endpointSys = &copy
 	}
 
-	client, err := newDockerClientFromRef(endpointSys, physicalRef, false, "pull")
+	client, err := newDockerClientFromRef(endpointSys, physicalRef, registryConfig, false, "pull")
 	if err != nil {
 		return nil, err
 	}
@@ -190,25 +195,7 @@ func (s *dockerImageSource) GetManifest(ctx context.Context, instanceDigest *dig
 }
 
 func (s *dockerImageSource) fetchManifest(ctx context.Context, tagOrDigest string) ([]byte, string, error) {
-	path := fmt.Sprintf(manifestPath, reference.Path(s.physicalRef.ref), tagOrDigest)
-	headers := map[string][]string{
-		"Accept": manifest.DefaultRequestedManifestMIMETypes,
-	}
-	res, err := s.c.makeRequest(ctx, http.MethodGet, path, headers, nil, v2Auth, nil)
-	if err != nil {
-		return nil, "", err
-	}
-	logrus.Debugf("Content-Type from manifest GET is %q", res.Header.Get("Content-Type"))
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, "", perrors.Wrapf(registryHTTPResponseToError(res), "reading manifest %s in %s", tagOrDigest, s.physicalRef.ref.Name())
-	}
-
-	manblob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxManifestBodySize)
-	if err != nil {
-		return nil, "", err
-	}
-	return manblob, simplifyContentType(res.Header.Get("Content-Type")), nil
+	return s.c.fetchManifest(ctx, s.physicalRef, tagOrDigest)
 }
 
 // ensureManifestIsLoaded sets s.cachedManifest and s.cachedManifestMIMEType
@@ -236,53 +223,6 @@ func (s *dockerImageSource) ensureManifestIsLoaded(ctx context.Context) error {
 	s.cachedManifest = manblob
 	s.cachedManifestMIMEType = mt
 	return nil
-}
-
-// getExternalBlob returns the reader of the first available blob URL from urls, which must not be empty.
-// This function can return nil reader when no url is supported by this function. In this case, the caller
-// should fallback to fetch the non-external blob (i.e. pull from the registry).
-func (s *dockerImageSource) getExternalBlob(ctx context.Context, urls []string) (io.ReadCloser, int64, error) {
-	var (
-		resp *http.Response
-		err  error
-	)
-	if len(urls) == 0 {
-		return nil, 0, errors.New("internal error: getExternalBlob called with no URLs")
-	}
-	for _, u := range urls {
-		url, err := url.Parse(u)
-		if err != nil || (url.Scheme != "http" && url.Scheme != "https") {
-			continue // unsupported url. skip this url.
-		}
-		// NOTE: we must not authenticate on additional URLs as those
-		//       can be abused to leak credentials or tokens.  Please
-		//       refer to CVE-2020-15157 for more information.
-		resp, err = s.c.makeRequestToResolvedURL(ctx, http.MethodGet, url, nil, nil, -1, noAuth, nil)
-		if err == nil {
-			if resp.StatusCode != http.StatusOK {
-				err = fmt.Errorf("error fetching external blob from %q: %d (%s)", u, resp.StatusCode, http.StatusText(resp.StatusCode))
-				logrus.Debug(err)
-				resp.Body.Close()
-				continue
-			}
-			break
-		}
-	}
-	if resp == nil && err == nil {
-		return nil, 0, nil // fallback to non-external blob
-	}
-	if err != nil {
-		return nil, 0, err
-	}
-	return resp.Body, getBlobSize(resp), nil
-}
-
-func getBlobSize(resp *http.Response) int64 {
-	size, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
-	if err != nil {
-		size = -1
-	}
-	return size
 }
 
 // splitHTTP200ResponseToPartial splits a 200 response in multiple streams as specified by the chunks
@@ -446,27 +386,7 @@ func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, 
 // The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
 // May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
 func (s *dockerImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
-	if len(info.URLs) != 0 {
-		r, s, err := s.getExternalBlob(ctx, info.URLs)
-		if err != nil {
-			return nil, 0, err
-		} else if r != nil {
-			return r, s, nil
-		}
-	}
-
-	path := fmt.Sprintf(blobsPath, reference.Path(s.physicalRef.ref), info.Digest.String())
-	logrus.Debugf("Downloading %s", path)
-	res, err := s.c.makeRequest(ctx, http.MethodGet, path, nil, nil, v2Auth, nil)
-	if err != nil {
-		return nil, 0, err
-	}
-	if err := httpResponseToError(res, "Error fetching blob"); err != nil {
-		res.Body.Close()
-		return nil, 0, err
-	}
-	cache.RecordKnownLocation(s.physicalRef.Transport(), bicTransportScope(s.physicalRef), info.Digest, newBICLocationReference(s.physicalRef))
-	return res.Body, getBlobSize(res), nil
+	return s.c.getBlob(ctx, s.physicalRef, info, cache)
 }
 
 // GetSignaturesWithFormat returns the image's signatures.  It may use a remote (= slow) service.
@@ -477,14 +397,30 @@ func (s *dockerImageSource) GetSignaturesWithFormat(ctx context.Context, instanc
 	if err := s.c.detectProperties(ctx); err != nil {
 		return nil, err
 	}
+	var res []signature.Signature
 	switch {
 	case s.c.supportsSignatures:
-		return s.getSignaturesFromAPIExtension(ctx, instanceDigest)
+		sigs, err := s.getSignaturesFromAPIExtension(ctx, instanceDigest)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, sigs...)
 	case s.c.signatureBase != nil:
-		return s.getSignaturesFromLookaside(ctx, instanceDigest)
+		sigs, err := s.getSignaturesFromLookaside(ctx, instanceDigest)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, sigs...)
 	default:
 		return nil, errors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
 	}
+
+	cosignSigs, err := s.getSignaturesFromCosignAttachments(ctx, instanceDigest)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, cosignSigs...)
+	return res, nil
 }
 
 // manifestDigest returns a digest of the manifest, from instanceDigest if non-nil; or from the supplied reference,
@@ -601,8 +537,50 @@ func (s *dockerImageSource) getSignaturesFromAPIExtension(ctx context.Context, i
 	return sigs, nil
 }
 
+func (s *dockerImageSource) getSignaturesFromCosignAttachments(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error) {
+	if !s.c.useCosignAttachments {
+		logrus.Debugf("Not looking for Cosign attachments: disabled by configuration")
+		return nil, nil
+	}
+
+	manifestDigest, err := s.manifestDigest(ctx, instanceDigest)
+	if err != nil {
+		return nil, err
+	}
+
+	ociManifest, err := s.c.getCosignAttachmentManifest(ctx, s.physicalRef, manifestDigest)
+	if err != nil {
+		return nil, err
+	}
+	if ociManifest == nil {
+		return nil, nil
+	}
+
+	logrus.Debugf("Found a Cosign attachment manifest with %d layers", len(ociManifest.Layers))
+	res := []signature.Signature{}
+	for layerIndex, layer := range ociManifest.Layers {
+		// Note that this copies all kinds of attachments: attestations, and whatever else is there,
+		// not just signatures. We leave the signature consumers to decide based on the MIME type.
+		logrus.Debugf("Fetching Cosign attachment %d/%d: %s", layerIndex+1, len(ociManifest.Layers), layer.Digest.String())
+		// We don’t benefit from a real BlobInfoCache here because we never try to reuse/mount attachment payloads.
+		// That might eventually need to change if payloads grow to be not just signatures, but something
+		// significantly large.
+		payload, err := s.c.getOCIDescriptorContents(ctx, s.physicalRef, layer, iolimits.MaxSignatureBodySize,
+			none.NoCache)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, signature.CosignFromComponents(layer.MediaType, payload, layer.Annotations))
+	}
+	return res, nil
+}
+
 // deleteImage deletes the named image from the registry, if supported.
 func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerReference) error {
+	registryConfig, err := loadRegistryConfiguration(sys)
+	if err != nil {
+		return err
+	}
 	// docker/distribution does not document what action should be used for deleting images.
 	//
 	// Current docker/distribution requires "pull" for reading the manifest and "delete" for deleting it.
@@ -610,7 +588,7 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 	// OpenShift ignores the action string (both the password and the token is an OpenShift API token identifying a user).
 	//
 	// We have to hard-code a single string, luckily both docker/distribution and quay.io support "*" to mean "everything".
-	c, err := newDockerClientFromRef(sys, ref, true, "*")
+	c, err := newDockerClientFromRef(sys, ref, registryConfig, true, "*")
 	if err != nil {
 		return err
 	}

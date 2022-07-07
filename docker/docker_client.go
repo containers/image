@@ -18,15 +18,19 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/iolimits"
+	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/docker/config"
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/pkg/tlsclientconfig"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/image/v5/version"
 	"github.com/containers/storage/pkg/homedir"
+	"github.com/docker/distribution/registry/api/errcode"
+	v2 "github.com/docker/distribution/registry/api/v2"
 	clientLib "github.com/docker/distribution/registry/client"
 	"github.com/docker/go-connections/tlsconfig"
 	digest "github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -102,10 +106,11 @@ type dockerClient struct {
 	// by detectProperties(). Callers can edit tlsClientConfig.InsecureSkipVerify in the meantime.
 	tlsClientConfig *tls.Config
 	// The following members are not set by newDockerClient and must be set by callers if needed.
-	auth          types.DockerAuthConfig
-	registryToken string
-	signatureBase signatureStorageBase
-	scope         authScope
+	auth                 types.DockerAuthConfig
+	registryToken        string
+	signatureBase        signatureStorageBase
+	useCosignAttachments bool
+	scope                authScope
 
 	// The following members are detected registry properties:
 	// They are set after a successful detectProperties(), and never change afterwards.
@@ -210,13 +215,13 @@ func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
 // newDockerClientFromRef returns a new dockerClient instance for refHostname (a host a specified in the Docker image reference, not canonicalized to dockerRegistry)
 // “write” specifies whether the client will be used for "write" access (in particular passed to lookaside.go:toplevelFromSection)
 // signatureBase is always set in the return value
-func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write bool, actions string) (*dockerClient, error) {
+func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, registryConfig *registryConfiguration, write bool, actions string) (*dockerClient, error) {
 	auth, err := config.GetCredentialsForRef(sys, ref.ref)
 	if err != nil {
 		return nil, perrors.Wrapf(err, "getting username and password")
 	}
 
-	sigBase, err := SignatureStorageBaseURL(sys, ref, write)
+	sigBase, err := registryConfig.signatureStorageBaseURL(ref, write)
 	if err != nil {
 		return nil, err
 	}
@@ -231,6 +236,7 @@ func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write
 		client.registryToken = sys.DockerBearerRegistryToken
 	}
 	client.signatureBase = sigBase
+	client.useCosignAttachments = registryConfig.useCosignAttachments(ref)
 	client.scope.actions = actions
 	client.scope.remoteName = reference.Path(ref.ref)
 	return client, nil
@@ -801,6 +807,166 @@ func (c *dockerClient) detectProperties(ctx context.Context) error {
 	return c.detectPropertiesError
 }
 
+func (c *dockerClient) fetchManifest(ctx context.Context, ref dockerReference, tagOrDigest string) ([]byte, string, error) {
+	path := fmt.Sprintf(manifestPath, reference.Path(ref.ref), tagOrDigest)
+	headers := map[string][]string{
+		"Accept": manifest.DefaultRequestedManifestMIMETypes,
+	}
+	res, err := c.makeRequest(ctx, http.MethodGet, path, headers, nil, v2Auth, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	logrus.Debugf("Content-Type from manifest GET is %q", res.Header.Get("Content-Type"))
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil, "", perrors.Wrapf(registryHTTPResponseToError(res), "reading manifest %s in %s", tagOrDigest, ref.ref.Name())
+	}
+
+	manblob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxManifestBodySize)
+	if err != nil {
+		return nil, "", err
+	}
+	return manblob, simplifyContentType(res.Header.Get("Content-Type")), nil
+}
+
+// getExternalBlob returns the reader of the first available blob URL from urls, which must not be empty.
+// This function can return nil reader when no url is supported by this function. In this case, the caller
+// should fallback to fetch the non-external blob (i.e. pull from the registry).
+func (c *dockerClient) getExternalBlob(ctx context.Context, urls []string) (io.ReadCloser, int64, error) {
+	var (
+		resp *http.Response
+		err  error
+	)
+	if len(urls) == 0 {
+		return nil, 0, errors.New("internal error: getExternalBlob called with no URLs")
+	}
+	for _, u := range urls {
+		url, err := url.Parse(u)
+		if err != nil || (url.Scheme != "http" && url.Scheme != "https") {
+			continue // unsupported url. skip this url.
+		}
+		// NOTE: we must not authenticate on additional URLs as those
+		//       can be abused to leak credentials or tokens.  Please
+		//       refer to CVE-2020-15157 for more information.
+		resp, err = c.makeRequestToResolvedURL(ctx, http.MethodGet, url, nil, nil, -1, noAuth, nil)
+		if err == nil {
+			if resp.StatusCode != http.StatusOK {
+				err = fmt.Errorf("error fetching external blob from %q: %d (%s)", u, resp.StatusCode, http.StatusText(resp.StatusCode))
+				logrus.Debug(err)
+				resp.Body.Close()
+				continue
+			}
+			break
+		}
+	}
+	if resp == nil && err == nil {
+		return nil, 0, nil // fallback to non-external blob
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+	return resp.Body, getBlobSize(resp), nil
+}
+
+func getBlobSize(resp *http.Response) int64 {
+	size, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
+	if err != nil {
+		size = -1
+	}
+	return size
+}
+
+// getBlob returns a stream for the specified blob in ref, and the blob’s size (or -1 if unknown).
+// The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
+// May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
+func (c *dockerClient) getBlob(ctx context.Context, ref dockerReference, info types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
+	if len(info.URLs) != 0 {
+		r, s, err := c.getExternalBlob(ctx, info.URLs)
+		if err != nil {
+			return nil, 0, err
+		} else if r != nil {
+			return r, s, nil
+		}
+	}
+
+	path := fmt.Sprintf(blobsPath, reference.Path(ref.ref), info.Digest.String())
+	logrus.Debugf("Downloading %s", path)
+	res, err := c.makeRequest(ctx, http.MethodGet, path, nil, nil, v2Auth, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	if err := httpResponseToError(res, "Error fetching blob"); err != nil {
+		res.Body.Close()
+		return nil, 0, err
+	}
+	cache.RecordKnownLocation(ref.Transport(), bicTransportScope(ref), info.Digest, newBICLocationReference(ref))
+	return res.Body, getBlobSize(res), nil
+}
+
+// getOCIDescriptorContents returns the contents a blob spcified by descriptor in ref, which must fit within limit.
+func (c *dockerClient) getOCIDescriptorContents(ctx context.Context, ref dockerReference, desc imgspecv1.Descriptor, maxSize int, cache types.BlobInfoCache) ([]byte, error) {
+	// Note that this copies all kinds of attachments: attestations, and whatever else is there,
+	// not just signatures. We leave the signature consumers to decide based on the MIME type.
+	reader, _, err := c.getBlob(ctx, ref, manifest.BlobInfoFromOCI1Descriptor(desc), cache)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+	payload, err := iolimits.ReadAtMost(reader, iolimits.MaxSignatureBodySize)
+	if err != nil {
+		return nil, fmt.Errorf("reading blob %s in %s: %w", desc.Digest.String(), ref.ref.Name(), err)
+	}
+	return payload, nil
+}
+
+// isManifestUnknownError returns true iff err from fetchManifest is a “manifest unknown” error.
+func isManifestUnknownError(err error) bool {
+	var errs errcode.Errors
+	if !errors.As(err, &errs) || len(errs) == 0 {
+		return false
+	}
+	err = errs[0]
+	ec, ok := err.(errcode.ErrorCoder)
+	if !ok {
+		return false
+	}
+	return ec.ErrorCode() == v2.ErrorCodeManifestUnknown
+}
+
+// getCosignAttachmentManifest loads and parses the manifest for Cosign attachments for
+// digest in ref.
+// It returns (nil, nil) if the manifest does not exist.
+func (c *dockerClient) getCosignAttachmentManifest(ctx context.Context, ref dockerReference, digest digest.Digest) (*manifest.OCI1, error) {
+	tag := cosignAttachmentTag(digest)
+	cosignRef, err := reference.WithTag(reference.TrimNamed(ref.ref), tag)
+	if err != nil {
+		return nil, err
+	}
+	logrus.Debugf("Looking for Cosign attachments in %s", cosignRef.String())
+	manifestBlob, mimeType, err := c.fetchManifest(ctx, ref, tag)
+	if err != nil {
+		// FIXME: Are we going to need better heuristics??
+		// This alone is probably a good enough reason for Cosign to be opt-in only,
+		// otherwise we would just break ordinary copies.
+		if isManifestUnknownError(err) {
+			logrus.Debugf("Fetching Cosign attachment manifest failed, assuming it does not exist: %v", err)
+			return nil, nil
+		}
+		logrus.Debugf("Fetching Cosign attachment manifest failed: %v", err)
+		return nil, err
+	}
+	if mimeType != imgspecv1.MediaTypeImageManifest {
+		// FIXME: Try anyway??
+		return nil, fmt.Errorf("unexpected MIME type for Cosign attachment manifest %s: %q",
+			cosignRef.String(), mimeType)
+	}
+	res, err := manifest.OCI1FromManifest(manifestBlob)
+	if err != nil {
+		return nil, fmt.Errorf("parsing manifest %s: %w", cosignRef.String(), err)
+	}
+	return res, nil
+}
+
 // getExtensionsSignatures returns signatures from the X-Registry-Supports-Signatures API extension,
 // using the original data structures.
 func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerReference, manifestDigest digest.Digest) (*extensionSignatureList, error) {
@@ -825,4 +991,9 @@ func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerRe
 		return nil, perrors.Wrapf(err, "decoding signature list")
 	}
 	return &parsedBody, nil
+}
+
+// cosignAttachmentTag returns a Cosign attachment tag for the specified digest.
+func cosignAttachmentTag(d digest.Digest) string {
+	return strings.Replace(d.String(), ":", "-", 1) + ".sig"
 }

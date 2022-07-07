@@ -47,8 +47,9 @@ type registryConfiguration struct {
 
 // registryNamespace defines lookaside locations for a single namespace.
 type registryNamespace struct {
-	SigStore        string `json:"sigstore"`         // For reading, and if SigStoreStaging is not present, for writing.
-	SigStoreStaging string `json:"sigstore-staging"` // For writing only.
+	SigStore             string `json:"sigstore"`         // For reading, and if SigStoreStaging is not present, for writing.
+	SigStoreStaging      string `json:"sigstore-staging"` // For writing only.
+	UseCosignAttachments *bool  `json:"use-cosign-attachments,omitempty"`
 }
 
 // signatureStorageBase is an "opaque" type representing a lookaside Docker signature storage.
@@ -64,34 +65,19 @@ func SignatureStorageBaseURL(sys *types.SystemContext, ref types.ImageReference,
 	if !ok {
 		return nil, errors.New("ref must be a dockerReference")
 	}
-	// FIXME? Loading and parsing the config could be cached across calls.
-	dirPath := registriesDirPath(sys)
-	logrus.Debugf(`Using registries.d directory %s for sigstore configuration`, dirPath)
-	config, err := loadAndMergeConfig(dirPath)
+	config, err := loadRegistryConfiguration(sys)
 	if err != nil {
 		return nil, err
 	}
 
-	topLevel := config.signatureTopLevel(dr, write)
-	var url *url.URL
-	if topLevel != "" {
-		url, err = url.Parse(topLevel)
-		if err != nil {
-			return nil, perrors.Wrapf(err, "Invalid signature storage URL %s", topLevel)
-		}
-	} else {
-		// returns default directory if no sigstore specified in configuration file
-		url = builtinDefaultSignatureStorageDir(rootless.GetRootlessEUID())
-		logrus.Debugf(" No signature storage configuration found for %s, using built-in default %s", dr.PolicyConfigurationIdentity(), url.Redacted())
-	}
-	// NOTE: Keep this in sync with docs/signature-protocols.md!
-	// FIXME? Restrict to explicitly supported schemes?
-	repo := reference.Path(dr.ref) // Note that this is without a tag or digest.
-	if path.Clean(repo) != repo {  // Coverage: This should not be reachable because /./ and /../ components are not valid in docker references
-		return nil, fmt.Errorf("Unexpected path elements in Docker reference %s for signature storage", dr.ref.String())
-	}
-	url.Path = url.Path + "/" + repo
-	return url, nil
+	return config.signatureStorageBaseURL(dr, write)
+}
+
+// loadRegistryConfiguration returns a registryConfiguration appropriate for sys.
+func loadRegistryConfiguration(sys *types.SystemContext) (*registryConfiguration, error) {
+	dirPath := registriesDirPath(sys)
+	logrus.Debugf(`Using registries.d directory %s`, dirPath)
+	return loadAndMergeConfig(dirPath)
 }
 
 // registriesDirPath returns a path to registries.d
@@ -116,15 +102,8 @@ func registriesDirPathWithHomeDir(sys *types.SystemContext, homeDir string) stri
 	return systemRegistriesDirPath
 }
 
-// builtinDefaultSignatureStorageDir returns default signature storage URL as per euid
-func builtinDefaultSignatureStorageDir(euid int) *url.URL {
-	if euid != 0 {
-		return &url.URL{Scheme: "file", Path: filepath.Join(homedir.Get(), defaultUserDockerDir)}
-	}
-	return &url.URL{Scheme: "file", Path: defaultDockerDir}
-}
-
 // loadAndMergeConfig loads configuration files in dirPath
+// FIXME: Probably rename to loadRegistryConfigurationForPath
 func loadAndMergeConfig(dirPath string) (*registryConfiguration, error) {
 	mergedConfig := registryConfiguration{Docker: map[string]registryNamespace{}}
 	dockerDefaultMergedFrom := ""
@@ -179,6 +158,40 @@ func loadAndMergeConfig(dirPath string) (*registryConfiguration, error) {
 	return &mergedConfig, nil
 }
 
+// signatureStorageBaseURL returns an appropriate signature storage URL for ref, for write access if “write”.
+// the usage of the BaseURL is defined under docker/distribution registries—separate storage of docs/signature-protocols.md
+func (config *registryConfiguration) signatureStorageBaseURL(dr dockerReference, write bool) (*url.URL, error) {
+	topLevel := config.signatureTopLevel(dr, write)
+	var url *url.URL
+	if topLevel != "" {
+		u, err := url.Parse(topLevel)
+		if err != nil {
+			return nil, perrors.Wrapf(err, "Invalid signature storage URL %s", topLevel)
+		}
+		url = u
+	} else {
+		// returns default directory if no sigstore specified in configuration file
+		url = builtinDefaultSignatureStorageDir(rootless.GetRootlessEUID())
+		logrus.Debugf(" No signature storage configuration found for %s, using built-in default %s", dr.PolicyConfigurationIdentity(), url.Redacted())
+	}
+	// NOTE: Keep this in sync with docs/signature-protocols.md!
+	// FIXME? Restrict to explicitly supported schemes?
+	repo := reference.Path(dr.ref) // Note that this is without a tag or digest.
+	if path.Clean(repo) != repo {  // Coverage: This should not be reachable because /./ and /../ components are not valid in docker references
+		return nil, fmt.Errorf("Unexpected path elements in Docker reference %s for signature storage", dr.ref.String())
+	}
+	url.Path = url.Path + "/" + repo
+	return url, nil
+}
+
+// builtinDefaultSignatureStorageDir returns default signature storage URL as per euid
+func builtinDefaultSignatureStorageDir(euid int) *url.URL {
+	if euid != 0 {
+		return &url.URL{Scheme: "file", Path: filepath.Join(homedir.Get(), defaultUserDockerDir)}
+	}
+	return &url.URL{Scheme: "file", Path: defaultDockerDir}
+}
+
 // config.signatureTopLevel returns an URL string configured in config for ref, for write access if “write”.
 // (the top level of the storage, namespaced by repo.FullName etc.), or "" if nothing has been configured.
 func (config *registryConfiguration) signatureTopLevel(ref dockerReference, write bool) string {
@@ -186,7 +199,7 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 		// Look for a full match.
 		identity := ref.PolicyConfigurationIdentity()
 		if ns, ok := config.Docker[identity]; ok {
-			logrus.Debugf(` Using "docker" namespace %s`, identity)
+			logrus.Debugf(` Sigstore configuration: using "docker" namespace %s`, identity)
 			if url := ns.signatureTopLevel(write); url != "" {
 				return url
 			}
@@ -195,7 +208,7 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 		// Look for a match of the possible parent namespaces.
 		for _, name := range ref.PolicyConfigurationNamespaces() {
 			if ns, ok := config.Docker[name]; ok {
-				logrus.Debugf(` Using "docker" namespace %s`, name)
+				logrus.Debugf(` Sigstore configuration: using "docker" namespace %s`, name)
 				if url := ns.signatureTopLevel(write); url != "" {
 					return url
 				}
@@ -204,12 +217,45 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 	}
 	// Look for a default location
 	if config.DefaultDocker != nil {
-		logrus.Debugf(` Using "default-docker" configuration`)
+		logrus.Debugf(` Sigstore configuration: using "default-docker" configuration`)
 		if url := config.DefaultDocker.signatureTopLevel(write); url != "" {
 			return url
 		}
 	}
 	return ""
+}
+
+// config.useCosignAttachments returns whether we should look for and write cosign attachments.
+// for ref.
+func (config *registryConfiguration) useCosignAttachments(ref dockerReference) bool {
+	if config.Docker != nil {
+		// Look for a full match.
+		identity := ref.PolicyConfigurationIdentity()
+		if ns, ok := config.Docker[identity]; ok {
+			logrus.Debugf(` Cosign attachments: using "docker" namespace %s`, identity)
+			if ns.UseCosignAttachments != nil {
+				return *ns.UseCosignAttachments
+			}
+		}
+
+		// Look for a match of the possible parent namespaces.
+		for _, name := range ref.PolicyConfigurationNamespaces() {
+			if ns, ok := config.Docker[name]; ok {
+				logrus.Debugf(` Cosign attachments: using "docker" namespace %s`, name)
+				if ns.UseCosignAttachments != nil {
+					return *ns.UseCosignAttachments
+				}
+			}
+		}
+	}
+	// Look for a default location
+	if config.DefaultDocker != nil {
+		logrus.Debugf(` Cosign attachments: using "default-docker" configuration`)
+		if config.DefaultDocker.UseCosignAttachments != nil {
+			return *config.DefaultDocker.UseCosignAttachments
+		}
+	}
+	return false
 }
 
 // ns.signatureTopLevel returns an URL string configured in ns for ref, for write access if “write”.
