@@ -6,6 +6,7 @@ package image
 import (
 	"context"
 
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/types"
 )
 
@@ -127,6 +128,11 @@ func (i *SourcedImage) Size() (int64, error) {
 // Manifest overrides the UnparsedImage.Manifest to always use the fields which we have already fetched.
 func (i *SourcedImage) Manifest(ctx context.Context) ([]byte, string, error) {
 	return i.ManifestBlob, i.ManifestMIMEType, nil
+}
+
+// SignaturesWithFormat is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
+func (i *SourcedImage) SignaturesWithFormat(ctx context.Context) ([]signature.Signature, error) {
+	return i.UnparsedImage.signaturesWithFormat(ctx)
 }
 
 func (i *SourcedImage) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, error) {

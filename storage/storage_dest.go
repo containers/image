@@ -21,6 +21,7 @@ import (
 	"github.com/containers/image/v5/internal/imagedestination/stubs"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/putblobdigest"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/internal/tmpdir"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache/none"
@@ -890,11 +891,18 @@ func (s *storageImageDestination) PutManifest(ctx context.Context, manifestBlob 
 	return nil
 }
 
-// PutSignatures records the image's signatures for committing as a single data blob.
-func (s *storageImageDestination) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
+// PutSignaturesWithFormat writes a set of signatures to the destination.
+// If instanceDigest is not nil, it contains a digest of the specific manifest instance to write or overwrite the signatures for
+// (when the primary manifest is a manifest list); this should always be nil if the primary manifest is not a manifest list.
+// MUST be called after PutManifest (signatures may reference manifest contents).
+func (s *storageImageDestination) PutSignaturesWithFormat(ctx context.Context, signatures []signature.Signature, instanceDigest *digest.Digest) error {
 	sizes := []int{}
 	sigblob := []byte{}
-	for _, sig := range signatures {
+	for _, sigWithFormat := range signatures {
+		sig, err := signature.Blob(sigWithFormat)
+		if err != nil {
+			return err
+		}
 		sizes = append(sizes, len(sig))
 		newblob := make([]byte, len(sigblob)+len(sig))
 		copy(newblob, sigblob)
