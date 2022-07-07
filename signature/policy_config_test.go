@@ -18,6 +18,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type mSI map[string]interface{} // To minimize typing the long name
+
+// A short-hand way to get a JSON object field value or panic. No error handling done, we know
+// what we are working with, a panic in a test is good enough, and fitting test cases on a single line
+// is a priority.
+func x(m mSI, fields ...string) mSI {
+	for _, field := range fields {
+		// Not .(mSI) because type assertion of an unnamed type to a named type always fails (the types
+		// are not "identical"), but the assignment is fine because they are "assignable".
+		m = m[field].(map[string]interface{})
+	}
+	return m
+}
+
 // policyFixtureContents is a data structure equal to the contents of "fixtures/policy.json"
 var policyFixtureContents = &Policy{
 	Default: PolicyRequirements{NewPRReject()},

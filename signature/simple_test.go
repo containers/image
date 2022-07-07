@@ -15,13 +15,6 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-func TestInvalidSignatureError(t *testing.T) {
-	// A stupid test just to keep code coverage
-	s := "test"
-	err := InvalidSignatureError{msg: s}
-	assert.Equal(t, s, err.Error())
-}
-
 func TestNewUntrustedSignature(t *testing.T) {
 	timeBefore := time.Now()
 	sig := newUntrustedSignature(TestImageManifestDigest, TestImageSignatureReference)

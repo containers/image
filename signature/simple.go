@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containers/image/v5/signature/internal"
 	"github.com/containers/image/v5/version"
 	digest "github.com/opencontainers/go-digest"
 )
@@ -19,13 +20,7 @@ const (
 )
 
 // InvalidSignatureError is returned when parsing an invalid signature.
-type InvalidSignatureError struct {
-	msg string
-}
-
-func (err InvalidSignatureError) Error() string {
-	return err.msg
-}
+type InvalidSignatureError = internal.InvalidSignatureError
 
 // Signature is a parsed content of a signature.
 // The only way to get this structure from a blob should be as a return value from a successful call to verifyAndExtractSignature below.
@@ -111,18 +106,18 @@ var _ json.Unmarshaler = (*untrustedSignature)(nil)
 func (s *untrustedSignature) UnmarshalJSON(data []byte) error {
 	err := s.strictUnmarshalJSON(data)
 	if err != nil {
-		if formatErr, ok := err.(jsonFormatError); ok {
-			err = InvalidSignatureError{msg: formatErr.Error()}
+		if formatErr, ok := err.(internal.JSONFormatError); ok {
+			err = internal.NewInvalidSignatureError(formatErr.Error())
 		}
 	}
 	return err
 }
 
-// strictUnmarshalJSON is UnmarshalJSON, except that it may return the internal jsonFormatError error type.
-// Splitting it into a separate function allows us to do the jsonFormatError → InvalidSignatureError in a single place, the caller.
+// strictUnmarshalJSON is UnmarshalJSON, except that it may return the internal.JSONFormatError error type.
+// Splitting it into a separate function allows us to do the internal.JSONFormatError → InvalidSignatureError in a single place, the caller.
 func (s *untrustedSignature) strictUnmarshalJSON(data []byte) error {
 	var critical, optional json.RawMessage
-	if err := paranoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
+	if err := internal.ParanoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
 		"critical": &critical,
 		"optional": &optional,
 	}); err != nil {
@@ -132,7 +127,7 @@ func (s *untrustedSignature) strictUnmarshalJSON(data []byte) error {
 	var creatorID string
 	var timestamp float64
 	var gotCreatorID, gotTimestamp = false, false
-	if err := paranoidUnmarshalJSONObject(optional, func(key string) interface{} {
+	if err := internal.ParanoidUnmarshalJSONObject(optional, func(key string) interface{} {
 		switch key {
 		case "creator":
 			gotCreatorID = true
@@ -153,14 +148,14 @@ func (s *untrustedSignature) strictUnmarshalJSON(data []byte) error {
 	if gotTimestamp {
 		intTimestamp := int64(timestamp)
 		if float64(intTimestamp) != timestamp {
-			return InvalidSignatureError{msg: "Field optional.timestamp is not is not an integer"}
+			return internal.NewInvalidSignatureError("Field optional.timestamp is not is not an integer")
 		}
 		s.UntrustedTimestamp = &intTimestamp
 	}
 
 	var t string
 	var image, identity json.RawMessage
-	if err := paranoidUnmarshalJSONObjectExactFields(critical, map[string]interface{}{
+	if err := internal.ParanoidUnmarshalJSONObjectExactFields(critical, map[string]interface{}{
 		"type":     &t,
 		"image":    &image,
 		"identity": &identity,
@@ -168,18 +163,18 @@ func (s *untrustedSignature) strictUnmarshalJSON(data []byte) error {
 		return err
 	}
 	if t != signatureType {
-		return InvalidSignatureError{msg: fmt.Sprintf("Unrecognized signature type %s", t)}
+		return internal.NewInvalidSignatureError(fmt.Sprintf("Unrecognized signature type %s", t))
 	}
 
 	var digestString string
-	if err := paranoidUnmarshalJSONObjectExactFields(image, map[string]interface{}{
+	if err := internal.ParanoidUnmarshalJSONObjectExactFields(image, map[string]interface{}{
 		"docker-manifest-digest": &digestString,
 	}); err != nil {
 		return err
 	}
 	s.UntrustedDockerManifestDigest = digest.Digest(digestString)
 
-	return paranoidUnmarshalJSONObjectExactFields(identity, map[string]interface{}{
+	return internal.ParanoidUnmarshalJSONObjectExactFields(identity, map[string]interface{}{
 		"docker-reference": &s.UntrustedDockerReference,
 	})
 }
@@ -231,7 +226,7 @@ func verifyAndExtractSignature(mech SigningMechanism, unverifiedSignature []byte
 
 	var unmatchedSignature untrustedSignature
 	if err := json.Unmarshal(signed, &unmatchedSignature); err != nil {
-		return nil, InvalidSignatureError{msg: err.Error()}
+		return nil, internal.NewInvalidSignatureError(err.Error())
 	}
 	if err := rules.validateSignedDockerManifestDigest(unmatchedSignature.UntrustedDockerManifestDigest); err != nil {
 		return nil, err
@@ -269,7 +264,7 @@ func GetUntrustedSignatureInformationWithoutVerifying(untrustedSignatureBytes []
 	}
 	var untrustedDecodedContents untrustedSignature
 	if err := json.Unmarshal(untrustedContents, &untrustedDecodedContents); err != nil {
-		return nil, InvalidSignatureError{msg: err.Error()}
+		return nil, internal.NewInvalidSignatureError(err.Error())
 	}
 
 	var timestamp *time.Time // = nil
