@@ -29,17 +29,6 @@ type UntrustedCosignPayload struct {
 // NewUntrustedCosignPayload returns an untrustedCosignPayload object with
 // the specified primary contents and appropriate metadata.
 func NewUntrustedCosignPayload(dockerManifestDigest digest.Digest, dockerReference string) UntrustedCosignPayload {
-	// FIXME: Move this comment to the caller.
-	// AARGH. sigstore/cosign mostly ignores dockerReference for actual policy decisions.
-	// That’s bad enough, BUT they also:
-	// - Record the repo (but NOT THE TAG) in the value; without the tag we can’t detect version rollbacks.
-	// - parse dockerReference @ dockerManifestDigest and expect that to be valid.
-	// - It seems (FIXME: TEST THIS) that putting a repo:tag in would pass the current implementation.
-	//   And signing digest references is _possible_ but probably rare (because signing typically happens on push, when
-	//   the digest reference is not known in advance).
-	//   SO: We put the full value in, which is not interoperable for signed digest references right now,
-	//   and TODO: Talk sigstore/cosign to relax that.
-	//
 	// Use intermediate variables for these values so that we can take their addresses.
 	// Golang guarantees that they will have a new address on every execution.
 	creatorID := "containers/image " + version.Version
