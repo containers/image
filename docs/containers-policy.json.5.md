@@ -255,7 +255,7 @@ selectively allow individual transports and scopes as desired.
             "docker.io/openshift": [{"type": "insecureAcceptAnything"}],
             /* Similarly, allow installing the “official” busybox images.  Note how the fully expanded
                form, with the explicit /library/, must be used. */
-            "docker.io/library/busybox": [{"type": "insecureAcceptAnything"}]
+            "docker.io/library/busybox": [{"type": "insecureAcceptAnything"}],
             /* Allow installing images from all subdomains */
             "*.temporary-project.example.com": [{"type": "insecureAcceptAnything"}]
             /* Other docker: images use the global default policy and are rejected */
@@ -301,7 +301,7 @@ selectively allow individual transports and scopes as desired.
                     "signedIdentity": {
                         "type": "remapIdentity",
                         "prefix": "private-mirror:5000/vendor-mirror",
-                        "signedPrefix": "vendor.example.com",
+                        "signedPrefix": "vendor.example.com"
                     }
                 }
             ]
