@@ -105,8 +105,22 @@ func (m *manifestSchema1) UpdatedImageNeedsLayerDiffIDs(options types.ManifestUp
 
 // UpdatedImage returns a types.Image modified according to options.
 // This does not change the state of the original Image object.
-func (m *manifestSchema1) UpdatedImage(ctx context.Context, options types.ManifestUpdateOptions) (types.Image, error) {
+func (m *manifestSchema1) UpdatedImage(ctx context.Context, options types.ManifestUpdateOptions) (image types.Image, retErr error) {
 	copy := manifestSchema1{m: manifest.Schema1Clone(m.m)}
+
+	manifestTmp := m
+	defer func() {
+		if retErr != nil {
+			m = manifestTmp
+		}
+	}()
+
+	// No conversion required, update manifest
+	if options.LayerInfos != nil {
+		if err := copy.m.UpdateLayerInfos(options.LayerInfos); err != nil {
+			return nil, err
+		}
+	}
 
 	// We have 2 MIME types for schema 1, which are basically equivalent (even the un-"Signed" MIME type will be rejected if there isn’t a signature; so,
 	// handle conversions between them by doing nothing.
@@ -124,12 +138,6 @@ func (m *manifestSchema1) UpdatedImage(ctx context.Context, options types.Manife
 		}
 	}
 
-	// No conversion required, update manifest
-	if options.LayerInfos != nil {
-		if err := copy.m.UpdateLayerInfos(options.LayerInfos); err != nil {
-			return nil, err
-		}
-	}
 	if options.EmbeddedDockerReference != nil {
 		copy.m.Name = reference.Path(options.EmbeddedDockerReference)
 		if tagged, isTagged := options.EmbeddedDockerReference.(reference.NamedTagged); isTagged {

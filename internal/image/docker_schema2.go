@@ -161,11 +161,25 @@ func (m *manifestSchema2) UpdatedImageNeedsLayerDiffIDs(options types.ManifestUp
 // The returned error will be a manifest.ManifestLayerCompressionIncompatibilityError
 // if the CompressionOperation and CompressionAlgorithm specified in one or more
 // options.LayerInfos items is anything other than gzip.
-func (m *manifestSchema2) UpdatedImage(ctx context.Context, options types.ManifestUpdateOptions) (types.Image, error) {
+func (m *manifestSchema2) UpdatedImage(ctx context.Context, options types.ManifestUpdateOptions) (image types.Image, retErr error) {
 	copy := manifestSchema2{ // NOTE: This is not a deep copy, it still shares slices etc.
 		src:        m.src,
 		configBlob: m.configBlob,
 		m:          manifest.Schema2Clone(m.m),
+	}
+
+	manifestTmp := m
+	defer func() {
+		if retErr != nil {
+			m = manifestTmp
+		}
+	}()
+
+	// No conversion required, update manifest
+	if options.LayerInfos != nil {
+		if err := copy.m.UpdateLayerInfos(options.LayerInfos); err != nil {
+			return nil, err
+		}
 	}
 
 	converted, err := convertManifestIfRequiredWithUpdate(ctx, options, map[string]manifestConvertFn{
@@ -181,12 +195,6 @@ func (m *manifestSchema2) UpdatedImage(ctx context.Context, options types.Manife
 		return converted, nil
 	}
 
-	// No conversion required, update manifest
-	if options.LayerInfos != nil {
-		if err := copy.m.UpdateLayerInfos(options.LayerInfos); err != nil {
-			return nil, err
-		}
-	}
 	// Ignore options.EmbeddedDockerReference: it may be set when converting from schema1 to schema2, but we really don't care.
 
 	return memoryImageFromManifest(&copy), nil
