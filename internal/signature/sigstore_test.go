@@ -41,7 +41,7 @@ func TestSigstoreFormatID(t *testing.T) {
 	assert.Equal(t, SigstoreFormat, sig.FormatID())
 }
 
-func TestSigstore_blobChunk(t *testing.T) {
+func TestSigstoreBlobChunk(t *testing.T) {
 	sig := SigstoreFromComponents("mime-type", []byte("payload"),
 		map[string]string{"a": "b", "c": "d"})
 	res, err := sig.blobChunk()
@@ -57,14 +57,14 @@ func TestSigstore_blobChunk(t *testing.T) {
 	assert.Equal(t, expectedRaw, raw)
 }
 
-func TestSigstore_UntrustedPayload(t *testing.T) {
+func TestSigstoreUntrustedPayload(t *testing.T) {
 	var payload = []byte("payload")
 	sig := SigstoreFromComponents("mime-type", payload,
 		map[string]string{"a": "b", "c": "d"})
 	assert.Equal(t, payload, sig.UntrustedPayload())
 }
 
-func TestSigstore_UntrustedAnnotations(t *testing.T) {
+func TestSigstoreUntrustedAnnotations(t *testing.T) {
 	annotations := map[string]string{"a": "b", "c": "d"}
 	sig := SigstoreFromComponents("mime-type", []byte("payload"), annotations)
 	assert.Equal(t, annotations, sig.UntrustedAnnotations())
