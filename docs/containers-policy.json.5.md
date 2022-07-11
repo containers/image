@@ -284,7 +284,7 @@ selectively allow individual transports and scopes as desired.
                 }
             ],
             /* A sigstore-signed repository, accepts signatures by /usr/bin/cosign */
-            "hostname:5000/myns/sigstore-signed-risky": [
+            "hostname:5000/myns/sigstore-signed-allows-malicious-tag-substitution": [
                 {
                     "type": "sigstoreSigned",
                     "keyPath": "/path/to/sigstore-pubkey.key",
