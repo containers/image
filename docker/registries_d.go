@@ -31,10 +31,10 @@ const builtinRegistriesDirPath = etcDir + "/containers/registries.d"
 // userRegistriesDirPath is the path to the per user registries.d.
 var userRegistriesDir = filepath.FromSlash(".config/containers/registries.d")
 
-// defaultUserDockerDir is the default sigstore directory for unprivileged user
+// defaultUserDockerDir is the default lookaside directory for unprivileged user
 var defaultUserDockerDir = filepath.FromSlash(".local/share/containers/sigstore")
 
-// defaultDockerDir is the default sigstore directory for root
+// defaultDockerDir is the default lookaside directory for root
 var defaultDockerDir = "/var/lib/containers/sigstore"
 
 // registryConfiguration is one of the files in registriesDirPath configuring lookaside locations, or the result of merging them all.
@@ -170,7 +170,7 @@ func (config *registryConfiguration) signatureStorageBaseURL(dr dockerReference,
 		}
 		url = u
 	} else {
-		// returns default directory if no sigstore specified in configuration file
+		// returns default directory if no lookaside specified in configuration file
 		url = builtinDefaultSignatureStorageDir(rootless.GetRootlessEUID())
 		logrus.Debugf(" No signature storage configuration found for %s, using built-in default %s", dr.PolicyConfigurationIdentity(), url.Redacted())
 	}
@@ -199,7 +199,7 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 		// Look for a full match.
 		identity := ref.PolicyConfigurationIdentity()
 		if ns, ok := config.Docker[identity]; ok {
-			logrus.Debugf(` Sigstore configuration: using "docker" namespace %s`, identity)
+			logrus.Debugf(` Lookaside configuration: using "docker" namespace %s`, identity)
 			if url := ns.signatureTopLevel(write); url != "" {
 				return url
 			}
@@ -208,7 +208,7 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 		// Look for a match of the possible parent namespaces.
 		for _, name := range ref.PolicyConfigurationNamespaces() {
 			if ns, ok := config.Docker[name]; ok {
-				logrus.Debugf(` Sigstore configuration: using "docker" namespace %s`, name)
+				logrus.Debugf(` Lookaside configuration: using "docker" namespace %s`, name)
 				if url := ns.signatureTopLevel(write); url != "" {
 					return url
 				}
@@ -217,7 +217,7 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 	}
 	// Look for a default location
 	if config.DefaultDocker != nil {
-		logrus.Debugf(` Sigstore configuration: using "default-docker" configuration`)
+		logrus.Debugf(` Lookaside configuration: using "default-docker" configuration`)
 		if url := config.DefaultDocker.signatureTopLevel(write); url != "" {
 			return url
 		}
