@@ -139,7 +139,7 @@
                     "keyData": "bm9uc2Vuc2U="
                 }
             ],
-            "example.com/sigstore/key-Path-example": [
+            "example.com/sigstore/key-path-example": [
                 {
                     "type": "sigstoreSigned",
                     "keyPath": "/keys/public-key",

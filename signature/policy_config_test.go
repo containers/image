@@ -102,7 +102,7 @@ var policyFixtureContents = &Policy{
 				xNewPRSigstoreSignedKeyData([]byte("nonsense"),
 					NewPRMMatchRepoDigestOrExact()),
 			},
-			"example.com/sigstore/key-Path-example": {
+			"example.com/sigstore/key-path-example": {
 				xNewPRSigstoreSignedKeyPath("/keys/public-key",
 					NewPRMMatchRepository()),
 			},
