@@ -149,7 +149,7 @@ This requirement rejects every image, and every signature.
 
 ### `signedBy`
 
-This requirement requires an image to be signed with an expected identity, or accepts a signature if it is using an expected identity and key.
+This requirement requires an image to be signed using “simple signing” with an expected identity, or accepts a signature if it is using an expected identity and key.
 
 ```js
 {
@@ -236,6 +236,24 @@ used with `exactReference` or `exactRepository`.
 
 <!-- ### `signedBaseLayer` -->
 
+
+### `cosignSigned`
+
+This requirement requires an image to be signed using a Cosign signature with an expected identity and key.
+
+```js
+{
+    "type":    "cosignSigned",
+    "keyPath": "/path/to/local/keyring/file",
+    "keyData": "base64-encoded-keyring-data",
+    "signedIdentity": identity_requirement
+}
+```
+Exactly one of `keyPath` and `keyData` must be present, containing a Cosign public key.  Only signatures made by this key is accepted.
+
+The `signedIdentity` field has the same semantics as in the `signedBy` requirement described above.
+Note that `cosign`-created signatures only contain a repository, so only `matchRepository` and `exactRepository` can be used to accept them (and that does not protect against substitution of a signed image with an unexpected tag).
+
 ## Examples
 
 It is *strongly* recommended to set the `default` policy to `reject`, and then
@@ -255,9 +273,24 @@ selectively allow individual transports and scopes as desired.
             "docker.io/openshift": [{"type": "insecureAcceptAnything"}],
             /* Similarly, allow installing the “official” busybox images.  Note how the fully expanded
                form, with the explicit /library/, must be used. */
-            "docker.io/library/busybox": [{"type": "insecureAcceptAnything"}]
+            "docker.io/library/busybox": [{"type": "insecureAcceptAnything"}],
             /* Allow installing images from all subdomains */
-            "*.temporary-project.example.com": [{"type": "insecureAcceptAnything"}]
+            "*.temporary-project.example.com": [{"type": "insecureAcceptAnything"}],
+            /* A Cosign-signed repository */
+            "hostname:5000/myns/cosign-signed-with-full-references": [
+                {
+                    "type": "cosignSigned",
+                    "keyPath": "/path/to/cosign-pubkey.key"
+                }
+            ],
+            /* A Cosign-signed repository, accepts signatures by /usr/bin/cosign */
+            "hostname:5000/myns/cosign-signed-risky": [
+                {
+                    "type": "cosignSigned",
+                    "keyPath": "/path/to/cosign-pubkey.key",
+                    "signedIdentity": {"type": "matchRepository"}
+                }
+            ]
             /* Other docker: images use the global default policy and are rejected */
         },
         "dir": {
@@ -301,7 +334,7 @@ selectively allow individual transports and scopes as desired.
                     "signedIdentity": {
                         "type": "remapIdentity",
                         "prefix": "private-mirror:5000/vendor-mirror",
-                        "signedPrefix": "vendor.example.com",
+                        "signedPrefix": "vendor.example.com"
                     }
                 }
             ]

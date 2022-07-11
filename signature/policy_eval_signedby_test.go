@@ -9,20 +9,22 @@ import (
 	"github.com/containers/image/v5/directory"
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/image"
+	"github.com/containers/image/v5/internal/imagesource"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// dirImageMock returns a types.UnparsedImage for a directory, claiming a specified dockerReference.
-func dirImageMock(t *testing.T, dir, dockerReference string) types.UnparsedImage {
+// dirImageMock returns a private.UnparsedImage for a directory, claiming a specified dockerReference.
+func dirImageMock(t *testing.T, dir, dockerReference string) private.UnparsedImage {
 	ref, err := reference.ParseNormalizedNamed(dockerReference)
 	require.NoError(t, err)
 	return dirImageMockWithRef(t, dir, refImageReferenceMock{ref: ref})
 }
 
-// dirImageMockWithRef returns a types.UnparsedImage for a directory, claiming a specified ref.
-func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) types.UnparsedImage {
+// dirImageMockWithRef returns a private.UnparsedImage for a directory, claiming a specified ref.
+func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) private.UnparsedImage {
 	srcRef, err := directory.NewReference(dir)
 	require.NoError(t, err)
 	src, err := srcRef.NewImageSource(context.Background(), nil)
@@ -32,14 +34,14 @@ func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) typ
 		require.NoError(t, err)
 	})
 	return image.UnparsedInstance(&dirImageSourceMock{
-		ImageSource: src,
+		ImageSource: imagesource.FromPublic(src),
 		ref:         ref,
 	}, nil)
 }
 
 // dirImageSourceMock inherits dirImageSource, but overrides its Reference method.
 type dirImageSourceMock struct {
-	types.ImageSource
+	private.ImageSource
 	ref types.ImageReference
 }
 

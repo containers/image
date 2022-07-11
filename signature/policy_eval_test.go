@@ -8,6 +8,7 @@ import (
 	"github.com/containers/image/v5/docker"
 	"github.com/containers/image/v5/docker/policyconfiguration"
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/testing/mocks"
 	"github.com/containers/image/v5/transports"
 	"github.com/containers/image/v5/types"
@@ -202,8 +203,8 @@ func TestPolicyContextRequirementsForImageRef(t *testing.T) {
 	}
 }
 
-// pcImageMock returns a types.UnparsedImage for a directory, claiming a specified dockerReference and implementing PolicyConfigurationIdentity/PolicyConfigurationNamespaces.
-func pcImageMock(t *testing.T, dir, dockerReference string) types.UnparsedImage {
+// pcImageMock returns a private.UnparsedImage for a directory, claiming a specified dockerReference and implementing PolicyConfigurationIdentity/PolicyConfigurationNamespaces.
+func pcImageMock(t *testing.T, dir, dockerReference string) private.UnparsedImage {
 	ref, err := reference.ParseNormalizedNamed(dockerReference)
 	require.NoError(t, err)
 	return dirImageMockWithRef(t, dir, pcImageReferenceMock{transportName: "docker", ref: ref})

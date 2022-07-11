@@ -1,6 +1,9 @@
 package internal
 
 import (
+	"bytes"
+	"crypto"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,10 +11,12 @@ import (
 
 	"github.com/containers/image/v5/version"
 	digest "github.com/opencontainers/go-digest"
+	cosignSignature "github.com/sigstore/sigstore/pkg/signature"
 )
 
 const (
-	cosignSignatureType = "cosign container image signature"
+	cosignSignatureType         = "cosign container image signature"
+	cosignHarcodedHashAlgorithm = crypto.SHA256
 )
 
 // UntrustedCosignPayload is a parsed content of a Cosign signature payload (not the full signature)
@@ -96,20 +101,23 @@ func (s *UntrustedCosignPayload) strictUnmarshalJSON(data []byte) error {
 	var creatorID string
 	var timestamp float64
 	var gotCreatorID, gotTimestamp = false, false
-	if err := ParanoidUnmarshalJSONObject(optional, func(key string) interface{} {
-		switch key {
-		case "creator":
-			gotCreatorID = true
-			return &creatorID
-		case "timestamp":
-			gotTimestamp = true
-			return &timestamp
-		default:
-			var ignore interface{}
-			return &ignore
+	// Cosign generates "optional": null if there are no user-specified annotations.
+	if !bytes.Equal(optional, []byte("null")) {
+		if err := ParanoidUnmarshalJSONObject(optional, func(key string) interface{} {
+			switch key {
+			case "creator":
+				gotCreatorID = true
+				return &creatorID
+			case "timestamp":
+				gotTimestamp = true
+				return &timestamp
+			default:
+				var ignore interface{}
+				return &ignore
+			}
+		}); err != nil {
+			return err
 		}
-	}); err != nil {
-		return err
 	}
 	if gotCreatorID {
 		s.UntrustedCreatorID = &creatorID
@@ -146,4 +154,48 @@ func (s *UntrustedCosignPayload) strictUnmarshalJSON(data []byte) error {
 	return ParanoidUnmarshalJSONObjectExactFields(identity, map[string]interface{}{
 		"docker-reference": &s.UntrustedDockerReference,
 	})
+}
+
+// CosignPayloadAcceptanceRules specifies how to decide whether an untrusted payload is acceptable.
+// We centralize the actual parsing and data extraction in VerifyCosignPayload; this supplies
+// the policy.  We use an object instead of supplying func parameters to verifyAndExtractSignature
+// because the functions have the same or similar types, so there is a risk of exchanging the functions;
+// named members of this struct are more explicit.
+type CosignPayloadAcceptanceRules struct {
+	ValidateSignedDockerReference      func(string) error
+	ValidateSignedDockerManifestDigest func(digest.Digest) error
+}
+
+// VerifyCosignPayload verifies unverifiedBase64Signature of unverifiedPayload was correctly created by publicKey, and that its principal components
+// match expected values, both as specified by rules, and returns it.
+// We return an *UntrustedCosignPayload, although nothing actually uses it,
+// just to double-check against stupid typos.
+func VerifyCosignPayload(publicKey crypto.PublicKey, unverifiedPayload []byte, unverifiedBase64Signature string, rules CosignPayloadAcceptanceRules) (*UntrustedCosignPayload, error) {
+	verifier, err := cosignSignature.LoadVerifier(publicKey, cosignHarcodedHashAlgorithm)
+	if err != nil {
+		return nil, fmt.Errorf("creating verifier: %w", err)
+	}
+
+	unverifiedSignature, err := base64.StdEncoding.DecodeString(unverifiedBase64Signature)
+	if err != nil {
+		return nil, NewInvalidSignatureError(fmt.Sprintf("base64 decoding: %v", err))
+	}
+	// github.com/sigstore/cosign/pkg/cosign.verifyOCISignature uses signatureoptions.WithContext(),
+	// which seems to be not used by anything. So we don’t bother.
+	if err := verifier.VerifySignature(bytes.NewReader(unverifiedSignature), bytes.NewReader(unverifiedPayload)); err != nil {
+		return nil, NewInvalidSignatureError(fmt.Sprintf("cryptographic signature verification failed: %v", err))
+	}
+
+	var unmatchedPayload UntrustedCosignPayload
+	if err := json.Unmarshal(unverifiedPayload, &unmatchedPayload); err != nil {
+		return nil, NewInvalidSignatureError(err.Error())
+	}
+	if err := rules.ValidateSignedDockerManifestDigest(unmatchedPayload.UntrustedDockerManifestDigest); err != nil {
+		return nil, err
+	}
+	if err := rules.ValidateSignedDockerReference(unmatchedPayload.UntrustedDockerReference); err != nil {
+		return nil, err
+	}
+	// CosignPayloadAcceptanceRules have accepted this value.
+	return &unmatchedPayload, nil
 }

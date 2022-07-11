@@ -92,7 +92,9 @@ func (i *UnparsedImage) expectedManifestDigest() (digest.Digest, bool) {
 
 // Signatures is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
 func (i *UnparsedImage) Signatures(ctx context.Context) ([][]byte, error) {
-	sigs, err := i.signaturesWithFormat(ctx)
+	// It would be consistent to make this an internal/unparsedimage/impl.Compat wrapper,
+	// but this is very likely to be the only implementation ever.
+	sigs, err := i.UntrustedSignatures(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -105,8 +107,8 @@ func (i *UnparsedImage) Signatures(ctx context.Context) ([][]byte, error) {
 	return simpleSigs, nil
 }
 
-// signaturesWithFormat is like ImageSource.GetSignatures, but the result is cached; it is OK to call this however often you need.
-func (i *UnparsedImage) signaturesWithFormat(ctx context.Context) ([]signature.Signature, error) {
+// UntrustedSignatures is like ImageSource.GetSignaturesWithFormat, but the result is cached; it is OK to call this however often you need.
+func (i *UnparsedImage) UntrustedSignatures(ctx context.Context) ([]signature.Signature, error) {
 	if i.cachedSignatures == nil {
 		sigs, err := i.src.GetSignaturesWithFormat(ctx, i.instanceDigest)
 		if err != nil {
