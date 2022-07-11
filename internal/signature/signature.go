@@ -12,7 +12,7 @@ type FormatID string
 
 const (
 	SimpleSigningFormat FormatID = "simple-signing"
-	CosignFormat        FormatID = "cosign-json"
+	SigstoreFormat      FormatID = "sigstore-json"
 	// Update also UnsupportedFormatError below
 )
 
@@ -80,8 +80,8 @@ func FromBlob(blob []byte) (Signature, error) {
 		switch {
 		case bytes.Equal(formatBytes, []byte(SimpleSigningFormat)):
 			return SimpleSigningFromBlob(blobChunk), nil
-		case bytes.Equal(formatBytes, []byte(CosignFormat)):
-			return cosignFromBlobChunk(blobChunk)
+		case bytes.Equal(formatBytes, []byte(SigstoreFormat)):
+			return SigstoreFromBlobChunk(blobChunk)
 		default:
 			return nil, fmt.Errorf("unrecognized signature format %q", string(formatBytes))
 		}
@@ -96,7 +96,7 @@ func FromBlob(blob []byte) (Signature, error) {
 func UnsupportedFormatError(sig Signature) error {
 	formatID := sig.FormatID()
 	switch formatID {
-	case SimpleSigningFormat, CosignFormat:
+	case SimpleSigningFormat, SigstoreFormat:
 		return fmt.Errorf("unsupported signature format %s", string(formatID))
 	default:
 		return fmt.Errorf("unsupported, and unrecognized, signature format %q", string(formatID))

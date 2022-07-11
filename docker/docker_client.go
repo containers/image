@@ -106,11 +106,11 @@ type dockerClient struct {
 	// by detectProperties(). Callers can edit tlsClientConfig.InsecureSkipVerify in the meantime.
 	tlsClientConfig *tls.Config
 	// The following members are not set by newDockerClient and must be set by callers if needed.
-	auth                 types.DockerAuthConfig
-	registryToken        string
-	signatureBase        lookasideStorageBase
-	useCosignAttachments bool
-	scope                authScope
+	auth                   types.DockerAuthConfig
+	registryToken          string
+	signatureBase          lookasideStorageBase
+	useSigstoreAttachments bool
+	scope                  authScope
 
 	// The following members are detected registry properties:
 	// They are set after a successful detectProperties(), and never change afterwards.
@@ -236,7 +236,7 @@ func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, regis
 		client.registryToken = sys.DockerBearerRegistryToken
 	}
 	client.signatureBase = sigBase
-	client.useCosignAttachments = registryConfig.useCosignAttachments(ref)
+	client.useSigstoreAttachments = registryConfig.useSigstoreAttachments(ref)
 	client.scope.actions = actions
 	client.scope.remoteName = reference.Path(ref.ref)
 	return client, nil
@@ -933,36 +933,36 @@ func isManifestUnknownError(err error) bool {
 	return ec.ErrorCode() == v2.ErrorCodeManifestUnknown
 }
 
-// getCosignAttachmentManifest loads and parses the manifest for Cosign attachments for
+// getSigstoreAttachmentManifest loads and parses the manifest for sigstore attachments for
 // digest in ref.
 // It returns (nil, nil) if the manifest does not exist.
-func (c *dockerClient) getCosignAttachmentManifest(ctx context.Context, ref dockerReference, digest digest.Digest) (*manifest.OCI1, error) {
-	tag := cosignAttachmentTag(digest)
-	cosignRef, err := reference.WithTag(reference.TrimNamed(ref.ref), tag)
+func (c *dockerClient) getSigstoreAttachmentManifest(ctx context.Context, ref dockerReference, digest digest.Digest) (*manifest.OCI1, error) {
+	tag := sigstoreAttachmentTag(digest)
+	sigstoreRef, err := reference.WithTag(reference.TrimNamed(ref.ref), tag)
 	if err != nil {
 		return nil, err
 	}
-	logrus.Debugf("Looking for Cosign attachments in %s", cosignRef.String())
+	logrus.Debugf("Looking for sigstore attachments in %s", sigstoreRef.String())
 	manifestBlob, mimeType, err := c.fetchManifest(ctx, ref, tag)
 	if err != nil {
 		// FIXME: Are we going to need better heuristics??
-		// This alone is probably a good enough reason for Cosign to be opt-in only,
+		// This alone is probably a good enough reason for sigstore to be opt-in only,
 		// otherwise we would just break ordinary copies.
 		if isManifestUnknownError(err) {
-			logrus.Debugf("Fetching Cosign attachment manifest failed, assuming it does not exist: %v", err)
+			logrus.Debugf("Fetching sigstore attachment manifest failed, assuming it does not exist: %v", err)
 			return nil, nil
 		}
-		logrus.Debugf("Fetching Cosign attachment manifest failed: %v", err)
+		logrus.Debugf("Fetching sigstore attachment manifest failed: %v", err)
 		return nil, err
 	}
 	if mimeType != imgspecv1.MediaTypeImageManifest {
 		// FIXME: Try anyway??
-		return nil, fmt.Errorf("unexpected MIME type for Cosign attachment manifest %s: %q",
-			cosignRef.String(), mimeType)
+		return nil, fmt.Errorf("unexpected MIME type for sigstore attachment manifest %s: %q",
+			sigstoreRef.String(), mimeType)
 	}
 	res, err := manifest.OCI1FromManifest(manifestBlob)
 	if err != nil {
-		return nil, fmt.Errorf("parsing manifest %s: %w", cosignRef.String(), err)
+		return nil, fmt.Errorf("parsing manifest %s: %w", sigstoreRef.String(), err)
 	}
 	return res, nil
 }
@@ -993,7 +993,7 @@ func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerRe
 	return &parsedBody, nil
 }
 
-// cosignAttachmentTag returns a Cosign attachment tag for the specified digest.
-func cosignAttachmentTag(d digest.Digest) string {
+// sigstoreAttachmentTag returns a sigstore attachment tag for the specified digest.
+func sigstoreAttachmentTag(d digest.Digest) string {
 	return strings.Replace(d.String(), ":", "-", 1) + ".sig"
 }

@@ -30,9 +30,9 @@ func x(m mSI, fields ...string) mSI {
 	return m
 }
 
-func TestNewUntrustedCosignPayload(t *testing.T) {
+func TestNewUntrustedSigstorePayload(t *testing.T) {
 	timeBefore := time.Now()
-	sig := NewUntrustedCosignPayload(TestImageManifestDigest, TestImageSignatureReference)
+	sig := NewUntrustedSigstorePayload(TestImageManifestDigest, TestImageSignatureReference)
 	assert.Equal(t, TestImageManifestDigest, sig.UntrustedDockerManifestDigest)
 	assert.Equal(t, TestImageSignatureReference, sig.UntrustedDockerReference)
 	require.NotNil(t, sig.UntrustedCreatorID)
@@ -43,12 +43,12 @@ func TestNewUntrustedCosignPayload(t *testing.T) {
 	assert.True(t, *sig.UntrustedTimestamp <= timeAfter.Unix())
 }
 
-func TestUntrustedCosignPayloadMarshalJSON(t *testing.T) {
+func TestUntrustedSigstorePayloadMarshalJSON(t *testing.T) {
 	// Empty string values
-	s := NewUntrustedCosignPayload("", "_")
+	s := NewUntrustedSigstorePayload("", "_")
 	_, err := s.MarshalJSON()
 	assert.Error(t, err)
-	s = NewUntrustedCosignPayload("_", "")
+	s = NewUntrustedSigstorePayload("_", "")
 	_, err = s.MarshalJSON()
 	assert.Error(t, err)
 
@@ -57,11 +57,11 @@ func TestUntrustedCosignPayloadMarshalJSON(t *testing.T) {
 	creatorID := "CREATOR"
 	timestamp := int64(1484683104)
 	for _, c := range []struct {
-		input    UntrustedCosignPayload
+		input    UntrustedSigstorePayload
 		expected string
 	}{
 		{
-			UntrustedCosignPayload{
+			UntrustedSigstorePayload{
 				UntrustedDockerManifestDigest: "digest!@#",
 				UntrustedDockerReference:      "reference#@!",
 				UntrustedCreatorID:            &creatorID,
@@ -70,7 +70,7 @@ func TestUntrustedCosignPayloadMarshalJSON(t *testing.T) {
 			"{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"digest!@#\"},\"type\":\"cosign container image signature\"},\"optional\":{\"creator\":\"CREATOR\",\"timestamp\":1484683104}}",
 		},
 		{
-			UntrustedCosignPayload{
+			UntrustedSigstorePayload{
 				UntrustedDockerManifestDigest: "digest!@#",
 				UntrustedDockerReference:      "reference#@!",
 			},
@@ -89,7 +89,7 @@ func TestUntrustedCosignPayloadMarshalJSON(t *testing.T) {
 }
 
 // Return the result of modifying validJSON with fn
-func modifiedUntrustedCosignPayloadJSON(t *testing.T, validJSON []byte, modifyFn func(mSI)) []byte {
+func modifiedUntrustedSigstorePayloadJSON(t *testing.T, validJSON []byte, modifyFn func(mSI)) []byte {
 	var tmp mSI
 	err := json.Unmarshal(validJSON, &tmp)
 	require.NoError(t, err)
@@ -101,45 +101,45 @@ func modifiedUntrustedCosignPayloadJSON(t *testing.T, validJSON []byte, modifyFn
 	return modifiedJSON
 }
 
-// Verify that input can be unmarshaled as an untrustedCosignPayload.
-func successfullyUnmarshalUntrustedCosignPayload(t *testing.T, input []byte) UntrustedCosignPayload {
-	var s UntrustedCosignPayload
+// Verify that input can be unmarshaled as an untrustedSigstorePayload.
+func successfullyUnmarshalUntrustedSigstorePayload(t *testing.T, input []byte) UntrustedSigstorePayload {
+	var s UntrustedSigstorePayload
 	err := json.Unmarshal(input, &s)
 	require.NoError(t, err, string(input))
 
 	return s
 }
 
-// Verify that input can't be unmarshaled as an untrustedCosignPayload.
-func assertUnmarshalUntrustedCosignPayloadFails(t *testing.T, input []byte) {
-	var s UntrustedCosignPayload
+// Verify that input can't be unmarshaled as an untrustedSigstorePayload.
+func assertUnmarshalUntrustedSigstorePayloadFails(t *testing.T, input []byte) {
+	var s UntrustedSigstorePayload
 	err := json.Unmarshal(input, &s)
 	assert.Error(t, err, string(input))
 }
 
-func TestUntrustedCosignPayloadUnmarshalJSON(t *testing.T) {
+func TestUntrustedSigstorePayloadUnmarshalJSON(t *testing.T) {
 	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
 	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
-	assertUnmarshalUntrustedCosignPayloadFails(t, []byte("&"))
-	var s UntrustedCosignPayload
+	assertUnmarshalUntrustedSigstorePayloadFails(t, []byte("&"))
+	var s UntrustedSigstorePayload
 	err := s.UnmarshalJSON([]byte("&"))
 	assert.Error(t, err)
 
 	// Not an object
-	assertUnmarshalUntrustedCosignPayloadFails(t, []byte("1"))
+	assertUnmarshalUntrustedSigstorePayloadFails(t, []byte("1"))
 
 	// Start with a valid JSON.
-	validSig := NewUntrustedCosignPayload("digest!@#", "reference#@!")
+	validSig := NewUntrustedSigstorePayload("digest!@#", "reference#@!")
 	validJSON, err := validSig.MarshalJSON()
 	require.NoError(t, err)
 
 	// Success
-	s = successfullyUnmarshalUntrustedCosignPayload(t, validJSON)
+	s = successfullyUnmarshalUntrustedSigstorePayload(t, validJSON)
 	assert.Equal(t, validSig, s)
 
-	// A Cosign-generated payload is handled correctly
-	s = successfullyUnmarshalUntrustedCosignPayload(t, []byte(`{"critical":{"identity":{"docker-reference":"192.168.64.2:5000/cosign-signed-multi"},"image":{"docker-manifest-digest":"sha256:43955d6857268cc948ae9b370b221091057de83c4962da0826f9a2bdc9bd6b44"},"type":"cosign container image signature"},"optional":null}`))
-	assert.Equal(t, UntrustedCosignPayload{
+	// A /usr/bin/cosign-generated payload is handled correctly
+	s = successfullyUnmarshalUntrustedSigstorePayload(t, []byte(`{"critical":{"identity":{"docker-reference":"192.168.64.2:5000/cosign-signed-multi"},"image":{"docker-manifest-digest":"sha256:43955d6857268cc948ae9b370b221091057de83c4962da0826f9a2bdc9bd6b44"},"type":"cosign container image signature"},"optional":null}`))
+	assert.Equal(t, UntrustedSigstorePayload{
 		UntrustedDockerManifestDigest: "sha256:43955d6857268cc948ae9b370b221091057de83c4962da0826f9a2bdc9bd6b44",
 		UntrustedDockerReference:      "192.168.64.2:5000/cosign-signed-multi",
 		UntrustedCreatorID:            nil,
@@ -185,8 +185,8 @@ func TestUntrustedCosignPayloadUnmarshalJSON(t *testing.T) {
 		func(v mSI) { x(v, "optional")["timestamp"] = 0.5 }, // Fractional input
 	}
 	for _, fn := range breakFns {
-		testJSON := modifiedUntrustedCosignPayloadJSON(t, validJSON, fn)
-		assertUnmarshalUntrustedCosignPayloadFails(t, testJSON)
+		testJSON := modifiedUntrustedSigstorePayloadJSON(t, validJSON, fn)
+		assertUnmarshalUntrustedSigstorePayloadFails(t, testJSON)
 	}
 
 	// Modifications to unrecognized fields in "optional" are allowed and ignored
@@ -195,13 +195,13 @@ func TestUntrustedCosignPayloadUnmarshalJSON(t *testing.T) {
 		func(v mSI) { x(v, "optional")["unexpected"] = 1 },
 	}
 	for _, fn := range allowedModificationFns {
-		testJSON := modifiedUntrustedCosignPayloadJSON(t, validJSON, fn)
-		s := successfullyUnmarshalUntrustedCosignPayload(t, testJSON)
+		testJSON := modifiedUntrustedSigstorePayloadJSON(t, validJSON, fn)
+		s := successfullyUnmarshalUntrustedSigstorePayload(t, testJSON)
 		assert.Equal(t, validSig, s)
 	}
 
 	// Optional fields can be missing
-	validSig = UntrustedCosignPayload{
+	validSig = UntrustedSigstorePayload{
 		UntrustedDockerManifestDigest: "digest!@#",
 		UntrustedDockerReference:      "reference#@!",
 		UntrustedCreatorID:            nil,
@@ -209,11 +209,11 @@ func TestUntrustedCosignPayloadUnmarshalJSON(t *testing.T) {
 	}
 	validJSON, err = validSig.MarshalJSON()
 	require.NoError(t, err)
-	s = successfullyUnmarshalUntrustedCosignPayload(t, validJSON)
+	s = successfullyUnmarshalUntrustedSigstorePayload(t, validJSON)
 	assert.Equal(t, validSig, s)
 }
 
-func TestVerifyCosignPayload(t *testing.T) {
+func TestVerifySigstorePayload(t *testing.T) {
 	publicKeyPEM, err := os.ReadFile("./testdata/cosign.pub")
 	require.NoError(t, err)
 	publicKey, err := cryptoutils.UnmarshalPEMToPublicKey(publicKeyPEM)
@@ -224,9 +224,9 @@ func TestVerifyCosignPayload(t *testing.T) {
 		signedDockerManifestDigest digest.Digest
 	}
 	var wanted, recorded acceptanceData
-	// recordingRules are a plausible CosignPayloadAcceptanceRules implementations, but equally
+	// recordingRules are a plausible SigstorePayloadAcceptanceRules implementations, but equally
 	// importantly record that we are passing the correct values to the rule callbacks.
-	recordingRules := CosignPayloadAcceptanceRules{
+	recordingRules := SigstorePayloadAcceptanceRules{
 		ValidateSignedDockerReference: func(signedDockerReference string) error {
 			recorded.signedDockerReference = signedDockerReference
 			if signedDockerReference != wanted.signedDockerReference {
@@ -247,23 +247,23 @@ func TestVerifyCosignPayload(t *testing.T) {
 	require.NoError(t, err)
 	genericSig, err := signature.FromBlob(sigBlob)
 	require.NoError(t, err)
-	cosignSig, ok := genericSig.(signature.Cosign)
+	sigstoreSig, ok := genericSig.(signature.Sigstore)
 	require.True(t, ok)
-	cryptoBase64Sig, ok := cosignSig.UntrustedAnnotations()[signature.CosignSignatureAnnotationKey]
+	cryptoBase64Sig, ok := sigstoreSig.UntrustedAnnotations()[signature.SigstoreSignatureAnnotationKey]
 	require.True(t, ok)
 	signatureData := acceptanceData{
-		signedDockerReference:      TestCosignSignatureReference,
-		signedDockerManifestDigest: TestCosignManifestDigest,
+		signedDockerReference:      TestSigstoreSignatureReference,
+		signedDockerManifestDigest: TestSigstoreManifestDigest,
 	}
 
 	// Successful verification
 	wanted = signatureData
 	recorded = acceptanceData{}
-	res, err := VerifyCosignPayload(publicKey, cosignSig.UntrustedPayload(), cryptoBase64Sig, recordingRules)
+	res, err := VerifySigstorePayload(publicKey, sigstoreSig.UntrustedPayload(), cryptoBase64Sig, recordingRules)
 	require.NoError(t, err)
-	assert.Equal(t, res, &UntrustedCosignPayload{
-		UntrustedDockerManifestDigest: TestCosignManifestDigest,
-		UntrustedDockerReference:      TestCosignSignatureReference,
+	assert.Equal(t, res, &UntrustedSigstorePayload{
+		UntrustedDockerManifestDigest: TestSigstoreManifestDigest,
+		UntrustedDockerReference:      TestSigstoreSignatureReference,
 		UntrustedCreatorID:            nil,
 		UntrustedTimestamp:            nil,
 	})
@@ -274,7 +274,7 @@ func TestVerifyCosignPayload(t *testing.T) {
 	// Invalid verifier
 	recorded = acceptanceData{}
 	invalidPublicKey := struct{}{} // crypto.PublicKey is, for some reason, just an interface{}, so this is acceptable.
-	res, err = VerifyCosignPayload(invalidPublicKey, cosignSig.UntrustedPayload(), cryptoBase64Sig, recordingRules)
+	res, err = VerifySigstorePayload(invalidPublicKey, sigstoreSig.UntrustedPayload(), cryptoBase64Sig, recordingRules)
 	assert.Error(t, err)
 	assert.Nil(t, res)
 	assert.Equal(t, acceptanceData{}, recorded)
@@ -286,7 +286,7 @@ func TestVerifyCosignPayload(t *testing.T) {
 		cryptoBase64Sig[:len(cryptoBase64Sig)-1], // Truncated base64 data
 	} {
 		recorded = acceptanceData{}
-		res, err = VerifyCosignPayload(publicKey, cosignSig.UntrustedPayload(), invalidBase64Sig, recordingRules)
+		res, err = VerifySigstorePayload(publicKey, sigstoreSig.UntrustedPayload(), invalidBase64Sig, recordingRules)
 		assert.Error(t, err)
 		assert.Nil(t, res)
 		assert.Equal(t, acceptanceData{}, recorded)
@@ -301,7 +301,7 @@ func TestVerifyCosignPayload(t *testing.T) {
 		append(validSignatureBytes, validSignatureBytes...),
 	} {
 		recorded = acceptanceData{}
-		res, err = VerifyCosignPayload(publicKey, cosignSig.UntrustedPayload(), base64.StdEncoding.EncodeToString(invalidSig), recordingRules)
+		res, err = VerifySigstorePayload(publicKey, sigstoreSig.UntrustedPayload(), base64.StdEncoding.EncodeToString(invalidSig), recordingRules)
 		assert.Error(t, err)
 		assert.Nil(t, res)
 		assert.Equal(t, acceptanceData{}, recorded)
@@ -309,14 +309,14 @@ func TestVerifyCosignPayload(t *testing.T) {
 
 	// Valid signature of non-JSON
 	recorded = acceptanceData{}
-	res, err = VerifyCosignPayload(publicKey, []byte("&"), "MEUCIARnnxZQPALBfqkB4aNAYXad79Qs6VehcrgIeZ8p7I2FAiEAzq2HXwXlz1iJeh+ucUR3L0zpjynQk6Rk0+/gXYp49RU=", recordingRules)
+	res, err = VerifySigstorePayload(publicKey, []byte("&"), "MEUCIARnnxZQPALBfqkB4aNAYXad79Qs6VehcrgIeZ8p7I2FAiEAzq2HXwXlz1iJeh+ucUR3L0zpjynQk6Rk0+/gXYp49RU=", recordingRules)
 	assert.Error(t, err)
 	assert.Nil(t, res)
 	assert.Equal(t, acceptanceData{}, recorded)
 
 	// Valid signature of an unacceptable JSON
 	recorded = acceptanceData{}
-	res, err = VerifyCosignPayload(publicKey, []byte("{}"), "MEUCIQDkySOBGxastVP0+koTA33NH5hXjwosFau4rxTPN6g48QIgb7eWKkGqfEpHMM3aT4xiqyP/170jEkdFuciuwN4mux4=", recordingRules)
+	res, err = VerifySigstorePayload(publicKey, []byte("{}"), "MEUCIQDkySOBGxastVP0+koTA33NH5hXjwosFau4rxTPN6g48QIgb7eWKkGqfEpHMM3aT4xiqyP/170jEkdFuciuwN4mux4=", recordingRules)
 	assert.Error(t, err)
 	assert.Nil(t, res)
 	assert.Equal(t, acceptanceData{}, recorded)
@@ -325,7 +325,7 @@ func TestVerifyCosignPayload(t *testing.T) {
 	wanted = signatureData
 	wanted.signedDockerManifestDigest = "invalid digest"
 	recorded = acceptanceData{}
-	res, err = VerifyCosignPayload(publicKey, cosignSig.UntrustedPayload(), cryptoBase64Sig, recordingRules)
+	res, err = VerifySigstorePayload(publicKey, sigstoreSig.UntrustedPayload(), cryptoBase64Sig, recordingRules)
 	assert.Error(t, err)
 	assert.Nil(t, res)
 	assert.Equal(t, acceptanceData{
@@ -336,7 +336,7 @@ func TestVerifyCosignPayload(t *testing.T) {
 	wanted = signatureData
 	wanted.signedDockerReference = "unexpected docker reference"
 	recorded = acceptanceData{}
-	res, err = VerifyCosignPayload(publicKey, cosignSig.UntrustedPayload(), cryptoBase64Sig, recordingRules)
+	res, err = VerifySigstorePayload(publicKey, sigstoreSig.UntrustedPayload(), cryptoBase64Sig, recordingRules)
 	assert.Error(t, err)
 	assert.Nil(t, res)
 	assert.Equal(t, signatureData, recorded)

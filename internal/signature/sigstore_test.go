@@ -8,41 +8,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCosignFromComponents(t *testing.T) {
+func TestSigstoreFromComponents(t *testing.T) {
 	const mimeType = "mime-type"
 	payload := []byte("payload")
 	annotations := map[string]string{"a": "b", "c": "d"}
 
-	sig := CosignFromComponents(mimeType, payload, annotations)
-	assert.Equal(t, Cosign{
+	sig := SigstoreFromComponents(mimeType, payload, annotations)
+	assert.Equal(t, Sigstore{
 		untrustedMIMEType:    mimeType,
 		untrustedPayload:     payload,
 		untrustedAnnotations: annotations,
 	}, sig)
 }
 
-func TestCosignFromBlobChunk(t *testing.T) {
+func TestSigstoreFromBlobChunk(t *testing.T) {
 	// Success
 	json := []byte(`{"mimeType":"mime-type","payload":"cGF5bG9hZA==", "annotations":{"a":"b","c":"d"}}`)
-	res, err := cosignFromBlobChunk(json)
+	res, err := SigstoreFromBlobChunk(json)
 	require.NoError(t, err)
 	assert.Equal(t, "mime-type", res.UntrustedMIMEType())
 	assert.Equal(t, []byte("payload"), res.UntrustedPayload())
 	assert.Equal(t, map[string]string{"a": "b", "c": "d"}, res.UntrustedAnnotations())
 
 	// Invalid JSON
-	_, err = cosignFromBlobChunk([]byte("&"))
+	_, err = SigstoreFromBlobChunk([]byte("&"))
 	assert.Error(t, err)
 }
 
-func TestCosignFormatID(t *testing.T) {
-	sig := CosignFromComponents("mime-type", []byte("payload"),
+func TestSigstoreFormatID(t *testing.T) {
+	sig := SigstoreFromComponents("mime-type", []byte("payload"),
 		map[string]string{"a": "b", "c": "d"})
-	assert.Equal(t, CosignFormat, sig.FormatID())
+	assert.Equal(t, SigstoreFormat, sig.FormatID())
 }
 
-func TestCosign_blobChunk(t *testing.T) {
-	sig := CosignFromComponents("mime-type", []byte("payload"),
+func TestSigstore_blobChunk(t *testing.T) {
+	sig := SigstoreFromComponents("mime-type", []byte("payload"),
 		map[string]string{"a": "b", "c": "d"})
 	res, err := sig.blobChunk()
 	require.NoError(t, err)
@@ -57,15 +57,15 @@ func TestCosign_blobChunk(t *testing.T) {
 	assert.Equal(t, expectedRaw, raw)
 }
 
-func TestCosign_UntrustedPayload(t *testing.T) {
+func TestSigstore_UntrustedPayload(t *testing.T) {
 	var payload = []byte("payload")
-	sig := CosignFromComponents("mime-type", payload,
+	sig := SigstoreFromComponents("mime-type", payload,
 		map[string]string{"a": "b", "c": "d"})
 	assert.Equal(t, payload, sig.UntrustedPayload())
 }
 
-func TestCosign_UntrustedAnnotations(t *testing.T) {
+func TestSigstore_UntrustedAnnotations(t *testing.T) {
 	annotations := map[string]string{"a": "b", "c": "d"}
-	sig := CosignFromComponents("mime-type", []byte("payload"), annotations)
+	sig := SigstoreFromComponents("mime-type", []byte("payload"), annotations)
 	assert.Equal(t, annotations, sig.UntrustedAnnotations())
 }

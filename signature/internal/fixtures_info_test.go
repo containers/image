@@ -8,8 +8,8 @@ const (
 	// TestImageSignatureReference is the Docker image reference signed in "image.signature"
 	TestImageSignatureReference = "testing/manifest"
 
-	// TestCosignManifestDigest is the manifest digest of "valid.signature"
-	TestCosignManifestDigest = digest.Digest("sha256:634a8f35b5f16dcf4aaa0822adc0b1964bb786fca12f6831de8ddc45e5986a00")
-	// TestCosignSignatureReference is the Docker reference signed in "valid.signature"
-	TestCosignSignatureReference = "192.168.64.2:5000/cosign-signed-single-sample"
+	// TestSigstoreManifestDigest is the manifest digest of "valid.signature"
+	TestSigstoreManifestDigest = digest.Digest("sha256:634a8f35b5f16dcf4aaa0822adc0b1964bb786fca12f6831de8ddc45e5986a00")
+	// TestSigstoreSignatureReference is the Docker reference signed in "valid.signature"
+	TestSigstoreSignatureReference = "192.168.64.2:5000/cosign-signed-single-sample"
 )

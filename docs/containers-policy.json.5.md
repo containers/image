@@ -237,19 +237,19 @@ used with `exactReference` or `exactRepository`.
 <!-- ### `signedBaseLayer` -->
 
 
-### `cosignSigned`
+### `sigstoreSigned`
 
-This requirement requires an image to be signed using a Cosign signature with an expected identity and key.
+This requirement requires an image to be signed using a sigstore signature with an expected identity and key.
 
 ```js
 {
-    "type":    "cosignSigned",
+    "type":    "sigstoreSigned",
     "keyPath": "/path/to/local/keyring/file",
     "keyData": "base64-encoded-keyring-data",
     "signedIdentity": identity_requirement
 }
 ```
-Exactly one of `keyPath` and `keyData` must be present, containing a Cosign public key.  Only signatures made by this key is accepted.
+Exactly one of `keyPath` and `keyData` must be present, containing a sigstore public key.  Only signatures made by this key is accepted.
 
 The `signedIdentity` field has the same semantics as in the `signedBy` requirement described above.
 Note that `cosign`-created signatures only contain a repository, so only `matchRepository` and `exactRepository` can be used to accept them (and that does not protect against substitution of a signed image with an unexpected tag).
@@ -276,18 +276,18 @@ selectively allow individual transports and scopes as desired.
             "docker.io/library/busybox": [{"type": "insecureAcceptAnything"}],
             /* Allow installing images from all subdomains */
             "*.temporary-project.example.com": [{"type": "insecureAcceptAnything"}],
-            /* A Cosign-signed repository */
-            "hostname:5000/myns/cosign-signed-with-full-references": [
+            /* A sigstore-signed repository */
+            "hostname:5000/myns/sigstore-signed-with-full-references": [
                 {
-                    "type": "cosignSigned",
-                    "keyPath": "/path/to/cosign-pubkey.key"
+                    "type": "sigstoreSigned",
+                    "keyPath": "/path/to/sigstore-pubkey.key"
                 }
             ],
-            /* A Cosign-signed repository, accepts signatures by /usr/bin/cosign */
-            "hostname:5000/myns/cosign-signed-risky": [
+            /* A sigstore-signed repository, accepts signatures by /usr/bin/cosign */
+            "hostname:5000/myns/sigstore-signed-risky": [
                 {
-                    "type": "cosignSigned",
-                    "keyPath": "/path/to/cosign-pubkey.key",
+                    "type": "sigstoreSigned",
+                    "keyPath": "/path/to/sigstore-pubkey.key",
                     "signedIdentity": {"type": "matchRepository"}
                 }
             ]

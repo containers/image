@@ -133,15 +133,15 @@
                     }
                 }
             ],
-            "example.com/cosign/key-data-example": [
+            "example.com/sigstore/key-data-example": [
                 {
-                    "type": "cosignSigned",
+                    "type": "sigstoreSigned",
                     "keyData": "bm9uc2Vuc2U="
                 }
             ],
-            "example.com/cosign/key-Path-example": [
+            "example.com/sigstore/key-Path-example": [
                 {
-                    "type": "cosignSigned",
+                    "type": "sigstoreSigned",
                     "keyPath": "/keys/public-key",
                     "signedIdentity": {
                         "type": "matchRepository"

@@ -143,7 +143,7 @@ var prmRepositoryMatchTestTable = []prmSymmetricTableTest{
 	{"busybox:notlatest", "docker.io/library/busybox:latest", true},
 	{"busybox:latest", "busybox" + digestSuffix, true},
 	{"busybox" + digestSuffix, "busybox" + digestSuffixOther, true}, // Even this is accepted here. (This could more reasonably happen with two different digest algorithms.)
-	// The same as above, but with defaulted tags (which can happen with Cosign)
+	// The same as above, but with defaulted tags (which can happen with /usr/bin/cosign)
 	{"busybox", "busybox:notlatest", true},
 	{fullRHELRef, untaggedRHELRef, true},
 	{"busybox", "busybox" + digestSuffix, true},
