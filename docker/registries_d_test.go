@@ -271,7 +271,7 @@ func TestRegistryNamespaceSignatureTopLevel(t *testing.T) {
 	}
 }
 
-func TestSignatureStorageBaseSignatureStorageURL(t *testing.T) {
+func TestLookasideStorageURL(t *testing.T) {
 	const mdInput = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	const mdMapped = "sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
@@ -291,17 +291,17 @@ func TestSignatureStorageBaseSignatureStorageURL(t *testing.T) {
 		require.NoError(t, err)
 		expectedURL, err := url.Parse(c.expected)
 		require.NoError(t, err)
-		res := signatureStorageURL(url, mdInput, c.index)
+		res := lookasideStorageURL(url, mdInput, c.index)
 		assert.Equal(t, expectedURL, res, c.expected)
 	}
 }
 
-func TestBuiltinDefaultSignatureStorageDir(t *testing.T) {
-	base := builtinDefaultSignatureStorageDir(0)
+func TestBuiltinDefaultLookasideStorageDir(t *testing.T) {
+	base := builtinDefaultLookasideStorageDir(0)
 	assert.NotNil(t, base)
 	assert.Equal(t, "file://"+defaultDockerDir, base.String())
 
-	base = builtinDefaultSignatureStorageDir(1000)
+	base = builtinDefaultLookasideStorageDir(1000)
 	assert.NotNil(t, base)
 	assert.Equal(t, "file://"+filepath.Join(os.Getenv("HOME"), defaultUserDockerDir), base.String())
 }
