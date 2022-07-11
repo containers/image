@@ -101,7 +101,7 @@ func modifiedUntrustedSigstorePayloadJSON(t *testing.T, validJSON []byte, modify
 	return modifiedJSON
 }
 
-// Verify that input can be unmarshaled as an untrustedSigstorePayload.
+// Verify that input can be unmarshaled as an UntrustedSigstorePayload.
 func successfullyUnmarshalUntrustedSigstorePayload(t *testing.T, input []byte) UntrustedSigstorePayload {
 	var s UntrustedSigstorePayload
 	err := json.Unmarshal(input, &s)
@@ -110,7 +110,7 @@ func successfullyUnmarshalUntrustedSigstorePayload(t *testing.T, input []byte) U
 	return s
 }
 
-// Verify that input can't be unmarshaled as an untrustedSigstorePayload.
+// Verify that input can't be unmarshaled as an UntrustedSigstorePayload.
 func assertUnmarshalUntrustedSigstorePayloadFails(t *testing.T, input []byte) {
 	var s UntrustedSigstorePayload
 	err := json.Unmarshal(input, &s)

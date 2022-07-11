@@ -31,7 +31,7 @@ type UntrustedSigstorePayload struct {
 	UntrustedTimestamp *int64
 }
 
-// NewUntrustedSigstorePayload returns an untrustedSigstorePayload object with
+// NewUntrustedSigstorePayload returns an UntrustedSigstorePayload object with
 // the specified primary contents and appropriate metadata.
 func NewUntrustedSigstorePayload(dockerManifestDigest digest.Digest, dockerReference string) UntrustedSigstorePayload {
 	// Use intermediate variables for these values so that we can take their addresses.
@@ -46,7 +46,7 @@ func NewUntrustedSigstorePayload(dockerManifestDigest digest.Digest, dockerRefer
 	}
 }
 
-// Compile-time check that untrustedSigstorePayload implements json.Marshaler
+// Compile-time check that UntrustedSigstorePayload implements json.Marshaler
 var _ json.Marshaler = (*UntrustedSigstorePayload)(nil)
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -73,7 +73,7 @@ func (s UntrustedSigstorePayload) MarshalJSON() ([]byte, error) {
 	return json.Marshal(signature)
 }
 
-// Compile-time check that untrustedSigstorePayload implements json.Unmarshaler
+// Compile-time check that UntrustedSigstorePayload implements json.Unmarshaler
 var _ json.Unmarshaler = (*UntrustedSigstorePayload)(nil)
 
 // UnmarshalJSON implements the json.Unmarshaler interface
