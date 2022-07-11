@@ -1,14 +1,14 @@
 docker:
     example.com:
-        sigstore: https://sigstore.example.com
+        lookaside: https://lookaside.example.com
     registry.test.example.com:
-        sigstore: http://registry.test.example.com/sigstore
+        lookaside: http://registry.test.example.com/lookaside
     registry.test.example.com:8888:
-        sigstore: http://registry.test.example.com:8889/sigstore
-        sigstore-staging: https://registry.test.example.com:8889/sigstore/specialAPIserverWhichDoesNotExist
+        lookaside: http://registry.test.example.com:8889/lookaside
+        lookaside-staging: https://registry.test.example.com:8889/lookaside/specialAPIserverWhichDoesNotExist
     localhost:
-        sigstore: file:///home/mitr/mydevelopment1
+        lookaside: file:///home/mitr/mydevelopment1
     localhost:8080:
-        sigstore: file:///home/mitr/mydevelopment2
+        lookaside: file:///home/mitr/mydevelopment2
     localhost/invalid/url/test:
-        sigstore: ":emptyscheme"
+        lookaside: ":emptyscheme"

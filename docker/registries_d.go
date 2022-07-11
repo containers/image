@@ -47,8 +47,10 @@ type registryConfiguration struct {
 
 // registryNamespace defines lookaside locations for a single namespace.
 type registryNamespace struct {
-	SigStore             string `json:"sigstore"`         // For reading, and if SigStoreStaging is not present, for writing.
-	SigStoreStaging      string `json:"sigstore-staging"` // For writing only.
+	Lookaside            string `json:"lookaside"`         // For reading, and if LookasideStaging is not present, for writing.
+	LookasideStaging     string `json:"lookaside-staging"` // For writing only.
+	SigStore             string `json:"sigstore"`          // For compatibility, deprecated in favor of Lookaside.
+	SigStoreStaging      string `json:"sigstore-staging"`  // For compatibility, deprecated in favor of LookasideStaging.
 	UseCosignAttachments *bool  `json:"use-cosign-attachments,omitempty"`
 }
 
@@ -261,12 +263,22 @@ func (config *registryConfiguration) useCosignAttachments(ref dockerReference) b
 // ns.signatureTopLevel returns an URL string configured in ns for ref, for write access if “write”.
 // or "" if nothing has been configured.
 func (ns registryNamespace) signatureTopLevel(write bool) string {
-	if write && ns.SigStoreStaging != "" {
-		logrus.Debugf(`  Using %s`, ns.SigStoreStaging)
-		return ns.SigStoreStaging
+	if write {
+		if ns.LookasideStaging != "" {
+			logrus.Debugf(`  Using "lookaside-staging" %s`, ns.LookasideStaging)
+			return ns.LookasideStaging
+		}
+		if ns.SigStoreStaging != "" {
+			logrus.Debugf(`  Using "sigstore-staging" %s`, ns.SigStoreStaging)
+			return ns.SigStoreStaging
+		}
+	}
+	if ns.Lookaside != "" {
+		logrus.Debugf(`  Using "lookaside" %s`, ns.Lookaside)
+		return ns.Lookaside
 	}
 	if ns.SigStore != "" {
-		logrus.Debugf(`  Using %s`, ns.SigStore)
+		logrus.Debugf(`  Using "sigstore" %s`, ns.SigStore)
 		return ns.SigStore
 	}
 	return ""

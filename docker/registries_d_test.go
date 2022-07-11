@@ -45,7 +45,7 @@ func TestSignatureStorageBaseURL(t *testing.T) {
 		dockerRefFromString(t, "//example.com/my/project"), false)
 	assert.NoError(t, err)
 	require.NotNil(t, base)
-	assert.Equal(t, "https://sigstore.example.com/my/project", base.String())
+	assert.Equal(t, "https://lookaside.example.com/my/project", base.String())
 }
 
 func TestRegistriesDirPath(t *testing.T) {
@@ -157,10 +157,10 @@ func TestLoadAndMergeConfig(t *testing.T) {
 	err = os.Mkdir(duplicateDefault, 0755)
 	require.NoError(t, err)
 	err = os.WriteFile(filepath.Join(duplicateDefault, "0.yaml"),
-		[]byte("default-docker:\n sigstore: file:////tmp/something"), 0644)
+		[]byte("default-docker:\n lookaside: file:////tmp/something"), 0644)
 	require.NoError(t, err)
 	err = os.WriteFile(filepath.Join(duplicateDefault, "1.yaml"),
-		[]byte("default-docker:\n sigstore: file:////tmp/different"), 0644)
+		[]byte("default-docker:\n lookaside: file:////tmp/different"), 0644)
 	require.NoError(t, err)
 	_, err = loadAndMergeConfig(duplicateDefault)
 	assert.ErrorContains(t, err, "0.yaml")
@@ -171,10 +171,10 @@ func TestLoadAndMergeConfig(t *testing.T) {
 	err = os.Mkdir(duplicateNS, 0755)
 	require.NoError(t, err)
 	err = os.WriteFile(filepath.Join(duplicateNS, "0.yaml"),
-		[]byte("docker:\n example.com:\n  sigstore: file:////tmp/something"), 0644)
+		[]byte("docker:\n example.com:\n  lookaside: file:////tmp/something"), 0644)
 	require.NoError(t, err)
 	err = os.WriteFile(filepath.Join(duplicateNS, "1.yaml"),
-		[]byte("docker:\n example.com:\n  sigstore: file:////tmp/different"), 0644)
+		[]byte("docker:\n example.com:\n  lookaside: file:////tmp/different"), 0644)
 	require.NoError(t, err)
 	_, err = loadAndMergeConfig(duplicateNS)
 	assert.ErrorContains(t, err, "0.yaml")
@@ -184,28 +184,28 @@ func TestLoadAndMergeConfig(t *testing.T) {
 	config, err = loadAndMergeConfig("fixtures/registries.d")
 	require.NoError(t, err)
 	assert.Equal(t, &registryConfiguration{
-		DefaultDocker: &registryNamespace{SigStore: "file:///mnt/companywide/signatures/for/other/repositories"},
+		DefaultDocker: &registryNamespace{Lookaside: "file:///mnt/companywide/signatures/for/other/repositories"},
 		Docker: map[string]registryNamespace{
-			"example.com":                    {SigStore: "https://sigstore.example.com"},
-			"registry.test.example.com":      {SigStore: "http://registry.test.example.com/sigstore"},
-			"registry.test.example.com:8888": {SigStore: "http://registry.test.example.com:8889/sigstore", SigStoreStaging: "https://registry.test.example.com:8889/sigstore/specialAPIserverWhichDoesNotExist"},
-			"localhost":                      {SigStore: "file:///home/mitr/mydevelopment1"},
-			"localhost:8080":                 {SigStore: "file:///home/mitr/mydevelopment2"},
-			"localhost/invalid/url/test":     {SigStore: ":emptyscheme"},
-			"docker.io/contoso":              {SigStore: "https://sigstore.contoso.com/fordocker"},
-			"docker.io/centos":               {SigStore: "https://sigstore.centos.org/"},
+			"example.com":                    {Lookaside: "https://lookaside.example.com"},
+			"registry.test.example.com":      {Lookaside: "http://registry.test.example.com/lookaside"},
+			"registry.test.example.com:8888": {Lookaside: "http://registry.test.example.com:8889/lookaside", LookasideStaging: "https://registry.test.example.com:8889/lookaside/specialAPIserverWhichDoesNotExist"},
+			"localhost":                      {Lookaside: "file:///home/mitr/mydevelopment1"},
+			"localhost:8080":                 {Lookaside: "file:///home/mitr/mydevelopment2"},
+			"localhost/invalid/url/test":     {Lookaside: ":emptyscheme"},
+			"docker.io/contoso":              {Lookaside: "https://lookaside.contoso.com/fordocker"},
+			"docker.io/centos":               {Lookaside: "https://lookaside.centos.org/"},
 			"docker.io/centos/mybetaproduct": {
-				SigStore:        "http://localhost:9999/mybetaWIP/sigstore",
-				SigStoreStaging: "file:///srv/mybetaWIP/sigstore",
+				Lookaside:        "http://localhost:9999/mybetaWIP/lookaside",
+				LookasideStaging: "file:///srv/mybetaWIP/lookaside",
 			},
-			"docker.io/centos/mybetaproduct:latest": {SigStore: "https://sigstore.centos.org/"},
+			"docker.io/centos/mybetaproduct:latest": {Lookaside: "https://lookaside.centos.org/"},
 		},
 	}, config)
 }
 
 func TestRegistryConfigurationSignatureTopLevel(t *testing.T) {
 	config := registryConfiguration{
-		DefaultDocker: &registryNamespace{SigStore: "=default", SigStoreStaging: "=default+w"},
+		DefaultDocker: &registryNamespace{Lookaside: "=default", LookasideStaging: "=default+w"},
 		Docker:        map[string]registryNamespace{},
 	}
 	for _, ns := range []string{
@@ -217,7 +217,7 @@ func TestRegistryConfigurationSignatureTopLevel(t *testing.T) {
 		"example.com/ns1/ns2/repo",
 		"example.com/ns1/ns2/repo:notlatest",
 	} {
-		config.Docker[ns] = registryNamespace{SigStore: ns, SigStoreStaging: ns + "+w"}
+		config.Docker[ns] = registryNamespace{Lookaside: ns, LookasideStaging: ns + "+w"}
 	}
 
 	for _, c := range []struct{ input, expected string }{
@@ -241,7 +241,7 @@ func TestRegistryConfigurationSignatureTopLevel(t *testing.T) {
 
 	config = registryConfiguration{
 		Docker: map[string]registryNamespace{
-			"unmatched": {SigStore: "a", SigStoreStaging: "b"},
+			"unmatched": {Lookaside: "a", LookasideStaging: "b"},
 		},
 	}
 	dr := dockerRefFromString(t, "//thisisnotmatched")
@@ -257,14 +257,24 @@ func TestRegistryNamespaceSignatureTopLevel(t *testing.T) {
 		forWriting bool
 		expected   string
 	}{
-		{registryNamespace{SigStoreStaging: "a", SigStore: "b"}, true, "a"},
-		{registryNamespace{SigStoreStaging: "a", SigStore: "b"}, false, "b"},
-		{registryNamespace{SigStore: "b"}, true, "b"},
-		{registryNamespace{SigStore: "b"}, false, "b"},
-		{registryNamespace{SigStoreStaging: "a"}, true, "a"},
-		{registryNamespace{SigStoreStaging: "a"}, false, ""},
+		{registryNamespace{LookasideStaging: "a", Lookaside: "b"}, true, "a"},
+		{registryNamespace{LookasideStaging: "a", Lookaside: "b"}, false, "b"},
+		{registryNamespace{Lookaside: "b"}, true, "b"},
+		{registryNamespace{Lookaside: "b"}, false, "b"},
+		{registryNamespace{LookasideStaging: "a"}, true, "a"},
+		{registryNamespace{LookasideStaging: "a"}, false, ""},
 		{registryNamespace{}, true, ""},
 		{registryNamespace{}, false, ""},
+
+		{registryNamespace{LookasideStaging: "a", Lookaside: "b", SigStoreStaging: "c", SigStore: "d"}, true, "a"},
+		{registryNamespace{Lookaside: "b", SigStoreStaging: "c", SigStore: "d"}, true, "c"},
+		{registryNamespace{Lookaside: "b", SigStore: "d"}, true, "b"},
+		{registryNamespace{SigStore: "d"}, true, "d"},
+
+		{registryNamespace{LookasideStaging: "a", Lookaside: "b", SigStoreStaging: "c", SigStore: "d"}, false, "b"},
+		{registryNamespace{Lookaside: "b", SigStoreStaging: "c", SigStore: "d"}, false, "b"},
+		{registryNamespace{Lookaside: "b", SigStore: "d"}, false, "b"},
+		{registryNamespace{SigStore: "d"}, false, "d"},
 	} {
 		res := c.ns.signatureTopLevel(c.forWriting)
 		assert.Equal(t, c.expected, res, fmt.Sprintf("%#v %v", c.ns, c.forWriting))
