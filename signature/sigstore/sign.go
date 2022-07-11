@@ -1,4 +1,4 @@
-package cosign
+package sigstore
 
 import (
 	"bytes"

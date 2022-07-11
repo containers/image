@@ -6,7 +6,7 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	internalsig "github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/signature"
-	"github.com/containers/image/v5/signature/cosign"
+	"github.com/containers/image/v5/signature/sigstore"
 	"github.com/containers/image/v5/transports"
 	perrors "github.com/pkg/errors"
 )
@@ -55,7 +55,7 @@ func (c *copier) createCosignSignature(manifest []byte, privateKeyFile string, p
 	}
 
 	c.Printf("Signing manifest using Cosign\n")
-	newSig, err := cosign.SignDockerManifestWithPrivateKeyFileUnstable(manifest, identity, privateKeyFile, passphrase)
+	newSig, err := sigstore.SignDockerManifestWithPrivateKeyFileUnstable(manifest, identity, privateKeyFile, passphrase)
 	if err != nil {
 		return nil, fmt.Errorf("creating signature: %w", err)
 	}
