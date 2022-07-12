@@ -31,10 +31,10 @@ const builtinRegistriesDirPath = etcDir + "/containers/registries.d"
 // userRegistriesDirPath is the path to the per user registries.d.
 var userRegistriesDir = filepath.FromSlash(".config/containers/registries.d")
 
-// defaultUserDockerDir is the default sigstore directory for unprivileged user
+// defaultUserDockerDir is the default lookaside directory for unprivileged user
 var defaultUserDockerDir = filepath.FromSlash(".local/share/containers/sigstore")
 
-// defaultDockerDir is the default sigstore directory for root
+// defaultDockerDir is the default lookaside directory for root
 var defaultDockerDir = "/var/lib/containers/sigstore"
 
 // registryConfiguration is one of the files in registriesDirPath configuring lookaside locations, or the result of merging them all.
@@ -47,16 +47,18 @@ type registryConfiguration struct {
 
 // registryNamespace defines lookaside locations for a single namespace.
 type registryNamespace struct {
-	SigStore             string `json:"sigstore"`         // For reading, and if SigStoreStaging is not present, for writing.
-	SigStoreStaging      string `json:"sigstore-staging"` // For writing only.
+	Lookaside            string `json:"lookaside"`         // For reading, and if LookasideStaging is not present, for writing.
+	LookasideStaging     string `json:"lookaside-staging"` // For writing only.
+	SigStore             string `json:"sigstore"`          // For compatibility, deprecated in favor of Lookaside.
+	SigStoreStaging      string `json:"sigstore-staging"`  // For compatibility, deprecated in favor of LookasideStaging.
 	UseCosignAttachments *bool  `json:"use-cosign-attachments,omitempty"`
 }
 
-// signatureStorageBase is an "opaque" type representing a lookaside Docker signature storage.
-// Users outside of this file should use SignatureStorageBaseURL and signatureStorageURL below.
-type signatureStorageBase *url.URL
+// lookasideStorageBase is an "opaque" type representing a lookaside Docker signature storage.
+// Users outside of this file should use SignatureStorageBaseURL and lookasideStorageURL below.
+type lookasideStorageBase *url.URL
 
-// SignatureStorageBaseURL reads configuration to find an appropriate signature storage URL for ref, for write access if “write”.
+// SignatureStorageBaseURL reads configuration to find an appropriate lookaside storage URL for ref, for write access if “write”.
 // the usage of the BaseURL is defined under docker/distribution registries—separate storage of docs/signature-protocols.md
 // Warning: This function only exposes configuration in registries.d;
 // just because this function returns an URL does not mean that the URL will be used by c/image/docker (e.g. if the registry natively supports X-R-S-S).
@@ -70,7 +72,7 @@ func SignatureStorageBaseURL(sys *types.SystemContext, ref types.ImageReference,
 		return nil, err
 	}
 
-	return config.signatureStorageBaseURL(dr, write)
+	return config.lookasideStorageBaseURL(dr, write)
 }
 
 // loadRegistryConfiguration returns a registryConfiguration appropriate for sys.
@@ -158,9 +160,9 @@ func loadAndMergeConfig(dirPath string) (*registryConfiguration, error) {
 	return &mergedConfig, nil
 }
 
-// signatureStorageBaseURL returns an appropriate signature storage URL for ref, for write access if “write”.
+// lookasideStorageBaseURL returns an appropriate signature storage URL for ref, for write access if “write”.
 // the usage of the BaseURL is defined under docker/distribution registries—separate storage of docs/signature-protocols.md
-func (config *registryConfiguration) signatureStorageBaseURL(dr dockerReference, write bool) (*url.URL, error) {
+func (config *registryConfiguration) lookasideStorageBaseURL(dr dockerReference, write bool) (*url.URL, error) {
 	topLevel := config.signatureTopLevel(dr, write)
 	var url *url.URL
 	if topLevel != "" {
@@ -170,8 +172,8 @@ func (config *registryConfiguration) signatureStorageBaseURL(dr dockerReference,
 		}
 		url = u
 	} else {
-		// returns default directory if no sigstore specified in configuration file
-		url = builtinDefaultSignatureStorageDir(rootless.GetRootlessEUID())
+		// returns default directory if no lookaside specified in configuration file
+		url = builtinDefaultLookasideStorageDir(rootless.GetRootlessEUID())
 		logrus.Debugf(" No signature storage configuration found for %s, using built-in default %s", dr.PolicyConfigurationIdentity(), url.Redacted())
 	}
 	// NOTE: Keep this in sync with docs/signature-protocols.md!
@@ -184,8 +186,8 @@ func (config *registryConfiguration) signatureStorageBaseURL(dr dockerReference,
 	return url, nil
 }
 
-// builtinDefaultSignatureStorageDir returns default signature storage URL as per euid
-func builtinDefaultSignatureStorageDir(euid int) *url.URL {
+// builtinDefaultLookasideStorageDir returns default signature storage URL as per euid
+func builtinDefaultLookasideStorageDir(euid int) *url.URL {
 	if euid != 0 {
 		return &url.URL{Scheme: "file", Path: filepath.Join(homedir.Get(), defaultUserDockerDir)}
 	}
@@ -199,7 +201,7 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 		// Look for a full match.
 		identity := ref.PolicyConfigurationIdentity()
 		if ns, ok := config.Docker[identity]; ok {
-			logrus.Debugf(` Sigstore configuration: using "docker" namespace %s`, identity)
+			logrus.Debugf(` Lookaside configuration: using "docker" namespace %s`, identity)
 			if url := ns.signatureTopLevel(write); url != "" {
 				return url
 			}
@@ -208,7 +210,7 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 		// Look for a match of the possible parent namespaces.
 		for _, name := range ref.PolicyConfigurationNamespaces() {
 			if ns, ok := config.Docker[name]; ok {
-				logrus.Debugf(` Sigstore configuration: using "docker" namespace %s`, name)
+				logrus.Debugf(` Lookaside configuration: using "docker" namespace %s`, name)
 				if url := ns.signatureTopLevel(write); url != "" {
 					return url
 				}
@@ -217,7 +219,7 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 	}
 	// Look for a default location
 	if config.DefaultDocker != nil {
-		logrus.Debugf(` Sigstore configuration: using "default-docker" configuration`)
+		logrus.Debugf(` Lookaside configuration: using "default-docker" configuration`)
 		if url := config.DefaultDocker.signatureTopLevel(write); url != "" {
 			return url
 		}
@@ -261,21 +263,31 @@ func (config *registryConfiguration) useCosignAttachments(ref dockerReference) b
 // ns.signatureTopLevel returns an URL string configured in ns for ref, for write access if “write”.
 // or "" if nothing has been configured.
 func (ns registryNamespace) signatureTopLevel(write bool) string {
-	if write && ns.SigStoreStaging != "" {
-		logrus.Debugf(`  Using %s`, ns.SigStoreStaging)
-		return ns.SigStoreStaging
+	if write {
+		if ns.LookasideStaging != "" {
+			logrus.Debugf(`  Using "lookaside-staging" %s`, ns.LookasideStaging)
+			return ns.LookasideStaging
+		}
+		if ns.SigStoreStaging != "" {
+			logrus.Debugf(`  Using "sigstore-staging" %s`, ns.SigStoreStaging)
+			return ns.SigStoreStaging
+		}
+	}
+	if ns.Lookaside != "" {
+		logrus.Debugf(`  Using "lookaside" %s`, ns.Lookaside)
+		return ns.Lookaside
 	}
 	if ns.SigStore != "" {
-		logrus.Debugf(`  Using %s`, ns.SigStore)
+		logrus.Debugf(`  Using "sigstore" %s`, ns.SigStore)
 		return ns.SigStore
 	}
 	return ""
 }
 
-// signatureStorageURL returns an URL usable for accessing signature index in base with known manifestDigest.
+// lookasideStorageURL returns an URL usable for accessing signature index in base with known manifestDigest.
 // base is not nil from the caller
 // NOTE: Keep this in sync with docs/signature-protocols.md!
-func signatureStorageURL(base signatureStorageBase, manifestDigest digest.Digest, index int) *url.URL {
+func lookasideStorageURL(base lookasideStorageBase, manifestDigest digest.Digest, index int) *url.URL {
 	url := *base
 	url.Path = fmt.Sprintf("%s@%s=%s/signature-%d", url.Path, manifestDigest.Algorithm(), manifestDigest.Hex(), index+1)
 	return &url

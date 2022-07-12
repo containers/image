@@ -108,7 +108,7 @@ type dockerClient struct {
 	// The following members are not set by newDockerClient and must be set by callers if needed.
 	auth                 types.DockerAuthConfig
 	registryToken        string
-	signatureBase        signatureStorageBase
+	signatureBase        lookasideStorageBase
 	useCosignAttachments bool
 	scope                authScope
 
@@ -221,7 +221,7 @@ func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, regis
 		return nil, perrors.Wrapf(err, "getting username and password")
 	}
 
-	sigBase, err := registryConfig.signatureStorageBaseURL(ref, write)
+	sigBase, err := registryConfig.lookasideStorageBaseURL(ref, write)
 	if err != nil {
 		return nil, err
 	}

@@ -585,7 +585,7 @@ func (d *dockerImageDestination) putSignaturesToLookaside(signatures []signature
 
 	// NOTE: Keep this in sync with docs/signature-protocols.md!
 	for i, signature := range signatures {
-		url := signatureStorageURL(d.c.signatureBase, manifestDigest, i)
+		url := lookasideStorageURL(d.c.signatureBase, manifestDigest, i)
 		err := d.putOneSignature(url, signature)
 		if err != nil {
 			return err
@@ -597,7 +597,7 @@ func (d *dockerImageDestination) putSignaturesToLookaside(signatures []signature
 	// is enough for dockerImageSource to stop looking for other signatures, so that
 	// is sufficient.
 	for i := len(signatures); ; i++ {
-		url := signatureStorageURL(d.c.signatureBase, manifestDigest, i)
+		url := lookasideStorageURL(d.c.signatureBase, manifestDigest, i)
 		missing, err := d.c.deleteOneSignature(url)
 		if err != nil {
 			return err
@@ -631,7 +631,7 @@ func (d *dockerImageDestination) putOneSignature(url *url.URL, sig signature.Sig
 		return nil
 
 	case "http", "https":
-		return fmt.Errorf("Writing directly to a %s sigstore %s is not supported. Configure a sigstore-staging: location", url.Scheme, url.Redacted())
+		return fmt.Errorf("Writing directly to a %s lookaside %s is not supported. Configure a lookaside-staging: location", url.Scheme, url.Redacted())
 	default:
 		return fmt.Errorf("Unsupported scheme when writing signature to %s", url.Redacted())
 	}
@@ -785,7 +785,7 @@ func (c *dockerClient) deleteOneSignature(url *url.URL) (missing bool, err error
 		return false, err
 
 	case "http", "https":
-		return false, fmt.Errorf("Writing directly to a %s sigstore %s is not supported. Configure a sigstore-staging: location", url.Scheme, url.Redacted())
+		return false, fmt.Errorf("Writing directly to a %s lookaside %s is not supported. Configure a lookaside-staging: location", url.Scheme, url.Redacted())
 	default:
 		return false, fmt.Errorf("Unsupported scheme when deleting signature from %s", url.Redacted())
 	}
