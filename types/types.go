@@ -466,6 +466,19 @@ type ImageInspectInfo struct {
 	Os            string
 	Layers        []string
 	Env           []string
+	LayersDetail  []LayerDetail
+	Author        string
+	// Size is the total size of the image including all layers it is composed of
+	Size    int64
+	Config  v1.ImageConfig
+	History []v1.History
+}
+
+type LayerDetail struct {
+	MIMEType    string
+	Digest      digest.Digest
+	Size        int64
+	Annotations map[string]string
 }
 
 // DockerAuthConfig contains authorization information for connecting to a registry.

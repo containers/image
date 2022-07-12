@@ -215,23 +215,59 @@ func validateV1ID(id string) error {
 	return nil
 }
 
+type schema2Image struct {
+	Schema2V1Image
+	Parent     digest.Digest    `json:"parent,omitempty"`
+	RootFS     *Schema2RootFS   `json:"rootfs,omitempty"`
+	History    []Schema2History `json:"history,omitempty"`
+	OSVersion  string           `json:"os.version,omitempty"`
+	OSFeatures []string         `json:"os.features,omitempty"`
+}
+
 // Inspect returns various information for (skopeo inspect) parsed from the manifest and configuration.
 func (m *Schema1) Inspect(_ func(types.BlobInfo) ([]byte, error)) (*types.ImageInspectInfo, error) {
 	s1 := &Schema2V1Image{}
 	if err := json.Unmarshal([]byte(m.History[0].V1Compatibility), s1); err != nil {
 		return nil, err
 	}
+	layerInfos := m.LayerInfos()
 	i := &types.ImageInspectInfo{
 		Tag:           m.Tag,
 		Created:       &s1.Created,
 		DockerVersion: s1.DockerVersion,
 		Architecture:  s1.Architecture,
 		Os:            s1.OS,
-		Layers:        layerInfosToStrings(m.LayerInfos()),
+		Layers:        layerInfosToStrings(layerInfos),
+		LayersDetail:  imgInspectLayersFromLayerInfos(layerInfos),
+		Author:        s1.Author,
+		Size:          s1.Size,
 	}
+
+	diffIDs := []digest.Digest{digest.FromString(s1.ID)}
+	schema2Config, err := m.ToSchema2Config(diffIDs)
+	if err != nil {
+		return nil, err
+	}
+	imageConfig := &schema2Image{}
+	if err := json.Unmarshal(schema2Config, imageConfig); err != nil {
+		return nil, err
+	}
+	i.History = schema2HistoryToV1History(imageConfig.History)
 	if s1.Config != nil {
 		i.Labels = s1.Config.Labels
 		i.Env = s1.Config.Env
+		i.Config.Env = s1.Config.Env
+		i.Config.Labels = s1.Config.Labels
+		i.Config.User = s1.Config.User
+		i.Config.Volumes = s1.Config.Volumes
+		i.Config.Entrypoint = s1.Config.Entrypoint
+		for key, value := range s1.Config.ExposedPorts {
+			exposedPorts := make(map[string]struct{})
+			exposedPorts[string(key)] = value
+			i.Config.ExposedPorts = exposedPorts
+		}
+		i.Config.StopSignal = s1.Config.StopSignal
+		i.Config.WorkingDir = s1.Config.WorkingDir
 	}
 	return i, nil
 }

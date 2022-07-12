@@ -6,6 +6,7 @@ import (
 
 	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 )
 
@@ -227,4 +228,29 @@ func compressionVariantsRecognizeMIMEType(variantTable []compressionMIMETypeSet,
 	}
 	variants := findCompressionMIMETypeSet(variantTable, mimeType)
 	return variants != nil // Alternatively, this could be len(variants) > 1, but really the caller should ask about a specific algorithm.
+}
+
+// imgInspectLayersFromLayerInfos converts a list of layer infos, presumably obtained from a Manifest.LayerInfos()
+// method call, into a format suitable for inclusion in a types.ImageInspectInfo structure.
+func imgInspectLayersFromLayerInfos(infos []LayerInfo) []types.LayerDetail {
+	layers := make([]types.LayerDetail, len(infos))
+	for i, info := range infos {
+		layers[i].MIMEType = info.MediaType
+		layers[i].Digest = info.Digest
+		layers[i].Size = info.Size
+		layers[i].Annotations = info.Annotations
+	}
+	return layers
+}
+
+func schema2HistoryToV1History(history []Schema2History) []v1.History {
+	v1History := make([]v1.History, len(history))
+	for index, value := range history {
+		v1History[index].Created = &value.Created
+		v1History[index].Author = value.Author
+		v1History[index].CreatedBy = value.CreatedBy
+		v1History[index].Comment = value.Comment
+		v1History[index].EmptyLayer = value.EmptyLayer
+	}
+	return v1History
 }

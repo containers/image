@@ -281,30 +281,44 @@ func TestManifestOCI1Inspect(t *testing.T) {
 	ii, err := m.Inspect(context.Background())
 	require.NoError(t, err)
 	created := time.Date(2016, 9, 23, 23, 20, 45, 789764590, time.UTC)
-	assert.Equal(t, types.ImageInspectInfo{
-		Tag:           "",
-		Created:       &created,
-		DockerVersion: "1.12.1",
-		Labels:        map[string]string{},
-		Architecture:  "amd64",
-		Os:            "linux",
-		Layers: []string{
-			"sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
-			"sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
-			"sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
-			"sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
-			"sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
-		},
-		Env: []string{
-			"PATH=/usr/local/apache2/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-			"HTTPD_PREFIX=/usr/local/apache2",
-			"HTTPD_VERSION=2.4.23",
-			"HTTPD_SHA1=5101be34ac4a509b245adb70a56690a84fcc4e7f",
-			"HTTPD_BZ2_URL=https://www.apache.org/dyn/closer.cgi?action=download&filename=httpd/httpd-2.4.23.tar.bz2",
-			"HTTPD_ASC_URL=https://www.apache.org/dist/httpd/httpd-2.4.23.tar.bz2.asc",
-		},
-	}, *ii)
 
+	layers := []string{
+		"sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+		"sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+		"sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
+		"sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
+		"sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
+	}
+
+	env := []string{
+		"PATH=/usr/local/apache2/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		"HTTPD_PREFIX=/usr/local/apache2",
+		"HTTPD_VERSION=2.4.23",
+		"HTTPD_SHA1=5101be34ac4a509b245adb70a56690a84fcc4e7f",
+		"HTTPD_BZ2_URL=https://www.apache.org/dyn/closer.cgi?action=download&filename=httpd/httpd-2.4.23.tar.bz2",
+		"HTTPD_ASC_URL=https://www.apache.org/dist/httpd/httpd-2.4.23.tar.bz2.asc",
+	}
+
+	assert.Equal(t, "", ii.Tag)
+	assert.Equal(t, &created, ii.Created)
+	assert.Equal(t, layers, ii.Layers)
+
+	assert.Equal(t, "1.12.1", ii.DockerVersion)
+	assert.Equal(t, map[string]string{}, ii.Labels)
+	assert.Equal(t, "amd64", ii.Architecture)
+	assert.Equal(t, "linux", ii.Os)
+	assert.Equal(t, layers, ii.Layers)
+	assert.Equal(t, env, ii.Env)
+	assert.NotEqual(t, nil, ii.Config)
+	assert.Equal(t, int64(-1), ii.Size)
+	assert.Equal(t, "", ii.Author)
+
+	for _, layer := range ii.LayersDetail {
+		assert.NotEqual(t, nil, layer)
+	}
+	for _, history := range ii.History {
+		assert.NotEqual(t, nil, history)
+	}
 	// nil configBlob will trigger an error in m.ConfigBlob()
 	m = manifestOCI1FromComponentsLikeFixture(nil)
 	_, err = m.Inspect(context.Background())
