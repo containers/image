@@ -21,7 +21,6 @@ require (
 	github.com/opencontainers/image-spec v1.0.3-0.20220114050600-8b9d41f48198
 	github.com/opencontainers/selinux v1.10.1
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f
-	github.com/pkg/errors v0.9.1
 	github.com/proglottis/gpgme v0.1.3
 	github.com/sigstore/sigstore v1.3.1-0.20220629021053-b95fc0d626c1
 	github.com/sirupsen/logrus v1.8.1
@@ -75,6 +74,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/opencontainers/runc v1.1.2 // indirect
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.12.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect

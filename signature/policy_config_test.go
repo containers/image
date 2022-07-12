@@ -9,7 +9,6 @@ import (
 
 	"github.com/containers/image/v5/directory"
 	"github.com/containers/image/v5/docker"
-	perrors "github.com/pkg/errors"
 
 	// this import is needed  where we use the "atomic" transport in TestPolicyUnmarshalJSON
 	_ "github.com/containers/image/v5/openshift"
@@ -229,7 +228,8 @@ func TestNewPolicyFromFile(t *testing.T) {
 	// A failure case; most are tested in the individual method unit tests.
 	_, err = NewPolicyFromFile("/dev/null")
 	require.Error(t, err)
-	assert.IsType(t, InvalidPolicyFormatError(""), perrors.Cause(err))
+	var formatError InvalidPolicyFormatError
+	assert.ErrorAs(t, err, &formatError)
 }
 
 func TestNewPolicyFromBytes(t *testing.T) {
