@@ -415,11 +415,11 @@ func (s *dockerImageSource) GetSignaturesWithFormat(ctx context.Context, instanc
 		return nil, errors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
 	}
 
-	cosignSigs, err := s.getSignaturesFromCosignAttachments(ctx, instanceDigest)
+	sigstoreSigs, err := s.getSignaturesFromSigstoreAttachments(ctx, instanceDigest)
 	if err != nil {
 		return nil, err
 	}
-	res = append(res, cosignSigs...)
+	res = append(res, sigstoreSigs...)
 	return res, nil
 }
 
@@ -537,9 +537,9 @@ func (s *dockerImageSource) getSignaturesFromAPIExtension(ctx context.Context, i
 	return sigs, nil
 }
 
-func (s *dockerImageSource) getSignaturesFromCosignAttachments(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error) {
-	if !s.c.useCosignAttachments {
-		logrus.Debugf("Not looking for Cosign attachments: disabled by configuration")
+func (s *dockerImageSource) getSignaturesFromSigstoreAttachments(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error) {
+	if !s.c.useSigstoreAttachments {
+		logrus.Debugf("Not looking for sigstore attachments: disabled by configuration")
 		return nil, nil
 	}
 
@@ -548,7 +548,7 @@ func (s *dockerImageSource) getSignaturesFromCosignAttachments(ctx context.Conte
 		return nil, err
 	}
 
-	ociManifest, err := s.c.getCosignAttachmentManifest(ctx, s.physicalRef, manifestDigest)
+	ociManifest, err := s.c.getSigstoreAttachmentManifest(ctx, s.physicalRef, manifestDigest)
 	if err != nil {
 		return nil, err
 	}
@@ -556,12 +556,12 @@ func (s *dockerImageSource) getSignaturesFromCosignAttachments(ctx context.Conte
 		return nil, nil
 	}
 
-	logrus.Debugf("Found a Cosign attachment manifest with %d layers", len(ociManifest.Layers))
+	logrus.Debugf("Found a sigstore attachment manifest with %d layers", len(ociManifest.Layers))
 	res := []signature.Signature{}
 	for layerIndex, layer := range ociManifest.Layers {
 		// Note that this copies all kinds of attachments: attestations, and whatever else is there,
 		// not just signatures. We leave the signature consumers to decide based on the MIME type.
-		logrus.Debugf("Fetching Cosign attachment %d/%d: %s", layerIndex+1, len(ociManifest.Layers), layer.Digest.String())
+		logrus.Debugf("Fetching sigstore attachment %d/%d: %s", layerIndex+1, len(ociManifest.Layers), layer.Digest.String())
 		// We don’t benefit from a real BlobInfoCache here because we never try to reuse/mount attachment payloads.
 		// That might eventually need to change if payloads grow to be not just signatures, but something
 		// significantly large.
@@ -570,7 +570,7 @@ func (s *dockerImageSource) getSignaturesFromCosignAttachments(ctx context.Conte
 		if err != nil {
 			return nil, err
 		}
-		res = append(res, signature.CosignFromComponents(layer.MediaType, payload, layer.Annotations))
+		res = append(res, signature.SigstoreFromComponents(layer.MediaType, payload, layer.Annotations))
 	}
 	return res, nil
 }

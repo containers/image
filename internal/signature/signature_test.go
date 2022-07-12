@@ -34,25 +34,25 @@ func TestBlobSimpleSigning(t *testing.T) {
 
 }
 
-func TestBlobCosign(t *testing.T) {
-	cosignSig := CosignFromComponents("mime-type", []byte("payload"),
+func TestBlobSigstore(t *testing.T) {
+	sigstoreSig := SigstoreFromComponents("mime-type", []byte("payload"),
 		map[string]string{"a": "b", "c": "d"})
 
-	cosignBlob, err := Blob(cosignSig)
+	sigstoreBlob, err := Blob(sigstoreSig)
 	require.NoError(t, err)
-	assert.True(t, bytes.HasPrefix(cosignBlob, []byte("\x00cosign-json\n{")))
+	assert.True(t, bytes.HasPrefix(sigstoreBlob, []byte("\x00sigstore-json\n{")))
 
-	fromBlob, err := FromBlob(cosignBlob)
+	fromBlob, err := FromBlob(sigstoreBlob)
 	require.NoError(t, err)
-	fromBlobCosign, ok := fromBlob.(Cosign)
+	fromBlobSigstore, ok := fromBlob.(Sigstore)
 	require.True(t, ok)
-	assert.Equal(t, cosignSig.UntrustedMIMEType(), fromBlobCosign.UntrustedMIMEType())
-	assert.Equal(t, cosignSig.UntrustedPayload(), fromBlobCosign.UntrustedPayload())
-	assert.Equal(t, cosignSig.UntrustedAnnotations(), fromBlobCosign.UntrustedAnnotations())
+	assert.Equal(t, sigstoreSig.UntrustedMIMEType(), fromBlobSigstore.UntrustedMIMEType())
+	assert.Equal(t, sigstoreSig.UntrustedPayload(), fromBlobSigstore.UntrustedPayload())
+	assert.Equal(t, sigstoreSig.UntrustedAnnotations(), fromBlobSigstore.UntrustedAnnotations())
 }
 
 func TestFromBlobInvalid(t *testing.T) {
-	// Round-tripping valid data has been tested in TestBlobSimpleSigning and TestBlobCosign above.
+	// Round-tripping valid data has been tested in TestBlobSimpleSigning and TestBlobSigstore above.
 	for _, c := range []string{
 		"",                          // Empty
 		"\xFFsimple-signing\nhello", // Invalid first byte
@@ -85,7 +85,7 @@ func TestUnsuportedFormatError(t *testing.T) {
 		expected string
 	}{
 		{SimpleSigningFromBlob(nil), "unsupported signature format simple-signing"},
-		{CosignFromComponents("mime-type", nil, nil), "unsupported signature format cosign-json"},
+		{SigstoreFromComponents("mime-type", nil, nil), "unsupported signature format sigstore-json"},
 		{mockFormatSignature{FormatID("invalid")}, `unsupported, and unrecognized, signature format "invalid"`},
 	} {
 		res := UnsupportedFormatError(c.input)

@@ -47,11 +47,11 @@ type registryConfiguration struct {
 
 // registryNamespace defines lookaside locations for a single namespace.
 type registryNamespace struct {
-	Lookaside            string `json:"lookaside"`         // For reading, and if LookasideStaging is not present, for writing.
-	LookasideStaging     string `json:"lookaside-staging"` // For writing only.
-	SigStore             string `json:"sigstore"`          // For compatibility, deprecated in favor of Lookaside.
-	SigStoreStaging      string `json:"sigstore-staging"`  // For compatibility, deprecated in favor of LookasideStaging.
-	UseCosignAttachments *bool  `json:"use-cosign-attachments,omitempty"`
+	Lookaside              string `json:"lookaside"`         // For reading, and if LookasideStaging is not present, for writing.
+	LookasideStaging       string `json:"lookaside-staging"` // For writing only.
+	SigStore               string `json:"sigstore"`          // For compatibility, deprecated in favor of Lookaside.
+	SigStoreStaging        string `json:"sigstore-staging"`  // For compatibility, deprecated in favor of LookasideStaging.
+	UseSigstoreAttachments *bool  `json:"use-sigstore-attachments,omitempty"`
 }
 
 // lookasideStorageBase is an "opaque" type representing a lookaside Docker signature storage.
@@ -227,34 +227,34 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 	return ""
 }
 
-// config.useCosignAttachments returns whether we should look for and write cosign attachments.
+// config.useSigstoreAttachments returns whether we should look for and write sigstore attachments.
 // for ref.
-func (config *registryConfiguration) useCosignAttachments(ref dockerReference) bool {
+func (config *registryConfiguration) useSigstoreAttachments(ref dockerReference) bool {
 	if config.Docker != nil {
 		// Look for a full match.
 		identity := ref.PolicyConfigurationIdentity()
 		if ns, ok := config.Docker[identity]; ok {
-			logrus.Debugf(` Cosign attachments: using "docker" namespace %s`, identity)
-			if ns.UseCosignAttachments != nil {
-				return *ns.UseCosignAttachments
+			logrus.Debugf(` Sigstore attachments: using "docker" namespace %s`, identity)
+			if ns.UseSigstoreAttachments != nil {
+				return *ns.UseSigstoreAttachments
 			}
 		}
 
 		// Look for a match of the possible parent namespaces.
 		for _, name := range ref.PolicyConfigurationNamespaces() {
 			if ns, ok := config.Docker[name]; ok {
-				logrus.Debugf(` Cosign attachments: using "docker" namespace %s`, name)
-				if ns.UseCosignAttachments != nil {
-					return *ns.UseCosignAttachments
+				logrus.Debugf(` Sigstore attachments: using "docker" namespace %s`, name)
+				if ns.UseSigstoreAttachments != nil {
+					return *ns.UseSigstoreAttachments
 				}
 			}
 		}
 	}
 	// Look for a default location
 	if config.DefaultDocker != nil {
-		logrus.Debugf(` Cosign attachments: using "default-docker" configuration`)
-		if config.DefaultDocker.UseCosignAttachments != nil {
-			return *config.DefaultDocker.UseCosignAttachments
+		logrus.Debugf(` Sigstore attachments: using "default-docker" configuration`)
+		if config.DefaultDocker.UseSigstoreAttachments != nil {
+			return *config.DefaultDocker.UseSigstoreAttachments
 		}
 	}
 	return false

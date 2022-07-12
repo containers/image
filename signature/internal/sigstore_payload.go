@@ -11,16 +11,16 @@ import (
 
 	"github.com/containers/image/v5/version"
 	digest "github.com/opencontainers/go-digest"
-	cosignSignature "github.com/sigstore/sigstore/pkg/signature"
+	sigstoreSignature "github.com/sigstore/sigstore/pkg/signature"
 )
 
 const (
-	cosignSignatureType         = "cosign container image signature"
-	cosignHarcodedHashAlgorithm = crypto.SHA256
+	sigstoreSignatureType         = "cosign container image signature"
+	sigstoreHarcodedHashAlgorithm = crypto.SHA256
 )
 
-// UntrustedCosignPayload is a parsed content of a Cosign signature payload (not the full signature)
-type UntrustedCosignPayload struct {
+// UntrustedSigstorePayload is a parsed content of a sigstore signature payload (not the full signature)
+type UntrustedSigstorePayload struct {
 	UntrustedDockerManifestDigest digest.Digest
 	UntrustedDockerReference      string // FIXME: more precise type?
 	UntrustedCreatorID            *string
@@ -31,14 +31,14 @@ type UntrustedCosignPayload struct {
 	UntrustedTimestamp *int64
 }
 
-// NewUntrustedCosignPayload returns an untrustedCosignPayload object with
+// NewUntrustedSigstorePayload returns an UntrustedSigstorePayload object with
 // the specified primary contents and appropriate metadata.
-func NewUntrustedCosignPayload(dockerManifestDigest digest.Digest, dockerReference string) UntrustedCosignPayload {
+func NewUntrustedSigstorePayload(dockerManifestDigest digest.Digest, dockerReference string) UntrustedSigstorePayload {
 	// Use intermediate variables for these values so that we can take their addresses.
 	// Golang guarantees that they will have a new address on every execution.
 	creatorID := "containers/image " + version.Version
 	timestamp := time.Now().Unix()
-	return UntrustedCosignPayload{
+	return UntrustedSigstorePayload{
 		UntrustedDockerManifestDigest: dockerManifestDigest,
 		UntrustedDockerReference:      dockerReference,
 		UntrustedCreatorID:            &creatorID,
@@ -46,16 +46,16 @@ func NewUntrustedCosignPayload(dockerManifestDigest digest.Digest, dockerReferen
 	}
 }
 
-// Compile-time check that untrustedCosignPayload implements json.Marshaler
-var _ json.Marshaler = (*UntrustedCosignPayload)(nil)
+// Compile-time check that UntrustedSigstorePayload implements json.Marshaler
+var _ json.Marshaler = (*UntrustedSigstorePayload)(nil)
 
 // MarshalJSON implements the json.Marshaler interface.
-func (s UntrustedCosignPayload) MarshalJSON() ([]byte, error) {
+func (s UntrustedSigstorePayload) MarshalJSON() ([]byte, error) {
 	if s.UntrustedDockerManifestDigest == "" || s.UntrustedDockerReference == "" {
 		return nil, errors.New("Unexpected empty signature content")
 	}
 	critical := map[string]interface{}{
-		"type":     cosignSignatureType,
+		"type":     sigstoreSignatureType,
 		"image":    map[string]string{"docker-manifest-digest": s.UntrustedDockerManifestDigest.String()},
 		"identity": map[string]string{"docker-reference": s.UntrustedDockerReference},
 	}
@@ -73,11 +73,11 @@ func (s UntrustedCosignPayload) MarshalJSON() ([]byte, error) {
 	return json.Marshal(signature)
 }
 
-// Compile-time check that untrustedCosignPayload implements json.Unmarshaler
-var _ json.Unmarshaler = (*UntrustedCosignPayload)(nil)
+// Compile-time check that UntrustedSigstorePayload implements json.Unmarshaler
+var _ json.Unmarshaler = (*UntrustedSigstorePayload)(nil)
 
 // UnmarshalJSON implements the json.Unmarshaler interface
-func (s *UntrustedCosignPayload) UnmarshalJSON(data []byte) error {
+func (s *UntrustedSigstorePayload) UnmarshalJSON(data []byte) error {
 	err := s.strictUnmarshalJSON(data)
 	if err != nil {
 		if formatErr, ok := err.(JSONFormatError); ok {
@@ -89,7 +89,7 @@ func (s *UntrustedCosignPayload) UnmarshalJSON(data []byte) error {
 
 // strictUnmarshalJSON is UnmarshalJSON, except that it may return the internal JSONFormatError error type.
 // Splitting it into a separate function allows us to do the JSONFormatError → InvalidSignatureError in a single place, the caller.
-func (s *UntrustedCosignPayload) strictUnmarshalJSON(data []byte) error {
+func (s *UntrustedSigstorePayload) strictUnmarshalJSON(data []byte) error {
 	var critical, optional json.RawMessage
 	if err := ParanoidUnmarshalJSONObjectExactFields(data, map[string]interface{}{
 		"critical": &critical,
@@ -101,7 +101,7 @@ func (s *UntrustedCosignPayload) strictUnmarshalJSON(data []byte) error {
 	var creatorID string
 	var timestamp float64
 	var gotCreatorID, gotTimestamp = false, false
-	// Cosign generates "optional": null if there are no user-specified annotations.
+	// /usr/bin/cosign generates "optional": null if there are no user-specified annotations.
 	if !bytes.Equal(optional, []byte("null")) {
 		if err := ParanoidUnmarshalJSONObject(optional, func(key string) interface{} {
 			switch key {
@@ -139,7 +139,7 @@ func (s *UntrustedCosignPayload) strictUnmarshalJSON(data []byte) error {
 	}); err != nil {
 		return err
 	}
-	if t != cosignSignatureType {
+	if t != sigstoreSignatureType {
 		return NewInvalidSignatureError(fmt.Sprintf("Unrecognized signature type %s", t))
 	}
 
@@ -156,22 +156,22 @@ func (s *UntrustedCosignPayload) strictUnmarshalJSON(data []byte) error {
 	})
 }
 
-// CosignPayloadAcceptanceRules specifies how to decide whether an untrusted payload is acceptable.
-// We centralize the actual parsing and data extraction in VerifyCosignPayload; this supplies
+// SigstorePayloadAcceptanceRules specifies how to decide whether an untrusted payload is acceptable.
+// We centralize the actual parsing and data extraction in VerifySigstorePayload; this supplies
 // the policy.  We use an object instead of supplying func parameters to verifyAndExtractSignature
 // because the functions have the same or similar types, so there is a risk of exchanging the functions;
 // named members of this struct are more explicit.
-type CosignPayloadAcceptanceRules struct {
+type SigstorePayloadAcceptanceRules struct {
 	ValidateSignedDockerReference      func(string) error
 	ValidateSignedDockerManifestDigest func(digest.Digest) error
 }
 
-// VerifyCosignPayload verifies unverifiedBase64Signature of unverifiedPayload was correctly created by publicKey, and that its principal components
+// VerifySigstorePayload verifies unverifiedBase64Signature of unverifiedPayload was correctly created by publicKey, and that its principal components
 // match expected values, both as specified by rules, and returns it.
-// We return an *UntrustedCosignPayload, although nothing actually uses it,
+// We return an *UntrustedSigstorePayload, although nothing actually uses it,
 // just to double-check against stupid typos.
-func VerifyCosignPayload(publicKey crypto.PublicKey, unverifiedPayload []byte, unverifiedBase64Signature string, rules CosignPayloadAcceptanceRules) (*UntrustedCosignPayload, error) {
-	verifier, err := cosignSignature.LoadVerifier(publicKey, cosignHarcodedHashAlgorithm)
+func VerifySigstorePayload(publicKey crypto.PublicKey, unverifiedPayload []byte, unverifiedBase64Signature string, rules SigstorePayloadAcceptanceRules) (*UntrustedSigstorePayload, error) {
+	verifier, err := sigstoreSignature.LoadVerifier(publicKey, sigstoreHarcodedHashAlgorithm)
 	if err != nil {
 		return nil, fmt.Errorf("creating verifier: %w", err)
 	}
@@ -186,7 +186,7 @@ func VerifyCosignPayload(publicKey crypto.PublicKey, unverifiedPayload []byte, u
 		return nil, NewInvalidSignatureError(fmt.Sprintf("cryptographic signature verification failed: %v", err))
 	}
 
-	var unmatchedPayload UntrustedCosignPayload
+	var unmatchedPayload UntrustedSigstorePayload
 	if err := json.Unmarshal(unverifiedPayload, &unmatchedPayload); err != nil {
 		return nil, NewInvalidSignatureError(err.Error())
 	}
@@ -196,6 +196,6 @@ func VerifyCosignPayload(publicKey crypto.PublicKey, unverifiedPayload []byte, u
 	if err := rules.ValidateSignedDockerReference(unmatchedPayload.UntrustedDockerReference); err != nil {
 		return nil, err
 	}
-	// CosignPayloadAcceptanceRules have accepted this value.
+	// SigstorePayloadAcceptanceRules have accepted this value.
 	return &unmatchedPayload, nil
 }

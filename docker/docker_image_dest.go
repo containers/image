@@ -531,22 +531,22 @@ func (d *dockerImageDestination) PutSignaturesWithFormat(ctx context.Context, si
 		instanceDigest = &d.manifestDigest
 	}
 
-	cosignSignatures := []signature.Cosign{}
+	sigstoreSignatures := []signature.Sigstore{}
 	otherSignatures := []signature.Signature{}
 	for _, sig := range signatures {
-		if cosignSig, ok := sig.(signature.Cosign); ok {
-			cosignSignatures = append(cosignSignatures, cosignSig)
+		if sigstoreSig, ok := sig.(signature.Sigstore); ok {
+			sigstoreSignatures = append(sigstoreSignatures, sigstoreSig)
 		} else {
 			otherSignatures = append(otherSignatures, sig)
 		}
 	}
 
-	// Only write Cosign signatures to cosign attachments. We _could_ store them to lookaside
+	// Only write sigstores signatures to sigstores attachments. We _could_ store them to lookaside
 	// instead, but that would probably be rather surprising.
-	// FIXME: So should we enable cosign in all cases? Or write in all cases, but opt-in to read?
+	// FIXME: So should we enable sigstores in all cases? Or write in all cases, but opt-in to read?
 
-	if len(cosignSignatures) != 0 {
-		if err := d.putSignaturesToCosignAttachments(ctx, cosignSignatures, *instanceDigest); err != nil {
+	if len(sigstoreSignatures) != 0 {
+		if err := d.putSignaturesToSigstoreAttachments(ctx, sigstoreSignatures, *instanceDigest); err != nil {
 			return err
 		}
 	}
@@ -637,12 +637,12 @@ func (d *dockerImageDestination) putOneSignature(url *url.URL, sig signature.Sig
 	}
 }
 
-func (d *dockerImageDestination) putSignaturesToCosignAttachments(ctx context.Context, signatures []signature.Cosign, manifestDigest digest.Digest) error {
-	if !d.c.useCosignAttachments {
-		return errors.New("writing Cosign attachments is disabled by configuration")
+func (d *dockerImageDestination) putSignaturesToSigstoreAttachments(ctx context.Context, signatures []signature.Sigstore, manifestDigest digest.Digest) error {
+	if !d.c.useSigstoreAttachments {
+		return errors.New("writing sigstore attachments is disabled by configuration")
 	}
 
-	ociManifest, err := d.c.getCosignAttachmentManifest(ctx, d.ref, manifestDigest)
+	ociManifest, err := d.c.getSigstoreAttachmentManifest(ctx, d.ref, manifestDigest)
 	if err != nil {
 		return nil
 	}
@@ -654,7 +654,7 @@ func (d *dockerImageDestination) putSignaturesToCosignAttachments(ctx context.Co
 			Size:      0,
 		}, nil)
 	} else {
-		logrus.Debugf("Fetching Cosign attachment config %s", ociManifest.Config.Digest.String())
+		logrus.Debugf("Fetching sigstore attachment config %s", ociManifest.Config.Digest.String())
 		// We don’t benefit from a real BlobInfoCache here because we never try to reuse/mount configs.
 		configBlob, err := d.c.getOCIDescriptorContents(ctx, d.ref, ociManifest.Config, iolimits.MaxConfigBodySize,
 			none.NoCache)
@@ -662,7 +662,7 @@ func (d *dockerImageDestination) putSignaturesToCosignAttachments(ctx context.Co
 			return err
 		}
 		if err := json.Unmarshal(configBlob, &ociConfig); err != nil {
-			return fmt.Errorf("parsing Cosign attachment config %s in %s: %w", ociManifest.Config.Digest.String(),
+			return fmt.Errorf("parsing sigstore attachment config %s in %s: %w", ociManifest.Config.Digest.String(),
 				d.ref.ref.Name(), err)
 		}
 	}
@@ -674,7 +674,7 @@ func (d *dockerImageDestination) putSignaturesToCosignAttachments(ctx context.Co
 
 		alreadyOnRegistry := false
 		for _, layer := range ociManifest.Layers {
-			if layerMatchesCosignSignature(layer, mimeType, payloadBlob, annotations) {
+			if layerMatchesSigstoreSignature(layer, mimeType, payloadBlob, annotations) {
 				logrus.Debugf("Signature with digest %s already exists on the registry", layer.Digest.String())
 				alreadyOnRegistry = true
 				break
@@ -706,7 +706,7 @@ func (d *dockerImageDestination) putSignaturesToCosignAttachments(ctx context.Co
 	if err != nil {
 		return err
 	}
-	logrus.Debugf("Uploading updated Cosign attachment config")
+	logrus.Debugf("Uploading updated sigstore attachment config")
 	// We don’t benefit from a real BlobInfoCache here because we never try to reuse/mount configs.
 	configDesc, err := d.putBlobBytesAsOCI(ctx, configBlob, imgspecv1.MediaTypeImageConfig, private.PutBlobOptions{
 		Cache:      none.NoCache,
@@ -723,11 +723,11 @@ func (d *dockerImageDestination) putSignaturesToCosignAttachments(ctx context.Co
 	if err != nil {
 		return nil
 	}
-	logrus.Debugf("Uploading Cosign attachment manifest")
-	return d.uploadManifest(ctx, manifestBlob, cosignAttachmentTag(manifestDigest))
+	logrus.Debugf("Uploading sigstore attachment manifest")
+	return d.uploadManifest(ctx, manifestBlob, sigstoreAttachmentTag(manifestDigest))
 }
 
-func layerMatchesCosignSignature(layer imgspecv1.Descriptor, mimeType string,
+func layerMatchesSigstoreSignature(layer imgspecv1.Descriptor, mimeType string,
 	payloadBlob []byte, annotations map[string]string) bool {
 	if layer.MediaType != mimeType ||
 		layer.Size != int64(len(payloadBlob)) ||

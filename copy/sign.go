@@ -6,7 +6,7 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	internalsig "github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/signature"
-	"github.com/containers/image/v5/signature/cosign"
+	"github.com/containers/image/v5/signature/sigstore"
 	"github.com/containers/image/v5/transports"
 	perrors "github.com/pkg/errors"
 )
@@ -41,8 +41,8 @@ func (c *copier) createSignature(manifest []byte, keyIdentity string, passphrase
 	return internalsig.SimpleSigningFromBlob(newSig), nil
 }
 
-// createCosignSignature creates a new Cosign signature of manifest using privateKeyFile and identity.
-func (c *copier) createCosignSignature(manifest []byte, privateKeyFile string, passphrase []byte, identity reference.Named) (internalsig.Signature, error) {
+// createSigstoreSignature creates a new sigstore signature of manifest using privateKeyFile and identity.
+func (c *copier) createSigstoreSignature(manifest []byte, privateKeyFile string, passphrase []byte, identity reference.Named) (internalsig.Signature, error) {
 	if identity != nil {
 		if reference.IsNameOnly(identity) {
 			return nil, fmt.Errorf("Sign identity must be a fully specified reference %s", identity.String())
@@ -54,8 +54,8 @@ func (c *copier) createCosignSignature(manifest []byte, privateKeyFile string, p
 		}
 	}
 
-	c.Printf("Signing manifest using Cosign\n")
-	newSig, err := cosign.SignDockerManifestWithPrivateKeyFileUnstable(manifest, identity, privateKeyFile, passphrase)
+	c.Printf("Signing manifest using a sigstore signature\n")
+	newSig, err := sigstore.SignDockerManifestWithPrivateKeyFileUnstable(manifest, identity, privateKeyFile, passphrase)
 	if err != nil {
 		return nil, fmt.Errorf("creating signature: %w", err)
 	}

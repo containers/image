@@ -66,7 +66,7 @@ more general scopes is ignored.  For example, if _any_ configuration exists for
 If no `docker` section can be found for the container image, and no `default-docker` section is configured:
 
 - The default directory, `/var/lib/containers/sigstore` for root and `$HOME/.local/share/containers/sigstore` for unprivileged user,  will be used for reading and writing signatures.
-- Cosign attachments will not be read/written.
+- Sigstore attachments will not be read/written.
 
 ## Individual Configuration Sections
 
@@ -86,7 +86,7 @@ described above.  The configuration section is a YAML mapping, with the followin
    This key is optional; if it is missing, no signature storage is defined (no signatures
    are download along with images, adding new signatures is possible only if `lookaside-staging` is defined).
 
-- `use-cosign-attachments` specifies whether Cosign image attachments (signatures, attestations and the like) are going to be read/written along with the image.
+- `use-sigstore-attachments` specifies whether sigstore image attachments (signatures, attestations and the like) are going to be read/written along with the image.
    If disabled, the images are treated as if no attachments exist; attempts to write attachments fail.
 
 ## Examples

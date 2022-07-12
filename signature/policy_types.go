@@ -46,7 +46,7 @@ const (
 	prTypeReject                 prTypeIdentifier = "reject"
 	prTypeSignedBy               prTypeIdentifier = "signedBy"
 	prTypeSignedBaseLayer        prTypeIdentifier = "signedBaseLayer"
-	prTypeCosignSigned           prTypeIdentifier = "cosignSigned"
+	prTypeSigstoreSigned         prTypeIdentifier = "sigstoreSigned"
 )
 
 // prInsecureAcceptAnything is a PolicyRequirement with type = prTypeInsecureAcceptAnything:
@@ -105,8 +105,8 @@ type prSignedBaseLayer struct {
 	BaseLayerIdentity PolicyReferenceMatch `json:"baseLayerIdentity"`
 }
 
-// prCosignSigned is a PolicyRequirement with type = prTypeCosignSigned: the image is signed by trusted keys for a specified identity
-type prCosignSigned struct {
+// prSigstoreSigned is a PolicyRequirement with type = prTypeSigstoreSigned: the image is signed by trusted keys for a specified identity
+type prSigstoreSigned struct {
 	prCommon
 
 	// KeyPath is a pathname to a local file containing the trusted key. Exactly one of KeyPath and KeyData must be specified.
@@ -119,7 +119,7 @@ type prCosignSigned struct {
 
 	// SignedIdentity specifies what image identity the signature must be claiming about the image.
 	// Defaults to "matchRepoDigestOrExact" if not specified.
-	// Note that Cosign interoperability might require using repo-only matching.
+	// Note that /usr/bin/cosign interoperability might require using repo-only matching.
 	SignedIdentity PolicyReferenceMatch `json:"signedIdentity"`
 }
 

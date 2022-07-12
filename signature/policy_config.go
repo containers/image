@@ -244,8 +244,8 @@ func newPolicyRequirementFromJSON(data []byte) (PolicyRequirement, error) {
 		res = &prSignedBy{}
 	case prTypeSignedBaseLayer:
 		res = &prSignedBaseLayer{}
-	case prTypeCosignSigned:
-		res = &prCosignSigned{}
+	case prTypeSigstoreSigned:
+		res = &prSigstoreSigned{}
 	default:
 		return nil, InvalidPolicyFormatError(fmt.Sprintf("Unknown policy requirement type \"%s\"", typeField.Type))
 	}
@@ -495,49 +495,49 @@ func (pr *prSignedBaseLayer) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// newPRCosignSigned returns a new prCosignSigned if parameters are valid.
-func newPRCosignSigned(keyPath string, keyData []byte, signedIdentity PolicyReferenceMatch) (*prCosignSigned, error) {
+// newPRSigstoreSigned returns a new prSigstoreSigned if parameters are valid.
+func newPRSigstoreSigned(keyPath string, keyData []byte, signedIdentity PolicyReferenceMatch) (*prSigstoreSigned, error) {
 	if len(keyPath) > 0 && len(keyData) > 0 {
 		return nil, InvalidPolicyFormatError("keyType and keyData cannot be used simultaneously")
 	}
 	if signedIdentity == nil {
 		return nil, InvalidPolicyFormatError("signedIdentity not specified")
 	}
-	return &prCosignSigned{
-		prCommon:       prCommon{Type: prTypeCosignSigned},
+	return &prSigstoreSigned{
+		prCommon:       prCommon{Type: prTypeSigstoreSigned},
 		KeyPath:        keyPath,
 		KeyData:        keyData,
 		SignedIdentity: signedIdentity,
 	}, nil
 }
 
-// newPRCosignSignedKeyPath is NewPRCosignSignedKeyPath, except it returns the private type.
-func newPRCosignSignedKeyPath(keyPath string, signedIdentity PolicyReferenceMatch) (*prCosignSigned, error) {
-	return newPRCosignSigned(keyPath, nil, signedIdentity)
+// newPRSigstoreSignedKeyPath is NewPRSigstoreSignedKeyPath, except it returns the private type.
+func newPRSigstoreSignedKeyPath(keyPath string, signedIdentity PolicyReferenceMatch) (*prSigstoreSigned, error) {
+	return newPRSigstoreSigned(keyPath, nil, signedIdentity)
 }
 
-// NewPRCosignSignedKeyPath returns a new "cosignSigned" PolicyRequirement using a KeyPath
-func NewPRCosignSignedKeyPath(keyPath string, signedIdentity PolicyReferenceMatch) (PolicyRequirement, error) {
-	return newPRCosignSignedKeyPath(keyPath, signedIdentity)
+// NewPRSigstoreSignedKeyPath returns a new "sigstoreSigned" PolicyRequirement using a KeyPath
+func NewPRSigstoreSignedKeyPath(keyPath string, signedIdentity PolicyReferenceMatch) (PolicyRequirement, error) {
+	return newPRSigstoreSignedKeyPath(keyPath, signedIdentity)
 }
 
-// newPRCosignSignedKeyData is NewPRCosignSignedKeyData, except it returns the private type.
-func newPRCosignSignedKeyData(keyData []byte, signedIdentity PolicyReferenceMatch) (*prCosignSigned, error) {
-	return newPRCosignSigned("", keyData, signedIdentity)
+// newPRSigstoreSignedKeyData is NewPRSigstoreSignedKeyData, except it returns the private type.
+func newPRSigstoreSignedKeyData(keyData []byte, signedIdentity PolicyReferenceMatch) (*prSigstoreSigned, error) {
+	return newPRSigstoreSigned("", keyData, signedIdentity)
 }
 
-// NewPRCosignSignedKeyData returns a new "cosignSigned" PolicyRequirement using a KeyData
-func NewPRCosignSignedKeyData(keyData []byte, signedIdentity PolicyReferenceMatch) (PolicyRequirement, error) {
-	return newPRCosignSignedKeyData(keyData, signedIdentity)
+// NewPRSigstoreSignedKeyData returns a new "sigstoreSigned" PolicyRequirement using a KeyData
+func NewPRSigstoreSignedKeyData(keyData []byte, signedIdentity PolicyReferenceMatch) (PolicyRequirement, error) {
+	return newPRSigstoreSignedKeyData(keyData, signedIdentity)
 }
 
-// Compile-time check that prCosignSigned implements json.Unmarshaler.
-var _ json.Unmarshaler = (*prCosignSigned)(nil)
+// Compile-time check that prSigstoreSigned implements json.Unmarshaler.
+var _ json.Unmarshaler = (*prSigstoreSigned)(nil)
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
-func (pr *prCosignSigned) UnmarshalJSON(data []byte) error {
-	*pr = prCosignSigned{}
-	var tmp prCosignSigned
+func (pr *prSigstoreSigned) UnmarshalJSON(data []byte) error {
+	*pr = prSigstoreSigned{}
+	var tmp prSigstoreSigned
 	var gotKeyPath, gotKeyData = false, false
 	var signedIdentity json.RawMessage
 	if err := internal.ParanoidUnmarshalJSONObject(data, func(key string) interface{} {
@@ -559,7 +559,7 @@ func (pr *prCosignSigned) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	if tmp.Type != prTypeCosignSigned {
+	if tmp.Type != prTypeSigstoreSigned {
 		return InvalidPolicyFormatError(fmt.Sprintf("Unexpected policy requirement type \"%s\"", tmp.Type))
 	}
 	if signedIdentity == nil {
@@ -572,22 +572,22 @@ func (pr *prCosignSigned) UnmarshalJSON(data []byte) error {
 		tmp.SignedIdentity = si
 	}
 
-	var res *prCosignSigned
+	var res *prSigstoreSigned
 	var err error
 	switch {
 	case gotKeyPath && gotKeyData:
 		return InvalidPolicyFormatError("keyPath and keyData cannot be used simultaneously")
 	case gotKeyPath && !gotKeyData:
-		res, err = newPRCosignSignedKeyPath(tmp.KeyPath, tmp.SignedIdentity)
+		res, err = newPRSigstoreSignedKeyPath(tmp.KeyPath, tmp.SignedIdentity)
 	case !gotKeyPath && gotKeyData:
-		res, err = newPRCosignSignedKeyData(tmp.KeyData, tmp.SignedIdentity)
+		res, err = newPRSigstoreSignedKeyData(tmp.KeyData, tmp.SignedIdentity)
 	case !gotKeyPath && !gotKeyData:
 		return InvalidPolicyFormatError("At least one of keyPath and keyData mus be specified")
 	default: // Coverage: This should never happen
 		return fmt.Errorf("Impossible keyPath/keyData presence combination!?")
 	}
 	if err != nil {
-		// Coverage: This cannot currently happen, creating a prCosignSigned only fails
+		// Coverage: This cannot currently happen, creating a prSigstoreSigned only fails
 		// if signedIdentity is nil, which we replace with a default above.
 		return err
 	}

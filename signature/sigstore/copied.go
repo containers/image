@@ -1,4 +1,4 @@
-package cosign
+package sigstore
 
 import (
 	"crypto"
@@ -32,8 +32,8 @@ import (
 // limitations under the License.
 
 const (
-	// from sigstore/cosign/pkg/cosign.cosignPrivateKeyPemType
-	cosignPrivateKeyPemType = "ENCRYPTED COSIGN PRIVATE KEY"
+	// from sigstore/cosign/pkg/cosign.sigstorePrivateKeyPemType
+	sigstorePrivateKeyPemType = "ENCRYPTED COSIGN PRIVATE KEY"
 )
 
 // from sigstore/cosign/pkg/cosign.loadPrivateKey
@@ -44,7 +44,7 @@ func loadPrivateKey(key []byte, pass []byte) (signature.SignerVerifier, error) {
 	if p == nil {
 		return nil, errors.New("invalid pem block")
 	}
-	if p.Type != cosignPrivateKeyPemType {
+	if p.Type != sigstorePrivateKeyPemType {
 		return nil, fmt.Errorf("unsupported pem type: %s", p.Type)
 	}
 
