@@ -3,6 +3,7 @@ package signature
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -68,6 +69,11 @@ var policyFixtureContents = &Policy{
 				xNewPRSignedByKeyPath(SBKeyTypeSignedByGPGKeys,
 					"/keys/RH-key-signing-key-gpg-keyring",
 					NewPRMMatchRepoDigestOrExact()),
+			},
+			"registry.redhat.io/beta": {
+				xNewPRSignedByKeyPaths(SBKeyTypeGPGKeys,
+					[]string{"/keys/RH-production-signing-key-gpg-keyring", "/keys/RH-beta-signing-key-gpg-keyring"},
+					newPRMMatchRepoDigestOrExact()),
 			},
 			"private-mirror:5000/vendor-mirror": {
 				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys,
@@ -342,15 +348,17 @@ func (d policyJSONUmarshallerTests) run(t *testing.T) {
 		assertJSONUnmarshalFromObjectFails(t, invalid, dest)
 	}
 	// Various ways to corrupt the JSON
-	for _, fn := range d.breakFns {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
+	for index, fn := range d.breakFns {
+		t.Run(fmt.Sprintf("breakFns[%d]", index), func(t *testing.T) {
+			var tmp mSI
+			err := json.Unmarshal(validJSON, &tmp)
+			require.NoError(t, err)
 
-		fn(tmp)
+			fn(tmp)
 
-		dest := d.newDest()
-		assertJSONUnmarshalFromObjectFails(t, tmp, dest)
+			dest := d.newDest()
+			assertJSONUnmarshalFromObjectFails(t, tmp, dest)
+		})
 	}
 
 	// Duplicated fields
@@ -372,6 +380,15 @@ func xNewPRSignedByKeyPath(keyType sbKeyType, keyPath string, signedIdentity Pol
 	pr, err := NewPRSignedByKeyPath(keyType, keyPath, signedIdentity)
 	if err != nil {
 		panic("xNewPRSignedByKeyPath failed")
+	}
+	return pr
+}
+
+// xNewPRSignedByKeyPaths is like NewPRSignedByKeyPaths, except it must not fail.
+func xNewPRSignedByKeyPaths(keyType sbKeyType, keyPaths []string, signedIdentity PolicyReferenceMatch) PolicyRequirement {
+	pr, err := NewPRSignedByKeyPaths(keyType, keyPaths, signedIdentity)
+	if err != nil {
+		panic("xNewPRSignedByKeyPaths failed")
 	}
 	return pr
 }
@@ -705,41 +722,62 @@ func TestPRRejectUnmarshalJSON(t *testing.T) {
 
 func TestNewPRSignedBy(t *testing.T) {
 	const testPath = "/foo/bar"
+	testPaths := []string{"/path/1", "/path/2"}
 	testData := []byte("abc")
 	testIdentity := NewPRMMatchRepoDigestOrExact()
 
 	// Success
-	pr, err := newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, testIdentity)
+	pr, err := newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, nil, testIdentity)
 	require.NoError(t, err)
 	assert.Equal(t, &prSignedBy{
 		prCommon:       prCommon{prTypeSignedBy},
 		KeyType:        SBKeyTypeGPGKeys,
 		KeyPath:        testPath,
+		KeyPaths:       nil,
 		KeyData:        nil,
 		SignedIdentity: testIdentity,
 	}, pr)
-	pr, err = newPRSignedBy(SBKeyTypeGPGKeys, "", testData, testIdentity)
+	pr, err = newPRSignedBy(SBKeyTypeGPGKeys, "", testPaths, nil, testIdentity)
 	require.NoError(t, err)
 	assert.Equal(t, &prSignedBy{
 		prCommon:       prCommon{prTypeSignedBy},
 		KeyType:        SBKeyTypeGPGKeys,
 		KeyPath:        "",
+		KeyPaths:       testPaths,
+		KeyData:        nil,
+		SignedIdentity: testIdentity,
+	}, pr)
+	pr, err = newPRSignedBy(SBKeyTypeGPGKeys, "", nil, testData, testIdentity)
+	require.NoError(t, err)
+	assert.Equal(t, &prSignedBy{
+		prCommon:       prCommon{prTypeSignedBy},
+		KeyType:        SBKeyTypeGPGKeys,
+		KeyPath:        "",
+		KeyPaths:       nil,
 		KeyData:        testData,
 		SignedIdentity: testIdentity,
 	}, pr)
 
 	// Invalid keyType
-	_, err = newPRSignedBy(sbKeyType(""), testPath, nil, testIdentity)
+	_, err = newPRSignedBy(sbKeyType(""), testPath, nil, nil, testIdentity)
 	assert.Error(t, err)
-	_, err = newPRSignedBy(sbKeyType("this is invalid"), testPath, nil, testIdentity)
+	_, err = newPRSignedBy(sbKeyType("this is invalid"), testPath, nil, nil, testIdentity)
 	assert.Error(t, err)
 
-	// Both keyPath and keyData specified
-	_, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, testData, testIdentity)
+	// Invalid keyPath/keyPaths/keyData combinations
+	_, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, testPaths, testData, testIdentity)
+	assert.Error(t, err)
+	_, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, testPaths, nil, testIdentity)
+	assert.Error(t, err)
+	_, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, testData, testIdentity)
+	assert.Error(t, err)
+	_, err = newPRSignedBy(SBKeyTypeGPGKeys, "", testPaths, testData, testIdentity)
+	assert.Error(t, err)
+	_, err = newPRSignedBy(SBKeyTypeGPGKeys, "", nil, nil, testIdentity)
 	assert.Error(t, err)
 
 	// Invalid signedIdentity
-	_, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, nil)
+	_, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, nil, nil)
 	assert.Error(t, err)
 }
 
@@ -750,6 +788,16 @@ func TestNewPRSignedByKeyPath(t *testing.T) {
 	pr, ok := _pr.(*prSignedBy)
 	require.True(t, ok)
 	assert.Equal(t, testPath, pr.KeyPath)
+	// Failure cases tested in TestNewPRSignedBy.
+}
+
+func TestNewPRSignedByKeyPaths(t *testing.T) {
+	testPaths := []string{"/path/1", "/path/2"}
+	_pr, err := NewPRSignedByKeyPaths(SBKeyTypeGPGKeys, testPaths, NewPRMMatchRepoDigestOrExact())
+	require.NoError(t, err)
+	pr, ok := _pr.(*prSignedBy)
+	require.True(t, ok)
+	assert.Equal(t, testPaths, pr.KeyPaths)
 	// Failure cases tested in TestNewPRSignedBy.
 }
 
@@ -796,13 +844,19 @@ func TestPRSignedByUnmarshalJSON(t *testing.T) {
 			func(v mSI) { delete(v, "keyType") },
 			// Invalid "keyType" field
 			func(v mSI) { v["keyType"] = "this is invalid" },
-			// Both "keyPath" and "keyData" is missing
+			// All three of "keyPath", "keyPaths" and "keyData" are missing
 			func(v mSI) { delete(v, "keyData") },
-			// Both "keyPath" and "keyData" is present
+			// All three of "keyPath", "keyPaths" and "keyData" are present
+			func(v mSI) { v["keyPath"] = "/foo/bar"; v["keyPaths"] = []string{"/1", "/2"} },
+			// Two of "keyPath", "keyPaths" and "keyData" are present
+			func(v mSI) { v["keyPath"] = "/foo/bar"; v["keyPaths"] = []string{"/1", "/2"}; delete(v, "keyData") },
 			func(v mSI) { v["keyPath"] = "/foo/bar" },
+			func(v mSI) { v["keyPaths"] = []string{"/1", "/2"} },
 			// Invalid "keyPath" field
 			func(v mSI) { delete(v, "keyData"); v["keyPath"] = 1 },
-			func(v mSI) { v["type"] = "this is invalid" },
+			// Invalid "keyPaths" field
+			func(v mSI) { delete(v, "keyData"); v["keyPaths"] = 1 },
+			func(v mSI) { delete(v, "keyData"); v["keyPaths"] = []int{1} },
 			// Invalid "keyData" field
 			func(v mSI) { v["keyData"] = 1 },
 			func(v mSI) { v["keyData"] = "this is invalid base64" },
@@ -824,6 +878,17 @@ func TestPRSignedByUnmarshalJSON(t *testing.T) {
 			return newPolicyRequirementFromJSON(validJSON)
 		},
 		duplicateFields: []string{"type", "keyType", "keyPath", "signedIdentity"},
+	}.run(t)
+	// Test the keyPaths-specific aspects
+	policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prSignedBy{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRSignedByKeyPaths(SBKeyTypeGPGKeys, []string{"/1", "/2"}, NewPRMMatchRepoDigestOrExact())
+		},
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyRequirementFromJSON(validJSON)
+		},
+		duplicateFields: []string{"type", "keyType", "keyPaths", "signedIdentity"},
 	}.run(t)
 
 	var pr prSignedBy

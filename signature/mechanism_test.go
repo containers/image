@@ -135,7 +135,7 @@ func TestNewEphemeralGPGSigningMechanism(t *testing.T) {
 		assert.Equal(t, TestKeyFingerprint, signingFingerprint, version)
 	}
 
-	// Two keys: Read the binary-format pubring.gpg, and concatenate it twice.
+	// Two keys in a keyring: Read the binary-format pubring.gpg, and concatenate it twice.
 	// (Using two copies of public-key.gpg, in the ASCII-armored format, works with
 	// gpgmeSigningMechanism but not openpgpSigningMechanism.)
 	keyBlob, err = os.ReadFile("./fixtures/pubring.gpg")
@@ -144,6 +144,16 @@ func TestNewEphemeralGPGSigningMechanism(t *testing.T) {
 	require.NoError(t, err)
 	defer mech.Close()
 	assert.Equal(t, []string{TestKeyFingerprint, TestKeyFingerprintWithPassphrase, TestKeyFingerprint, TestKeyFingerprintWithPassphrase}, keyIdentities)
+
+	// Two keys from two blobs:
+	keyBlob1, err := os.ReadFile("./fixtures/public-key-1.gpg")
+	require.NoError(t, err)
+	keyBlob2, err := os.ReadFile("./fixtures/public-key-2.gpg")
+	require.NoError(t, err)
+	mech, keyIdentities, err = newEphemeralGPGSigningMechanism([][]byte{keyBlob1, keyBlob2})
+	require.NoError(t, err)
+	defer mech.Close()
+	assert.Equal(t, []string{TestKeyFingerprint, TestKeyFingerprintWithPassphrase}, keyIdentities)
 
 	// Invalid input: This is, sadly, accepted anyway by GPG, just returns no keys.
 	// For openpgpSigningMechanism we can detect this and fail.
