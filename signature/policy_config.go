@@ -408,7 +408,7 @@ func (pr *prSignedBy) UnmarshalJSON(data []byte) error {
 	case !gotKeyPath && gotKeyData:
 		res, err = newPRSignedByKeyData(tmp.KeyType, tmp.KeyData, tmp.SignedIdentity)
 	case !gotKeyPath && !gotKeyData:
-		return InvalidPolicyFormatError("At least one of keyPath and keyData mus be specified")
+		return InvalidPolicyFormatError("At least one of keyPath and keyData must be specified")
 	default: // Coverage: This should never happen
 		return fmt.Errorf("Impossible keyPath/keyData presence combination!?")
 	}
@@ -582,7 +582,7 @@ func (pr *prSigstoreSigned) UnmarshalJSON(data []byte) error {
 	case !gotKeyPath && gotKeyData:
 		res, err = newPRSigstoreSignedKeyData(tmp.KeyData, tmp.SignedIdentity)
 	case !gotKeyPath && !gotKeyData:
-		return InvalidPolicyFormatError("At least one of keyPath and keyData mus be specified")
+		return InvalidPolicyFormatError("At least one of keyPath and keyData must be specified")
 	default: // Coverage: This should never happen
 		return fmt.Errorf("Impossible keyPath/keyData presence combination!?")
 	}
