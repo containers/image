@@ -55,6 +55,8 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	testImage := dirImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
 	testImageSig, err := os.ReadFile("fixtures/dir-img-valid/signature-1")
 	require.NoError(t, err)
+	keyData, err := os.ReadFile("fixtures/public-key.gpg")
+	require.NoError(t, err)
 
 	// Successful validation, with KeyData and KeyPath
 	pr, err := NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
@@ -65,8 +67,6 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 		DockerReference:      "testing/manifest:latest",
 	})
 
-	keyData, err := os.ReadFile("fixtures/public-key.gpg")
-	require.NoError(t, err)
 	pr, err = NewPRSignedByKeyData(ktGPG, keyData, prm)
 	require.NoError(t, err)
 	sar, parsedSig, err = pr.isSignatureAuthorAccepted(context.Background(), testImage, testImageSig)
@@ -84,7 +84,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 		// Do not use NewPRSignedByKeyData, because it would reject invalid values.
 		pr := &prSignedBy{
 			KeyType:        keyType,
-			KeyData:        []byte("abc"),
+			KeyData:        keyData,
 			SignedIdentity: prm,
 		}
 		// Pass nil pointers to, kind of, test that the return value does not depend on the parameters.
@@ -95,8 +95,8 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	// Both KeyPath and KeyData set. Do not use NewPRSignedBy*, because it would reject this.
 	prSB := &prSignedBy{
 		KeyType:        ktGPG,
-		KeyPath:        "/foo/bar",
-		KeyData:        []byte("abc"),
+		KeyPath:        "fixtures/public-key.gpg",
+		KeyData:        keyData,
 		SignedIdentity: prm,
 	}
 	// Pass nil pointers to, kind of, test that the return value does not depend on the parameters.
