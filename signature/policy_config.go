@@ -26,7 +26,6 @@ import (
 	"github.com/containers/image/v5/transports"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/homedir"
-	perrors "github.com/pkg/errors"
 )
 
 // systemDefaultPolicyPath is the policy path used for DefaultPolicy().
@@ -83,7 +82,7 @@ func NewPolicyFromFile(fileName string) (*Policy, error) {
 	}
 	policy, err := NewPolicyFromBytes(contents)
 	if err != nil {
-		return nil, perrors.Wrapf(err, "invalid policy in %q", fileName)
+		return nil, fmt.Errorf("invalid policy in %q: %w", fileName, err)
 	}
 	return policy, nil
 }
