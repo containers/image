@@ -320,8 +320,15 @@ func newPRSignedBy(keyType sbKeyType, keyPath string, keyData []byte, signedIden
 	if !keyType.IsValid() {
 		return nil, InvalidPolicyFormatError(fmt.Sprintf("invalid keyType \"%s\"", keyType))
 	}
-	if len(keyPath) > 0 && len(keyData) > 0 {
-		return nil, InvalidPolicyFormatError("keyType and keyData cannot be used simultaneously")
+	keySources := 0
+	if keyPath != "" {
+		keySources++
+	}
+	if keyData != nil {
+		keySources++
+	}
+	if keySources != 1 {
+		return nil, InvalidPolicyFormatError("exactly one of keyPath and keyData must be specified")
 	}
 	if signedIdentity == nil {
 		return nil, InvalidPolicyFormatError("signedIdentity not specified")
@@ -401,16 +408,14 @@ func (pr *prSignedBy) UnmarshalJSON(data []byte) error {
 	var res *prSignedBy
 	var err error
 	switch {
-	case gotKeyPath && gotKeyData:
-		return InvalidPolicyFormatError("keyPath and keyData cannot be used simultaneously")
 	case gotKeyPath && !gotKeyData:
 		res, err = newPRSignedByKeyPath(tmp.KeyType, tmp.KeyPath, tmp.SignedIdentity)
 	case !gotKeyPath && gotKeyData:
 		res, err = newPRSignedByKeyData(tmp.KeyType, tmp.KeyData, tmp.SignedIdentity)
 	case !gotKeyPath && !gotKeyData:
 		return InvalidPolicyFormatError("At least one of keyPath and keyData must be specified")
-	default: // Coverage: This should never happen
-		return fmt.Errorf("Impossible keyPath/keyData presence combination!?")
+	default:
+		return fmt.Errorf("Exactly one of keyPath and keyData must be specified, more than one present")
 	}
 	if err != nil {
 		return err

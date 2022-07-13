@@ -25,19 +25,23 @@ func (pr *prSignedBy) isSignatureAuthorAccepted(ctx context.Context, image priva
 		return sarRejected, nil, fmt.Errorf(`Unknown "keyType" value "%s"`, string(pr.KeyType))
 	}
 
-	if pr.KeyPath != "" && pr.KeyData != nil {
-		return sarRejected, nil, errors.New(`Internal inconsistency: both "keyPath" and "keyData" specified`)
-	}
 	// FIXME: move this to per-context initialization
 	var data []byte
-	if pr.KeyData != nil {
-		data = pr.KeyData
-	} else {
+	keySources := 0
+	if pr.KeyPath != "" {
+		keySources++
 		d, err := os.ReadFile(pr.KeyPath)
 		if err != nil {
 			return sarRejected, nil, err
 		}
 		data = d
+	}
+	if pr.KeyData != nil {
+		keySources++
+		data = pr.KeyData
+	}
+	if keySources != 1 {
+		return sarRejected, nil, errors.New(`Internal inconsistency: not exactly one of "keyPath" and "keyData" specified`)
 	}
 
 	// FIXME: move this to per-context initialization
