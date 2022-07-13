@@ -3,6 +3,7 @@ package signature
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -342,15 +343,17 @@ func (d policyJSONUmarshallerTests) run(t *testing.T) {
 		assertJSONUnmarshalFromObjectFails(t, invalid, dest)
 	}
 	// Various ways to corrupt the JSON
-	for _, fn := range d.breakFns {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
+	for index, fn := range d.breakFns {
+		t.Run(fmt.Sprintf("breakFns[%d]", index), func(t *testing.T) {
+			var tmp mSI
+			err := json.Unmarshal(validJSON, &tmp)
+			require.NoError(t, err)
 
-		fn(tmp)
+			fn(tmp)
 
-		dest := d.newDest()
-		assertJSONUnmarshalFromObjectFails(t, tmp, dest)
+			dest := d.newDest()
+			assertJSONUnmarshalFromObjectFails(t, tmp, dest)
+		})
 	}
 
 	// Duplicated fields
