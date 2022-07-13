@@ -802,7 +802,6 @@ func TestPRSignedByUnmarshalJSON(t *testing.T) {
 			func(v mSI) { v["keyPath"] = "/foo/bar" },
 			// Invalid "keyPath" field
 			func(v mSI) { delete(v, "keyData"); v["keyPath"] = 1 },
-			func(v mSI) { v["type"] = "this is invalid" },
 			// Invalid "keyData" field
 			func(v mSI) { v["keyData"] = 1 },
 			func(v mSI) { v["keyData"] = "this is invalid base64" },
