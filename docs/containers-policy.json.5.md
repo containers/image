@@ -156,13 +156,14 @@ This requirement requires an image to be signed using “simple signing” with 
     "type":    "signedBy",
     "keyType": "GPGKeys", /* The only currently supported value */
     "keyPath": "/path/to/local/keyring/file",
+    "keyPaths": ["/path/to/local/keyring/file1","/path/to/local/keyring/file2"…],
     "keyData": "base64-encoded-keyring-data",
     "signedIdentity": identity_requirement
 }
 ```
 <!-- Later: other keyType values -->
 
-Exactly one of `keyPath` and `keyData` must be present, containing a GPG keyring of one or more public keys.  Only signatures made by these keys are accepted.
+Exactly one of `keyPath`, `keyPaths` and `keyData` must be present, containing a GPG keyring of one or more public keys.  Only signatures made by these keys are accepted.
 
 The `signedIdentity` field, a JSON object, specifies what image identity the signature claims about the image.
 One of the following alternatives are supported:

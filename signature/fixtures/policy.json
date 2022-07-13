@@ -75,6 +75,13 @@
                     }
                 }
             ],
+            "registry.redhat.io/beta": [
+                {
+                    "type": "signedBy",
+                    "keyType": "GPGKeys",
+                    "keyPaths": ["/keys/RH-production-signing-key-gpg-keyring", "/keys/RH-beta-signing-key-gpg-keyring"]
+                }
+            ],
             "private-mirror:5000/vendor-mirror": [
                 {
                     "type": "signedBy",

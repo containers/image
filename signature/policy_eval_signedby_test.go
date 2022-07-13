@@ -58,10 +58,17 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	keyData, err := os.ReadFile("fixtures/public-key.gpg")
 	require.NoError(t, err)
 
-	// Successful validation, with KeyData and KeyPath
+	// Successful validation, with KeyPath, KeyPaths and KeyData.
 	for _, fn := range []func() (PolicyRequirement, error){
 		func() (PolicyRequirement, error) {
 			return NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
+		},
+		// Test the files in both orders, to make sure the correct public keys accepted in either position.
+		func() (PolicyRequirement, error) {
+			return NewPRSignedByKeyPaths(ktGPG, []string{"fixtures/public-key-1.gpg", "fixtures/public-key-1.gpg"}, prm)
+		},
+		func() (PolicyRequirement, error) {
+			return NewPRSignedByKeyPaths(ktGPG, []string{"fixtures/public-key-2.gpg", "fixtures/public-key-1.gpg"}, prm)
 		},
 		func() (PolicyRequirement, error) {
 			return NewPRSignedByKeyData(ktGPG, keyData, prm)
@@ -95,16 +102,31 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 
 	// Invalid KeyPath/KeyPaths/KeyData combinations.
 	for _, fn := range []func() (PolicyRequirement, error){
-		// Both KeyPath and KeyData set. Do not use NewPRSignedBy*, because it would reject this.
+		// Two or more of KeyPath, KeyPaths and KeyData set. Do not use NewPRSignedBy*, because it would reject this.
 		func() (PolicyRequirement, error) {
-			return &prSignedBy{KeyType: ktGPG, KeyPath: "fixtures/public-key.gpg", KeyData: []byte("abc"), SignedIdentity: prm}, nil
+			return &prSignedBy{KeyType: ktGPG, KeyPath: "fixtures/public-key.gpg", KeyPaths: []string{"fixtures/public-key-1.gpg", "fixtures/public-key-2.gpg"}, KeyData: keyData, SignedIdentity: prm}, nil
 		},
-		// Neither KeyPath nor KeyData set. Do not use NewPRSignedBy*, because it would reject this.
+		func() (PolicyRequirement, error) {
+			return &prSignedBy{KeyType: ktGPG, KeyPath: "fixtures/public-key.gpg", KeyPaths: []string{"fixtures/public-key-1.gpg", "fixtures/public-key-2.gpg"}, SignedIdentity: prm}, nil
+		},
+		func() (PolicyRequirement, error) {
+			return &prSignedBy{KeyType: ktGPG, KeyPath: "fixtures/public-key.gpg", KeyData: keyData, SignedIdentity: prm}, nil
+		},
+		func() (PolicyRequirement, error) {
+			return &prSignedBy{KeyType: ktGPG, KeyPaths: []string{"fixtures/public-key-1.gpg", "fixtures/public-key-2.gpg"}, KeyData: keyData, SignedIdentity: prm}, nil
+		},
+		// None of KeyPath, KeyPaths and KeyData set. Do not use NewPRSignedBy*, because it would reject this.
 		func() (PolicyRequirement, error) {
 			return &prSignedBy{KeyType: ktGPG, SignedIdentity: prm}, nil
 		},
 		func() (PolicyRequirement, error) { // Invalid KeyPath
 			return NewPRSignedByKeyPath(ktGPG, "/this/does/not/exist", prm)
+		},
+		func() (PolicyRequirement, error) { // Invalid KeyPaths
+			return NewPRSignedByKeyPaths(ktGPG, []string{"/this/does/not/exist"}, prm)
+		},
+		func() (PolicyRequirement, error) { // One of the KeyPaths is invalid
+			return NewPRSignedByKeyPaths(ktGPG, []string{"fixtures/public-key.gpg", "/this/does/not/exist"}, prm)
 		},
 	} {
 		pr, err := fn()
