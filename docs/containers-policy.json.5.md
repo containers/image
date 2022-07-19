@@ -283,14 +283,14 @@ selectively allow individual transports and scopes as desired.
             "hostname:5000/myns/sigstore-signed-with-full-references": [
                 {
                     "type": "sigstoreSigned",
-                    "keyPath": "/path/to/sigstore-pubkey.key"
+                    "keyPath": "/path/to/sigstore-pubkey.pub"
                 }
             ],
             /* A sigstore-signed repository, accepts signatures by /usr/bin/cosign */
             "hostname:5000/myns/sigstore-signed-allows-malicious-tag-substitution": [
                 {
                     "type": "sigstoreSigned",
-                    "keyPath": "/path/to/sigstore-pubkey.key",
+                    "keyPath": "/path/to/sigstore-pubkey.pub",
                     "signedIdentity": {"type": "matchRepository"}
                 }
             ]
