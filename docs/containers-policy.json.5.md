@@ -255,6 +255,8 @@ Exactly one of `keyPath` and `keyData` must be present, containing a sigstore pu
 The `signedIdentity` field has the same semantics as in the `signedBy` requirement described above.
 Note that `cosign`-created signatures only contain a repository, so only `matchRepository` and `exactRepository` can be used to accept them (and that does not protect against substitution of a signed image with an unexpected tag).
 
+To use this with images hosted on image registries, the relevant registry or repository must have the `use-sigstore-attachments` option enabled in containers-registries.d(5).
+
 ## Examples
 
 It is *strongly* recommended to set the `default` policy to `reject`, and then
@@ -281,14 +283,14 @@ selectively allow individual transports and scopes as desired.
             "hostname:5000/myns/sigstore-signed-with-full-references": [
                 {
                     "type": "sigstoreSigned",
-                    "keyPath": "/path/to/sigstore-pubkey.key"
+                    "keyPath": "/path/to/sigstore-pubkey.pub"
                 }
             ],
             /* A sigstore-signed repository, accepts signatures by /usr/bin/cosign */
             "hostname:5000/myns/sigstore-signed-allows-malicious-tag-substitution": [
                 {
                     "type": "sigstoreSigned",
-                    "keyPath": "/path/to/sigstore-pubkey.key",
+                    "keyPath": "/path/to/sigstore-pubkey.pub",
                     "signedIdentity": {"type": "matchRepository"}
                 }
             ]
