@@ -133,14 +133,14 @@ func TestManifestSchema2ConfigInfo(t *testing.T) {
 // configBlobImageSource allows testing various GetBlob behaviors in .ConfigBlob()
 type configBlobImageSource struct {
 	mocks.ForbiddenImageSource // We inherit almost all of the methods, which just panic()
-	f                          func(digest digest.Digest) (io.ReadCloser, int64, error)
+	f                          func() (io.ReadCloser, int64, error)
 }
 
 func (f configBlobImageSource) GetBlob(ctx context.Context, info types.BlobInfo, _ types.BlobInfoCache) (io.ReadCloser, int64, error) {
 	if info.Digest.String() != "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f" {
 		panic("Unexpected digest in GetBlob")
 	}
-	return f.f(info.Digest)
+	return f.f()
 }
 
 func TestManifestSchema2ConfigBlob(t *testing.T) {
@@ -148,25 +148,25 @@ func TestManifestSchema2ConfigBlob(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, c := range []struct {
-		cbISfn func(digest digest.Digest) (io.ReadCloser, int64, error)
+		cbISfn func() (io.ReadCloser, int64, error)
 		blob   []byte
 	}{
 		// Success
-		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
+		{func() (io.ReadCloser, int64, error) {
 			return io.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
 		}, realConfigJSON},
 		// Various kinds of failures
 		{nil, nil},
-		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
+		{func() (io.ReadCloser, int64, error) {
 			return nil, -1, errors.New("Error returned from GetBlob")
 		}, nil},
-		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
+		{func() (io.ReadCloser, int64, error) {
 			reader, writer := io.Pipe()
 			err = writer.CloseWithError(errors.New("Expected error reading input in ConfigBlob"))
 			assert.NoError(t, err)
 			return reader, 1, nil
 		}, nil},
-		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
+		{func() (io.ReadCloser, int64, error) {
 			nonmatchingJSON := []byte("This does not match ConfigDescriptor.Digest")
 			return io.NopCloser(bytes.NewReader(nonmatchingJSON)), int64(len(nonmatchingJSON)), nil
 		}, nil},
@@ -330,7 +330,7 @@ func newSchema2ImageSource(t *testing.T, dockerRef string) *schema2ImageSource {
 
 	return &schema2ImageSource{
 		configBlobImageSource: configBlobImageSource{
-			f: func(digest digest.Digest) (io.ReadCloser, int64, error) {
+			f: func() (io.ReadCloser, int64, error) {
 				return io.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
 			},
 		},
