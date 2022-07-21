@@ -15,7 +15,6 @@ import (
 	"github.com/containers/image/v5/internal/testing/mocks"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
-	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -142,25 +141,25 @@ func TestManifestOCI1ConfigBlob(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, c := range []struct {
-		cbISfn func(digest digest.Digest) (io.ReadCloser, int64, error)
+		cbISfn func() (io.ReadCloser, int64, error)
 		blob   []byte
 	}{
 		// Success
-		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
+		{func() (io.ReadCloser, int64, error) {
 			return io.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
 		}, realConfigJSON},
 		// Various kinds of failures
 		{nil, nil},
-		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
+		{func() (io.ReadCloser, int64, error) {
 			return nil, -1, errors.New("Error returned from GetBlob")
 		}, nil},
-		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
+		{func() (io.ReadCloser, int64, error) {
 			reader, writer := io.Pipe()
 			err = writer.CloseWithError(errors.New("Expected error reading input in ConfigBlob"))
 			require.NoError(t, err)
 			return reader, 1, nil
 		}, nil},
-		{func(digest digest.Digest) (io.ReadCloser, int64, error) {
+		{func() (io.ReadCloser, int64, error) {
 			nonmatchingJSON := []byte("This does not match ConfigDescriptor.Digest")
 			return io.NopCloser(bytes.NewReader(nonmatchingJSON)), int64(len(nonmatchingJSON)), nil
 		}, nil},
@@ -345,7 +344,7 @@ func newOCI1ImageSource(t *testing.T, dockerRef string) *oci1ImageSource {
 
 	return &oci1ImageSource{
 		configBlobImageSource: configBlobImageSource{
-			f: func(digest digest.Digest) (io.ReadCloser, int64, error) {
+			f: func() (io.ReadCloser, int64, error) {
 				return io.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
 			},
 		},
