@@ -33,7 +33,7 @@ require (
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838
-	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e
+	golang.org/x/net v0.0.0-20220708220712-1185a9018129
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 )
@@ -57,7 +57,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/go-containerregistry v0.10.0 // indirect
+	github.com/google/go-containerregistry v0.11.0 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
