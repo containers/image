@@ -55,7 +55,7 @@ tools: .install.gitvalidation .install.golangci-lint .install.golint
 
 .install.golangci-lint:
 	if [ ! -x "$(GOBIN)/golangci-lint" ]; then \
-		curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(GOBIN) v1.44.2; \
+		curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(GOBIN) v1.47.2; \
 	fi
 
 .install.golint:
