@@ -221,20 +221,36 @@ func (m *Schema1) Inspect(_ func(types.BlobInfo) ([]byte, error)) (*types.ImageI
 	if err := json.Unmarshal([]byte(m.History[0].V1Compatibility), s1); err != nil {
 		return nil, err
 	}
+	layerInfos := m.LayerInfos()
 	i := &types.ImageInspectInfo{
 		Tag:           m.Tag,
 		Created:       &s1.Created,
 		DockerVersion: s1.DockerVersion,
 		Architecture:  s1.Architecture,
 		Os:            s1.OS,
-		Layers:        layerInfosToStrings(m.LayerInfos()),
+		Layers:        layerInfosToStrings(layerInfos),
+		LayersDetail:  imgInspectLayersFromLayerInfos(layerInfos),
+		Author:        s1.Author,
 	}
 	if s1.Config != nil {
 		i.Labels = s1.Config.Labels
 		i.Env = s1.Config.Env
+		i.Config.Env = s1.Config.Env
+		i.Config.Labels = s1.Config.Labels
+		i.Config.User = s1.Config.User
+		i.Config.Volumes = s1.Config.Volumes
+		i.Config.Entrypoint = s1.Config.Entrypoint
+		for key, value := range s1.Config.ExposedPorts {
+			exposedPorts := make(map[string]struct{})
+			exposedPorts[string(key)] = value
+			i.Config.ExposedPorts = exposedPorts
+		}
+		i.Config.StopSignal = s1.Config.StopSignal
+		i.Config.WorkingDir = s1.Config.WorkingDir
 	}
 	return i, nil
 }
+
 
 // ToSchema2Config builds a schema2-style configuration blob using the supplied diffIDs.
 func (m *Schema1) ToSchema2Config(diffIDs []digest.Digest) ([]byte, error) {

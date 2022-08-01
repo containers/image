@@ -267,6 +267,7 @@ func (m *Schema2) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*t
 	if err != nil {
 		return nil, err
 	}
+	layerInfos := m.LayerInfos()
 	s2 := &Schema2Image{}
 	if err := json.Unmarshal(config, s2); err != nil {
 		return nil, err
@@ -278,11 +279,25 @@ func (m *Schema2) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*t
 		Architecture:  s2.Architecture,
 		Variant:       s2.Variant,
 		Os:            s2.OS,
-		Layers:        layerInfosToStrings(m.LayerInfos()),
+		Layers:        layerInfosToStrings(layerInfos),
+		LayersDetail:  imgInspectLayersFromLayerInfos(layerInfos),
+		Author:        s2.Author,
 	}
 	if s2.Config != nil {
 		i.Labels = s2.Config.Labels
 		i.Env = s2.Config.Env
+		i.Config.Env = s2.Config.Env
+		i.Config.Labels = s2.Config.Labels
+		i.Config.User = s2.Config.User
+		i.Config.Volumes = s2.Config.Volumes
+		i.Config.Entrypoint = s2.Config.Entrypoint
+		for key, value := range s2.Config.ExposedPorts {
+			exposedPorts := make(map[string]struct{})
+			exposedPorts[string(key)] = value
+			i.Config.ExposedPorts = exposedPorts
+		}
+		i.Config.StopSignal = s2.Config.StopSignal
+		i.Config.WorkingDir = s2.Config.WorkingDir
 	}
 	return i, nil
 }

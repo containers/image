@@ -466,6 +466,16 @@ type ImageInspectInfo struct {
 	Os            string
 	Layers        []string
 	Env           []string
+	LayersDetail  []LayerDetail
+	Author        string
+	Config v1.ImageConfig
+}
+
+type LayerDetail struct {
+	MIMEType    string
+	Digest      digest.Digest
+	Size        int64
+	Annotations map[string]string
 }
 
 // DockerAuthConfig contains authorization information for connecting to a registry.

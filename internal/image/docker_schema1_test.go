@@ -269,6 +269,7 @@ func TestManifestSchema1EmbeddedDockerReferenceConflicts(t *testing.T) {
 }
 
 func TestManifestSchema1Inspect(t *testing.T) {
+
 	for _, m := range []genericManifest{
 		manifestSchema1FromFixture(t, "schema1.json"),
 		manifestSchema1FromComponentsLikeFixture(t),
@@ -276,6 +277,34 @@ func TestManifestSchema1Inspect(t *testing.T) {
 		ii, err := m.Inspect(context.Background())
 		require.NoError(t, err)
 		created := time.Date(2018, 1, 25, 0, 37, 48, 268558000, time.UTC)
+		var annotations map[string]string
+		config := imgspecv1.ImageConfig{
+			User:         "nova",
+			ExposedPorts: nil,
+			Env: []string{
+
+				"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+				"container=oci", "KOLLA_BASE_DISTRO=rhel", "KOLLA_INSTALL_TYPE=binary", "KOLLA_INSTALL_METATYPE=rhos",
+				"PS1=$(tput bold)($(printenv KOLLA_SERVICE_NAME))$(tput sgr0)[$(id -un)@$(hostname -s) $(pwd)]$ ",
+			},
+			Entrypoint: nil,
+			Cmd:        nil,
+			Volumes:    nil,
+			WorkingDir: "",
+			Labels: map[string]string{
+				"Kolla-SHA":    "5.0.0-39-g6f1b947b",
+				"architecture": "x86_64", "authoritative-source-url": "registry.access.redhat.com",
+				"build-date": "2018-01-25T00:32:27.807261", "com.redhat.build-host": "ip-10-29-120-186.ec2.internal",
+				"com.redhat.component": "openstack-nova-api-docker", "description": "Red Hat OpenStack Platform 12.0 nova-api",
+				"distribution-scope": "public", "io.k8s.description": "Red Hat OpenStack Platform 12.0 nova-api",
+				"io.k8s.display-name": "Red Hat OpenStack Platform 12.0 nova-api", "io.openshift.tags": "rhosp osp openstack osp-12.0",
+				"kolla_version": "stable/pike", "name": "rhosp12/openstack-nova-api", "release": "20180124.1",
+				"summary": "Red Hat OpenStack Platform 12.0 nova-api", "tripleo-common_version": "7.6.3-23-g4891cfe",
+				"url":     "https://access.redhat.com/containers/#/registry.access.redhat.com/rhosp12/openstack-nova-api/images/12.0-20180124.1",
+				"vcs-ref": "9b31243b7b448eb2fc3b6e2c96935b948f806e98", "vcs-type": "git", "vendor": "Red Hat, Inc.", "version": "12.0", "version-release": "12.0-20180124.1",
+			},
+			StopSignal: "",
+		}
 		assert.Equal(t, types.ImageInspectInfo{
 			Tag:           "latest",
 			Created:       &created,
@@ -314,6 +343,41 @@ func TestManifestSchema1Inspect(t *testing.T) {
 				"sha256:62e48e39dc5b30b75a97f05bccc66efbae6058b860ee20a5c9a184b9d5e25788",
 				"sha256:e623934bca8d1a74f51014256445937714481e49343a31bda2bc5f534748184d",
 			},
+			LayersDetail: []types.LayerDetail{{
+				MIMEType:    "",
+				Digest:      "sha256:9cadd93b16ff2a0c51ac967ea2abfadfac50cfa3af8b5bf983d89b8f8647f3e4",
+				Size:        -1,
+				Annotations: annotations,
+			}, {
+				MIMEType:    "",
+				Digest:      "sha256:4aa565ad8b7a87248163ce7dba1dd3894821aac97e846b932ff6b8ef9a8a508a",
+				Size:        -1,
+				Annotations: annotations,
+			}, {
+				MIMEType:    "",
+				Digest:      "sha256:f576d102e09b9eef0e305aaef705d2d43a11bebc3fd5810a761624bd5e11997e",
+				Size:        -1,
+				Annotations: annotations,
+			}, {
+				MIMEType:    "",
+				Digest:      "sha256:9e92df2aea7dc0baf5f1f8d509678d6a6306de27ad06513f8e218371938c07a6",
+				Size:        -1,
+				Annotations: annotations,
+			}, {
+				MIMEType:    "",
+				Digest:      "sha256:62e48e39dc5b30b75a97f05bccc66efbae6058b860ee20a5c9a184b9d5e25788",
+				Size:        -1,
+				Annotations: annotations,
+			},
+				{
+					MIMEType:    "",
+					Digest:      "sha256:e623934bca8d1a74f51014256445937714481e49343a31bda2bc5f534748184d",
+					Size:        -1,
+					Annotations: annotations,
+				},
+			},
+			Author: "",
+			Config: config,
 			Env: []string{
 				"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 				"container=oci",
