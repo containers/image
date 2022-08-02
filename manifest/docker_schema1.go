@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/set"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/regexp"
 	"github.com/docker/docker/api/types/versions"
@@ -184,15 +185,15 @@ func (m *Schema1) fixManifestLayers() error {
 		return errors.New("Invalid parent ID in the base layer of the image")
 	}
 	// check general duplicates to error instead of a deadlock
-	idmap := make(map[string]struct{})
+	idmap := set.New[string]()
 	var lastID string
 	for _, img := range m.ExtractedV1Compatibility {
 		// skip IDs that appear after each other, we handle those later
-		if _, exists := idmap[img.ID]; img.ID != lastID && exists {
+		if img.ID != lastID && idmap.Contains(img.ID) {
 			return fmt.Errorf("ID %+v appears multiple times in manifest", img.ID)
 		}
 		lastID = img.ID
-		idmap[lastID] = struct{}{}
+		idmap.Add(lastID)
 	}
 	// backwards loop so that we keep the remaining indexes after removing items
 	for i := len(m.ExtractedV1Compatibility) - 2; i >= 0; i-- {

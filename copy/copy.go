@@ -19,6 +19,7 @@ import (
 	"github.com/containers/image/v5/internal/imagesource"
 	"github.com/containers/image/v5/internal/pkg/platform"
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/set"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache"
 	"github.com/containers/image/v5/pkg/compression"
@@ -936,20 +937,20 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		data[index] = cld
 	}
 
-	// Create layer Encryption map
-	encLayerBitmap := map[int]bool{}
+	// Decide which layers to encrypt
+	layersToEncrypt := set.New[int]()
 	var encryptAll bool
 	if ic.ociEncryptLayers != nil {
 		encryptAll = len(*ic.ociEncryptLayers) == 0
 		totalLayers := len(srcInfos)
 		for _, l := range *ic.ociEncryptLayers {
 			// if layer is negative, it is reverse indexed.
-			encLayerBitmap[(totalLayers+l)%totalLayers] = true
+			layersToEncrypt.Add((totalLayers + l) % totalLayers)
 		}
 
 		if encryptAll {
 			for i := 0; i < len(srcInfos); i++ {
-				encLayerBitmap[i] = true
+				layersToEncrypt.Add(i)
 			}
 		}
 	}
@@ -968,7 +969,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 				return fmt.Errorf("copying layer: %w", err)
 			}
 			copyGroup.Add(1)
-			go copyLayerHelper(i, srcLayer, encLayerBitmap[i], progressPool, ic.c.rawSource.Reference().DockerReference())
+			go copyLayerHelper(i, srcLayer, layersToEncrypt.Contains(i), progressPool, ic.c.rawSource.Reference().DockerReference())
 		}
 
 		// A call to copyGroup.Wait() is done at this point by the defer above.

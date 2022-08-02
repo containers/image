@@ -21,6 +21,7 @@ import (
 	"github.com/containers/image/v5/internal/imagedestination/stubs"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/putblobdigest"
+	"github.com/containers/image/v5/internal/set"
 	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/internal/tmpdir"
 	"github.com/containers/image/v5/manifest"
@@ -796,14 +797,14 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 
 	// Add the non-layer blobs as data items.  Since we only share layers, they should all be in files, so
 	// we just need to screen out the ones that are actually layers to get the list of non-layers.
-	dataBlobs := make(map[digest.Digest]struct{})
+	dataBlobs := set.New[digest.Digest]()
 	for blob := range s.filenames {
-		dataBlobs[blob] = struct{}{}
+		dataBlobs.Add(blob)
 	}
 	for _, layerBlob := range layerBlobs {
-		delete(dataBlobs, layerBlob.Digest)
+		dataBlobs.Delete(layerBlob.Digest)
 	}
-	for blob := range dataBlobs {
+	for _, blob := range dataBlobs.Values() {
 		v, err := os.ReadFile(s.filenames[blob])
 		if err != nil {
 			return fmt.Errorf("copying non-layer blob %q to image: %w", blob, err)

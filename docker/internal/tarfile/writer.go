@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/set"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
@@ -30,7 +31,7 @@ type Writer struct {
 	// Other state.
 	blobs            map[digest.Digest]types.BlobInfo // list of already-sent blobs
 	repositories     map[string]map[string]string
-	legacyLayers     map[string]struct{} // A set of IDs of legacy layers that have been already sent.
+	legacyLayers     *set.Set[string] // A set of IDs of legacy layers that have been already sent.
 	manifest         []ManifestItem
 	manifestByConfig map[digest.Digest]int // A map from config digest to an entry index in manifest above.
 }
@@ -43,7 +44,7 @@ func NewWriter(dest io.Writer) *Writer {
 		tar:              tar.NewWriter(dest),
 		blobs:            make(map[digest.Digest]types.BlobInfo),
 		repositories:     map[string]map[string]string{},
-		legacyLayers:     map[string]struct{}{},
+		legacyLayers:     set.New[string](),
 		manifestByConfig: map[digest.Digest]int{},
 	}
 }
@@ -90,7 +91,7 @@ func (w *Writer) recordBlobLocked(info types.BlobInfo) {
 // ensureSingleLegacyLayerLocked writes legacy VERSION and configuration files for a single layer
 // The caller must have locked the Writer.
 func (w *Writer) ensureSingleLegacyLayerLocked(layerID string, layerDigest digest.Digest, configBytes []byte) error {
-	if _, ok := w.legacyLayers[layerID]; !ok {
+	if !w.legacyLayers.Contains(layerID) {
 		// Create a symlink for the legacy format, where there is one subdirectory per layer ("image").
 		// See also the comment in physicalLayerPath.
 		physicalLayerPath := w.physicalLayerPath(layerDigest)
@@ -107,7 +108,7 @@ func (w *Writer) ensureSingleLegacyLayerLocked(layerID string, layerDigest diges
 			return fmt.Errorf("writing config json file: %w", err)
 		}
 
-		w.legacyLayers[layerID] = struct{}{}
+		w.legacyLayers.Add(layerID)
 	}
 	return nil
 }
@@ -225,9 +226,9 @@ func (w *Writer) ensureManifestItemLocked(layerDescriptors []manifest.Schema2Des
 		item = &w.manifest[i]
 	}
 
-	knownRepoTags := map[string]struct{}{}
+	knownRepoTags := set.New[string]()
 	for _, repoTag := range item.RepoTags {
-		knownRepoTags[repoTag] = struct{}{}
+		knownRepoTags.Add(repoTag)
 	}
 	for _, tag := range repoTags {
 		// For github.com/docker/docker consumers, this works just as well as
@@ -248,9 +249,9 @@ func (w *Writer) ensureManifestItemLocked(layerDescriptors []manifest.Schema2Des
 		// analysis and explanation.
 		refString := fmt.Sprintf("%s:%s", tag.Name(), tag.Tag())
 
-		if _, ok := knownRepoTags[refString]; !ok {
+		if !knownRepoTags.Contains(refString) {
 			item.RepoTags = append(item.RepoTags, refString)
-			knownRepoTags[refString] = struct{}{}
+			knownRepoTags.Add(refString)
 		}
 	}
 

@@ -21,6 +21,7 @@ import (
 	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/putblobdigest"
+	"github.com/containers/image/v5/internal/set"
 	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/internal/streamdigest"
 	"github.com/containers/image/v5/internal/uploadreader"
@@ -796,9 +797,9 @@ func (d *dockerImageDestination) putSignaturesToAPIExtension(ctx context.Context
 	if err != nil {
 		return err
 	}
-	existingSigNames := map[string]struct{}{}
+	existingSigNames := set.New[string]()
 	for _, sig := range existingSignatures.Signatures {
-		existingSigNames[sig.Name] = struct{}{}
+		existingSigNames.Add(sig.Name)
 	}
 
 	for _, newSigWithFormat := range signatures {
@@ -823,7 +824,7 @@ func (d *dockerImageDestination) putSignaturesToAPIExtension(ctx context.Context
 				return fmt.Errorf("generating random signature len %d: %w", n, err)
 			}
 			signatureName = fmt.Sprintf("%s@%032x", manifestDigest.String(), randBytes)
-			if _, ok := existingSigNames[signatureName]; !ok {
+			if !existingSigNames.Contains(signatureName) {
 				break
 			}
 		}

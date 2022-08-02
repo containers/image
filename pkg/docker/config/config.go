@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/set"
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/homedir"
@@ -139,10 +140,7 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 	// possible sources, and then call `GetCredentials` on them.  That
 	// prevents us from having to reverse engineer the logic in
 	// `GetCredentials`.
-	allKeys := make(map[string]bool)
-	addKey := func(s string) {
-		allKeys[s] = true
-	}
+	allKeys := set.New[string]()
 
 	// To use GetCredentials, we must at least convert the URL forms into host names.
 	// While we're at it, we’ll also canonicalize docker.io to the standard format.
@@ -166,14 +164,14 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 				// direct mapping to a registry, so we can just
 				// walk the map.
 				for registry := range auths.CredHelpers {
-					addKey(registry)
+					allKeys.Add(registry)
 				}
 				for key := range auths.AuthConfigs {
 					key := normalizeAuthFileKey(key, path.legacyFormat)
 					if key == normalizedDockerIORegistry {
 						key = "docker.io"
 					}
-					addKey(key)
+					allKeys.Add(key)
 				}
 			}
 		// External helpers.
@@ -188,7 +186,7 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 				}
 			}
 			for registry := range creds {
-				addKey(registry)
+				allKeys.Add(registry)
 			}
 		}
 	}
@@ -196,7 +194,7 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 	// Now use `GetCredentials` to the specific auth configs for each
 	// previously listed registry.
 	authConfigs := make(map[string]types.DockerAuthConfig)
-	for key := range allKeys {
+	for _, key := range allKeys.Values() {
 		authConf, err := GetCredentials(sys, key)
 		if err != nil {
 			// Note: we rely on the logging in `GetCredentials`.

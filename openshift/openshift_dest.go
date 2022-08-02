@@ -17,6 +17,7 @@ import (
 	"github.com/containers/image/v5/internal/imagedestination/impl"
 	"github.com/containers/image/v5/internal/imagedestination/stubs"
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/set"
 	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
@@ -181,9 +182,9 @@ func (d *openshiftImageDestination) PutSignaturesWithFormat(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	existingSigNames := map[string]struct{}{}
+	existingSigNames := set.New[string]()
 	for _, sig := range image.Signatures {
-		existingSigNames[sig.objectMeta.Name] = struct{}{}
+		existingSigNames.Add(sig.objectMeta.Name)
 	}
 
 	for _, newSigWithFormat := range signatures {
@@ -208,7 +209,7 @@ func (d *openshiftImageDestination) PutSignaturesWithFormat(ctx context.Context,
 				return fmt.Errorf("generating random signature len %d: %w", n, err)
 			}
 			signatureName = fmt.Sprintf("%s@%032x", imageStreamImageName, randBytes)
-			if _, ok := existingSigNames[signatureName]; !ok {
+			if !existingSigNames.Contains(signatureName) {
 				break
 			}
 		}
