@@ -759,8 +759,8 @@ func decodeDockerAuth(path, key string, conf dockerAuthConfig) (types.DockerAuth
 		return types.DockerAuthConfig{}, err
 	}
 
-	parts := strings.SplitN(string(decoded), ":", 2)
-	if len(parts) != 2 {
+	user, passwordPart, valid := strings.Cut(string(decoded), ":")
+	if !valid {
 		// if it's invalid just skip, as docker does
 		if len(decoded) > 0 { // Docker writes "auths": { "$host": {} } entries if a credential helper is used, don’t warn about those
 			logrus.Warnf(`Error parsing the "auth" field of a credential entry %q in %q, missing semicolon`, key, path) // Don’t include the text of decoded, because that might put secrets into a log.
@@ -770,8 +770,7 @@ func decodeDockerAuth(path, key string, conf dockerAuthConfig) (types.DockerAuth
 		return types.DockerAuthConfig{}, nil
 	}
 
-	user := parts[0]
-	password := strings.Trim(parts[1], "\x00")
+	password := strings.Trim(passwordPart, "\x00")
 	return types.DockerAuthConfig{
 		Username:      user,
 		Password:      password,
@@ -786,7 +785,7 @@ func normalizeAuthFileKey(key string, legacyFormat bool) string {
 	stripped = strings.TrimPrefix(stripped, "https://")
 
 	if legacyFormat || stripped != key {
-		stripped = strings.SplitN(stripped, "/", 2)[0]
+		stripped, _, _ = strings.Cut(stripped, "/")
 	}
 
 	return normalizeRegistry(stripped)
