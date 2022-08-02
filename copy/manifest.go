@@ -9,6 +9,7 @@ import (
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 )
 
 // preferredManifestMIMETypes lists manifest MIME types in order of our preference, if we can't use the original manifest and need to convert.
@@ -166,11 +167,8 @@ func (c *copier) determineListConversion(currentListMIMEType string, destSupport
 	prioritizedTypes := newOrderedSet()
 	// The first priority is the current type, if it's in the list, since that lets us avoid a
 	// conversion that isn't strictly necessary.
-	for _, t := range destSupportedMIMETypes {
-		if t == currentListMIMEType {
-			prioritizedTypes.append(currentListMIMEType)
-			break
-		}
+	if slices.Contains(destSupportedMIMETypes, currentListMIMEType) {
+		prioritizedTypes.append(currentListMIMEType)
 	}
 	// Pick out the other list types that we support.
 	for _, t := range destSupportedMIMETypes {

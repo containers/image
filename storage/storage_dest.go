@@ -34,6 +34,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 )
 
 var (
@@ -883,9 +884,7 @@ func (s *storageImageDestination) PutManifest(ctx context.Context, manifestBlob 
 	if err != nil {
 		return err
 	}
-	newBlob := make([]byte, len(manifestBlob))
-	copy(newBlob, manifestBlob)
-	s.manifest = newBlob
+	s.manifest = slices.Clone(manifestBlob)
 	s.manifestDigest = digest
 	return nil
 }

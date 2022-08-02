@@ -32,6 +32,7 @@ import (
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/vbauerster/mpb/v8"
+	"golang.org/x/exp/slices"
 	"golang.org/x/sync/semaphore"
 	"golang.org/x/term"
 )
@@ -370,12 +371,7 @@ func supportsMultipleImages(dest types.ImageDestination) bool {
 		// Anything goes!
 		return true
 	}
-	for _, mtype := range mtypes {
-		if manifest.MIMETypeIsMultiImage(mtype) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(mtypes, manifest.MIMETypeIsMultiImage)
 }
 
 // compareImageDestinationManifestEqual compares the `src` and `dest` image manifests (reading the manifest from the
@@ -491,24 +487,16 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	updates := make([]manifest.ListUpdate, len(instanceDigests))
 	instancesCopied := 0
 	for i, instanceDigest := range instanceDigests {
-		if options.ImageListSelection == CopySpecificImages {
-			skip := true
-			for _, instance := range options.Instances {
-				if instance == instanceDigest {
-					skip = false
-					break
-				}
+		if options.ImageListSelection == CopySpecificImages &&
+			!slices.Contains(options.Instances, instanceDigest) {
+			update, err := updatedList.Instance(instanceDigest)
+			if err != nil {
+				return nil, err
 			}
-			if skip {
-				update, err := updatedList.Instance(instanceDigest)
-				if err != nil {
-					return nil, err
-				}
-				logrus.Debugf("Skipping instance %s (%d/%d)", instanceDigest, i+1, len(instanceDigests))
-				// Record the digest/size/type of the manifest that we didn't copy.
-				updates[i] = update
-				continue
-			}
+			logrus.Debugf("Skipping instance %s (%d/%d)", instanceDigest, i+1, len(instanceDigests))
+			// Record the digest/size/type of the manifest that we didn't copy.
+			updates[i] = update
+			continue
 		}
 		logrus.Debugf("Copying instance %s (%d/%d)", instanceDigest, i+1, len(instanceDigests))
 		c.Printf("Copying image %s (%d/%d)\n", instanceDigest, instancesCopied+1, imagesToCopy)
@@ -1013,15 +1001,9 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 
 // layerDigestsDiffer returns true iff the digests in a and b differ (ignoring sizes and possible other fields)
 func layerDigestsDiffer(a, b []types.BlobInfo) bool {
-	if len(a) != len(b) {
-		return true
-	}
-	for i := range a {
-		if a[i].Digest != b[i].Digest {
-			return true
-		}
-	}
-	return false
+	return !slices.EqualFunc(a, b, func(a, b types.BlobInfo) bool {
+		return a.Digest == b.Digest
+	})
 }
 
 // copyUpdatedConfigAndManifest updates the image per ic.manifestUpdates, if necessary,

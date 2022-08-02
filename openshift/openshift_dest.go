@@ -21,6 +21,7 @@ import (
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
+	"golang.org/x/exp/slices"
 )
 
 type openshiftImageDestination struct {
@@ -185,7 +186,6 @@ func (d *openshiftImageDestination) PutSignaturesWithFormat(ctx context.Context,
 		existingSigNames[sig.objectMeta.Name] = struct{}{}
 	}
 
-sigExists:
 	for _, newSigWithFormat := range signatures {
 		newSigSimple, ok := newSigWithFormat.(signature.SimpleSigning)
 		if !ok {
@@ -193,10 +193,10 @@ sigExists:
 		}
 		newSig := newSigSimple.UntrustedSignature()
 
-		for _, existingSig := range image.Signatures {
-			if existingSig.Type == imageSignatureTypeAtomic && bytes.Equal(existingSig.Content, newSig) {
-				continue sigExists
-			}
+		if slices.ContainsFunc(image.Signatures, func(existingSig imageSignature) bool {
+			return existingSig.Type == imageSignatureTypeAtomic && bytes.Equal(existingSig.Content, newSig)
+		}) {
+			continue
 		}
 
 		// The API expect us to invent a new unique name. This is racy, but hopefully good enough.

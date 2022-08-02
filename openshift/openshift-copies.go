@@ -19,6 +19,7 @@ import (
 	"github.com/containers/storage/pkg/homedir"
 	"github.com/imdario/mergo"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 	"golang.org/x/net/http2"
 	"gopkg.in/yaml.v3"
 )
@@ -901,10 +902,10 @@ func newProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error
 			return delegate(req)
 		}
 
-		for _, cidr := range cidrs {
-			if cidr.Contains(ip) {
-				return nil, nil
-			}
+		if slices.ContainsFunc(cidrs, func(cidr *net.IPNet) bool {
+			return cidr.Contains(ip)
+		}) {
+			return nil, nil
 		}
 
 		return delegate(req)

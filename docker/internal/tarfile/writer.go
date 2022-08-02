@@ -17,6 +17,7 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 )
 
 // Writer allows creating a (docker save)-formatted tar archive containing one or more images.
@@ -188,13 +189,8 @@ func checkManifestItemsMatch(a, b *ManifestItem) error {
 	if a.Config != b.Config {
 		return fmt.Errorf("Internal error: Trying to reuse ManifestItem values with configs %#v vs. %#v", a.Config, b.Config)
 	}
-	if len(a.Layers) != len(b.Layers) {
+	if !slices.Equal(a.Layers, b.Layers) {
 		return fmt.Errorf("Internal error: Trying to reuse ManifestItem values with layers %#v vs. %#v", a.Layers, b.Layers)
-	}
-	for i := range a.Layers {
-		if a.Layers[i] != b.Layers[i] {
-			return fmt.Errorf("Internal error: Trying to reuse ManifestItem values with layers[i] %#v vs. %#v", a.Layers[i], b.Layers[i])
-		}
 	}
 	// Ignore RepoTags, that will be built later.
 	// Ignore Parent and LayerSources, which we don’t set to anything meaningful.

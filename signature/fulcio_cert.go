@@ -12,6 +12,7 @@ import (
 	"github.com/containers/image/v5/signature/internal"
 	"github.com/sigstore/fulcio/pkg/certificate"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
+	"golang.org/x/exp/slices"
 )
 
 // fulcioTrustRoot contains policy allow validating Fulcio-issued certificates.
@@ -136,15 +137,7 @@ func (f *fulcioTrustRoot) verifyFulcioCertificateAtTime(relevantTime time.Time, 
 	}
 
 	// == Validate the OIDC subject
-	foundEmail := false
-	// TO DO: Use slices.Contains after we update to Go 1.18
-	for _, certEmail := range untrustedCertificate.EmailAddresses {
-		if certEmail == f.subjectEmail {
-			foundEmail = true
-			break
-		}
-	}
-	if !foundEmail {
+	if !slices.Contains(untrustedCertificate.EmailAddresses, f.subjectEmail) {
 		return nil, internal.NewInvalidSignatureError(fmt.Sprintf("Required email %s not found (got %#v)",
 			f.subjectEmail,
 			untrustedCertificate.EmailAddresses))

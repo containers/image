@@ -10,6 +10,7 @@ import (
 	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/maps"
 )
 
 // bpDetectCompressionStepData contains data that the copy pipeline needs about the “detect compression” step.
@@ -232,9 +233,7 @@ func (d *bpCompressionStepData) updateCompressionEdits(operation *types.LayerCom
 	if *annotations == nil {
 		*annotations = map[string]string{}
 	}
-	for k, v := range d.uploadedAnnotations {
-		(*annotations)[k] = v
-	}
+	maps.Copy(*annotations, d.uploadedAnnotations)
 }
 
 // recordValidatedBlobData updates b.blobInfoCache with data about the created uploadedInfo adnd the original srcInfo.

@@ -10,6 +10,7 @@ import (
 
 	"github.com/containers/image/v5/directory"
 	"github.com/containers/image/v5/docker"
+	"golang.org/x/exp/maps"
 
 	// this import is needed  where we use the "atomic" transport in TestPolicyUnmarshalJSON
 	_ "github.com/containers/image/v5/openshift"
@@ -585,11 +586,7 @@ func TestPolicyTransportScopesWithTransportUnmarshalJSON(t *testing.T) {
 		// The "" scope is missing
 		func(v mSI) { delete(v, "") },
 		// The policy is completely empty
-		func(v mSI) {
-			for key := range v {
-				delete(v, key)
-			}
-		},
+		func(v mSI) { maps.Clear(v) },
 	}
 	for _, fn := range allowedModificationFns {
 		err = tryUnmarshalModifiedPTS(t, &pts, docker.Transport, validJSON, fn)

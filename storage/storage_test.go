@@ -33,6 +33,7 @@ import (
 	ddigest "github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
 )
 
 var (
@@ -192,13 +193,8 @@ func TestParseWithGraphDriverOptions(t *testing.T) {
 			t.Fatalf("ParseReference returned a reference from transport %s, not one of ours", ref2.Transport().Name())
 		}
 		parsedOptions := sref.transport.store.GraphOptions()
-		if len(parsedOptions) != len(optionList) {
-			t.Fatalf("Lost options between %v and %v", optionList, parsedOptions)
-		}
-		for i := range optionList {
-			if parsedOptions[i] != optionList[i] {
-				t.Fatalf("Mismatched option %d: %v and %v", i, optionList[i], parsedOptions[i])
-			}
+		if !slices.Equal(parsedOptions, optionList) {
+			t.Fatalf("Mismatched options: %#v and %#v", optionList, parsedOptions)
 		}
 	}
 }

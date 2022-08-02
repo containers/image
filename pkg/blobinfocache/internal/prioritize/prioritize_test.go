@@ -10,6 +10,7 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/exp/slices"
 )
 
 const (
@@ -139,7 +140,7 @@ func TestCandidateSortStateLess(t *testing.T) {
 func TestCandidateSortStateSwap(t *testing.T) {
 	freshCSS := func() candidateSortState { // Return a deep copy of cssLiteral which is safe to modify.
 		res := cssLiteral
-		res.cs = append([]CandidateWithTime{}, cssLiteral.cs...)
+		res.cs = slices.Clone(cssLiteral.cs)
 		return res
 	}
 
@@ -157,7 +158,7 @@ func TestCandidateSortStateSwap(t *testing.T) {
 func TestDestructivelyPrioritizeReplacementCandidatesWithMax(t *testing.T) {
 	for _, max := range []int{0, 1, replacementAttempts, 100} {
 		// Just a smoke test; we mostly rely on test coverage in TestCandidateSortStateLess
-		res := destructivelyPrioritizeReplacementCandidatesWithMax(append([]CandidateWithTime{}, cssLiteral.cs...), digestCompressedPrimary, digestUncompressed, max)
+		res := destructivelyPrioritizeReplacementCandidatesWithMax(slices.Clone(cssLiteral.cs), digestCompressedPrimary, digestUncompressed, max)
 		if max > len(cssExpectedReplacementCandidates) {
 			max = len(cssExpectedReplacementCandidates)
 		}
@@ -167,6 +168,6 @@ func TestDestructivelyPrioritizeReplacementCandidatesWithMax(t *testing.T) {
 
 func TestDestructivelyPrioritizeReplacementCandidates(t *testing.T) {
 	// Just a smoke test; we mostly rely on test coverage in TestCandidateSortStateLess
-	res := DestructivelyPrioritizeReplacementCandidates(append([]CandidateWithTime{}, cssLiteral.cs...), digestCompressedPrimary, digestUncompressed)
+	res := DestructivelyPrioritizeReplacementCandidates(slices.Clone(cssLiteral.cs), digestCompressedPrimary, digestUncompressed)
 	assert.Equal(t, cssExpectedReplacementCandidates[:replacementAttempts], res)
 }

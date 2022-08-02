@@ -20,6 +20,7 @@ import (
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
 )
 
 func manifestSchema2FromFixture(t *testing.T, src types.ImageSource, fixture string, mustFail bool) genericManifest {
@@ -442,7 +443,7 @@ func modifiedLayerInfos(t *testing.T, input []types.BlobInfo) ([]types.BlobInfo,
 		modified = append(modified, b2)
 	}
 
-	copy := append([]types.BlobInfo{}, modified...)
+	copy := slices.Clone(modified)
 	return modified, copy
 }
 

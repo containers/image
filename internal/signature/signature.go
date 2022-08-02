@@ -100,10 +100,3 @@ func UnsupportedFormatError(sig Signature) error {
 		return fmt.Errorf("unsupported, and unrecognized, signature format %q", string(formatID))
 	}
 }
-
-// copyByteSlice returns a guaranteed-fresh copy of a byte slice
-// Use this to make sure the underlying data is not shared and can’t be unexpectedly modified.
-func copyByteSlice(s []byte) []byte {
-	res := []byte{}
-	return append(res, s...)
-}

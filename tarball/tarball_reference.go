@@ -11,6 +11,7 @@ import (
 	"github.com/containers/image/v5/types"
 
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/exp/maps"
 )
 
 // ConfigUpdater is an interface that ImageReferences for "tarball" images also
@@ -35,9 +36,7 @@ func (r *tarballReference) ConfigUpdate(config imgspecv1.Image, annotations map[
 	if r.annotations == nil {
 		r.annotations = make(map[string]string)
 	}
-	for k, v := range annotations {
-		r.annotations[k] = v
-	}
+	maps.Copy(r.annotations, annotations)
 	return nil
 }
 
