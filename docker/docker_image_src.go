@@ -250,7 +250,7 @@ func splitHTTP200ResponseToPartial(streams chan io.ReadCloser, errs chan error, 
 			currentOffset += toSkip
 		}
 		s := signalCloseReader{
-			closed:        make(chan interface{}),
+			closed:        make(chan struct{}),
 			stream:        io.NopCloser(io.LimitReader(body, int64(c.Length))),
 			consumeStream: true,
 		}
@@ -292,7 +292,7 @@ func handle206Response(streams chan io.ReadCloser, errs chan error, body io.Read
 			return
 		}
 		s := signalCloseReader{
-			closed: make(chan interface{}),
+			closed: make(chan struct{}),
 			stream: p,
 		}
 		streams <- s
@@ -766,7 +766,7 @@ func makeBufferedNetworkReader(stream io.ReadCloser, nBuffers, bufferSize uint) 
 }
 
 type signalCloseReader struct {
-	closed        chan interface{}
+	closed        chan struct{}
 	stream        io.ReadCloser
 	consumeStream bool
 }
