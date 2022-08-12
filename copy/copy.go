@@ -812,7 +812,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 // has a built-in list of functions/methods (whatever object they are for)
 // which have their format strings checked; for other names we would have
 // to pass a parameter to every (go tool vet) invocation.
-func (c *copier) Printf(format string, a ...interface{}) {
+func (c *copier) Printf(format string, a ...any) {
 	fmt.Fprintf(c.reportWriter, format, a...)
 }
 

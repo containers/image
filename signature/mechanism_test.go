@@ -203,7 +203,7 @@ func TestGPGSigningMechanismSign(t *testing.T) {
 	// The various GPG/GPGME failures cases are not obviously easy to reach.
 }
 
-func assertSigningError(t *testing.T, content []byte, fingerprint string, err error, msgAndArgs ...interface{}) {
+func assertSigningError(t *testing.T, content []byte, fingerprint string, err error, msgAndArgs ...any) {
 	assert.Error(t, err, msgAndArgs...)
 	assert.Nil(t, content, msgAndArgs...)
 	assert.Empty(t, fingerprint, msgAndArgs...)

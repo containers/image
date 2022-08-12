@@ -153,13 +153,13 @@ func TestManifestSchema1Serialize(t *testing.T) {
 	} {
 		serialized, err := m.serialize()
 		require.NoError(t, err)
-		var contents map[string]interface{}
+		var contents map[string]any
 		err = json.Unmarshal(serialized, &contents)
 		require.NoError(t, err)
 
 		original, err := os.ReadFile("fixtures/schema1.json")
 		require.NoError(t, err)
-		var originalContents map[string]interface{}
+		var originalContents map[string]any
 		err = json.Unmarshal(original, &originalContents)
 		require.NoError(t, err)
 
@@ -465,7 +465,7 @@ func TestManifestSchema1ConvertToSchema2(t *testing.T) {
 
 	byHandJSON, err := os.ReadFile("fixtures/schema1-to-schema2.json")
 	require.NoError(t, err)
-	var converted, byHand map[string]interface{}
+	var converted, byHand map[string]any
 	err = json.Unmarshal(byHandJSON, &byHand)
 	require.NoError(t, err)
 	err = json.Unmarshal(convertedJSON, &converted)
@@ -479,8 +479,8 @@ func TestManifestSchema1ConvertToSchema2(t *testing.T) {
 
 	byHandConfig, err := os.ReadFile("fixtures/schema1-to-schema2-config.json")
 	require.NoError(t, err)
-	converted = map[string]interface{}{}
-	byHand = map[string]interface{}{}
+	converted = map[string]any{}
+	byHand = map[string]any{}
 	err = json.Unmarshal(byHandConfig, &byHand)
 	require.NoError(t, err)
 	err = json.Unmarshal(convertedConfig, &converted)
@@ -558,7 +558,7 @@ func TestManifestSchema1ConvertToManifestOCI1(t *testing.T) {
 
 	byHandJSON, err := os.ReadFile("fixtures/schema1-to-oci1.json")
 	require.NoError(t, err)
-	var converted, byHand map[string]interface{}
+	var converted, byHand map[string]any
 	err = json.Unmarshal(byHandJSON, &byHand)
 	require.NoError(t, err)
 	err = json.Unmarshal(convertedJSON, &converted)
@@ -572,8 +572,8 @@ func TestManifestSchema1ConvertToManifestOCI1(t *testing.T) {
 
 	byHandConfig, err := os.ReadFile("fixtures/schema1-to-oci1-config.json")
 	require.NoError(t, err)
-	converted = map[string]interface{}{}
-	byHand = map[string]interface{}{}
+	converted = map[string]any{}
+	byHand = map[string]any{}
 	err = json.Unmarshal(byHandConfig, &byHand)
 	require.NoError(t, err)
 	err = json.Unmarshal(convertedConfig, &converted)

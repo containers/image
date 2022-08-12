@@ -119,7 +119,7 @@ func (w *Writer) writeLegacyMetadataLocked(layerDescriptors []manifest.Schema2De
 	lastLayerID := ""
 	for i, l := range layerDescriptors {
 		// The legacy format requires a config file per layer
-		layerConfig := make(map[string]interface{})
+		layerConfig := make(map[string]any)
 
 		// The root layer doesn't have any parent
 		if lastLayerID != "" {
@@ -334,7 +334,7 @@ func (t *tarFI) ModTime() time.Time {
 func (t *tarFI) IsDir() bool {
 	return false
 }
-func (t *tarFI) Sys() interface{} {
+func (t *tarFI) Sys() any {
 	return nil
 }
 

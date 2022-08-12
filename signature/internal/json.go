@@ -22,7 +22,7 @@ func (err JSONFormatError) Error() string {
 //
 // The fieldResolver approach is useful for decoding the Policy.Transports map; using it for structs is a bit lazy,
 // we could use reflection to automate this. Later?
-func ParanoidUnmarshalJSONObject(data []byte, fieldResolver func(string) interface{}) error {
+func ParanoidUnmarshalJSONObject(data []byte, fieldResolver func(string) any) error {
 	seenKeys := set.New[string]()
 
 	dec := json.NewDecoder(bytes.NewReader(data))
@@ -70,9 +70,9 @@ func ParanoidUnmarshalJSONObject(data []byte, fieldResolver func(string) interfa
 // ParanoidUnmarshalJSONObjectExactFields unmarshals data as a JSON object, but failing on the slightest unexpected aspect
 // (including duplicated keys, unrecognized keys, and non-matching types). Each of the fields in exactFields
 // must be present exactly once, and none other fields are accepted.
-func ParanoidUnmarshalJSONObjectExactFields(data []byte, exactFields map[string]interface{}) error {
+func ParanoidUnmarshalJSONObjectExactFields(data []byte, exactFields map[string]any) error {
 	seenKeys := set.New[string]()
-	if err := ParanoidUnmarshalJSONObject(data, func(key string) interface{} {
+	if err := ParanoidUnmarshalJSONObject(data, func(key string) any {
 		if valuePtr, ok := exactFields[key]; ok {
 			seenKeys.Add(key)
 			return valuePtr

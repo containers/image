@@ -23,8 +23,8 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 		name              string
 		response          string
 		errorString       string
-		errorType         interface{}                   // A value of the same type as the expected error, or nil
-		unwrappedErrorPtr interface{}                   // A pointer to a value expected to be reachable using errors.As, or nil
+		errorType         any                           // A value of the same type as the expected error, or nil
+		unwrappedErrorPtr any                           // A pointer to a value expected to be reachable using errors.As, or nil
 		errorCode         *errcode.ErrorCode            // A matching ErrorCode, or nil
 		fn                func(t *testing.T, err error) // A more specialized test, or nil
 	}{

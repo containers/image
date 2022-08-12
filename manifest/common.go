@@ -34,17 +34,17 @@ func validateUnambiguousManifestFormat(manifest []byte, expectedMIMEType string,
 	if allowed >= allowedFieldFirstUnusedBit {
 		return fmt.Errorf("internal error: invalid allowedManifestFields value %#v", allowed)
 	}
-	// Use a private type to decode, not just a map[string]interface{}, because we want
+	// Use a private type to decode, not just a map[string]any, because we want
 	// to also reject case-insensitive matches (which would be used by Go when really decoding
 	// the manifest).
 	// (It is expected that as manifest formats are added or extended over time, more fields will be added
 	// here.)
 	detectedFields := struct {
-		Config    interface{} `json:"config"`
-		FSLayers  interface{} `json:"fsLayers"`
-		History   interface{} `json:"history"`
-		Layers    interface{} `json:"layers"`
-		Manifests interface{} `json:"manifests"`
+		Config    any `json:"config"`
+		FSLayers  any `json:"fsLayers"`
+		History   any `json:"history"`
+		Layers    any `json:"layers"`
+		Manifests any `json:"manifests"`
 	}{}
 	if err := json.Unmarshal(manifest, &detectedFields); err != nil {
 		// The caller was supposed to already validate version numbers, so this should not happen;
