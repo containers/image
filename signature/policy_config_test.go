@@ -310,17 +310,17 @@ func addExtraJSONMember(t *testing.T, encoded []byte, name string, extra any) []
 
 // policyJSONUnmarshallerTests formalizes the repeated structure of the JSON unmarshaller
 // tests in this file, and allows sharing the test implementation.
-type policyJSONUmarshallerTests struct {
-	newDest         func() json.Unmarshaler           // Create a new json.Unmarshaler to test against
-	newValidObject  func() (interface{}, error)       // A function that generates a valid object, used as a base for other tests
-	otherJSONParser func([]byte) (interface{}, error) // Another function that must accept the result of encoding validObject
-	invalidObjects  []mSA                             // mSA values that are invalid for this unmarshaller; a simpler alternative to breakFns
-	breakFns        []func(mSA)                       // Functions that edit a mSA from newValidObject() to make it invalid
-	duplicateFields []string                          // Names of fields in the return value of newValidObject() that should not be duplicated
+type policyJSONUmarshallerTests[T any] struct {
+	newDest         func() json.Unmarshaler // Create a new json.Unmarshaler to test against
+	newValidObject  func() (T, error)       // A function that generates a valid object, used as a base for other tests
+	otherJSONParser func([]byte) (T, error) // Another function that must accept the result of encoding validObject
+	invalidObjects  []mSA                   // mSA values that are invalid for this unmarshaller; a simpler alternative to breakFns
+	breakFns        []func(mSA)             // Functions that edit a mSA from newValidObject() to make it invalid
+	duplicateFields []string                // Names of fields in the return value of newValidObject() that should not be duplicated
 }
 
 // validObjectAndJSON returns an object created by d.newValidObject() and its JSON representation.
-func (d policyJSONUmarshallerTests) validObjectAndJSON(t *testing.T) (interface{}, []byte) {
+func (d policyJSONUmarshallerTests[T]) validObjectAndJSON(t *testing.T) (T, []byte) {
 	validObject, err := d.newValidObject()
 	require.NoError(t, err)
 	validJSON, err := json.Marshal(validObject)
@@ -328,7 +328,7 @@ func (d policyJSONUmarshallerTests) validObjectAndJSON(t *testing.T) (interface{
 	return validObject, validJSON
 }
 
-func (d policyJSONUmarshallerTests) run(t *testing.T) {
+func (d policyJSONUmarshallerTests[T]) run(t *testing.T) {
 	dest := d.newDest()
 	testInvalidJSONInput(t, dest)
 
@@ -408,9 +408,9 @@ func xNewPRSignedByKeyData(keyType sbKeyType, keyData []byte, signedIdentity Pol
 }
 
 func TestPolicyUnmarshalJSON(t *testing.T) {
-	tests := policyJSONUmarshallerTests{
+	tests := policyJSONUmarshallerTests[*Policy]{
 		newDest: func() json.Unmarshaler { return &Policy{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (*Policy, error) {
 			return &Policy{
 				Default: []PolicyRequirement{
 					xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("abc"), NewPRMMatchRepoDigestOrExact()),
@@ -595,9 +595,9 @@ func TestPolicyTransportScopesWithTransportUnmarshalJSON(t *testing.T) {
 }
 
 func TestPolicyRequirementsUnmarshalJSON(t *testing.T) {
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[*PolicyRequirements]{
 		newDest: func() json.Unmarshaler { return &PolicyRequirements{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (*PolicyRequirements, error) {
 			return &PolicyRequirements{
 				xNewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("def"), NewPRMMatchRepoDigestOrExact()),
 				xNewPRSignedByKeyData(SBKeyTypeSignedByGPGKeys, []byte("RH"), NewPRMMatchRepository()),
@@ -665,14 +665,12 @@ func TestNewPRInsecureAcceptAnything(t *testing.T) {
 }
 
 func TestPRInsecureAcceptAnythingUnmarshalJSON(t *testing.T) {
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyRequirement]{
 		newDest: func() json.Unmarshaler { return &prInsecureAcceptAnything{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyRequirement, error) {
 			return NewPRInsecureAcceptAnything(), nil
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyRequirementFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyRequirementFromJSON,
 		invalidObjects: []mSA{
 			// Missing "type" field
 			{},
@@ -697,14 +695,12 @@ func TestNewPRReject(t *testing.T) {
 }
 
 func TestPRRejectUnmarshalJSON(t *testing.T) {
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyRequirement]{
 		newDest: func() json.Unmarshaler { return &prReject{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyRequirement, error) {
 			return NewPRReject(), nil
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyRequirementFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyRequirementFromJSON,
 		invalidObjects: []mSA{
 			// Missing "type" field
 			{},
@@ -825,14 +821,12 @@ func tryUnmarshalModifiedSignedBy(t *testing.T, pr *prSignedBy, validJSON []byte
 }
 
 func TestPRSignedByUnmarshalJSON(t *testing.T) {
-	keyDataTests := policyJSONUmarshallerTests{
+	keyDataTests := policyJSONUmarshallerTests[PolicyRequirement]{
 		newDest: func() json.Unmarshaler { return &prSignedBy{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyRequirement, error) {
 			return NewPRSignedByKeyData(SBKeyTypeGPGKeys, []byte("abc"), NewPRMMatchRepoDigestOrExact())
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyRequirementFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyRequirementFromJSON,
 		breakFns: []func(mSA){
 			// The "type" field is missing
 			func(v mSA) { delete(v, "type") },
@@ -870,25 +864,21 @@ func TestPRSignedByUnmarshalJSON(t *testing.T) {
 	}
 	keyDataTests.run(t)
 	// Test the keyPath-specific aspects
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyRequirement]{
 		newDest: func() json.Unmarshaler { return &prSignedBy{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyRequirement, error) {
 			return NewPRSignedByKeyPath(SBKeyTypeGPGKeys, "/foo/bar", NewPRMMatchRepoDigestOrExact())
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyRequirementFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyRequirementFromJSON,
 		duplicateFields: []string{"type", "keyType", "keyPath", "signedIdentity"},
 	}.run(t)
 	// Test the keyPaths-specific aspects
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyRequirement]{
 		newDest: func() json.Unmarshaler { return &prSignedBy{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyRequirement, error) {
 			return NewPRSignedByKeyPaths(SBKeyTypeGPGKeys, []string{"/1", "/2"}, NewPRMMatchRepoDigestOrExact())
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyRequirementFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyRequirementFromJSON,
 		duplicateFields: []string{"type", "keyType", "keyPaths", "signedIdentity"},
 	}.run(t)
 
@@ -993,16 +983,14 @@ func TestNewPRSignedBaseLayer(t *testing.T) {
 }
 
 func TestPRSignedBaseLayerUnmarshalJSON(t *testing.T) {
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyRequirement]{
 		newDest: func() json.Unmarshaler { return &prSignedBaseLayer{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyRequirement, error) {
 			baseIdentity, err := NewPRMExactReference("registry.access.redhat.com/rhel7/rhel:7.2.3")
 			require.NoError(t, err)
 			return NewPRSignedBaseLayer(baseIdentity)
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyRequirementFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyRequirementFromJSON,
 		breakFns: []func(mSA){
 			// The "type" field is missing
 			func(v mSA) { delete(v, "type") },
@@ -1061,14 +1049,12 @@ func TestNewPRMMatchExact(t *testing.T) {
 }
 
 func TestPRMMatchExactUnmarshalJSON(t *testing.T) {
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyReferenceMatch]{
 		newDest: func() json.Unmarshaler { return &prmMatchExact{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyReferenceMatch, error) {
 			return NewPRMMatchExact(), nil
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyReferenceMatchFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyReferenceMatchFromJSON,
 		invalidObjects: []mSA{
 			// Missing "type" field
 			{},
@@ -1093,14 +1079,12 @@ func TestNewPRMMatchRepoDigestOrExact(t *testing.T) {
 }
 
 func TestPRMMatchRepoDigestOrExactUnmarshalJSON(t *testing.T) {
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyReferenceMatch]{
 		newDest: func() json.Unmarshaler { return &prmMatchRepoDigestOrExact{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyReferenceMatch, error) {
 			return NewPRMMatchRepoDigestOrExact(), nil
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyReferenceMatchFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyReferenceMatchFromJSON,
 		invalidObjects: []mSA{
 			// Missing "type" field
 			{},
@@ -1125,14 +1109,12 @@ func TestNewPRMMatchRepository(t *testing.T) {
 }
 
 func TestPRMMatchRepositoryUnmarshalJSON(t *testing.T) {
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyReferenceMatch]{
 		newDest: func() json.Unmarshaler { return &prmMatchRepository{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyReferenceMatch, error) {
 			return NewPRMMatchRepository(), nil
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyReferenceMatchFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyReferenceMatchFromJSON,
 		invalidObjects: []mSA{
 			// Missing "type" field
 			{},
@@ -1183,14 +1165,12 @@ func TestNewPRMExactReference(t *testing.T) {
 }
 
 func TestPRMExactReferenceUnmarshalJSON(t *testing.T) {
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyReferenceMatch]{
 		newDest: func() json.Unmarshaler { return &prmExactReference{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyReferenceMatch, error) {
 			return NewPRMExactReference("library/busybox:latest")
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyReferenceMatchFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyReferenceMatchFromJSON,
 		breakFns: []func(mSA){
 			// The "type" field is missing
 			func(v mSA) { delete(v, "type") },
@@ -1239,14 +1219,12 @@ func TestNewPRMExactRepository(t *testing.T) {
 }
 
 func TestPRMExactRepositoryUnmarshalJSON(t *testing.T) {
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyReferenceMatch]{
 		newDest: func() json.Unmarshaler { return &prmExactRepository{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyReferenceMatch, error) {
 			return NewPRMExactRepository("library/busybox:latest")
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyReferenceMatchFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyReferenceMatchFromJSON,
 		breakFns: []func(mSA){
 			// The "type" field is missing
 			func(v mSA) { delete(v, "type") },
@@ -1333,14 +1311,12 @@ func TestNewPRMRemapIdentity(t *testing.T) {
 }
 
 func TestPRMRemapIdentityUnmarshalJSON(t *testing.T) {
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyReferenceMatch]{
 		newDest: func() json.Unmarshaler { return &prmRemapIdentity{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyReferenceMatch, error) {
 			return NewPRMRemapIdentity("example.com/docker-library", "docker.io/library")
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyReferenceMatchFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyReferenceMatchFromJSON,
 		breakFns: []func(mSA){
 			// The "type" field is missing
 			func(v mSA) { delete(v, "type") },

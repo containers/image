@@ -234,14 +234,12 @@ func tryUnmarshalModifiedSigstoreSigned(t *testing.T, pr *prSigstoreSigned, vali
 }
 
 func TestPRSigstoreSignedUnmarshalJSON(t *testing.T) {
-	keyDataTests := policyJSONUmarshallerTests{
+	keyDataTests := policyJSONUmarshallerTests[PolicyRequirement]{
 		newDest: func() json.Unmarshaler { return &prSigstoreSigned{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyRequirement, error) {
 			return NewPRSigstoreSignedKeyData([]byte("abc"), NewPRMMatchRepoDigestOrExact())
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyRequirementFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyRequirementFromJSON,
 		breakFns: []func(mSA){
 			// The "type" field is missing
 			func(v mSA) { delete(v, "type") },
@@ -291,14 +289,12 @@ func TestPRSigstoreSignedUnmarshalJSON(t *testing.T) {
 	}
 	keyDataTests.run(t)
 	// Test keyPath-specific duplicate fields
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyRequirement]{
 		newDest: func() json.Unmarshaler { return &prSigstoreSigned{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyRequirement, error) {
 			return NewPRSigstoreSignedKeyPath("/foo/bar", NewPRMMatchRepoDigestOrExact())
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyRequirementFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyRequirementFromJSON,
 		duplicateFields: []string{"type", "keyPath", "signedIdentity"},
 	}.run(t)
 	// Test Fulcio and rekorPublicKeyPath duplicate fields
@@ -308,33 +304,29 @@ func TestPRSigstoreSignedUnmarshalJSON(t *testing.T) {
 		PRSigstoreSignedFulcioWithSubjectEmail("mitr@redhat.com"),
 	)
 	require.NoError(t, err)
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyRequirement]{
 		newDest: func() json.Unmarshaler { return &prSigstoreSigned{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyRequirement, error) {
 			return NewPRSigstoreSigned(
 				PRSigstoreSignedWithFulcio(testFulcio),
 				PRSigstoreSignedWithRekorPublicKeyPath("/foo/rekor"),
 				PRSigstoreSignedWithSignedIdentity(NewPRMMatchRepoDigestOrExact()),
 			)
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyRequirementFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyRequirementFromJSON,
 		duplicateFields: []string{"type", "fulcio", "rekorPublicKeyPath", "signedIdentity"},
 	}.run(t)
 	// Test rekorPublicKeyData duplicate fields
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyRequirement]{
 		newDest: func() json.Unmarshaler { return &prSigstoreSigned{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyRequirement, error) {
 			return NewPRSigstoreSigned(
 				PRSigstoreSignedWithKeyPath("/foo/bar"),
 				PRSigstoreSignedWithRekorPublicKeyData([]byte("foo")),
 				PRSigstoreSignedWithSignedIdentity(NewPRMMatchRepoDigestOrExact()),
 			)
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyRequirementFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyRequirementFromJSON,
 		duplicateFields: []string{"type", "keyPath", "rekorPublicKeyData", "signedIdentity"},
 	}.run(t)
 
@@ -459,9 +451,9 @@ func TestNewPRSigstoreSignedFulcio(t *testing.T) {
 }
 
 func TestPRSigstoreSignedFulcioUnmarshalJSON(t *testing.T) {
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PRSigstoreSignedFulcio]{
 		newDest: func() json.Unmarshaler { return &prSigstoreSignedFulcio{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PRSigstoreSignedFulcio, error) {
 			return NewPRSigstoreSignedFulcio(
 				PRSigstoreSignedFulcioWithCAPath("fixtures/fulcio_v1.crt.pem"),
 				PRSigstoreSignedFulcioWithOIDCIssuer("https://github.com/login/oauth"),
@@ -490,9 +482,9 @@ func TestPRSigstoreSignedFulcioUnmarshalJSON(t *testing.T) {
 		duplicateFields: []string{"caPath", "oidcIssuer", "subjectEmail"},
 	}.run(t)
 	// Test caData specifics
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PRSigstoreSignedFulcio]{
 		newDest: func() json.Unmarshaler { return &prSigstoreSignedFulcio{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PRSigstoreSignedFulcio, error) {
 			return NewPRSigstoreSignedFulcio(
 				PRSigstoreSignedFulcioWithCAData([]byte("abc")),
 				PRSigstoreSignedFulcioWithOIDCIssuer("https://github.com/login/oauth"),
