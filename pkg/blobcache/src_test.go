@@ -3,7 +3,6 @@ package blobcache
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"testing"
 
 	"github.com/containers/image/v5/internal/private"
@@ -17,7 +16,7 @@ func readNextStream(streams chan io.ReadCloser, errs chan error) ([]byte, error)
 			return nil, nil
 		}
 		defer r.Close()
-		return ioutil.ReadAll(r)
+		return io.ReadAll(r)
 	case err := <-errs:
 		return nil, err
 	}
