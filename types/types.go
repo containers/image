@@ -471,7 +471,7 @@ type ImageInspectInfo struct {
 	Author        string
 }
 
-//ImageInspectLayer is a set of metadata describing an image layers' detail
+// ImageInspectLayer is a set of metadata describing an image layers' detail
 type ImageInspectLayer struct {
 	MIMEType    string // "" if unknown.
 	Digest      digest.Digest
