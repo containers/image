@@ -466,7 +466,17 @@ type ImageInspectInfo struct {
 	Variant       string
 	Os            string
 	Layers        []string
+	LayersData    []ImageInspectLayer
 	Env           []string
+	Author        string
+}
+
+//ImageInspectLayer is a set of metadata describing an image layers' detail
+type ImageInspectLayer struct {
+	MIMEType    string // "" if unknown.
+	Digest      digest.Digest
+	Size        int64 // -1 if unknown.
+	Annotations map[string]string
 }
 
 // DockerAuthConfig contains authorization information for connecting to a registry.
