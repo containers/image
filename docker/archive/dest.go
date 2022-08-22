@@ -68,6 +68,7 @@ func (d *archiveImageDestination) Close() error {
 // - Uploaded data MAY be visible to others before Commit() is called
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 func (d *archiveImageDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {
+	d.writer.imageCommitted()
 	if d.closeWriter {
 		// We could do this only in .Close(), but failures in .Close() are much more likely to be
 		// ignored by callers that use defer. So, in single-image destinations, try to complete

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	"github.com/containers/image/v5/docker/internal/tarfile"
 	"github.com/containers/image/v5/docker/reference"
@@ -13,9 +14,14 @@ import (
 
 // Writer manages a single in-progress Docker archive and allows adding images to it.
 type Writer struct {
-	path    string // The original, user-specified path; not the maintained temporary file, if any
-	archive *tarfile.Writer
-	writer  io.Closer
+	path        string // The original, user-specified path; not the maintained temporary file, if any
+	regularFile bool   // path refers to a regular file (e.g. not a pipe)
+	archive     *tarfile.Writer
+	writer      io.Closer
+
+	// The following state can only be acccessed with the mutex held.
+	mutex     sync.Mutex
+	hadCommit bool // At least one successful commit has happened
 }
 
 // NewWriter returns a Writer for path.
@@ -36,12 +42,13 @@ func NewWriter(sys *types.SystemContext, path string) (*Writer, error) {
 			fh.Close()
 		}
 	}()
+
 	fhStat, err := fh.Stat()
 	if err != nil {
 		return nil, fmt.Errorf("statting file %q: %w", path, err)
 	}
-
-	if fhStat.Mode().IsRegular() && fhStat.Size() != 0 {
+	regularFile := fhStat.Mode().IsRegular()
+	if regularFile && fhStat.Size() != 0 {
 		return nil, errors.New("docker-archive doesn't support modifying existing images")
 	}
 
@@ -49,10 +56,19 @@ func NewWriter(sys *types.SystemContext, path string) (*Writer, error) {
 
 	succeeded = true
 	return &Writer{
-		path:    path,
-		archive: archive,
-		writer:  fh,
+		path:        path,
+		regularFile: regularFile,
+		archive:     archive,
+		writer:      fh,
+		hadCommit:   false,
 	}, nil
+}
+
+// imageCommitted notifies the Writer that at least one image was successfully commited to the stream.
+func (w *Writer) imageCommitted() {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+	w.hadCommit = true
 }
 
 // Close writes all outstanding data about images to the archive, and
@@ -62,6 +78,20 @@ func (w *Writer) Close() error {
 	err := w.archive.Close()
 	if err2 := w.writer.Close(); err2 != nil && err == nil {
 		err = err2
+	}
+	if err == nil && w.regularFile && !w.hadCommit {
+		// Writing to the destination never had a success; delete the destination if we created it.
+		// This is done primarily because we don’t implement adding another image to a pre-existing image, so if we
+		// left a partial archive around (notably because reading from the _source_ has failed), we couldn’t retry without
+		// the caller manually deleting the partial archive. So, delete it instead.
+		//
+		// Archives with at least one successfully created image are left around; they might still be valuable.
+		//
+		// Note a corner case: If there _originally_ was an empty file (which is not a valid archive anyway), this deletes it.
+		// Ideally, if w.regularFile, we should write the full contents to a temporary file and use os.Rename here, only on success.
+		if err2 := os.Remove(w.path); err2 != nil {
+			err = err2
+		}
 	}
 	return err
 }
