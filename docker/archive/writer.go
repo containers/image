@@ -21,39 +21,6 @@ type Writer struct {
 // NewWriter returns a Writer for path.
 // The caller should call .Close() on the returned object.
 func NewWriter(sys *types.SystemContext, path string) (*Writer, error) {
-	fh, err := openArchiveForWriting(path)
-	if err != nil {
-		return nil, err
-	}
-	archive := tarfile.NewWriter(fh)
-
-	return &Writer{
-		path:    path,
-		archive: archive,
-		writer:  fh,
-	}, nil
-}
-
-// Close writes all outstanding data about images to the archive, and
-// releases state associated with the Writer, if any.
-// No more images can be added after this is called.
-func (w *Writer) Close() error {
-	err := w.archive.Close()
-	if err2 := w.writer.Close(); err2 != nil && err == nil {
-		err = err2
-	}
-	return err
-}
-
-// NewReference returns an ImageReference that allows adding an image to Writer,
-// with an optional reference.
-func (w *Writer) NewReference(destinationRef reference.NamedTagged) (types.ImageReference, error) {
-	return newReference(w.path, destinationRef, -1, nil, w)
-}
-
-// openArchiveForWriting opens path for writing a tar archive,
-// making a few sanity checks.
-func openArchiveForWriting(path string) (*os.File, error) {
 	// path can be either a pipe or a regular file
 	// in the case of a pipe, we require that we can open it for write
 	// in the case of a regular file, we don't want to overwrite any pre-existing file
@@ -78,6 +45,29 @@ func openArchiveForWriting(path string) (*os.File, error) {
 		return nil, errors.New("docker-archive doesn't support modifying existing images")
 	}
 
+	archive := tarfile.NewWriter(fh)
+
 	succeeded = true
-	return fh, nil
+	return &Writer{
+		path:    path,
+		archive: archive,
+		writer:  fh,
+	}, nil
+}
+
+// Close writes all outstanding data about images to the archive, and
+// releases state associated with the Writer, if any.
+// No more images can be added after this is called.
+func (w *Writer) Close() error {
+	err := w.archive.Close()
+	if err2 := w.writer.Close(); err2 != nil && err == nil {
+		err = err2
+	}
+	return err
+}
+
+// NewReference returns an ImageReference that allows adding an image to Writer,
+// with an optional reference.
+func (w *Writer) NewReference(destinationRef reference.NamedTagged) (types.ImageReference, error) {
+	return newReference(w.path, destinationRef, -1, nil, w)
 }
