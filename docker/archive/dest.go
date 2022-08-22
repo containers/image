@@ -3,7 +3,6 @@ package archive
 import (
 	"context"
 	"fmt"
-	"io"
 
 	"github.com/containers/image/v5/docker/internal/tarfile"
 	"github.com/containers/image/v5/internal/private"
@@ -13,9 +12,8 @@ import (
 type archiveImageDestination struct {
 	*tarfile.Destination // Implements most of types.ImageDestination
 	ref                  archiveReference
-	archive              *tarfile.Writer // Should be closed if closeWriter
+	writer               *Writer // Should be closed if closeWriter
 	closeWriter          bool
-	file                 io.Closer // File owned uniquely by this archiveImageDestination; nil if !closeWriter
 }
 
 func newImageDestination(sys *types.SystemContext, ref archiveReference) (private.ImageDestination, error) {
@@ -23,33 +21,28 @@ func newImageDestination(sys *types.SystemContext, ref archiveReference) (privat
 		return nil, fmt.Errorf("Destination reference must not contain a manifest index @%d", ref.sourceIndex)
 	}
 
-	var archive *tarfile.Writer
+	var writer *Writer
 	var closeWriter bool
-	var file io.Closer
-	if ref.archiveWriter != nil {
-		archive = ref.archiveWriter
+	if ref.writer != nil {
+		writer = ref.writer
 		closeWriter = false
-		file = nil
 	} else {
-		fh, err := openArchiveForWriting(ref.path)
+		w, err := NewWriter(sys, ref.path)
 		if err != nil {
 			return nil, err
 		}
-
-		archive = tarfile.NewWriter(fh)
+		writer = w
 		closeWriter = true
-		file = fh
 	}
-	tarDest := tarfile.NewDestination(sys, archive, ref.Transport().Name(), ref.ref)
+	tarDest := tarfile.NewDestination(sys, writer.archive, ref.Transport().Name(), ref.ref)
 	if sys != nil && sys.DockerArchiveAdditionalTags != nil {
 		tarDest.AddRepoTags(sys.DockerArchiveAdditionalTags)
 	}
 	return &archiveImageDestination{
 		Destination: tarDest,
 		ref:         ref,
-		archive:     archive,
+		writer:      writer,
 		closeWriter: closeWriter,
-		file:        file,
 	}, nil
 }
 
@@ -62,7 +55,7 @@ func (d *archiveImageDestination) Reference() types.ImageReference {
 // Close removes resources associated with an initialized ImageDestination, if any.
 func (d *archiveImageDestination) Close() error {
 	if d.closeWriter {
-		return d.file.Close()
+		return d.writer.Close()
 	}
 	return nil
 }
@@ -76,7 +69,13 @@ func (d *archiveImageDestination) Close() error {
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 func (d *archiveImageDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {
 	if d.closeWriter {
-		return d.archive.Close()
+		// We could do this only in .Close(), but failures in .Close() are much more likely to be
+		// ignored by callers that use defer. So, in single-image destinations, try to complete
+		// the archive here.
+		// But if Commit() is never called, let .Close() clean up.
+		err := d.writer.Close()
+		d.closeWriter = false
+		return err
 	}
 	return nil
 }
