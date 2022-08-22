@@ -13,8 +13,8 @@ import (
 type archiveImageDestination struct {
 	*tarfile.Destination // Implements most of types.ImageDestination
 	ref                  archiveReference
-	archive              *tarfile.Writer // Should only be closed if writer != nil
-	writer               io.Closer       // May be nil if the archive is shared
+	archive              *tarfile.Writer // Should only be closed if file != nil
+	file                 io.Closer       // File owned uniquely by this archiveImageDestination; nil if the archive is shared
 }
 
 func newImageDestination(sys *types.SystemContext, ref archiveReference) (private.ImageDestination, error) {
@@ -23,10 +23,10 @@ func newImageDestination(sys *types.SystemContext, ref archiveReference) (privat
 	}
 
 	var archive *tarfile.Writer
-	var writer io.Closer
+	var file io.Closer
 	if ref.archiveWriter != nil {
 		archive = ref.archiveWriter
-		writer = nil
+		file = nil
 	} else {
 		fh, err := openArchiveForWriting(ref.path)
 		if err != nil {
@@ -34,7 +34,7 @@ func newImageDestination(sys *types.SystemContext, ref archiveReference) (privat
 		}
 
 		archive = tarfile.NewWriter(fh)
-		writer = fh
+		file = fh
 	}
 	tarDest := tarfile.NewDestination(sys, archive, ref.Transport().Name(), ref.ref)
 	if sys != nil && sys.DockerArchiveAdditionalTags != nil {
@@ -44,7 +44,7 @@ func newImageDestination(sys *types.SystemContext, ref archiveReference) (privat
 		Destination: tarDest,
 		ref:         ref,
 		archive:     archive,
-		writer:      writer,
+		file:        file,
 	}, nil
 }
 
@@ -56,8 +56,8 @@ func (d *archiveImageDestination) Reference() types.ImageReference {
 
 // Close removes resources associated with an initialized ImageDestination, if any.
 func (d *archiveImageDestination) Close() error {
-	if d.writer != nil {
-		return d.writer.Close()
+	if d.file != nil {
+		return d.file.Close()
 	}
 	return nil
 }
@@ -70,7 +70,7 @@ func (d *archiveImageDestination) Close() error {
 // - Uploaded data MAY be visible to others before Commit() is called
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 func (d *archiveImageDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {
-	if d.writer != nil {
+	if d.file != nil {
 		return d.archive.Close()
 	}
 	return nil
