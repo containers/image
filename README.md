@@ -57,10 +57,16 @@ or use the build tags described below to avoid the dependencies (e.g. using `go 
 
 ### Supported build tags
 
-- `containers_image_openpgp`: Use a Golang-only OpenPGP implementation for signature verification instead of the default cgo/gpgme-based implementation;
-the primary downside is that creating new signatures with the Golang-only implementation is not supported.
+Additional features:
+
 - `containers_image_ostree`: Import `ostree:` transport in `github.com/containers/image/transports/alltransports`. This builds the library requiring the `libostree` development libraries. Otherwise a stub which reports that the transport is not supported gets used. The `github.com/containers/image/ostree` package is completely disabled
 and impossible to import when this build tag is not in use.
+
+Unsupported / untested / not-recommended flags:
+
+- `containers_image_openpgp`: Use a Golang-only OpenPGP implementation for signature verification instead of the default cgo/gpgme-based implementation;
+the primary downside is that creating new signatures with the Golang-only implementation is not supported.
+- `containers_image_disable_signing`: do not compile in any signing implementation. Compiles a stub which returns an error indicating that signing is disabled.
 
 ## [Contributing](CONTRIBUTING.md)
 

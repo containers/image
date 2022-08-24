@@ -1,3 +1,6 @@
+//go:build cgo || containers_image_openpgp
+// +build cgo containers_image_openpgp
+
 package signature
 
 import (

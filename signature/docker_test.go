@@ -1,3 +1,6 @@
+//go:build cgo || containers_image_openpgp
+// +build cgo containers_image_openpgp
+
 package signature
 
 import (
@@ -7,6 +10,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	testGPGHomeDirectory = "./fixtures"
 )
 
 // Kill the running gpg-agent to drop unlocked keys. This allows for testing handling of invalid passphrases.

@@ -1,5 +1,5 @@
-//go:build !containers_image_openpgp && cgo
-// +build !containers_image_openpgp,cgo
+//go:build !containers_image_openpgp && !containers_image_disable_signing && cgo
+// +build !containers_image_openpgp,!containers_image_disable_signing,cgo
 
 package signature
 
