@@ -29,7 +29,7 @@ require (
 	github.com/theupdateframework/go-tuf v0.3.1
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbatts/tar-split v0.11.2
-	github.com/vbauerster/mpb/v7 v7.4.2
+	github.com/vbauerster/mpb/v7 v7.5.2
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa
