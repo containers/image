@@ -313,8 +313,14 @@ func CheckAuth(ctx context.Context, sys *types.SystemContext, username, password
 		return err
 	}
 	defer resp.Body.Close()
-
-	return httpResponseToError(resp, "")
+	if resp.StatusCode != http.StatusOK {
+		err := registryHTTPResponseToError(resp)
+		if resp.StatusCode == http.StatusUnauthorized {
+			err = ErrUnauthorizedForCredentials{Err: err}
+		}
+		return err
+	}
+	return nil
 }
 
 // SearchResult holds the information of each matching image
@@ -411,7 +417,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			err := httpResponseToError(resp, "")
+			err := registryHTTPResponseToError(resp)
 			logrus.Errorf("error getting search results from v2 endpoint %q: %v", registry, err)
 			return nil, fmt.Errorf("couldn't search registry %q: %w", registry, err)
 		}
@@ -816,7 +822,7 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 		defer resp.Body.Close()
 		logrus.Debugf("Ping %s status %d", url.Redacted(), resp.StatusCode)
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
-			return httpResponseToError(resp, "")
+			return registryHTTPResponseToError(resp)
 		}
 		c.challenges = parseAuthHeader(resp.Header)
 		c.scheme = scheme
@@ -956,9 +962,10 @@ func (c *dockerClient) getBlob(ctx context.Context, ref dockerReference, info ty
 	if err != nil {
 		return nil, 0, err
 	}
-	if err := httpResponseToError(res, "Error fetching blob"); err != nil {
+	if res.StatusCode != http.StatusOK {
+		err := registryHTTPResponseToError(res)
 		res.Body.Close()
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("fetching blob: %w", err)
 	}
 	cache.RecordKnownLocation(ref.Transport(), bicTransportScope(ref), info.Digest, newBICLocationReference(ref))
 	return res.Body, getBlobSize(res), nil

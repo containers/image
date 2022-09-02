@@ -376,12 +376,9 @@ func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, 
 		res.Body.Close()
 		return nil, nil, private.BadPartialRequestError{Status: res.Status}
 	default:
-		err := httpResponseToError(res, "Error fetching partial blob")
-		if err == nil {
-			err = fmt.Errorf("invalid status code returned when fetching blob %d (%s)", res.StatusCode, http.StatusText(res.StatusCode))
-		}
+		err := registryHTTPResponseToError(res)
 		res.Body.Close()
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("fetching partial blob: %w", err)
 	}
 }
 
@@ -622,16 +619,16 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 		return err
 	}
 	defer get.Body.Close()
-	manifestBody, err := iolimits.ReadAtMost(get.Body, iolimits.MaxManifestBodySize)
-	if err != nil {
-		return err
-	}
 	switch get.StatusCode {
 	case http.StatusOK:
 	case http.StatusNotFound:
 		return fmt.Errorf("Unable to delete %v. Image may not exist or is not stored with a v2 Schema in a v2 registry", ref.ref)
 	default:
-		return fmt.Errorf("Failed to delete %v: %s (%v)", ref.ref, manifestBody, get.Status)
+		return fmt.Errorf("deleting %v: %w", ref.ref, registryHTTPResponseToError(get))
+	}
+	manifestBody, err := iolimits.ReadAtMost(get.Body, iolimits.MaxManifestBodySize)
+	if err != nil {
+		return err
 	}
 
 	manifestDigest, err := manifest.Digest(manifestBody)
@@ -647,13 +644,8 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 		return err
 	}
 	defer delete.Body.Close()
-
-	body, err := iolimits.ReadAtMost(delete.Body, iolimits.MaxErrorBodySize)
-	if err != nil {
-		return err
-	}
 	if delete.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("Failed to delete %v: %s (%v)", deletePath, string(body), delete.Status)
+		return fmt.Errorf("deleting %v: %w", ref.ref, registryHTTPResponseToError(delete))
 	}
 
 	for i := 0; ; i++ {
