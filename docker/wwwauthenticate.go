@@ -71,7 +71,7 @@ func parseAuthHeader(header http.Header) []challenge {
 	return challenges
 }
 
-/// parses an authentication scope string of the form `$resource:$remote:$actions`
+// parseAuthScope parses an authentication scope string of the form `$resource:$remote:$actions`
 func parseAuthScope(scopeStr string) (*authScope, error) {
 	if parts := strings.Split(scopeStr, ":"); len(parts) == 3 {
 		return &authScope{
