@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/docker/distribution/registry/api/errcode"
+	v2 "github.com/docker/distribution/registry/api/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,8 +21,10 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 		name              string
 		response          string
 		errorString       string
-		errorType         interface{} // A value of the same type as the expected error, or nil
-		unwrappedErrorPtr interface{} // A pointer to a value expected to be reachable using errors.As, or nil
+		errorType         interface{}                   // A value of the same type as the expected error, or nil
+		unwrappedErrorPtr interface{}                   // A pointer to a value expected to be reachable using errors.As, or nil
+		errorCode         *errcode.ErrorCode            // A matching ErrorCode, or nil
+		fn                func(t *testing.T, err error) // A more specialized test, or nil
 	}{
 		{
 			name: "HTTP status out of registry error range",
@@ -51,6 +54,7 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 			errorString:       "unauthorized: authentication required",
 			errorType:         errcode.Error{},
 			unwrappedErrorPtr: nil,
+			errorCode:         &errcode.ErrorCodeUnauthorized,
 		},
 		{ // docker.io when an image is not found
 			name: "GET https://registry-1.docker.io/v2/library/this-does-not-exist/manifests/latest",
@@ -67,6 +71,7 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 			errorString:       "denied: requested access to the resource is denied",
 			errorType:         errcode.Error{},
 			unwrappedErrorPtr: nil,
+			errorCode:         &errcode.ErrorCodeDenied,
 		},
 		{ // docker.io when a tag is not found
 			name: "GET https://registry-1.docker.io/v2/library/busybox/manifests/this-does-not-exist",
@@ -84,6 +89,7 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 			errorString:       "manifest unknown: manifest unknown",
 			errorType:         errcode.Error{},
 			unwrappedErrorPtr: nil,
+			errorCode:         &v2.ErrorCodeManifestUnknown,
 		},
 		{ // public.ecr.aws does not implement tag list
 			name: "GET https://public.ecr.aws/v2/nginx/nginx/tags/list",
@@ -98,6 +104,17 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 			errorString:       "unknown: 404 page not found",
 			errorType:         errcode.Error{},
 			unwrappedErrorPtr: nil,
+			errorCode:         &errcode.ErrorCodeUnknown,
+			fn: func(t *testing.T, err error) {
+				var e errcode.Error
+				ok := errors.As(err, &e)
+				require.True(t, ok)
+				assert.Equal(t, errcode.Error{
+					Code:    errcode.ErrorCodeUnknown, // The NOT_FOUND value is not defined, and turns into Unknown
+					Message: "404 page not found",
+					Detail:  nil,
+				}, e)
+			},
 		},
 	} {
 		res, err := http.ReadResponse(bufio.NewReader(bytes.NewReader([]byte(c.response))), nil)
@@ -111,6 +128,15 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 		if c.unwrappedErrorPtr != nil {
 			found := errors.As(err, c.unwrappedErrorPtr)
 			assert.True(t, found, c.name)
+		}
+		if c.errorCode != nil {
+			var ec errcode.ErrorCoder
+			ok := errors.As(err, &ec)
+			require.True(t, ok, c.name)
+			assert.Equal(t, *c.errorCode, ec.ErrorCode(), c.name)
+		}
+		if c.fn != nil {
+			c.fn(t, err)
 		}
 	}
 }
