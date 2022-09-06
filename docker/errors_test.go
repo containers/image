@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/docker/distribution/registry/api/errcode"
-	"github.com/docker/distribution/registry/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +30,7 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"\r\n" +
 				"Body of the request\r\n",
 			errorString: "received unexpected HTTP status: 333 HTTP status out of range",
-			errorType:   &client.UnexpectedHTTPStatusError{},
+			errorType:   &unexpectedHTTPStatusError{},
 		},
 		{
 			name: "HTTP body not in expected format",
