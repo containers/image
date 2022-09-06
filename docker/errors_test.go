@@ -89,15 +89,14 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 			name: "GET https://public.ecr.aws/v2/nginx/nginx/tags/list",
 			response: "HTTP/1.1 404 Not Found\r\n" +
 				"Connection: close\r\n" +
-				"Content-Length: 19\r\n" +
-				"Content-Type: text/plain; charset=utf-8\r\n" +
-				"Date: Thu, 12 Aug 2021 19:54:58 GMT\r\n" +
+				"Content-Length: 65\r\n" +
+				"Content-Type: application/json; charset=utf-8\r\n" +
+				"Date: Tue, 06 Sep 2022 21:19:02 GMT\r\n" +
 				"Docker-Distribution-Api-Version: registry/2.0\r\n" +
-				"X-Content-Type-Options: nosniff\r\n" +
 				"\r\n" +
-				"404 page not found\n",
-			errorString:       "StatusCode: 404, 404 page not found\n",
-			errorType:         nil,
+				"{\"errors\":[{\"code\":\"NOT_FOUND\",\"message\":\"404 page not found\"}]}\r\n",
+			errorString:       "unknown: 404 page not found",
+			errorType:         errcode.Errors{},
 			unwrappedErrorPtr: nil,
 		},
 	} {
