@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/containers/image/v5/manifest"
@@ -27,9 +28,9 @@ func TestSourcePrepareLayerData(t *testing.T) {
 		ctx := context.Background()
 
 		writer := NewWriter(&tarfileBuffer)
-		dest := NewDestination(nil, writer, nil)
+		dest := NewDestination(nil, writer, "transport name", nil)
 		// No layers
-		configInfo, err := dest.PutBlob(ctx, bytes.NewBufferString(c.config),
+		configInfo, err := dest.PutBlob(ctx, strings.NewReader(c.config),
 			types.BlobInfo{Size: -1}, cache, true)
 		require.NoError(t, err, c.config)
 		manifest, err := manifest.Schema2FromComponents(
@@ -46,7 +47,7 @@ func TestSourcePrepareLayerData(t *testing.T) {
 
 		reader, err := NewReaderFromStream(nil, &tarfileBuffer)
 		require.NoError(t, err, c.config)
-		src := NewSource(reader, true, nil, -1)
+		src := NewSource(reader, true, "transport name", nil, -1)
 		require.NoError(t, err, c.config)
 		defer src.Close()
 		configStream, _, err := src.GetBlob(ctx, types.BlobInfo{

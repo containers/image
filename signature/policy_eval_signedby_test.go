@@ -8,21 +8,23 @@ import (
 
 	"github.com/containers/image/v5/directory"
 	"github.com/containers/image/v5/docker/reference"
-	"github.com/containers/image/v5/image"
+	"github.com/containers/image/v5/internal/image"
+	"github.com/containers/image/v5/internal/imagesource"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// dirImageMock returns a types.UnparsedImage for a directory, claiming a specified dockerReference.
-func dirImageMock(t *testing.T, dir, dockerReference string) types.UnparsedImage {
+// dirImageMock returns a private.UnparsedImage for a directory, claiming a specified dockerReference.
+func dirImageMock(t *testing.T, dir, dockerReference string) private.UnparsedImage {
 	ref, err := reference.ParseNormalizedNamed(dockerReference)
 	require.NoError(t, err)
-	return dirImageMockWithRef(t, dir, refImageReferenceMock{ref})
+	return dirImageMockWithRef(t, dir, refImageReferenceMock{ref: ref})
 }
 
-// dirImageMockWithRef returns a types.UnparsedImage for a directory, claiming a specified ref.
-func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) types.UnparsedImage {
+// dirImageMockWithRef returns a private.UnparsedImage for a directory, claiming a specified ref.
+func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) private.UnparsedImage {
 	srcRef, err := directory.NewReference(dir)
 	require.NoError(t, err)
 	src, err := srcRef.NewImageSource(context.Background(), nil)
@@ -32,14 +34,14 @@ func dirImageMockWithRef(t *testing.T, dir string, ref types.ImageReference) typ
 		require.NoError(t, err)
 	})
 	return image.UnparsedInstance(&dirImageSourceMock{
-		ImageSource: src,
+		ImageSource: imagesource.FromPublic(src),
 		ref:         ref,
 	}, nil)
 }
 
 // dirImageSourceMock inherits dirImageSource, but overrides its Reference method.
 type dirImageSourceMock struct {
-	types.ImageSource
+	private.ImageSource
 	ref types.ImageReference
 }
 
@@ -53,25 +55,33 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	testImage := dirImageMock(t, "fixtures/dir-img-valid", "testing/manifest:latest")
 	testImageSig, err := os.ReadFile("fixtures/dir-img-valid/signature-1")
 	require.NoError(t, err)
-
-	// Successful validation, with KeyData and KeyPath
-	pr, err := NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
-	require.NoError(t, err)
-	sar, parsedSig, err := pr.isSignatureAuthorAccepted(context.Background(), testImage, testImageSig)
-	assertSARAccepted(t, sar, parsedSig, err, Signature{
-		DockerManifestDigest: TestImageManifestDigest,
-		DockerReference:      "testing/manifest:latest",
-	})
-
 	keyData, err := os.ReadFile("fixtures/public-key.gpg")
 	require.NoError(t, err)
-	pr, err = NewPRSignedByKeyData(ktGPG, keyData, prm)
-	require.NoError(t, err)
-	sar, parsedSig, err = pr.isSignatureAuthorAccepted(context.Background(), testImage, testImageSig)
-	assertSARAccepted(t, sar, parsedSig, err, Signature{
-		DockerManifestDigest: TestImageManifestDigest,
-		DockerReference:      "testing/manifest:latest",
-	})
+
+	// Successful validation, with KeyPath, KeyPaths and KeyData.
+	for _, fn := range []func() (PolicyRequirement, error){
+		func() (PolicyRequirement, error) {
+			return NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", prm)
+		},
+		// Test the files in both orders, to make sure the correct public keys accepted in either position.
+		func() (PolicyRequirement, error) {
+			return NewPRSignedByKeyPaths(ktGPG, []string{"fixtures/public-key-1.gpg", "fixtures/public-key-1.gpg"}, prm)
+		},
+		func() (PolicyRequirement, error) {
+			return NewPRSignedByKeyPaths(ktGPG, []string{"fixtures/public-key-2.gpg", "fixtures/public-key-1.gpg"}, prm)
+		},
+		func() (PolicyRequirement, error) {
+			return NewPRSignedByKeyData(ktGPG, keyData, prm)
+		},
+	} {
+		pr, err := fn()
+		require.NoError(t, err)
+		sar, parsedSig, err := pr.isSignatureAuthorAccepted(context.Background(), testImage, testImageSig)
+		assertSARAccepted(t, sar, parsedSig, err, Signature{
+			DockerManifestDigest: TestImageManifestDigest,
+			DockerReference:      "testing/manifest:latest",
+		})
+	}
 
 	// Unimplemented and invalid KeyType values
 	for _, keyType := range []sbKeyType{SBKeyTypeSignedByGPGKeys,
@@ -82,7 +92,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 		// Do not use NewPRSignedByKeyData, because it would reject invalid values.
 		pr := &prSignedBy{
 			KeyType:        keyType,
-			KeyData:        []byte("abc"),
+			KeyData:        keyData,
 			SignedIdentity: prm,
 		}
 		// Pass nil pointers to, kind of, test that the return value does not depend on the parameters.
@@ -90,31 +100,49 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 		assertSARRejected(t, sar, parsedSig, err)
 	}
 
-	// Both KeyPath and KeyData set. Do not use NewPRSignedBy*, because it would reject this.
-	prSB := &prSignedBy{
-		KeyType:        ktGPG,
-		KeyPath:        "/foo/bar",
-		KeyData:        []byte("abc"),
-		SignedIdentity: prm,
+	// Invalid KeyPath/KeyPaths/KeyData combinations.
+	for _, fn := range []func() (PolicyRequirement, error){
+		// Two or more of KeyPath, KeyPaths and KeyData set. Do not use NewPRSignedBy*, because it would reject this.
+		func() (PolicyRequirement, error) {
+			return &prSignedBy{KeyType: ktGPG, KeyPath: "fixtures/public-key.gpg", KeyPaths: []string{"fixtures/public-key-1.gpg", "fixtures/public-key-2.gpg"}, KeyData: keyData, SignedIdentity: prm}, nil
+		},
+		func() (PolicyRequirement, error) {
+			return &prSignedBy{KeyType: ktGPG, KeyPath: "fixtures/public-key.gpg", KeyPaths: []string{"fixtures/public-key-1.gpg", "fixtures/public-key-2.gpg"}, SignedIdentity: prm}, nil
+		},
+		func() (PolicyRequirement, error) {
+			return &prSignedBy{KeyType: ktGPG, KeyPath: "fixtures/public-key.gpg", KeyData: keyData, SignedIdentity: prm}, nil
+		},
+		func() (PolicyRequirement, error) {
+			return &prSignedBy{KeyType: ktGPG, KeyPaths: []string{"fixtures/public-key-1.gpg", "fixtures/public-key-2.gpg"}, KeyData: keyData, SignedIdentity: prm}, nil
+		},
+		// None of KeyPath, KeyPaths and KeyData set. Do not use NewPRSignedBy*, because it would reject this.
+		func() (PolicyRequirement, error) {
+			return &prSignedBy{KeyType: ktGPG, SignedIdentity: prm}, nil
+		},
+		func() (PolicyRequirement, error) { // Invalid KeyPath
+			return NewPRSignedByKeyPath(ktGPG, "/this/does/not/exist", prm)
+		},
+		func() (PolicyRequirement, error) { // Invalid KeyPaths
+			return NewPRSignedByKeyPaths(ktGPG, []string{"/this/does/not/exist"}, prm)
+		},
+		func() (PolicyRequirement, error) { // One of the KeyPaths is invalid
+			return NewPRSignedByKeyPaths(ktGPG, []string{"fixtures/public-key.gpg", "/this/does/not/exist"}, prm)
+		},
+	} {
+		pr, err := fn()
+		require.NoError(t, err)
+		// Pass nil pointers to, kind of, test that the return value does not depend on the parameters.
+		sar, parsedSig, err := pr.isSignatureAuthorAccepted(context.Background(), nil, nil)
+		assertSARRejected(t, sar, parsedSig, err)
 	}
-	// Pass nil pointers to, kind of, test that the return value does not depend on the parameters.
-	sar, parsedSig, err = prSB.isSignatureAuthorAccepted(context.Background(), nil, nil)
-	assertSARRejected(t, sar, parsedSig, err)
-
-	// Invalid KeyPath
-	pr, err = NewPRSignedByKeyPath(ktGPG, "/this/does/not/exist", prm)
-	require.NoError(t, err)
-	// Pass nil pointers to, kind of, test that the return value does not depend on the parameters.
-	sar, parsedSig, err = pr.isSignatureAuthorAccepted(context.Background(), nil, nil)
-	assertSARRejected(t, sar, parsedSig, err)
 
 	// Errors initializing the temporary GPG directory and mechanism are not obviously easy to reach.
 
 	// KeyData has no public keys.
-	pr, err = NewPRSignedByKeyData(ktGPG, []byte{}, prm)
+	pr, err := NewPRSignedByKeyData(ktGPG, []byte{}, prm)
 	require.NoError(t, err)
 	// Pass nil pointers to, kind of, test that the return value does not depend on the parameters.
-	sar, parsedSig, err = pr.isSignatureAuthorAccepted(context.Background(), nil, nil)
+	sar, parsedSig, err := pr.isSignatureAuthorAccepted(context.Background(), nil, nil)
 	assertSARRejectedPolicyRequirement(t, sar, parsedSig, err)
 
 	// A signature which does not GPG verify

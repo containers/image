@@ -9,6 +9,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -30,7 +31,6 @@ import (
 	"github.com/containers/storage/pkg/ioutils"
 	"github.com/containers/storage/pkg/reexec"
 	ddigest "github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -39,6 +39,7 @@ var (
 	_ types.ImageDestination   = &storageImageDestination{}
 	_ private.ImageDestination = (*storageImageDestination)(nil)
 	_ types.ImageSource        = &storageImageSource{}
+	_ private.ImageSource      = (*storageImageSource)(nil)
 	_ types.ImageReference     = &storageReference{}
 	_ types.ImageTransport     = &storageTransport{}
 )
@@ -389,16 +390,16 @@ func TestWriteRead(t *testing.T) {
 			t.Fatalf("Error saving randomly-generated layer to destination: %v", err)
 		}
 		t.Logf("Wrote randomly-generated layer %q (%d/%d bytes) to destination", digest, size, decompressedSize)
-		if _, err := dest.PutBlob(context.Background(), bytes.NewBufferString(config), configInfo, cache, false); err != nil {
+		if _, err := dest.PutBlob(context.Background(), strings.NewReader(config), configInfo, cache, false); err != nil {
 			t.Fatalf("Error saving config to destination: %v", err)
 		}
-		manifest := strings.Replace(manifestFmt, "%lh", digest.String(), -1)
-		manifest = strings.Replace(manifest, "%ch", configInfo.Digest.String(), -1)
-		manifest = strings.Replace(manifest, "%ls", fmt.Sprintf("%d", size), -1)
-		manifest = strings.Replace(manifest, "%cs", fmt.Sprintf("%d", configInfo.Size), -1)
+		manifest := strings.ReplaceAll(manifestFmt, "%lh", digest.String())
+		manifest = strings.ReplaceAll(manifest, "%ch", configInfo.Digest.String())
+		manifest = strings.ReplaceAll(manifest, "%ls", fmt.Sprintf("%d", size))
+		manifest = strings.ReplaceAll(manifest, "%cs", fmt.Sprintf("%d", configInfo.Size))
 		li := digest.Hex()
-		manifest = strings.Replace(manifest, "%li", li, -1)
-		manifest = strings.Replace(manifest, "%ci", sum.Hex(), -1)
+		manifest = strings.ReplaceAll(manifest, "%li", li)
+		manifest = strings.ReplaceAll(manifest, "%ci", sum.Hex())
 		t.Logf("this manifest is %q", manifest)
 		if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
 			t.Fatalf("Error saving manifest to destination: %v", err)
@@ -728,7 +729,7 @@ func TestDuplicateID(t *testing.T) {
 		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
 		signatures:     nil,
 	}
-	if err := dest.Commit(context.Background(), &unparsedToplevel); errors.Cause(err) != storage.ErrDuplicateID {
+	if err := dest.Commit(context.Background(), &unparsedToplevel); !errors.Is(err, storage.ErrDuplicateID) {
 		if err != nil {
 			t.Fatalf("Wrong error committing changes to destination, second pass: %v", err)
 		}
@@ -830,7 +831,7 @@ func TestDuplicateNameID(t *testing.T) {
 		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
 		signatures:     nil,
 	}
-	if err := dest.Commit(context.Background(), &unparsedToplevel); errors.Cause(err) != storage.ErrDuplicateID {
+	if err := dest.Commit(context.Background(), &unparsedToplevel); !errors.Is(err, storage.ErrDuplicateID) {
 		if err != nil {
 			t.Fatalf("Wrong error committing changes to destination, second pass: %v", err)
 		}
@@ -908,7 +909,7 @@ func TestSize(t *testing.T) {
 	if dest == nil {
 		t.Fatalf("NewImageDestination(%q) returned no destination", ref.StringWithinTransport())
 	}
-	if _, err := dest.PutBlob(context.Background(), bytes.NewBufferString(config), configInfo, cache, false); err != nil {
+	if _, err := dest.PutBlob(context.Background(), strings.NewReader(config), configInfo, cache, false); err != nil {
 		t.Fatalf("Error saving config to destination: %v", err)
 	}
 	digest1, usize1, size1, blob := makeLayer(t, archive.Gzip)

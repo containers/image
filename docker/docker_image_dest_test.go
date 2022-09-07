@@ -6,9 +6,12 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/containers/image/v5/internal/private"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var _ private.ImageDestination = (*dockerImageDestination)(nil)
 
 func TestIsManifestInvalidError(t *testing.T) {
 	// Sadly only a smoke test; this really should record all known errors exactly as they happen.

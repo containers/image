@@ -39,7 +39,7 @@ func TestDockerImageSourceReference(t *testing.T) {
 	require.NoError(t, err)
 	registry := registryURL.Host
 
-	mirrorConfiguration := strings.Replace(
+	mirrorConfiguration := strings.ReplaceAll(
 		`[[registry]]
 prefix = "primary-override.example.com"
 location = "@REGISTRY@/primary-override"
@@ -49,7 +49,7 @@ location = "with-mirror.example.com"
 
 [[registry.mirror]]
 location = "@REGISTRY@/with-mirror"
-`, "@REGISTRY@", registry, -1)
+`, "@REGISTRY@", registry)
 	registriesConf, err := os.CreateTemp("", "docker-image-src")
 	require.NoError(t, err)
 	defer registriesConf.Close()
@@ -182,4 +182,31 @@ func TestHandle206Response(t *testing.T) {
 		{[]byte(nil), nil},
 	}
 	verifyGetBlobAtOutput(t, streams, errs, expected)
+}
+
+func TestParseMediaType(t *testing.T) {
+	mediaType, params, err := parseMediaType("multipart/byteranges; boundary=CloudFront:3F750DE0752BEDE3882F7DBE80010D31")
+	require.NoError(t, err)
+	assert.Equal(t, mediaType, "multipart/byteranges")
+	assert.Equal(t, params["boundary"], "CloudFront:3F750DE0752BEDE3882F7DBE80010D31")
+
+	mediaType, params, err = parseMediaType("multipart/byteranges; boundary=00000000000061573284")
+	require.NoError(t, err)
+	assert.Equal(t, mediaType, "multipart/byteranges")
+	assert.Equal(t, params["boundary"], "00000000000061573284")
+
+	mediaType, params, err = parseMediaType("multipart/byteranges; foo=bar; bar=baz")
+	require.NoError(t, err)
+	assert.Equal(t, mediaType, "multipart/byteranges")
+	assert.Equal(t, params["foo"], "bar")
+	assert.Equal(t, params["bar"], "baz")
+
+	// quoted symbols '@'
+	_, params, err = parseMediaType("multipart/byteranges; boundary=\"@:\"")
+	require.NoError(t, err)
+	assert.Equal(t, params["boundary"], "@:")
+
+	// unquoted '@'
+	_, _, err = parseMediaType("multipart/byteranges; boundary=@")
+	require.Error(t, err)
 }

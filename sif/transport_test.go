@@ -72,7 +72,8 @@ func testNewReference(t *testing.T, fn func(string) (types.ImageReference, error
 
 // refToTempFile creates a temporary file and returns a reference to it.
 // The caller should
-//   defer os.Remove(tmpFile)
+//
+//	defer os.Remove(tmpFile)
 func refToTempFile(t *testing.T) (ref types.ImageReference, tmpDir string) {
 	f, err := os.CreateTemp("", "sif-transport-test")
 	require.NoError(t, err)

@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +16,8 @@ import (
 
 	cp "github.com/containers/image/v5/copy"
 	"github.com/containers/image/v5/directory"
-	"github.com/containers/image/v5/image"
+	"github.com/containers/image/v5/internal/image"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/pkg/blobinfocache/none"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/types"
@@ -22,8 +25,15 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+)
+
+var (
+	_ types.ImageReference     = &BlobCache{}
+	_ types.ImageSource        = &blobCacheSource{}
+	_ private.ImageSource      = (*blobCacheSource)(nil)
+	_ types.ImageDestination   = &blobCacheDestination{}
+	_ private.ImageDestination = (*blobCacheDestination)(nil)
 )
 
 func TestMain(m *testing.M) {
@@ -221,7 +231,7 @@ func TestBlobCache(t *testing.T) {
 				if err == nil {
 					t.Fatalf("expected an error copying the image, but got success")
 				} else {
-					if os.IsNotExist(errors.Cause(err)) {
+					if errors.Is(err, fs.ErrNotExist) {
 						t.Logf("ok: got expected does-not-exist error copying the image with blobs missing: %v", err)
 					} else {
 						t.Logf("got an error copying the image with missing blobs, but not sure which error: %v", err)

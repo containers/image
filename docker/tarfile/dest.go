@@ -26,7 +26,7 @@ func NewDestination(dest io.Writer, ref reference.NamedTagged) *Destination {
 func NewDestinationWithContext(sys *types.SystemContext, dest io.Writer, ref reference.NamedTagged) *Destination {
 	archive := internal.NewWriter(dest)
 	return &Destination{
-		internal: internal.NewDestination(sys, archive, ref),
+		internal: internal.NewDestination(sys, archive, "[An external docker/tarfile caller]", ref),
 		archive:  archive,
 	}
 }

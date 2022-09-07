@@ -3,19 +3,22 @@ package layout
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/pkg/blobinfocache/memory"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var _ private.ImageDestination = (*ociImageDestination)(nil)
 
 // readerFromFunc allows implementing Reader by any function, e.g. a closure.
 type readerFromFunc func([]byte) (int, error)
@@ -50,7 +53,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 			}
 			return len(p), nil
 		}
-		return 0, errors.Errorf(digestErrorString)
+		return 0, errors.New(digestErrorString)
 	})
 
 	dest, err := ref.NewImageDestination(context.Background(), nil)
@@ -129,7 +132,7 @@ func TestPutTwoDifferentTags(t *testing.T) {
 }
 
 func putTestConfig(t *testing.T, ociRef ociReference, tmpDir string) {
-	data, err := os.ReadFile("../../image/fixtures/oci1-config.json")
+	data, err := os.ReadFile("../../internal/image/fixtures/oci1-config.json")
 	assert.NoError(t, err)
 	imageDest, err := newImageDestination(nil, ociRef)
 	assert.NoError(t, err)
@@ -154,7 +157,7 @@ func putTestConfig(t *testing.T, ociRef ociReference, tmpDir string) {
 }
 
 func putTestManifest(t *testing.T, ociRef ociReference, tmpDir string) {
-	data, err := os.ReadFile("../../image/fixtures/oci1.json")
+	data, err := os.ReadFile("../../internal/image/fixtures/oci1.json")
 	assert.NoError(t, err)
 	imageDest, err := newImageDestination(nil, ociRef)
 	assert.NoError(t, err)

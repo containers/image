@@ -3,13 +3,13 @@ package signature
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/containers/image/v5/directory"
 	"github.com/containers/image/v5/docker"
-	"github.com/pkg/errors"
 
 	// this import is needed  where we use the "atomic" transport in TestPolicyUnmarshalJSON
 	_ "github.com/containers/image/v5/openshift"
@@ -17,6 +17,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type mSI map[string]interface{} // To minimize typing the long name
+
+// A short-hand way to get a JSON object field value or panic. No error handling done, we know
+// what we are working with, a panic in a test is good enough, and fitting test cases on a single line
+// is a priority.
+func x(m mSI, fields ...string) mSI {
+	for _, field := range fields {
+		// Not .(mSI) because type assertion of an unnamed type to a named type always fails (the types
+		// are not "identical"), but the assignment is fine because they are "assignable".
+		m = m[field].(map[string]interface{})
+	}
+	return m
+}
 
 // policyFixtureContents is a data structure equal to the contents of "fixtures/policy.json"
 var policyFixtureContents = &Policy{
@@ -56,6 +70,11 @@ var policyFixtureContents = &Policy{
 					"/keys/RH-key-signing-key-gpg-keyring",
 					NewPRMMatchRepoDigestOrExact()),
 			},
+			"registry.redhat.io/beta": {
+				xNewPRSignedByKeyPaths(SBKeyTypeGPGKeys,
+					[]string{"/keys/RH-production-signing-key-gpg-keyring", "/keys/RH-beta-signing-key-gpg-keyring"},
+					newPRMMatchRepoDigestOrExact()),
+			},
 			"private-mirror:5000/vendor-mirror": {
 				xNewPRSignedByKeyPath(SBKeyTypeGPGKeys,
 					"/keys/vendor-gpg-keyring",
@@ -83,6 +102,14 @@ var policyFixtureContents = &Policy{
 			},
 			"bogus/signed-identity-example": {
 				xNewPRSignedBaseLayer(xNewPRMExactReference("registry.access.redhat.com/rhel7/rhel:latest")),
+			},
+			"example.com/sigstore/key-data-example": {
+				xNewPRSigstoreSignedKeyData([]byte("nonsense"),
+					NewPRMMatchRepoDigestOrExact()),
+			},
+			"example.com/sigstore/key-path-example": {
+				xNewPRSigstoreSignedKeyPath("/keys/public-key",
+					NewPRMMatchRepository()),
 			},
 		},
 	},
@@ -207,7 +234,8 @@ func TestNewPolicyFromFile(t *testing.T) {
 	// A failure case; most are tested in the individual method unit tests.
 	_, err = NewPolicyFromFile("/dev/null")
 	require.Error(t, err)
-	assert.IsType(t, InvalidPolicyFormatError(""), errors.Cause(err))
+	var formatError InvalidPolicyFormatError
+	assert.ErrorAs(t, err, &formatError)
 }
 
 func TestNewPolicyFromBytes(t *testing.T) {
@@ -320,15 +348,17 @@ func (d policyJSONUmarshallerTests) run(t *testing.T) {
 		assertJSONUnmarshalFromObjectFails(t, invalid, dest)
 	}
 	// Various ways to corrupt the JSON
-	for _, fn := range d.breakFns {
-		var tmp mSI
-		err := json.Unmarshal(validJSON, &tmp)
-		require.NoError(t, err)
+	for index, fn := range d.breakFns {
+		t.Run(fmt.Sprintf("breakFns[%d]", index), func(t *testing.T) {
+			var tmp mSI
+			err := json.Unmarshal(validJSON, &tmp)
+			require.NoError(t, err)
 
-		fn(tmp)
+			fn(tmp)
 
-		dest := d.newDest()
-		assertJSONUnmarshalFromObjectFails(t, tmp, dest)
+			dest := d.newDest()
+			assertJSONUnmarshalFromObjectFails(t, tmp, dest)
+		})
 	}
 
 	// Duplicated fields
@@ -350,6 +380,15 @@ func xNewPRSignedByKeyPath(keyType sbKeyType, keyPath string, signedIdentity Pol
 	pr, err := NewPRSignedByKeyPath(keyType, keyPath, signedIdentity)
 	if err != nil {
 		panic("xNewPRSignedByKeyPath failed")
+	}
+	return pr
+}
+
+// xNewPRSignedByKeyPaths is like NewPRSignedByKeyPaths, except it must not fail.
+func xNewPRSignedByKeyPaths(keyType sbKeyType, keyPaths []string, signedIdentity PolicyReferenceMatch) PolicyRequirement {
+	pr, err := NewPRSignedByKeyPaths(keyType, keyPaths, signedIdentity)
+	if err != nil {
+		panic("xNewPRSignedByKeyPaths failed")
 	}
 	return pr
 }
@@ -683,41 +722,62 @@ func TestPRRejectUnmarshalJSON(t *testing.T) {
 
 func TestNewPRSignedBy(t *testing.T) {
 	const testPath = "/foo/bar"
+	testPaths := []string{"/path/1", "/path/2"}
 	testData := []byte("abc")
 	testIdentity := NewPRMMatchRepoDigestOrExact()
 
 	// Success
-	pr, err := newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, testIdentity)
+	pr, err := newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, nil, testIdentity)
 	require.NoError(t, err)
 	assert.Equal(t, &prSignedBy{
 		prCommon:       prCommon{prTypeSignedBy},
 		KeyType:        SBKeyTypeGPGKeys,
 		KeyPath:        testPath,
+		KeyPaths:       nil,
 		KeyData:        nil,
 		SignedIdentity: testIdentity,
 	}, pr)
-	pr, err = newPRSignedBy(SBKeyTypeGPGKeys, "", testData, testIdentity)
+	pr, err = newPRSignedBy(SBKeyTypeGPGKeys, "", testPaths, nil, testIdentity)
 	require.NoError(t, err)
 	assert.Equal(t, &prSignedBy{
 		prCommon:       prCommon{prTypeSignedBy},
 		KeyType:        SBKeyTypeGPGKeys,
 		KeyPath:        "",
+		KeyPaths:       testPaths,
+		KeyData:        nil,
+		SignedIdentity: testIdentity,
+	}, pr)
+	pr, err = newPRSignedBy(SBKeyTypeGPGKeys, "", nil, testData, testIdentity)
+	require.NoError(t, err)
+	assert.Equal(t, &prSignedBy{
+		prCommon:       prCommon{prTypeSignedBy},
+		KeyType:        SBKeyTypeGPGKeys,
+		KeyPath:        "",
+		KeyPaths:       nil,
 		KeyData:        testData,
 		SignedIdentity: testIdentity,
 	}, pr)
 
 	// Invalid keyType
-	_, err = newPRSignedBy(sbKeyType(""), testPath, nil, testIdentity)
+	_, err = newPRSignedBy(sbKeyType(""), testPath, nil, nil, testIdentity)
 	assert.Error(t, err)
-	_, err = newPRSignedBy(sbKeyType("this is invalid"), testPath, nil, testIdentity)
+	_, err = newPRSignedBy(sbKeyType("this is invalid"), testPath, nil, nil, testIdentity)
 	assert.Error(t, err)
 
-	// Both keyPath and keyData specified
-	_, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, testData, testIdentity)
+	// Invalid keyPath/keyPaths/keyData combinations
+	_, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, testPaths, testData, testIdentity)
+	assert.Error(t, err)
+	_, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, testPaths, nil, testIdentity)
+	assert.Error(t, err)
+	_, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, testData, testIdentity)
+	assert.Error(t, err)
+	_, err = newPRSignedBy(SBKeyTypeGPGKeys, "", testPaths, testData, testIdentity)
+	assert.Error(t, err)
+	_, err = newPRSignedBy(SBKeyTypeGPGKeys, "", nil, nil, testIdentity)
 	assert.Error(t, err)
 
 	// Invalid signedIdentity
-	_, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, nil)
+	_, err = newPRSignedBy(SBKeyTypeGPGKeys, testPath, nil, nil, nil)
 	assert.Error(t, err)
 }
 
@@ -728,6 +788,16 @@ func TestNewPRSignedByKeyPath(t *testing.T) {
 	pr, ok := _pr.(*prSignedBy)
 	require.True(t, ok)
 	assert.Equal(t, testPath, pr.KeyPath)
+	// Failure cases tested in TestNewPRSignedBy.
+}
+
+func TestNewPRSignedByKeyPaths(t *testing.T) {
+	testPaths := []string{"/path/1", "/path/2"}
+	_pr, err := NewPRSignedByKeyPaths(SBKeyTypeGPGKeys, testPaths, NewPRMMatchRepoDigestOrExact())
+	require.NoError(t, err)
+	pr, ok := _pr.(*prSignedBy)
+	require.True(t, ok)
+	assert.Equal(t, testPaths, pr.KeyPaths)
 	// Failure cases tested in TestNewPRSignedBy.
 }
 
@@ -774,13 +844,19 @@ func TestPRSignedByUnmarshalJSON(t *testing.T) {
 			func(v mSI) { delete(v, "keyType") },
 			// Invalid "keyType" field
 			func(v mSI) { v["keyType"] = "this is invalid" },
-			// Both "keyPath" and "keyData" is missing
+			// All three of "keyPath", "keyPaths" and "keyData" are missing
 			func(v mSI) { delete(v, "keyData") },
-			// Both "keyPath" and "keyData" is present
+			// All three of "keyPath", "keyPaths" and "keyData" are present
+			func(v mSI) { v["keyPath"] = "/foo/bar"; v["keyPaths"] = []string{"/1", "/2"} },
+			// Two of "keyPath", "keyPaths" and "keyData" are present
+			func(v mSI) { v["keyPath"] = "/foo/bar"; v["keyPaths"] = []string{"/1", "/2"}; delete(v, "keyData") },
 			func(v mSI) { v["keyPath"] = "/foo/bar" },
+			func(v mSI) { v["keyPaths"] = []string{"/1", "/2"} },
 			// Invalid "keyPath" field
 			func(v mSI) { delete(v, "keyData"); v["keyPath"] = 1 },
-			func(v mSI) { v["type"] = "this is invalid" },
+			// Invalid "keyPaths" field
+			func(v mSI) { delete(v, "keyData"); v["keyPaths"] = 1 },
+			func(v mSI) { delete(v, "keyData"); v["keyPaths"] = []int{1} },
 			// Invalid "keyData" field
 			func(v mSI) { v["keyData"] = 1 },
 			func(v mSI) { v["keyData"] = "this is invalid base64" },
@@ -802,6 +878,17 @@ func TestPRSignedByUnmarshalJSON(t *testing.T) {
 			return newPolicyRequirementFromJSON(validJSON)
 		},
 		duplicateFields: []string{"type", "keyType", "keyPath", "signedIdentity"},
+	}.run(t)
+	// Test the keyPaths-specific aspects
+	policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prSignedBy{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRSignedByKeyPaths(SBKeyTypeGPGKeys, []string{"/1", "/2"}, NewPRMMatchRepoDigestOrExact())
+		},
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyRequirementFromJSON(validJSON)
+		},
+		duplicateFields: []string{"type", "keyType", "keyPaths", "signedIdentity"},
 	}.run(t)
 
 	var pr prSignedBy
@@ -932,6 +1019,164 @@ func TestPRSignedBaseLayerUnmarshalJSON(t *testing.T) {
 		},
 		duplicateFields: []string{"type", "baseLayerIdentity"},
 	}.run(t)
+}
+
+// xNewPRSigstoreSignedKeyPath is like NewPRSigstoreSignedKeyPath, except it must not fail.
+func xNewPRSigstoreSignedKeyPath(keyPath string, signedIdentity PolicyReferenceMatch) PolicyRequirement {
+	pr, err := NewPRSigstoreSignedKeyPath(keyPath, signedIdentity)
+	if err != nil {
+		panic("xNewPRSigstoreSignedKeyPath failed")
+	}
+	return pr
+}
+
+// xNewPRSigstoreSignedKeyData is like NewPRSigstoreSignedKeyData, except it must not fail.
+func xNewPRSigstoreSignedKeyData(keyData []byte, signedIdentity PolicyReferenceMatch) PolicyRequirement {
+	pr, err := NewPRSigstoreSignedKeyData(keyData, signedIdentity)
+	if err != nil {
+		panic("xNewPRSigstoreSignedKeyData failed")
+	}
+	return pr
+}
+
+func TestNewPRSigstoreSigned(t *testing.T) {
+	const testPath = "/foo/bar"
+	testData := []byte("abc")
+	testIdentity := NewPRMMatchRepoDigestOrExact()
+
+	// Success
+	pr, err := newPRSigstoreSigned(testPath, nil, testIdentity)
+	require.NoError(t, err)
+	assert.Equal(t, &prSigstoreSigned{
+		prCommon:       prCommon{prTypeSigstoreSigned},
+		KeyPath:        testPath,
+		KeyData:        nil,
+		SignedIdentity: testIdentity,
+	}, pr)
+	pr, err = newPRSigstoreSigned("", testData, testIdentity)
+	require.NoError(t, err)
+	assert.Equal(t, &prSigstoreSigned{
+		prCommon:       prCommon{prTypeSigstoreSigned},
+		KeyPath:        "",
+		KeyData:        testData,
+		SignedIdentity: testIdentity,
+	}, pr)
+
+	// Both keyPath and keyData specified
+	_, err = newPRSigstoreSigned(testPath, testData, testIdentity)
+	assert.Error(t, err)
+
+	// Invalid signedIdentity
+	_, err = newPRSigstoreSigned(testPath, nil, nil)
+	assert.Error(t, err)
+}
+
+func TestNewPRSigstoreSignedKeyPath(t *testing.T) {
+	const testPath = "/foo/bar"
+	_pr, err := NewPRSigstoreSignedKeyPath(testPath, NewPRMMatchRepoDigestOrExact())
+	require.NoError(t, err)
+	pr, ok := _pr.(*prSigstoreSigned)
+	require.True(t, ok)
+	assert.Equal(t, testPath, pr.KeyPath)
+	// Failure cases tested in TestNewPRSigstoreSigned.
+}
+
+func TestNewPRSigstoreSignedKeyData(t *testing.T) {
+	testData := []byte("abc")
+	_pr, err := NewPRSigstoreSignedKeyData(testData, NewPRMMatchRepoDigestOrExact())
+	require.NoError(t, err)
+	pr, ok := _pr.(*prSigstoreSigned)
+	require.True(t, ok)
+	assert.Equal(t, testData, pr.KeyData)
+	// Failure cases tested in TestNewPRSigstoreSigned.
+}
+
+// Return the result of modifying validJSON with fn and unmarshaling it into *pr
+func tryUnmarshalModifiedSigstoreSigned(t *testing.T, pr *prSigstoreSigned, validJSON []byte, modifyFn func(mSI)) error {
+	var tmp mSI
+	err := json.Unmarshal(validJSON, &tmp)
+	require.NoError(t, err)
+
+	modifyFn(tmp)
+
+	*pr = prSigstoreSigned{}
+	return jsonUnmarshalFromObject(t, tmp, &pr)
+}
+
+func TestPRSigstoreSignedUnmarshalJSON(t *testing.T) {
+	keyDataTests := policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prSigstoreSigned{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRSigstoreSignedKeyData([]byte("abc"), NewPRMMatchRepoDigestOrExact())
+		},
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyRequirementFromJSON(validJSON)
+		},
+		breakFns: []func(mSI){
+			// The "type" field is missing
+			func(v mSI) { delete(v, "type") },
+			// Wrong "type" field
+			func(v mSI) { v["type"] = 1 },
+			func(v mSI) { v["type"] = "this is invalid" },
+			// Extra top-level sub-object
+			func(v mSI) { v["unexpected"] = 1 },
+			// Both "keyPath" and "keyData" is missing
+			func(v mSI) { delete(v, "keyData") },
+			// Both "keyPath" and "keyData" is present
+			func(v mSI) { v["keyPath"] = "/foo/bar" },
+			// Invalid "keyPath" field
+			func(v mSI) { delete(v, "keyData"); v["keyPath"] = 1 },
+			func(v mSI) { v["type"] = "this is invalid" },
+			// Invalid "keyData" field
+			func(v mSI) { v["keyData"] = 1 },
+			func(v mSI) { v["keyData"] = "this is invalid base64" },
+			// Invalid "signedIdentity" field
+			func(v mSI) { v["signedIdentity"] = "this is invalid" },
+			// "signedIdentity" an explicit nil
+			func(v mSI) { v["signedIdentity"] = nil },
+		},
+		duplicateFields: []string{"type", "keyData", "signedIdentity"},
+	}
+	keyDataTests.run(t)
+	// Test the keyPath-specific aspects
+	policyJSONUmarshallerTests{
+		newDest: func() json.Unmarshaler { return &prSigstoreSigned{} },
+		newValidObject: func() (interface{}, error) {
+			return NewPRSigstoreSignedKeyPath("/foo/bar", NewPRMMatchRepoDigestOrExact())
+		},
+		otherJSONParser: func(validJSON []byte) (interface{}, error) {
+			return newPolicyRequirementFromJSON(validJSON)
+		},
+		duplicateFields: []string{"type", "keyPath", "signedIdentity"},
+	}.run(t)
+
+	var pr prSigstoreSigned
+
+	// Start with a valid JSON.
+	_, validJSON := keyDataTests.validObjectAndJSON(t)
+
+	// Various allowed modifications to the requirement
+	allowedModificationFns := []func(mSI){
+		// Delete the signedIdentity field
+		func(v mSI) { delete(v, "signedIdentity") },
+	}
+	for _, fn := range allowedModificationFns {
+		err := tryUnmarshalModifiedSigstoreSigned(t, &pr, validJSON, fn)
+		require.NoError(t, err)
+	}
+
+	// Various ways to set signedIdentity to the default value
+	signedIdentityDefaultFns := []func(mSI){
+		// Set signedIdentity to the default explicitly
+		func(v mSI) { v["signedIdentity"] = NewPRMMatchRepoDigestOrExact() },
+		// Delete the signedIdentity field
+		func(v mSI) { delete(v, "signedIdentity") },
+	}
+	for _, fn := range signedIdentityDefaultFns {
+		err := tryUnmarshalModifiedSigstoreSigned(t, &pr, validJSON, fn)
+		require.NoError(t, err)
+		assert.Equal(t, NewPRMMatchRepoDigestOrExact(), pr.SignedIdentity)
+	}
 }
 
 func TestNewPolicyReferenceMatchFromJSON(t *testing.T) {

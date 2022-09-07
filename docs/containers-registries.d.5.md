@@ -63,25 +63,31 @@ more general scopes is ignored.  For example, if _any_ configuration exists for
 
 ### Built-in Defaults
 
-If no `docker` section can be found for the container image, and no `default-docker` section is configured,
-the default directory, `/var/lib/containers/sigstore` for root and `$HOME/.local/share/containers/sigstore` for unprivileged user,  will be used for reading and writing signatures.
+If no `docker` section can be found for the container image, and no `default-docker` section is configured:
+
+- The default directory, `/var/lib/containers/sigstore` for root and `$HOME/.local/share/containers/sigstore` for unprivileged user,  will be used for reading and writing signatures.
+- Sigstore attachments will not be read/written.
 
 ## Individual Configuration Sections
 
 A single configuration section is selected for a container image using the process
 described above.  The configuration section is a YAML mapping, with the following keys:
 
-- `sigstore-staging` defines an URL of of the signature storage, used for editing it (adding or deleting signatures).
+<!-- `sigstore` and `sigstore-staging` are deprecated and intentionally not documented here. -->
 
-   This key is optional; if it is missing, `sigstore` below is used.
+- `lookaside-staging` defines an URL of of the signature storage, used for editing it (adding or deleting signatures).
 
-- `sigstore` defines an URL of the signature storage.
+   This key is optional; if it is missing, `lookaside` below is used.
+
+- `lookaside` defines an URL of the signature storage.
    This URL is used for reading existing signatures,
-   and if `sigstore-staging` does not exist, also for adding or removing them.
+   and if `lookaside-staging` does not exist, also for adding or removing them.
 
    This key is optional; if it is missing, no signature storage is defined (no signatures
-   are download along with images, adding new signatures is possible only if `sigstore-staging` is defined).
+   are download along with images, adding new signatures is possible only if `lookaside-staging` is defined).
 
+- `use-sigstore-attachments` specifies whether sigstore image attachments (signatures, attestations and the like) are going to be read/written along with the image.
+   If disabled, the images are treated as if no attachments exist; attempts to write attachments fail.
 
 ## Examples
 
@@ -92,11 +98,11 @@ The following demonstrates how to to consume and run images from various registr
 ```yaml
 docker:
     registry.database-supplier.com:
-        sigstore: https://sigstore.database-supplier.com
+        lookaside: https://lookaside.database-supplier.com
     distribution.great-middleware.org:
-        sigstore: https://security-team.great-middleware.org/sigstore
+        lookaside: https://security-team.great-middleware.org/lookaside
     docker.io/web-framework:
-        sigstore: https://sigstore.web-framework.io:8080
+        lookaside: https://lookaside.web-framework.io:8080
 ```
 
 ### Developing and Signing Containers, Staging Signatures
@@ -110,13 +116,13 @@ For developers in `example.com`:
 ```yaml
 docker:
     registry.example.com:
-        sigstore: https://registry-sigstore.example.com
+        lookaside: https://registry-lookaside.example.com
     registry.example.com/mydepartment:
-        sigstore: https://sigstore.mydepartment.example.com
-        sigstore-staging: file:///mnt/mydepartment/sigstore-staging
+        lookaside: https://lookaside.mydepartment.example.com
+        lookaside-staging: file:///mnt/mydepartment/lookaside-staging
     registry.example.com/mydepartment/myproject:mybranch:
-        sigstore: http://localhost:4242/sigstore
-        sigstore-staging: file:///home/useraccount/webroot/sigstore
+        lookaside: http://localhost:4242/lookaside
+        lookaside-staging: file:///home/useraccount/webroot/lookaside
 ```
 
 ### A Global Default
@@ -126,7 +132,7 @@ without listing each domain individually. This is expected to rarely happen, usu
 
 ```yaml
 default-docker:
-    sigstore-staging: file:///mnt/company/common-sigstore-staging
+    lookaside-staging: file:///mnt/company/common-lookaside-staging
 ```
 
 # AUTHORS

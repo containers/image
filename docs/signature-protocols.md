@@ -26,13 +26,13 @@ a simple static web server serving a directory structure created by writing to a
 e.g. a HTTP server reading signatures from a database.)
 
 The usual workflow for producing and distributing images using the separate storage mechanism
-is to configure the repository in `registries.d` with `sigstore-staging` URL pointing to a private
-`file:///` staging area, and a `sigstore` URL pointing to a public web server.
+is to configure the repository in `registries.d` with `lookaside-staging` URL pointing to a private
+`file:///` staging area, and a `lookaside` URL pointing to a public web server.
 To publish an image, the image author would sign the image as necessary (e.g. using `skopeo copy`),
 and then copy the created directory structure from the `file:///` staging area
-to a subdirectory of a webroot of the public web server so that they are accessible using the public `sigstore` URL.
+to a subdirectory of a webroot of the public web server so that they are accessible using the public `lookaside` URL.
 The author would also instruct consumers of the image to, or provide a `registries.d` configuration file to,
-set up a `sigstore` URL pointing to the public web server.
+set up a `lookaside` URL pointing to the public web server.
 
 ### Path structure
 
@@ -63,15 +63,15 @@ and no way to download all of the signatures at once.
 
 For a docker/distribution image available as `busybox@sha256:817a12c32a39bbe394944ba49de563e085f1d3c5266eb8e9723256bc4448680e`
 (or as `busybox:latest` if the `latest` tag points to to a manifest with the same digest),
-and with a `registries.d` configuration specifying a `sigstore` URL `https://example.com/sigstore` for the same image,
+and with a `registries.d` configuration specifying a `lookaside` URL `https://example.com/lookaside` for the same image,
 the following URLs would be accessed to download all signatures:
-> - `https://example.com/sigstore/library/busybox@sha256=817a12c32a39bbe394944ba49de563e085f1d3c5266eb8e9723256bc4448680e/signature-1`
-> - `https://example.com/sigstore/library/busybox@sha256=817a12c32a39bbe394944ba49de563e085f1d3c5266eb8e9723256bc4448680e/signature-2`
+> - `https://example.com/lookaside/library/busybox@sha256=817a12c32a39bbe394944ba49de563e085f1d3c5266eb8e9723256bc4448680e/signature-1`
+> - `https://example.com/lookaside/library/busybox@sha256=817a12c32a39bbe394944ba49de563e085f1d3c5266eb8e9723256bc4448680e/signature-2`
 > - …
 
 For a docker/distribution image available as `example.com/ns1/ns2/ns3/repo@somedigest:digestvalue` and the same
-`sigstore` URL, the signatures would be available at
-> `https://example.com/sigstore/ns1/ns2/ns3/repo@somedigest=digestvalue/signature-1`
+`lookaside` URL, the signatures would be available at
+> `https://example.com/lookaside/ns1/ns2/ns3/repo@somedigest=digestvalue/signature-1`
 
 and so on.
 

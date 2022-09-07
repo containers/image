@@ -1,6 +1,7 @@
 package blobinfocache
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -20,28 +21,8 @@ func TestBlobInfoCacheDir(t *testing.T) {
 	const homeDir = "/fake/home/directory"
 	const xdgDataHome = "/fake/home/directory/XDG"
 
-	// Environment is per-process, so this looks very unsafe; actually it seems fine because tests are not
-	// run in parallel unless they opt in by calling t.Parallel().  So don’t do that.
-	oldXRD, hasXRD := os.LookupEnv("XDG_RUNTIME_DIR")
-	defer func() {
-		if hasXRD {
-			os.Setenv("XDG_RUNTIME_DIR", oldXRD)
-		} else {
-			os.Unsetenv("XDG_RUNTIME_DIR")
-		}
-	}()
-	// FIXME: This should be a shared helper in internal/testing
-	oldHome, hasHome := os.LookupEnv("HOME")
-	defer func() {
-		if hasHome {
-			os.Setenv("HOME", oldHome)
-		} else {
-			os.Unsetenv("HOME")
-		}
-	}()
-
-	os.Setenv("HOME", homeDir)
-	os.Setenv("XDG_DATA_HOME", xdgDataHome)
+	t.Setenv("HOME", homeDir)
+	t.Setenv("XDG_DATA_HOME", xdgDataHome)
 
 	// The default paths and explicit overrides
 	for _, c := range []struct {
@@ -83,7 +64,7 @@ func TestBlobInfoCacheDir(t *testing.T) {
 	}
 
 	// Paths used by unprivileged users
-	for _, c := range []struct {
+	for caseIndex, c := range []struct {
 		xdgDH, home, expected string
 	}{
 		{"", homeDir, filepath.Join(homeDir, ".local", "share", "containers", "cache")}, // HOME only
@@ -91,25 +72,28 @@ func TestBlobInfoCacheDir(t *testing.T) {
 		{xdgDataHome, homeDir, filepath.Join(xdgDataHome, "containers", "cache")},       // both
 		{"", "", ""}, // neither
 	} {
-		if c.xdgDH != "" {
-			os.Setenv("XDG_DATA_HOME", c.xdgDH)
-		} else {
-			os.Unsetenv("XDG_DATA_HOME")
-		}
-		if c.home != "" {
-			os.Setenv("HOME", c.home)
-		} else {
-			os.Unsetenv("HOME")
-		}
-		for _, sys := range []*types.SystemContext{nil, {}} {
-			path, err := blobInfoCacheDir(sys, 1)
-			if c.expected != "" {
-				require.NoError(t, err)
-				assert.Equal(t, c.expected, path)
-			} else {
-				assert.Error(t, err)
+		t.Run(fmt.Sprintf("unprivileged %d", caseIndex), func(t *testing.T) {
+			// Always use t.Setenv() to ensure the environment variable is restored to the original value after the test.
+			// Then, in cases where the test needs the variable unset (not just set to empty), use a raw os.Unsetenv()
+			// to override the situation. (Sadly there isn’t a t.Unsetenv() as of Go 1.17.)
+			t.Setenv("XDG_DATA_HOME", c.xdgDH)
+			if c.xdgDH == "" {
+				os.Unsetenv("XDG_DATA_HOME")
 			}
-		}
+			t.Setenv("HOME", c.home)
+			if c.home == "" {
+				os.Unsetenv("HOME")
+			}
+			for _, sys := range []*types.SystemContext{nil, {}} {
+				path, err := blobInfoCacheDir(sys, 1)
+				if c.expected != "" {
+					require.NoError(t, err)
+					assert.Equal(t, c.expected, path)
+				} else {
+					assert.Error(t, err)
+				}
+			}
+		})
 	}
 }
 
@@ -123,26 +107,10 @@ func TestDefaultCache(t *testing.T) {
 	assert.Equal(t, boltdb.New(filepath.Join(normalDir, blobInfoCacheFilename)), c)
 
 	// Error running blobInfoCacheDir:
-	// Environment is per-process, so this looks very unsafe; actually it seems fine because tests are not
-	// run in parallel unless they opt in by calling t.Parallel().  So don’t do that.
-	oldXRD, hasXRD := os.LookupEnv("XDG_RUNTIME_DIR")
-	defer func() {
-		if hasXRD {
-			os.Setenv("XDG_RUNTIME_DIR", oldXRD)
-		} else {
-			os.Unsetenv("XDG_RUNTIME_DIR")
-		}
-	}()
-	// FIXME: This should be a shared helper in internal/testing
-	oldHome, hasHome := os.LookupEnv("HOME")
-	defer func() {
-		if hasHome {
-			os.Setenv("HOME", oldHome)
-		} else {
-			os.Unsetenv("HOME")
-		}
-	}()
+	// Use t.Setenv() just as a way to set up cleanup to original values; then os.Unsetenv() to test a situation where the values are not set.
+	t.Setenv("HOME", "")
 	os.Unsetenv("HOME")
+	t.Setenv("XDG_DATA_HOME", "")
 	os.Unsetenv("XDG_DATA_HOME")
 	c = DefaultCache(nil)
 	assert.IsType(t, memory.New(), c)

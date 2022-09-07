@@ -149,20 +149,21 @@ This requirement rejects every image, and every signature.
 
 ### `signedBy`
 
-This requirement requires an image to be signed with an expected identity, or accepts a signature if it is using an expected identity and key.
+This requirement requires an image to be signed using “simple signing” with an expected identity, or accepts a signature if it is using an expected identity and key.
 
 ```js
 {
     "type":    "signedBy",
     "keyType": "GPGKeys", /* The only currently supported value */
     "keyPath": "/path/to/local/keyring/file",
+    "keyPaths": ["/path/to/local/keyring/file1","/path/to/local/keyring/file2"…],
     "keyData": "base64-encoded-keyring-data",
     "signedIdentity": identity_requirement
 }
 ```
 <!-- Later: other keyType values -->
 
-Exactly one of `keyPath` and `keyData` must be present, containing a GPG keyring of one or more public keys.  Only signatures made by these keys are accepted.
+Exactly one of `keyPath`, `keyPaths` and `keyData` must be present, containing a GPG keyring of one or more public keys.  Only signatures made by these keys are accepted.
 
 The `signedIdentity` field, a JSON object, specifies what image identity the signature claims about the image.
 One of the following alternatives are supported:
@@ -236,6 +237,26 @@ used with `exactReference` or `exactRepository`.
 
 <!-- ### `signedBaseLayer` -->
 
+
+### `sigstoreSigned`
+
+This requirement requires an image to be signed using a sigstore signature with an expected identity and key.
+
+```js
+{
+    "type":    "sigstoreSigned",
+    "keyPath": "/path/to/local/keyring/file",
+    "keyData": "base64-encoded-keyring-data",
+    "signedIdentity": identity_requirement
+}
+```
+Exactly one of `keyPath` and `keyData` must be present, containing a sigstore public key.  Only signatures made by this key is accepted.
+
+The `signedIdentity` field has the same semantics as in the `signedBy` requirement described above.
+Note that `cosign`-created signatures only contain a repository, so only `matchRepository` and `exactRepository` can be used to accept them (and that does not protect against substitution of a signed image with an unexpected tag).
+
+To use this with images hosted on image registries, the relevant registry or repository must have the `use-sigstore-attachments` option enabled in containers-registries.d(5).
+
 ## Examples
 
 It is *strongly* recommended to set the `default` policy to `reject`, and then
@@ -255,9 +276,24 @@ selectively allow individual transports and scopes as desired.
             "docker.io/openshift": [{"type": "insecureAcceptAnything"}],
             /* Similarly, allow installing the “official” busybox images.  Note how the fully expanded
                form, with the explicit /library/, must be used. */
-            "docker.io/library/busybox": [{"type": "insecureAcceptAnything"}]
+            "docker.io/library/busybox": [{"type": "insecureAcceptAnything"}],
             /* Allow installing images from all subdomains */
-            "*.temporary-project.example.com": [{"type": "insecureAcceptAnything"}]
+            "*.temporary-project.example.com": [{"type": "insecureAcceptAnything"}],
+            /* A sigstore-signed repository */
+            "hostname:5000/myns/sigstore-signed-with-full-references": [
+                {
+                    "type": "sigstoreSigned",
+                    "keyPath": "/path/to/sigstore-pubkey.pub"
+                }
+            ],
+            /* A sigstore-signed repository, accepts signatures by /usr/bin/cosign */
+            "hostname:5000/myns/sigstore-signed-allows-malicious-tag-substitution": [
+                {
+                    "type": "sigstoreSigned",
+                    "keyPath": "/path/to/sigstore-pubkey.pub",
+                    "signedIdentity": {"type": "matchRepository"}
+                }
+            ]
             /* Other docker: images use the global default policy and are rejected */
         },
         "dir": {
@@ -301,7 +337,7 @@ selectively allow individual transports and scopes as desired.
                     "signedIdentity": {
                         "type": "remapIdentity",
                         "prefix": "private-mirror:5000/vendor-mirror",
-                        "signedPrefix": "vendor.example.com",
+                        "signedPrefix": "vendor.example.com"
                     }
                 }
             ]

@@ -12,12 +12,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/pkg/blobinfocache/memory"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var _ private.ImageSource = (*ociImageSource)(nil)
 
 const RemoteLayerContent = "This is the remote layer content"
 

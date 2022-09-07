@@ -3,18 +3,22 @@ package directory
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"testing"
 
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache/memory"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var _ private.ImageSource = (*dirImageSource)(nil)
+var _ private.ImageDestination = (*dirImageDestination)(nil)
 
 func TestDestinationReference(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
@@ -131,7 +135,7 @@ func TestPutBlobDigestFailure(t *testing.T) {
 			}
 			return len(p), nil
 		}
-		return 0, errors.Errorf(digestErrorString)
+		return 0, errors.New(digestErrorString)
 	})
 
 	dest, err := ref.NewImageDestination(context.Background(), nil)
@@ -154,13 +158,14 @@ func TestGetPutSignatures(t *testing.T) {
 	list := []byte("test-manifest-list")
 	md, err := manifest.Digest(man)
 	require.NoError(t, err)
+	// These signatures are completely invalid; start with 0xA3 just to be minimally plausible to signature.FromBlob.
 	signatures := [][]byte{
-		[]byte("sig1"),
-		[]byte("sig2"),
+		[]byte("\xA3sig1"),
+		[]byte("\xA3sig2"),
 	}
 	listSignatures := [][]byte{
-		[]byte("sig3"),
-		[]byte("sig4"),
+		[]byte("\xA3sig3"),
+		[]byte("\xA3sig4"),
 	}
 
 	dest, err := ref.NewImageDestination(context.Background(), nil)
