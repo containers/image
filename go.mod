@@ -8,7 +8,7 @@ require (
 	github.com/containers/ocicrypt v1.1.5
 	github.com/containers/storage v1.42.0
 	github.com/docker/distribution v2.8.1+incompatible
-	github.com/docker/docker v20.10.17+incompatible
+	github.com/docker/docker v20.10.18+incompatible
 	github.com/docker/docker-credential-helpers v0.6.4
 	github.com/docker/go-connections v0.4.0
 	github.com/ghodss/yaml v1.0.0
