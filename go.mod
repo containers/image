@@ -22,7 +22,7 @@ require (
 	github.com/opencontainers/selinux v1.10.1
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f
 	github.com/proglottis/gpgme v0.1.3
-	github.com/sigstore/sigstore v1.4.1
+	github.com/sigstore/sigstore v1.4.2
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.0
 	github.com/sylabs/sif/v2 v2.7.2
@@ -32,8 +32,8 @@ require (
 	github.com/vbauerster/mpb/v7 v7.5.3
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.6
-	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90
-	golang.org/x/net v0.0.0-20220826154423-83b083e8dc8b
+	golang.org/x/crypto v0.0.0-20220919173607-35f4265a4bc0
+	golang.org/x/net v0.0.0-20220909164309-bea034e7d591
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467
 )
@@ -83,7 +83,7 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352 // indirect
 	go.opencensus.io v0.23.0 // indirect
-	golang.org/x/sys v0.0.0-20220909162455-aba9fc2a8ff2 // indirect
+	golang.org/x/sys v0.0.0-20220919091848-fb04ddd9f9c8 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20220720214146-176da50484ac // indirect
 	google.golang.org/grpc v1.48.0 // indirect
