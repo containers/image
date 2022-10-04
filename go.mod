@@ -18,7 +18,7 @@ require (
 	github.com/klauspost/pgzip v1.2.6-0.20220930104621-17e8dac29df8
 	github.com/manifoldco/promptui v0.9.0
 	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/image-spec v1.1.0-rc1
+	github.com/opencontainers/image-spec v1.1.0-rc2
 	github.com/opencontainers/selinux v1.10.2
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f
 	github.com/proglottis/gpgme v0.1.3
