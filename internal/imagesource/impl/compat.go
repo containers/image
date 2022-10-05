@@ -42,14 +42,11 @@ func (c *Compat) GetSignatures(ctx context.Context, instanceDigest *digest.Diges
 	// Alternatively, we could possibly define the old GetSignatures to use the multi-format
 	// signature.Blob representation now, in general, but that could silently break them as well.
 	sigs, err := c.src.GetSignaturesWithFormat(ctx, instanceDigest)
-	if err != nil {
-		return nil, err
-	}
 	simpleSigs := [][]byte{}
 	for _, sig := range sigs {
 		if sig, ok := sig.(signature.SimpleSigning); ok {
 			simpleSigs = append(simpleSigs, sig.UntrustedSignature())
 		}
 	}
-	return simpleSigs, nil
+	return simpleSigs, err
 }

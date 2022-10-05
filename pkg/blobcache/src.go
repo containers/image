@@ -115,8 +115,8 @@ func (s *blobCacheSource) GetSignaturesWithFormat(ctx context.Context, instanceD
 
 func (s *blobCacheSource) LayerInfosForCopy(ctx context.Context, instanceDigest *digest.Digest) ([]types.BlobInfo, error) {
 	signatures, err := s.source.GetSignaturesWithFormat(ctx, instanceDigest)
-	if err != nil {
-		return nil, fmt.Errorf("error checking if image %q has signatures: %w", transports.ImageName(s.reference), err)
+	if len(signatures) == 0 && err != nil {
+		return nil, fmt.Errorf("error finding any signatures for image %q: %w", transports.ImageName(s.reference), err)
 	}
 	canReplaceBlobs := len(signatures) == 0
 

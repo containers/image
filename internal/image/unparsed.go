@@ -108,7 +108,7 @@ func (i *UnparsedImage) Signatures(ctx context.Context) ([][]byte, error) {
 
 // UntrustedSignatures is like ImageSource.GetSignaturesWithFormat, but the result is cached; it is OK to call this however often you need.
 func (i *UnparsedImage) UntrustedSignatures(ctx context.Context) ([]signature.Signature, error) {
-	if i.cachedSignatures == nil {
+	if i.cachedSignatures == nil { // FIXME: this is going to be sticky...
 		sigs, err := i.src.GetSignaturesWithFormat(ctx, i.instanceDigest)
 		if err != nil {
 			return nil, err

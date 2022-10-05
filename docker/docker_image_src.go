@@ -400,26 +400,23 @@ func (s *dockerImageSource) GetSignaturesWithFormat(ctx context.Context, instanc
 	switch {
 	case s.c.supportsSignatures:
 		sigs, err := s.getSignaturesFromAPIExtension(ctx, instanceDigest)
-		if err != nil {
-			return nil, err
-		}
 		res = append(res, sigs...)
+		if err != nil {
+			return res, err
+		}
 	case s.c.signatureBase != nil:
 		sigs, err := s.getSignaturesFromLookaside(ctx, instanceDigest)
-		if err != nil {
-			return nil, err
-		}
 		res = append(res, sigs...)
+		if err != nil {
+			return sigs, err
+		}
 	default:
 		return nil, errors.New("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
 	}
 
 	sigstoreSigs, err := s.getSignaturesFromSigstoreAttachments(ctx, instanceDigest)
-	if err != nil {
-		return nil, err
-	}
 	res = append(res, sigstoreSigs...)
-	return res, nil
+	return res, err
 }
 
 // manifestDigest returns a digest of the manifest, from instanceDigest if non-nil; or from the supplied reference,
