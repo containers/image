@@ -107,16 +107,20 @@ func LoadManifestDescriptorWithContext(sys *types.SystemContext, imgRef types.Im
 	if !ok {
 		return imgspecv1.Descriptor{}, errors.New("error typecasting, need type ociArchiveReference")
 	}
-	tempDirRef, err := createUntarTempDir(sys, ociArchRef)
+
+	layoutRef, individualReaderOrNil, err := openRef(context.TODO(), sys, ociArchRef)
 	if err != nil {
-		return imgspecv1.Descriptor{}, fmt.Errorf("creating temp directory: %w", err)
+		return imgspecv1.Descriptor{}, err
 	}
 	defer func() {
-		err := tempDirRef.deleteTempDir()
-		logrus.Debugf("Error deleting temporary directory: %v", err)
+		if individualReaderOrNil != nil {
+			if err := individualReaderOrNil.Close(); err != nil {
+				logrus.Debugf("Error deleting temporary directory: %v", err)
+			}
+		}
 	}()
 
-	descriptor, err := layout.LoadManifestDescriptor(tempDirRef.ociRefExtracted)
+	descriptor, err := layout.LoadManifestDescriptor(layoutRef)
 	if err != nil {
 		return imgspecv1.Descriptor{}, fmt.Errorf("loading index: %w", err)
 	}
