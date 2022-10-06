@@ -501,6 +501,14 @@ func (s *dockerImageSource) getOneSignature(ctx context.Context, url *url.URL) (
 		} else if res.StatusCode != http.StatusOK {
 			return nil, false, fmt.Errorf("reading signature from %s: status %d (%s)", url.Redacted(), res.StatusCode, http.StatusText(res.StatusCode))
 		}
+
+		contentType := res.Header.Get("Content-Type")
+		if mimeType := simplifyContentType(contentType); mimeType == "text/html" {
+			logrus.Warnf("Signature %q has Content-Type %q, unexpected for a signature", url.Redacted(), contentType)
+			// Don’t immediately fail; the lookaside spec does not place any requirements on Content-Type.
+			// If the content really is HTML, it’s going to fail in signature.FromBlob.
+		}
+
 		sigBlob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxSignatureBodySize)
 		if err != nil {
 			return nil, false, err
