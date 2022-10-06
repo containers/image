@@ -44,17 +44,23 @@ func newImageDestination(ctx context.Context, sys *types.SystemContext, ref ociA
 		}
 		individualWriterOrNil = archive
 	}
+	succeeded := false
+	defer func() {
+		if !succeeded && individualWriterOrNil != nil {
+			individualWriterOrNil.Close()
+		}
+	}()
+
 	layoutRef, err := layout.NewReference(archive.tempDir, ref.image)
 	if err != nil {
-		archive.Close()
 		return nil, err
 	}
 	dst, err := layoutRef.NewImageDestination(ctx, sys)
 	if err != nil {
-		archive.Close()
 		return nil, err
 	}
 
+	succeeded = true
 	d := &ociArchiveImageDestination{
 		ref:                   ref,
 		individualWriterOrNil: individualWriterOrNil,

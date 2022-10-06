@@ -36,6 +36,12 @@ func NewReader(ctx context.Context, sys *types.SystemContext, src string) (*Read
 	if err != nil {
 		return nil, fmt.Errorf("creating temp directory: %w", err)
 	}
+	succeeded := false
+	defer func() {
+		if !succeeded {
+			os.RemoveAll(dst)
+		}
+	}()
 
 	reader := Reader{
 		tempDirectory: dst,
@@ -56,6 +62,7 @@ func NewReader(ctx context.Context, sys *types.SystemContext, src string) (*Read
 		return nil, err
 	}
 
+	succeeded = true
 	return &reader, nil
 }
 

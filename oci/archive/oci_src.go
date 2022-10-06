@@ -43,27 +43,31 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiv
 		}
 		individualReaderOrNil = archive
 	}
+	succeeded := false
+	defer func() {
+		if !succeeded && individualReaderOrNil != nil {
+			individualReaderOrNil.Close()
+		}
+	}()
 
 	if ref.sourceIndex != -1 {
 		layoutRef, err = layout.NewIndexReference(archive.tempDirectory, ref.sourceIndex)
 		if err != nil {
-			archive.Close()
 			return nil, err
 		}
 	} else {
 		layoutRef, err = layout.NewReference(archive.tempDirectory, ref.image)
 		if err != nil {
-			archive.Close()
 			return nil, err
 		}
 	}
 
 	src, err := layoutRef.NewImageSource(ctx, sys)
 	if err != nil {
-		archive.Close()
 		return nil, err
 	}
 
+	succeeded = true
 	s := &ociArchiveImageSource{
 		ref:                   ref,
 		unpackedSrc:           imagesource.FromPublic(src),
