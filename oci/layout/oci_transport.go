@@ -212,21 +212,12 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 	}
 
 	if ref.sourceIndex != -1 {
-		if ref.sourceIndex < len(index.Manifests) {
-			return index.Manifests[ref.sourceIndex], nil
-		} else {
+		if ref.sourceIndex >= len(index.Manifests) {
 			return imgspecv1.Descriptor{}, fmt.Errorf("index %d is too large, only %d entries available", ref.sourceIndex, len(index.Manifests))
 		}
+		return index.Manifests[ref.sourceIndex], nil
 	}
-	if ref.image == "" {
-		// return manifest if only one image is in the oci directory
-		if len(index.Manifests) == 1 {
-			return index.Manifests[0], nil
-		} else {
-			// ask user to choose image when more than one image in the oci directory
-			return imgspecv1.Descriptor{}, ErrMoreThanOneImage
-		}
-	} else {
+	if ref.image != "" {
 		// if image specified, look through all manifests for a match
 		for _, md := range index.Manifests {
 			if md.MediaType != imgspecv1.MediaTypeImageManifest && md.MediaType != imgspecv1.MediaTypeImageIndex {
@@ -241,6 +232,13 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 			}
 		}
 		return imgspecv1.Descriptor{}, fmt.Errorf("no descriptor found for reference %q", ref.image)
+	} else {
+		// return manifest if only one image is in the oci directory
+		if len(index.Manifests) != 1 {
+			// ask user to choose image when more than one image in the oci directory
+			return imgspecv1.Descriptor{}, ErrMoreThanOneImage
+		}
+		return index.Manifests[0], nil
 	}
 }
 
