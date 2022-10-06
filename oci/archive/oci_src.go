@@ -11,7 +11,6 @@ import (
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/oci/layout"
-	ocilayout "github.com/containers/image/v5/oci/layout"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -95,7 +94,7 @@ func LoadManifestDescriptorWithContext(sys *types.SystemContext, imgRef types.Im
 		logrus.Debugf("Error deleting temporary directory: %v", err)
 	}()
 
-	descriptor, err := ocilayout.LoadManifestDescriptor(tempDirRef.ociRefExtracted)
+	descriptor, err := layout.LoadManifestDescriptor(tempDirRef.ociRefExtracted)
 	if err != nil {
 		return imgspecv1.Descriptor{}, fmt.Errorf("loading index: %w", err)
 	}
