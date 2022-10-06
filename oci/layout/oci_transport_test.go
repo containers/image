@@ -190,11 +190,8 @@ func TestNewIndexReference(t *testing.T) {
 }
 
 // refToTempOCI creates a temporary directory and returns an reference to it.
-// The caller should
-//   defer os.RemoveAll(tmpDir)
-func refToTempOCI(t *testing.T, sourceIndex bool) (ref types.ImageReference, tmpDir string) {
-	tmpDir, err := ioutil.TempDir("", "oci-transport-test")
-	require.NoError(t, err)
+func refToTempOCI(t *testing.T, sourceIndex bool) (types.ImageReference, string) {
+	tmpDir := t.TempDir()
 
 	m := `{
 		"schemaVersion": 2,
@@ -232,9 +229,10 @@ func refToTempOCI(t *testing.T, sourceIndex bool) (ref types.ImageReference, tmp
 	`
 	}
 
-	err = os.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
+	err := os.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
 	require.NoError(t, err)
 
+	var ref types.ImageReference
 	if sourceIndex {
 		ref, err = NewIndexReference(tmpDir, 1)
 		require.NoError(t, err)
@@ -246,8 +244,7 @@ func refToTempOCI(t *testing.T, sourceIndex bool) (ref types.ImageReference, tmp
 }
 
 func TestReferenceTransport(t *testing.T) {
-	ref, tmpDir := refToTempOCI(t, false)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempOCI(t, false)
 	assert.Equal(t, Transport, ref.Transport())
 }
 
@@ -272,14 +269,12 @@ func TestReferenceStringWithinTransport(t *testing.T) {
 }
 
 func TestReferenceDockerReference(t *testing.T) {
-	ref, tmpDir := refToTempOCI(t, false)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempOCI(t, false)
 	assert.Nil(t, ref.DockerReference())
 }
 
 func TestReferencePolicyConfigurationIdentity(t *testing.T) {
 	ref, tmpDir := refToTempOCI(t, false)
-	defer os.RemoveAll(tmpDir)
 
 	assert.Equal(t, tmpDir, ref.PolicyConfigurationIdentity())
 	// A non-canonical path.  Test just one, the various other cases are
@@ -295,7 +290,6 @@ func TestReferencePolicyConfigurationIdentity(t *testing.T) {
 
 	// Test the sourceIndex case
 	ref, tmpDir = refToTempOCI(t, true)
-	defer os.RemoveAll(tmpDir)
 
 	assert.Equal(t, tmpDir, ref.PolicyConfigurationIdentity())
 	// A non-canonical path.  Test just one, the various other cases are
@@ -312,7 +306,6 @@ func TestReferencePolicyConfigurationIdentity(t *testing.T) {
 
 func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 	ref, tmpDir := refToTempOCI(t, false)
-	defer os.RemoveAll(tmpDir)
 	// We don't really know enough to make a full equality test here.
 	ns := ref.PolicyConfigurationNamespaces()
 	require.NotNil(t, ns)
@@ -343,7 +336,6 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 
 	// Test the sourceIndex case
 	ref, tmpDir = refToTempOCI(t, true)
-	defer os.RemoveAll(tmpDir)
 	// We don't really know enough to make a full equality test here.
 	ns = ref.PolicyConfigurationNamespaces()
 	require.NotNil(t, ns)
@@ -374,22 +366,19 @@ func TestReferencePolicyConfigurationNamespaces(t *testing.T) {
 }
 
 func TestReferenceNewImage(t *testing.T) {
-	ref, tmpDir := refToTempOCI(t, false)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempOCI(t, false)
 	_, err := ref.NewImage(context.Background(), nil)
 	assert.Error(t, err)
 }
 
 func TestReferenceNewImageSource(t *testing.T) {
-	ref, tmpDir := refToTempOCI(t, false)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempOCI(t, false)
 	_, err := ref.NewImageSource(context.Background(), nil)
 	assert.NoError(t, err)
 }
 
 func TestReferenceNewImageDestination(t *testing.T) {
-	ref, tmpDir := refToTempOCI(t, false)
-	defer os.RemoveAll(tmpDir)
+	ref, _ := refToTempOCI(t, false)
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	assert.NoError(t, err)
 	defer dest.Close()

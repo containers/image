@@ -27,7 +27,7 @@ type ociArchiveImageSource struct {
 }
 
 // newImageSource returns an ImageSource for reading from an existing directory.
-func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiveReference) (types.ImageSource, error) {
+func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiveReference) (private.ImageSource, error) {
 	var (
 		archive, individualReaderOrNil *Reader
 		layoutRef                      types.ImageReference
