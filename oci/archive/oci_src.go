@@ -10,6 +10,7 @@ import (
 	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/signature"
+	"github.com/containers/image/v5/oci/layout"
 	ocilayout "github.com/containers/image/v5/oci/layout"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
@@ -20,30 +21,54 @@ import (
 type ociArchiveImageSource struct {
 	impl.Compat
 
-	ref         ociArchiveReference
-	unpackedSrc private.ImageSource
-	tempDirRef  tempDirOCIRef
+	ref                   ociArchiveReference
+	unpackedSrc           private.ImageSource
+	individualReaderOrNil *Reader
 }
 
 // newImageSource returns an ImageSource for reading from an existing directory.
-// newImageSource untars the file and saves it in a temp directory
-func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiveReference) (private.ImageSource, error) {
-	tempDirRef, err := createUntarTempDir(sys, ref)
-	if err != nil {
-		return nil, fmt.Errorf("creating temp directory: %w", err)
+func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiveReference) (types.ImageSource, error) {
+	var (
+		archive, individualReaderOrNil *Reader
+		layoutRef                      types.ImageReference
+		err                            error
+	)
+
+	if ref.archiveReader != nil {
+		archive = ref.archiveReader
+		individualReaderOrNil = nil
+	} else {
+		archive, _, err = NewReaderForReference(ctx, sys, ref)
+		if err != nil {
+			return nil, err
+		}
+		individualReaderOrNil = archive
 	}
 
-	unpackedSrc, err := tempDirRef.ociRefExtracted.NewImageSource(ctx, sys)
-	if err != nil {
-		if err := tempDirRef.deleteTempDir(); err != nil {
-			return nil, fmt.Errorf("deleting temp directory %q: %w", tempDirRef.tempDirectory, err)
+	if ref.sourceIndex != -1 {
+		layoutRef, err = layout.NewIndexReference(archive.tempDirectory, ref.sourceIndex)
+		if err != nil {
+			archive.Close()
+			return nil, err
 		}
+	} else {
+		layoutRef, err = layout.NewReference(archive.tempDirectory, ref.image)
+		if err != nil {
+			archive.Close()
+			return nil, err
+		}
+	}
+
+	src, err := layoutRef.NewImageSource(ctx, sys)
+	if err != nil {
+		archive.Close()
 		return nil, err
 	}
+
 	s := &ociArchiveImageSource{
-		ref:         ref,
-		unpackedSrc: imagesource.FromPublic(unpackedSrc),
-		tempDirRef:  tempDirRef,
+		ref:                   ref,
+		unpackedSrc:           imagesource.FromPublic(src),
+		individualReaderOrNil: individualReaderOrNil,
 	}
 	s.Compat = impl.AddCompat(s)
 	return s, nil
@@ -83,13 +108,14 @@ func (s *ociArchiveImageSource) Reference() types.ImageReference {
 }
 
 // Close removes resources associated with an initialized ImageSource, if any.
-// Close deletes the temporary directory at dst
 func (s *ociArchiveImageSource) Close() error {
-	defer func() {
-		err := s.tempDirRef.deleteTempDir()
-		logrus.Debugf("error deleting tmp dir: %v", err)
-	}()
-	return s.unpackedSrc.Close()
+	if err := s.unpackedSrc.Close(); err != nil {
+		return err
+	}
+	if s.individualReaderOrNil == nil {
+		return nil
+	}
+	return s.individualReaderOrNil.Close()
 }
 
 // GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).

@@ -6,7 +6,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
+
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // annotation spex from https://github.com/opencontainers/image-spec/blob/master/annotations.md#pre-defined-annotation-keys
@@ -33,9 +36,9 @@ func ValidateImageName(image string) error {
 	return err
 }
 
-// SplitPathAndImage tries to split the provided OCI reference into the OCI path and image.
+// splitPathAndImage tries to split the provided OCI reference into the OCI path and image.
 // Neither path nor image parts are validated at this stage.
-func SplitPathAndImage(reference string) (string, string) {
+func splitPathAndImage(reference string) (string, string) {
 	if runtime.GOOS == "windows" {
 		return splitPathAndImageWindows(reference)
 	}
@@ -124,4 +127,46 @@ func validateScopeNonWindows(scope string) error {
 	}
 
 	return nil
+}
+
+// parseOCIReferenceName parses the image from the oci reference.
+func parseOCIReferenceName(image string) (img string, index int, err error) {
+	index = -1
+	if strings.HasPrefix(image, "@") {
+		idx, err := strconv.Atoi(image[1:])
+		if err != nil {
+			return "", index, fmt.Errorf("Invalid source index @%s: not an integer: %w", image[1:], err)
+		}
+		if idx < 0 {
+			return "", index, fmt.Errorf("Invalid source index @%d: must not be negative", idx)
+		}
+		index = idx
+	} else {
+		img = image
+	}
+	return img, index, nil
+}
+
+// ParseReferenceIntoElements splits the oci reference into location, image name and source index if exists
+func ParseReferenceIntoElements(reference string) (string, string, int, error) {
+	dir, image := splitPathAndImage(reference)
+	image, index, err := parseOCIReferenceName(image)
+	if err != nil {
+		return "", "", -1, err
+	}
+	return dir, image, index, nil
+}
+
+// NameFromAnnotations returns a reference string to be used as an image name,
+// or an empty string.  The annotations map may be nil.
+func NameFromAnnotations(annotations map[string]string) string {
+	if annotations == nil {
+		return ""
+	}
+	// buildkit/containerd are using a custom annotation see
+	// containers/podman/issues/12560.
+	if annotations["io.containerd.image.name"] != "" {
+		return annotations["io.containerd.image.name"]
+	}
+	return annotations[imgspecv1.AnnotationRefName]
 }
