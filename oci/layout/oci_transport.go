@@ -211,13 +211,18 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 		return imgspecv1.Descriptor{}, err
 	}
 
-	if ref.sourceIndex != -1 {
+	switch {
+	case ref.image != "" && ref.sourceIndex != -1:
+		return imgspecv1.Descriptor{}, fmt.Errorf("Internal error: Cannot have both ref %s and source index @%d",
+			ref.image, ref.sourceIndex)
+
+	case ref.sourceIndex != -1:
 		if ref.sourceIndex >= len(index.Manifests) {
 			return imgspecv1.Descriptor{}, fmt.Errorf("index %d is too large, only %d entries available", ref.sourceIndex, len(index.Manifests))
 		}
 		return index.Manifests[ref.sourceIndex], nil
-	}
-	if ref.image != "" {
+
+	case ref.image != "":
 		// if image specified, look through all manifests for a match
 		for _, md := range index.Manifests {
 			if md.MediaType != imgspecv1.MediaTypeImageManifest && md.MediaType != imgspecv1.MediaTypeImageIndex {
@@ -232,7 +237,8 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 			}
 		}
 		return imgspecv1.Descriptor{}, fmt.Errorf("no descriptor found for reference %q", ref.image)
-	} else {
+
+	default:
 		// return manifest if only one image is in the oci directory
 		if len(index.Manifests) != 1 {
 			// ask user to choose image when more than one image in the oci directory
