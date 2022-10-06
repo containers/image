@@ -22,8 +22,6 @@ func init() {
 	transports.Register(Transport)
 }
 
-var invalidOciArchiveErr error = errors.New("Invalid oci-archive: reference")
-
 // Transport is an ImageTransport for OCI archive
 // it creates an oci-archive tar file by calling into the OCI transport
 // tarring the directory created by oci and deleting the directory
@@ -90,10 +88,10 @@ func newReference(file, image string, sourceIndex int, archiveReader *Reader, ar
 	}
 
 	if sourceIndex != -1 && sourceIndex < 0 {
-		return nil, fmt.Errorf("index @%d must not be negative: %w", sourceIndex, invalidOciArchiveErr)
+		return nil, fmt.Errorf("Invalid oci-archive: reference: index @%d must not be negative", sourceIndex)
 	}
 	if sourceIndex != -1 && image != "" {
-		return nil, fmt.Errorf("cannot set image %s and index @%d at the same time: %w", image, sourceIndex, invalidOciArchiveErr)
+		return nil, fmt.Errorf("Invalid oci-archive: reference: cannot set image %s and index @%d at the same time", image, sourceIndex)
 	}
 	return ociArchiveReference{
 		file:          file,

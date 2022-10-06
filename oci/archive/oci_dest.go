@@ -31,7 +31,7 @@ func newImageDestination(ctx context.Context, sys *types.SystemContext, ref ociA
 	)
 
 	if ref.sourceIndex != -1 {
-		return nil, fmt.Errorf("destination reference must not contain a manifest index @%d: %w", ref.sourceIndex, invalidOciArchiveErr)
+		return nil, fmt.Errorf("destination reference must not contain a manifest index @%d", ref.sourceIndex)
 	}
 
 	if ref.archiveWriter != nil {
