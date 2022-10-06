@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/containers/image/v5/internal/tmpdir"
@@ -23,7 +22,7 @@ type Writer struct {
 // NewWriter creates a temp directory will be tarred to oci-archive.
 // The caller should call .Close() on the returned object.
 func NewWriter(ctx context.Context, sys *types.SystemContext, file string) (*Writer, error) {
-	dir, err := ioutil.TempDir(tmpdir.TemporaryDirectoryForBigFiles(sys), "oci")
+	dir, err := os.MkdirTemp(tmpdir.TemporaryDirectoryForBigFiles(sys), "oci")
 	if err != nil {
 		return nil, fmt.Errorf("error creating temp directory: %w", err)
 	}

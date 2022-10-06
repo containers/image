@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -77,7 +76,7 @@ func NewReader(ctx context.Context, sys *types.SystemContext, src string) (*Read
 	}
 	defer arch.Close()
 
-	dst, err := ioutil.TempDir(tmpdir.TemporaryDirectoryForBigFiles(sys), "oci")
+	dst, err := os.MkdirTemp(tmpdir.TemporaryDirectoryForBigFiles(sys), "oci")
 	if err != nil {
 		return nil, perrors.Wrap(err, "error creating temp directory")
 	}

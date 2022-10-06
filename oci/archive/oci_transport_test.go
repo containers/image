@@ -2,7 +2,6 @@ package archive
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -136,9 +135,7 @@ func TestNewReference(t *testing.T) {
 func TestNewIndexReference(t *testing.T) {
 	const imageValue = "imageValue"
 
-	tmpDir, err := ioutil.TempDir("", "oci-transport-test")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	ref, err := NewIndexReference(tmpDir, 10)
 	require.NoError(t, err)
