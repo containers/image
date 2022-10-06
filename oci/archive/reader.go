@@ -106,11 +106,11 @@ type ListResult struct {
 func (r *Reader) List() ([]ListResult, error) {
 	var res []ListResult
 
-	for _, md := range r.manifest.Manifests {
+	for manifestIndex, md := range r.manifest.Manifests {
 		refName := internal.NameFromAnnotations(md.Annotations)
 		index := -1
-		if refName != "" {
-			index = 1
+		if refName == "" {
+			index = manifestIndex
 		}
 		ref, err := newReference(r.path, refName, index, r, nil)
 		if err != nil {
