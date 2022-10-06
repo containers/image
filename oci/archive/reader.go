@@ -25,49 +25,6 @@ type Reader struct {
 	path          string // The original, user-specified path
 }
 
-// NewReader creates the temp directory that keeps the untarred archive from src.
-// // The caller should call .Close() on the returned object.
-// func NewReader(ctx context.Context, sys *types.SystemContext, src string) (*Reader, error) {
-// 	// TODO: This can take quite some time, and should ideally be cancellable using a context.Context.
-// 	arch, err := os.Open(src)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer arch.Close()
-
-// 	dst, err := ioutil.TempDir(tmpdir.TemporaryDirectoryForBigFiles(sys), "oci")
-// 	if err != nil {
-// 		return nil, errors.Wrap(err, "error creating temp directory")
-// 	}
-
-// 	reader := Reader{
-// 		tempDirectory: dst,
-// 		path:          src,
-// 	}
-
-// 	succeeded := false
-// 	defer func() {
-// 		if !succeeded {
-// 			reader.Close()
-// 		}
-// 	}()
-// 	if err := archive.NewDefaultArchiver().Untar(arch, dst, &archive.TarOptions{NoLchown: true}); err != nil {
-// 		return nil, errors.Wrapf(err, "error untarring file %q", dst)
-// 	}
-
-// 	indexJSON, err := os.Open(filepath.Join(dst, "index.json"))
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer indexJSON.Close()
-// 	reader.manifest = &imgspecv1.Index{}
-// 	if err := json.NewDecoder(indexJSON).Decode(reader.manifest); err != nil {
-// 		return nil, err
-// 	}
-// 	succeeded = true
-// 	return &reader, nil
-// }
-
 func NewReader(ctx context.Context, sys *types.SystemContext, src string) (*Reader, error) {
 	arch, err := os.Open(src)
 	if err != nil {
@@ -116,22 +73,6 @@ func NewReaderForReference(ctx context.Context, sys *types.SystemContext, ref ty
 	if err != nil {
 		return nil, nil, err
 	}
-	// src := standalone.resolvedFile
-	// arch, err := os.Open(src)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// defer arch.Close()
-
-	// dst, err := ioutil.TempDir(tmpdir.TemporaryDirectoryForBigFiles(sys), "oci")
-	// if err != nil {
-	// 	return nil, fmt.Errorf("error creating temp directory: %w", err)
-	// }
-
-	// reader := Reader{
-	// 	tempDirectory: dst,
-	// 	path:          src,
-	// }
 
 	succeeded := false
 	defer func() {
@@ -139,19 +80,7 @@ func NewReaderForReference(ctx context.Context, sys *types.SystemContext, ref ty
 			reader.Close()
 		}
 	}()
-	// if err := archive.NewDefaultArchiver().Untar(arch, dst, &archive.TarOptions{NoLchown: true}); err != nil {
-	// 	return nil, fmt.Errorf("error untarring file %q: %w", dst, err)
-	// }
 
-	// indexJSON, err := os.Open(filepath.Join(dst, "index.json"))
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// defer indexJSON.Close()
-	// reader.manifest = &imgspecv1.Index{}
-	// if err := json.NewDecoder(indexJSON).Decode(reader.manifest); err != nil {
-	// 	return nil, err
-	// }
 	readerRef, err := newReference(standalone.resolvedFile, standalone.image, -1, reader, nil)
 	if err != nil {
 		return nil, nil, err
