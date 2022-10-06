@@ -25,8 +25,9 @@ type ociArchiveImageSource struct {
 	individualReaderOrNil *Reader
 }
 
-// newImageSource returns an ImageSource for reading from an existing directory.
-func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiveReference) (private.ImageSource, error) {
+// openRef returns (layoutRef, individualReaderOrNil) for consuming ref.
+// The caller must close individualReaderOrNil (if the latter is not nil).
+func openRef(ctx context.Context, sys *types.SystemContext, ref ociArchiveReference) (types.ImageReference, *Reader, error) {
 	var (
 		archive, individualReaderOrNil *Reader
 		layoutRef                      types.ImageReference
@@ -39,7 +40,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiv
 	} else {
 		archive, err = NewReader(ctx, sys, ref.resolvedFile)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		individualReaderOrNil = archive
 	}
@@ -53,14 +54,31 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiv
 	if ref.sourceIndex != -1 {
 		layoutRef, err = layout.NewIndexReference(archive.tempDirectory, ref.sourceIndex)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	} else {
 		layoutRef, err = layout.NewReference(archive.tempDirectory, ref.image)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
+
+	succeeded = true
+	return layoutRef, individualReaderOrNil, nil
+}
+
+// newImageSource returns an ImageSource for reading from an existing directory.
+func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiveReference) (private.ImageSource, error) {
+	layoutRef, individualReaderOrNil, err := openRef(ctx, sys, ref)
+	if err != nil {
+		return nil, err
+	}
+	succeeded := false
+	defer func() {
+		if !succeeded && individualReaderOrNil != nil {
+			individualReaderOrNil.Close()
+		}
+	}()
 
 	src, err := layoutRef.NewImageSource(ctx, sys)
 	if err != nil {
