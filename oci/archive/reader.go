@@ -13,7 +13,6 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/archive"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
-	perrors "github.com/pkg/errors"
 )
 
 // Reader manages the temp directory that the oci archive is untarred to and the
@@ -78,7 +77,7 @@ func NewReader(ctx context.Context, sys *types.SystemContext, src string) (*Read
 
 	dst, err := os.MkdirTemp(tmpdir.TemporaryDirectoryForBigFiles(sys), "oci")
 	if err != nil {
-		return nil, perrors.Wrap(err, "error creating temp directory")
+		return nil, fmt.Errorf("creating temp directory: %w", err)
 	}
 
 	reader := Reader{
@@ -87,7 +86,7 @@ func NewReader(ctx context.Context, sys *types.SystemContext, src string) (*Read
 	}
 
 	if err := archive.NewDefaultArchiver().Untar(arch, dst, &archive.TarOptions{NoLchown: true}); err != nil {
-		return nil, perrors.Wrapf(err, "error untarring file %q", dst)
+		return nil, fmt.Errorf("untarring file %q: %w", dst, err)
 	}
 
 	indexJSON, err := os.Open(filepath.Join(dst, "index.json"))
@@ -107,10 +106,10 @@ func NewReader(ctx context.Context, sys *types.SystemContext, src string) (*Read
 func NewReaderForReference(ctx context.Context, sys *types.SystemContext, ref types.ImageReference) (*Reader, types.ImageReference, error) {
 	standalone, ok := ref.(ociArchiveReference)
 	if !ok {
-		return nil, nil, perrors.Errorf("Internal error: NewReader called for a non-oci/archive ImageReference %s", transports.ImageName(ref))
+		return nil, nil, fmt.Errorf("Internal error: NewReader called for a non-oci/archive ImageReference %s", transports.ImageName(ref))
 	}
 	if standalone.archiveReader != nil {
-		return nil, nil, perrors.Errorf("Internal error: NewReader called for a reader-bound reference %s", standalone.StringWithinTransport())
+		return nil, nil, fmt.Errorf("Internal error: NewReader called for a reader-bound reference %s", standalone.StringWithinTransport())
 	}
 
 	reader, err := NewReader(ctx, sys, standalone.resolvedFile)

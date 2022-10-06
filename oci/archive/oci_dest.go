@@ -13,7 +13,6 @@ import (
 	"github.com/containers/image/v5/oci/layout"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
-	perrors "github.com/pkg/errors"
 )
 
 type ociArchiveImageDestination struct {
@@ -32,7 +31,7 @@ func newImageDestination(ctx context.Context, sys *types.SystemContext, ref ociA
 	)
 
 	if ref.sourceIndex != -1 {
-		return nil, perrors.Wrapf(invalidOciArchiveErr, "destination reference must not contain a manifest index @%d", ref.sourceIndex)
+		return nil, fmt.Errorf("destination reference must not contain a manifest index @%d: %w", ref.sourceIndex, invalidOciArchiveErr)
 	}
 
 	if ref.archiveWriter != nil {
