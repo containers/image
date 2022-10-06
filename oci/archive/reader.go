@@ -25,6 +25,7 @@ type Reader struct {
 	path          string // The original, user-specified path
 }
 
+// NewReader returns a Reader for src. The caller should call Close() on the returned object
 func NewReader(ctx context.Context, sys *types.SystemContext, src string) (*Reader, error) {
 	arch, err := os.Open(src)
 	if err != nil {
@@ -66,7 +67,9 @@ func NewReader(ctx context.Context, sys *types.SystemContext, src string) (*Read
 	return &reader, nil
 }
 
-// NewReader returns a Reader for src. The caller should call Close() on the returned object
+// NewReaderForReference creates a Reader from a Reader-independent imageReference, which must be from oci/archive.Transport,
+// and a variant of imageReference that points at the same image within the reader.
+// The caller should call .Close() on the returned Reader.
 func NewReaderForReference(ctx context.Context, sys *types.SystemContext, ref types.ImageReference) (*Reader, types.ImageReference, error) {
 	standalone, ok := ref.(ociArchiveReference)
 	if !ok {
