@@ -37,7 +37,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiv
 		archive = ref.archiveReader
 		individualReaderOrNil = nil
 	} else {
-		archive, _, err = NewReaderForReference(ctx, sys, ref)
+		archive, err = NewReader(ctx, sys, ref.resolvedFile)
 		if err != nil {
 			return nil, err
 		}
