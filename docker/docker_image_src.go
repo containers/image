@@ -28,6 +28,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// maxLookasideSignatures is an arbitrary limit for the total number of signatures we would try to read from a lookaside server,
+// even if it were broken or malicious and it continued serving an enormous number of items.
+const maxLookasideSignatures = 128
+
 type dockerImageSource struct {
 	impl.Compat
 	impl.PropertyMethodsInitialize
@@ -451,6 +455,10 @@ func (s *dockerImageSource) getSignaturesFromLookaside(ctx context.Context, inst
 	// NOTE: Keep this in sync with docs/signature-protocols.md!
 	signatures := []signature.Signature{}
 	for i := 0; ; i++ {
+		if i >= maxLookasideSignatures {
+			return nil, fmt.Errorf("server provided %d signatures, assuming that's unreasonable and a server error", maxLookasideSignatures)
+		}
+
 		url := lookasideStorageURL(s.c.signatureBase, manifestDigest, i)
 		signature, missing, err := s.getOneSignature(ctx, url)
 		if err != nil {
