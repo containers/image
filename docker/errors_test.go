@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/docker/distribution/registry/api/errcode"
+	v2 "github.com/docker/distribution/registry/api/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,12 +17,16 @@ import (
 // NOR the error texts are an API commitment subject to API stability expectations;
 // they can change at any time for any reason.
 func TestRegistryHTTPResponseToError(t *testing.T) {
+	var unwrappedUnexpectedHTTPResponseError *unexpectedHTTPResponseError
+	var unwrappedErrcodeError errcode.Error
 	for _, c := range []struct {
 		name              string
 		response          string
 		errorString       string
-		errorType         interface{} // A value of the same type as the expected error, or nil
-		unwrappedErrorPtr interface{} // A pointer to a value expected to be reachable using errors.As, or nil
+		errorType         interface{}                   // A value of the same type as the expected error, or nil
+		unwrappedErrorPtr interface{}                   // A pointer to a value expected to be reachable using errors.As, or nil
+		errorCode         *errcode.ErrorCode            // A matching ErrorCode, or nil
+		fn                func(t *testing.T, err error) // A more specialized test, or nil
 	}{
 		{
 			name: "HTTP status out of registry error range",
@@ -40,7 +45,7 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"<html><body>JSON? What JSON?</body></html>\r\n",
 			errorString:       "StatusCode: 400, <html><body>JSON? What JSON?</body></html>\r\n",
 			errorType:         nil,
-			unwrappedErrorPtr: nil,
+			unwrappedErrorPtr: &unwrappedUnexpectedHTTPResponseError,
 		},
 		{
 			name: "401 body not in expected format",
@@ -48,9 +53,10 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"Header1: Value1\r\n" +
 				"\r\n" +
 				"<html><body>JSON? What JSON?</body></html>\r\n",
-			errorString:       "unauthorized: authentication required",
-			errorType:         errcode.Error{},
-			unwrappedErrorPtr: nil,
+			errorString:       "authentication required",
+			errorType:         nil,
+			unwrappedErrorPtr: &unwrappedErrcodeError,
+			errorCode:         &errcode.ErrorCodeUnauthorized,
 		},
 		{ // docker.io when an image is not found
 			name: "GET https://registry-1.docker.io/v2/library/this-does-not-exist/manifests/latest",
@@ -64,9 +70,10 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"Www-Authenticate: Bearer realm=\"https://auth.docker.io/token\",service=\"registry.docker.io\",scope=\"repository:library/this-does-not-exist:pull\",error=\"insufficient_scope\"\r\n" +
 				"\r\n" +
 				"{\"errors\":[{\"code\":\"UNAUTHORIZED\",\"message\":\"authentication required\",\"detail\":[{\"Type\":\"repository\",\"Class\":\"\",\"Name\":\"library/this-does-not-exist\",\"Action\":\"pull\"}]}]}\n",
-			errorString:       "errors:\ndenied: requested access to the resource is denied\nunauthorized: authentication required\n",
-			errorType:         errcode.Errors{},
-			unwrappedErrorPtr: nil,
+			errorString:       "requested access to the resource is denied",
+			errorType:         nil,
+			unwrappedErrorPtr: &unwrappedErrcodeError,
+			errorCode:         &errcode.ErrorCodeDenied,
 		},
 		{ // docker.io when a tag is not found
 			name: "GET https://registry-1.docker.io/v2/library/busybox/manifests/this-does-not-exist",
@@ -81,24 +88,36 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"Strict-Transport-Security: max-age=31536000\r\n" +
 				"\r\n" +
 				"{\"errors\":[{\"code\":\"MANIFEST_UNKNOWN\",\"message\":\"manifest unknown\",\"detail\":{\"Tag\":\"this-does-not-exist\"}}]}\n",
-			errorString:       "manifest unknown: manifest unknown",
-			errorType:         errcode.Errors{},
-			unwrappedErrorPtr: nil,
+			errorString:       "manifest unknown",
+			errorType:         nil,
+			unwrappedErrorPtr: &unwrappedErrcodeError,
+			errorCode:         &v2.ErrorCodeManifestUnknown,
 		},
 		{ // public.ecr.aws does not implement tag list
 			name: "GET https://public.ecr.aws/v2/nginx/nginx/tags/list",
 			response: "HTTP/1.1 404 Not Found\r\n" +
 				"Connection: close\r\n" +
-				"Content-Length: 19\r\n" +
-				"Content-Type: text/plain; charset=utf-8\r\n" +
-				"Date: Thu, 12 Aug 2021 19:54:58 GMT\r\n" +
+				"Content-Length: 65\r\n" +
+				"Content-Type: application/json; charset=utf-8\r\n" +
+				"Date: Tue, 06 Sep 2022 21:19:02 GMT\r\n" +
 				"Docker-Distribution-Api-Version: registry/2.0\r\n" +
-				"X-Content-Type-Options: nosniff\r\n" +
 				"\r\n" +
-				"404 page not found\n",
-			errorString:       "StatusCode: 404, 404 page not found\n",
+				"{\"errors\":[{\"code\":\"NOT_FOUND\",\"message\":\"404 page not found\"}]}\r\n",
+			errorString:       "unknown: 404 page not found",
 			errorType:         nil,
-			unwrappedErrorPtr: nil,
+			unwrappedErrorPtr: &unwrappedErrcodeError,
+			errorCode:         &errcode.ErrorCodeUnknown,
+			fn: func(t *testing.T, err error) {
+				var e errcode.Error
+				ok := errors.As(err, &e)
+				require.True(t, ok)
+				// Note: (skopeo inspect) is checking for this errcode.Error value
+				assert.Equal(t, errcode.Error{
+					Code:    errcode.ErrorCodeUnknown, // The NOT_FOUND value is not defined, and turns into Unknown
+					Message: "404 page not found",
+					Detail:  nil,
+				}, e)
+			},
 		},
 	} {
 		res, err := http.ReadResponse(bufio.NewReader(bytes.NewReader([]byte(c.response))), nil)
@@ -112,6 +131,15 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 		if c.unwrappedErrorPtr != nil {
 			found := errors.As(err, c.unwrappedErrorPtr)
 			assert.True(t, found, c.name)
+		}
+		if c.errorCode != nil {
+			var ec errcode.ErrorCoder
+			ok := errors.As(err, &ec)
+			require.True(t, ok, c.name)
+			assert.Equal(t, *c.errorCode, ec.ErrorCode(), c.name)
+		}
+		if c.fn != nil {
+			c.fn(t, err)
 		}
 	}
 }

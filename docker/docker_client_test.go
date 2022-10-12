@@ -1,6 +1,8 @@
 package docker
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -327,4 +329,27 @@ func TestNeedsNoRetry(t *testing.T) {
 	if needsRetry {
 		t.Fatal("Got the need to retry, but none should be required")
 	}
+}
+
+func TestIsManifestUnknownError(t *testing.T) {
+	// Mostly a smoke test; we can add more registries here if they need special handling.
+
+	// docker.io when a tag in an _existing repo_ is not found
+	response := "HTTP/1.1 404 Not Found\r\n" +
+		"Connection: close\r\n" +
+		"Content-Length: 109\r\n" +
+		"Content-Type: application/json\r\n" +
+		"Date: Thu, 12 Aug 2021 20:51:32 GMT\r\n" +
+		"Docker-Distribution-Api-Version: registry/2.0\r\n" +
+		"Ratelimit-Limit: 100;w=21600\r\n" +
+		"Ratelimit-Remaining: 100;w=21600\r\n" +
+		"Strict-Transport-Security: max-age=31536000\r\n" +
+		"\r\n" +
+		"{\"errors\":[{\"code\":\"MANIFEST_UNKNOWN\",\"message\":\"manifest unknown\",\"detail\":{\"Tag\":\"this-does-not-exist\"}}]}\n"
+	resp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader([]byte(response))), nil)
+	require.NoError(t, err)
+	err = fmt.Errorf("wrapped: %w", registryHTTPResponseToError(resp))
+
+	res := isManifestUnknownError(err)
+	assert.True(t, res, "%#v", err)
 }
