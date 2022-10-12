@@ -10,7 +10,7 @@ import (
 	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/signature"
-	ocilayout "github.com/containers/image/v5/oci/layout"
+	"github.com/containers/image/v5/oci/layout"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -20,30 +20,76 @@ import (
 type ociArchiveImageSource struct {
 	impl.Compat
 
-	ref         ociArchiveReference
-	unpackedSrc private.ImageSource
-	tempDirRef  tempDirOCIRef
+	ref                   ociArchiveReference
+	unpackedSrc           private.ImageSource
+	individualReaderOrNil *Reader
+}
+
+// openRef returns (layoutRef, individualReaderOrNil) for consuming ref.
+// The caller must close individualReaderOrNil (if the latter is not nil).
+func openRef(ctx context.Context, sys *types.SystemContext, ref ociArchiveReference) (types.ImageReference, *Reader, error) {
+	var (
+		archive, individualReaderOrNil *Reader
+		layoutRef                      types.ImageReference
+		err                            error
+	)
+
+	if ref.archiveReader != nil {
+		archive = ref.archiveReader
+		individualReaderOrNil = nil
+	} else {
+		archive, err = NewReader(ctx, sys, ref.resolvedFile)
+		if err != nil {
+			return nil, nil, err
+		}
+		individualReaderOrNil = archive
+	}
+	succeeded := false
+	defer func() {
+		if !succeeded && individualReaderOrNil != nil {
+			individualReaderOrNil.Close()
+		}
+	}()
+
+	if ref.sourceIndex != -1 {
+		layoutRef, err = layout.NewIndexReference(archive.tempDirectory, ref.sourceIndex)
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		layoutRef, err = layout.NewReference(archive.tempDirectory, ref.image)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	succeeded = true
+	return layoutRef, individualReaderOrNil, nil
 }
 
 // newImageSource returns an ImageSource for reading from an existing directory.
-// newImageSource untars the file and saves it in a temp directory
 func newImageSource(ctx context.Context, sys *types.SystemContext, ref ociArchiveReference) (private.ImageSource, error) {
-	tempDirRef, err := createUntarTempDir(sys, ref)
+	layoutRef, individualReaderOrNil, err := openRef(ctx, sys, ref)
 	if err != nil {
-		return nil, fmt.Errorf("creating temp directory: %w", err)
-	}
-
-	unpackedSrc, err := tempDirRef.ociRefExtracted.NewImageSource(ctx, sys)
-	if err != nil {
-		if err := tempDirRef.deleteTempDir(); err != nil {
-			return nil, fmt.Errorf("deleting temp directory %q: %w", tempDirRef.tempDirectory, err)
-		}
 		return nil, err
 	}
+	succeeded := false
+	defer func() {
+		if !succeeded && individualReaderOrNil != nil {
+			individualReaderOrNil.Close()
+		}
+	}()
+
+	src, err := layoutRef.NewImageSource(ctx, sys)
+	if err != nil {
+		return nil, err
+	}
+
+	succeeded = true
 	s := &ociArchiveImageSource{
-		ref:         ref,
-		unpackedSrc: imagesource.FromPublic(unpackedSrc),
-		tempDirRef:  tempDirRef,
+		ref:                   ref,
+		unpackedSrc:           imagesource.FromPublic(src),
+		individualReaderOrNil: individualReaderOrNil,
 	}
 	s.Compat = impl.AddCompat(s)
 	return s, nil
@@ -61,16 +107,20 @@ func LoadManifestDescriptorWithContext(sys *types.SystemContext, imgRef types.Im
 	if !ok {
 		return imgspecv1.Descriptor{}, errors.New("error typecasting, need type ociArchiveReference")
 	}
-	tempDirRef, err := createUntarTempDir(sys, ociArchRef)
+
+	layoutRef, individualReaderOrNil, err := openRef(context.TODO(), sys, ociArchRef)
 	if err != nil {
-		return imgspecv1.Descriptor{}, fmt.Errorf("creating temp directory: %w", err)
+		return imgspecv1.Descriptor{}, err
 	}
 	defer func() {
-		err := tempDirRef.deleteTempDir()
-		logrus.Debugf("Error deleting temporary directory: %v", err)
+		if individualReaderOrNil != nil {
+			if err := individualReaderOrNil.Close(); err != nil {
+				logrus.Debugf("Error deleting temporary directory: %v", err)
+			}
+		}
 	}()
 
-	descriptor, err := ocilayout.LoadManifestDescriptor(tempDirRef.ociRefExtracted)
+	descriptor, err := layout.LoadManifestDescriptor(layoutRef)
 	if err != nil {
 		return imgspecv1.Descriptor{}, fmt.Errorf("loading index: %w", err)
 	}
@@ -83,13 +133,14 @@ func (s *ociArchiveImageSource) Reference() types.ImageReference {
 }
 
 // Close removes resources associated with an initialized ImageSource, if any.
-// Close deletes the temporary directory at dst
 func (s *ociArchiveImageSource) Close() error {
-	defer func() {
-		err := s.tempDirRef.deleteTempDir()
-		logrus.Debugf("error deleting tmp dir: %v", err)
-	}()
-	return s.unpackedSrc.Close()
+	if err := s.unpackedSrc.Close(); err != nil {
+		return err
+	}
+	if s.individualReaderOrNil == nil {
+		return nil
+	}
+	return s.individualReaderOrNil.Close()
 }
 
 // GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).
