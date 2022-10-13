@@ -1,6 +1,8 @@
 package docker
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -185,5 +187,61 @@ func TestUserAgent(t *testing.T) {
 		if err := CheckAuth(context.Background(), tc.sys, "", "", registry); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
+	}
+}
+
+func TestIsManifestUnknownError(t *testing.T) {
+	// Mostly a smoke test; we can add more registries here if they need special handling.
+
+	for _, c := range []struct{ name, response string }{
+		{
+			name: "docker.io when a tag in an _existing repo_ is not found",
+			response: "HTTP/1.1 404 Not Found\r\n" +
+				"Connection: close\r\n" +
+				"Content-Length: 109\r\n" +
+				"Content-Type: application/json\r\n" +
+				"Date: Thu, 12 Aug 2021 20:51:32 GMT\r\n" +
+				"Docker-Distribution-Api-Version: registry/2.0\r\n" +
+				"Ratelimit-Limit: 100;w=21600\r\n" +
+				"Ratelimit-Remaining: 100;w=21600\r\n" +
+				"Strict-Transport-Security: max-age=31536000\r\n" +
+				"\r\n" +
+				"{\"errors\":[{\"code\":\"MANIFEST_UNKNOWN\",\"message\":\"manifest unknown\",\"detail\":{\"Tag\":\"this-does-not-exist\"}}]}\n",
+		},
+		{
+			name: "registry.redhat.io/v2/this-does-not-exist/manifests/latest",
+			response: "HTTP/1.1 404 Not Found\r\n" +
+				"Connection: close\r\n" +
+				"Content-Length: 53\r\n" +
+				"Cache-Control: max-age=0, no-cache, no-store\r\n" +
+				"Content-Type: application/json\r\n" +
+				"Date: Thu, 13 Oct 2022 18:15:15 GMT\r\n" +
+				"Expires: Thu, 13 Oct 2022 18:15:15 GMT\r\n" +
+				"Pragma: no-cache\r\n" +
+				"Server: Apache\r\n" +
+				"Strict-Transport-Security: max-age=63072000; includeSubdomains; preload\r\n" +
+				"X-Hostname: crane-tbr06.cran-001.prod.iad2.dc.redhat.com\r\n" +
+				"\r\n" +
+				"{\"errors\": [{\"code\": \"404\", \"message\": \"Not Found\"}]}\r\n",
+		},
+		{
+			name: "registry.redhat.io/v2/rhosp15-rhel8/openstack-cron/manifests/sha256-8df5e60c42668706ac108b59c559b9187fa2de7e4e262e2967e3e9da35d5a8d7.sig",
+			response: "HTTP/1.1 404 Not Found\r\n" +
+				"Connection: close\r\n" +
+				"Content-Length: 10\r\n" +
+				"Accept-Ranges: bytes\r\n" +
+				"Date: Thu, 13 Oct 2022 18:13:53 GMT\r\n" +
+				"Server: AkamaiNetStorage\r\n" +
+				"X-Docker-Size: -1\r\n" +
+				"\r\n" +
+				"Not found\r\n",
+		},
+	} {
+		resp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader([]byte(c.response))), nil)
+		require.NoError(t, err, c.name)
+		err = fmt.Errorf("wrapped: %w", registryHTTPResponseToError(resp))
+
+		res := isManifestUnknownError(err)
+		assert.True(t, res, "%#v", err, c.name)
 	}
 }
