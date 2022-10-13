@@ -119,6 +119,60 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				}, e)
 			},
 		},
+		{ // registry.redhat.io is not compliant, variant 1: invalid "code" value
+			name: "registry.redhat.io/v2/this-does-not-exist/manifests/latest",
+			response: "HTTP/1.1 404 Not Found\r\n" +
+				"Connection: close\r\n" +
+				"Content-Length: 53\r\n" +
+				"Cache-Control: max-age=0, no-cache, no-store\r\n" +
+				"Content-Type: application/json\r\n" +
+				"Date: Thu, 13 Oct 2022 18:15:15 GMT\r\n" +
+				"Expires: Thu, 13 Oct 2022 18:15:15 GMT\r\n" +
+				"Pragma: no-cache\r\n" +
+				"Server: Apache\r\n" +
+				"Strict-Transport-Security: max-age=63072000; includeSubdomains; preload\r\n" +
+				"X-Hostname: crane-tbr06.cran-001.prod.iad2.dc.redhat.com\r\n" +
+				"\r\n" +
+				"{\"errors\": [{\"code\": \"404\", \"message\": \"Not Found\"}]}\r\n",
+			errorString:       "unknown: Not Found",
+			errorType:         errcode.Error{},
+			unwrappedErrorPtr: &unwrappedErrcodeError,
+			errorCode:         &errcode.ErrorCodeUnknown,
+			fn: func(t *testing.T, err error) {
+				var e errcode.Error
+				ok := errors.As(err, &e)
+				require.True(t, ok)
+				// isManifestUnknownError is checking for this
+				assert.Equal(t, errcode.Error{
+					Code:    errcode.ErrorCodeUnknown, // The 404 value is not defined, and turns into Unknown
+					Message: "Not Found",
+					Detail:  nil,
+				}, e)
+			},
+		},
+		{ // registry.redhat.io is not compliant, variant 2: a completely out-of-protocol response
+			name: "registry.redhat.io/v2/rhosp15-rhel8/openstack-cron/manifests/sha256-8df5e60c42668706ac108b59c559b9187fa2de7e4e262e2967e3e9da35d5a8d7.sig",
+			response: "HTTP/1.1 404 Not Found\r\n" +
+				"Connection: close\r\n" +
+				"Content-Length: 10\r\n" +
+				"Accept-Ranges: bytes\r\n" +
+				"Date: Thu, 13 Oct 2022 18:13:53 GMT\r\n" +
+				"Server: AkamaiNetStorage\r\n" +
+				"X-Docker-Size: -1\r\n" +
+				"\r\n" +
+				"Not found\r\n",
+			errorString:       "StatusCode: 404, Not found\r",
+			errorType:         nil,
+			unwrappedErrorPtr: &unwrappedUnexpectedHTTPResponseError,
+			fn: func(t *testing.T, err error) {
+				var e *unexpectedHTTPResponseError
+				ok := errors.As(err, &e)
+				require.True(t, ok)
+				// isManifestUnknownError is checking for this
+				assert.Equal(t, 404, e.StatusCode)
+				assert.Equal(t, []byte("Not found\r"), e.Response)
+			},
+		},
 	} {
 		res, err := http.ReadResponse(bufio.NewReader(bytes.NewReader([]byte(c.response))), nil)
 		require.NoError(t, err, c.name)
