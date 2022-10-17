@@ -62,7 +62,9 @@
     // N/B: LAST MATCHING RULE WINS
     // https://docs.renovatebot.com/configuration-options/#packagerules
     "packageRules": [
-      // Leave developers in control, never update golang version automatically.
+      // Workaround https://github.com/renovatebot/renovate/issues/16715
+      // our own way.  Rec. workaround in issue seems to disable more than
+      // only golang updates.
       {
         "matchDatasources": ["golang-version"],
         "enabled": false,
