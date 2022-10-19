@@ -48,45 +48,4 @@
 
   // Don't leave dep. update. PRs "hanging", assign them to people.
   "assignees": ["containers/image-maintainers"],
-
-  /*************************************************
-   ***** Golang-specific configuration options *****
-   *************************************************/
-
-  "golang": {
-    "commitMessageTopic": "module {{depName}}",
-
-    // disabled by default, safe to enable since "tidy" enforced by CI.
-    "postUpdateOptions": ["gomodTidy"],
-
-    // N/B: LAST MATCHING RULE WINS
-    // https://docs.renovatebot.com/configuration-options/#packagerules
-    "packageRules": [
-      // Workaround https://github.com/renovatebot/renovate/issues/16715
-      // our own way.  Rec. workaround in issue seems to disable more than
-      // only golang updates.
-      {
-        "matchDatasources": ["golang-version"],
-        "enabled": false,
-      },
-
-      // Golang pseudo-version packages will spam with every Commit ID change.
-      // Limit update frequency.
-      {
-        "matchUpdateTypes": ["digest"],
-        "schedule": "every month",
-      },
-
-      // Workaround: rollbackPRs are not compatible with digest updates.
-      // This rule must appear AFTER the "digest" rule.
-      // Ref: https://github.com/renovatebot/renovate/discussions/18250
-      {
-        "matchLanguages": ["go"],
-
-        // Open rollback PR if updated dep. is removed (i.e. tag pulled
-        // due to major bug or security issue).
-        "rollbackPrs": true,
-      },
-    ],
-  },
 }
