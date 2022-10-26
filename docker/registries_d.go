@@ -201,8 +201,8 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 		identity := ref.PolicyConfigurationIdentity()
 		if ns, ok := config.Docker[identity]; ok {
 			logrus.Debugf(` Lookaside configuration: using "docker" namespace %s`, identity)
-			if url := ns.signatureTopLevel(write); url != "" {
-				return url
+			if ret := ns.signatureTopLevel(write); ret != "" {
+				return ret
 			}
 		}
 
@@ -210,8 +210,8 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 		for _, name := range ref.PolicyConfigurationNamespaces() {
 			if ns, ok := config.Docker[name]; ok {
 				logrus.Debugf(` Lookaside configuration: using "docker" namespace %s`, name)
-				if url := ns.signatureTopLevel(write); url != "" {
-					return url
+				if ret := ns.signatureTopLevel(write); ret != "" {
+					return ret
 				}
 			}
 		}
@@ -219,8 +219,8 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 	// Look for a default location
 	if config.DefaultDocker != nil {
 		logrus.Debugf(` Lookaside configuration: using "default-docker" configuration`)
-		if url := config.DefaultDocker.signatureTopLevel(write); url != "" {
-			return url
+		if ret := config.DefaultDocker.signatureTopLevel(write); ret != "" {
+			return ret
 		}
 	}
 	return ""
@@ -287,7 +287,7 @@ func (ns registryNamespace) signatureTopLevel(write bool) string {
 // base is not nil from the caller
 // NOTE: Keep this in sync with docs/signature-protocols.md!
 func lookasideStorageURL(base lookasideStorageBase, manifestDigest digest.Digest, index int) *url.URL {
-	url := *base
-	url.Path = fmt.Sprintf("%s@%s=%s/signature-%d", url.Path, manifestDigest.Algorithm(), manifestDigest.Hex(), index+1)
-	return &url
+	sigURL := *base
+	sigURL.Path = fmt.Sprintf("%s@%s=%s/signature-%d", sigURL.Path, manifestDigest.Algorithm(), manifestDigest.Hex(), index+1)
+	return &sigURL
 }
