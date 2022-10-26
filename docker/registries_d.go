@@ -163,17 +163,17 @@ func loadAndMergeConfig(dirPath string) (*registryConfiguration, error) {
 // the usage of the BaseURL is defined under docker/distribution registries—separate storage of docs/signature-protocols.md
 func (config *registryConfiguration) lookasideStorageBaseURL(dr dockerReference, write bool) (*url.URL, error) {
 	topLevel := config.signatureTopLevel(dr, write)
-	var url *url.URL
+	var baseURL *url.URL
 	if topLevel != "" {
 		u, err := url.Parse(topLevel)
 		if err != nil {
 			return nil, fmt.Errorf("Invalid signature storage URL %s: %w", topLevel, err)
 		}
-		url = u
+		baseURL = u
 	} else {
 		// returns default directory if no lookaside specified in configuration file
-		url = builtinDefaultLookasideStorageDir(rootless.GetRootlessEUID())
-		logrus.Debugf(" No signature storage configuration found for %s, using built-in default %s", dr.PolicyConfigurationIdentity(), url.Redacted())
+		baseURL = builtinDefaultLookasideStorageDir(rootless.GetRootlessEUID())
+		logrus.Debugf(" No signature storage configuration found for %s, using built-in default %s", dr.PolicyConfigurationIdentity(), baseURL.Redacted())
 	}
 	// NOTE: Keep this in sync with docs/signature-protocols.md!
 	// FIXME? Restrict to explicitly supported schemes?
@@ -181,8 +181,8 @@ func (config *registryConfiguration) lookasideStorageBaseURL(dr dockerReference,
 	if path.Clean(repo) != repo {  // Coverage: This should not be reachable because /./ and /../ components are not valid in docker references
 		return nil, fmt.Errorf("Unexpected path elements in Docker reference %s for signature storage", dr.ref.String())
 	}
-	url.Path = url.Path + "/" + repo
-	return url, nil
+	baseURL.Path = baseURL.Path + "/" + repo
+	return baseURL, nil
 }
 
 // builtinDefaultLookasideStorageDir returns default signature storage URL as per euid
