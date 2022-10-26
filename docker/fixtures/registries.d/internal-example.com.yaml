@@ -12,3 +12,7 @@ docker:
         lookaside: file:///home/mitr/mydevelopment2
     localhost/invalid/url/test:
         lookaside: ":emptyscheme"
+    localhost/file/path/test:
+        lookaside: "/no/scheme/just/a/path"
+    localhost/relative/path/test:
+        lookaside: "no/scheme/relative/path"

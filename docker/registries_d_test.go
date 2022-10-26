@@ -21,31 +21,48 @@ func dockerRefFromString(t *testing.T, s string) dockerReference {
 }
 
 func TestSignatureStorageBaseURL(t *testing.T) {
-	// Error reading configuration directory (/dev/null is not a directory)
-	_, err := SignatureStorageBaseURL(&types.SystemContext{RegistriesDirPath: "/dev/null"},
-		dockerRefFromString(t, "//busybox"), false)
-	assert.Error(t, err)
-
-	// No match found
-	// expect default user storage base
 	emptyDir := t.TempDir()
-	base, err := SignatureStorageBaseURL(&types.SystemContext{RegistriesDirPath: emptyDir},
-		dockerRefFromString(t, "//this/is/not/in/the:configuration"), false)
-	assert.NoError(t, err)
-	assert.NotNil(t, base)
-	assert.Equal(t, "file://"+filepath.Join(os.Getenv("HOME"), defaultUserDockerDir, "//this/is/not/in/the"), base.String())
-
-	// Invalid URL
-	_, err = SignatureStorageBaseURL(&types.SystemContext{RegistriesDirPath: "fixtures/registries.d"},
-		dockerRefFromString(t, "//localhost/invalid/url/test"), false)
-	assert.Error(t, err)
-
-	// Success
-	base, err = SignatureStorageBaseURL(&types.SystemContext{RegistriesDirPath: "fixtures/registries.d"},
-		dockerRefFromString(t, "//example.com/my/project"), false)
-	assert.NoError(t, err)
-	require.NotNil(t, base)
-	assert.Equal(t, "https://lookaside.example.com/my/project", base.String())
+	for _, c := range []struct {
+		dir, ref string
+		expected string // Or "" to expect failure
+	}{
+		{ // Error reading configuration directory (/dev/null is not a directory)
+			"/dev/null", "//busybox",
+			"",
+		},
+		{ // No match found: expect default user storage base
+			emptyDir, "//this/is/not/in/the:configuration",
+			"file://" + filepath.Join(os.Getenv("HOME"), defaultUserDockerDir, "//this/is/not/in/the"),
+		},
+		{ // Invalid URL
+			"fixtures/registries.d", "//localhost/invalid/url/test",
+			"",
+		},
+		// URLs without a scheme: This will be rejected by consumers, so we don't really care about
+		// the returned value, but it should not crash at the very least.
+		{ // Absolute path
+			"fixtures/registries.d", "//localhost/file/path/test",
+			"/no/scheme/just/a/path/file/path/test",
+		},
+		{ // Relative path
+			"fixtures/registries.d", "//localhost/relative/path/test",
+			"no/scheme/relative/path/relative/path/test",
+		},
+		{ // Success
+			"fixtures/registries.d", "//example.com/my/project",
+			"https://lookaside.example.com/my/project",
+		},
+	} {
+		base, err := SignatureStorageBaseURL(&types.SystemContext{RegistriesDirPath: c.dir},
+			dockerRefFromString(t, c.ref), false)
+		if c.expected != "" {
+			require.NoError(t, err, c.ref)
+			require.NotNil(t, base, c.ref)
+			assert.Equal(t, c.expected, base.String(), c.ref)
+		} else {
+			assert.Error(t, err, c.ref)
+		}
+	}
 }
 
 func TestRegistriesDirPath(t *testing.T) {
@@ -192,6 +209,8 @@ func TestLoadAndMergeConfig(t *testing.T) {
 			"localhost":                      {Lookaside: "file:///home/mitr/mydevelopment1"},
 			"localhost:8080":                 {Lookaside: "file:///home/mitr/mydevelopment2"},
 			"localhost/invalid/url/test":     {Lookaside: ":emptyscheme"},
+			"localhost/file/path/test":       {Lookaside: "/no/scheme/just/a/path"},
+			"localhost/relative/path/test":   {Lookaside: "no/scheme/relative/path"},
 			"docker.io/contoso":              {Lookaside: "https://lookaside.contoso.com/fordocker"},
 			"docker.io/centos":               {Lookaside: "https://lookaside.centos.org/"},
 			"docker.io/centos/mybetaproduct": {
@@ -297,11 +316,11 @@ func TestLookasideStorageURL(t *testing.T) {
 		{"http://localhost:5555/root", 0, "http://localhost:5555/root@" + mdMapped + "/signature-1"},
 		{"http://localhost:5555/root", 1, "http://localhost:5555/root@" + mdMapped + "/signature-2"},
 	} {
-		url, err := url.Parse(c.base)
+		baseURL, err := url.Parse(c.base)
 		require.NoError(t, err)
 		expectedURL, err := url.Parse(c.expected)
 		require.NoError(t, err)
-		res := lookasideStorageURL(url, mdInput, c.index)
+		res := lookasideStorageURL(baseURL, mdInput, c.index)
 		assert.Equal(t, expectedURL, res, c.expected)
 	}
 }
