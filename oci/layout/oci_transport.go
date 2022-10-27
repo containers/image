@@ -181,23 +181,18 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 
 	if ref.image == "" {
 		// return manifest if only one image is in the oci directory
-		if len(index.Manifests) == 1 {
-			return index.Manifests[0], nil
-		} else {
+		if len(index.Manifests) != 1 {
 			// ask user to choose image when more than one image in the oci directory
 			return imgspecv1.Descriptor{}, ErrMoreThanOneImage
 		}
+		return index.Manifests[0], nil
 	} else {
 		// if image specified, look through all manifests for a match
 		for _, md := range index.Manifests {
 			if md.MediaType != imgspecv1.MediaTypeImageManifest && md.MediaType != imgspecv1.MediaTypeImageIndex {
 				continue
 			}
-			refName, ok := md.Annotations[imgspecv1.AnnotationRefName]
-			if !ok {
-				continue
-			}
-			if refName == ref.image {
+			if refName, ok := md.Annotations[imgspecv1.AnnotationRefName]; ok && refName == ref.image {
 				return md, nil
 			}
 		}
