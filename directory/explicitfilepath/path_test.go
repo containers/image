@@ -133,7 +133,7 @@ func runPathResolvingTestCase(t *testing.T, f func(string) (string, error), c pa
 	input := c.setup(t, topDir) + suffix // Do not call filepath.Join() on input, it calls filepath.Clean() internally!
 	description := fmt.Sprintf("%s vs. %s%s", input, c.expected, suffix)
 
-	fullOutput, err := ResolvePathToFullyExplicit(topDir + "/" + input)
+	fullOutput, err := f(topDir + "/" + input)
 	if c.expected == "" {
 		assert.Error(t, err, description)
 	} else {
