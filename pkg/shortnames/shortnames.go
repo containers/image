@@ -168,7 +168,7 @@ func (r *Resolved) Description() string {
 // Note that nil is returned if len(pullErrors) == 0.  Otherwise, the amount of
 // pull errors must equal the amount of pull candidates.
 func (r *Resolved) FormatPullErrors(pullErrors []error) error {
-	if len(pullErrors) >= 0 && len(pullErrors) != len(r.PullCandidates) {
+	if len(pullErrors) > 0 && len(pullErrors) != len(r.PullCandidates) {
 		pullErrors = append(pullErrors,
 			fmt.Errorf("internal error: expected %d instead of %d errors for %d pull candidates",
 				len(r.PullCandidates), len(pullErrors), len(r.PullCandidates)))
