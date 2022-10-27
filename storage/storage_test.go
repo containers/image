@@ -475,7 +475,7 @@ func TestWriteRead(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetManifest(%q) with an instanceDigest is supposed to succeed", ref.StringWithinTransport())
 		}
-		if string(retrieved) != string(manifest) {
+		if string(retrieved) != manifest {
 			t.Fatalf("GetManifest(%q) with an instanceDigest retrieved a different manifest", ref.StringWithinTransport())
 		}
 		sigs, err := src.GetSignatures(context.Background(), nil)
@@ -603,7 +603,7 @@ func TestDuplicateName(t *testing.T) {
 	}
 	digest, _, size, blob = makeLayer(t, archive.Gzip)
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
-		Size:   int64(size),
+		Size:   size,
 		Digest: digest,
 	}, cache, false); err != nil {
 		t.Fatalf("Error saving randomly-generated layer to destination, second pass: %v", err)
@@ -702,7 +702,7 @@ func TestDuplicateID(t *testing.T) {
 	}
 	digest, _, size, blob = makeLayer(t, archive.Gzip)
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
-		Size:   int64(size),
+		Size:   size,
 		Digest: digest,
 	}, cache, false); err != nil {
 		t.Fatalf("Error saving randomly-generated layer to destination, second pass: %v", err)
@@ -804,7 +804,7 @@ func TestDuplicateNameID(t *testing.T) {
 	}
 	digest, _, size, blob = makeLayer(t, archive.Gzip)
 	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
-		Size:   int64(size),
+		Size:   size,
 		Digest: digest,
 	}, cache, false); err != nil {
 		t.Fatalf("Error saving randomly-generated layer to destination, second pass: %v", err)
