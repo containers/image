@@ -179,11 +179,10 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 		return imgspecv1.Descriptor{}, err
 	}
 
-	var d *imgspecv1.Descriptor
 	if ref.image == "" {
 		// return manifest if only one image is in the oci directory
 		if len(index.Manifests) == 1 {
-			d = &index.Manifests[0]
+			return index.Manifests[0], nil
 		} else {
 			// ask user to choose image when more than one image in the oci directory
 			return imgspecv1.Descriptor{}, ErrMoreThanOneImage
@@ -199,15 +198,11 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 				continue
 			}
 			if refName == ref.image {
-				d = &md
-				break
+				return md, nil
 			}
 		}
 	}
-	if d == nil {
-		return imgspecv1.Descriptor{}, ImageNotFoundError{ref}
-	}
-	return *d, nil
+	return imgspecv1.Descriptor{}, ImageNotFoundError{ref}
 }
 
 // LoadManifestDescriptor loads the manifest descriptor to be used to retrieve the image name
