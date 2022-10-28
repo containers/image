@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/manifest"
@@ -53,7 +54,13 @@ func (pr *prSigstoreSigned) isSignatureAccepted(ctx context.Context, image priva
 	signature, err := internal.VerifySigstorePayload(publicKey, sig.UntrustedPayload(), untrustedBase64Signature, internal.SigstorePayloadAcceptanceRules{
 		ValidateSignedDockerReference: func(ref string) error {
 			if !pr.SignedIdentity.matchesDockerReference(image, ref) {
-				return PolicyRequirementError(fmt.Sprintf("Signature for identity %s is not accepted", ref))
+				// If reference from sigstore attachment manifest failed, try to use image reference
+				var imgref string
+				imgref = image.Reference().DockerReference().Name()
+				logrus.Debugf("Signature for identity %s is not accepted, try to use image reference %s", ref, imgref)
+				if !pr.SignedIdentity.matchesDockerReference(image, imgref) {
+					return PolicyRequirementError(fmt.Sprintf("Signature for identity %s is not accepted neither", imgref))
+				}
 			}
 			return nil
 		},
