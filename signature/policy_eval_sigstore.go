@@ -52,8 +52,10 @@ func (pr *prSigstoreSigned) isSignatureAccepted(ctx context.Context, image priva
 
 	signature, err := internal.VerifySigstorePayload(publicKey, sig.UntrustedPayload(), untrustedBase64Signature, internal.SigstorePayloadAcceptanceRules{
 		ValidateSignedDockerReference: func(ref string) error {
-			if !pr.SignedIdentity.matchesDockerReference(image, ref) {
-				return PolicyRequirementError(fmt.Sprintf("Signature for identity %s is not accepted", ref))
+			// If reference from sigstore attachment manifest failed, try to use image reference
+			var imgref string = image.Reference().DockerReference().Name()
+			if !pr.SignedIdentity.matchesDockerReference(image, ref) && !pr.SignedIdentity.matchesDockerReference(image, imgref) {
+				return PolicyRequirementError(fmt.Sprintf("Signature for identity %s or %s are not accepted", ref, imgref))
 			}
 			return nil
 		},
