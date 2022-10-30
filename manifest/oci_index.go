@@ -69,11 +69,10 @@ func (index *OCI1Index) UpdateInstances(updates []ListUpdate) error {
 	return nil
 }
 
-func (list *OCI1Index) RemoveInstance(d digest.Digest) {
-	// Not implemented in the most efficient way currently, we first want to just get this working
-	var result []imgspecv1.Descriptor
+func (list *OCI1Index) RemoveInstance(imageDigest digest.Digest) {
+	var result = make([]imgspecv1.Descriptor, 0, len(list.Manifests))
 	for _, manifest := range list.Manifests {
-		if manifest.Digest != d {
+		if manifest.Digest != imageDigest {
 			result = append(result, manifest)
 		}
 	}

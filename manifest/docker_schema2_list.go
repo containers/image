@@ -85,11 +85,10 @@ func (list *Schema2List) UpdateInstances(updates []ListUpdate) error {
 	return nil
 }
 
-func (list *Schema2List) RemoveInstance(d digest.Digest) {
-	// Not implemented in the most efficient way currently, we first want to just get this working
-	var result []Schema2ManifestDescriptor
+func (list *Schema2List) RemoveInstance(imageDigest digest.Digest) {
+	var result = make([]Schema2ManifestDescriptor, 0, len(list.Manifests))
 	for _, manifest := range list.Manifests {
-		if manifest.Digest != d {
+		if manifest.Digest != imageDigest {
 			result = append(result, manifest)
 		}
 	}

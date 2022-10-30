@@ -119,6 +119,22 @@ const (
 // specific images from the source reference.
 type ImageListSelection int
 
+const (
+	// SparseManifestListAction is the default value which, when set in
+	// Options.SparseManifestListAction, indicates that the manifest is kept
+	// as is even though some images from the list may be missing. Some
+	// registries may not support this.
+	KeepSparseManifestList SparseManifestListAction = iota
+
+	// StripSparseManifestList will strip missing images from the manifest
+	// list. When images are stripped the digest will differ from the original.
+	StripSparseManifestList
+)
+
+// SparseImageListAction is one of KeepSparseManifestList or StripSparseManifestList
+// to control the behavior when only a subset of images from a manifest list is copied
+type SparseManifestListAction int
+
 // Options allows supplying non-default configuration modifying the behavior of CopyImage.
 type Options struct {
 	RemoveSignatures                 bool            // Remove any pre-existing signatures. SignBy will still add a new signature.
@@ -171,7 +187,7 @@ type Options struct {
 	DownloadForeignLayers bool
 
 	// When not all images of a manifest list are copied, strip the other images from the list. The digest will differ from the original if so.
-	StripManifestList bool
+	SparseImageListAction SparseManifestListAction
 }
 
 // validateImageListSelection returns an error if the passed-in value is not one that we recognize as a valid ImageListSelection value
@@ -516,7 +532,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	}
 
 	// Remove skipped images from the manifest if StripManifestList == true
-	if options.StripManifestList {
+	if options.SparseImageListAction == StripSparseManifestList {
 		for _, d := range skipped {
 			logrus.Debugf("Removeing instance %s from manifest list", d)
 
