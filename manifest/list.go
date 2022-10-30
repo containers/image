@@ -33,6 +33,10 @@ type List interface {
 	// must be specified.
 	UpdateInstances([]ListUpdate) error
 
+	// RemoveInstance removes the instance with the given digest from the list. If no such instance
+	// exists the list is left unchanged.
+	RemoveInstance(digest.Digest)
+
 	// Instance returns the size and MIME type of a particular instance in the list.
 	Instance(digest.Digest) (ListUpdate, error)
 

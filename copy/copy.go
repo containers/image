@@ -169,6 +169,9 @@ type Options struct {
 	// Download layer contents with "nondistributable" media types ("foreign" layers) and translate the layer media type
 	// to not indicate "nondistributable".
 	DownloadForeignLayers bool
+
+	// When not all images of a manifest list are copied, strip the other images from the list. The digest will differ from the original if so.
+	StripManifestList bool
 }
 
 // validateImageListSelection returns an error if the passed-in value is not one that we recognize as a valid ImageListSelection value
@@ -467,6 +470,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	}
 	c.Printf("Copying %d of %d images in list\n", imagesToCopy, len(instanceDigests))
 	updates := make([]manifest.ListUpdate, len(instanceDigests))
+	var skipped []digest.Digest
 	instancesCopied := 0
 	for i, instanceDigest := range instanceDigests {
 		if options.ImageListSelection == CopySpecificImages {
@@ -485,6 +489,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 				logrus.Debugf("Skipping instance %s (%d/%d)", instanceDigest, i+1, len(instanceDigests))
 				// Record the digest/size/type of the manifest that we didn't copy.
 				updates[i] = update
+				skipped = append(skipped, instanceDigest)
 				continue
 			}
 		}
@@ -508,6 +513,15 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	// Now reset the digest/size/types of the manifests in the list to account for any conversions that we made.
 	if err = updatedList.UpdateInstances(updates); err != nil {
 		return nil, fmt.Errorf("updating manifest list: %w", err)
+	}
+
+	// Remove skipped images from the manifest if StripManifestList == true
+	if options.StripManifestList {
+		for _, d := range skipped {
+			logrus.Debugf("Removeing instance %s from manifest list", d)
+
+			updatedList.RemoveInstance(d)
+		}
 	}
 
 	// Iterate through supported list types, preferred format first.

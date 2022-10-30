@@ -69,6 +69,17 @@ func (index *OCI1Index) UpdateInstances(updates []ListUpdate) error {
 	return nil
 }
 
+func (list *OCI1Index) RemoveInstance(d digest.Digest) {
+	// Not implemented in the most efficient way currently, we first want to just get this working
+	var result []imgspecv1.Descriptor
+	for _, manifest := range list.Manifests {
+		if manifest.Digest != d {
+			result = append(result, manifest)
+		}
+	}
+	list.Manifests = result
+}
+
 // ChooseInstance parses blob as an oci v1 manifest index, and returns the digest
 // of the image which is appropriate for the current environment.
 func (index *OCI1Index) ChooseInstance(ctx *types.SystemContext) (digest.Digest, error) {
