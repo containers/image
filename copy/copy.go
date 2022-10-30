@@ -534,8 +534,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	// Remove skipped images from the manifest if StripManifestList == true
 	if options.SparseImageListAction == StripSparseManifestList {
 		for _, d := range skipped {
-			logrus.Debugf("Removeing instance %s from manifest list", d)
-
+			logrus.Debugf("Removing instance %s from manifest list", d)
 			updatedList.RemoveInstance(d)
 		}
 	}
