@@ -85,16 +85,6 @@ func (list *Schema2List) UpdateInstances(updates []ListUpdate) error {
 	return nil
 }
 
-func (list *Schema2List) RemoveInstance(imageDigest digest.Digest) {
-	var result = make([]Schema2ManifestDescriptor, 0, len(list.Manifests))
-	for _, manifest := range list.Manifests {
-		if manifest.Digest != imageDigest {
-			result = append(result, manifest)
-		}
-	}
-	list.Manifests = result
-}
-
 // ChooseInstance parses blob as a schema2 manifest list, and returns the digest
 // of the image which is appropriate for the current environment.
 func (list *Schema2List) ChooseInstance(ctx *types.SystemContext) (digest.Digest, error) {

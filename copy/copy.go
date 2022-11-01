@@ -410,6 +410,33 @@ func compareImageDestinationManifestEqual(ctx context.Context, options *Options,
 	return true, destManifest, destManifestType, destManifestDigest, nil
 }
 
+// removeInstanceFromList removes the given image from the list
+// this should probably move to an internal API
+func removeInstanceFromList(manifestList manifest.List, imageDigest digest.Digest) error {
+	switch list := manifestList.(type) {
+	case *manifest.Schema2List:
+		var result = make([]manifest.Schema2ManifestDescriptor, 0, len(list.Manifests))
+		for _, manifest := range list.Manifests {
+			if manifest.Digest != imageDigest {
+				result = append(result, manifest)
+			}
+		}
+		list.Manifests = result
+		return nil
+	case *manifest.OCI1Index:
+		var result = make([]imgspecv1.Descriptor, 0, len(list.Manifests))
+		for _, manifest := range list.Manifests {
+			if manifest.Digest != imageDigest {
+				result = append(result, manifest)
+			}
+		}
+		list.Manifests = result
+		return nil
+	default:
+		return fmt.Errorf("stripping images from manifest list type %s is not supported", manifestList.MIMEType())
+	}
+}
+
 // copyMultipleImages copies some or all of an image list's instances, using
 // policyContext to validate source image admissibility.
 func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signature.PolicyContext, options *Options, unparsedToplevel *image.UnparsedImage) (copiedManifest []byte, retErr error) {
@@ -536,7 +563,9 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	if options.SparseImageListAction == StripSparseManifestList {
 		for _, d := range skipped {
 			logrus.Debugf("Removing instance %s from manifest list", d)
-			updatedList.RemoveInstance(d)
+			if err := removeInstanceFromList(updatedList, d); err != nil {
+				return nil, fmt.Errorf("Striping manifest list: %w", err)
+			}
 		}
 	}
 
