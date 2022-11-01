@@ -412,12 +412,12 @@ func compareImageDestinationManifestEqual(ctx context.Context, options *Options,
 
 // removeInstanceFromList removes the given image from the list
 // this should probably move to an internal API
-func removeInstanceFromList(manifestList manifest.List, imageDigest digest.Digest) error {
+func removeInstancesFromList(manifestList manifest.List, imageIndices map[int]bool) error {
 	switch list := manifestList.(type) {
 	case *manifest.Schema2List:
 		var result = make([]manifest.Schema2ManifestDescriptor, 0, len(list.Manifests))
-		for _, manifest := range list.Manifests {
-			if manifest.Digest != imageDigest {
+		for i, manifest := range list.Manifests {
+			if !imageIndices[i] {
 				result = append(result, manifest)
 			}
 		}
@@ -425,8 +425,8 @@ func removeInstanceFromList(manifestList manifest.List, imageDigest digest.Diges
 		return nil
 	case *manifest.OCI1Index:
 		var result = make([]imgspecv1.Descriptor, 0, len(list.Manifests))
-		for _, manifest := range list.Manifests {
-			if manifest.Digest != imageDigest {
+		for i, manifest := range list.Manifests {
+			if !imageIndices[i] {
 				result = append(result, manifest)
 			}
 		}
@@ -514,7 +514,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	}
 	c.Printf("Copying %d of %d images in list\n", imagesToCopy, len(instanceDigests))
 	updates := make([]manifest.ListUpdate, len(instanceDigests))
-	var skipped []digest.Digest
+	skipped := make(map[int]bool)
 	instancesCopied := 0
 	for i, instanceDigest := range instanceDigests {
 		if options.ImageListSelection == CopySpecificImages {
@@ -533,7 +533,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 				logrus.Debugf("Skipping instance %s (%d/%d)", instanceDigest, i+1, len(instanceDigests))
 				// Record the digest/size/type of the manifest that we didn't copy.
 				updates[i] = update
-				skipped = append(skipped, instanceDigest)
+				skipped[i] = true
 				continue
 			}
 		}
@@ -561,11 +561,9 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 
 	// Remove skipped images from the manifest if StripManifestList == true
 	if options.SparseImageListAction == StripSparseManifestList {
-		for _, d := range skipped {
-			logrus.Debugf("Removing instance %s from manifest list", d)
-			if err := removeInstanceFromList(updatedList, d); err != nil {
-				return nil, fmt.Errorf("Striping manifest list: %w", err)
-			}
+		logrus.Debugf("Removing instances %v from manifest list", skipped)
+		if err := removeInstancesFromList(updatedList, skipped); err != nil {
+			return nil, fmt.Errorf("striping manifest list: %w", err)
 		}
 	}
 
