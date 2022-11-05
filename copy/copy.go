@@ -186,7 +186,7 @@ type Options struct {
 	// to not indicate "nondistributable".
 	DownloadForeignLayers bool
 
-	// When only a subset of images of a list is copied, this action indicates if the manifest should be kept or stript.
+	// When only a subset of images of a list is copied, this action indicates if the manifest should be kept or stripped.
 	// See CopySpecificImages.
 	SparseImageListAction SparseManifestListAction
 }
