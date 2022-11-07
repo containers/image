@@ -25,7 +25,7 @@ require (
 	github.com/sigstore/sigstore v1.4.5
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
-	github.com/sylabs/sif/v2 v2.8.1
+	github.com/sylabs/sif/v2 v2.8.3
 	github.com/theupdateframework/go-tuf v0.5.2-0.20220930112810-3890c1e7ace4
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbatts/tar-split v0.11.2
