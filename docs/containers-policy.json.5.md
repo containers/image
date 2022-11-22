@@ -30,7 +30,9 @@ Policy requirements can be defined for:
 
   Usually, a scope can be defined to match a single image, and various prefixes of
   such a most specific scope define namespaces of matching images.
+
 - A default policy for a single transport, expressed using an empty string as a scope
+
 - A global default policy.
 
 If multiple policy requirements match a given image, only the requirements from the most specific match apply,
