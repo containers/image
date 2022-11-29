@@ -2,7 +2,7 @@ package reference
 
 import "regexp"
 
-var (
+const (
 	// alphaNumeric defines the alpha numeric atom, typically a
 	// component of names. This only allows lower case characters and digits.
 	alphaNumeric = `[a-z0-9]+`
@@ -16,17 +16,30 @@ var (
 	// supported names.
 	separator = `(?:[._]|__|[-]*)`
 
+	// repository name to start with a component as defined by DomainRegexp
+	// and followed by an optional port.
+	domainComponent = `(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])`
+
+	// The string counterpart for TagRegexp.
+	tag = `[\w][\w.-]{0,127}`
+
+	// The string counterpart for DigestRegexp.
+	digestPat = `[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}`
+
+	// The string counterpart for IdentifierRegexp.
+	identifier = `([a-f0-9]{64})`
+
+	// The string counterpart for ShortIdentifierRegexp.
+	shortIdentifier = `([a-f0-9]{6,64})`
+)
+
+var (
 	// nameComponent restricts registry path component names to start
 	// with at least one letter or number, with following parts able to be
 	// separated by one period, one or two underscore and multiple dashes.
 	nameComponent = expression(
 		alphaNumeric,
 		optional(repeated(separator, alphaNumeric)))
-
-	// domainComponent restricts the registry domain component of a
-	// repository name to start with a component as defined by DomainRegexp
-	// and followed by an optional port.
-	domainComponent = `(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])`
 
 	domain = expression(
 		domainComponent,
@@ -38,7 +51,6 @@ var (
 	// names.
 	DomainRegexp = re(domain)
 
-	tag = `[\w][\w.-]{0,127}`
 	// TagRegexp matches valid tag names. From docker/docker:graph/tags.go.
 	TagRegexp = re(tag)
 
@@ -47,7 +59,6 @@ var (
 	// end of the matched string.
 	anchoredTagRegexp = re(anchoredTag)
 
-	digestPat = `[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}`
 	// DigestRegexp matches valid digests.
 	DigestRegexp = re(digestPat)
 
@@ -81,13 +92,11 @@ var (
 	// components.
 	ReferenceRegexp = re(referencePat)
 
-	identifier = `([a-f0-9]{64})`
 	// IdentifierRegexp is the format for string identifier used as a
 	// content addressable identifier using sha256. These identifiers
 	// are like digests without the algorithm, since sha256 is used.
 	IdentifierRegexp = re(identifier)
 
-	shortIdentifier = `([a-f0-9]{6,64})`
 	// ShortIdentifierRegexp is the format used to represent a prefix
 	// of an identifier. A prefix may be used to match a sha256 identifier
 	// within a list of trusted identifiers.
