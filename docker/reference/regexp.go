@@ -120,13 +120,7 @@ var re = regexp.MustCompile
 // literal compiles s into a literal regular expression, escaping any regexp
 // reserved characters.
 func literal(s string) string {
-	re := re(regexp.QuoteMeta(s))
-
-	if _, complete := re.LiteralPrefix(); !complete {
-		panic("must be a literal")
-	}
-
-	return re.String()
+	return regexp.QuoteMeta(s)
 }
 
 // expression defines a full expression, where each regular expression must
