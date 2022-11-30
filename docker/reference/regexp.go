@@ -1,6 +1,9 @@
 package reference
 
-import "regexp"
+import (
+	"regexp"
+	"strings"
+)
 
 const (
 	// alphaNumeric defines the alpha numeric atom, typically a
@@ -126,12 +129,7 @@ func literal(s string) string {
 // expression defines a full expression, where each regular expression must
 // follow the previous.
 func expression(res ...string) string {
-	var s string
-	for _, re := range res {
-		s += re
-	}
-
-	return s
+	return strings.Join(res, "")
 }
 
 // optional wraps the expression in a non-capturing group and makes the
