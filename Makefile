@@ -85,3 +85,6 @@ lint:
 	git fetch -q "https://github.com/containers/image.git" "refs/heads/main"
 	upstream="$$(git rev-parse --verify FETCH_HEAD)" ; \
 		$(GOBIN)/git-validation -q -run DCO,short-subject,dangling-whitespace -range $$upstream..HEAD
+
+vendor-in-container:
+	podman run --privileged --rm --env HOME=/root -v `pwd`:/src -w /src golang go mod tidy
