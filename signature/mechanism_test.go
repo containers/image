@@ -1,3 +1,6 @@
+//go:build cgo || containers_image_openpgp
+// +build cgo containers_image_openpgp
+
 package signature
 
 // These tests are expected to pass unmodified for _both_ mechanism_gpgme.go and mechanism_openpgp.go.
@@ -10,10 +13,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-)
-
-const (
-	testGPGHomeDirectory = "./fixtures"
 )
 
 // Many of the tests use two fixtures: V4 signature packets (*.signature), and V3 signature packets (*.signature-v3)

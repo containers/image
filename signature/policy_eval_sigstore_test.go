@@ -1,6 +1,9 @@
-// Policy evaluation for prCosignSigned.
+//go:build cgo || containers_image_openpgp
+// +build cgo containers_image_openpgp
 
 package signature
+
+// Policy evaluation for prCosignSigned.
 
 import (
 	"context"
