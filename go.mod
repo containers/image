@@ -32,7 +32,7 @@ require (
 	github.com/vbauerster/mpb/v7 v7.5.3
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.6
-	golang.org/x/crypto v0.3.0
+	golang.org/x/crypto v0.4.0
 	golang.org/x/net v0.3.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/term v0.3.0
