@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -35,6 +36,8 @@ type dockerConfigFile struct {
 	CredHelpers map[string]string           `json:"credHelpers,omitempty"`
 }
 
+// systemPath is the global auth path preferred for systemd services.
+var systemPath = authPath{path: filepath.FromSlash("/etc/containers/auth.json"), legacyFormat: false, requireUserOnly: true}
 var (
 	defaultPerUIDPathFormat = filepath.FromSlash("/run/containers/%d/auth.json")
 	xdgConfigHomePath       = filepath.FromSlash("containers/auth.json")
@@ -56,6 +59,8 @@ var (
 type authPath struct {
 	path         string
 	legacyFormat bool
+	// requireUserOnly will cause the file to be ignored if it is readable by group or other
+	requireUserOnly bool
 }
 
 // newAuthPathDefault constructs an authPath in non-legacy format.
@@ -143,8 +148,21 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 // The homeDir parameter should always be homedir.Get(), and is only intended to be overridden
 // by tests.
 func getAuthFilePaths(sys *types.SystemContext, homeDir string) []authPath {
+	runningInSystemd := os.Getenv("INVOCATION_ID") != ""
+	runningAsRoot := os.Getuid() == 0
+	runningSystemdPrivileged := runningInSystemd && runningAsRoot
+
 	paths := []authPath{}
 	pathToAuth, userSpecifiedPath, err := getPathToAuth(sys)
+
+	// If we're in systemd, prefer the global auth path first.
+	insertedGlobalPath := false
+	if !userSpecifiedPath && runningSystemdPrivileged {
+		paths = append(paths, systemPath)
+		insertedGlobalPath = true
+	}
+
+
 	if err == nil {
 		paths = append(paths, pathToAuth)
 	} else {
@@ -169,6 +187,12 @@ func getAuthFilePaths(sys *types.SystemContext, homeDir string) []authPath {
 		paths = append(paths,
 			authPath{path: filepath.Join(homeDir, dockerLegacyHomePath), legacyFormat: true},
 		)
+		// If we didn't already insert the global path, do it at the end if we're running as root.
+		// This will ensure the same semantics for code executed as systemd units and run
+		// from an interactive shell (as root) as long as there's no user-root owned configs.
+		if !insertedGlobalPath && runningAsRoot {
+			paths = append(paths, systemPath)
+		}
 	}
 	return paths
 }
@@ -596,13 +620,28 @@ func getPathToAuthWithOS(sys *types.SystemContext, goOS string) (authPath, bool,
 func (path authPath) parse() (dockerConfigFile, error) {
 	var fileContents dockerConfigFile
 
-	raw, err := os.ReadFile(path.path)
+	f, err := os.Open(path.path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			fileContents.AuthConfigs = map[string]dockerAuthConfig{}
 			return fileContents, nil
 		}
 		return dockerConfigFile{}, err
+	}
+	defer f.Close()
+	if path.requireUserOnly {
+		st, err := f.Stat()
+		if err != nil {
+			return dockerConfigFile{}, fmt.Errorf("stat %s: %w", path.path, err)
+		}
+		perms := st.Mode().Perm()
+		if (perms & 044) > 0 {
+			return dockerConfigFile{}, fmt.Errorf("refusing to process %s with group or world read permissions", path.path)
+		}
+	}
+	raw, err := io.ReadAll(f)
+	if err != nil {
+		return dockerConfigFile{}, fmt.Errorf("reading %s: %w", path.path, err)
 	}
 
 	if path.legacyFormat {

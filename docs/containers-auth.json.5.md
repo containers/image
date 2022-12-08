@@ -5,17 +5,22 @@ containers-auth.json - syntax for the registry authentication file
 
 # DESCRIPTION
 
-A file in JSON format controlling authentication against container image registries.
-The primary (read/write) file is stored at `${XDG_RUNTIME_DIR}/containers/auth.json` on Linux;
+A credentials file in JSON format used to authenticate against container image registries.
+The primary (read/write) per-user file is stored at `${XDG_RUNTIME_DIR}/containers/auth.json` on Linux;
 on Windows and macOS, at `$HOME/.config/containers/auth.json`.
 
-When searching for the credential for a registry, the following files will be read in sequence until the valid credential is found:
+There is also a system-global `/etc/containers/auth.json` path.  When the current process is executing inside systemd as root, this path will be preferred.
+
+When running as a user and searching for the credential for a registry, the following files will be read in sequence until the valid credential is found:
 first reading the primary (read/write) file, or the explicit override using an option of the calling application.
 If credentials are not present there,
 the search continues in `${XDG_CONFIG_HOME}/containers/auth.json` (usually `~/.config/containers/auth.json`), `$HOME/.docker/config.json`, `$HOME/.dockercfg`.
 
-Except for the primary (read/write) file, other files are read-only unless the user, using an option of the calling application, explicitly points at it as an override.
+If the current process is not running in systemd, but is running as root, the system global path will be read last.
 
+Except the primary (read/write) file, other files are read-only, unless the user use an option of the calling application explicitly points at it as an override.
+
+Note that the `/etc/containers/auth.json` file must not be readable by group or world (i.e. mode `044`), or a fatal error will occur.
 
 ## FORMAT
 
