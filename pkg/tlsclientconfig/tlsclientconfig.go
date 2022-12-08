@@ -2,6 +2,7 @@ package tlsclientconfig
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/docker/go-connections/sockets"
-	"github.com/docker/go-connections/tlsconfig"
 	"github.com/sirupsen/logrus"
 )
 
@@ -47,7 +47,7 @@ func SetupCertificates(dir string, tlsc *tls.Config) error {
 				return err
 			}
 			if tlsc.RootCAs == nil {
-				systemPool, err := tlsconfig.SystemCertPool()
+				systemPool, err := x509.SystemCertPool()
 				if err != nil {
 					return fmt.Errorf("unable to get system cert pool: %w", err)
 				}
