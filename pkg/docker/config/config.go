@@ -217,23 +217,25 @@ func getAuthFilePaths(sys *types.SystemContext, homeDir string) []authPath {
 		// Logging the error as a warning instead and moving on to pulling the image
 		logrus.Warnf("%v: Trying to pull image in the event that it is a public image.", err)
 	}
-	xdgCfgHome := os.Getenv("XDG_CONFIG_HOME")
-	if xdgCfgHome == "" {
-		xdgCfgHome = filepath.Join(homeDir, ".config")
-	}
-	paths = append(paths, authPath{path: filepath.Join(xdgCfgHome, xdgConfigHomePath), legacyFormat: false})
-	if dockerConfig := os.Getenv("DOCKER_CONFIG"); dockerConfig != "" {
+	if sys == nil || (sys.AuthFilePath == "" && sys.LegacyFormatAuthFilePath == "") {
+		xdgCfgHome := os.Getenv("XDG_CONFIG_HOME")
+		if xdgCfgHome == "" {
+			xdgCfgHome = filepath.Join(homeDir, ".config")
+		}
+		paths = append(paths, authPath{path: filepath.Join(xdgCfgHome, xdgConfigHomePath), legacyFormat: false})
+		if dockerConfig := os.Getenv("DOCKER_CONFIG"); dockerConfig != "" {
+			paths = append(paths,
+				authPath{path: filepath.Join(dockerConfig, "config.json"), legacyFormat: false},
+			)
+		} else {
+			paths = append(paths,
+				authPath{path: filepath.Join(homeDir, dockerHomePath), legacyFormat: false},
+			)
+		}
 		paths = append(paths,
-			authPath{path: filepath.Join(dockerConfig, "config.json"), legacyFormat: false},
-		)
-	} else {
-		paths = append(paths,
-			authPath{path: filepath.Join(homeDir, dockerHomePath), legacyFormat: false},
+			authPath{path: filepath.Join(homeDir, dockerLegacyHomePath), legacyFormat: true},
 		)
 	}
-	paths = append(paths,
-		authPath{path: filepath.Join(homeDir, dockerLegacyHomePath), legacyFormat: true},
-	)
 	return paths
 }
 
