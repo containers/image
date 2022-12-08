@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/go-connections/sockets"
 	"github.com/sirupsen/logrus"
 )
 
@@ -102,9 +101,6 @@ func NewTransport() *http.Transport {
 		TLSHandshakeTimeout: 10 * time.Second,
 		// TODO(dmcgowan): Call close idle connections when complete and use keep alive
 		DisableKeepAlives: true,
-	}
-	if _, err := sockets.DialerFromEnvironment(direct); err != nil {
-		logrus.Debugf("Can't execute DialerFromEnvironment: %v", err)
 	}
 	return tr
 }
