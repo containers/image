@@ -56,7 +56,7 @@ var (
 // appropriate for sys and the users’ configuration.
 // A valid key is a repository, a namespace within a registry, or a registry hostname;
 // using forms other than just a registry may fail depending on configuration.
-// Returns a human-redable description of the location that was updated.
+// Returns a human-readable description of the location that was updated.
 // NOTE: The return value is only intended to be read by humans; its form is not an API,
 // it may change (or new forms can be added) any time.
 func SetCredentials(sys *types.SystemContext, key, username, password string) (string, error) {
@@ -573,7 +573,7 @@ func readJSONFile(path string, legacyFormat bool) (dockerConfigFile, error) {
 
 // modifyJSON finds an auth.json file, calls editor on the contents, and
 // writes it back if editor returns true.
-// Returns a human-redable description of the file, to be returned by SetCredentials.
+// Returns a human-readable description of the file, to be returned by SetCredentials.
 func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (bool, error)) (string, error) {
 	path, legacyFormat, err := getPathToAuth(sys)
 	if err != nil {
