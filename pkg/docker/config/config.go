@@ -78,18 +78,21 @@ func SetCredentials(sys *types.SystemContext, key, username, password string) (s
 		switch helper {
 		// Special-case the built-in helpers for auth files.
 		case sysregistriesv2.AuthenticationFileHelper:
-			desc, err = modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
+			desc, err = modifyJSON(sys, func(auths *dockerConfigFile) (bool, string, error) {
 				if ch, exists := auths.CredHelpers[key]; exists {
 					if isNamespaced {
-						return false, unsupportedNamespaceErr(ch)
+						return false, "", unsupportedNamespaceErr(ch)
 					}
-					_, err := setAuthToCredHelper(ch, key, username, password)
-					return false, err
+					desc, err := setAuthToCredHelper(ch, key, username, password)
+					if err != nil {
+						return false, "", err
+					}
+					return false, desc, nil
 				}
 				creds := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 				newCreds := dockerAuthConfig{Auth: creds}
 				auths.AuthConfigs[key] = newCreds
-				return true, nil
+				return true, "", nil
 			})
 		// External helpers.
 		default:
@@ -403,7 +406,7 @@ func RemoveAuthentication(sys *types.SystemContext, key string) error {
 		switch helper {
 		// Special-case the built-in helper for auth files.
 		case sysregistriesv2.AuthenticationFileHelper:
-			_, err = modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
+			_, err = modifyJSON(sys, func(auths *dockerConfigFile) (bool, string, error) {
 				if innerHelper, exists := auths.CredHelpers[key]; exists {
 					removeFromCredHelper(innerHelper)
 				}
@@ -411,7 +414,7 @@ func RemoveAuthentication(sys *types.SystemContext, key string) error {
 					isLoggedIn = true
 					delete(auths.AuthConfigs, key)
 				}
-				return true, multiErr
+				return true, "", multiErr
 			})
 			if err != nil {
 				multiErr = multierror.Append(multiErr, err)
@@ -446,18 +449,18 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 		switch helper {
 		// Special-case the built-in helper for auth files.
 		case sysregistriesv2.AuthenticationFileHelper:
-			_, err = modifyJSON(sys, func(auths *dockerConfigFile) (bool, error) {
+			_, err = modifyJSON(sys, func(auths *dockerConfigFile) (bool, string, error) {
 				for registry, helper := range auths.CredHelpers {
 					// Helpers in auth files are expected
 					// to exist, so no special treatment
 					// for them.
 					if err := deleteAuthFromCredHelper(helper, registry); err != nil {
-						return false, err
+						return false, "", err
 					}
 				}
 				auths.CredHelpers = make(map[string]string)
 				auths.AuthConfigs = make(map[string]dockerAuthConfig)
-				return true, nil
+				return true, "", nil
 			})
 		// External helpers.
 		default:
@@ -574,7 +577,10 @@ func readJSONFile(path string, legacyFormat bool) (dockerConfigFile, error) {
 // modifyJSON finds an auth.json file, calls editor on the contents, and
 // writes it back if editor returns true.
 // Returns a human-readable description of the file, to be returned by SetCredentials.
-func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (bool, error)) (string, error) {
+//
+// The editor may also return a human-readable description of the updated location; if it is "",
+// the file itself is used.
+func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (bool, string, error)) (string, error) {
 	path, legacyFormat, err := getPathToAuth(sys)
 	if err != nil {
 		return "", err
@@ -593,7 +599,7 @@ func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (
 		return "", fmt.Errorf("reading JSON file %q: %w", path, err)
 	}
 
-	updated, err := editor(&auths)
+	updated, description, err := editor(&auths)
 	if err != nil {
 		return "", fmt.Errorf("updating %q: %w", path, err)
 	}
@@ -608,7 +614,10 @@ func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (
 		}
 	}
 
-	return path, nil
+	if description == "" {
+		description = path
+	}
+	return description, nil
 }
 
 func getAuthFromCredHelper(credHelper, registry string) (types.DockerAuthConfig, error) {
