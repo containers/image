@@ -13,16 +13,16 @@ import (
 )
 
 var v1RegistriesConfEmptyTestData = []struct {
-	nonempty bool
-	v        V1RegistriesConf
+	nonempty, hasSetField bool
+	v                     V1RegistriesConf
 }{
-	{nonempty: false, v: V1RegistriesConf{}},
-	{nonempty: false, v: V1RegistriesConf{V1TOMLConfig{Search: V1TOMLregistries{Registries: []string{}}}}},
-	{nonempty: false, v: V1RegistriesConf{V1TOMLConfig{Insecure: V1TOMLregistries{Registries: []string{}}}}},
-	{nonempty: false, v: V1RegistriesConf{V1TOMLConfig{Block: V1TOMLregistries{Registries: []string{}}}}},
-	{nonempty: true, v: V1RegistriesConf{V1TOMLConfig{Search: V1TOMLregistries{Registries: []string{"example.com"}}}}},
-	{nonempty: true, v: V1RegistriesConf{V1TOMLConfig{Insecure: V1TOMLregistries{Registries: []string{"example.com"}}}}},
-	{nonempty: true, v: V1RegistriesConf{V1TOMLConfig{Block: V1TOMLregistries{Registries: []string{"example.com"}}}}},
+	{nonempty: false, hasSetField: false, v: V1RegistriesConf{}},
+	{nonempty: false, hasSetField: true, v: V1RegistriesConf{V1TOMLConfig{Search: V1TOMLregistries{Registries: []string{}}}}},
+	{nonempty: false, hasSetField: true, v: V1RegistriesConf{V1TOMLConfig{Insecure: V1TOMLregistries{Registries: []string{}}}}},
+	{nonempty: false, hasSetField: true, v: V1RegistriesConf{V1TOMLConfig{Block: V1TOMLregistries{Registries: []string{}}}}},
+	{nonempty: true, hasSetField: true, v: V1RegistriesConf{V1TOMLConfig{Search: V1TOMLregistries{Registries: []string{"example.com"}}}}},
+	{nonempty: true, hasSetField: true, v: V1RegistriesConf{V1TOMLConfig{Insecure: V1TOMLregistries{Registries: []string{"example.com"}}}}},
+	{nonempty: true, hasSetField: true, v: V1RegistriesConf{V1TOMLConfig{Block: V1TOMLregistries{Registries: []string{"example.com"}}}}},
 }
 
 func TestV1RegistriesConfNonempty(t *testing.T) {
@@ -34,20 +34,29 @@ func TestV1RegistriesConfNonempty(t *testing.T) {
 	}
 }
 
+func TestV1RegistriesConfHasSetField(t *testing.T) {
+	for _, c := range v1RegistriesConfEmptyTestData {
+		copy := c.v // A shallow copy
+		res := copy.hasSetField()
+		assert.Equal(t, c.hasSetField, res, c.v)
+		assert.Equal(t, c.v, copy, c.v) // Ensure the method did not change the original value
+	}
+}
+
 var v2RegistriesConfEmptyTestData = []struct {
-	nonempty bool
-	v        V2RegistriesConf
+	nonempty, hasSetField bool
+	v                     V2RegistriesConf
 }{
-	{nonempty: false, v: V2RegistriesConf{}},
-	{nonempty: false, v: V2RegistriesConf{Registries: []Registry{}}},
-	{nonempty: false, v: V2RegistriesConf{UnqualifiedSearchRegistries: []string{}}},
-	{nonempty: false, v: V2RegistriesConf{CredentialHelpers: []string{}}},
-	{nonempty: false, v: V2RegistriesConf{shortNameAliasConf: shortNameAliasConf{Aliases: map[string]string{}}}},
-	{nonempty: true, v: V2RegistriesConf{Registries: []Registry{{Prefix: "example.com"}}}},
-	{nonempty: true, v: V2RegistriesConf{UnqualifiedSearchRegistries: []string{"example.com"}}},
-	{nonempty: true, v: V2RegistriesConf{CredentialHelpers: []string{"a"}}},
-	{nonempty: true, v: V2RegistriesConf{ShortNameMode: "enforcing"}},
-	{nonempty: true, v: V2RegistriesConf{shortNameAliasConf: shortNameAliasConf{Aliases: map[string]string{"a": "example.com/b"}}}},
+	{nonempty: false, hasSetField: false, v: V2RegistriesConf{}},
+	{nonempty: false, hasSetField: true, v: V2RegistriesConf{Registries: []Registry{}}},
+	{nonempty: false, hasSetField: true, v: V2RegistriesConf{UnqualifiedSearchRegistries: []string{}}},
+	{nonempty: false, hasSetField: true, v: V2RegistriesConf{CredentialHelpers: []string{}}},
+	{nonempty: false, hasSetField: true, v: V2RegistriesConf{shortNameAliasConf: shortNameAliasConf{Aliases: map[string]string{}}}},
+	{nonempty: true, hasSetField: true, v: V2RegistriesConf{Registries: []Registry{{Prefix: "example.com"}}}},
+	{nonempty: true, hasSetField: true, v: V2RegistriesConf{UnqualifiedSearchRegistries: []string{"example.com"}}},
+	{nonempty: true, hasSetField: true, v: V2RegistriesConf{CredentialHelpers: []string{"a"}}},
+	{nonempty: true, hasSetField: true, v: V2RegistriesConf{ShortNameMode: "enforcing"}},
+	{nonempty: true, hasSetField: true, v: V2RegistriesConf{shortNameAliasConf: shortNameAliasConf{Aliases: map[string]string{"a": "example.com/b"}}}},
 }
 
 func TestV2RegistriesConfNonempty(t *testing.T) {
@@ -55,6 +64,15 @@ func TestV2RegistriesConfNonempty(t *testing.T) {
 		copy := c.v // A shallow copy
 		res := copy.Nonempty()
 		assert.Equal(t, c.nonempty, res, c.v)
+		assert.Equal(t, c.v, copy, c.v) // Ensure the method did not change the original value
+	}
+}
+
+func TestV2RegistriesConfHasSetField(t *testing.T) {
+	for _, c := range v2RegistriesConfEmptyTestData {
+		copy := c.v // A shallow copy
+		res := copy.hasSetField()
+		assert.Equal(t, c.hasSetField, res, c.v)
 		assert.Equal(t, c.v, copy, c.v) // Ensure the method did not change the original value
 	}
 }
@@ -471,11 +489,16 @@ func TestV1BackwardsCompatibility(t *testing.T) {
 }
 
 func TestMixingV1andV2(t *testing.T) {
-	_, err := GetRegistries(&types.SystemContext{
-		SystemRegistriesConfPath:    "testdata/mixing-v1-v2.conf",
-		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
-	})
-	assert.ErrorContains(t, err, "mixing sysregistry v1/v2 is not supported")
+	for _, c := range []string{
+		"testdata/mixing-v1-v2.conf",
+		"testdata/mixing-v1-v2-empty.conf",
+	} {
+		_, err := GetRegistries(&types.SystemContext{
+			SystemRegistriesConfPath:    c,
+			SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
+		})
+		assert.ErrorContains(t, err, "mixing sysregistry v1/v2 is not supported", c)
+	}
 }
 
 func TestConfigCache(t *testing.T) {
