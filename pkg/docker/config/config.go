@@ -83,7 +83,8 @@ func SetCredentials(sys *types.SystemContext, key, username, password string) (s
 					if isNamespaced {
 						return false, unsupportedNamespaceErr(ch)
 					}
-					return false, setAuthToCredHelper(ch, key, username, password)
+					_, err := setAuthToCredHelper(ch, key, username, password)
+					return false, err
 				}
 				creds := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 				newCreds := dockerAuthConfig{Auth: creds}
@@ -95,8 +96,7 @@ func SetCredentials(sys *types.SystemContext, key, username, password string) (s
 			if isNamespaced {
 				err = unsupportedNamespaceErr(helper)
 			} else {
-				desc = fmt.Sprintf("credential helper: %s", helper)
-				err = setAuthToCredHelper(helper, key, username, password)
+				desc, err = setAuthToCredHelper(helper, key, username, password)
 			}
 		}
 		if err != nil {
@@ -636,7 +636,9 @@ func getAuthFromCredHelper(credHelper, registry string) (types.DockerAuthConfig,
 	}
 }
 
-func setAuthToCredHelper(credHelper, registry, username, password string) error {
+// setAuthToCredHelper stores (username, password) for registry in credHelper.
+// Returns a human-readable description of the destination, to be returned by SetCredentials.
+func setAuthToCredHelper(credHelper, registry, username, password string) (string, error) {
 	helperName := fmt.Sprintf("docker-credential-%s", credHelper)
 	p := helperclient.NewShellProgramFunc(helperName)
 	creds := &credentials.Credentials{
@@ -644,7 +646,10 @@ func setAuthToCredHelper(credHelper, registry, username, password string) error 
 		Username:  username,
 		Secret:    password,
 	}
-	return helperclient.Store(p, creds)
+	if err := helperclient.Store(p, creds); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("credential helper: %s", credHelper), nil
 }
 
 func deleteAuthFromCredHelper(credHelper, registry string) error {
