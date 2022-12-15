@@ -1098,7 +1098,8 @@ func TestDuplicateBlob(t *testing.T) {
 		t.Fatalf("LayerInfosForCopy() returned error %v", err)
 	}
 	for _, layerInfo := range layersInfo {
-		rc, _, layerID, err := source.getBlobAndLayerID(layerInfo)
+		digestLayers, _ := source.imageRef.transport.store.LayersByUncompressedDigest(layerInfo.Digest)
+		rc, _, layerID, err := source.getBlobAndLayerID(layerInfo.Digest, digestLayers)
 		if err != nil {
 			t.Fatalf("getBlobAndLayerID(%q) returned error %v", layerInfo.Digest, err)
 		}
