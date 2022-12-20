@@ -30,6 +30,7 @@ require (
 	github.com/ulikunitz/xz v0.5.11
 	github.com/vbatts/tar-split v0.11.2
 	github.com/vbauerster/mpb/v7 v7.5.3
+	github.com/vbauerster/mpb/v8 v8.1.4
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/crypto v0.4.0
@@ -62,7 +63,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/letsencrypt/boulder v0.0.0-20221109233200-85aa52084eaf // indirect
-	github.com/mattn/go-runewidth v0.0.13 // indirect
+	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/mattn/go-shellwords v1.0.12 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
 	github.com/mistifyio/go-zfs/v3 v3.0.0 // indirect
