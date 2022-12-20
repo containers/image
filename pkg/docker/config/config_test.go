@@ -58,13 +58,12 @@ func TestGetPathToAuth(t *testing.T) {
 			if c.xrd == "" {
 				os.Unsetenv("XDG_RUNTIME_DIR")
 			}
-			res, lf, err := getPathToAuthWithOS(c.sys, c.os)
+			res, err := getPathToAuthWithOS(c.sys, c.os)
 			if c.expected == "" {
 				assert.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, c.expected, res)
-				assert.Equal(t, c.legacyFormat, lf)
+				assert.Equal(t, authPath{path: c.expected, legacyFormat: c.legacyFormat}, res)
 			}
 		})
 	}
@@ -652,7 +651,7 @@ func TestSetCredentials(t *testing.T) {
 		}
 
 		// Read the resulting file and verify it contains the expected keys
-		auth, err := readJSONFile(tmpFile.Name(), false)
+		auth, err := newAuthPathDefault(tmpFile.Name()).parse()
 		require.NoError(t, err)
 		assert.Len(t, auth.AuthConfigs, len(writtenCredentials))
 		// auth.AuthConfigs and writtenCredentials are both maps, i.e. their keys are unique;
@@ -772,7 +771,7 @@ func TestRemoveAuthentication(t *testing.T) {
 			}
 		}
 
-		auth, err := readJSONFile(tmpFile.Name(), false)
+		auth, err := newAuthPathDefault(tmpFile.Name()).parse()
 		require.NoError(t, err)
 
 		tc.assert(auth)
