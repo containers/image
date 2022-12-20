@@ -157,8 +157,8 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 		// Special-case the built-in helper for auth files.
 		case sysregistriesv2.AuthenticationFileHelper:
 			for _, path := range getAuthFilePaths(sys, homedir.Get()) {
-				// readJSONFile returns an empty map in case the path doesn't exist.
-				auths, err := readJSONFile(path)
+				// parse returns an empty map in case the path doesn't exist.
+				auths, err := path.parse()
 				if err != nil {
 					return nil, fmt.Errorf("reading JSON file %q: %w", path.path, err)
 				}
@@ -546,10 +546,10 @@ func getPathToAuthWithOS(sys *types.SystemContext, goOS string) (authPath, error
 	return newAuthPathDefault(fmt.Sprintf(defaultPerUIDPathFormat, os.Getuid())), nil
 }
 
-// readJSONFile unmarshals the authentications stored in the auth.json file and returns it
+// parse unmarshals the authentications stored in the auth.json file and returns it
 // or returns an empty dockerConfigFile data structure if auth.json does not exist
-// if the file exists and is empty, readJSONFile returns an error
-func readJSONFile(path authPath) (dockerConfigFile, error) {
+// if the file exists and is empty, this function returns an error.
+func (path authPath) parse() (dockerConfigFile, error) {
 	var auths dockerConfigFile
 
 	raw, err := os.ReadFile(path.path)
@@ -602,7 +602,7 @@ func modifyJSON(sys *types.SystemContext, editor func(auths *dockerConfigFile) (
 		return "", err
 	}
 
-	auths, err := readJSONFile(path)
+	auths, err := path.parse()
 	if err != nil {
 		return "", fmt.Errorf("reading JSON file %q: %w", path.path, err)
 	}
@@ -678,7 +678,7 @@ func deleteAuthFromCredHelper(credHelper, registry string) error {
 // findCredentialsInFile looks for credentials matching "key"
 // (which is "registry" or a namespace in "registry") in "path".
 func findCredentialsInFile(key, registry string, path authPath) (types.DockerAuthConfig, error) {
-	auths, err := readJSONFile(path)
+	auths, err := path.parse()
 	if err != nil {
 		return types.DockerAuthConfig{}, fmt.Errorf("reading JSON file %q: %w", path.path, err)
 	}

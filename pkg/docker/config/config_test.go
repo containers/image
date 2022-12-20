@@ -651,7 +651,7 @@ func TestSetCredentials(t *testing.T) {
 		}
 
 		// Read the resulting file and verify it contains the expected keys
-		auth, err := readJSONFile(newAuthPathDefault(tmpFile.Name()))
+		auth, err := newAuthPathDefault(tmpFile.Name()).parse()
 		require.NoError(t, err)
 		assert.Len(t, auth.AuthConfigs, len(writtenCredentials))
 		// auth.AuthConfigs and writtenCredentials are both maps, i.e. their keys are unique;
@@ -771,7 +771,7 @@ func TestRemoveAuthentication(t *testing.T) {
 			}
 		}
 
-		auth, err := readJSONFile(newAuthPathDefault(tmpFile.Name()))
+		auth, err := newAuthPathDefault(tmpFile.Name()).parse()
 		require.NoError(t, err)
 
 		tc.assert(auth)
