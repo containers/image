@@ -673,8 +673,8 @@ github.com/containers/ocicrypt v1.1.0/go.mod h1:b8AOe0YR67uU8OqfVNcznfFpAzu3rdgU
 github.com/containers/ocicrypt v1.1.1/go.mod h1:Dm55fwWm1YZAjYRaJ94z2mfZikIyIN4B0oB3dj3jFxY=
 github.com/containers/ocicrypt v1.1.6 h1:uoG52u2e91RE4UqmBICZY8dNshgfvkdl3BW6jnxiFaI=
 github.com/containers/ocicrypt v1.1.6/go.mod h1:WgjxPWdTJMqYMjf3M6cuIFFA1/MpyyhIM99YInA+Rvc=
-github.com/containers/storage v1.44.1-0.20221215163359-b0949d90efad h1:s1HIzrTnTI51kcrhnkXlvvzKs05V3MKviDsrTarhFyU=
-github.com/containers/storage v1.44.1-0.20221215163359-b0949d90efad/go.mod h1:o+bCRUdLbr6MPQaV5TphvdxBUucUBDFqzAcPIi8WWtg=
+github.com/containers/storage v1.44.1-0.20230103141912-46e94559ce9d h1:JD7cvc2hZwMK/bCY21yOddL9jN4DrxwjW3mkrqjBAH8=
+github.com/containers/storage v1.44.1-0.20230103141912-46e94559ce9d/go.mod h1:OdRUYHrq1HP6iAo79VxqtYuJzC5j4eA2I60jKOoCT7g=
 github.com/coreos/bbolt v1.3.2/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=
 github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
 github.com/coreos/go-iptables v0.4.5/go.mod h1:/mVI274lEDI2ns62jHCDnCyBF9Iwsmekav8Dbxlm1MU=
@@ -1143,7 +1143,6 @@ github.com/klauspost/compress v1.11.13/go.mod h1:aoV0uJVorq1K+umq18yTdKaF57EivdY
 github.com/klauspost/compress v1.15.7/go.mod h1:PhcZ0MbTNciWF3rruxRgKxI5NkcHHrHUDtV4Yw2GlzU=
 github.com/klauspost/compress v1.15.11/go.mod h1:QPwzmACJjUTFsnSHH934V6woptycfrDDJnH7hvFVbGM=
 github.com/klauspost/compress v1.15.12/go.mod h1:QPwzmACJjUTFsnSHH934V6woptycfrDDJnH7hvFVbGM=
-github.com/klauspost/compress v1.15.13/go.mod h1:QPwzmACJjUTFsnSHH934V6woptycfrDDJnH7hvFVbGM=
 github.com/klauspost/compress v1.15.14 h1:i7WCKDToww0wA+9qrUZ1xOjp218vfFo3nTU6UHp+gOc=
 github.com/klauspost/compress v1.15.14/go.mod h1:QPwzmACJjUTFsnSHH934V6woptycfrDDJnH7hvFVbGM=
 github.com/klauspost/pgzip v1.2.5/go.mod h1:Ch1tH69qFZu15pkjo5kYi6mth2Zzwzt50oCQKQE9RUs=
