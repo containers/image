@@ -14,7 +14,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/imdario/mergo v0.3.13
-	github.com/klauspost/compress v1.15.13
+	github.com/klauspost/compress v1.15.14
 	github.com/klauspost/pgzip v1.2.6-0.20220930104621-17e8dac29df8
 	github.com/manifoldco/promptui v0.9.0
 	github.com/opencontainers/go-digest v1.0.0
@@ -30,7 +30,6 @@ require (
 	github.com/ulikunitz/xz v0.5.11
 	github.com/vbatts/tar-split v0.11.2
 	github.com/vbauerster/mpb/v7 v7.5.3
-	github.com/vbauerster/mpb/v8 v8.1.4
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/crypto v0.4.0
