@@ -26,29 +26,30 @@ func TestGetPathToAuth(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	for caseIndex, c := range []struct {
-		sys          *types.SystemContext
-		os           string
-		xrd          string
-		expected     string
-		legacyFormat bool
+		sys                   *types.SystemContext
+		os                    string
+		xrd                   string
+		expected              string
+		legacyFormat          bool
+		expectedUserSpecified bool
 	}{
 		// Default paths
-		{&types.SystemContext{}, linux, "", "/run/containers/" + uid + "/auth.json", false},
-		{&types.SystemContext{}, darwin, "", darwinDefault, false},
-		{nil, linux, "", "/run/containers/" + uid + "/auth.json", false},
-		{nil, darwin, "", darwinDefault, false},
+		{&types.SystemContext{}, linux, "", "/run/containers/" + uid + "/auth.json", false, false},
+		{&types.SystemContext{}, darwin, "", darwinDefault, false, false},
+		{nil, linux, "", "/run/containers/" + uid + "/auth.json", false, false},
+		{nil, darwin, "", darwinDefault, false, false},
 		// SystemContext overrides
-		{&types.SystemContext{AuthFilePath: "/absolute/path"}, linux, "", "/absolute/path", false},
-		{&types.SystemContext{AuthFilePath: "/absolute/path"}, darwin, "", "/absolute/path", false},
-		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, linux, "", "/absolute/path", true},
-		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, darwin, "", "/absolute/path", true},
-		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, linux, "", "/prefix/run/containers/" + uid + "/auth.json", false},
-		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, darwin, "", "/prefix/run/containers/" + uid + "/auth.json", false},
+		{&types.SystemContext{AuthFilePath: "/absolute/path"}, linux, "", "/absolute/path", false, true},
+		{&types.SystemContext{AuthFilePath: "/absolute/path"}, darwin, "", "/absolute/path", false, true},
+		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, linux, "", "/absolute/path", true, true},
+		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, darwin, "", "/absolute/path", true, true},
+		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, linux, "", "/prefix/run/containers/" + uid + "/auth.json", false, false},
+		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, darwin, "", "/prefix/run/containers/" + uid + "/auth.json", false, false},
 		// XDG_RUNTIME_DIR defined
-		{nil, linux, tmpDir, tmpDir + "/containers/auth.json", false},
-		{nil, darwin, tmpDir, darwinDefault, false},
-		{nil, linux, tmpDir + "/thisdoesnotexist", "", false},
-		{nil, darwin, tmpDir + "/thisdoesnotexist", darwinDefault, false},
+		{nil, linux, tmpDir, tmpDir + "/containers/auth.json", false, false},
+		{nil, darwin, tmpDir, darwinDefault, false, false},
+		{nil, linux, tmpDir + "/thisdoesnotexist", "", false, false},
+		{nil, darwin, tmpDir + "/thisdoesnotexist", darwinDefault, false, false},
 	} {
 		t.Run(fmt.Sprintf("%d", caseIndex), func(t *testing.T) {
 			// Always use t.Setenv() to ensure XDG_RUNTIME_DIR is restored to the original value after the test.
@@ -58,12 +59,13 @@ func TestGetPathToAuth(t *testing.T) {
 			if c.xrd == "" {
 				os.Unsetenv("XDG_RUNTIME_DIR")
 			}
-			res, err := getPathToAuthWithOS(c.sys, c.os)
+			res, userSpecified, err := getPathToAuthWithOS(c.sys, c.os)
 			if c.expected == "" {
 				assert.Error(t, err)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, authPath{path: c.expected, legacyFormat: c.legacyFormat}, res)
+				assert.Equal(t, c.expectedUserSpecified, userSpecified)
 			}
 		})
 	}
