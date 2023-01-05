@@ -247,12 +247,37 @@ This requirement requires an image to be signed using a sigstore signature with 
 ```js
 {
     "type":    "sigstoreSigned",
-    "keyPath": "/path/to/local/keyring/file",
-    "keyData": "base64-encoded-keyring-data",
+    "keyPath": "/path/to/local/public/key/file",
+    "keyData": "base64-encoded-public-key-data",
+    "fulcio": {
+        "caPath": "/path/to/local/CA/file",
+        "caData": "base64-encoded-CA-data",
+        "oidcIssuer": "https://expected.OIDC.issuer/",
+        "subjectEmail", "expected-signing-user@example.com",
+    },
+    "rekorPublicKeyPath": "/path/to/local/public/key/file",
+    "rekorPublicKeyData": "base64-encoded-public-key-data",
     "signedIdentity": identity_requirement
 }
 ```
-Exactly one of `keyPath` and `keyData` must be present, containing a sigstore public key.  Only signatures made by this key is accepted.
+Exactly one of `keyPath`, `keyData` and `fulcio` must be present.
+
+If `keyPath` or `keyData` is present, it contains a sigstore public key.
+Only signatures made by this key are accepted.
+
+If `fulcio` is present, the signature must be based on a Fulcio-issued certificate.
+One of `caPath` and `caData` must be specified, containing the public key of the Fulcio instance.
+Both `oidcIssuer` and `subjectEmail` are mandatory,
+exactly specifying the expected identity provider,
+and the identity of the user obtaining the Fulcio certificate.
+
+At most one of `rekorPublicKeyPath` and `rekorPublicKeyData` can be present;
+it is mandatory if `fulcio` is specified.
+If a Rekor public key is specified,
+the signature must have been uploaded to a Rekor server
+and the signature must contain an (offline-verifiable) “signed entry timestamp”
+proving the existence of the Rekor log record,
+signed by the provided public key.
 
 The `signedIdentity` field has the same semantics as in the `signedBy` requirement described above.
 Note that `cosign`-created signatures only contain a repository, so only `matchRepository` and `exactRepository` can be used to accept them (and that does not protect against substitution of a signed image with an unexpected tag).
@@ -288,6 +313,21 @@ selectively allow individual transports and scopes as desired.
                     "keyPath": "/path/to/sigstore-pubkey.pub"
                 }
             ],
+            /* A sigstore-signed repository using the community Fulcio+Rekor servers.
+
+               The community servers’ public keys can be obtained from
+               https://github.com/sigstore/sigstore/tree/main/pkg/tuf/repository/targets .  */
+            "hostname:5000/myns/sigstore-signed-fulcio-rekor": [
+                {
+                    "type": "sigstoreSigned",
+                    "fulcio": {
+                        "caPath": "/path/to/fulcio_v1.crt.pem",
+                        "oidcIssuer": "https://github.com/login/oauth",
+                        "subjectEmail": "test-user@example.com"
+                    },
+                    "rekorPublicKeyPath": "/path/to/rekor.pub",
+                }
+            ],
             /* A sigstore-signed repository, accepts signatures by /usr/bin/cosign */
             "hostname:5000/myns/sigstore-signed-allows-malicious-tag-substitution": [
                 {
@@ -295,8 +335,25 @@ selectively allow individual transports and scopes as desired.
                     "keyPath": "/path/to/sigstore-pubkey.pub",
                     "signedIdentity": {"type": "matchRepository"}
                 }
+            ],
+            /* A sigstore-signed repository using the community Fulcio+Rekor servers,
+               accepts signatures by /usr/bin/cosign.
+
+               The community servers’ public keys can be obtained from
+               https://github.com/sigstore/sigstore/tree/main/pkg/tuf/repository/targets .  */
+            "hostname:5000/myns/sigstore-signed-fulcio-rekor- allows-malicious-tag-substitution": [
+                {
+                    "type": "sigstoreSigned",
+                    "fulcio": {
+                        "caPath": "/path/to/fulcio_v1.crt.pem",
+                        "oidcIssuer": "https://github.com/login/oauth",
+                        "subjectEmail": "test-user@example.com"
+                    },
+                    "rekorPublicKeyPath": "/path/to/rekor.pub",
+                    "signedIdentity": { "type": "matchRepository" }
+                }
             ]
-            /* Other docker: images use the global default policy and are rejected */
+              /* Other docker: images use the global default policy and are rejected */
         },
         "dir": {
             "": [{"type": "insecureAcceptAnything"}] /* Allow any images originating in local directories */
