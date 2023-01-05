@@ -565,7 +565,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 
 	// Sign the manifest list.
 	if options.SignBy != "" {
-		newSig, err := c.createSignature(manifestList, options.SignBy, options.SignPassphrase, options.SignIdentity)
+		newSig, err := c.createSignature(ctx, manifestList, options.SignBy, options.SignPassphrase, options.SignIdentity)
 		if err != nil {
 			return nil, err
 		}
@@ -792,7 +792,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 	}
 
 	if options.SignBy != "" {
-		newSig, err := c.createSignature(manifestBytes, options.SignBy, options.SignPassphrase, options.SignIdentity)
+		newSig, err := c.createSignature(ctx, manifestBytes, options.SignBy, options.SignPassphrase, options.SignIdentity)
 		if err != nil {
 			return nil, "", "", err
 		}

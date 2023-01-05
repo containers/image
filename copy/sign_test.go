@@ -126,7 +126,7 @@ func TestCreateSignature(t *testing.T) {
 			dest:         imagedestination.FromPublic(cc.dest),
 			reportWriter: io.Discard,
 		}
-		sig, err := c.createSignature(manifestBlob, fingerprint, "", identity)
+		sig, err := c.createSignature(context.Background(), manifestBlob, fingerprint, "", identity)
 		if cc.successfullySignedIdentity == "" {
 			assert.Error(t, err, cc.name)
 		} else {
