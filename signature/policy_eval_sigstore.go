@@ -4,6 +4,7 @@ package signature
 
 import (
 	"context"
+	"crypto"
 	"errors"
 	"fmt"
 	"os"
@@ -17,6 +18,50 @@ import (
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
+// loadBytesFromDataOrPath ensures there is at most one of ${prefix}Data and ${prefix}Path set,
+// and returns the referenced data, or nil if neither is set.
+func loadBytesFromDataOrPath(prefix string, data []byte, path string) ([]byte, error) {
+	switch {
+	case data != nil && path != "":
+		return nil, fmt.Errorf(`Internal inconsistency: both "%sPath" and "%sData" specified`, prefix, prefix)
+	case path != "":
+		d, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		return d, nil
+	case data != nil:
+		return data, nil
+	default: // Nothing
+		return nil, nil
+	}
+}
+
+// sigstoreSignedTrustRoot contains an already parsed version of the prSigstoreSigned policy
+type sigstoreSignedTrustRoot struct {
+	publicKey crypto.PublicKey
+}
+
+func (pr *prSigstoreSigned) prepareTrustRoot() (*sigstoreSignedTrustRoot, error) {
+	res := sigstoreSignedTrustRoot{}
+
+	publicKeyPEM, err := loadBytesFromDataOrPath("key", pr.KeyData, pr.KeyPath)
+	if err != nil {
+		return nil, err
+	}
+	if publicKeyPEM != nil {
+		pk, err := cryptoutils.UnmarshalPEMToPublicKey(publicKeyPEM)
+		if err != nil {
+			return nil, fmt.Errorf("parsing public key: %w", err)
+		}
+		res.publicKey = pk
+	} else {
+		return nil, errors.New("internal inconsistency: no public key specified")
+	}
+
+	return &res, nil
+}
+
 func (pr *prSigstoreSigned) isSignatureAuthorAccepted(ctx context.Context, image private.UnparsedImage, sig []byte) (signatureAcceptanceResult, *Signature, error) {
 	// We don’t know of a single user of this API, and we might return unexpected values in Signature.
 	// For now, just punt.
@@ -24,24 +69,10 @@ func (pr *prSigstoreSigned) isSignatureAuthorAccepted(ctx context.Context, image
 }
 
 func (pr *prSigstoreSigned) isSignatureAccepted(ctx context.Context, image private.UnparsedImage, sig signature.Sigstore) (signatureAcceptanceResult, error) {
-	if pr.KeyPath != "" && pr.KeyData != nil {
-		return sarRejected, errors.New(`Internal inconsistency: both "keyPath" and "keyData" specified`)
-	}
 	// FIXME: move this to per-context initialization
-	var publicKeyPEM []byte
-	if pr.KeyData != nil {
-		publicKeyPEM = pr.KeyData
-	} else {
-		d, err := os.ReadFile(pr.KeyPath)
-		if err != nil {
-			return sarRejected, err
-		}
-		publicKeyPEM = d
-	}
-
-	publicKey, err := cryptoutils.UnmarshalPEMToPublicKey(publicKeyPEM)
+	trustRoot, err := pr.prepareTrustRoot()
 	if err != nil {
-		return sarRejected, fmt.Errorf("parsing public key: %w", err)
+		return sarRejected, err
 	}
 
 	untrustedAnnotations := sig.UntrustedAnnotations()
@@ -49,8 +80,10 @@ func (pr *prSigstoreSigned) isSignatureAccepted(ctx context.Context, image priva
 	if !ok {
 		return sarRejected, fmt.Errorf("missing %s annotation", signature.SigstoreSignatureAnnotationKey)
 	}
+	untrustedPayload := sig.UntrustedPayload()
 
-	signature, err := internal.VerifySigstorePayload(publicKey, sig.UntrustedPayload(), untrustedBase64Signature, internal.SigstorePayloadAcceptanceRules{
+	publicKey := trustRoot.publicKey
+	signature, err := internal.VerifySigstorePayload(publicKey, untrustedPayload, untrustedBase64Signature, internal.SigstorePayloadAcceptanceRules{
 		ValidateSignedDockerReference: func(ref string) error {
 			if !pr.SignedIdentity.matchesDockerReference(image, ref) {
 				return PolicyRequirementError(fmt.Sprintf("Signature for identity %s is not accepted", ref))
