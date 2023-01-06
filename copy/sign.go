@@ -8,6 +8,7 @@ import (
 	"github.com/containers/image/v5/internal/private"
 	internalsig "github.com/containers/image/v5/internal/signature"
 	internalSigner "github.com/containers/image/v5/internal/signer"
+	"github.com/containers/image/v5/signature/signer"
 	"github.com/containers/image/v5/signature/sigstore"
 	"github.com/containers/image/v5/signature/simplesigning"
 	"github.com/containers/image/v5/transports"
@@ -52,23 +53,7 @@ func (c *copier) createSignature(ctx context.Context, manifest []byte, keyIdenti
 	}
 	defer signer.Close()
 
-	if identity != nil {
-		if reference.IsNameOnly(identity) {
-			return nil, fmt.Errorf("Sign identity must be a fully specified reference %s", identity)
-		}
-	} else {
-		identity = c.dest.Reference().DockerReference()
-		if identity == nil {
-			return nil, fmt.Errorf("Cannot determine canonical Docker reference for destination %s", transports.ImageName(c.dest.Reference()))
-		}
-	}
-
-	c.Printf("%s\n", internalSigner.ProgressMessage(signer))
-	newSig, err := internalSigner.SignImageManifest(ctx, signer, manifest, identity)
-	if err != nil {
-		return nil, fmt.Errorf("creating signature: %w", err)
-	}
-	return newSig, nil
+	return c.createSignatureWithSigner(ctx, signer, manifest, identity)
 }
 
 // createSigstoreSignature creates a new sigstore signature of manifest using privateKeyFile and identity.
@@ -79,6 +64,10 @@ func (c *copier) createSigstoreSignature(ctx context.Context, manifest []byte, p
 	}
 	defer signer.Close()
 
+	return c.createSignatureWithSigner(ctx, signer, manifest, identity)
+}
+
+func (c *copier) createSignatureWithSigner(ctx context.Context, signer *signer.Signer, manifest []byte, identity reference.Named) (internalsig.Signature, error) {
 	if identity != nil {
 		if reference.IsNameOnly(identity) {
 			return nil, fmt.Errorf("Sign identity must be a fully specified reference %s", identity.String())
