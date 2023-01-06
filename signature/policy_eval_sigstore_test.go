@@ -65,29 +65,24 @@ func TestPRrSigstoreSignedIsSignatureAccepted(t *testing.T) {
 	sar, err = pr.isSignatureAccepted(context.Background(), testImage, testImageSig)
 	assertAccepted(sar, err)
 
-	// Both KeyPath and KeyData set. Do not use newPRSigstoreSigned*, because it would reject this.
-	pr = &prSigstoreSigned{
-		KeyPath:        "/foo/bar",
-		KeyData:        []byte("abc"),
-		SignedIdentity: prm,
+	// Invalid KeyPath/KeyData combinations.
+	for _, fn := range []func() (*prSigstoreSigned, error){
+		func() (*prSigstoreSigned, error) { // Both KeyPath and KeyData set. Do not use newPRSigstoreSigned*, because it would reject this.
+			return &prSigstoreSigned{KeyPath: "/foo/bar", KeyData: []byte("abc"), SignedIdentity: prm}, nil
+		},
+		func() (*prSigstoreSigned, error) { // Invalid KeyPath
+			return newPRSigstoreSignedKeyPath("/this/does/not/exist", prm)
+		},
+		func() (*prSigstoreSigned, error) { // KeyData doesn’t contain a public key.
+			return newPRSigstoreSignedKeyData([]byte{}, prm)
+		},
+	} {
+		pr, err := fn()
+		require.NoError(t, err)
+		// Pass a nil pointer to, kind of, test that the return value does not depend on the image.
+		sar, err := pr.isSignatureAccepted(context.Background(), nil, testImageSig)
+		assertRejected(sar, err)
 	}
-	// Pass nil and empty data to, kind of, test that the return value does not depend on the image.
-	sar, err = pr.isSignatureAccepted(context.Background(), nil, testImageSig)
-	assertRejected(sar, err)
-
-	// Invalid KeyPath
-	pr, err = newPRSigstoreSignedKeyPath("/this/does/not/exist", prm)
-	require.NoError(t, err)
-	// Pass nil and empty data to, kind of, test that the return value does not depend on the image.
-	sar, err = pr.isSignatureAccepted(context.Background(), nil, testImageSig)
-	assertRejected(sar, err)
-
-	// KeyData doesn’t contain a public key.
-	pr, err = newPRSigstoreSignedKeyData([]byte{}, prm)
-	require.NoError(t, err)
-	// Pass nil and empty data to, kind of, test that the return value does not depend on the image.
-	sar, err = pr.isSignatureAccepted(context.Background(), nil, testImageSig)
-	assertRejected(sar, err)
 
 	// Signature has no cryptographic signature
 	pr, err = newPRSigstoreSignedKeyPath("fixtures/cosign.pub", prm)
