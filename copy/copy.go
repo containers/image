@@ -77,7 +77,8 @@ type copier struct {
 	ociEncryptConfig              *encconfig.EncryptConfig
 	concurrentBlobCopiesSemaphore *semaphore.Weighted // Limits the amount of concurrently copied blobs
 	downloadForeignLayers         bool
-	signers                       []*signer.Signer
+	signers                       []*signer.Signer // Signers to use to create new signatures for the image
+	signersToClose                []*signer.Signer // Signers that should be closed when this copier is destroyed.
 }
 
 // imageCopier tracks state specific to a single image (possibly an item of a manifest list)
@@ -124,17 +125,21 @@ type ImageListSelection int
 
 // Options allows supplying non-default configuration modifying the behavior of CopyImage.
 type Options struct {
-	RemoveSignatures                 bool            // Remove any pre-existing signatures. SignBy will still add a new signature.
+	RemoveSignatures bool // Remove any pre-existing signatures. Signers and SignBy… will still add a new signature.
+	// Signers to use to add signatures during the copy.
+	// Callers are still responsible for closing these Signer objects; they can be reused for multiple copy.Image operations in a row.
+	Signers                          []*signer.Signer
 	SignBy                           string          // If non-empty, asks for a signature to be added during the copy, and specifies a key ID, as accepted by signature.NewGPGSigningMechanism().SignDockerManifest(),
 	SignPassphrase                   string          // Passphrase to use when signing with the key ID from `SignBy`.
 	SignBySigstorePrivateKeyFile     string          // If non-empty, asks for a signature to be added during the copy, using a sigstore private key file at the provided path.
 	SignSigstorePrivateKeyPassphrase []byte          // Passphrase to use when signing with `SignBySigstorePrivateKeyFile`.
 	SignIdentity                     reference.Named // Identify to use when signing, defaults to the docker reference of the destination
-	ReportWriter                     io.Writer
-	SourceCtx                        *types.SystemContext
-	DestinationCtx                   *types.SystemContext
-	ProgressInterval                 time.Duration                 // time to wait between reports to signal the progress channel
-	Progress                         chan types.ProgressProperties // Reported to when ProgressInterval has arrived for a single artifact+offset.
+
+	ReportWriter     io.Writer
+	SourceCtx        *types.SystemContext
+	DestinationCtx   *types.SystemContext
+	ProgressInterval time.Duration                 // time to wait between reports to signal the progress channel
+	Progress         chan types.ProgressProperties // Reported to when ProgressInterval has arrived for a single artifact+offset.
 
 	// Preserve digests, and fail if we cannot.
 	PreserveDigests bool
@@ -350,7 +355,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 
 // close tears down state owned by copier.
 func (c *copier) close() {
-	for i, s := range c.signers {
+	for i, s := range c.signersToClose {
 		if err := s.Close(); err != nil {
 			logrus.Warnf("Error closing per-copy signer %d: %v", i+1, err)
 		}

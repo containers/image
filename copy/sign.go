@@ -15,6 +15,9 @@ import (
 
 // setupSigners initializes c.signers based on options.
 func (c *copier) setupSigners(options *Options) error {
+	c.signers = append(c.signers, options.Signers...)
+	// c.signersToClose is intentionally not updated with options.Signers.
+
 	// We immediately append created signers to c.signers, and we rely on c.close() to clean them up; so we don’t need
 	// to clean up any created signers on failure.
 
@@ -30,6 +33,7 @@ func (c *copier) setupSigners(options *Options) error {
 			return err
 		}
 		c.signers = append(c.signers, signer)
+		c.signersToClose = append(c.signersToClose, signer)
 	}
 
 	if options.SignBySigstorePrivateKeyFile != "" {
@@ -40,6 +44,7 @@ func (c *copier) setupSigners(options *Options) error {
 			return err
 		}
 		c.signers = append(c.signers, signer)
+		c.signersToClose = append(c.signersToClose, signer)
 	}
 
 	return nil
