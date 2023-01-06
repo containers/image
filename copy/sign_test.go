@@ -77,11 +77,6 @@ func TestCreateSignature(t *testing.T) {
 		successfullySignedIdentity string // Set to expect a successful signing with testKeyFingerprint
 	}{
 		{
-			name:     "dir: with no identity specified",
-			dest:     dirDest,
-			identity: "",
-		},
-		{
 			name:        "unknown key",
 			dest:        dockerDest,
 			fingerprint: "this key does not exist",
@@ -90,6 +85,12 @@ func TestCreateSignature(t *testing.T) {
 			name:     "not a full reference",
 			dest:     dockerDest,
 			identity: "myregistry.io/myrepo",
+		},
+
+		{
+			name:     "dir: with no identity specified",
+			dest:     dirDest,
+			identity: "",
 		},
 		{
 			name:                       "docker:// without overriding the identity",
