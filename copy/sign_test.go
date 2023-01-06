@@ -93,6 +93,12 @@ func TestCreateSignature(t *testing.T) {
 			identity: "",
 		},
 		{
+			name:                       "dir: with overridden identity",
+			dest:                       dirDest,
+			identity:                   "myregistry.io/myrepo:mytag",
+			successfullySignedIdentity: "myregistry.io/myrepo:mytag",
+		},
+		{
 			name:                       "docker:// without overriding the identity",
 			dest:                       dockerDest,
 			identity:                   "",
