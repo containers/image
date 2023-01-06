@@ -3,6 +3,7 @@ package copy
 import (
 	"context"
 	"io"
+	"os"
 	"testing"
 
 	"github.com/containers/image/v5/directory"
@@ -10,9 +11,11 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/imagedestination"
 	internalsig "github.com/containers/image/v5/internal/signature"
+	"github.com/containers/image/v5/internal/testing/gpgagent"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/types"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,6 +26,15 @@ const (
 	// Keep this in sync with signature/fixtures_info_test.go
 	testKeyFingerprint = "1D8230F6CDB6A06716E414C1DB72F2188BB46CC8"
 )
+
+// Ensure we don’t leave around GPG agent processes.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if err := gpgagent.KillGPGAgent(testGPGHomeDirectory); err != nil {
+		logrus.Warnf("Error killing GPG agent: %v", err)
+	}
+	os.Exit(code)
+}
 
 func TestCreateSignature(t *testing.T) {
 	manifestBlob := []byte("Something")

@@ -7,9 +7,20 @@ import (
 	"os"
 	"testing"
 
+	"github.com/containers/image/v5/internal/testing/gpgagent"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// Ensure we don’t leave around GPG agent processes.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if err := gpgagent.KillGPGAgent(testGPGHomeDirectory); err != nil {
+		logrus.Warnf("Error killing GPG agent: %v", err)
+	}
+	os.Exit(code)
+}
 
 func TestGPGMESigningMechanismClose(t *testing.T) {
 	// Closing an ephemeral mechanism removes the directory.
