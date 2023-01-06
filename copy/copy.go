@@ -123,9 +123,9 @@ type ImageListSelection int
 type Options struct {
 	RemoveSignatures                 bool            // Remove any pre-existing signatures. SignBy will still add a new signature.
 	SignBy                           string          // If non-empty, asks for a signature to be added during the copy, and specifies a key ID, as accepted by signature.NewGPGSigningMechanism().SignDockerManifest(),
-	SignPassphrase                   string          // Passphare to use when signing with the key ID from `SignBy`.
+	SignPassphrase                   string          // Passphrase to use when signing with the key ID from `SignBy`.
 	SignBySigstorePrivateKeyFile     string          // If non-empty, asks for a signature to be added during the copy, using a sigstore private key file at the provided path.
-	SignSigstorePrivateKeyPassphrase []byte          // Passphare to use when signing with `SignBySigstorePrivateKeyFile`.
+	SignSigstorePrivateKeyPassphrase []byte          // Passphrase to use when signing with `SignBySigstorePrivateKeyFile`.
 	SignIdentity                     reference.Named // Identify to use when signing, defaults to the docker reference of the destination
 	ReportWriter                     io.Writer
 	SourceCtx                        *types.SystemContext
