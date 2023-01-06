@@ -2,20 +2,12 @@ package signature
 
 import (
 	"os"
-	"os/exec"
 	"testing"
 
+	"github.com/containers/image/v5/internal/testing/gpgagent"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// Kill the running gpg-agent to drop unlocked keys. This allows for testing handling of invalid passphrases.
-func killGPGAgent(t *testing.T) {
-	cmd := exec.Command("gpgconf", "--kill", "gpg-agent")
-	cmd.Env = append(os.Environ(), "GNUPGHOME="+testGPGHomeDirectory)
-	err := cmd.Run()
-	assert.NoError(t, err)
-}
 
 func TestSignDockerManifest(t *testing.T) {
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
@@ -54,7 +46,8 @@ func TestSignDockerManifest(t *testing.T) {
 }
 
 func TestSignDockerManifestWithPassphrase(t *testing.T) {
-	killGPGAgent(t)
+	err := gpgagent.KillGPGAgent(testGPGHomeDirectory)
+	require.NoError(t, err)
 
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
 	require.NoError(t, err)
