@@ -9,8 +9,11 @@ import (
 
 // newPRSigstoreSigned returns a new prSigstoreSigned if parameters are valid.
 func newPRSigstoreSigned(keyPath string, keyData []byte, signedIdentity PolicyReferenceMatch) (*prSigstoreSigned, error) {
-	if len(keyPath) > 0 && len(keyData) > 0 {
+	if keyPath != "" && keyData != nil {
 		return nil, InvalidPolicyFormatError("keyType and keyData cannot be used simultaneously")
+	}
+	if keyPath == "" && keyData == nil {
+		return nil, InvalidPolicyFormatError("neither keyType nor keyData specified")
 	}
 	if signedIdentity == nil {
 		return nil, InvalidPolicyFormatError("signedIdentity not specified")

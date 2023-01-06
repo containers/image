@@ -52,6 +52,9 @@ func TestNewPRSigstoreSigned(t *testing.T) {
 	// Both keyPath and keyData specified
 	_, err = newPRSigstoreSigned(testPath, testData, testIdentity)
 	assert.Error(t, err)
+	// Neither keyPath nor keyData specified
+	_, err = newPRSigstoreSigned("", nil, testIdentity)
+	assert.Error(t, err)
 
 	// Invalid signedIdentity
 	_, err = newPRSigstoreSigned(testPath, nil, nil)

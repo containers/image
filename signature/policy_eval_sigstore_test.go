@@ -70,6 +70,9 @@ func TestPRrSigstoreSignedIsSignatureAccepted(t *testing.T) {
 		func() (*prSigstoreSigned, error) { // Both KeyPath and KeyData set. Do not use newPRSigstoreSigned*, because it would reject this.
 			return &prSigstoreSigned{KeyPath: "/foo/bar", KeyData: []byte("abc"), SignedIdentity: prm}, nil
 		},
+		func() (*prSigstoreSigned, error) { // Neither KeyPath nor KeyData set. Do not use newPRSigstoreSigned*, because it would reject this.
+			return &prSigstoreSigned{KeyPath: "", KeyData: nil, SignedIdentity: prm}, nil
+		},
 		func() (*prSigstoreSigned, error) { // Invalid KeyPath
 			return newPRSigstoreSignedKeyPath("/this/does/not/exist", prm)
 		},
