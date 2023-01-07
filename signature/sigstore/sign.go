@@ -1,33 +1,50 @@
 package sigstore
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"os"
 
-	"github.com/containers/image/v5/docker/reference"
-	"github.com/containers/image/v5/internal/signature"
 	internalSigner "github.com/containers/image/v5/internal/signer"
+	"github.com/containers/image/v5/signature/signer"
 	"github.com/containers/image/v5/signature/sigstore/internal"
 )
 
-// SignDockerManifestWithPrivateKeyFileUnstable returns a signature for manifest as the specified dockerReference,
-// using a private key and an optional passphrase.
-//
-// Yes, this returns an internal type, and should currently not be used outside of c/image.
-// There is NO COMITTMENT TO STABLE API.
-func SignDockerManifestWithPrivateKeyFileUnstable(m []byte, dockerReference reference.Named, privateKeyFile string, passphrase []byte) (signature.Signature, error) {
-	privateKeyPEM, err := os.ReadFile(privateKeyFile)
-	if err != nil {
-		return nil, fmt.Errorf("reading private key from %s: %w", privateKeyFile, err)
+type Option = internal.Option
+
+func WithPrivateKeyFile(file string, passphrase []byte) Option {
+	return func(s *internal.SigstoreSigner) error {
+		if s.PrivateKey != nil {
+			return fmt.Errorf("multiple private key sources specified when preparing to create sigstore signatures")
+		}
+
+		if passphrase == nil {
+			return errors.New("private key passphrase not provided")
+		}
+
+		privateKeyPEM, err := os.ReadFile(file)
+		if err != nil {
+			return fmt.Errorf("reading private key from %s: %w", file, err)
+		}
+		signerVerifier, err := loadPrivateKey(privateKeyPEM, passphrase)
+		if err != nil {
+			return fmt.Errorf("initializing private key: %w", err)
+		}
+		s.PrivateKey = signerVerifier
+		return nil
 	}
-	signerVerifier, err := loadPrivateKey(privateKeyPEM, passphrase)
-	if err != nil {
-		return nil, fmt.Errorf("initializing private key: %w", err)
+}
+
+func NewSigner(opts ...Option) (*signer.Signer, error) {
+	s := internal.SigstoreSigner{}
+	for _, o := range opts {
+		if err := o(&s); err != nil {
+			return nil, err
+		}
+	}
+	if s.PrivateKey == nil {
+		return nil, fmt.Errorf("preparing to create a sigstore signature: nothing to sign with provided")
 	}
 
-	signer := internalSigner.NewSigner(&internal.SigstoreSigner{
-		PrivateKey: signerVerifier,
-	})
-	return internalSigner.SignImageManifest(context.TODO(), signer, m, dockerReference)
+	return internalSigner.NewSigner(&s), nil
 }

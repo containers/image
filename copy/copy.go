@@ -572,7 +572,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 		sigs = append(sigs, newSig)
 	}
 	if options.SignBySigstorePrivateKeyFile != "" {
-		newSig, err := c.createSigstoreSignature(manifestList, options.SignBySigstorePrivateKeyFile, options.SignSigstorePrivateKeyPassphrase, options.SignIdentity)
+		newSig, err := c.createSigstoreSignature(ctx, manifestList, options.SignBySigstorePrivateKeyFile, options.SignSigstorePrivateKeyPassphrase, options.SignIdentity)
 		if err != nil {
 			return nil, err
 		}
@@ -799,7 +799,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 		sigs = append(sigs, newSig)
 	}
 	if options.SignBySigstorePrivateKeyFile != "" {
-		newSig, err := c.createSigstoreSignature(manifestBytes, options.SignBySigstorePrivateKeyFile, options.SignSigstorePrivateKeyPassphrase, options.SignIdentity)
+		newSig, err := c.createSigstoreSignature(ctx, manifestBytes, options.SignBySigstorePrivateKeyFile, options.SignSigstorePrivateKeyPassphrase, options.SignIdentity)
 		if err != nil {
 			return nil, "", "", err
 		}

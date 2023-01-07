@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/containers/image/v5/docker/reference"
@@ -14,6 +15,11 @@ import (
 	sigstoreSignature "github.com/sigstore/sigstore/pkg/signature"
 )
 
+type Option func(*SigstoreSigner) error
+
+// SigstoreSigner is a signer.SignerImplementation implementation for sigstore signatures.
+// It is initialized using various closures that implement Option, sadly over several subpackages, to decrease the
+// dependency impact.
 type SigstoreSigner struct {
 	PrivateKey sigstoreSignature.Signer // May be nil during initialization
 }
@@ -25,6 +31,10 @@ func (s *SigstoreSigner) ProgressMessage() string {
 
 // SignImageManifest creates a new signature for manifest m as dockerReference.
 func (s *SigstoreSigner) SignImageManifest(ctx context.Context, m []byte, dockerReference reference.Named) (signature.Signature, error) {
+	if s.PrivateKey == nil {
+		return nil, errors.New("internal error: nothing to sign with, should have been detected in NewSigner")
+	}
+
 	if reference.IsNameOnly(dockerReference) {
 		return nil, fmt.Errorf("reference %s can’t be signed, it has neither a tag nor a digest", dockerReference.String())
 	}
