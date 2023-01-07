@@ -9,6 +9,10 @@ const (
 	SigstoreSignatureAnnotationKey = "dev.cosignproject.cosign/signature"
 	// from sigstore/cosign/pkg/oci/static.BundleAnnotationKey
 	SigstoreSETAnnotationKey = "dev.sigstore.cosign/bundle"
+	// from sigstore/cosign/pkg/oci/static.CertificateAnnotationKey
+	SigstoreCertificateAnnotationKey = "dev.sigstore.cosign/certificate"
+	// from sigstore/cosign/pkg/oci/static.ChainAnnotationKey
+	SigstoreIntermediateCertificateChainAnnotationKey = "dev.sigstore.cosign/chain"
 )
 
 // Sigstore is a github.com/cosign/cosign signature.
