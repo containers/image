@@ -2,8 +2,8 @@ package copy
 
 import (
 	"context"
+	"errors"
 	"io"
-	"os"
 	"testing"
 
 	"github.com/containers/image/v5/directory"
@@ -11,45 +11,39 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/imagedestination"
 	internalsig "github.com/containers/image/v5/internal/signature"
-	"github.com/containers/image/v5/internal/testing/gpgagent"
-	"github.com/containers/image/v5/manifest"
-	"github.com/containers/image/v5/signature"
+	internalSigner "github.com/containers/image/v5/internal/signer"
+	"github.com/containers/image/v5/signature/signer"
 	"github.com/containers/image/v5/types"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	testGPGHomeDirectory = "../signature/fixtures"
-	// TestKeyFingerprint is the fingerprint of the private key in testGPGHomeDirectory.
-	// Keep this in sync with signature/fixtures_info_test.go
-	testKeyFingerprint = "1D8230F6CDB6A06716E414C1DB72F2188BB46CC8"
-)
+// stubSignerImpl is a signer.SigningImplementation that allows us to check the signed identity, without the overhead of actually signing.
+// We abuse internalsig.Sigstore to store the signed manifest and identity in the payload and MIME type fields, respectively.
+type stubSignerImpl struct {
+	signingFailure error // if set, SignImageManifest returns this
+}
 
-// Ensure we don’t leave around GPG agent processes.
-func TestMain(m *testing.M) {
-	code := m.Run()
-	if err := gpgagent.KillGPGAgent(testGPGHomeDirectory); err != nil {
-		logrus.Warnf("Error killing GPG agent: %v", err)
+func (s *stubSignerImpl) ProgressMessage() string {
+	return "Signing with stubSigner"
+}
+
+func (s *stubSignerImpl) SignImageManifest(ctx context.Context, m []byte, dockerReference reference.Named) (internalsig.Signature, error) {
+	if s.signingFailure != nil {
+		return nil, s.signingFailure
 	}
-	os.Exit(code)
+	return internalsig.SigstoreFromComponents(dockerReference.String(), m, nil), nil
+}
+
+func (s *stubSignerImpl) Close() error {
+	return nil
 }
 
 func TestCreateSignatures(t *testing.T) {
+	stubSigner := internalSigner.NewSigner(&stubSignerImpl{})
+	defer stubSigner.Close()
+
 	manifestBlob := []byte("Something")
-	manifestDigest, err := manifest.Digest(manifestBlob)
-	require.NoError(t, err)
-
-	mech, _, err := signature.NewEphemeralGPGSigningMechanism([]byte{})
-	require.NoError(t, err)
-	defer mech.Close()
-	if err := mech.SupportsSigning(); err != nil {
-		t.Skipf("Signing not supported: %v", err)
-	}
-
-	t.Setenv("GNUPGHOME", testGPGHomeDirectory)
-
 	// Set up dir: and docker: destinations
 	tempDir := t.TempDir()
 	dirRef, err := directory.NewReference(tempDir)
@@ -64,12 +58,7 @@ func TestCreateSignatures(t *testing.T) {
 	require.NoError(t, err)
 	defer dockerDest.Close()
 
-	// Mechanism for verifying the signatures
-	mech, err = signature.NewGPGSigningMechanism()
-	require.NoError(t, err)
-	defer mech.Close()
-
-	workingOptions := Options{SignBy: testKeyFingerprint}
+	workingOptions := Options{Signers: []*signer.Signer{stubSigner}}
 	for _, cc := range []struct {
 		name                       string
 		dest                       types.ImageDestination
@@ -79,9 +68,23 @@ func TestCreateSignatures(t *testing.T) {
 		successfullySignedIdentity string // Set to expect a successful signing with workingOptions
 	}{
 		{
-			name:    "unknown key",
-			dest:    dockerDest,
-			options: &Options{SignBy: "this key does not exist"},
+			name: "signing fails",
+			dest: dockerDest,
+			options: &Options{
+				Signers: []*signer.Signer{
+					internalSigner.NewSigner(&stubSignerImpl{signingFailure: errors.New("fails")}),
+				},
+			},
+		},
+		{
+			name: "second signing fails",
+			dest: dockerDest,
+			options: &Options{
+				Signers: []*signer.Signer{
+					stubSigner,
+					internalSigner.NewSigner(&stubSignerImpl{signingFailure: errors.New("fails")}),
+				},
+			},
 		},
 		{
 			name:     "not a full reference",
@@ -142,12 +145,11 @@ func TestCreateSignatures(t *testing.T) {
 		case cc.successfullySignedIdentity != "":
 			require.NoError(t, err, cc.name)
 			require.Len(t, sigs, 1, cc.name)
-			simpleSig, ok := sigs[0].(internalsig.SimpleSigning)
+			stubSig, ok := sigs[0].(internalsig.Sigstore)
 			require.True(t, ok, cc.name)
-			verified, err := signature.VerifyDockerManifestSignature(simpleSig.UntrustedSignature(), manifestBlob, cc.successfullySignedIdentity, mech, workingOptions.SignBy)
-			require.NoError(t, err, cc.name)
-			assert.Equal(t, cc.successfullySignedIdentity, verified.DockerReference, cc.name)
-			assert.Equal(t, manifestDigest, verified.DockerManifestDigest, cc.name)
+			// Compare how stubSignerImpl.SignImageManifest stuffs the signing parameters into these fields.
+			assert.Equal(t, manifestBlob, stubSig.UntrustedPayload(), cc.name)
+			assert.Equal(t, cc.successfullySignedIdentity, stubSig.UntrustedMIMEType(), cc.name)
 
 		case cc.successWithNoSigs:
 			require.NoError(t, err, cc.name)
