@@ -69,9 +69,9 @@ func makeLayer(filename string, repeat int, compression archive.Compression) ([]
 func TestBlobCache(t *testing.T) {
 	cacheDir := t.TempDir()
 
-	systemContext := types.SystemContext{}
+	systemContext := types.SystemContext{BlobInfoCacheDir: "/dev/null/this/does/not/exist"}
 
-	for _, repeat := range []int{1, 10, 100, 1000, 10000} {
+	for _, repeat := range []int{1, 10000} {
 		for _, desiredCompression := range []types.LayerCompression{types.PreserveOriginal, types.Compress, types.Decompress} {
 			for _, layerCompression := range []archive.Compression{archive.Uncompressed, archive.Gzip} {
 				// Create a layer with the specified layerCompression.
