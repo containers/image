@@ -7,6 +7,8 @@ const (
 	SigstoreSignatureMIMEType = "application/vnd.dev.cosign.simplesigning.v1+json"
 	// from sigstore/cosign/pkg/oci/static.SignatureAnnotationKey
 	SigstoreSignatureAnnotationKey = "dev.cosignproject.cosign/signature"
+	// from sigstore/cosign/pkg/oci/static.BundleAnnotationKey
+	SigstoreSETAnnotationKey = "dev.sigstore.cosign/bundle"
 )
 
 // Sigstore is a github.com/cosign/cosign signature.

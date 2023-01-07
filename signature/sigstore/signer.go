@@ -8,6 +8,7 @@ import (
 	internalSigner "github.com/containers/image/v5/internal/signer"
 	"github.com/containers/image/v5/signature/signer"
 	"github.com/containers/image/v5/signature/sigstore/internal"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
 type Option = internal.Option
@@ -30,7 +31,16 @@ func WithPrivateKeyFile(file string, passphrase []byte) Option {
 		if err != nil {
 			return fmt.Errorf("initializing private key: %w", err)
 		}
+		publicKey, err := signerVerifier.PublicKey()
+		if err != nil {
+			return fmt.Errorf("getting public key from private key: %w", err)
+		}
+		publicKeyPEM, err := cryptoutils.MarshalPublicKeyToPEM(publicKey)
+		if err != nil {
+			return fmt.Errorf("converting public key to PEM: %w", err)
+		}
 		s.PrivateKey = signerVerifier
+		s.SigningKeyOrCert = publicKeyPEM
 		return nil
 	}
 }

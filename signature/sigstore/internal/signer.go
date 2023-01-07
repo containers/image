@@ -21,7 +21,11 @@ type Option func(*SigstoreSigner) error
 // It is initialized using various closures that implement Option, sadly over several subpackages, to decrease the
 // dependency impact.
 type SigstoreSigner struct {
-	PrivateKey sigstoreSignature.Signer // May be nil during initialization
+	PrivateKey       sigstoreSignature.Signer // May be nil during initialization
+	SigningKeyOrCert []byte                   // For possible Rekor upload; always initialized together with PrivateKey
+
+	// Rekor state
+	RekorUploader func(ctx context.Context, keyOrCertBytes []byte, signatureBytes []byte, payloadBytes []byte) ([]byte, error) // Or nil
 }
 
 // ProgressMessage returns a human-readable sentence that makes sense to write before starting to create a single signature.
@@ -58,9 +62,20 @@ func (s *SigstoreSigner) SignImageManifest(ctx context.Context, m []byte, docker
 		return nil, fmt.Errorf("creating signature: %w", err)
 	}
 	base64Signature := base64.StdEncoding.EncodeToString(signatureBytes)
+	var rekorSETBytes []byte // = nil
+	if s.RekorUploader != nil {
+		set, err := s.RekorUploader(ctx, s.SigningKeyOrCert, signatureBytes, payloadBytes)
+		if err != nil {
+			return nil, err
+		}
+		rekorSETBytes = set
+	}
 
 	annotations := map[string]string{
 		signature.SigstoreSignatureAnnotationKey: base64Signature,
+	}
+	if rekorSETBytes != nil {
+		annotations[signature.SigstoreSETAnnotationKey] = string(rekorSETBytes)
 	}
 	return signature.SigstoreFromComponents(signature.SigstoreSignatureMIMEType, payloadBytes, annotations), nil
 }
