@@ -1,11 +1,13 @@
 package sigstore
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/signature"
+	internalSigner "github.com/containers/image/v5/internal/signer"
 	"github.com/containers/image/v5/signature/sigstore/internal"
 )
 
@@ -24,8 +26,8 @@ func SignDockerManifestWithPrivateKeyFileUnstable(m []byte, dockerReference refe
 		return nil, fmt.Errorf("initializing private key: %w", err)
 	}
 
-	signer := internal.SigstoreSigner{
+	signer := internalSigner.NewSigner(&internal.SigstoreSigner{
 		PrivateKey: signerVerifier,
-	}
-	return signer.SignImageManifest(m, dockerReference)
+	})
+	return internalSigner.SignImageManifest(context.TODO(), signer, m, dockerReference)
 }
