@@ -2,48 +2,90 @@ package signature
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/containers/image/v5/signature/internal"
 )
 
-// newPRSigstoreSigned returns a new prSigstoreSigned if parameters are valid.
-func newPRSigstoreSigned(keyPath string, keyData []byte, signedIdentity PolicyReferenceMatch) (*prSigstoreSigned, error) {
-	if keyPath != "" && keyData != nil {
-		return nil, InvalidPolicyFormatError("keyType and keyData cannot be used simultaneously")
+// PRSigstoreSignedOption is way to pass values to NewPRSigstoreSigned
+type PRSigstoreSignedOption func(*prSigstoreSigned) error
+
+// PRSigstoreSignedWithKeyPath specifies a value for the "keyPath" field when calling NewPRSigstoreSigned.
+func PRSigstoreSignedWithKeyPath(keyPath string) PRSigstoreSignedOption {
+	return func(pr *prSigstoreSigned) error {
+		if pr.KeyPath != "" {
+			return errors.New(`"keyPath" already specified`)
+		}
+		pr.KeyPath = keyPath
+		return nil
 	}
-	if keyPath == "" && keyData == nil {
-		return nil, InvalidPolicyFormatError("neither keyType nor keyData specified")
-	}
-	if signedIdentity == nil {
-		return nil, InvalidPolicyFormatError("signedIdentity not specified")
-	}
-	return &prSigstoreSigned{
-		prCommon:       prCommon{Type: prTypeSigstoreSigned},
-		KeyPath:        keyPath,
-		KeyData:        keyData,
-		SignedIdentity: signedIdentity,
-	}, nil
 }
 
-// newPRSigstoreSignedKeyPath is NewPRSigstoreSignedKeyPath, except it returns the private type.
-func newPRSigstoreSignedKeyPath(keyPath string, signedIdentity PolicyReferenceMatch) (*prSigstoreSigned, error) {
-	return newPRSigstoreSigned(keyPath, nil, signedIdentity)
+// PRSigstoreSignedWithKeyData specifies a value for the "keyData" field when calling NewPRSigstoreSigned.
+func PRSigstoreSignedWithKeyData(keyData []byte) PRSigstoreSignedOption {
+	return func(pr *prSigstoreSigned) error {
+		if pr.KeyData != nil {
+			return errors.New(`"keyData" already specified`)
+		}
+		pr.KeyData = keyData
+		return nil
+	}
+}
+
+// PRSigstoreSignedWithSignedIdentity specifies a value for the "signedIdentity" field when calling NewPRSigstoreSigned.
+func PRSigstoreSignedWithSignedIdentity(signedIdentity PolicyReferenceMatch) PRSigstoreSignedOption {
+	return func(pr *prSigstoreSigned) error {
+		if pr.SignedIdentity != nil {
+			return errors.New(`"signedIdentity" already specified`)
+		}
+		pr.SignedIdentity = signedIdentity
+		return nil
+	}
+}
+
+// newPRSigstoreSigned is NewPRSigstoreSigned, except it returns the private type.
+func newPRSigstoreSigned(options ...PRSigstoreSignedOption) (*prSigstoreSigned, error) {
+	res := prSigstoreSigned{
+		prCommon: prCommon{Type: prTypeSigstoreSigned},
+	}
+	for _, o := range options {
+		if err := o(&res); err != nil {
+			return nil, err
+		}
+	}
+	if res.KeyPath != "" && res.KeyData != nil {
+		return nil, InvalidPolicyFormatError("keyType and keyData cannot be used simultaneously")
+	}
+	if res.KeyPath == "" && res.KeyData == nil {
+		return nil, InvalidPolicyFormatError("At least one of keyPath and keyData must be specified")
+	}
+	if res.SignedIdentity == nil {
+		return nil, InvalidPolicyFormatError("signedIdentity not specified")
+	}
+
+	return &res, nil
+}
+
+// NewPRSigstoreSigned returns a new "sigstoreSigned" PolicyRequirement based on options.
+func NewPRSigstoreSigned(options ...PRSigstoreSignedOption) (PolicyRequirement, error) {
+	return newPRSigstoreSigned(options...)
 }
 
 // NewPRSigstoreSignedKeyPath returns a new "sigstoreSigned" PolicyRequirement using a KeyPath
 func NewPRSigstoreSignedKeyPath(keyPath string, signedIdentity PolicyReferenceMatch) (PolicyRequirement, error) {
-	return newPRSigstoreSignedKeyPath(keyPath, signedIdentity)
-}
-
-// newPRSigstoreSignedKeyData is NewPRSigstoreSignedKeyData, except it returns the private type.
-func newPRSigstoreSignedKeyData(keyData []byte, signedIdentity PolicyReferenceMatch) (*prSigstoreSigned, error) {
-	return newPRSigstoreSigned("", keyData, signedIdentity)
+	return NewPRSigstoreSigned(
+		PRSigstoreSignedWithKeyPath(keyPath),
+		PRSigstoreSignedWithSignedIdentity(signedIdentity),
+	)
 }
 
 // NewPRSigstoreSignedKeyData returns a new "sigstoreSigned" PolicyRequirement using a KeyData
 func NewPRSigstoreSignedKeyData(keyData []byte, signedIdentity PolicyReferenceMatch) (PolicyRequirement, error) {
-	return newPRSigstoreSignedKeyData(keyData, signedIdentity)
+	return NewPRSigstoreSigned(
+		PRSigstoreSignedWithKeyData(keyData),
+		PRSigstoreSignedWithSignedIdentity(signedIdentity),
+	)
 }
 
 // Compile-time check that prSigstoreSigned implements json.Unmarshaler.
@@ -87,23 +129,17 @@ func (pr *prSigstoreSigned) UnmarshalJSON(data []byte) error {
 		tmp.SignedIdentity = si
 	}
 
-	var res *prSigstoreSigned
-	var err error
-	switch {
-	case gotKeyPath && gotKeyData:
-		return InvalidPolicyFormatError("keyPath and keyData cannot be used simultaneously")
-	case gotKeyPath && !gotKeyData:
-		res, err = newPRSigstoreSignedKeyPath(tmp.KeyPath, tmp.SignedIdentity)
-	case !gotKeyPath && gotKeyData:
-		res, err = newPRSigstoreSignedKeyData(tmp.KeyData, tmp.SignedIdentity)
-	case !gotKeyPath && !gotKeyData:
-		return InvalidPolicyFormatError("At least one of keyPath and keyData must be specified")
-	default: // Coverage: This should never happen
-		return fmt.Errorf("Impossible keyPath/keyData presence combination!?")
+	var opts []PRSigstoreSignedOption
+	if gotKeyPath {
+		opts = append(opts, PRSigstoreSignedWithKeyPath(tmp.KeyPath))
 	}
+	if gotKeyData {
+		opts = append(opts, PRSigstoreSignedWithKeyData(tmp.KeyData))
+	}
+	opts = append(opts, PRSigstoreSignedWithSignedIdentity(tmp.SignedIdentity))
+
+	res, err := newPRSigstoreSigned(opts...)
 	if err != nil {
-		// Coverage: This cannot currently happen, creating a prSigstoreSigned only fails
-		// if signedIdentity is nil, which we replace with a default above.
 		return err
 	}
 	*pr = *res

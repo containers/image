@@ -8,20 +8,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// xNewPRSigstoreSignedKeyPath is like NewPRSigstoreSignedKeyPath, except it must not fail.
-func xNewPRSigstoreSignedKeyPath(keyPath string, signedIdentity PolicyReferenceMatch) PolicyRequirement {
-	pr, err := NewPRSigstoreSignedKeyPath(keyPath, signedIdentity)
+// xNewPRSigstoreSigned is like NewPRSigstoreSigned, except it must not fail.
+func xNewPRSigstoreSigned(options ...PRSigstoreSignedOption) PolicyRequirement {
+	pr, err := NewPRSigstoreSigned(options...)
 	if err != nil {
-		panic("xNewPRSigstoreSignedKeyPath failed")
-	}
-	return pr
-}
-
-// xNewPRSigstoreSignedKeyData is like NewPRSigstoreSignedKeyData, except it must not fail.
-func xNewPRSigstoreSignedKeyData(keyData []byte, signedIdentity PolicyReferenceMatch) PolicyRequirement {
-	pr, err := NewPRSigstoreSignedKeyData(keyData, signedIdentity)
-	if err != nil {
-		panic("xNewPRSigstoreSignedKeyData failed")
+		panic("xNewPRSigstoreSigned failed")
 	}
 	return pr
 }
@@ -32,7 +23,10 @@ func TestNewPRSigstoreSigned(t *testing.T) {
 	testIdentity := NewPRMMatchRepoDigestOrExact()
 
 	// Success
-	pr, err := newPRSigstoreSigned(testPath, nil, testIdentity)
+	pr, err := newPRSigstoreSigned(
+		PRSigstoreSignedWithKeyPath(testPath),
+		PRSigstoreSignedWithSignedIdentity(testIdentity),
+	)
 	require.NoError(t, err)
 	assert.Equal(t, &prSigstoreSigned{
 		prCommon:       prCommon{prTypeSigstoreSigned},
@@ -40,7 +34,10 @@ func TestNewPRSigstoreSigned(t *testing.T) {
 		KeyData:        nil,
 		SignedIdentity: testIdentity,
 	}, pr)
-	pr, err = newPRSigstoreSigned("", testData, testIdentity)
+	pr, err = newPRSigstoreSigned(
+		PRSigstoreSignedWithKeyData(testData),
+		PRSigstoreSignedWithSignedIdentity(testIdentity),
+	)
 	require.NoError(t, err)
 	assert.Equal(t, &prSigstoreSigned{
 		prCommon:       prCommon{prTypeSigstoreSigned},
@@ -49,36 +46,63 @@ func TestNewPRSigstoreSigned(t *testing.T) {
 		SignedIdentity: testIdentity,
 	}, pr)
 
-	// Both keyPath and keyData specified
-	_, err = newPRSigstoreSigned(testPath, testData, testIdentity)
-	assert.Error(t, err)
-	// Neither keyPath nor keyData specified
-	_, err = newPRSigstoreSigned("", nil, testIdentity)
-	assert.Error(t, err)
-
-	// Invalid signedIdentity
-	_, err = newPRSigstoreSigned(testPath, nil, nil)
-	assert.Error(t, err)
+	for _, c := range [][]PRSigstoreSignedOption{
+		{ // Both keyPath and keyData specified
+			PRSigstoreSignedWithKeyPath(testPath),
+			PRSigstoreSignedWithKeyData(testData),
+			PRSigstoreSignedWithSignedIdentity(testIdentity),
+		},
+		{}, // Neither keyPath nor keyData specified
+		{ // Duplicate keyPath
+			PRSigstoreSignedWithKeyPath(testPath),
+			PRSigstoreSignedWithKeyPath(testPath + "1"),
+			PRSigstoreSignedWithSignedIdentity(testIdentity),
+		},
+		{ // Duplicate keyData
+			PRSigstoreSignedWithKeyData(testData),
+			PRSigstoreSignedWithKeyData([]byte("def")),
+			PRSigstoreSignedWithSignedIdentity(testIdentity),
+		},
+		{ // Missing signedIdentity
+			PRSigstoreSignedWithKeyPath(testPath),
+		},
+		{ // Duplicate signedIdentity}
+			PRSigstoreSignedWithKeyPath(testPath),
+			PRSigstoreSignedWithSignedIdentity(testIdentity),
+			PRSigstoreSignedWithSignedIdentity(newPRMMatchRepository()),
+		},
+	} {
+		_, err = newPRSigstoreSigned(c...)
+		assert.Error(t, err)
+	}
 }
 
 func TestNewPRSigstoreSignedKeyPath(t *testing.T) {
 	const testPath = "/foo/bar"
-	_pr, err := NewPRSigstoreSignedKeyPath(testPath, NewPRMMatchRepoDigestOrExact())
+	signedIdentity := NewPRMMatchRepoDigestOrExact()
+	_pr, err := NewPRSigstoreSignedKeyPath(testPath, signedIdentity)
 	require.NoError(t, err)
 	pr, ok := _pr.(*prSigstoreSigned)
 	require.True(t, ok)
-	assert.Equal(t, testPath, pr.KeyPath)
-	// Failure cases tested in TestNewPRSigstoreSigned.
+	assert.Equal(t, &prSigstoreSigned{
+		prCommon:       prCommon{Type: prTypeSigstoreSigned},
+		KeyPath:        testPath,
+		SignedIdentity: NewPRMMatchRepoDigestOrExact(),
+	}, pr)
 }
 
 func TestNewPRSigstoreSignedKeyData(t *testing.T) {
 	testData := []byte("abc")
-	_pr, err := NewPRSigstoreSignedKeyData(testData, NewPRMMatchRepoDigestOrExact())
+	signedIdentity := NewPRMMatchRepoDigestOrExact()
+	_pr, err := NewPRSigstoreSignedKeyData(testData, signedIdentity)
 	require.NoError(t, err)
 	pr, ok := _pr.(*prSigstoreSigned)
 	require.True(t, ok)
-	assert.Equal(t, testData, pr.KeyData)
-	// Failure cases tested in TestNewPRSigstoreSigned.
+	assert.Equal(t, &prSigstoreSigned{
+		prCommon:       prCommon{Type: prTypeSigstoreSigned},
+		KeyData:        testData,
+		SignedIdentity: NewPRMMatchRepoDigestOrExact(),
+	}, pr)
 }
 
 // Return the result of modifying validJSON with fn and unmarshaling it into *pr

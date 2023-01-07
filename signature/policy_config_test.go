@@ -104,12 +104,16 @@ var policyFixtureContents = &Policy{
 				xNewPRSignedBaseLayer(xNewPRMExactReference("registry.access.redhat.com/rhel7/rhel:latest")),
 			},
 			"example.com/sigstore/key-data-example": {
-				xNewPRSigstoreSignedKeyData([]byte("nonsense"),
-					NewPRMMatchRepoDigestOrExact()),
+				xNewPRSigstoreSigned(
+					PRSigstoreSignedWithKeyData([]byte("nonsense")),
+					PRSigstoreSignedWithSignedIdentity(NewPRMMatchRepoDigestOrExact()),
+				),
 			},
 			"example.com/sigstore/key-path-example": {
-				xNewPRSigstoreSignedKeyPath("/keys/public-key",
-					NewPRMMatchRepository()),
+				xNewPRSigstoreSigned(
+					PRSigstoreSignedWithKeyPath("/keys/public-key"),
+					PRSigstoreSignedWithSignedIdentity(NewPRMMatchRepository()),
+				),
 			},
 		},
 	},
