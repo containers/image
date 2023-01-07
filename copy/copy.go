@@ -24,6 +24,7 @@ import (
 	"github.com/containers/image/v5/pkg/compression"
 	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/signature"
+	"github.com/containers/image/v5/signature/signer"
 	"github.com/containers/image/v5/transports"
 	"github.com/containers/image/v5/types"
 	encconfig "github.com/containers/ocicrypt/config"
@@ -61,6 +62,7 @@ var expectedCompressionFormats = map[string]*compressiontypes.Algorithm{
 
 // copier allows us to keep track of diffID values for blobs, and other
 // data shared across one or more images in a possible manifest list.
+// The owner must call close() when done.
 type copier struct {
 	dest                          private.ImageDestination
 	rawSource                     private.ImageSource
@@ -75,6 +77,7 @@ type copier struct {
 	ociEncryptConfig              *encconfig.EncryptConfig
 	concurrentBlobCopiesSemaphore *semaphore.Weighted // Limits the amount of concurrently copied blobs
 	downloadForeignLayers         bool
+	signers                       []*signer.Signer
 }
 
 // imageCopier tracks state specific to a single image (possibly an item of a manifest list)
@@ -257,6 +260,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		ociEncryptConfig:      options.OciEncryptConfig,
 		downloadForeignLayers: options.DownloadForeignLayers,
 	}
+	defer c.close()
 
 	// Set the concurrentBlobCopiesSemaphore if we can copy layers in parallel.
 	if dest.HasThreadSafePutBlob() && rawSource.HasThreadSafeGetBlob() {
@@ -282,6 +286,10 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		// Note that compressionFormat and compressionLevel can be nil.
 		c.compressionFormat = options.DestinationCtx.CompressionFormat
 		c.compressionLevel = options.DestinationCtx.CompressionLevel
+	}
+
+	if err := c.setupSigners(options); err != nil {
+		return nil, err
 	}
 
 	unparsedToplevel := image.UnparsedInstance(rawSource, nil)
@@ -338,6 +346,15 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 	}
 
 	return copiedManifest, nil
+}
+
+// close tears down state owned by copier.
+func (c *copier) close() {
+	for i, s := range c.signers {
+		if err := s.Close(); err != nil {
+			logrus.Warnf("Error closing per-copy signer %d: %v", i+1, err)
+		}
+	}
 }
 
 // Checks if the destination supports accepting multiple images by checking if it can support
@@ -564,20 +581,11 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	}
 
 	// Sign the manifest list.
-	if options.SignBy != "" {
-		newSig, err := c.createSignature(ctx, manifestList, options.SignBy, options.SignPassphrase, options.SignIdentity)
-		if err != nil {
-			return nil, err
-		}
-		sigs = append(sigs, newSig)
+	newSigs, err := c.createSignatures(ctx, manifestList, options.SignIdentity)
+	if err != nil {
+		return nil, err
 	}
-	if options.SignBySigstorePrivateKeyFile != "" {
-		newSig, err := c.createSigstoreSignature(ctx, manifestList, options.SignBySigstorePrivateKeyFile, options.SignSigstorePrivateKeyPassphrase, options.SignIdentity)
-		if err != nil {
-			return nil, err
-		}
-		sigs = append(sigs, newSig)
-	}
+	sigs = append(sigs, newSigs...)
 
 	c.Printf("Storing list signatures\n")
 	if err := c.dest.PutSignaturesWithFormat(ctx, sigs, nil); err != nil {
@@ -675,12 +683,12 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 	// Decide whether we can substitute blobs with semantic equivalents:
 	// - Don’t do that if we can’t modify the manifest at all
 	// - Ensure _this_ copy sees exactly the intended data when either processing a signed image or signing it.
-	//   This may be too conservative, but for now, better safe than sorry, _especially_ on the SignBy path:
+	//   This may be too conservative, but for now, better safe than sorry, _especially_ on the len(c.signers) != 0 path:
 	//   The signature makes the content non-repudiable, so it very much matters that the signature is made over exactly what the user intended.
 	//   We do intend the RecordDigestUncompressedPair calls to only work with reliable data, but at least there’s a risk
 	//   that the compressed version coming from a third party may be designed to attack some other decompressor implementation,
 	//   and we would reuse and sign it.
-	ic.canSubstituteBlobs = ic.cannotModifyManifestReason == "" && options.SignBy == "" && options.SignBySigstorePrivateKeyFile == ""
+	ic.canSubstituteBlobs = ic.cannotModifyManifestReason == "" && len(c.signers) == 0
 
 	if err := ic.updateEmbeddedDockerReference(); err != nil {
 		return nil, "", "", err
@@ -711,7 +719,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 
 	// If enabled, fetch and compare the destination's manifest. And as an optimization skip updating the destination iff equal
 	if options.OptimizeDestinationImageAlreadyExists {
-		shouldUpdateSigs := len(sigs) > 0 || options.SignBy != "" || options.SignBySigstorePrivateKeyFile != "" // TODO: Consider allowing signatures updates only and skipping the image's layers/manifest copy if possible
+		shouldUpdateSigs := len(sigs) > 0 || len(c.signers) != 0 // TODO: Consider allowing signatures updates only and skipping the image's layers/manifest copy if possible
 		noPendingManifestUpdates := ic.noPendingManifestUpdates()
 
 		logrus.Debugf("Checking if we can skip copying: has signatures=%t, OCI encryption=%t, no manifest updates=%t", shouldUpdateSigs, destRequiresOciEncryption, noPendingManifestUpdates)
@@ -791,20 +799,11 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 		targetInstance = &retManifestDigest
 	}
 
-	if options.SignBy != "" {
-		newSig, err := c.createSignature(ctx, manifestBytes, options.SignBy, options.SignPassphrase, options.SignIdentity)
-		if err != nil {
-			return nil, "", "", err
-		}
-		sigs = append(sigs, newSig)
+	newSigs, err := c.createSignatures(ctx, manifestBytes, options.SignIdentity)
+	if err != nil {
+		return nil, "", "", err
 	}
-	if options.SignBySigstorePrivateKeyFile != "" {
-		newSig, err := c.createSigstoreSignature(ctx, manifestBytes, options.SignBySigstorePrivateKeyFile, options.SignSigstorePrivateKeyPassphrase, options.SignIdentity)
-		if err != nil {
-			return nil, "", "", err
-		}
-		sigs = append(sigs, newSig)
-	}
+	sigs = append(sigs, newSigs...)
 
 	c.Printf("Storing signatures\n")
 	if err := c.dest.PutSignaturesWithFormat(ctx, sigs, targetInstance); err != nil {

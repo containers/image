@@ -8,11 +8,42 @@ import (
 	"github.com/containers/image/v5/internal/private"
 	internalsig "github.com/containers/image/v5/internal/signature"
 	internalSigner "github.com/containers/image/v5/internal/signer"
-	"github.com/containers/image/v5/signature/signer"
 	"github.com/containers/image/v5/signature/sigstore"
 	"github.com/containers/image/v5/signature/simplesigning"
 	"github.com/containers/image/v5/transports"
 )
+
+// setupSigners initializes c.signers based on options.
+func (c *copier) setupSigners(options *Options) error {
+	// We immediately append created signers to c.signers, and we rely on c.close() to clean them up; so we don’t need
+	// to clean up any created signers on failure.
+
+	if options.SignBy != "" {
+		opts := []simplesigning.Option{
+			simplesigning.WithKeyFingerprint(options.SignBy),
+		}
+		if options.SignPassphrase != "" {
+			opts = append(opts, simplesigning.WithPassphrase(options.SignPassphrase))
+		}
+		signer, err := simplesigning.NewSigner(opts...)
+		if err != nil {
+			return err
+		}
+		c.signers = append(c.signers, signer)
+	}
+
+	if options.SignBySigstorePrivateKeyFile != "" {
+		signer, err := sigstore.NewSigner(
+			sigstore.WithPrivateKeyFile(options.SignBySigstorePrivateKeyFile, options.SignSigstorePrivateKeyPassphrase),
+		)
+		if err != nil {
+			return err
+		}
+		c.signers = append(c.signers, signer)
+	}
+
+	return nil
+}
 
 // sourceSignatures returns signatures from unparsedSource based on options,
 // and verifies that they can be used (to avoid copying a large image when we
@@ -39,35 +70,13 @@ func (c *copier) sourceSignatures(ctx context.Context, unparsed private.Unparsed
 	return sigs, nil
 }
 
-// createSignature creates a new signature of manifest using keyIdentity.
-func (c *copier) createSignature(ctx context.Context, manifest []byte, keyIdentity string, passphrase string, identity reference.Named) (internalsig.Signature, error) {
-	opts := []simplesigning.Option{
-		simplesigning.WithKeyFingerprint(keyIdentity),
+// createSignatures creates signatures for manifest and an optional identity.
+func (c *copier) createSignatures(ctx context.Context, manifest []byte, identity reference.Named) ([]internalsig.Signature, error) {
+	if len(c.signers) == 0 {
+		// We must exit early here, otherwise copies with no Docker reference wouldn’t be possible.
+		return nil, nil
 	}
-	if passphrase != "" {
-		opts = append(opts, simplesigning.WithPassphrase(passphrase))
-	}
-	signer, err := simplesigning.NewSigner(opts...)
-	if err != nil {
-		return nil, err
-	}
-	defer signer.Close()
 
-	return c.createSignatureWithSigner(ctx, signer, manifest, identity)
-}
-
-// createSigstoreSignature creates a new sigstore signature of manifest using privateKeyFile and identity.
-func (c *copier) createSigstoreSignature(ctx context.Context, manifest []byte, privateKeyFile string, passphrase []byte, identity reference.Named) (internalsig.Signature, error) {
-	signer, err := sigstore.NewSigner(sigstore.WithPrivateKeyFile(privateKeyFile, passphrase))
-	if err != nil {
-		return nil, err
-	}
-	defer signer.Close()
-
-	return c.createSignatureWithSigner(ctx, signer, manifest, identity)
-}
-
-func (c *copier) createSignatureWithSigner(ctx context.Context, signer *signer.Signer, manifest []byte, identity reference.Named) (internalsig.Signature, error) {
 	if identity != nil {
 		if reference.IsNameOnly(identity) {
 			return nil, fmt.Errorf("Sign identity must be a fully specified reference %s", identity.String())
@@ -79,10 +88,23 @@ func (c *copier) createSignatureWithSigner(ctx context.Context, signer *signer.S
 		}
 	}
 
-	c.Printf("%s\n", internalSigner.ProgressMessage(signer))
-	newSig, err := internalSigner.SignImageManifest(ctx, signer, manifest, identity)
-	if err != nil {
-		return nil, fmt.Errorf("creating signature: %w", err)
+	res := make([]internalsig.Signature, 0, len(c.signers))
+	for signerIndex, signer := range c.signers {
+		msg := internalSigner.ProgressMessage(signer)
+		if len(c.signers) == 1 {
+			c.Printf("Creating signature: %s\n", msg)
+		} else {
+			c.Printf("Creating signature %d: %s\n", signerIndex+1, msg)
+		}
+		newSig, err := internalSigner.SignImageManifest(ctx, signer, manifest, identity)
+		if err != nil {
+			if len(c.signers) == 1 {
+				return nil, fmt.Errorf("creating signature: %w", err)
+			} else {
+				return nil, fmt.Errorf("creating signature %d: %w", signerIndex, err)
+			}
+		}
+		res = append(res, newSig)
 	}
-	return newSig, nil
+	return res, nil
 }

@@ -36,7 +36,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func TestCreateSignature(t *testing.T) {
+func TestCreateSignatures(t *testing.T) {
 	manifestBlob := []byte("Something")
 	manifestDigest, err := manifest.Digest(manifestBlob)
 	require.NoError(t, err)
@@ -69,22 +69,30 @@ func TestCreateSignature(t *testing.T) {
 	require.NoError(t, err)
 	defer mech.Close()
 
+	workingOptions := Options{SignBy: testKeyFingerprint}
 	for _, cc := range []struct {
 		name                       string
 		dest                       types.ImageDestination
-		fingerprint                string // Uses testKeyFingerprint if not set
+		options                    *Options
 		identity                   string
-		successfullySignedIdentity string // Set to expect a successful signing with testKeyFingerprint
+		successWithNoSigs          bool
+		successfullySignedIdentity string // Set to expect a successful signing with workingOptions
 	}{
 		{
-			name:        "unknown key",
-			dest:        dockerDest,
-			fingerprint: "this key does not exist",
+			name:    "unknown key",
+			dest:    dockerDest,
+			options: &Options{SignBy: "this key does not exist"},
 		},
 		{
 			name:     "not a full reference",
 			dest:     dockerDest,
 			identity: "myregistry.io/myrepo",
+		},
+		{
+			name:              "dir: with no identity specified, but no signing request",
+			dest:              dirDest,
+			options:           &Options{},
+			successWithNoSigs: true,
 		},
 
 		{
@@ -117,26 +125,36 @@ func TestCreateSignature(t *testing.T) {
 			require.NoError(t, err, cc.name)
 			identity = i
 		}
-		fingerprint := cc.fingerprint
-		if fingerprint == "" {
-			fingerprint = testKeyFingerprint
+		options := cc.options
+		if options == nil {
+			options = &workingOptions
 		}
 
 		c := &copier{
 			dest:         imagedestination.FromPublic(cc.dest),
 			reportWriter: io.Discard,
 		}
-		sig, err := c.createSignature(context.Background(), manifestBlob, fingerprint, "", identity)
-		if cc.successfullySignedIdentity == "" {
-			assert.Error(t, err, cc.name)
-		} else {
+		defer c.close()
+		err := c.setupSigners(options)
+		require.NoError(t, err, cc.name)
+		sigs, err := c.createSignatures(context.Background(), manifestBlob, identity)
+		switch {
+		case cc.successfullySignedIdentity != "":
 			require.NoError(t, err, cc.name)
-			simpleSig, ok := sig.(internalsig.SimpleSigning)
+			require.Len(t, sigs, 1, cc.name)
+			simpleSig, ok := sigs[0].(internalsig.SimpleSigning)
 			require.True(t, ok, cc.name)
-			verified, err := signature.VerifyDockerManifestSignature(simpleSig.UntrustedSignature(), manifestBlob, cc.successfullySignedIdentity, mech, testKeyFingerprint)
+			verified, err := signature.VerifyDockerManifestSignature(simpleSig.UntrustedSignature(), manifestBlob, cc.successfullySignedIdentity, mech, workingOptions.SignBy)
 			require.NoError(t, err, cc.name)
 			assert.Equal(t, cc.successfullySignedIdentity, verified.DockerReference, cc.name)
 			assert.Equal(t, manifestDigest, verified.DockerManifestDigest, cc.name)
+
+		case cc.successWithNoSigs:
+			require.NoError(t, err, cc.name)
+			require.Empty(t, sigs, cc.name)
+
+		default:
+			assert.Error(t, err, cc.name)
 		}
 	}
 }
