@@ -59,11 +59,10 @@ func (s *SigstoreSigner) SignImageManifest(ctx context.Context, m []byte, docker
 	}
 	base64Signature := base64.StdEncoding.EncodeToString(signatureBytes)
 
-	return signature.SigstoreFromComponents(signature.SigstoreSignatureMIMEType,
-		payloadBytes,
-		map[string]string{
-			signature.SigstoreSignatureAnnotationKey: base64Signature,
-		}), nil
+	annotations := map[string]string{
+		signature.SigstoreSignatureAnnotationKey: base64Signature,
+	}
+	return signature.SigstoreFromComponents(signature.SigstoreSignatureMIMEType, payloadBytes, annotations), nil
 }
 
 func (s *SigstoreSigner) Close() error {
