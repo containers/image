@@ -3,6 +3,7 @@ package copy
 import (
 	"context"
 	"io"
+	"os"
 	"testing"
 
 	"github.com/containers/image/v5/directory"
@@ -10,9 +11,11 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/imagedestination"
 	internalsig "github.com/containers/image/v5/internal/signature"
+	"github.com/containers/image/v5/internal/testing/gpgagent"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/types"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,6 +26,15 @@ const (
 	// Keep this in sync with signature/fixtures_info_test.go
 	testKeyFingerprint = "1D8230F6CDB6A06716E414C1DB72F2188BB46CC8"
 )
+
+// Ensure we don’t leave around GPG agent processes.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if err := gpgagent.KillGPGAgent(testGPGHomeDirectory); err != nil {
+		logrus.Warnf("Error killing GPG agent: %v", err)
+	}
+	os.Exit(code)
+}
 
 func TestCreateSignature(t *testing.T) {
 	manifestBlob := []byte("Something")
@@ -38,66 +50,93 @@ func TestCreateSignature(t *testing.T) {
 
 	t.Setenv("GNUPGHOME", testGPGHomeDirectory)
 
-	// Signing a directory: reference, which does not have a DockerReference(), fails.
+	// Set up dir: and docker: destinations
 	tempDir := t.TempDir()
 	dirRef, err := directory.NewReference(tempDir)
 	require.NoError(t, err)
 	dirDest, err := dirRef.NewImageDestination(context.Background(), nil)
 	require.NoError(t, err)
 	defer dirDest.Close()
-	c := &copier{
-		dest:         imagedestination.FromPublic(dirDest),
-		reportWriter: io.Discard,
-	}
-	_, err = c.createSignature(manifestBlob, testKeyFingerprint, "", nil)
-	assert.Error(t, err)
-
-	// Set up a docker: reference
 	dockerRef, err := docker.ParseReference("//busybox")
 	require.NoError(t, err)
 	dockerDest, err := dockerRef.NewImageDestination(context.Background(),
 		&types.SystemContext{RegistriesDirPath: "/this/does/not/exist", DockerPerHostCertDirPath: "/this/does/not/exist"})
 	require.NoError(t, err)
 	defer dockerDest.Close()
-	c = &copier{
-		dest:         imagedestination.FromPublic(dockerDest),
-		reportWriter: io.Discard,
-	}
-
-	// Signing with an unknown key fails
-	_, err = c.createSignature(manifestBlob, "this key does not exist", "", nil)
-	assert.Error(t, err)
-
-	// Can't sign without a full reference
-	ref, err := reference.ParseNamed("myregistry.io/myrepo")
-	require.NoError(t, err)
-	_, err = c.createSignature(manifestBlob, testKeyFingerprint, "", ref)
-	assert.Error(t, err)
 
 	// Mechanism for verifying the signatures
 	mech, err = signature.NewGPGSigningMechanism()
 	require.NoError(t, err)
 	defer mech.Close()
 
-	// Signing without overriding the identity uses the docker reference
-	sig, err := c.createSignature(manifestBlob, testKeyFingerprint, "", nil)
-	require.NoError(t, err)
-	simpleSig, ok := sig.(internalsig.SimpleSigning)
-	require.True(t, ok)
-	verified, err := signature.VerifyDockerManifestSignature(simpleSig.UntrustedSignature(), manifestBlob, "docker.io/library/busybox:latest", mech, testKeyFingerprint)
-	require.NoError(t, err)
-	assert.Equal(t, "docker.io/library/busybox:latest", verified.DockerReference)
-	assert.Equal(t, manifestDigest, verified.DockerManifestDigest)
+	for _, cc := range []struct {
+		name                       string
+		dest                       types.ImageDestination
+		fingerprint                string // Uses testKeyFingerprint if not set
+		identity                   string
+		successfullySignedIdentity string // Set to expect a successful signing with testKeyFingerprint
+	}{
+		{
+			name:        "unknown key",
+			dest:        dockerDest,
+			fingerprint: "this key does not exist",
+		},
+		{
+			name:     "not a full reference",
+			dest:     dockerDest,
+			identity: "myregistry.io/myrepo",
+		},
 
-	// Can override the identity with own
-	ref, err = reference.ParseNamed("myregistry.io/myrepo:mytag")
-	require.NoError(t, err)
-	sig, err = c.createSignature(manifestBlob, testKeyFingerprint, "", ref)
-	require.NoError(t, err)
-	simpleSig, ok = sig.(internalsig.SimpleSigning)
-	require.True(t, ok)
-	verified, err = signature.VerifyDockerManifestSignature(simpleSig.UntrustedSignature(), manifestBlob, "myregistry.io/myrepo:mytag", mech, testKeyFingerprint)
-	require.NoError(t, err)
-	assert.Equal(t, "myregistry.io/myrepo:mytag", verified.DockerReference)
-	assert.Equal(t, manifestDigest, verified.DockerManifestDigest)
+		{
+			name:     "dir: with no identity specified",
+			dest:     dirDest,
+			identity: "",
+		},
+		{
+			name:                       "dir: with overridden identity",
+			dest:                       dirDest,
+			identity:                   "myregistry.io/myrepo:mytag",
+			successfullySignedIdentity: "myregistry.io/myrepo:mytag",
+		},
+		{
+			name:                       "docker:// without overriding the identity",
+			dest:                       dockerDest,
+			identity:                   "",
+			successfullySignedIdentity: "docker.io/library/busybox:latest",
+		},
+		{
+			name:                       "docker:// with overidden identity",
+			dest:                       dockerDest,
+			identity:                   "myregistry.io/myrepo:mytag",
+			successfullySignedIdentity: "myregistry.io/myrepo:mytag",
+		},
+	} {
+		var identity reference.Named = nil
+		if cc.identity != "" {
+			i, err := reference.ParseNormalizedNamed(cc.identity)
+			require.NoError(t, err, cc.name)
+			identity = i
+		}
+		fingerprint := cc.fingerprint
+		if fingerprint == "" {
+			fingerprint = testKeyFingerprint
+		}
+
+		c := &copier{
+			dest:         imagedestination.FromPublic(cc.dest),
+			reportWriter: io.Discard,
+		}
+		sig, err := c.createSignature(manifestBlob, fingerprint, "", identity)
+		if cc.successfullySignedIdentity == "" {
+			assert.Error(t, err, cc.name)
+		} else {
+			require.NoError(t, err, cc.name)
+			simpleSig, ok := sig.(internalsig.SimpleSigning)
+			require.True(t, ok, cc.name)
+			verified, err := signature.VerifyDockerManifestSignature(simpleSig.UntrustedSignature(), manifestBlob, cc.successfullySignedIdentity, mech, testKeyFingerprint)
+			require.NoError(t, err, cc.name)
+			assert.Equal(t, cc.successfullySignedIdentity, verified.DockerReference, cc.name)
+			assert.Equal(t, manifestDigest, verified.DockerManifestDigest, cc.name)
+		}
+	}
 }
