@@ -109,12 +109,6 @@ var (
 	// anchoredIdentifierRegexp is used to check or match an
 	// identifier value, anchored at start and end of string.
 	anchoredIdentifierRegexp = re(anchoredIdentifier)
-
-	anchoredShortIdentifier = anchored(shortIdentifier)
-	// anchoredShortIdentifierRegexp is used to check if a value
-	// is a possible identifier prefix, anchored at start and end
-	// of string.
-	anchoredShortIdentifierRegexp = re(anchoredShortIdentifier)
 )
 
 // re compiles the string to a regular expression.
