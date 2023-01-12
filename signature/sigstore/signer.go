@@ -53,7 +53,7 @@ func NewSigner(opts ...Option) (*signer.Signer, error) {
 		}
 	}
 	if s.PrivateKey == nil {
-		return nil, fmt.Errorf("preparing to create a sigstore signature: nothing to sign with provided")
+		return nil, errors.New("no private key source provided (neither a private key nor Fulcio) when preparing to create sigstore signatures")
 	}
 
 	return internalSigner.NewSigner(&s), nil

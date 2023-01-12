@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containers/image/v5/internal/useragent"
 	"github.com/containers/image/v5/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -176,7 +177,7 @@ func TestUserAgent(t *testing.T) {
 	}{
 		// Can't both test nil and set DockerInsecureSkipTLSVerify :(
 		// {nil, defaultUA},
-		{&types.SystemContext{}, defaultUserAgent},
+		{&types.SystemContext{}, useragent.DefaultUserAgent},
 		{&types.SystemContext{DockerRegistryUserAgent: sentinelUA}, sentinelUA},
 	} {
 		// For this test against localhost, we don't care.

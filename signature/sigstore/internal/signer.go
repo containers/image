@@ -24,6 +24,10 @@ type SigstoreSigner struct {
 	PrivateKey       sigstoreSignature.Signer // May be nil during initialization
 	SigningKeyOrCert []byte                   // For possible Rekor upload; always initialized together with PrivateKey
 
+	// Fulcio results to include
+	FulcioGeneratedCertificate      []byte // Or nil
+	FulcioGeneratedCertificateChain []byte // Or nil
+
 	// Rekor state
 	RekorUploader func(ctx context.Context, keyOrCertBytes []byte, signatureBytes []byte, payloadBytes []byte) ([]byte, error) // Or nil
 }
@@ -73,6 +77,12 @@ func (s *SigstoreSigner) SignImageManifest(ctx context.Context, m []byte, docker
 
 	annotations := map[string]string{
 		signature.SigstoreSignatureAnnotationKey: base64Signature,
+	}
+	if s.FulcioGeneratedCertificate != nil {
+		annotations[signature.SigstoreCertificateAnnotationKey] = string(s.FulcioGeneratedCertificate)
+	}
+	if s.FulcioGeneratedCertificateChain != nil {
+		annotations[signature.SigstoreIntermediateCertificateChainAnnotationKey] = string(s.FulcioGeneratedCertificateChain)
 	}
 	if rekorSETBytes != nil {
 		annotations[signature.SigstoreSETAnnotationKey] = string(rekorSETBytes)
