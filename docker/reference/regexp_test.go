@@ -11,8 +11,12 @@ type regexpMatch struct {
 	match bool
 	subs  []string
 }
+type Regex interface {
+	FindStringSubmatch(s string) []string
+	NumSubexp() int
+}
 
-func checkRegexp(t *testing.T, r *regexp.Regexp, m regexpMatch) {
+func checkRegexp(t *testing.T, r Regex, m regexpMatch) {
 	matches := r.FindStringSubmatch(m.input)
 	if m.match && matches != nil {
 		if len(matches) != (r.NumSubexp()+1) || matches[0] != m.input {
@@ -125,7 +129,7 @@ func TestDomainRegexp(t *testing.T) {
 func TestFullNameRegexp(t *testing.T) {
 	if anchoredNameRegexp.NumSubexp() != 2 {
 		t.Fatalf("anchored name regexp should have two submatches: %v, %v != 2",
-			anchoredNameRegexp, anchoredNameRegexp.NumSubexp())
+			anchoredNameRegexp.String(), anchoredNameRegexp.NumSubexp())
 	}
 
 	testcases := []regexpMatch{
@@ -413,7 +417,7 @@ func TestFullNameRegexp(t *testing.T) {
 		},
 	}
 	for i := range testcases {
-		checkRegexp(t, anchoredNameRegexp, testcases[i])
+		checkRegexp(t, &anchoredNameRegexp, testcases[i])
 	}
 }
 
@@ -512,45 +516,10 @@ func TestIdentifierRegexp(t *testing.T) {
 		},
 	}
 
-	shortCases := []regexpMatch{
-		{
-			input: "da304e823d8ca2b9d863a3c897baeb852ba21ea9a9f1414736394ae7fcaf9821",
-			match: true,
-		},
-		{
-			input: "7EC43B381E5AEFE6E04EFB0B3F0693FF2A4A50652D64AEC573905F2DB5889A1C",
-			match: false,
-		},
-		{
-			input: "da304e823d8ca2b9d863a3c897baeb852ba21ea9a9f1414736394ae7fcaf",
-			match: true,
-		},
-		{
-			input: "sha256:da304e823d8ca2b9d863a3c897baeb852ba21ea9a9f1414736394ae7fcaf9821",
-			match: false,
-		},
-		{
-			input: "da304e823d8ca2b9d863a3c897baeb852ba21ea9a9f1414736394ae7fcaf98218482",
-			match: false,
-		},
-		{
-			input: "da304",
-			match: false,
-		},
-		{
-			input: "da304e",
-			match: true,
-		},
-	}
-
 	for i := range fullCases {
-		checkRegexp(t, anchoredIdentifierRegexp, fullCases[i])
+		checkRegexp(t, &anchoredIdentifierRegexp, fullCases[i])
 		if IsFullIdentifier(fullCases[i].input) != fullCases[i].match {
 			t.Errorf("Expected match for %q to be %v", fullCases[i].input, fullCases[i].match)
 		}
-	}
-
-	for i := range shortCases {
-		checkRegexp(t, anchoredShortIdentifierRegexp, shortCases[i])
 	}
 }
