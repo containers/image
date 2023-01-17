@@ -16,8 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type mSI map[string]interface{} // To minimize typing the long name
-
 // A short-hand way to get a JSON object field value or panic. No error handling done, we know
 // what we are working with, a panic in a test is good enough, and fitting test cases on a single line
 // is a priority.
@@ -86,19 +84,6 @@ func TestUntrustedSigstorePayloadMarshalJSON(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, []byte(c.expected), marshaled)
 	}
-}
-
-// Return the result of modifying validJSON with fn
-func modifiedUntrustedSigstorePayloadJSON(t *testing.T, validJSON []byte, modifyFn func(mSI)) []byte {
-	var tmp mSI
-	err := json.Unmarshal(validJSON, &tmp)
-	require.NoError(t, err)
-
-	modifyFn(tmp)
-
-	modifiedJSON, err := json.Marshal(tmp)
-	require.NoError(t, err)
-	return modifiedJSON
 }
 
 // Verify that input can be unmarshaled as an UntrustedSigstorePayload.
@@ -185,7 +170,7 @@ func TestUntrustedSigstorePayloadUnmarshalJSON(t *testing.T) {
 		func(v mSI) { x(v, "optional")["timestamp"] = 0.5 }, // Fractional input
 	}
 	for _, fn := range breakFns {
-		testJSON := modifiedUntrustedSigstorePayloadJSON(t, validJSON, fn)
+		testJSON := modifiedJSON(t, validJSON, fn)
 		assertUnmarshalUntrustedSigstorePayloadFails(t, testJSON)
 	}
 
@@ -195,7 +180,7 @@ func TestUntrustedSigstorePayloadUnmarshalJSON(t *testing.T) {
 		func(v mSI) { x(v, "optional")["unexpected"] = 1 },
 	}
 	for _, fn := range allowedModificationFns {
-		testJSON := modifiedUntrustedSigstorePayloadJSON(t, validJSON, fn)
+		testJSON := modifiedJSON(t, validJSON, fn)
 		s := successfullyUnmarshalUntrustedSigstorePayload(t, testJSON)
 		assert.Equal(t, validSig, s)
 	}
