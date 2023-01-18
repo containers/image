@@ -20,7 +20,6 @@ import (
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	sigstoreSignature "github.com/sigstore/sigstore/pkg/signature"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -374,7 +373,6 @@ func TestVerifyRekorSET(t *testing.T) {
 		})
 		require.NoError(t, err)
 		tm, err = VerifyRekorSET(&testKey.PublicKey, testSET, cosignCertBytes, string(cosignSigBase64), cosignPayloadBytes)
-		logrus.Errorf("%#v", err)
 		assert.Error(t, err)
 		assert.Zero(t, tm)
 	}
@@ -396,7 +394,6 @@ func TestVerifyRekorSET(t *testing.T) {
 	} {
 		tm, err = VerifyRekorSET(cosignRekorKeyECDSA, cosignSETBytes, c,
 			string(cosignSigBase64), cosignPayloadBytes)
-		logrus.Errorf("%#v", err)
 		assert.Error(t, err)
 		assert.Zero(t, tm)
 	}
