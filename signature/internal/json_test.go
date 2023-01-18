@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type mSI map[string]interface{} // To minimize typing the long name
+
 // implementsUnmarshalJSON is a minimalistic type used to detect that
 // paranoidUnmarshalJSONObject uses the json.Unmarshaler interface of resolved
 // pointers.
@@ -120,4 +122,17 @@ func TestParanoidUnmarshalJSONObjectExactFields(t *testing.T) {
 		err := ParanoidUnmarshalJSONObjectExactFields([]byte(input), exactFields)
 		assert.Error(t, err, input)
 	}
+}
+
+// Return the result of modifying validJSON with fn
+func modifiedJSON(t *testing.T, validJSON []byte, modifyFn func(mSI)) []byte {
+	var tmp mSI
+	err := json.Unmarshal(validJSON, &tmp)
+	require.NoError(t, err)
+
+	modifyFn(tmp)
+
+	modifiedJSON, err := json.Marshal(tmp)
+	require.NoError(t, err)
+	return modifiedJSON
 }

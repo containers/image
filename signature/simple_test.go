@@ -74,7 +74,7 @@ func TestMarshalJSON(t *testing.T) {
 }
 
 // Return the result of modifying validJSON with fn
-func modifiedUntrustedSignatureJSON(t *testing.T, validJSON []byte, modifyFn func(mSI)) []byte {
+func modifiedJSON(t *testing.T, validJSON []byte, modifyFn func(mSI)) []byte {
 	var tmp mSI
 	err := json.Unmarshal(validJSON, &tmp)
 	require.NoError(t, err)
@@ -179,7 +179,7 @@ func TestUnmarshalJSON(t *testing.T) {
 		func(v mSI) { x(v, "optional")["timestamp"] = 0.5 }, // Fractional input
 	}
 	for _, fn := range breakFns {
-		testJSON := modifiedUntrustedSignatureJSON(t, validJSON, fn)
+		testJSON := modifiedJSON(t, validJSON, fn)
 		assertUnmarshalUntrustedSignatureFails(t, schemaLoader, testJSON)
 	}
 
@@ -189,7 +189,7 @@ func TestUnmarshalJSON(t *testing.T) {
 		func(v mSI) { x(v, "optional")["unexpected"] = 1 },
 	}
 	for _, fn := range allowedModificationFns {
-		testJSON := modifiedUntrustedSignatureJSON(t, validJSON, fn)
+		testJSON := modifiedJSON(t, validJSON, fn)
 		s := successfullyUnmarshalUntrustedSignature(t, schemaLoader, testJSON)
 		assert.Equal(t, validSig, s)
 	}
