@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/BurntSushi/toml v1.2.1
 	github.com/containers/libtrust v0.0.0-20200511145503-9c3a6c22cd9a
-	github.com/containers/ocicrypt v1.1.6
+	github.com/containers/ocicrypt v1.1.7
 	github.com/containers/storage v1.45.1
 	github.com/cyberphone/json-canonicalization v0.0.0-20220623050100-57a0ce2678a7
 	github.com/docker/distribution v2.8.1+incompatible
