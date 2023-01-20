@@ -87,4 +87,4 @@ lint:
 		$(GOBIN)/git-validation -q -run DCO,short-subject,dangling-whitespace -range $$upstream..HEAD
 
 vendor-in-container:
-	podman run --privileged --rm --env HOME=/root -v `pwd`:/src -w /src golang go mod tidy
+	podman run --privileged --rm -v `pwd`:/src -w /src golang go mod tidy
