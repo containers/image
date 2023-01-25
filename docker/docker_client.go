@@ -975,7 +975,14 @@ func (c *dockerClient) getBlob(ctx context.Context, ref dockerReference, info ty
 		return nil, 0, fmt.Errorf("fetching blob: %w", err)
 	}
 	cache.RecordKnownLocation(ref.Transport(), bicTransportScope(ref), info.Digest, newBICLocationReference(ref))
-	return res.Body, getBlobSize(res), nil
+	blobSize := getBlobSize(res)
+
+	reconnectingReader, err := newBodyReader(ctx, c, path, res.Body)
+	if err != nil {
+		res.Body.Close()
+		return nil, 0, err
+	}
+	return reconnectingReader, blobSize, nil
 }
 
 // getOCIDescriptorContents returns the contents a blob spcified by descriptor in ref, which must fit within limit.
