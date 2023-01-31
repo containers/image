@@ -1,13 +1,22 @@
 package openshift
 
 import (
+	"encoding"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 const fixtureKubeConfigPath = "testdata/admin.kubeconfig"
+
+var (
+	_ yaml.Unmarshaler         = (*clustersMap)(nil)
+	_ yaml.Unmarshaler         = (*authInfosMap)(nil)
+	_ yaml.Unmarshaler         = (*contextsMap)(nil)
+	_ encoding.TextUnmarshaler = (*yamlBinaryAsBase64String)(nil)
+)
 
 // These are only smoke tests based on the skopeo integration test cluster. Error handling, non-trivial configuration merging,
 // and any other situations are not currently covered.

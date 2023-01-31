@@ -12,7 +12,6 @@ require (
 	github.com/docker/docker v20.10.23+incompatible
 	github.com/docker/docker-credential-helpers v0.7.0
 	github.com/docker/go-connections v0.4.0
-	github.com/ghodss/yaml v1.0.0
 	github.com/go-openapi/strfmt v0.21.3
 	github.com/go-openapi/swag v0.22.3
 	github.com/hashicorp/go-multierror v1.1.1
