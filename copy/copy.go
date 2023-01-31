@@ -123,6 +123,22 @@ const (
 // specific images from the source reference.
 type ImageListSelection int
 
+const (
+	// SparseManifestListAction is the default value which, when set in
+	// Options.SparseManifestListAction, indicates that the manifest is kept
+	// as is even though some images from the list may be missing. Some
+	// registries may not support this.
+	KeepSparseManifestList SparseManifestListAction = iota
+
+	// StripSparseManifestList will strip missing images from the manifest
+	// list. When images are stripped the digest will differ from the original.
+	StripSparseManifestList
+)
+
+// SparseImageListAction is one of KeepSparseManifestList or StripSparseManifestList
+// to control the behavior when only a subset of images from a manifest list is copied
+type SparseManifestListAction int
+
 // Options allows supplying non-default configuration modifying the behavior of CopyImage.
 type Options struct {
 	RemoveSignatures bool // Remove any pre-existing signatures. Signers and SignBy… will still add a new signature.
@@ -177,6 +193,10 @@ type Options struct {
 	// Download layer contents with "nondistributable" media types ("foreign" layers) and translate the layer media type
 	// to not indicate "nondistributable".
 	DownloadForeignLayers bool
+
+	// When only a subset of images of a list is copied, this action indicates if the manifest should be kept or stripped.
+	// See CopySpecificImages.
+	SparseImageListAction SparseManifestListAction
 }
 
 // validateImageListSelection returns an error if the passed-in value is not one that we recognize as a valid ImageListSelection value
@@ -412,6 +432,33 @@ func compareImageDestinationManifestEqual(ctx context.Context, options *Options,
 	return true, destManifest, destManifestType, destManifestDigest, nil
 }
 
+// removeInstanceFromList removes the given image from the list
+// this should probably move to an internal API
+func removeInstancesFromList(manifestList manifest.List, imageIndices map[int]bool) error {
+	switch list := manifestList.(type) {
+	case *manifest.Schema2List:
+		var result = make([]manifest.Schema2ManifestDescriptor, 0, len(list.Manifests))
+		for i, manifest := range list.Manifests {
+			if !imageIndices[i] {
+				result = append(result, manifest)
+			}
+		}
+		list.Manifests = result
+		return nil
+	case *manifest.OCI1Index:
+		var result = make([]imgspecv1.Descriptor, 0, len(list.Manifests))
+		for i, manifest := range list.Manifests {
+			if !imageIndices[i] {
+				result = append(result, manifest)
+			}
+		}
+		list.Manifests = result
+		return nil
+	default:
+		return fmt.Errorf("stripping images from manifest list type %s is not supported", manifestList.MIMEType())
+	}
+}
+
 // copyMultipleImages copies some or all of an image list's instances, using
 // policyContext to validate source image admissibility.
 func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signature.PolicyContext, options *Options, unparsedToplevel *image.UnparsedImage) (copiedManifest []byte, retErr error) {
@@ -489,6 +536,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	}
 	c.Printf("Copying %d of %d images in list\n", imagesToCopy, len(instanceDigests))
 	updates := make([]manifest.ListUpdate, len(instanceDigests))
+	skipped := make(map[int]bool)
 	instancesCopied := 0
 	for i, instanceDigest := range instanceDigests {
 		if options.ImageListSelection == CopySpecificImages {
@@ -507,6 +555,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 				logrus.Debugf("Skipping instance %s (%d/%d)", instanceDigest, i+1, len(instanceDigests))
 				// Record the digest/size/type of the manifest that we didn't copy.
 				updates[i] = update
+				skipped[i] = true
 				continue
 			}
 		}
@@ -530,6 +579,14 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	// Now reset the digest/size/types of the manifests in the list to account for any conversions that we made.
 	if err = updatedList.UpdateInstances(updates); err != nil {
 		return nil, fmt.Errorf("updating manifest list: %w", err)
+	}
+
+	// Remove skipped images from the manifest if StripManifestList == true
+	if options.SparseImageListAction == StripSparseManifestList {
+		logrus.Debugf("Removing instances %v from manifest list", skipped)
+		if err := removeInstancesFromList(updatedList, skipped); err != nil {
+			return nil, fmt.Errorf("striping manifest list: %w", err)
+		}
 	}
 
 	// Iterate through supported list types, preferred format first.
