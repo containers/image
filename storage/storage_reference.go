@@ -204,10 +204,10 @@ func (s storageReference) StringWithinTransport() string {
 	}
 	res := "[" + s.transport.store.GraphDriverName() + "@" + s.transport.store.GraphRoot() + "+" + s.transport.store.RunRoot() + optionsList + "]"
 	if s.named != nil {
-		res = res + s.named.String()
+		res += s.named.String()
 	}
 	if s.id != "" {
-		res = res + "@" + s.id
+		res += "@" + s.id
 	}
 	return res
 }
@@ -215,10 +215,10 @@ func (s storageReference) StringWithinTransport() string {
 func (s storageReference) PolicyConfigurationIdentity() string {
 	res := "[" + s.transport.store.GraphDriverName() + "@" + s.transport.store.GraphRoot() + "]"
 	if s.named != nil {
-		res = res + s.named.String()
+		res += s.named.String()
 	}
 	if s.id != "" {
-		res = res + "@" + s.id
+		res += "@" + s.id
 	}
 	return res
 }

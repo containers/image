@@ -460,7 +460,7 @@ func modifiedString(t *testing.T, input string) string {
 	c := input[0]
 	switch {
 	case c >= 'a' && c <= 'y':
-		c = c + 1
+		c++
 	case c == 'z':
 		c = 'a'
 	default:

@@ -439,7 +439,7 @@ func modifiedLayerInfos(t *testing.T, input []types.BlobInfo) ([]types.BlobInfo,
 		require.NoError(t, err)
 		oldDigest[len(oldDigest)-1] ^= 1
 		b2.Digest = digest.NewDigestFromEncoded(b2.Digest.Algorithm(), hex.EncodeToString(oldDigest))
-		b2.Size = b2.Size ^ 1
+		b2.Size ^= 1
 		modified = append(modified, b2)
 	}
 

@@ -586,7 +586,7 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method stri
 		case <-time.After(delay):
 			// Nothing
 		}
-		delay = delay * 2 // If the registry does not specify a delay, back off exponentially.
+		delay *= 2 // If the registry does not specify a delay, back off exponentially.
 	}
 }
 
