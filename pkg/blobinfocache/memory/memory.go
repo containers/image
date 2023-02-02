@@ -20,7 +20,7 @@ type locationKey struct {
 	blobDigest digest.Digest
 }
 
-// cache implements an in-memory-only BlobInfoCache
+// cache implements an in-memory-only BlobInfoCache.
 type cache struct {
 	mutex sync.Mutex
 	// The following fields can only be accessed with mutex held.
