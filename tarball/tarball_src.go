@@ -64,13 +64,13 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		} else {
 			file, err = os.Open(filename)
 			if err != nil {
-				return nil, fmt.Errorf("error opening %q for reading: %v", filename, err)
+				return nil, fmt.Errorf("error opening %q for reading: %w", filename, err)
 			}
 			defer file.Close()
 			reader = file
 			fileinfo, err := file.Stat()
 			if err != nil {
-				return nil, fmt.Errorf("error reading size of %q: %v", filename, err)
+				return nil, fmt.Errorf("error reading size of %q: %w", filename, err)
 			}
 			blobSize = fileinfo.Size()
 			blobTime = fileinfo.ModTime()
