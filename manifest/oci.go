@@ -177,7 +177,7 @@ func getEncryptedMediaType(mediatype string) (string, error) {
 // an error if the mediatype does not support decryption
 func getDecryptedMediaType(mediatype string) (string, error) {
 	if !strings.HasSuffix(mediatype, "+encrypted") {
-		return "", fmt.Errorf("unsupported mediaType to decrypt %v:", mediatype)
+		return "", fmt.Errorf("unsupported mediaType to decrypt: %v", mediatype)
 	}
 
 	return strings.TrimSuffix(mediatype, "+encrypted"), nil
