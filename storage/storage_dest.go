@@ -244,7 +244,7 @@ type zstdFetcher struct {
 
 // GetBlobAt converts from chunked.GetBlobAt to BlobChunkAccessor.GetBlobAt.
 func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
-	var newChunks []private.ImageSourceChunk
+	newChunks := make([]private.ImageSourceChunk, 0, len(chunks))
 	for _, v := range chunks {
 		i := private.ImageSourceChunk{
 			Offset: v.Offset,
