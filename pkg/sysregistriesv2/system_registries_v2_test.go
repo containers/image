@@ -650,124 +650,125 @@ func TestPullSourcesFromReference(t *testing.T) {
 		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
 	}
 	registries, err := GetRegistries(sys)
-	assert.Nil(t, err)
-	assert.Equal(t, 2, len(registries))
-
-	// Registry A allowing any kind of pull from mirrors
-	registryA, err := FindRegistry(sys, "registry-a.com/foo/image:latest")
-	assert.Nil(t, err)
-	assert.NotNil(t, registryA)
-	// Digest
-	referenceADigest := toNamedRef(t, "registry-a.com/foo/image@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-	pullSources, err := registryA.PullSourcesFromReference(referenceADigest)
-	assert.Nil(t, err)
-	assert.Equal(t, 3, len(pullSources))
-	assert.Equal(t, "mirror-1.registry-a.com/image@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", pullSources[0].Reference.String())
-	assert.True(t, pullSources[1].Endpoint.Insecure)
-	// Tag
-	referenceATag := toNamedRef(t, "registry-a.com/foo/image:aaa")
-	pullSources, err = registryA.PullSourcesFromReference(referenceATag)
-	assert.Nil(t, err)
-	assert.Equal(t, 3, len(pullSources))
-	assert.Equal(t, "registry-a.com/bar/image:aaa", pullSources[2].Reference.String())
-
-	// Registry B allowing digests pull only from mirrors
-	registryB, err := FindRegistry(sys, "registry-b.com/foo/image:latest")
-	assert.Nil(t, err)
-	assert.NotNil(t, registryB)
-	// Digest
-	referenceBDigest := toNamedRef(t, "registry-b.com/foo/image@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-	pullSources, err = registryB.PullSourcesFromReference(referenceBDigest)
-	assert.Nil(t, err)
-	assert.Equal(t, 3, len(pullSources))
-	assert.Equal(t, "registry-b.com/bar", pullSources[2].Endpoint.Location)
-	assert.Equal(t, "registry-b.com/bar/image@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", pullSources[2].Reference.String())
-	// Tag
-	referenceBTag := toNamedRef(t, "registry-b.com/foo/image:aaa")
-	pullSources, err = registryB.PullSourcesFromReference(referenceBTag)
-	assert.Nil(t, err)
-	assert.Equal(t, 1, len(pullSources))
-}
-
-func TestPullSourcesMirrorFromReference(t *testing.T) {
-	sys := &types.SystemContext{
-		SystemRegistriesConfPath:    "testdata/pull-sources-mirror-reference.conf",
-		SystemRegistriesConfDirPath: "testdata/this-does-not-exist",
-	}
-	registries, err := GetRegistries(sys)
 	require.NoError(t, err)
-	assert.Equal(t, 7, len(registries))
+	assert.Equal(t, 9, len(registries))
 
 	digest := "@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	tag := ":aaa"
 	for _, tc := range []struct {
-		registry      string
-		digestSources []string
-		tagSources    []string
+		matchedPrefix  string
+		repo           string
+		digestPrefixes []string
+		digestInsecure []bool
+		tagPrefixes    []string
+		tagInsecure    []bool
 	}{
+		// Registry A allowing any kind of pull from mirrors
+		{
+			"registry-a.com/foo",
+			"image",
+			[]string{"mirror-1.registry-a.com", "mirror-2.registry-a.com", "registry-a.com/bar"},
+			[]bool{false, true, false},
+			[]string{"mirror-1.registry-a.com", "mirror-2.registry-a.com", "registry-a.com/bar"},
+			[]bool{false, true, false},
+		},
+		// Registry B allowing digests pull only from mirrors
+		{
+			"registry-b.com/foo",
+			"image",
+			[]string{"mirror-1.registry-b.com", "mirror-2.registry-b.com", "registry-b.com/bar"},
+			[]bool{false, false, false},
+			[]string{"registry-b.com/bar"},
+			[]bool{false},
+		},
 		// Registry A has mirrors allow any kind of pull
 		{
-			"registry-a.com/foo/image",
+			"registry-a.com/baz",
+			"image",
 			[]string{"mirror-1.registry-a.com", "mirror-2.registry-a.com", "registry-a.com/bar"},
+			[]bool{false, true, false},
 			[]string{"mirror-1.registry-a.com", "mirror-2.registry-a.com", "registry-a.com/bar"},
+			[]bool{false, true, false},
 		},
 		// Registry B has mirrors allow digests pull only
 		{
-			"registry-b.com/foo/image",
+			"registry-b.com/baz",
+			"image",
 			[]string{"mirror-1.registry-b.com", "mirror-2.registry-b.com", "registry-b.com/bar"},
+			[]bool{false, false, false},
 			[]string{"registry-b.com/bar"},
+			[]bool{false},
 		},
 		// Registry C has a mirror allows digest pull only and a mirror allows any kind of pull
 		{
-			"registry-c.com/foo/image",
+			"registry-c.com/baz",
+			"image",
 			[]string{"mirror-1.registry-c.com", "mirror-2.registry-c.com", "registry-c.com/bar"},
+			[]bool{false, false, false},
 			[]string{"mirror-1.registry-c.com", "registry-c.com/bar"},
+			[]bool{false, false},
 		},
 		// Registry D set digest-only for registry level, allows only digest pulls
 		// Registry D has no digest-only set for mirrors table
 		{
-			"registry-d.com/foo/image",
+			"registry-d.com/baz",
+			"image",
 			[]string{"mirror-1.registry-d.com", "mirror-2.registry-d.com", "registry-d.com/bar"},
+			[]bool{false, false, false},
 			[]string{"registry-d.com/bar"},
+			[]bool{false},
 		},
 		// Registry E has mirrors only allows tag pull
 		{
-			"registry-e.com/foo/image",
+			"registry-e.com/baz",
+			"image",
 			[]string{"registry-e.com/bar"},
+			[]bool{false},
 			[]string{"mirror-1.registry-e.com", "mirror-2.registry-e.com", "registry-e.com/bar"},
+			[]bool{false, false, false},
 		},
 		// Registry F has one tag only mirror does not allow digest pull
 		{
-			"registry-f.com/foo/image",
+			"registry-f.com/baz",
+			"image",
 			[]string{"mirror-1.registry-f.com", "registry-f.com/bar"},
+			[]bool{false, false},
 			[]string{"mirror-1.registry-f.com", "mirror-2.registry-f.com", "registry-f.com/bar"},
+			[]bool{false, false, false},
 		},
 		// Registry G has one digest-only pull and one tag only pull
 		{
-			"registry-g.com/foo/image",
+			"registry-g.com/baz",
+			"image",
 			[]string{"mirror-1.registry-g.com", "mirror-3.registry-g.com", "mirror-4.registry-g.com", "registry-g.com/bar"},
+			[]bool{false, false, false, false},
 			[]string{"mirror-2.registry-g.com", "mirror-3.registry-g.com", "mirror-4.registry-g.com", "registry-g.com/bar"},
+			[]bool{false, false, false, false},
 		},
 	} {
 		// Digest
-		digestedRef := toNamedRef(t, tc.registry+digest)
+		digestedRef := toNamedRef(t, fmt.Sprintf("%s/%s", tc.matchedPrefix, tc.repo)+digest)
 		registry, err := FindRegistry(sys, digestedRef.Name())
 		require.NoError(t, err)
 		require.NotNil(t, registry)
 		pullSource, err := registry.PullSourcesFromReference(digestedRef)
 		require.NoError(t, err)
-		for i, s := range tc.digestSources {
-			assert.Equal(t, s, pullSource[i].Endpoint.Location)
+		for i, p := range tc.digestPrefixes {
+			assert.Equal(t, p, pullSource[i].Endpoint.Location)
+			assert.Equal(t, fmt.Sprintf("%s/%s", p, tc.repo)+digest, pullSource[i].Reference.String())
+			assert.Equal(t, tc.digestInsecure[i], pullSource[i].Endpoint.Insecure)
 		}
 		// Tag
-		taggedRef := toNamedRef(t, tc.registry+tag)
+		taggedRef := toNamedRef(t, fmt.Sprintf("%s/%s", tc.matchedPrefix, tc.repo)+tag)
 		registry, err = FindRegistry(sys, taggedRef.Name())
 		require.NoError(t, err)
 		require.NotNil(t, registry)
 		pullSource, err = registry.PullSourcesFromReference(taggedRef)
 		require.NoError(t, err)
-		for i, s := range tc.tagSources {
-			assert.Equal(t, s, pullSource[i].Endpoint.Location)
+		for i, p := range tc.tagPrefixes {
+			assert.Equal(t, p, pullSource[i].Endpoint.Location)
+			assert.Equal(t, fmt.Sprintf("%s/%s", p, tc.repo)+tag, pullSource[i].Reference.String())
+			assert.Equal(t, tc.tagInsecure[i], pullSource[i].Endpoint.Insecure)
 		}
 	}
 }
