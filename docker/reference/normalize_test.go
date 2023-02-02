@@ -258,7 +258,6 @@ func TestParseRepositoryInfo(t *testing.T) {
 			if expected, actual := tcase.RemoteName, Path(r); expected != actual {
 				t.Fatalf("Invalid remoteName for %q. Expected %q, got %q", r, expected, actual)
 			}
-
 		}
 	}
 }

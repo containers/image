@@ -231,7 +231,6 @@ func TestReferenceParse(t *testing.T) {
 		} else if ok {
 			failf("unexpected digested type")
 		}
-
 	}
 }
 
@@ -462,7 +461,6 @@ func TestSerialization(t *testing.T) {
 		if _, ok := fieldInterface.(Reference); ok {
 			failf("field should not implement Reference interface")
 		}
-
 	}
 }
 
