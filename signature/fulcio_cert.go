@@ -110,7 +110,7 @@ func (f *fulcioTrustRoot) verifyFulcioCertificateAtTime(relevantTime time.Time, 
 	//
 	// So, pragmatically, the ideal design seem to be to only do signatures from a trusted build system (which is, by definition,
 	// the arbiter of desired vs. malicious signatures) that maintains an audit log of performed signature operations; and that seems to
-	// make make the SCT (and all of Rekor apart from the trusted timestamp) unnecessary.
+	// make the SCT (and all of Rekor apart from the trusted timestamp) unnecessary.
 
 	// == Validate the recorded OIDC issuer
 	gotOIDCIssuer := false

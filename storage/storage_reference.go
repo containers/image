@@ -61,7 +61,7 @@ func imageMatchesRepo(image *storage.Image, ref reference.Named) bool {
 	})
 }
 
-// multiArchImageMatchesSystemContext returns true if if the passed-in image both contains a
+// multiArchImageMatchesSystemContext returns true if the passed-in image both contains a
 // multi-arch manifest that matches the passed-in digest, and the image is the per-platform
 // image instance that matches sys.
 //

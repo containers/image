@@ -1020,7 +1020,7 @@ func (c *parsedConfig) updateWithConfigurationFrom(updates *parsedConfig) {
 	// Go maps have a non-deterministic order when iterating the keys, so
 	// we dump them in a slice and sort it to enforce some order in
 	// Registries slice.  Some consumers of c/image (e.g., CRI-O) log the
-	// the configuration where a non-deterministic order could easily cause
+	// configuration where a non-deterministic order could easily cause
 	// confusion.
 	prefixes := maps.Keys(registryMap)
 	sort.Strings(prefixes)

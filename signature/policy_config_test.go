@@ -269,7 +269,7 @@ func jsonUnmarshalFromObject(t *testing.T, object any, dest any) error {
 
 // assertJSONUnmarshalFromObjectFails checks that unmarshaling the JSON-marshaled version
 // of an arbitrary object (as a convenient way to create an invalid/unusual JSON input) into
-// into dest fails.
+// dest fails.
 func assertJSONUnmarshalFromObjectFails(t *testing.T, object any, dest any) {
 	err := jsonUnmarshalFromObject(t, object, dest)
 	assert.Error(t, err)
