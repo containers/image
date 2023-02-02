@@ -28,6 +28,7 @@ func TestIsManifestInvalidError(t *testing.T) {
 		"{\"errors\":[{\"code\":\"TAG_INVALID\",\"message\":\"manifest tag did not match URI\"}]}\n"
 	resp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader([]byte(response))), nil)
 	require.NoError(t, err)
+	defer resp.Body.Close()
 	err = registryHTTPResponseToError(resp)
 
 	res := isManifestInvalidError(err)

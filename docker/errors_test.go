@@ -176,6 +176,7 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 	} {
 		res, err := http.ReadResponse(bufio.NewReader(bytes.NewReader([]byte(c.response))), nil)
 		require.NoError(t, err, c.name)
+		defer res.Body.Close()
 
 		err = registryHTTPResponseToError(res)
 		assert.Equal(t, c.errorString, err.Error(), c.name)
