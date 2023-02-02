@@ -207,10 +207,7 @@ func (config *directClientConfig) ClientConfig() (*restConfig, error) {
 	if isConfigTransportTLS(*clientConfig) {
 		var err error
 		// REMOVED: Support for interactive fallback.
-		userAuthPartialConfig, err := getUserIdentificationPartialConfig(configAuthInfo)
-		if err != nil {
-			return nil, err
-		}
+		userAuthPartialConfig := getUserIdentificationPartialConfig(configAuthInfo)
 		if err = mergo.MergeWithOverwrite(clientConfig, userAuthPartialConfig); err != nil {
 			return nil, err
 		}
@@ -257,7 +254,7 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdAuthInfo, conf
 // 2.  configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
 // 3.  if there is not enough information to identify the user, load try the ~/.kubernetes_auth file
 // 4.  if there is not enough information to identify the user, prompt if possible
-func getUserIdentificationPartialConfig(configAuthInfo clientcmdAuthInfo) (*restConfig, error) {
+func getUserIdentificationPartialConfig(configAuthInfo clientcmdAuthInfo) *restConfig {
 	mergedConfig := &restConfig{}
 
 	// blindly overwrite existing values based on precedence
@@ -276,7 +273,7 @@ func getUserIdentificationPartialConfig(configAuthInfo clientcmdAuthInfo) (*rest
 	}
 
 	// REMOVED: prompting for missing information.
-	return mergedConfig, nil
+	return mergedConfig
 }
 
 // ConfirmUsable is a modified copy of k8s.io/kubernetes/pkg/client/unversioned/clientcmd.DirectClientConfig.ConfirmUsable.
