@@ -20,6 +20,7 @@ import (
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
 )
 
 func manifestSchema2FromFixture(t *testing.T, src types.ImageSource, fixture string, mustFail bool) genericManifest {
@@ -91,13 +92,13 @@ func TestManifestSchema2Serialize(t *testing.T) {
 	} {
 		serialized, err := m.serialize()
 		require.NoError(t, err)
-		var contents map[string]interface{}
+		var contents map[string]any
 		err = json.Unmarshal(serialized, &contents)
 		require.NoError(t, err)
 
 		original, err := os.ReadFile("fixtures/schema2.json")
 		require.NoError(t, err)
-		var originalContents map[string]interface{}
+		var originalContents map[string]any
 		err = json.Unmarshal(original, &originalContents)
 		require.NoError(t, err)
 
@@ -442,7 +443,7 @@ func modifiedLayerInfos(t *testing.T, input []types.BlobInfo) ([]types.BlobInfo,
 		modified = append(modified, b2)
 	}
 
-	copy := append([]types.BlobInfo{}, modified...)
+	copy := slices.Clone(modified)
 	return modified, copy
 }
 
@@ -522,7 +523,7 @@ func TestConvertToManifestOCI(t *testing.T) {
 
 	byHandJSON, err := os.ReadFile("fixtures/schema2-to-oci1.json")
 	require.NoError(t, err)
-	var converted, byHand map[string]interface{}
+	var converted, byHand map[string]any
 	err = json.Unmarshal(byHandJSON, &byHand)
 	require.NoError(t, err)
 	err = json.Unmarshal(convertedJSON, &converted)
@@ -543,7 +544,7 @@ func TestConvertToManifestOCIAllMediaTypes(t *testing.T) {
 
 	byHandJSON, err := os.ReadFile("fixtures/schema2-all-media-types-to-oci1.json")
 	require.NoError(t, err)
-	var converted, byHand map[string]interface{}
+	var converted, byHand map[string]any
 	err = json.Unmarshal(byHandJSON, &byHand)
 	require.NoError(t, err)
 	err = json.Unmarshal(convertedJSON, &converted)
@@ -577,7 +578,7 @@ func TestConvertToManifestSchema1(t *testing.T) {
 	// memoryDest, not from originalSrc, is used.
 	byDockerJSON, err := os.ReadFile("fixtures/schema2-to-schema1-by-docker.json")
 	require.NoError(t, err)
-	var converted, byDocker map[string]interface{}
+	var converted, byDocker map[string]any
 	err = json.Unmarshal(byDockerJSON, &byDocker)
 	require.NoError(t, err)
 	err = json.Unmarshal(convertedJSON, &converted)

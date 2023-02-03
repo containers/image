@@ -222,8 +222,8 @@ func TestNewPRSigstoreSignedKeyData(t *testing.T) {
 }
 
 // Return the result of modifying validJSON with fn and unmarshaling it into *pr
-func tryUnmarshalModifiedSigstoreSigned(t *testing.T, pr *prSigstoreSigned, validJSON []byte, modifyFn func(mSI)) error {
-	var tmp mSI
+func tryUnmarshalModifiedSigstoreSigned(t *testing.T, pr *prSigstoreSigned, validJSON []byte, modifyFn func(mSA)) error {
+	var tmp mSA
 	err := json.Unmarshal(validJSON, &tmp)
 	require.NoError(t, err)
 
@@ -234,71 +234,67 @@ func tryUnmarshalModifiedSigstoreSigned(t *testing.T, pr *prSigstoreSigned, vali
 }
 
 func TestPRSigstoreSignedUnmarshalJSON(t *testing.T) {
-	keyDataTests := policyJSONUmarshallerTests{
+	keyDataTests := policyJSONUmarshallerTests[PolicyRequirement]{
 		newDest: func() json.Unmarshaler { return &prSigstoreSigned{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyRequirement, error) {
 			return NewPRSigstoreSignedKeyData([]byte("abc"), NewPRMMatchRepoDigestOrExact())
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyRequirementFromJSON(validJSON)
-		},
-		breakFns: []func(mSI){
+		otherJSONParser: newPolicyRequirementFromJSON,
+		breakFns: []func(mSA){
 			// The "type" field is missing
-			func(v mSI) { delete(v, "type") },
+			func(v mSA) { delete(v, "type") },
 			// Wrong "type" field
-			func(v mSI) { v["type"] = 1 },
-			func(v mSI) { v["type"] = "this is invalid" },
+			func(v mSA) { v["type"] = 1 },
+			func(v mSA) { v["type"] = "this is invalid" },
 			// Extra top-level sub-object
-			func(v mSI) { v["unexpected"] = 1 },
+			func(v mSA) { v["unexpected"] = 1 },
 			// All of "keyPath" and "keyData", and "fulcio" is missing
-			func(v mSI) { delete(v, "keyData") },
+			func(v mSA) { delete(v, "keyData") },
 			// Both "keyPath" and "keyData" is present
-			func(v mSI) { v["keyPath"] = "/foo/bar" },
+			func(v mSA) { v["keyPath"] = "/foo/bar" },
 			// Both "keyData" and "fulcio" is present
-			func(v mSI) {
-				v["fulcio"] = mSI{
+			func(v mSA) {
+				v["fulcio"] = mSA{
 					"caPath":       "/foo/baz",
 					"oidcIssuer":   "https://example.com",
 					"subjectEmail": "test@example.com",
 				}
 			},
 			// Invalid "keyPath" field
-			func(v mSI) { delete(v, "keyData"); v["keyPath"] = 1 },
+			func(v mSA) { delete(v, "keyData"); v["keyPath"] = 1 },
 			// Invalid "keyData" field
-			func(v mSI) { v["keyData"] = 1 },
-			func(v mSI) { v["keyData"] = "this is invalid base64" },
+			func(v mSA) { v["keyData"] = 1 },
+			func(v mSA) { v["keyData"] = "this is invalid base64" },
 			// Invalid "fulcio" field
-			func(v mSI) { v["fulcio"] = 1 },
-			func(v mSI) { v["fulcio"] = mSI{} },
+			func(v mSA) { v["fulcio"] = 1 },
+			func(v mSA) { v["fulcio"] = mSA{} },
 			// "fulcio" is explicit nil
-			func(v mSI) { v["fulcio"] = nil },
+			func(v mSA) { v["fulcio"] = nil },
 			// Both "rekorKeyPath" and "rekorKeyData" is present
-			func(v mSI) {
+			func(v mSA) {
 				v["rekorPublicKeyPath"] = "/foo/baz"
 				v["rekorPublicKeyData"] = ""
 			},
 			// Invalid "rekorPublicKeyPath" field
-			func(v mSI) { v["rekorPublicKeyPath"] = 1 },
+			func(v mSA) { v["rekorPublicKeyPath"] = 1 },
 			// Invalid "rekorPublicKeyData" field
-			func(v mSI) { v["rekorPublicKeyData"] = 1 },
-			func(v mSI) { v["rekorPublicKeyData"] = "this is invalid base64" },
+			func(v mSA) { v["rekorPublicKeyData"] = 1 },
+			func(v mSA) { v["rekorPublicKeyData"] = "this is invalid base64" },
 			// Invalid "signedIdentity" field
-			func(v mSI) { v["signedIdentity"] = "this is invalid" },
+			func(v mSA) { v["signedIdentity"] = "this is invalid" },
 			// "signedIdentity" an explicit nil
-			func(v mSI) { v["signedIdentity"] = nil },
+			func(v mSA) { v["signedIdentity"] = nil },
 		},
 		duplicateFields: []string{"type", "keyData", "signedIdentity"},
 	}
 	keyDataTests.run(t)
 	// Test keyPath-specific duplicate fields
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyRequirement]{
 		newDest: func() json.Unmarshaler { return &prSigstoreSigned{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyRequirement, error) {
 			return NewPRSigstoreSignedKeyPath("/foo/bar", NewPRMMatchRepoDigestOrExact())
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyRequirementFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyRequirementFromJSON,
 		duplicateFields: []string{"type", "keyPath", "signedIdentity"},
 	}.run(t)
 	// Test Fulcio and rekorPublicKeyPath duplicate fields
@@ -308,33 +304,29 @@ func TestPRSigstoreSignedUnmarshalJSON(t *testing.T) {
 		PRSigstoreSignedFulcioWithSubjectEmail("mitr@redhat.com"),
 	)
 	require.NoError(t, err)
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyRequirement]{
 		newDest: func() json.Unmarshaler { return &prSigstoreSigned{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyRequirement, error) {
 			return NewPRSigstoreSigned(
 				PRSigstoreSignedWithFulcio(testFulcio),
 				PRSigstoreSignedWithRekorPublicKeyPath("/foo/rekor"),
 				PRSigstoreSignedWithSignedIdentity(NewPRMMatchRepoDigestOrExact()),
 			)
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyRequirementFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyRequirementFromJSON,
 		duplicateFields: []string{"type", "fulcio", "rekorPublicKeyPath", "signedIdentity"},
 	}.run(t)
 	// Test rekorPublicKeyData duplicate fields
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PolicyRequirement]{
 		newDest: func() json.Unmarshaler { return &prSigstoreSigned{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PolicyRequirement, error) {
 			return NewPRSigstoreSigned(
 				PRSigstoreSignedWithKeyPath("/foo/bar"),
 				PRSigstoreSignedWithRekorPublicKeyData([]byte("foo")),
 				PRSigstoreSignedWithSignedIdentity(NewPRMMatchRepoDigestOrExact()),
 			)
 		},
-		otherJSONParser: func(validJSON []byte) (interface{}, error) {
-			return newPolicyRequirementFromJSON(validJSON)
-		},
+		otherJSONParser: newPolicyRequirementFromJSON,
 		duplicateFields: []string{"type", "keyPath", "rekorPublicKeyData", "signedIdentity"},
 	}.run(t)
 
@@ -344,9 +336,9 @@ func TestPRSigstoreSignedUnmarshalJSON(t *testing.T) {
 	_, validJSON := keyDataTests.validObjectAndJSON(t)
 
 	// Various allowed modifications to the requirement
-	allowedModificationFns := []func(mSI){
+	allowedModificationFns := []func(mSA){
 		// Delete the signedIdentity field
-		func(v mSI) { delete(v, "signedIdentity") },
+		func(v mSA) { delete(v, "signedIdentity") },
 	}
 	for _, fn := range allowedModificationFns {
 		err := tryUnmarshalModifiedSigstoreSigned(t, &pr, validJSON, fn)
@@ -354,11 +346,11 @@ func TestPRSigstoreSignedUnmarshalJSON(t *testing.T) {
 	}
 
 	// Various ways to set signedIdentity to the default value
-	signedIdentityDefaultFns := []func(mSI){
+	signedIdentityDefaultFns := []func(mSA){
 		// Set signedIdentity to the default explicitly
-		func(v mSI) { v["signedIdentity"] = NewPRMMatchRepoDigestOrExact() },
+		func(v mSA) { v["signedIdentity"] = NewPRMMatchRepoDigestOrExact() },
 		// Delete the signedIdentity field
-		func(v mSI) { delete(v, "signedIdentity") },
+		func(v mSA) { delete(v, "signedIdentity") },
 	}
 	for _, fn := range signedIdentityDefaultFns {
 		err := tryUnmarshalModifiedSigstoreSigned(t, &pr, validJSON, fn)
@@ -459,9 +451,9 @@ func TestNewPRSigstoreSignedFulcio(t *testing.T) {
 }
 
 func TestPRSigstoreSignedFulcioUnmarshalJSON(t *testing.T) {
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PRSigstoreSignedFulcio]{
 		newDest: func() json.Unmarshaler { return &prSigstoreSignedFulcio{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PRSigstoreSignedFulcio, error) {
 			return NewPRSigstoreSignedFulcio(
 				PRSigstoreSignedFulcioWithCAPath("fixtures/fulcio_v1.crt.pem"),
 				PRSigstoreSignedFulcioWithOIDCIssuer("https://github.com/login/oauth"),
@@ -469,30 +461,30 @@ func TestPRSigstoreSignedFulcioUnmarshalJSON(t *testing.T) {
 			)
 		},
 		otherJSONParser: nil,
-		breakFns: []func(mSI){
+		breakFns: []func(mSA){
 			// Extra top-level sub-object
-			func(v mSI) { v["unexpected"] = 1 },
+			func(v mSA) { v["unexpected"] = 1 },
 			// Both of "caPath" and "caData" are missing
-			func(v mSI) { delete(v, "caPath") },
+			func(v mSA) { delete(v, "caPath") },
 			// Both "caPath" and "caData" is present
-			func(v mSI) { v["caData"] = "" },
+			func(v mSA) { v["caData"] = "" },
 			// Invalid "caPath" field
-			func(v mSI) { v["caPath"] = 1 },
+			func(v mSA) { v["caPath"] = 1 },
 			// Invalid "oidcIssuer" field
-			func(v mSI) { v["oidcIssuer"] = 1 },
+			func(v mSA) { v["oidcIssuer"] = 1 },
 			// "oidcIssuer" is missing
-			func(v mSI) { delete(v, "oidcIssuer") },
+			func(v mSA) { delete(v, "oidcIssuer") },
 			// Invalid "subjectEmail" field
-			func(v mSI) { v["subjectEmail"] = 1 },
+			func(v mSA) { v["subjectEmail"] = 1 },
 			// "subjectEmail" is missing
-			func(v mSI) { delete(v, "subjectEmail") },
+			func(v mSA) { delete(v, "subjectEmail") },
 		},
 		duplicateFields: []string{"caPath", "oidcIssuer", "subjectEmail"},
 	}.run(t)
 	// Test caData specifics
-	policyJSONUmarshallerTests{
+	policyJSONUmarshallerTests[PRSigstoreSignedFulcio]{
 		newDest: func() json.Unmarshaler { return &prSigstoreSignedFulcio{} },
-		newValidObject: func() (interface{}, error) {
+		newValidObject: func() (PRSigstoreSignedFulcio, error) {
 			return NewPRSigstoreSignedFulcio(
 				PRSigstoreSignedFulcioWithCAData([]byte("abc")),
 				PRSigstoreSignedFulcioWithOIDCIssuer("https://github.com/login/oauth"),
@@ -500,10 +492,10 @@ func TestPRSigstoreSignedFulcioUnmarshalJSON(t *testing.T) {
 			)
 		},
 		otherJSONParser: nil,
-		breakFns: []func(mSI){
+		breakFns: []func(mSA){
 			// Invalid "caData" field
-			func(v mSI) { v["caData"] = 1 },
-			func(v mSI) { v["caData"] = "this is invalid base64" },
+			func(v mSA) { v["caData"] = 1 },
+			func(v mSA) { v["caData"] = "this is invalid base64" },
 		},
 		duplicateFields: []string{"caData", "oidcIssuer", "subjectEmail"},
 	}.run(t)

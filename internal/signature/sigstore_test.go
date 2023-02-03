@@ -49,7 +49,7 @@ func TestSigstoreBlobChunk(t *testing.T) {
 
 	expectedJSON := []byte(`{"mimeType":"mime-type","payload":"cGF5bG9hZA==", "annotations":{"a":"b","c":"d"}}`)
 	// Don’t directly compare the JSON representation so that we don’t test for formatting differences, just verify that it contains exactly the expected data.
-	var raw, expectedRaw map[string]interface{}
+	var raw, expectedRaw map[string]any
 	err = json.Unmarshal(res, &raw)
 	require.NoError(t, err)
 	err = json.Unmarshal(expectedJSON, &expectedRaw)

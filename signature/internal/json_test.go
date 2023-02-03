@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type mSI map[string]interface{} // To minimize typing the long name
+type mSA map[string]any // To minimize typing the long name
 
 // implementsUnmarshalJSON is a minimalistic type used to detect that
 // paranoidUnmarshalJSONObject uses the json.Unmarshaler interface of resolved
@@ -31,7 +31,7 @@ func TestParanoidUnmarshalJSONObject(t *testing.T) {
 	}
 	ts := testStruct{}
 	var unmarshalJSONCalled implementsUnmarshalJSON
-	tsResolver := func(key string) interface{} {
+	tsResolver := func(key string) any {
 		switch key {
 		case "a":
 			return &ts.A
@@ -87,7 +87,7 @@ func TestParanoidUnmarshalJSONObjectExactFields(t *testing.T) {
 	var float64Value float64
 	var rawValue json.RawMessage
 	var unmarshallCalled implementsUnmarshalJSON
-	exactFields := map[string]interface{}{
+	exactFields := map[string]any{
 		"string":       &stringValue,
 		"float64":      &float64Value,
 		"raw":          &rawValue,
@@ -95,7 +95,7 @@ func TestParanoidUnmarshalJSONObjectExactFields(t *testing.T) {
 	}
 
 	// Empty object
-	err := ParanoidUnmarshalJSONObjectExactFields([]byte(`{}`), map[string]interface{}{})
+	err := ParanoidUnmarshalJSONObjectExactFields([]byte(`{}`), map[string]any{})
 	require.NoError(t, err)
 
 	// Success
@@ -125,8 +125,8 @@ func TestParanoidUnmarshalJSONObjectExactFields(t *testing.T) {
 }
 
 // Return the result of modifying validJSON with fn
-func modifiedJSON(t *testing.T, validJSON []byte, modifyFn func(mSI)) []byte {
-	var tmp mSI
+func modifiedJSON(t *testing.T, validJSON []byte, modifyFn func(mSA)) []byte {
+	var tmp mSA
 	err := json.Unmarshal(validJSON, &tmp)
 	require.NoError(t, err)
 

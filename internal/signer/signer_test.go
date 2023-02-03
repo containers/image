@@ -39,7 +39,7 @@ func TestNewSigner(t *testing.T) {
 	}
 	s := NewSigner(&si)
 	// Verify SignerImplementation methods are not visible even to determined callers
-	_, visible := interface{}(s).(SignerImplementation)
+	_, visible := any(s).(SignerImplementation)
 	assert.False(t, visible)
 	err := s.Close()
 	assert.Equal(t, closeError, err)

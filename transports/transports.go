@@ -5,6 +5,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/containers/image/v5/internal/set"
 	"github.com/containers/image/v5/types"
 )
 
@@ -71,17 +72,16 @@ func ImageName(ref types.ImageReference) string {
 	return ref.Transport().Name() + ":" + ref.StringWithinTransport()
 }
 
+var deprecatedTransports = set.NewWithValues("atomic")
+
 // ListNames returns a list of non deprecated transport names.
 // Deprecated transports can be used, but are not presented to users.
 func ListNames() []string {
 	kt.mu.Lock()
 	defer kt.mu.Unlock()
-	deprecated := map[string]bool{
-		"atomic": true,
-	}
 	var names []string
 	for _, transport := range kt.transports {
-		if !deprecated[transport.Name()] {
+		if !deprecatedTransports.Contains(transport.Name()) {
 			names = append(names, transport.Name())
 		}
 	}

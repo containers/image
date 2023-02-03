@@ -19,11 +19,11 @@ import (
 // A short-hand way to get a JSON object field value or panic. No error handling done, we know
 // what we are working with, a panic in a test is good enough, and fitting test cases on a single line
 // is a priority.
-func x(m mSI, fields ...string) mSI {
+func x(m mSA, fields ...string) mSA {
 	for _, field := range fields {
-		// Not .(mSI) because type assertion of an unnamed type to a named type always fails (the types
+		// Not .(mSA) because type assertion of an unnamed type to a named type always fails (the types
 		// are not "identical"), but the assignment is fine because they are "assignable".
-		m = m[field].(map[string]interface{})
+		m = m[field].(map[string]any)
 	}
 	return m
 }
@@ -132,42 +132,42 @@ func TestUntrustedSigstorePayloadUnmarshalJSON(t *testing.T) {
 	}, s)
 
 	// Various ways to corrupt the JSON
-	breakFns := []func(mSI){
+	breakFns := []func(mSA){
 		// A top-level field is missing
-		func(v mSI) { delete(v, "critical") },
-		func(v mSI) { delete(v, "optional") },
+		func(v mSA) { delete(v, "critical") },
+		func(v mSA) { delete(v, "optional") },
 		// Extra top-level sub-object
-		func(v mSI) { v["unexpected"] = 1 },
+		func(v mSA) { v["unexpected"] = 1 },
 		// "critical" not an object
-		func(v mSI) { v["critical"] = 1 },
+		func(v mSA) { v["critical"] = 1 },
 		// "optional" not an object
-		func(v mSI) { v["optional"] = 1 },
+		func(v mSA) { v["optional"] = 1 },
 		// A field of "critical" is missing
-		func(v mSI) { delete(x(v, "critical"), "type") },
-		func(v mSI) { delete(x(v, "critical"), "image") },
-		func(v mSI) { delete(x(v, "critical"), "identity") },
+		func(v mSA) { delete(x(v, "critical"), "type") },
+		func(v mSA) { delete(x(v, "critical"), "image") },
+		func(v mSA) { delete(x(v, "critical"), "identity") },
 		// Extra field of "critical"
-		func(v mSI) { x(v, "critical")["unexpected"] = 1 },
+		func(v mSA) { x(v, "critical")["unexpected"] = 1 },
 		// Invalid "type"
-		func(v mSI) { x(v, "critical")["type"] = 1 },
-		func(v mSI) { x(v, "critical")["type"] = "unexpected" },
+		func(v mSA) { x(v, "critical")["type"] = 1 },
+		func(v mSA) { x(v, "critical")["type"] = "unexpected" },
 		// Invalid "image" object
-		func(v mSI) { x(v, "critical")["image"] = 1 },
-		func(v mSI) { delete(x(v, "critical", "image"), "docker-manifest-digest") },
-		func(v mSI) { x(v, "critical", "image")["unexpected"] = 1 },
+		func(v mSA) { x(v, "critical")["image"] = 1 },
+		func(v mSA) { delete(x(v, "critical", "image"), "docker-manifest-digest") },
+		func(v mSA) { x(v, "critical", "image")["unexpected"] = 1 },
 		// Invalid "docker-manifest-digest"
-		func(v mSI) { x(v, "critical", "image")["docker-manifest-digest"] = 1 },
+		func(v mSA) { x(v, "critical", "image")["docker-manifest-digest"] = 1 },
 		// Invalid "identity" object
-		func(v mSI) { x(v, "critical")["identity"] = 1 },
-		func(v mSI) { delete(x(v, "critical", "identity"), "docker-reference") },
-		func(v mSI) { x(v, "critical", "identity")["unexpected"] = 1 },
+		func(v mSA) { x(v, "critical")["identity"] = 1 },
+		func(v mSA) { delete(x(v, "critical", "identity"), "docker-reference") },
+		func(v mSA) { x(v, "critical", "identity")["unexpected"] = 1 },
 		// Invalid "docker-reference"
-		func(v mSI) { x(v, "critical", "identity")["docker-reference"] = 1 },
+		func(v mSA) { x(v, "critical", "identity")["docker-reference"] = 1 },
 		// Invalid "creator"
-		func(v mSI) { x(v, "optional")["creator"] = 1 },
+		func(v mSA) { x(v, "optional")["creator"] = 1 },
 		// Invalid "timestamp"
-		func(v mSI) { x(v, "optional")["timestamp"] = "unexpected" },
-		func(v mSI) { x(v, "optional")["timestamp"] = 0.5 }, // Fractional input
+		func(v mSA) { x(v, "optional")["timestamp"] = "unexpected" },
+		func(v mSA) { x(v, "optional")["timestamp"] = 0.5 }, // Fractional input
 	}
 	for _, fn := range breakFns {
 		testJSON := modifiedJSON(t, validJSON, fn)
@@ -175,9 +175,9 @@ func TestUntrustedSigstorePayloadUnmarshalJSON(t *testing.T) {
 	}
 
 	// Modifications to unrecognized fields in "optional" are allowed and ignored
-	allowedModificationFns := []func(mSI){
+	allowedModificationFns := []func(mSA){
 		// Add an optional field
-		func(v mSI) { x(v, "optional")["unexpected"] = 1 },
+		func(v mSA) { x(v, "optional")["unexpected"] = 1 },
 	}
 	for _, fn := range allowedModificationFns {
 		testJSON := modifiedJSON(t, validJSON, fn)
@@ -258,7 +258,7 @@ func TestVerifySigstorePayload(t *testing.T) {
 
 	// Invalid verifier
 	recorded = acceptanceData{}
-	invalidPublicKey := struct{}{} // crypto.PublicKey is, for some reason, just an interface{}, so this is acceptable.
+	invalidPublicKey := struct{}{} // crypto.PublicKey is, for some reason, just an any, so this is acceptable.
 	res, err = VerifySigstorePayload(invalidPublicKey, sigstoreSig.UntrustedPayload(), cryptoBase64Sig, recordingRules)
 	assert.Error(t, err)
 	assert.Nil(t, res)

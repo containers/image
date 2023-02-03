@@ -75,16 +75,16 @@ func TestUntrustedRekorSETUnmarshalJSON(t *testing.T) {
 	}, s)
 
 	// Various ways to corrupt the JSON
-	breakFns := []func(mSI){
+	breakFns := []func(mSA){
 		// A top-level field is missing
-		func(v mSI) { delete(v, "SignedEntryTimestamp") },
-		func(v mSI) { delete(v, "Payload") },
+		func(v mSA) { delete(v, "SignedEntryTimestamp") },
+		func(v mSA) { delete(v, "Payload") },
 		// Extra top-level sub-object
-		func(v mSI) { v["unexpected"] = 1 },
+		func(v mSA) { v["unexpected"] = 1 },
 		// "SignedEntryTimestamp" not a string
-		func(v mSI) { v["critical"] = 1 },
+		func(v mSA) { v["critical"] = 1 },
 		// "Payload" not an object
-		func(v mSI) { v["optional"] = 1 },
+		func(v mSA) { v["optional"] = 1 },
 	}
 	for _, fn := range breakFns {
 		testJSON := modifiedJSON(t, validJSON, fn)
@@ -148,22 +148,22 @@ func TestUntrustedRekorPayloadUnmarshalJSON(t *testing.T) {
 	}, p)
 
 	// Various ways to corrupt the JSON
-	breakFns := []func(mSI){
+	breakFns := []func(mSA){
 		// A top-level field is missing
-		func(v mSI) { delete(v, "body") },
-		func(v mSI) { delete(v, "integratedTime") },
-		func(v mSI) { delete(v, "logIndex") },
-		func(v mSI) { delete(v, "logID") },
+		func(v mSA) { delete(v, "body") },
+		func(v mSA) { delete(v, "integratedTime") },
+		func(v mSA) { delete(v, "logIndex") },
+		func(v mSA) { delete(v, "logID") },
 		// Extra top-level sub-object
-		func(v mSI) { v["unexpected"] = 1 },
+		func(v mSA) { v["unexpected"] = 1 },
 		// "body" not a string
-		func(v mSI) { v["body"] = 1 },
+		func(v mSA) { v["body"] = 1 },
 		// "integratedTime" not an integer
-		func(v mSI) { v["integratedTime"] = "hello" },
+		func(v mSA) { v["integratedTime"] = "hello" },
 		// "logIndex" not an integer
-		func(v mSI) { v["logIndex"] = "hello" },
+		func(v mSA) { v["logIndex"] = "hello" },
 		// "logID" not a string
-		func(v mSI) { v["logID"] = 1 },
+		func(v mSA) { v["logID"] = 1 },
 	}
 	for _, fn := range breakFns {
 		testJSON := modifiedJSON(t, validJSON, fn)
@@ -265,91 +265,91 @@ func TestVerifyRekorSET(t *testing.T) {
 	}
 	validHashedRekordJSON, err := json.Marshal(validHashedRekord)
 	require.NoError(t, err)
-	for _, fn := range []func(mSI){
+	for _, fn := range []func(mSA){
 		// A Hashedrekord field is missing
-		func(v mSI) { delete(v, "apiVersion") },
-		func(v mSI) { delete(v, "kind") }, // "kind" is not visible in the type definition, but required by the implementation
-		func(v mSI) { delete(v, "spec") },
+		func(v mSA) { delete(v, "apiVersion") },
+		func(v mSA) { delete(v, "kind") }, // "kind" is not visible in the type definition, but required by the implementation
+		func(v mSA) { delete(v, "spec") },
 		// This, along with many other extra fields, is currently accepted. That is NOT an API commitment.
-		// func(v mSI) { v["unexpected"] = 1 }, // Extra top-level field:
+		// func(v mSA) { v["unexpected"] = 1 }, // Extra top-level field:
 		// Invalid apiVersion
-		func(v mSI) { v["apiVersion"] = nil },
-		func(v mSI) { v["apiVersion"] = 1 },
-		func(v mSI) { v["apiVersion"] = mSI{} },
-		func(v mSI) { v["apiVersion"] = "99.0.99" },
+		func(v mSA) { v["apiVersion"] = nil },
+		func(v mSA) { v["apiVersion"] = 1 },
+		func(v mSA) { v["apiVersion"] = mSA{} },
+		func(v mSA) { v["apiVersion"] = "99.0.99" },
 		// Invalid kind
-		func(v mSI) { v["kind"] = nil },
-		func(v mSI) { v["kind"] = 1 },
-		func(v mSI) { v["kind"] = "notHashedRekord" },
+		func(v mSA) { v["kind"] = nil },
+		func(v mSA) { v["kind"] = 1 },
+		func(v mSA) { v["kind"] = "notHashedRekord" },
 		// Invalid spec
-		func(v mSI) { v["spec"] = nil },
-		func(v mSI) { v["spec"] = 1 },
+		func(v mSA) { v["spec"] = nil },
+		func(v mSA) { v["spec"] = 1 },
 		// A HashedRekordV001Schema field is missing
-		func(v mSI) { delete(x(v, "spec"), "data") },
-		func(v mSI) { delete(x(v, "spec"), "signature") },
+		func(v mSA) { delete(x(v, "spec"), "data") },
+		func(v mSA) { delete(x(v, "spec"), "signature") },
 		// Invalid spec.data
-		func(v mSI) { x(v, "spec")["data"] = nil },
-		func(v mSI) { x(v, "spec")["data"] = 1 },
+		func(v mSA) { x(v, "spec")["data"] = nil },
+		func(v mSA) { x(v, "spec")["data"] = 1 },
 		// Missing spec.data.hash
-		func(v mSI) { delete(x(v, "spec", "data"), "hash") },
+		func(v mSA) { delete(x(v, "spec", "data"), "hash") },
 		// Invalid spec.data.hash
-		func(v mSI) { x(v, "spec", "data")["hash"] = nil },
-		func(v mSI) { x(v, "spec", "data")["hash"] = 1 },
+		func(v mSA) { x(v, "spec", "data")["hash"] = nil },
+		func(v mSA) { x(v, "spec", "data")["hash"] = 1 },
 		// A spec.data.hash field is missing
-		func(v mSI) { delete(x(v, "spec", "data", "hash"), "algorithm") },
-		func(v mSI) { delete(x(v, "spec", "data", "hash"), "value") },
+		func(v mSA) { delete(x(v, "spec", "data", "hash"), "algorithm") },
+		func(v mSA) { delete(x(v, "spec", "data", "hash"), "value") },
 		// Invalid spec.data.hash.algorithm
-		func(v mSI) { x(v, "spec", "data", "hash")["algorithm"] = nil },
-		func(v mSI) { x(v, "spec", "data", "hash")["algorithm"] = 1 },
+		func(v mSA) { x(v, "spec", "data", "hash")["algorithm"] = nil },
+		func(v mSA) { x(v, "spec", "data", "hash")["algorithm"] = 1 },
 		// Invalid spec.data.hash.value
-		func(v mSI) { x(v, "spec", "data", "hash")["value"] = nil },
-		func(v mSI) { x(v, "spec", "data", "hash")["value"] = 1 },
-		func(v mSI) { // An odd number of hexadecimal digits
+		func(v mSA) { x(v, "spec", "data", "hash")["value"] = nil },
+		func(v mSA) { x(v, "spec", "data", "hash")["value"] = 1 },
+		func(v mSA) { // An odd number of hexadecimal digits
 			x(v, "spec", "data", "hash")["value"] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 		},
 		// spec.data.hash does not match
-		func(v mSI) {
+		func(v mSA) {
 			x(v, "spec", "data", "hash")["value"] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 		},
 		// A non-sha256 hash
-		func(v mSI) {
+		func(v mSA) {
 			x(v, "spec", "data", "hash")["algorithm"] = "sha512"
 			h := sha512.Sum512(cosignPayloadBytes)
 			x(v, "spec", "data", "hash")["value"] = hex.EncodeToString(h[:])
 		},
 		// Invalid spec.signature
-		func(v mSI) { x(v, "spec")["signature"] = nil },
-		func(v mSI) { x(v, "spec")["signature"] = 1 },
+		func(v mSA) { x(v, "spec")["signature"] = nil },
+		func(v mSA) { x(v, "spec")["signature"] = 1 },
 		// A spec.signature field is mising
-		func(v mSI) { delete(x(v, "spec", "signature"), "content") },
-		func(v mSI) { delete(x(v, "spec", "signature"), "publicKey") },
+		func(v mSA) { delete(x(v, "spec", "signature"), "content") },
+		func(v mSA) { delete(x(v, "spec", "signature"), "publicKey") },
 		// Invalid spec.signature.content
-		func(v mSI) { x(v, "spec", "signature")["content"] = nil },
-		func(v mSI) { x(v, "spec", "signature")["content"] = 1 },
-		func(v mSI) { x(v, "spec", "signature")["content"] = "" },
-		func(v mSI) { x(v, "spec", "signature")["content"] = "+" }, // Invalid base64
+		func(v mSA) { x(v, "spec", "signature")["content"] = nil },
+		func(v mSA) { x(v, "spec", "signature")["content"] = 1 },
+		func(v mSA) { x(v, "spec", "signature")["content"] = "" },
+		func(v mSA) { x(v, "spec", "signature")["content"] = "+" }, // Invalid base64
 		// spec.signature.content does not match
-		func(v mSI) {
+		func(v mSA) {
 			x(v, "spec", "signature")["content"] = base64.StdEncoding.EncodeToString([]byte("does not match"))
 		},
 		// Invalid spec.signature.publicKey
-		func(v mSI) { x(v, "spec", "signature")["publicKey"] = nil },
-		func(v mSI) { x(v, "spec", "signature")["publicKey"] = 1 },
+		func(v mSA) { x(v, "spec", "signature")["publicKey"] = nil },
+		func(v mSA) { x(v, "spec", "signature")["publicKey"] = 1 },
 		// Missing spec.signature.publicKey.content
-		func(v mSI) { delete(x(v, "spec", "signature", "publicKey"), "content") },
+		func(v mSA) { delete(x(v, "spec", "signature", "publicKey"), "content") },
 		// Invalid spec.signature.publicKey.content
-		func(v mSI) { x(v, "spec", "signature", "publicKey")["content"] = nil },
-		func(v mSI) { x(v, "spec", "signature", "publicKey")["content"] = 1 },
-		func(v mSI) { x(v, "spec", "signature", "publicKey")["content"] = "" },
-		func(v mSI) { x(v, "spec", "signature", "publicKey")["content"] = "+" }, // Invalid base64
-		func(v mSI) {
+		func(v mSA) { x(v, "spec", "signature", "publicKey")["content"] = nil },
+		func(v mSA) { x(v, "spec", "signature", "publicKey")["content"] = 1 },
+		func(v mSA) { x(v, "spec", "signature", "publicKey")["content"] = "" },
+		func(v mSA) { x(v, "spec", "signature", "publicKey")["content"] = "+" }, // Invalid base64
+		func(v mSA) {
 			x(v, "spec", "signature", "publicKey")["content"] = base64.StdEncoding.EncodeToString([]byte("not PEM"))
 		},
-		func(v mSI) { // Multiple PEM blocks
+		func(v mSA) { // Multiple PEM blocks
 			x(v, "spec", "signature", "publicKey")["content"] = base64.StdEncoding.EncodeToString(bytes.Repeat(cosignCertBytes, 2))
 		},
 		// spec.signature.publicKey.content does not match
-		func(v mSI) {
+		func(v mSA) {
 			otherKey, err := testSigner.PublicKey()
 			require.NoError(t, err)
 			otherPEM, err := cryptoutils.MarshalPublicKeyToPEM(otherKey)

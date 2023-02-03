@@ -1,6 +1,6 @@
 module github.com/containers/image/v5
 
-go 1.17
+go 1.18
 
 require (
 	github.com/BurntSushi/toml v1.2.1
@@ -38,6 +38,7 @@ require (
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.7
 	golang.org/x/crypto v0.5.0
+	golang.org/x/exp v0.0.0-20230202163644-54bba9f4231b
 	golang.org/x/net v0.5.0
 	golang.org/x/oauth2 v0.4.0
 	golang.org/x/sync v0.1.0
