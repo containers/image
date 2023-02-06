@@ -29,7 +29,7 @@ var httpServerAddr string
 func TestMain(m *testing.M) {
 	httpServer, err := startRemoteLayerServer()
 	if err != nil {
-		println("Error starting test TLS server", err.Error())
+		fmt.Fprintf(os.Stderr, "Error starting test TLS server: %v", err.Error())
 		os.Exit(1)
 	}
 

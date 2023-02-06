@@ -103,10 +103,10 @@ func TestReferenceParse(t *testing.T) {
 		},
 		// FIXME "Uppercase" is incorrectly handled as a domain-name here, therefore passes.
 		// See https://github.com/docker/distribution/pull/1778, and https://github.com/docker/docker/pull/20175
-		//{
-		//	input: "Uppercase/lowercase:tag",
-		//	err:   ErrNameContainsUppercase,
-		//},
+		//	{
+		//		input: "Uppercase/lowercase:tag",
+		//		err:   ErrNameContainsUppercase,
+		//	},
 		{
 			input: "test:5000/Uppercase/lowercase:tag",
 			err:   ErrNameContainsUppercase,
@@ -231,7 +231,6 @@ func TestReferenceParse(t *testing.T) {
 		} else if ok {
 			failf("unexpected digested type")
 		}
-
 	}
 }
 
@@ -462,7 +461,6 @@ func TestSerialization(t *testing.T) {
 		if _, ok := fieldInterface.(Reference); ok {
 			failf("field should not implement Reference interface")
 		}
-
 	}
 }
 

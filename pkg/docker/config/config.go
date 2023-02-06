@@ -392,17 +392,16 @@ func RemoveAuthentication(sys *types.SystemContext, key string) error {
 		if isNamespaced {
 			logrus.Debugf("Not removing credentials because namespaced keys are not supported for the credential helper: %s", helper)
 			return
-		} else {
-			err := deleteAuthFromCredHelper(helper, key)
-			if err == nil {
-				logrus.Debugf("Credentials for %q were deleted from credential helper %s", key, helper)
-				isLoggedIn = true
-				return
-			}
-			if credentials.IsErrCredentialsNotFoundMessage(err.Error()) {
-				logrus.Debugf("Not logged in to %s with credential helper %s", key, helper)
-				return
-			}
+		}
+		err := deleteAuthFromCredHelper(helper, key)
+		if err == nil {
+			logrus.Debugf("Credentials for %q were deleted from credential helper %s", key, helper)
+			isLoggedIn = true
+			return
+		}
+		if credentials.IsErrCredentialsNotFoundMessage(err.Error()) {
+			logrus.Debugf("Not logged in to %s with credential helper %s", key, helper)
+			return
 		}
 		multiErr = multierror.Append(multiErr, fmt.Errorf("removing credentials for %s from credential helper %s: %w", key, helper, err))
 	}

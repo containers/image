@@ -335,7 +335,7 @@ func parseMediaType(contentType string) (string, map[string]string, error) {
 func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []private.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
 	headers := make(map[string][]string)
 
-	var rangeVals []string
+	rangeVals := make([]string, 0, len(chunks))
 	for _, c := range chunks {
 		rangeVals = append(rangeVals, fmt.Sprintf("%d-%d", c.Offset, c.Offset+c.Length-1))
 	}

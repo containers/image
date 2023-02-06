@@ -145,7 +145,7 @@ type Options struct {
 
 	// Preserve digests, and fail if we cannot.
 	PreserveDigests bool
-	// manifest MIME type of image set by user. "" is default and means use the autodetection to the the manifest MIME type
+	// manifest MIME type of image set by user. "" is default and means use the autodetection to the manifest MIME type
 	ForceManifestMIMEType string
 	ImageListSelection    ImageListSelection // set to either CopySystemImage (the default), CopyAllImages, or CopySpecificImages to control which instances we copy when the source reference is a list; ignored if the source reference is not a list
 	Instances             []digest.Digest    // if ImageListSelection is CopySpecificImages, copy only these instances and the list itself

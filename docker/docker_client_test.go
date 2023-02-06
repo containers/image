@@ -381,6 +381,7 @@ func TestIsManifestUnknownError(t *testing.T) {
 	} {
 		resp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader([]byte(c.response))), nil)
 		require.NoError(t, err, c.name)
+		defer resp.Body.Close()
 		err = fmt.Errorf("wrapped: %w", registryHTTPResponseToError(resp))
 
 		res := isManifestUnknownError(err)

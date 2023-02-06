@@ -9,7 +9,6 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/image"
 	"github.com/containers/image/v5/types"
-
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/exp/maps"
 )
@@ -72,7 +71,7 @@ func (r *tarballReference) NewImage(ctx context.Context, sys *types.SystemContex
 func (r *tarballReference) DeleteImage(ctx context.Context, sys *types.SystemContext) error {
 	for _, filename := range r.filenames {
 		if err := os.Remove(filename); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("error removing %q: %v", filename, err)
+			return fmt.Errorf("error removing %q: %w", filename, err)
 		}
 	}
 	return nil

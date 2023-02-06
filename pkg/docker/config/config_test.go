@@ -751,7 +751,6 @@ func TestRemoveAuthentication(t *testing.T) {
 			},
 		},
 	} {
-
 		content, err := json.Marshal(&tc.config)
 		require.NoError(t, err)
 
@@ -857,7 +856,6 @@ func TestSetGetCredentials(t *testing.T) {
 			useLegacyFormat: true,
 		},
 	} {
-
 		// Create a new empty SystemContext referring an empty auth.json
 		tmpFile, err := os.CreateTemp("", "auth.json-")
 		require.NoError(t, err)

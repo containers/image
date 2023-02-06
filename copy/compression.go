@@ -200,7 +200,9 @@ func (ic *imageCopier) bpcDecompressCompressed(stream *sourceStream, detected bp
 }
 
 // bpcPreserveOriginal returns a *bpCompressionStepData for not changing the original blob.
-func (ic *imageCopier) bpcPreserveOriginal(stream *sourceStream, detected bpDetectCompressionStepData,
+// This does not change the sourceStream parameter; we include it for symmetry with other
+// pipeline steps.
+func (ic *imageCopier) bpcPreserveOriginal(_ *sourceStream, detected bpDetectCompressionStepData,
 	layerCompressionChangeSupported bool) *bpCompressionStepData {
 	logrus.Debugf("Using original blob without modification")
 	// Remember if the original blob was compressed, and if so how, so that if

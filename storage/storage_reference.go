@@ -61,7 +61,7 @@ func imageMatchesRepo(image *storage.Image, ref reference.Named) bool {
 	})
 }
 
-// multiArchImageMatchesSystemContext returns true if if the passed-in image both contains a
+// multiArchImageMatchesSystemContext returns true if the passed-in image both contains a
 // multi-arch manifest that matches the passed-in digest, and the image is the per-platform
 // image instance that matches sys.
 //
@@ -204,10 +204,10 @@ func (s storageReference) StringWithinTransport() string {
 	}
 	res := "[" + s.transport.store.GraphDriverName() + "@" + s.transport.store.GraphRoot() + "+" + s.transport.store.RunRoot() + optionsList + "]"
 	if s.named != nil {
-		res = res + s.named.String()
+		res += s.named.String()
 	}
 	if s.id != "" {
-		res = res + "@" + s.id
+		res += "@" + s.id
 	}
 	return res
 }
@@ -215,10 +215,10 @@ func (s storageReference) StringWithinTransport() string {
 func (s storageReference) PolicyConfigurationIdentity() string {
 	res := "[" + s.transport.store.GraphDriverName() + "@" + s.transport.store.GraphRoot() + "]"
 	if s.named != nil {
-		res = res + s.named.String()
+		res += s.named.String()
 	}
 	if s.id != "" {
-		res = res + "@" + s.id
+		res += "@" + s.id
 	}
 	return res
 }

@@ -34,9 +34,9 @@ func TestGenerateKeyPair(t *testing.T) {
 
 	signer, err := NewSigner(WithPrivateKeyFile(privateKeyFile, passphrase))
 	require.NoError(t, err)
-	sig_, err := internalSigner.SignImageManifest(context.Background(), signer, testManifest, testDockerReference)
+	sig0, err := internalSigner.SignImageManifest(context.Background(), signer, testManifest, testDockerReference)
 	require.NoError(t, err)
-	sig, ok := sig_.(signature.Sigstore)
+	sig, ok := sig0.(signature.Sigstore)
 	require.True(t, ok)
 
 	// It would be even more elegant to invoke the higher-level prSigstoreSigned code,
