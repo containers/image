@@ -17,6 +17,7 @@ import (
 	"github.com/containers/image/v5/internal/image"
 	"github.com/containers/image/v5/internal/imagedestination"
 	"github.com/containers/image/v5/internal/imagesource"
+	internalManifest "github.com/containers/image/v5/internal/manifest"
 	"github.com/containers/image/v5/internal/pkg/platform"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/set"
@@ -317,7 +318,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		if err != nil {
 			return nil, fmt.Errorf("reading manifest for %s: %w", transports.ImageName(srcRef), err)
 		}
-		manifestList, err := manifest.ListFromBlob(mfest, manifestType)
+		manifestList, err := internalManifest.ListFromBlob(mfest, manifestType)
 		if err != nil {
 			return nil, fmt.Errorf("parsing primary manifest as list for %s: %w", transports.ImageName(srcRef), err)
 		}
@@ -417,11 +418,11 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	if err != nil {
 		return nil, fmt.Errorf("reading manifest list: %w", err)
 	}
-	originalList, err := manifest.ListFromBlob(manifestList, manifestType)
+	originalList, err := internalManifest.ListFromBlob(manifestList, manifestType)
 	if err != nil {
 		return nil, fmt.Errorf("parsing manifest list %q: %w", string(manifestList), err)
 	}
-	updatedList := originalList.Clone()
+	updatedList := originalList.CloneInternal()
 
 	sigs, err := c.sourceSignatures(ctx, unparsedToplevel, options,
 		"Getting image list signatures",
@@ -525,7 +526,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	c.Printf("Writing manifest list to image destination\n")
 	var errs []string
 	for _, thisListType := range append([]string{selectedListType}, otherManifestMIMETypeCandidates...) {
-		attemptedList := updatedList
+		var attemptedList internalManifest.ListPublic = updatedList
 
 		logrus.Debugf("Trying to use manifest list type %s…", thisListType)
 

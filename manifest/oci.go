@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/containers/image/v5/internal/manifest"
 	internalManifest "github.com/containers/image/v5/internal/manifest"
 	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
@@ -50,13 +51,13 @@ func SupportedOCI1MediaType(m string) error {
 }
 
 // OCI1FromManifest creates an OCI1 manifest instance from a manifest blob.
-func OCI1FromManifest(manifest []byte) (*OCI1, error) {
+func OCI1FromManifest(manifestBlob []byte) (*OCI1, error) {
 	oci1 := OCI1{}
-	if err := json.Unmarshal(manifest, &oci1); err != nil {
+	if err := json.Unmarshal(manifestBlob, &oci1); err != nil {
 		return nil, err
 	}
-	if err := validateUnambiguousManifestFormat(manifest, imgspecv1.MediaTypeImageIndex,
-		allowedFieldConfig|allowedFieldLayers); err != nil {
+	if err := manifest.ValidateUnambiguousManifestFormat(manifestBlob, imgspecv1.MediaTypeImageIndex,
+		manifest.AllowedFieldConfig|manifest.AllowedFieldLayers); err != nil {
 		return nil, err
 	}
 	return &oci1, nil

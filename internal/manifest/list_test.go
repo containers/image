@@ -6,19 +6,18 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/containers/image/v5/internal/manifest"
 	"github.com/containers/image/v5/types"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func pare(m List) {
-	if impl, ok := m.(*manifest.OCI1Index); ok {
+	if impl, ok := m.(*OCI1Index); ok {
 		impl.Annotations = nil
 	}
-	if impl, ok := m.(*manifest.Schema2List); ok {
+	if impl, ok := m.(*Schema2List); ok {
 		for i := range impl.Manifests {
 			impl.Manifests[i].Platform.Features = nil
 		}
@@ -34,12 +33,11 @@ func TestParseLists(t *testing.T) {
 		{"v2list.manifest.json", DockerV2ListMediaType},
 	}
 	for _, c := range cases {
-		manifest, err := os.ReadFile(filepath.Join("fixtures", c.path))
-		require.NoError(t, err, "error reading file %q", filepath.Join("fixtures", c.path))
+		manifest, err := os.ReadFile(filepath.Join("testdata", c.path))
+		require.NoError(t, err, "error reading file %q", filepath.Join("testdata", c.path))
 		assert.Equal(t, GuessMIMEType(manifest), c.mimeType)
 
-		_, err = FromBlob(manifest, c.mimeType)
-		require.Error(t, err, "manifest list %q should not parse as single images", c.path)
+		// c/image/manifest.TestParseLists verifies that FromBlob refuses to parse the manifest list
 
 		m, err := ListFromBlob(manifest, c.mimeType)
 		require.NoError(t, err, "manifest list %q  should parse as list types", c.path)
@@ -114,9 +112,9 @@ func TestChooseInstance(t *testing.T) {
 			},
 		},
 	} {
-		rawManifest, err := os.ReadFile(filepath.Join("..", "internal", "image", "fixtures", manifestList.listFile))
+		rawManifest, err := os.ReadFile(filepath.Join("..", "..", "internal", "image", "fixtures", manifestList.listFile))
 		require.NoError(t, err)
-		list, err := ListFromBlob(rawManifest, GuessMIMEType(rawManifest))
+		list, err := ListPublicFromBlob(rawManifest, GuessMIMEType(rawManifest))
 		require.NoError(t, err)
 		// Match found
 		for _, match := range manifestList.matchedInstances {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/manifest"
 	"github.com/containers/image/v5/internal/set"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/regexp"
@@ -55,16 +56,16 @@ type Schema1V1Compatibility struct {
 // Schema1FromManifest creates a Schema1 manifest instance from a manifest blob.
 // (NOTE: The instance is not necessary a literal representation of the original blob,
 // layers with duplicate IDs are eliminated.)
-func Schema1FromManifest(manifest []byte) (*Schema1, error) {
+func Schema1FromManifest(manifestBlob []byte) (*Schema1, error) {
 	s1 := Schema1{}
-	if err := json.Unmarshal(manifest, &s1); err != nil {
+	if err := json.Unmarshal(manifestBlob, &s1); err != nil {
 		return nil, err
 	}
 	if s1.SchemaVersion != 1 {
 		return nil, fmt.Errorf("unsupported schema version %d", s1.SchemaVersion)
 	}
-	if err := validateUnambiguousManifestFormat(manifest, DockerV2Schema1SignedMediaType,
-		allowedFieldFSLayers|allowedFieldHistory); err != nil {
+	if err := manifest.ValidateUnambiguousManifestFormat(manifestBlob, DockerV2Schema1SignedMediaType,
+		manifest.AllowedFieldFSLayers|manifest.AllowedFieldHistory); err != nil {
 		return nil, err
 	}
 	if err := s1.initialize(); err != nil {
