@@ -1,11 +1,1 @@
-{
-   "schemaVersion": 1,
-   "name": "mitr/busybox",
-   "tag": "latest",
-   "architecture": "amd64",
-   "fsLayers": [
-   ],
-   "history": [
-   ],
-   "signatures": 1
-}
+../../internal/manifest/testdata/v2s1-invalid-signatures.manifest.json

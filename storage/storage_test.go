@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
+	imanifest "github.com/containers/image/v5/internal/manifest"
 	"github.com/containers/image/v5/internal/private"
-	imanifest "github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache/memory"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage"

@@ -1,5 +1,1 @@
-{
-   "schemaVersion": 99999,
-   "name": "mitr/noversion-nonsense",
-   "tag": "latest"
-}
+../../internal/manifest/testdata/unknown-version.manifest.json
