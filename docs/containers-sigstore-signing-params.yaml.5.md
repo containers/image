@@ -78,7 +78,7 @@ In addition, a Rekor server must be specified as well.
 ### Recording the Signature to a Rekor Transparency Server
 
 This can be combined with either a private key or Fulcio.
-It is, pratically speaking, required for Fulcio; it is optional when a static private key is used, but necessary for
+It is, practically speaking, required for Fulcio; it is optional when a static private key is used, but necessary for
 interoperability with the default configuration of `cosign`.
 
 - `rekorURL`: _URL_
