@@ -320,7 +320,7 @@ func TestVerifyRekorSET(t *testing.T) {
 		// Invalid spec.signature
 		func(v mSA) { x(v, "spec")["signature"] = nil },
 		func(v mSA) { x(v, "spec")["signature"] = 1 },
-		// A spec.signature field is mising
+		// A spec.signature field is missing
 		func(v mSA) { delete(x(v, "spec", "signature"), "content") },
 		func(v mSA) { delete(x(v, "spec", "signature"), "publicKey") },
 		// Invalid spec.signature.content

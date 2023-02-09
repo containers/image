@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// asssert that crypto.PublicKey matches the on in certPEM.
+// assert that crypto.PublicKey matches the on in certPEM.
 func assertPublicKeyMatchesCert(t *testing.T, certPEM []byte, pk crypto.PublicKey) {
 	pkInterface, ok := pk.(interface {
 		Equal(x crypto.PublicKey) bool
@@ -153,7 +153,7 @@ func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 	}{
 		{
 			// OtherName SAN element, with none of the Go-parsed SAN elements present,
-			// should not be a reason to reject the certficate entirely;
+			// should not be a reason to reject the certificate entirely;
 			// but we don’t actually support matching it, so this basically tests that the code
 			// gets far enough to do subject matching.
 			name: "OtherName in SAN",
