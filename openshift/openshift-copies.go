@@ -21,7 +21,6 @@ import (
 	"github.com/imdario/mergo"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
-	"golang.org/x/net/http2"
 	"gopkg.in/yaml.v3"
 )
 
@@ -938,7 +937,7 @@ func tlsCacheGet(config *restConfig) (http.RoundTripper, error) {
 	}
 	// Allow clients to disable http2 if needed.
 	if s := os.Getenv("DISABLE_HTTP2"); len(s) == 0 {
-		_ = http2.ConfigureTransport(t)
+		t.ForceAttemptHTTP2 = true
 	}
 	return t, nil
 }
