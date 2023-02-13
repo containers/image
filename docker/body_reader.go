@@ -31,6 +31,7 @@ type bodyReader struct {
 
 	body            io.ReadCloser // The currently open connection we use to read data, or nil if there is nothing to read from / close.
 	lastRetryOffset int64
+	lastRetryTime   time.Time // time.Time{} if N/A
 	offset          int64     // Current offset within the blob
 	lastSuccessTime time.Time // time.Time{} if N/A
 }
@@ -52,7 +53,9 @@ func newBodyReader(ctx context.Context, c *dockerClient, path string, firstBody 
 
 		body:            firstBody,
 		lastRetryOffset: 0,
+		lastRetryTime:   time.Time{},
 		offset:          0,
+		lastSuccessTime: time.Time{},
 	}
 	return res, nil
 }
@@ -190,6 +193,7 @@ func (br *bodyReader) Read(p []byte) (int, error) {
 		consumedBody = true
 		br.body = res.Body
 		br.lastRetryOffset = br.offset
+		br.lastRetryTime = time.Time{}
 		return n, nil
 
 	default:
@@ -212,14 +216,15 @@ func millisecondsSinceOptional(currentTime time.Time, tm time.Time) float64 {
 func (br *bodyReader) errorIfNotReconnecting(originalErr error, redactedURL string) error {
 	currentTime := time.Now()
 	msSinceFirstConnection := millisecondsSinceOptional(currentTime, br.firstConnectionTime)
+	msSinceLastRetry := millisecondsSinceOptional(currentTime, br.lastRetryTime)
 	msSinceLastSuccess := millisecondsSinceOptional(currentTime, br.lastSuccessTime)
-	logrus.Debugf("Reading blob body from %s failed (%#v), decision inputs: lastRetryOffset %d, offset %d, %.3f ms since first connection, %.3f ms since last progress",
-		redactedURL, originalErr, br.lastRetryOffset, br.offset, msSinceFirstConnection, msSinceLastSuccess)
+	logrus.Debugf("Reading blob body from %s failed (%#v), decision inputs: total %d @%.3f ms, last retry %d @%.3f ms, last progress @%.3f ms",
+		redactedURL, originalErr, br.offset, msSinceFirstConnection, br.lastRetryOffset, msSinceLastRetry, msSinceLastSuccess)
 	progress := br.offset - br.lastRetryOffset
 	if progress < bodyReaderMinimumProgress {
 		logrus.Debugf("Not reconnecting to %s because only %d bytes progress made", redactedURL, progress)
-		return fmt.Errorf("(heuristic tuning data: last retry %d, current offset %d; %.3f ms total, %.3f ms since progress): %w",
-			br.lastRetryOffset, br.offset, msSinceFirstConnection, msSinceLastSuccess, originalErr)
+		return fmt.Errorf("(heuristic tuning data: total %d @%.3f ms, last retry %d @%.3f ms, last progress @ %.3f ms): %w",
+			br.offset, msSinceFirstConnection, br.lastRetryOffset, msSinceLastRetry, msSinceLastSuccess, originalErr)
 	}
 	logrus.Infof("Reading blob body from %s failed (%v), reconnecting…", redactedURL, originalErr)
 	return nil
