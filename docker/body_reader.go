@@ -23,16 +23,16 @@ const bodyReaderMinimumProgress = 1 * 1024 * 1024
 // bodyReader is an io.ReadCloser returned by dockerImageSource.GetBlob,
 // which can transparently resume some (very limited) kinds of aborted connections.
 type bodyReader struct {
-	ctx context.Context
-	c   *dockerClient
-
-	path                string        // path to pass to makeRequest to retry
-	logURL              *url.URL      // a string to use in error messages
-	body                io.ReadCloser // The currently open connection we use to read data, or nil if there is nothing to read from / close.
-	lastRetryOffset     int64
-	offset              int64 // Current offset within the blob
+	ctx                 context.Context
+	c                   *dockerClient
+	path                string   // path to pass to makeRequest to retry
+	logURL              *url.URL // a string to use in error messages
 	firstConnectionTime time.Time
-	lastSuccessTime     time.Time // time.Time{} if N/A
+
+	body            io.ReadCloser // The currently open connection we use to read data, or nil if there is nothing to read from / close.
+	lastRetryOffset int64
+	offset          int64     // Current offset within the blob
+	lastSuccessTime time.Time // time.Time{} if N/A
 }
 
 // newBodyReader creates a bodyReader for request path in c.
@@ -44,15 +44,15 @@ func newBodyReader(ctx context.Context, c *dockerClient, path string, firstBody 
 		return nil, err
 	}
 	res := &bodyReader{
-		ctx: ctx,
-		c:   c,
-
+		ctx:                 ctx,
+		c:                   c,
 		path:                path,
 		logURL:              logURL,
-		body:                firstBody,
-		lastRetryOffset:     0,
-		offset:              0,
 		firstConnectionTime: time.Now(),
+
+		body:            firstBody,
+		lastRetryOffset: 0,
+		offset:          0,
 	}
 	return res, nil
 }
