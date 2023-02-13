@@ -34,10 +34,10 @@ type bodyReader struct {
 	firstConnectionTime time.Time
 
 	body            io.ReadCloser // The currently open connection we use to read data, or nil if there is nothing to read from / close.
-	lastRetryOffset int64
-	lastRetryTime   time.Time // time.Time{} if N/A
-	offset          int64     // Current offset within the blob
-	lastSuccessTime time.Time // time.Time{} if N/A
+	lastRetryOffset int64         // -1 if N/A
+	lastRetryTime   time.Time     // time.Time{} if N/A
+	offset          int64         // Current offset within the blob
+	lastSuccessTime time.Time     // time.Time{} if N/A
 }
 
 // newBodyReader creates a bodyReader for request path in c.
@@ -56,7 +56,7 @@ func newBodyReader(ctx context.Context, c *dockerClient, path string, firstBody 
 		firstConnectionTime: time.Now(),
 
 		body:            firstBody,
-		lastRetryOffset: 0,
+		lastRetryOffset: -1,
 		lastRetryTime:   time.Time{},
 		offset:          0,
 		lastSuccessTime: time.Time{},
