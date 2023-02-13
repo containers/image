@@ -211,15 +211,15 @@ func millisecondsSinceOptional(currentTime time.Time, tm time.Time) float64 {
 // otherwise it returns an appropriate error to return to the caller (possibly augmented with data about the heuristic)
 func (br *bodyReader) errorIfNotReconnecting(originalErr error, redactedURL string) error {
 	currentTime := time.Now()
-	totalTime := millisecondsSinceOptional(currentTime, br.firstConnectionTime)
-	failureTime := millisecondsSinceOptional(currentTime, br.lastSuccessTime)
+	msSinceFirstConnection := millisecondsSinceOptional(currentTime, br.firstConnectionTime)
+	msSinceLastSuccess := millisecondsSinceOptional(currentTime, br.lastSuccessTime)
 	logrus.Debugf("Reading blob body from %s failed (%#v), decision inputs: lastRetryOffset %d, offset %d, %.3f ms since first connection, %.3f ms since last progress",
-		redactedURL, originalErr, br.lastRetryOffset, br.offset, totalTime, failureTime)
+		redactedURL, originalErr, br.lastRetryOffset, br.offset, msSinceFirstConnection, msSinceLastSuccess)
 	progress := br.offset - br.lastRetryOffset
 	if progress < bodyReaderMinimumProgress {
 		logrus.Debugf("Not reconnecting to %s because only %d bytes progress made", redactedURL, progress)
 		return fmt.Errorf("(heuristic tuning data: last retry %d, current offset %d; %.3f ms total, %.3f ms since progress): %w",
-			br.lastRetryOffset, br.offset, totalTime, failureTime, originalErr)
+			br.lastRetryOffset, br.offset, msSinceFirstConnection, msSinceLastSuccess, originalErr)
 	}
 	logrus.Infof("Reading blob body from %s failed (%v), reconnecting…", redactedURL, originalErr)
 	return nil
