@@ -198,20 +198,21 @@ func (br *bodyReader) Read(p []byte) (int, error) {
 	}
 }
 
-// millisecondsSinceOptional is like time.Since(tm).Milliseconds, but it returns a floating-point value.
-// If the input time is time.Time{}, it returns math.NaN()
-func millisecondsSinceOptional(tm time.Time) float64 {
+// millisecondsSinceOptional is like currentTime.Sub(tm).Milliseconds, but it returns a floating-point value.
+// If tm is time.Time{}, it returns math.NaN()
+func millisecondsSinceOptional(currentTime time.Time, tm time.Time) float64 {
 	if tm == (time.Time{}) {
 		return math.NaN()
 	}
-	return float64(time.Since(tm).Nanoseconds()) / 1_000_000.0
+	return float64(currentTime.Sub(tm).Nanoseconds()) / 1_000_000.0
 }
 
 // errorIfNotReconnecting makes a heuristic decision whether we should reconnect after err at redactedURL; if so, it returns nil,
 // otherwise it returns an appropriate error to return to the caller (possibly augmented with data about the heuristic)
 func (br *bodyReader) errorIfNotReconnecting(originalErr error, redactedURL string) error {
-	totalTime := millisecondsSinceOptional(br.firstConnectionTime)
-	failureTime := millisecondsSinceOptional(br.lastSuccessTime)
+	currentTime := time.Now()
+	totalTime := millisecondsSinceOptional(currentTime, br.firstConnectionTime)
+	failureTime := millisecondsSinceOptional(currentTime, br.lastSuccessTime)
 	logrus.Debugf("Reading blob body from %s failed (%#v), decision inputs: lastRetryOffset %d, offset %d, %.3f ms since first connection, %.3f ms since last progress",
 		redactedURL, originalErr, br.lastRetryOffset, br.offset, totalTime, failureTime)
 	progress := br.offset - br.lastRetryOffset
