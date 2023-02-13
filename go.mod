@@ -39,7 +39,6 @@ require (
 	go.etcd.io/bbolt v1.3.7
 	golang.org/x/crypto v0.6.0
 	golang.org/x/exp v0.0.0-20230206171751-46f607a40771
-	golang.org/x/net v0.6.0
 	golang.org/x/oauth2 v0.5.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/term v0.5.0
@@ -118,6 +117,7 @@ require (
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/mod v0.7.0 // indirect
+	golang.org/x/net v0.6.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/tools v0.4.0 // indirect
