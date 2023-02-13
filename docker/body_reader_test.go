@@ -1,9 +1,13 @@
 package docker
 
 import (
+	"errors"
+	"math"
 	"net/http"
 	"testing"
+	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -106,5 +110,87 @@ func TestParseContentRange(t *testing.T) {
 			},
 		})
 		assert.Error(t, err, c, c)
+	}
+}
+
+func TestMillisecondsSinceOptional(t *testing.T) {
+	current := time.Date(2023, 2, 9, 8, 7, 6, 5, time.UTC)
+	res := millisecondsSinceOptional(current, time.Time{})
+	assert.True(t, math.IsNaN(res))
+	tm := current.Add(-60 * time.Second) // 60 seconds _before_ current
+	res = millisecondsSinceOptional(current, tm)
+	assert.Equal(t, res, 60_000.0)
+}
+
+func TestBodyReaderErrorIfNotReconnecting(t *testing.T) {
+	// Silence logrus.Info logs in the tested method
+	prevLevel := logrus.StandardLogger().Level
+	logrus.StandardLogger().SetLevel(logrus.WarnLevel)
+	t.Cleanup(func() {
+		logrus.StandardLogger().SetLevel(prevLevel)
+	})
+
+	for _, c := range []struct {
+		name            string
+		previousRetry   bool
+		currentOffset   int64
+		currentTime     int // milliseconds
+		expectReconnect bool
+	}{
+		{
+			name:            "A lot of progress, after a long time, second retry",
+			previousRetry:   true,
+			currentOffset:   2 * bodyReaderMinimumProgress,
+			currentTime:     2 * bodyReaderMSSinceLastRetry,
+			expectReconnect: true,
+		},
+		{
+			name:            "A lot of progress, after little time, second retry",
+			previousRetry:   true,
+			currentOffset:   2 * bodyReaderMinimumProgress,
+			currentTime:     1,
+			expectReconnect: true,
+		},
+		{
+			name:            "Little progress, after a long time, second retry",
+			previousRetry:   true,
+			currentOffset:   1,
+			currentTime:     2 * bodyReaderMSSinceLastRetry,
+			expectReconnect: true,
+		},
+		{
+			name:            "Little progress, after little time, second retry",
+			previousRetry:   true,
+			currentOffset:   1,
+			currentTime:     1,
+			expectReconnect: false,
+		},
+		{
+			name:            "Little progress, after little time, first retry",
+			previousRetry:   false,
+			currentOffset:   1,
+			currentTime:     bodyReaderMSSinceLastRetry / 2,
+			expectReconnect: true,
+		},
+	} {
+		tm := time.Now()
+		br := bodyReader{}
+		if c.previousRetry {
+			br.lastRetryOffset = 2 * bodyReaderMinimumProgress
+			br.offset = br.lastRetryOffset + c.currentOffset
+			br.firstConnectionTime = tm.Add(-time.Duration(c.currentTime+2*bodyReaderMSSinceLastRetry) * time.Millisecond)
+			br.lastRetryTime = tm.Add(-time.Duration(c.currentTime) * time.Millisecond)
+		} else {
+			br.lastRetryOffset = -1
+			br.lastRetryTime = time.Time{}
+			br.offset = c.currentOffset
+			br.firstConnectionTime = tm.Add(-time.Duration(c.currentTime) * time.Millisecond)
+		}
+		err := br.errorIfNotReconnecting(errors.New("some error for error text only"), "URL for error text only")
+		if c.expectReconnect {
+			assert.NoError(t, err, c.name, br)
+		} else {
+			assert.Error(t, err, c.name, br)
+		}
 	}
 }
