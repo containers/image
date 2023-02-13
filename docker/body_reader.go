@@ -17,8 +17,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// bodyReaderMinimumProgress is the minimum progress we want to see before we retry
-const bodyReaderMinimumProgress = 1 * 1024 * 1024
+const (
+	// bodyReaderMinimumProgress is the minimum progress we consider a good reason to retry
+	bodyReaderMinimumProgress = 1 * 1024 * 1024
+	// bodyReaderMSSinceLastRetry is the minimum time since a last retry we consider a good reason to retry
+	bodyReaderMSSinceLastRetry = 60 * 1_000
+)
 
 // bodyReader is an io.ReadCloser returned by dockerImageSource.GetBlob,
 // which can transparently resume some (very limited) kinds of aborted connections.
@@ -221,13 +225,21 @@ func (br *bodyReader) errorIfNotReconnecting(originalErr error, redactedURL stri
 	logrus.Debugf("Reading blob body from %s failed (%#v), decision inputs: total %d @%.3f ms, last retry %d @%.3f ms, last progress @%.3f ms",
 		redactedURL, originalErr, br.offset, msSinceFirstConnection, br.lastRetryOffset, msSinceLastRetry, msSinceLastSuccess)
 	progress := br.offset - br.lastRetryOffset
-	if progress < bodyReaderMinimumProgress {
-		logrus.Debugf("Not reconnecting to %s because only %d bytes progress made", redactedURL, progress)
-		return fmt.Errorf("(heuristic tuning data: total %d @%.3f ms, last retry %d @%.3f ms, last progress @ %.3f ms): %w",
-			br.offset, msSinceFirstConnection, br.lastRetryOffset, msSinceLastRetry, msSinceLastSuccess, originalErr)
+	if progress >= bodyReaderMinimumProgress {
+		logrus.Infof("Reading blob body from %s failed (%v), reconnecting after %d bytes…", redactedURL, originalErr, progress)
+		return nil
 	}
-	logrus.Infof("Reading blob body from %s failed (%v), reconnecting…", redactedURL, originalErr)
-	return nil
+	if br.lastRetryTime == (time.Time{}) || msSinceLastRetry >= bodyReaderMSSinceLastRetry {
+		if br.lastRetryTime == (time.Time{}) {
+			logrus.Infof("Reading blob body from %s failed (%v), reconnecting (first reconnection)…", redactedURL, originalErr)
+		} else {
+			logrus.Infof("Reading blob body from %s failed (%v), reconnecting after %.3f ms…", redactedURL, originalErr, msSinceLastRetry)
+		}
+		return nil
+	}
+	logrus.Debugf("Not reconnecting to %s: insufficient progress %d / time since last retry %.3f ms", redactedURL, progress, msSinceLastRetry)
+	return fmt.Errorf("(heuristic tuning data: total %d @%.3f ms, last retry %d @%.3f ms, last progress @ %.3f ms): %w",
+		br.offset, msSinceFirstConnection, br.lastRetryOffset, msSinceLastRetry, msSinceLastSuccess, originalErr)
 }
 
 // Close implements io.ReadCloser
