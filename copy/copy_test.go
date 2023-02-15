@@ -17,7 +17,7 @@ import (
 
 func goDiffIDComputationGoroutineWithTimeout(layerStream io.ReadCloser, decompressor compressiontypes.DecompressorFunc) *diffIDResult {
 	ch := make(chan diffIDResult)
-	go diffIDComputationGoroutine(ch, layerStream, nil)
+	go diffIDComputationGoroutine(ch, layerStream, decompressor)
 	timeout := time.After(time.Second)
 	select {
 	case res := <-ch:
