@@ -18,14 +18,14 @@ import (
 func TestNewUntrustedSignature(t *testing.T) {
 	timeBefore := time.Now()
 	sig := newUntrustedSignature(TestImageManifestDigest, TestImageSignatureReference)
-	assert.Equal(t, TestImageManifestDigest, sig.UntrustedDockerManifestDigest)
-	assert.Equal(t, TestImageSignatureReference, sig.UntrustedDockerReference)
-	require.NotNil(t, sig.UntrustedCreatorID)
-	assert.Equal(t, "atomic "+version.Version, *sig.UntrustedCreatorID)
-	require.NotNil(t, sig.UntrustedTimestamp)
+	assert.Equal(t, TestImageManifestDigest, sig.untrustedDockerManifestDigest)
+	assert.Equal(t, TestImageSignatureReference, sig.untrustedDockerReference)
+	require.NotNil(t, sig.untrustedCreatorID)
+	assert.Equal(t, "atomic "+version.Version, *sig.untrustedCreatorID)
+	require.NotNil(t, sig.untrustedTimestamp)
 	timeAfter := time.Now()
-	assert.True(t, timeBefore.Unix() <= *sig.UntrustedTimestamp)
-	assert.True(t, *sig.UntrustedTimestamp <= timeAfter.Unix())
+	assert.True(t, timeBefore.Unix() <= *sig.untrustedTimestamp)
+	assert.True(t, *sig.untrustedTimestamp <= timeAfter.Unix())
 }
 
 func TestMarshalJSON(t *testing.T) {
@@ -47,17 +47,17 @@ func TestMarshalJSON(t *testing.T) {
 	}{
 		{
 			untrustedSignature{
-				UntrustedDockerManifestDigest: "digest!@#",
-				UntrustedDockerReference:      "reference#@!",
-				UntrustedCreatorID:            &creatorID,
-				UntrustedTimestamp:            &timestamp,
+				untrustedDockerManifestDigest: "digest!@#",
+				untrustedDockerReference:      "reference#@!",
+				untrustedCreatorID:            &creatorID,
+				untrustedTimestamp:            &timestamp,
 			},
 			"{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"digest!@#\"},\"type\":\"atomic container signature\"},\"optional\":{\"creator\":\"CREATOR\",\"timestamp\":1484683104}}",
 		},
 		{
 			untrustedSignature{
-				UntrustedDockerManifestDigest: "digest!@#",
-				UntrustedDockerReference:      "reference#@!",
+				untrustedDockerManifestDigest: "digest!@#",
+				untrustedDockerReference:      "reference#@!",
 			},
 			"{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"digest!@#\"},\"type\":\"atomic container signature\"},\"optional\":{}}",
 		},
@@ -196,10 +196,10 @@ func TestUnmarshalJSON(t *testing.T) {
 
 	// Optional fields can be missing
 	validSig = untrustedSignature{
-		UntrustedDockerManifestDigest: "digest!@#",
-		UntrustedDockerReference:      "reference#@!",
-		UntrustedCreatorID:            nil,
-		UntrustedTimestamp:            nil,
+		untrustedDockerManifestDigest: "digest!@#",
+		untrustedDockerReference:      "reference#@!",
+		untrustedCreatorID:            nil,
+		untrustedTimestamp:            nil,
 	}
 	validJSON, err = validSig.MarshalJSON()
 	require.NoError(t, err)
@@ -230,13 +230,13 @@ func TestSign(t *testing.T) {
 			return nil
 		},
 		validateSignedDockerReference: func(signedDockerReference string) error {
-			if signedDockerReference != sig.UntrustedDockerReference {
+			if signedDockerReference != sig.untrustedDockerReference {
 				return errors.New("Unexpected signedDockerReference")
 			}
 			return nil
 		},
 		validateSignedDockerManifestDigest: func(signedDockerManifestDigest digest.Digest) error {
-			if signedDockerManifestDigest != sig.UntrustedDockerManifestDigest {
+			if signedDockerManifestDigest != sig.untrustedDockerManifestDigest {
 				return errors.New("Unexpected signedDockerManifestDigest")
 			}
 			return nil
@@ -244,8 +244,8 @@ func TestSign(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assert.Equal(t, sig.UntrustedDockerManifestDigest, verified.DockerManifestDigest)
-	assert.Equal(t, sig.UntrustedDockerReference, verified.DockerReference)
+	assert.Equal(t, sig.untrustedDockerManifestDigest, verified.DockerManifestDigest)
+	assert.Equal(t, sig.untrustedDockerReference, verified.DockerReference)
 
 	// Error creating blob to sign
 	_, err = untrustedSignature{}.sign(mech, TestKeyFingerprint, "")
