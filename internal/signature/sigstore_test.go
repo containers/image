@@ -24,14 +24,14 @@ func TestSigstoreFromComponents(t *testing.T) {
 func TestSigstoreFromBlobChunk(t *testing.T) {
 	// Success
 	json := []byte(`{"mimeType":"mime-type","payload":"cGF5bG9hZA==", "annotations":{"a":"b","c":"d"}}`)
-	res, err := SigstoreFromBlobChunk(json)
+	res, err := sigstoreFromBlobChunk(json)
 	require.NoError(t, err)
 	assert.Equal(t, "mime-type", res.UntrustedMIMEType())
 	assert.Equal(t, []byte("payload"), res.UntrustedPayload())
 	assert.Equal(t, map[string]string{"a": "b", "c": "d"}, res.UntrustedAnnotations())
 
 	// Invalid JSON
-	_, err = SigstoreFromBlobChunk([]byte("&"))
+	_, err = sigstoreFromBlobChunk([]byte("&"))
 	assert.Error(t, err)
 }
 
