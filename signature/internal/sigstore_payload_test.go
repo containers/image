@@ -31,14 +31,14 @@ func x(m mSA, fields ...string) mSA {
 func TestNewUntrustedSigstorePayload(t *testing.T) {
 	timeBefore := time.Now()
 	sig := NewUntrustedSigstorePayload(TestImageManifestDigest, TestImageSignatureReference)
-	assert.Equal(t, TestImageManifestDigest, sig.UntrustedDockerManifestDigest)
-	assert.Equal(t, TestImageSignatureReference, sig.UntrustedDockerReference)
-	require.NotNil(t, sig.UntrustedCreatorID)
-	assert.Equal(t, "containers/image "+version.Version, *sig.UntrustedCreatorID)
-	require.NotNil(t, sig.UntrustedTimestamp)
+	assert.Equal(t, TestImageManifestDigest, sig.untrustedDockerManifestDigest)
+	assert.Equal(t, TestImageSignatureReference, sig.untrustedDockerReference)
+	require.NotNil(t, sig.untrustedCreatorID)
+	assert.Equal(t, "containers/image "+version.Version, *sig.untrustedCreatorID)
+	require.NotNil(t, sig.untrustedTimestamp)
 	timeAfter := time.Now()
-	assert.True(t, timeBefore.Unix() <= *sig.UntrustedTimestamp)
-	assert.True(t, *sig.UntrustedTimestamp <= timeAfter.Unix())
+	assert.True(t, timeBefore.Unix() <= *sig.untrustedTimestamp)
+	assert.True(t, *sig.untrustedTimestamp <= timeAfter.Unix())
 }
 
 func TestUntrustedSigstorePayloadMarshalJSON(t *testing.T) {
@@ -60,17 +60,17 @@ func TestUntrustedSigstorePayloadMarshalJSON(t *testing.T) {
 	}{
 		{
 			UntrustedSigstorePayload{
-				UntrustedDockerManifestDigest: "digest!@#",
-				UntrustedDockerReference:      "reference#@!",
-				UntrustedCreatorID:            &creatorID,
-				UntrustedTimestamp:            &timestamp,
+				untrustedDockerManifestDigest: "digest!@#",
+				untrustedDockerReference:      "reference#@!",
+				untrustedCreatorID:            &creatorID,
+				untrustedTimestamp:            &timestamp,
 			},
 			"{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"digest!@#\"},\"type\":\"cosign container image signature\"},\"optional\":{\"creator\":\"CREATOR\",\"timestamp\":1484683104}}",
 		},
 		{
 			UntrustedSigstorePayload{
-				UntrustedDockerManifestDigest: "digest!@#",
-				UntrustedDockerReference:      "reference#@!",
+				untrustedDockerManifestDigest: "digest!@#",
+				untrustedDockerReference:      "reference#@!",
 			},
 			"{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"digest!@#\"},\"type\":\"cosign container image signature\"},\"optional\":{}}",
 		},
@@ -125,10 +125,10 @@ func TestUntrustedSigstorePayloadUnmarshalJSON(t *testing.T) {
 	// A /usr/bin/cosign-generated payload is handled correctly
 	s = successfullyUnmarshalUntrustedSigstorePayload(t, []byte(`{"critical":{"identity":{"docker-reference":"192.168.64.2:5000/cosign-signed-multi"},"image":{"docker-manifest-digest":"sha256:43955d6857268cc948ae9b370b221091057de83c4962da0826f9a2bdc9bd6b44"},"type":"cosign container image signature"},"optional":null}`))
 	assert.Equal(t, UntrustedSigstorePayload{
-		UntrustedDockerManifestDigest: "sha256:43955d6857268cc948ae9b370b221091057de83c4962da0826f9a2bdc9bd6b44",
-		UntrustedDockerReference:      "192.168.64.2:5000/cosign-signed-multi",
-		UntrustedCreatorID:            nil,
-		UntrustedTimestamp:            nil,
+		untrustedDockerManifestDigest: "sha256:43955d6857268cc948ae9b370b221091057de83c4962da0826f9a2bdc9bd6b44",
+		untrustedDockerReference:      "192.168.64.2:5000/cosign-signed-multi",
+		untrustedCreatorID:            nil,
+		untrustedTimestamp:            nil,
 	}, s)
 
 	// Various ways to corrupt the JSON
@@ -187,10 +187,10 @@ func TestUntrustedSigstorePayloadUnmarshalJSON(t *testing.T) {
 
 	// Optional fields can be missing
 	validSig = UntrustedSigstorePayload{
-		UntrustedDockerManifestDigest: "digest!@#",
-		UntrustedDockerReference:      "reference#@!",
-		UntrustedCreatorID:            nil,
-		UntrustedTimestamp:            nil,
+		untrustedDockerManifestDigest: "digest!@#",
+		untrustedDockerReference:      "reference#@!",
+		untrustedCreatorID:            nil,
+		untrustedTimestamp:            nil,
 	}
 	validJSON, err = validSig.MarshalJSON()
 	require.NoError(t, err)
@@ -247,10 +247,10 @@ func TestVerifySigstorePayload(t *testing.T) {
 	res, err := VerifySigstorePayload(publicKey, sigstoreSig.UntrustedPayload(), cryptoBase64Sig, recordingRules)
 	require.NoError(t, err)
 	assert.Equal(t, res, &UntrustedSigstorePayload{
-		UntrustedDockerManifestDigest: TestSigstoreManifestDigest,
-		UntrustedDockerReference:      TestSigstoreSignatureReference,
-		UntrustedCreatorID:            nil,
-		UntrustedTimestamp:            nil,
+		untrustedDockerManifestDigest: TestSigstoreManifestDigest,
+		untrustedDockerReference:      TestSigstoreSignatureReference,
+		untrustedCreatorID:            nil,
+		untrustedTimestamp:            nil,
 	})
 	assert.Equal(t, signatureData, recorded)
 
