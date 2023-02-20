@@ -30,7 +30,7 @@ require (
 	github.com/sigstore/sigstore v1.5.1
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
-	github.com/sylabs/sif/v2 v2.9.1
+	github.com/sylabs/sif/v2 v2.9.2
 	github.com/theupdateframework/go-tuf v0.5.2
 	github.com/ulikunitz/xz v0.5.11
 	github.com/vbatts/tar-split v0.11.2
@@ -114,7 +114,7 @@ require (
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/mod v0.7.0 // indirect
-	golang.org/x/net v0.6.0 // indirect
+	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/tools v0.4.0 // indirect
