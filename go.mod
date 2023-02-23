@@ -27,7 +27,7 @@ require (
 	github.com/proglottis/gpgme v0.1.3
 	github.com/sigstore/fulcio v1.1.0
 	github.com/sigstore/rekor v1.0.1
-	github.com/sigstore/sigstore v1.5.1
+	github.com/sigstore/sigstore v1.5.2
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
 	github.com/sylabs/sif/v2 v2.9.2
@@ -74,7 +74,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/go-containerregistry v0.12.1 // indirect
+	github.com/google/go-containerregistry v0.13.0 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect
 	github.com/google/trillian v1.5.1-0.20220819043421-0a389c4bb8d9 // indirect
 	github.com/google/uuid v1.3.0 // indirect
