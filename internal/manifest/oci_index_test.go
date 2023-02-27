@@ -57,10 +57,9 @@ func TestOCI1IndexChooseInstanceByCompression(t *testing.T) {
 		preferGzip     bool
 	}
 	for _, manifestList := range []struct {
-		listFile               string
-		matchedInstances       []expectedMatch
-		prefferedGzipInstances []expectedMatch
-		unmatchedInstances     []string
+		listFile           string
+		matchedInstances   []expectedMatch
+		unmatchedInstances []string
 	}{
 		{
 			listFile: "oci1.index.zstd-selection.json",
@@ -112,16 +111,17 @@ func TestOCI1IndexChooseInstanceByCompression(t *testing.T) {
 				{"amd64", "", "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", false},
 				{"amd64", "", "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", true},
 				// must return first gzip even if the first entry is zstd
-				{"arm64", "", "sha256:qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", true},
+				{"arm64", "", "sha256:6dc14a60d2ba724646cfbf5fccbb9a618a5978a64a352e060b17caf5e005da9d", true},
 				// must return first zstd even if the first entry for same platform is gzip
-				{"arm64", "", "sha256:mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm", false},
+				{"arm64", "", "sha256:1c98002b30a71b08ab175915ce7c8fb8da9e9b502ae082d6f0c572bac9dee324", false},
 				// must return first zstd instance agnostic of platform
 				{"", "", "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", false},
 				// must return first gzip instance agnostic of platform
 				{"", "", "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", true},
-			},
-			unmatchedInstances: []string{
-				"unmatched",
+				// must return first zstd instance with no platform
+				{"matchesImageWithNoPlatform", "", "sha256:f2f5f52a2cf2c51d4cac6df0545f751c0adc3f3427eb47c59fcb32894503e18f", false},
+				// must return first gzip instance with no platform
+				{"matchesImageWithNoPlatform", "", "sha256:c76757bb6006babdd8464dbf2f1157fdfa6fead0bc6f84f15816a32d6f68f706", true},
 			},
 		},
 		{
@@ -139,7 +139,6 @@ func TestOCI1IndexChooseInstanceByCompression(t *testing.T) {
 		require.NoError(t, err)
 		list, err := ListFromBlob(rawManifest, GuessMIMEType(rawManifest))
 		require.NoError(t, err)
-		// Match found and Gzip preference false
 		for _, match := range manifestList.matchedInstances {
 			testName := fmt.Sprintf("%s %q+%q", manifestList.listFile, match.arch, match.variant)
 			digest, err := list.ChooseInstanceByCompression(&types.SystemContext{
@@ -150,7 +149,6 @@ func TestOCI1IndexChooseInstanceByCompression(t *testing.T) {
 			require.NoError(t, err, testName)
 			assert.Equal(t, match.instanceDigest, digest, testName)
 		}
-		// Not found and Gzip preference false
 		for _, arch := range manifestList.unmatchedInstances {
 			_, err := list.ChooseInstanceByCompression(&types.SystemContext{
 				ArchitectureChoice: arch,

@@ -126,30 +126,36 @@ func (index *OCI1IndexPublic) chooseInstance(ctx *types.SystemContext, preferGzi
 	if err != nil {
 		return "", fmt.Errorf("getting platform information %#v: %w", ctx, err)
 	}
-	var bestMatchedInstance *instanceCandidate
-	bestMatchedInstance = nil
+	var bestMatch *instanceCandidate
+	bestMatch = nil
 	for manifestIndex, d := range index.Manifests {
-		for platformIndex, wantedPlatform := range wantedPlatforms {
-			instanceCandidate := instanceCandidate{platformIndex: platformIndex, manifestPosition: manifestIndex, isZstd: instanceIsZstd(d), digest: d.Digest}
-			if d.Platform == nil {
-				instanceCandidate.platformIndex = math.MaxInt
-			}
-			imagePlatform := imgspecv1.Platform{
-				Architecture: d.Platform.Architecture,
-				OS:           d.Platform.OS,
-				OSVersion:    d.Platform.OSVersion,
-				OSFeatures:   slices.Clone(d.Platform.OSFeatures),
-				Variant:      d.Platform.Variant,
-			}
-			if platform.MatchesPlatform(imagePlatform, wantedPlatform) {
-				if bestMatchedInstance == nil || instanceCandidate.isPreferredOver(bestMatchedInstance, didPreferGzip) {
-					bestMatchedInstance = &instanceCandidate
+		candidate := instanceCandidate{platformIndex: math.MaxInt, manifestPosition: manifestIndex, isZstd: instanceIsZstd(d), digest: d.Digest}
+		if d.Platform != nil {
+			foundPlatform := false
+			for platformIndex, wantedPlatform := range wantedPlatforms {
+				imagePlatform := imgspecv1.Platform{
+					Architecture: d.Platform.Architecture,
+					OS:           d.Platform.OS,
+					OSVersion:    d.Platform.OSVersion,
+					OSFeatures:   slices.Clone(d.Platform.OSFeatures),
+					Variant:      d.Platform.Variant,
+				}
+				if platform.MatchesPlatform(imagePlatform, wantedPlatform) {
+					foundPlatform = true
+					candidate.platformIndex = platformIndex
+					break
 				}
 			}
+			if !foundPlatform {
+				continue
+			}
+		}
+		if bestMatch == nil || candidate.isPreferredOver(bestMatch, didPreferGzip) {
+			bestMatch = &candidate
 		}
 	}
-	if bestMatchedInstance != nil {
-		return bestMatchedInstance.digest, nil
+	if bestMatch != nil {
+		return bestMatch.digest, nil
 	}
 	return "", fmt.Errorf("no image found in image index for architecture %s, variant %q, OS %s", wantedPlatforms[0].Architecture, wantedPlatforms[0].Variant, wantedPlatforms[0].OS)
 }
