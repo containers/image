@@ -178,14 +178,26 @@ func (d *dockerImageDestination) PutBlobWithOptions(ctx context.Context, stream 
 	stream = io.TeeReader(stream, sizeCounter)
 
 	uploadLocation, err = func() (*url.URL, error) { // A scope for defer
+		maxChunkSize := int64(32 * 1024 * 1024) // FIXME: if not specified at cmdline, use the whole length
 		uploadReader := uploadreader.NewUploadReader(stream)
 		// This error text should never be user-visible, we terminate only after makeRequestToResolvedURL
 		// returns, so there isn’t a way for the error text to be provided to any of our callers.
 		defer uploadReader.Terminate(errors.New("Reading data from an already terminated upload"))
-		res, err = d.c.makeRequestToResolvedURL(ctx, http.MethodPatch, uploadLocation, map[string][]string{"Content-Type": {"application/octet-stream"}}, uploadReader, inputInfo.Size, v2Auth, nil)
-		if err != nil {
-			logrus.Debugf("Error uploading layer chunked %v", err)
-			return nil, err
+		for streamedLen := int64(0); streamedLen < inputInfo.Size; {
+			var chunkLen int64
+			if inputInfo.Size-streamedLen < maxChunkSize {
+				chunkLen = inputInfo.Size - streamedLen
+			} else {
+				chunkLen = maxChunkSize
+			}
+			rangeHdr := fmt.Sprintf("%d-%d", streamedLen, streamedLen+chunkLen-1)
+			res, err = d.c.makeRequestToResolvedURL(ctx, http.MethodPatch, uploadLocation, map[string][]string{"Content-Type": {"application/octet-stream"}, "Content-Range": {rangeHdr}}, io.LimitReader(uploadReader, chunkLen), inputInfo.Size, v2Auth, nil)
+			if err != nil {
+				logrus.Debugf("Error uploading layer chunked %v", err)
+				return nil, err
+			}
+
+			streamedLen += chunkLen
 		}
 		defer res.Body.Close()
 		if !successStatus(res.StatusCode) {
@@ -207,7 +219,8 @@ func (d *dockerImageDestination) PutBlobWithOptions(ctx context.Context, stream 
 	locationQuery := uploadLocation.Query()
 	locationQuery.Set("digest", blobDigest.String())
 	uploadLocation.RawQuery = locationQuery.Encode()
-	res, err = d.c.makeRequestToResolvedURL(ctx, http.MethodPut, uploadLocation, map[string][]string{"Content-Type": {"application/octet-stream"}}, nil, -1, v2Auth, nil)
+	rangeHdr := fmt.Sprintf("%d-%d", inputInfo.Size, inputInfo.Size)
+	res, err = d.c.makeRequestToResolvedURL(ctx, http.MethodPut, uploadLocation, map[string][]string{"Content-Type": {"application/octet-stream"}, "Content-Range": {rangeHdr}}, nil, -1, v2Auth, nil)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
