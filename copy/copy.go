@@ -327,7 +327,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		if err != nil {
 			return nil, fmt.Errorf("parsing primary manifest as list for %s: %w", transports.ImageName(srcRef), err)
 		}
-		instanceDigest, err := manifestList.ChooseInstance(options.SourceCtx) // try to pick one that matches options.SourceCtx
+		instanceDigest, err := manifestList.ChooseInstanceByCompression(options.SourceCtx, options.PreferGzipInstances) // try to pick one that matches options.SourceCtx
 		if err != nil {
 			return nil, fmt.Errorf("choosing an image from manifest list %s: %w", transports.ImageName(srcRef), err)
 		}
