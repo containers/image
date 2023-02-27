@@ -114,7 +114,7 @@ func TestChooseInstance(t *testing.T) {
 			},
 		},
 	} {
-		rawManifest, err := os.ReadFile(filepath.Join("..", "internal", "image", "fixtures", manifestList.listFile))
+		rawManifest, err := os.ReadFile(filepath.Join("..", "internal", "manifest", "testdata", manifestList.listFile))
 		require.NoError(t, err)
 		list, err := ListFromBlob(rawManifest, GuessMIMEType(rawManifest))
 		require.NoError(t, err)
