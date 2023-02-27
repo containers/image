@@ -19,6 +19,8 @@ func TestDockerClientFromNilSystemContext(t *testing.T) {
 
 	assert.Equal(t, dockerclient.DefaultDockerHost, client.DaemonHost(), "The default docker host should have been used")
 	assert.Equal(t, defaultAPIVersion, client.ClientVersion(), "The default api version should have been used")
+
+	assert.NoError(t, client.Close())
 }
 
 func TestDockerClientFromCertContext(t *testing.T) {
@@ -38,6 +40,8 @@ func TestDockerClientFromCertContext(t *testing.T) {
 
 	assert.Equal(t, host, client.DaemonHost())
 	assert.Equal(t, "1.22", client.ClientVersion())
+
+	assert.NoError(t, client.Close())
 }
 
 func TestTlsConfigFromInvalidCertPath(t *testing.T) {
@@ -94,6 +98,7 @@ func TestSpecifyPlainHTTPViaHostScheme(t *testing.T) {
 	assert.NotNil(t, client, "A Docker client reference should have been returned")
 
 	assert.Equal(t, host, client.DaemonHost())
+	assert.NoError(t, client.Close())
 }
 
 func testDir(t *testing.T) string {
