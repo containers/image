@@ -69,6 +69,30 @@ func TestChooseInstance(t *testing.T) {
 		arch, variant  string
 		instanceDigest digest.Digest
 	}
+	chooseInstanceCalls := []func(sys *types.SystemContext, rawManifest []byte) (digest.Digest, error){
+		func(sys *types.SystemContext, rawManifest []byte) (digest.Digest, error) {
+			list, err := ListPublicFromBlob(rawManifest, GuessMIMEType(rawManifest))
+			require.NoError(t, err)
+			return list.ChooseInstance(sys)
+		},
+		// Gzip preference true.
+		func(sys *types.SystemContext, rawManifest []byte) (digest.Digest, error) {
+			list, err := ListFromBlob(rawManifest, GuessMIMEType(rawManifest))
+			require.NoError(t, err)
+			return list.ChooseInstanceByCompression(sys, types.OptionalBoolTrue)
+		},
+		// Gzip preference false.
+		func(sys *types.SystemContext, rawManifest []byte) (digest.Digest, error) {
+			list, err := ListFromBlob(rawManifest, GuessMIMEType(rawManifest))
+			require.NoError(t, err)
+			return list.ChooseInstanceByCompression(sys, types.OptionalBoolFalse)
+		},
+		func(sys *types.SystemContext, rawManifest []byte) (digest.Digest, error) {
+			list, err := ListFromBlob(rawManifest, GuessMIMEType(rawManifest))
+			require.NoError(t, err)
+			return list.ChooseInstanceByCompression(sys, types.OptionalBoolUndefined)
+		},
+	}
 	for _, manifestList := range []struct {
 		listFile           string
 		matchedInstances   []expectedMatch
@@ -112,28 +136,26 @@ func TestChooseInstance(t *testing.T) {
 			},
 		},
 	} {
-		rawManifest, err := os.ReadFile(filepath.Join("..", "..", "internal", "image", "fixtures", manifestList.listFile))
+		rawManifest, err := os.ReadFile(filepath.Join("testdata", manifestList.listFile))
 		require.NoError(t, err)
-		list, err := ListPublicFromBlob(rawManifest, GuessMIMEType(rawManifest))
-		require.NoError(t, err)
-		// Match found
-		for _, match := range manifestList.matchedInstances {
-			testName := fmt.Sprintf("%s %q+%q", manifestList.listFile, match.arch, match.variant)
-			digest, err := list.ChooseInstance(&types.SystemContext{
-				ArchitectureChoice: match.arch,
-				VariantChoice:      match.variant,
-				OSChoice:           "linux",
-			})
-			require.NoError(t, err, testName)
-			assert.Equal(t, match.instanceDigest, digest, testName)
-		}
-		// Not found
-		for _, arch := range manifestList.unmatchedInstances {
-			_, err := list.ChooseInstance(&types.SystemContext{
-				ArchitectureChoice: arch,
-				OSChoice:           "linux",
-			})
-			assert.Error(t, err)
+		for _, chooseInstance := range chooseInstanceCalls {
+			for _, match := range manifestList.matchedInstances {
+				testName := fmt.Sprintf("%s %q+%q", manifestList.listFile, match.arch, match.variant)
+				digest, err := chooseInstance(&types.SystemContext{
+					ArchitectureChoice: match.arch,
+					VariantChoice:      match.variant,
+					OSChoice:           "linux",
+				}, rawManifest)
+				require.NoError(t, err, testName)
+				assert.Equal(t, match.instanceDigest, digest, testName)
+			}
+			for _, arch := range manifestList.unmatchedInstances {
+				_, err := chooseInstance(&types.SystemContext{
+					ArchitectureChoice: arch,
+					OSChoice:           "linux",
+				}, rawManifest)
+				assert.Error(t, err)
+			}
 		}
 	}
 }
