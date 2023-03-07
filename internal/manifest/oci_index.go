@@ -65,7 +65,12 @@ func (index *OCI1IndexPublic) Instance(instanceDigest digest.Digest) (ListUpdate
 // which the list catalogs.
 func (index *OCI1IndexPublic) UpdateInstances(updates []ListUpdate) error {
 	if len(updates) != len(index.Manifests) {
-		return fmt.Errorf("incorrect number of update entries passed to OCI1Index.UpdateInstances: expected %d, got %d", len(index.Manifests), len(updates))
+		//return fmt.Errorf("incorrect number of update entries passed to OCI1Index.UpdateInstances: expected %d, got %d", len(index.Manifests), len(updates))
+		if len(updates) > len(index.Manifests) {
+			newIndexes := make([]imgspecv1.Descriptor, len(updates))
+			copy(newIndexes, index.Manifests)
+			index.Manifests = newIndexes
+		}
 	}
 	for i := range updates {
 		if err := updates[i].Digest.Validate(); err != nil {
@@ -80,6 +85,12 @@ func (index *OCI1IndexPublic) UpdateInstances(updates []ListUpdate) error {
 			return fmt.Errorf("update %d of %d passed to OCI1Index.UpdateInstances had no media type (was %q)", i+1, len(updates), index.Manifests[i].MediaType)
 		}
 		index.Manifests[i].MediaType = updates[i].MediaType
+		if updates[i].Platform != nil {
+			index.Manifests[i].Platform = updates[i].Platform
+		}
+		if len(updates[i].Annotations) != 0 {
+			index.Manifests[i].Annotations = updates[i].Annotations
+		}
 	}
 	return nil
 }

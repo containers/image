@@ -60,9 +60,11 @@ type List interface {
 // ListUpdate includes the fields which a List's UpdateInstances() method will modify.
 // This is publicly visible as c/image/manifest.ListUpdate.
 type ListUpdate struct {
-	Digest    digest.Digest
-	Size      int64
-	MediaType string
+	Digest      digest.Digest
+	Size        int64
+	MediaType   string
+	Platform    *imgspecv1.Platform
+	Annotations map[string]string
 }
 
 // ListPublicFromBlob parses a list of manifests.

@@ -155,6 +155,9 @@ type Options struct {
 	// if this is set to OptionalBoolUndefined (which is the default behavior, and recommended for most callers).
 	// This only affects CopySystemImage.
 	PreferGzipInstances types.OptionalBool
+	// While Copying entire manifest list from src to dest, allow each image to be replicated with compression as zstd
+	// and appropriate annotations configured for each newly compressed image the manifest list.
+	ReplicateZstd bool
 
 	// If OciEncryptConfig is non-nil, it indicates that an image should be encrypted.
 	// The encryption options is derived from the construction of EncryptConfig object.
@@ -313,7 +316,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 
 	if !multiImage {
 		// The simple case: just copy a single image.
-		if copiedManifest, _, _, err = c.copyOneImage(ctx, policyContext, options, unparsedToplevel, unparsedToplevel, nil); err != nil {
+		if copiedManifest, _, _, _, err = c.copyOneImage(ctx, policyContext, options, unparsedToplevel, unparsedToplevel, nil); err != nil {
 			return nil, err
 		}
 	} else if options.ImageListSelection == CopySystemImage {
@@ -334,7 +337,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		logrus.Debugf("Source is a manifest list; copying (only) instance %s for current system", instanceDigest)
 		unparsedInstance := image.UnparsedInstance(rawSource, &instanceDigest)
 
-		if copiedManifest, _, _, err = c.copyOneImage(ctx, policyContext, options, unparsedToplevel, unparsedInstance, nil); err != nil {
+		if copiedManifest, _, _, _, err = c.copyOneImage(ctx, policyContext, options, unparsedToplevel, unparsedInstance, nil); err != nil {
 			return nil, fmt.Errorf("copying system image from manifest list: %w", err)
 		}
 	} else { /* options.ImageListSelection == CopyAllImages or options.ImageListSelection == CopySpecificImages, */
@@ -487,41 +490,84 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	// Copy each image, or just the ones we want to copy, in turn.
 	instanceDigests := updatedList.Instances()
 	imagesToCopy := len(instanceDigests)
+	// In case we are copying a manifest list from src to dest and
+	// zstd replication is set then all images will have one more
+	// copy with compression format as zstd.
+	if options.ReplicateZstd {
+		imagesToCopy = imagesToCopy * 2
+	}
 	if options.ImageListSelection == CopySpecificImages {
 		imagesToCopy = len(options.Instances)
 	}
-	c.Printf("Copying %d of %d images in list\n", imagesToCopy, len(instanceDigests))
-	updates := make([]manifest.ListUpdate, len(instanceDigests))
+	c.Printf("Copying %d of %d images in list\n", imagesToCopy, imagesToCopy)
+	updates := make([]manifest.ListUpdate, imagesToCopy)
 	instancesCopied := 0
-	for i, instanceDigest := range instanceDigests {
-		if options.ImageListSelection == CopySpecificImages &&
-			!slices.Contains(options.Instances, instanceDigest) {
-			update, err := updatedList.Instance(instanceDigest)
-			if err != nil {
-				return nil, err
-			}
-			logrus.Debugf("Skipping instance %s (%d/%d)", instanceDigest, i+1, len(instanceDigests))
-			// Record the digest/size/type of the manifest that we didn't copy.
-			updates[i] = update
-			continue
-		}
-		logrus.Debugf("Copying instance %s (%d/%d)", instanceDigest, i+1, len(instanceDigests))
-		c.Printf("Copying image %s (%d/%d)\n", instanceDigest, instancesCopied+1, imagesToCopy)
-		unparsedInstance := image.UnparsedInstance(c.rawSource, &instanceDigest)
-		updatedManifest, updatedManifestType, updatedManifestDigest, err := c.copyOneImage(ctx, policyContext, options, unparsedToplevel, unparsedInstance, &instanceDigest)
-		if err != nil {
-			return nil, fmt.Errorf("copying image %d/%d from manifest list: %w", instancesCopied+1, imagesToCopy, err)
-		}
-		instancesCopied++
-		// Record the result of a possible conversion here.
-		update := manifest.ListUpdate{
-			Digest:    updatedManifestDigest,
-			Size:      int64(len(updatedManifest)),
-			MediaType: updatedManifestType,
-		}
-		updates[i] = update
+	processDigestsTimes := 1
+	if options.ReplicateZstd {
+		processDigestsTimes = 2
 	}
-
+	for iter := 0; iter < processDigestsTimes; iter++ {
+		for i, instanceDigest := range instanceDigests {
+			if iter == 1 && options.ReplicateZstd {
+				i = i + 2
+				// Change compression to zstd
+				options.DestinationCtx.CompressionFormat = &compression.Zstd
+				level := 20
+				options.DestinationCtx.CompressionLevel = &level
+				c.compressionFormat = &compression.Zstd
+				c.compressionLevel = &level
+			}
+			if options.ImageListSelection == CopySpecificImages &&
+				!slices.Contains(options.Instances, instanceDigest) {
+				update, err := updatedList.Instance(instanceDigest)
+				if err != nil {
+					return nil, err
+				}
+				logrus.Debugf("Skipping instance %s (%d/%d)", instanceDigest, i+1, len(instanceDigests))
+				// Record the digest/size/type of the manifest that we didn't copy.
+				updates[i] = update
+				continue
+			}
+			logrus.Debugf("Copying instance %s (%d/%d)", instanceDigest, i+1, len(instanceDigests))
+			c.Printf("Copying image %s (%d/%d)\n", instanceDigest, instancesCopied+1, imagesToCopy)
+			unparsedInstance := image.UnparsedInstance(c.rawSource, &instanceDigest)
+			updatedManifest, updatedManifestType, updatedManifestDigest, parsedImage, err := c.copyOneImage(ctx, policyContext, options, unparsedToplevel, unparsedInstance, &instanceDigest)
+			if err != nil {
+				return nil, fmt.Errorf("copying image %d/%d from manifest list: %w", instancesCopied+1, imagesToCopy, err)
+			}
+			instancesCopied++
+			// Record the result of a possible conversion here.
+			update := manifest.ListUpdate{
+				Digest:    updatedManifestDigest,
+				Size:      int64(len(updatedManifest)),
+				MediaType: updatedManifestType,
+			}
+			if iter == 1 && options.ReplicateZstd {
+				srcImage, err := parsedImage.OCIConfig(ctx)
+				if err != nil {
+					return nil, err
+				}
+				blobInfo := parsedImage.ConfigInfo()
+				updatedPlatform := imgspecv1.Platform{Architecture: srcImage.Architecture, OS: srcImage.OS, OSVersion: srcImage.OSVersion, OSFeatures: srcImage.OSFeatures, Variant: srcImage.Variant}
+				instancesCopied++
+				annotations := make(map[string]string)
+				for k, v := range blobInfo.Annotations {
+					annotations[k] = v
+				}
+				// set the standard zstd annotations if annotation for zstd replication was set
+				annotations[internalManifest.OCI1InstanceAnnotationCompressionZSTD] = "true"
+				// Record the result of a possible conversion here with updated platform and annotations
+				update = manifest.ListUpdate{
+					Digest:      updatedManifestDigest,
+					Size:        int64(len(updatedManifest)),
+					MediaType:   updatedManifestType,
+					Platform:    &updatedPlatform,
+					Annotations: annotations,
+				}
+			}
+			updates[i] = update
+		}
+	}
 	// Now reset the digest/size/types of the manifests in the list to account for any conversions that we made.
 	if err = updatedList.UpdateInstances(updates); err != nil {
 		return nil, fmt.Errorf("updating manifest list: %w", err)
@@ -597,28 +643,36 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 
 // copyOneImage copies a single (non-manifest-list) image unparsedImage, using policyContext to validate
 // source image admissibility.
-func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.PolicyContext, options *Options, unparsedToplevel, unparsedImage *image.UnparsedImage, targetInstance *digest.Digest) (retManifest []byte, retManifestType string, retManifestDigest digest.Digest, retErr error) {
+func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.PolicyContext, options *Options, unparsedToplevel, unparsedImage *image.UnparsedImage, targetInstance *digest.Digest) (retManifest []byte, retManifestType string, retManifestDigest digest.Digest, retParsedImage types.Image, retErr error) {
+	var parsedImage types.Image
+	forceProcessLayer := false
+	// We will need to repush replicated image with different digest hence while
+	// copying layers we must force process layers
+	if options.ReplicateZstd {
+		forceProcessLayer = true
+	}
 	// The caller is handling manifest lists; this could happen only if a manifest list contains a manifest list.
 	// Make sure we fail cleanly in such cases.
 	multiImage, err := isMultiImage(ctx, unparsedImage)
 	if err != nil {
 		// FIXME FIXME: How to name a reference for the sub-image?
-		return nil, "", "", fmt.Errorf("determining manifest MIME type for %s: %w", transports.ImageName(unparsedImage.Reference()), err)
+		return nil, "", "", parsedImage, fmt.Errorf("determining manifest MIME type for %s: %w", transports.ImageName(unparsedImage.Reference()), err)
 	}
 	if multiImage {
-		return nil, "", "", fmt.Errorf("Unexpectedly received a manifest list instead of a manifest for a single image")
+		return nil, "", "", parsedImage, fmt.Errorf("Unexpectedly received a manifest list instead of a manifest for a single image")
 	}
 
 	// Please keep this policy check BEFORE reading any other information about the image.
 	// (The multiImage check above only matches the MIME type, which we have received anyway.
 	// Actual parsing of anything should be deferred.)
 	if allowed, err := policyContext.IsRunningImageAllowed(ctx, unparsedImage); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
-		return nil, "", "", fmt.Errorf("Source image rejected: %w", err)
+		return nil, "", "", parsedImage, fmt.Errorf("Source image rejected: %w", err)
 	}
 	src, err := image.FromUnparsedImage(ctx, options.SourceCtx, unparsedImage)
 	if err != nil {
-		return nil, "", "", fmt.Errorf("initializing image from source %s: %w", transports.ImageName(c.rawSource.Reference()), err)
+		return nil, "", "", parsedImage, fmt.Errorf("initializing image from source %s: %w", transports.ImageName(c.rawSource.Reference()), err)
 	}
+	parsedImage = src
 
 	// If the destination is a digested reference, make a note of that, determine what digest value we're
 	// expecting, and check that the source manifest matches it.  If the source manifest doesn't, but it's
@@ -629,33 +683,33 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 			destIsDigestedReference = true
 			matches, err := manifest.MatchesDigest(src.ManifestBlob, digested.Digest())
 			if err != nil {
-				return nil, "", "", fmt.Errorf("computing digest of source image's manifest: %w", err)
+				return nil, "", "", parsedImage, fmt.Errorf("computing digest of source image's manifest: %w", err)
 			}
 			if !matches {
 				manifestList, _, err := unparsedToplevel.Manifest(ctx)
 				if err != nil {
-					return nil, "", "", fmt.Errorf("reading manifest from source image: %w", err)
+					return nil, "", "", parsedImage, fmt.Errorf("reading manifest from source image: %w", err)
 				}
 				matches, err = manifest.MatchesDigest(manifestList, digested.Digest())
 				if err != nil {
-					return nil, "", "", fmt.Errorf("computing digest of source image's manifest: %w", err)
+					return nil, "", "", parsedImage, fmt.Errorf("computing digest of source image's manifest: %w", err)
 				}
 				if !matches {
-					return nil, "", "", errors.New("Digest of source image's manifest would not match destination reference")
+					return nil, "", "", parsedImage, errors.New("Digest of source image's manifest would not match destination reference")
 				}
 			}
 		}
 	}
 
 	if err := checkImageDestinationForCurrentRuntime(ctx, options.DestinationCtx, src, c.dest); err != nil {
-		return nil, "", "", err
+		return nil, "", "", parsedImage, err
 	}
 
 	sigs, err := c.sourceSignatures(ctx, src, options,
 		"Getting image source signatures",
 		"Checking if image destination supports signatures")
 	if err != nil {
-		return nil, "", "", err
+		return nil, "", "", parsedImage, err
 	}
 
 	// Determine if we're allowed to modify the manifest.
@@ -691,7 +745,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 	ic.canSubstituteBlobs = ic.cannotModifyManifestReason == "" && len(c.signers) == 0
 
 	if err := ic.updateEmbeddedDockerReference(); err != nil {
-		return nil, "", "", err
+		return nil, "", "", parsedImage, err
 	}
 
 	destRequiresOciEncryption := (isEncrypted(src) && ic.c.ociDecryptConfig != nil) || options.OciEncryptLayers != nil
@@ -704,7 +758,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 		cannotModifyManifestReason:     ic.cannotModifyManifestReason,
 	})
 	if err != nil {
-		return nil, "", "", err
+		return nil, "", "", parsedImage, err
 	}
 	// We set up this part of ic.manifestUpdates quite early, not just around the
 	// code that calls copyUpdatedConfigAndManifest, so that other parts of the copy code
@@ -727,18 +781,18 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 			isSrcDestManifestEqual, retManifest, retManifestType, retManifestDigest, err := compareImageDestinationManifestEqual(ctx, options, src, targetInstance, c.dest)
 			if err != nil {
 				logrus.Warnf("Failed to compare destination image manifest: %v", err)
-				return nil, "", "", err
+				return nil, "", "", parsedImage, err
 			}
 
 			if isSrcDestManifestEqual {
 				c.Printf("Skipping: image already present at destination\n")
-				return retManifest, retManifestType, retManifestDigest, nil
+				return retManifest, retManifestType, retManifestDigest, parsedImage, nil
 			}
 		}
 	}
 
-	if err := ic.copyLayers(ctx); err != nil {
-		return nil, "", "", err
+	if err := ic.copyLayers(ctx, forceProcessLayer); err != nil {
+		return nil, "", "", parsedImage, err
 	}
 
 	// With docker/distribution registries we do not know whether the registry accepts schema2 or schema1 only;
@@ -762,14 +816,14 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 			// We don’t have other options.
 			// In principle the code below would handle this as well, but the resulting  error message is fairly ugly.
 			// Don’t bother the user with MIME types if we have no choice.
-			return nil, "", "", err
+			return nil, "", "", parsedImage, err
 		}
 		// If the original MIME type is acceptable, determineManifestConversion always uses it as manifestConversionPlan.preferredMIMEType.
 		// So if we are here, we will definitely be trying to convert the manifest.
 		// With ic.cannotModifyManifestReason != "", that would just be a string of repeated failures for the same reason,
 		// so let’s bail out early and with a better error message.
 		if ic.cannotModifyManifestReason != "" {
-			return nil, "", "", fmt.Errorf("writing manifest failed and we cannot try conversions: %q: %w", cannotModifyManifestReason, err)
+			return nil, "", "", parsedImage, fmt.Errorf("writing manifest failed and we cannot try conversions: %q: %w", cannotModifyManifestReason, err)
 		}
 
 		// errs is a list of errors when trying various manifest types. Also serves as an "upload succeeded" flag when set to nil.
@@ -792,7 +846,7 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 			break
 		}
 		if errs != nil {
-			return nil, "", "", fmt.Errorf("Uploading manifest failed, attempted the following formats: %s", strings.Join(errs, ", "))
+			return nil, "", "", parsedImage, fmt.Errorf("Uploading manifest failed, attempted the following formats: %s", strings.Join(errs, ", "))
 		}
 	}
 	if targetInstance != nil {
@@ -801,16 +855,16 @@ func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.Poli
 
 	newSigs, err := c.createSignatures(ctx, manifestBytes, options.SignIdentity)
 	if err != nil {
-		return nil, "", "", err
+		return nil, "", "", parsedImage, err
 	}
 	sigs = append(sigs, newSigs...)
 
 	c.Printf("Storing signatures\n")
 	if err := c.dest.PutSignaturesWithFormat(ctx, sigs, targetInstance); err != nil {
-		return nil, "", "", fmt.Errorf("writing signatures: %w", err)
+		return nil, "", "", parsedImage, fmt.Errorf("writing signatures: %w", err)
 	}
 
-	return manifestBytes, retManifestType, retManifestDigest, nil
+	return manifestBytes, retManifestType, retManifestDigest, parsedImage, nil
 }
 
 // Printf writes a formatted string to c.reportWriter.
@@ -888,7 +942,7 @@ func isTTY(w io.Writer) bool {
 }
 
 // copyLayers copies layers from ic.src/ic.c.rawSource to dest, using and updating ic.manifestUpdates if necessary and ic.cannotModifyManifestReason == "".
-func (ic *imageCopier) copyLayers(ctx context.Context) error {
+func (ic *imageCopier) copyLayers(ctx context.Context, forceProcessLayers bool) error {
 	srcInfos := ic.src.LayerInfos()
 	numLayers := len(srcInfos)
 	updatedSrcInfos, err := ic.src.LayerInfosForCopy(ctx)
@@ -938,7 +992,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 				logrus.Debugf("Skipping foreign layer %q copy to %s", cld.destInfo.Digest, ic.c.dest.Reference().Transport().Name())
 			}
 		} else {
-			cld.destInfo, cld.diffID, cld.err = ic.copyLayer(ctx, srcLayer, toEncrypt, pool, index, srcRef, manifestLayerInfos[index].EmptyLayer)
+			cld.destInfo, cld.diffID, cld.err = ic.copyLayer(ctx, srcLayer, toEncrypt, pool, index, srcRef, manifestLayerInfos[index].EmptyLayer, forceProcessLayers)
 		}
 		data[index] = cld
 	}
@@ -1111,7 +1165,7 @@ type diffIDResult struct {
 // copyLayer copies a layer with srcInfo (with known Digest and Annotations and possibly known Size) in src to dest, perhaps (de/re/)compressing it,
 // and returns a complete blobInfo of the copied layer, and a value for LayerDiffIDs if diffIDIsNeeded
 // srcRef can be used as an additional hint to the destination during checking whether a layer can be reused but srcRef can be nil.
-func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, toEncrypt bool, pool *mpb.Progress, layerIndex int, srcRef reference.Named, emptyLayer bool) (types.BlobInfo, digest.Digest, error) {
+func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, toEncrypt bool, pool *mpb.Progress, layerIndex int, srcRef reference.Named, emptyLayer bool, forceProcessLayer bool) (types.BlobInfo, digest.Digest, error) {
 	// If the srcInfo doesn't contain compression information, try to compute it from the
 	// MediaType, which was either read from a manifest by way of LayerInfos() or constructed
 	// by LayerInfosForCopy(), if it was supplied at all.  If we succeed in copying the blob,
@@ -1141,6 +1195,9 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 	// but it’s not trivially safe to do such things, so until someone takes the effort to make a comprehensive argument, let’s not.
 	encryptingOrDecrypting := toEncrypt || (isOciEncrypted(srcInfo.MediaType) && ic.c.ociDecryptConfig != nil)
 	canAvoidProcessingCompleteLayer := !diffIDIsNeeded && !encryptingOrDecrypting
+	if forceProcessLayer {
+		canAvoidProcessingCompleteLayer = false
+	}
 
 	// Don’t read the layer from the source if we already have the blob, and optimizations are acceptable.
 	if canAvoidProcessingCompleteLayer {
