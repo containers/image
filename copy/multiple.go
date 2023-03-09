@@ -56,7 +56,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 
 	// Determine if we're allowed to modify the manifest list.
 	// If we can, set to the empty string. If we can't, set to the reason why.
-	// Compare, and perhaps keep in sync with, the version in copyOneImage.
+	// Compare, and perhaps keep in sync with, the version in copySingleImage.
 	cannotModifyManifestListReason := ""
 	if len(sigs) > 0 {
 		cannotModifyManifestListReason = "Would invalidate signatures"
@@ -110,7 +110,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 		logrus.Debugf("Copying instance %s (%d/%d)", instanceDigest, i+1, len(instanceDigests))
 		c.Printf("Copying image %s (%d/%d)\n", instanceDigest, instancesCopied+1, imagesToCopy)
 		unparsedInstance := image.UnparsedInstance(c.rawSource, &instanceDigest)
-		updatedManifest, updatedManifestType, updatedManifestDigest, err := c.copyOneImage(ctx, policyContext, options, unparsedToplevel, unparsedInstance, &instanceDigest)
+		updatedManifest, updatedManifestType, updatedManifestDigest, err := c.copySingleImage(ctx, policyContext, options, unparsedToplevel, unparsedInstance, &instanceDigest)
 		if err != nil {
 			return nil, fmt.Errorf("copying image %d/%d from manifest list: %w", instancesCopied+1, imagesToCopy, err)
 		}

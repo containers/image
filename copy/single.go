@@ -39,9 +39,9 @@ type imageCopier struct {
 	ociEncryptLayers           *[]int
 }
 
-// copyOneImage copies a single (non-manifest-list) image unparsedImage, using policyContext to validate
+// copySingleImage copies a single (non-manifest-list) image unparsedImage, using policyContext to validate
 // source image admissibility.
-func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.PolicyContext, options *Options, unparsedToplevel, unparsedImage *image.UnparsedImage, targetInstance *digest.Digest) (retManifest []byte, retManifestType string, retManifestDigest digest.Digest, retErr error) {
+func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.PolicyContext, options *Options, unparsedToplevel, unparsedImage *image.UnparsedImage, targetInstance *digest.Digest) (retManifest []byte, retManifestType string, retManifestDigest digest.Digest, retErr error) {
 	// The caller is handling manifest lists; this could happen only if a manifest list contains a manifest list.
 	// Make sure we fail cleanly in such cases.
 	multiImage, err := isMultiImage(ctx, unparsedImage)
