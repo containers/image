@@ -39,40 +39,6 @@ type imageCopier struct {
 	ociEncryptLayers           *[]int
 }
 
-// compareImageDestinationManifestEqual compares the `src` and `dest` image manifests (reading the manifest from the
-// (possibly remote) destination). Returning true and the destination's manifest, type and digest if they compare equal.
-func compareImageDestinationManifestEqual(ctx context.Context, options *Options, src *image.SourcedImage, targetInstance *digest.Digest, dest types.ImageDestination) (bool, []byte, string, digest.Digest, error) {
-	srcManifestDigest, err := manifest.Digest(src.ManifestBlob)
-	if err != nil {
-		return false, nil, "", "", fmt.Errorf("calculating manifest digest: %w", err)
-	}
-
-	destImageSource, err := dest.Reference().NewImageSource(ctx, options.DestinationCtx)
-	if err != nil {
-		logrus.Debugf("Unable to create destination image %s source: %v", dest.Reference(), err)
-		return false, nil, "", "", nil
-	}
-
-	destManifest, destManifestType, err := destImageSource.GetManifest(ctx, targetInstance)
-	if err != nil {
-		logrus.Debugf("Unable to get destination image %s/%s manifest: %v", destImageSource, targetInstance, err)
-		return false, nil, "", "", nil
-	}
-
-	destManifestDigest, err := manifest.Digest(destManifest)
-	if err != nil {
-		return false, nil, "", "", fmt.Errorf("calculating manifest digest: %w", err)
-	}
-
-	logrus.Debugf("Comparing source and destination manifest digests: %v vs. %v", srcManifestDigest, destManifestDigest)
-	if srcManifestDigest != destManifestDigest {
-		return false, nil, "", "", nil
-	}
-
-	// Destination and source manifests, types and digests should all be equivalent
-	return true, destManifest, destManifestType, destManifestDigest, nil
-}
-
 // copyOneImage copies a single (non-manifest-list) image unparsedImage, using policyContext to validate
 // source image admissibility.
 func (c *copier) copyOneImage(ctx context.Context, policyContext *signature.PolicyContext, options *Options, unparsedToplevel, unparsedImage *image.UnparsedImage, targetInstance *digest.Digest) (retManifest []byte, retManifestType string, retManifestDigest digest.Digest, retErr error) {
@@ -346,6 +312,40 @@ func (ic *imageCopier) updateEmbeddedDockerReference() error {
 
 func (ic *imageCopier) noPendingManifestUpdates() bool {
 	return reflect.DeepEqual(*ic.manifestUpdates, types.ManifestUpdateOptions{InformationOnly: ic.manifestUpdates.InformationOnly})
+}
+
+// compareImageDestinationManifestEqual compares the `src` and `dest` image manifests (reading the manifest from the
+// (possibly remote) destination). Returning true and the destination's manifest, type and digest if they compare equal.
+func compareImageDestinationManifestEqual(ctx context.Context, options *Options, src *image.SourcedImage, targetInstance *digest.Digest, dest types.ImageDestination) (bool, []byte, string, digest.Digest, error) {
+	srcManifestDigest, err := manifest.Digest(src.ManifestBlob)
+	if err != nil {
+		return false, nil, "", "", fmt.Errorf("calculating manifest digest: %w", err)
+	}
+
+	destImageSource, err := dest.Reference().NewImageSource(ctx, options.DestinationCtx)
+	if err != nil {
+		logrus.Debugf("Unable to create destination image %s source: %v", dest.Reference(), err)
+		return false, nil, "", "", nil
+	}
+
+	destManifest, destManifestType, err := destImageSource.GetManifest(ctx, targetInstance)
+	if err != nil {
+		logrus.Debugf("Unable to get destination image %s/%s manifest: %v", destImageSource, targetInstance, err)
+		return false, nil, "", "", nil
+	}
+
+	destManifestDigest, err := manifest.Digest(destManifest)
+	if err != nil {
+		return false, nil, "", "", fmt.Errorf("calculating manifest digest: %w", err)
+	}
+
+	logrus.Debugf("Comparing source and destination manifest digests: %v vs. %v", srcManifestDigest, destManifestDigest)
+	if srcManifestDigest != destManifestDigest {
+		return false, nil, "", "", nil
+	}
+
+	// Destination and source manifests, types and digests should all be equivalent
+	return true, destManifest, destManifestType, destManifestDigest, nil
 }
 
 // copyLayers copies layers from ic.src/ic.c.rawSource to dest, using and updating ic.manifestUpdates if necessary and ic.cannotModifyManifestReason == "".
