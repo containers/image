@@ -17,7 +17,6 @@ import (
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache"
-	"github.com/containers/image/v5/pkg/compression"
 	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/signature/signer"
@@ -25,7 +24,6 @@ import (
 	"github.com/containers/image/v5/types"
 	encconfig "github.com/containers/ocicrypt/config"
 	digest "github.com/opencontainers/go-digest"
-	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
 	"golang.org/x/sync/semaphore"
@@ -39,22 +37,7 @@ var (
 	// maxParallelDownloads is used to limit the maximum number of parallel
 	// downloads.  Let's follow Firefox by limiting it to 6.
 	maxParallelDownloads = uint(6)
-
-	// defaultCompressionFormat is used if the destination transport requests
-	// compression, and the user does not explicitly instruct us to use an algorithm.
-	defaultCompressionFormat = &compression.Gzip
 )
-
-// compressionBufferSize is the buffer size used to compress a blob
-var compressionBufferSize = 1048576
-
-// expectedCompressionFormats is used to check if a blob with a specified media type is compressed
-// using the algorithm that the media type says it should be compressed with
-var expectedCompressionFormats = map[string]*compressiontypes.Algorithm{
-	imgspecv1.MediaTypeImageLayerGzip:      &compression.Gzip,
-	imgspecv1.MediaTypeImageLayerZstd:      &compression.Zstd,
-	manifest.DockerV2Schema2LayerMediaType: &compression.Gzip,
-}
 
 const (
 	// CopySystemImage is the default value which, when set in

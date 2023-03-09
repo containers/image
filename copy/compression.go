@@ -6,11 +6,30 @@ import (
 	"io"
 
 	internalblobinfocache "github.com/containers/image/v5/internal/blobinfocache"
+	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/compression"
 	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/maps"
+)
+
+var (
+	// defaultCompressionFormat is used if the destination transport requests
+	// compression, and the user does not explicitly instruct us to use an algorithm.
+	defaultCompressionFormat = &compression.Gzip
+
+	// compressionBufferSize is the buffer size used to compress a blob
+	compressionBufferSize = 1048576
+
+	// expectedCompressionFormats is used to check if a blob with a specified media type is compressed
+	// using the algorithm that the media type says it should be compressed with
+	expectedCompressionFormats = map[string]*compressiontypes.Algorithm{
+		imgspecv1.MediaTypeImageLayerGzip:      &compression.Gzip,
+		imgspecv1.MediaTypeImageLayerZstd:      &compression.Zstd,
+		manifest.DockerV2Schema2LayerMediaType: &compression.Gzip,
+	}
 )
 
 // bpDetectCompressionStepData contains data that the copy pipeline needs about the “detect compression” step.
