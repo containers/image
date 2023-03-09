@@ -56,27 +56,6 @@ var expectedCompressionFormats = map[string]*compressiontypes.Algorithm{
 	manifest.DockerV2Schema2LayerMediaType: &compression.Gzip,
 }
 
-// copier allows us to keep track of diffID values for blobs, and other
-// data shared across one or more images in a possible manifest list.
-// The owner must call close() when done.
-type copier struct {
-	dest                          private.ImageDestination
-	rawSource                     private.ImageSource
-	reportWriter                  io.Writer
-	progressOutput                io.Writer
-	progressInterval              time.Duration
-	progress                      chan types.ProgressProperties
-	blobInfoCache                 internalblobinfocache.BlobInfoCache2
-	compressionFormat             *compressiontypes.Algorithm // Compression algorithm to use, if the user explicitly requested one, or nil.
-	compressionLevel              *int
-	ociDecryptConfig              *encconfig.DecryptConfig
-	ociEncryptConfig              *encconfig.EncryptConfig
-	concurrentBlobCopiesSemaphore *semaphore.Weighted // Limits the amount of concurrently copied blobs
-	downloadForeignLayers         bool
-	signers                       []*signer.Signer // Signers to use to create new signatures for the image
-	signersToClose                []*signer.Signer // Signers that should be closed when this copier is destroyed.
-}
-
 const (
 	// CopySystemImage is the default value which, when set in
 	// Options.ImageListSelection, indicates that the caller expects only one
@@ -169,14 +148,25 @@ type Options struct {
 	DownloadForeignLayers bool
 }
 
-// validateImageListSelection returns an error if the passed-in value is not one that we recognize as a valid ImageListSelection value
-func validateImageListSelection(selection ImageListSelection) error {
-	switch selection {
-	case CopySystemImage, CopyAllImages, CopySpecificImages:
-		return nil
-	default:
-		return fmt.Errorf("Invalid value for options.ImageListSelection: %d", selection)
-	}
+// copier allows us to keep track of diffID values for blobs, and other
+// data shared across one or more images in a possible manifest list.
+// The owner must call close() when done.
+type copier struct {
+	dest                          private.ImageDestination
+	rawSource                     private.ImageSource
+	reportWriter                  io.Writer
+	progressOutput                io.Writer
+	progressInterval              time.Duration
+	progress                      chan types.ProgressProperties
+	blobInfoCache                 internalblobinfocache.BlobInfoCache2
+	compressionFormat             *compressiontypes.Algorithm // Compression algorithm to use, if the user explicitly requested one, or nil.
+	compressionLevel              *int
+	ociDecryptConfig              *encconfig.DecryptConfig
+	ociEncryptConfig              *encconfig.EncryptConfig
+	concurrentBlobCopiesSemaphore *semaphore.Weighted // Limits the amount of concurrently copied blobs
+	downloadForeignLayers         bool
+	signers                       []*signer.Signer // Signers to use to create new signatures for the image
+	signersToClose                []*signer.Signer // Signers that should be closed when this copier is destroyed.
 }
 
 // Image copies image from srcRef to destRef, using policyContext to validate
@@ -343,12 +333,31 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 	return copiedManifest, nil
 }
 
+// Printf writes a formatted string to c.reportWriter.
+// Note that the method name Printf is not entirely arbitrary: (go tool vet)
+// has a built-in list of functions/methods (whatever object they are for)
+// which have their format strings checked; for other names we would have
+// to pass a parameter to every (go tool vet) invocation.
+func (c *copier) Printf(format string, a ...any) {
+	fmt.Fprintf(c.reportWriter, format, a...)
+}
+
 // close tears down state owned by copier.
 func (c *copier) close() {
 	for i, s := range c.signersToClose {
 		if err := s.Close(); err != nil {
 			logrus.Warnf("Error closing per-copy signer %d: %v", i+1, err)
 		}
+	}
+}
+
+// validateImageListSelection returns an error if the passed-in value is not one that we recognize as a valid ImageListSelection value
+func validateImageListSelection(selection ImageListSelection) error {
+	switch selection {
+	case CopySystemImage, CopyAllImages, CopySpecificImages:
+		return nil
+	default:
+		return fmt.Errorf("Invalid value for options.ImageListSelection: %d", selection)
 	}
 }
 
@@ -361,15 +370,6 @@ func supportsMultipleImages(dest types.ImageDestination) bool {
 		return true
 	}
 	return slices.ContainsFunc(mtypes, manifest.MIMETypeIsMultiImage)
-}
-
-// Printf writes a formatted string to c.reportWriter.
-// Note that the method name Printf is not entirely arbitrary: (go tool vet)
-// has a built-in list of functions/methods (whatever object they are for)
-// which have their format strings checked; for other names we would have
-// to pass a parameter to every (go tool vet) invocation.
-func (c *copier) Printf(format string, a ...any) {
-	fmt.Fprintf(c.reportWriter, format, a...)
 }
 
 // isTTY returns true if the io.Writer is a file and a tty.
