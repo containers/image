@@ -357,7 +357,6 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		return err
 	}
 	srcInfosUpdated := false
-	// If we only need to check authorization, no updates required.
 	if updatedSrcInfos != nil && !reflect.DeepEqual(srcInfos, updatedSrcInfos) {
 		if ic.cannotModifyManifestReason != "" {
 			return fmt.Errorf("Copying this image would require changing layer representation, which we cannot do: %q", ic.cannotModifyManifestReason)

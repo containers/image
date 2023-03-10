@@ -102,8 +102,6 @@ type Options struct {
 
 	// If OciEncryptConfig is non-nil, it indicates that an image should be encrypted.
 	// The encryption options is derived from the construction of EncryptConfig object.
-	// Note: During initial encryption process of a layer, the resultant digest is not known
-	// during creation, so newDigestingReader has to be set with validateDigest = false
 	OciEncryptConfig *encconfig.EncryptConfig
 	// OciEncryptLayers represents the list of layers to encrypt.
 	// If nil, don't encrypt any layers.
