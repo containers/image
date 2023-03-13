@@ -18,8 +18,8 @@ Except the primary (read/write) file, other files are read-only, unless the user
 
 ## FORMAT
 
-The auth.json file stores encrypted authentication information for the
-user to container image registries.  The file can have zero to many entries and
+The auth.json file stores, or references, credentials that allow the user to authenticate
+to container image registries.  The file can have zero to many entries and
 is created by a `login` command from a container tool such as `podman login`,
 `buildah login` or `skopeo login`. Each entry either contains a single
 hostname (e.g. `docker.io`) or a namespace (e.g. `quay.io/user/image`) as a key
