@@ -63,6 +63,8 @@ validate_task:
         # according to gcloud CLI tool warning messages.
         disk: 200
         image_name: ${DEBIAN_CACHE_IMAGE_NAME}
+    env:
+        HOME: "/root"  # default unset, needed by golangci-lint.
     script: |
         git remote update
         make tools
