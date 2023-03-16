@@ -16,7 +16,7 @@ require (
 	github.com/go-openapi/swag v0.22.3
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-retryablehttp v0.7.2
-	github.com/imdario/mergo v0.3.13
+	github.com/imdario/mergo v0.3.14
 	github.com/klauspost/compress v1.16.3
 	github.com/klauspost/pgzip v1.2.6-0.20220930104621-17e8dac29df8
 	github.com/manifoldco/promptui v0.9.0
