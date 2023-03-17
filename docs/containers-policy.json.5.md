@@ -282,7 +282,7 @@ signed by the provided public key.
 The `signedIdentity` field has the same semantics as in the `signedBy` requirement described above.
 Note that `cosign`-created signatures only contain a repository, so only `matchRepository` and `exactRepository` can be used to accept them (and that does not protect against substitution of a signed image with an unexpected tag).
 
-To use this with images hosted on image registries, the relevant registry or repository must have the `use-sigstore-attachments` option enabled in containers-registries.d(5).
+To use this with images hosted on image registries, the `use-sigstore-attachments` option needs to be enabled for the relevant registry or repository in the client's containers-registries.d(5).
 
 ## Examples
 
