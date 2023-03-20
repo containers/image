@@ -12,12 +12,12 @@ require (
 	github.com/docker/docker v23.0.1+incompatible
 	github.com/docker/docker-credential-helpers v0.7.0
 	github.com/docker/go-connections v0.4.0
-	github.com/go-openapi/strfmt v0.21.3
+	github.com/go-openapi/strfmt v0.21.5
 	github.com/go-openapi/swag v0.22.3
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-retryablehttp v0.7.2
-	github.com/imdario/mergo v0.3.13
-	github.com/klauspost/compress v1.16.0
+	github.com/imdario/mergo v0.3.14
+	github.com/klauspost/compress v1.16.3
 	github.com/klauspost/pgzip v1.2.6-0.20220930104621-17e8dac29df8
 	github.com/manifoldco/promptui v0.9.0
 	github.com/opencontainers/go-digest v1.0.0
@@ -34,11 +34,11 @@ require (
 	github.com/theupdateframework/go-tuf v0.5.2
 	github.com/ulikunitz/xz v0.5.11
 	github.com/vbatts/tar-split v0.11.2
-	github.com/vbauerster/mpb/v8 v8.2.1
+	github.com/vbauerster/mpb/v8 v8.3.0
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.7
 	golang.org/x/crypto v0.7.0
-	golang.org/x/exp v0.0.0-20230206171751-46f607a40771
+	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
 	golang.org/x/oauth2 v0.6.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/term v0.6.0

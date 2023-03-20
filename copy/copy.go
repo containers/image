@@ -17,7 +17,6 @@ import (
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache"
-	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/signature/signer"
 	"github.com/containers/image/v5/transports"
@@ -102,8 +101,6 @@ type Options struct {
 
 	// If OciEncryptConfig is non-nil, it indicates that an image should be encrypted.
 	// The encryption options is derived from the construction of EncryptConfig object.
-	// Note: During initial encryption process of a layer, the resultant digest is not known
-	// during creation, so newDigestingReader has to be set with validateDigest = false
 	OciEncryptConfig *encconfig.EncryptConfig
 	// OciEncryptLayers represents the list of layers to encrypt.
 	// If nil, don't encrypt any layers.
@@ -142,8 +139,6 @@ type copier struct {
 	progressInterval              time.Duration
 	progress                      chan types.ProgressProperties
 	blobInfoCache                 internalblobinfocache.BlobInfoCache2
-	compressionFormat             *compressiontypes.Algorithm // Compression algorithm to use, if the user explicitly requested one, or nil.
-	compressionLevel              *int
 	ociDecryptConfig              *encconfig.DecryptConfig
 	ociEncryptConfig              *encconfig.EncryptConfig
 	concurrentBlobCopiesSemaphore *semaphore.Weighted // Limits the amount of concurrently copied blobs
@@ -248,12 +243,6 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 			}
 			defer options.ConcurrentBlobCopiesSemaphore.Release(1)
 		}
-	}
-
-	if options.DestinationCtx != nil {
-		// Note that compressionFormat and compressionLevel can be nil.
-		c.compressionFormat = options.DestinationCtx.CompressionFormat
-		c.compressionLevel = options.DestinationCtx.CompressionLevel
 	}
 
 	if err := c.setupSigners(options); err != nil {

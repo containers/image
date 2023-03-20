@@ -36,6 +36,8 @@ type imageCopier struct {
 	diffIDsAreNeeded           bool
 	cannotModifyManifestReason string // The reason the manifest cannot be modified, or an empty string if it can
 	canSubstituteBlobs         bool
+	compressionFormat          *compressiontypes.Algorithm // Compression algorithm to use, if the user explicitly requested one, or nil.
+	compressionLevel           *int
 	ociEncryptLayers           *[]int
 }
 
@@ -123,6 +125,11 @@ func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.P
 		// diffIDsAreNeeded is computed later
 		cannotModifyManifestReason: cannotModifyManifestReason,
 		ociEncryptLayers:           options.OciEncryptLayers,
+	}
+	if options.DestinationCtx != nil {
+		// Note that compressionFormat and compressionLevel can be nil.
+		ic.compressionFormat = options.DestinationCtx.CompressionFormat
+		ic.compressionLevel = options.DestinationCtx.CompressionLevel
 	}
 	// Decide whether we can substitute blobs with semantic equivalents:
 	// - Don’t do that if we can’t modify the manifest at all
@@ -357,7 +364,6 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		return err
 	}
 	srcInfosUpdated := false
-	// If we only need to check authorization, no updates required.
 	if updatedSrcInfos != nil && !reflect.DeepEqual(srcInfos, updatedSrcInfos) {
 		if ic.cannotModifyManifestReason != "" {
 			return fmt.Errorf("Copying this image would require changing layer representation, which we cannot do: %q", ic.cannotModifyManifestReason)
