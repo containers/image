@@ -155,7 +155,7 @@ func (d *dockerImageDestination) PutBlobWithOptions(ctx context.Context, stream 
 			return types.BlobInfo{}, err
 		}
 		if haveBlob {
-			return reusedInfo, nil
+			return types.BlobInfo{Digest: reusedInfo.Digest, Size: reusedInfo.Size}, nil
 		}
 	}
 
@@ -299,34 +299,32 @@ func (d *dockerImageDestination) mountBlob(ctx context.Context, srcRepo referenc
 // tryReusingExactBlob is a subset of TryReusingBlob which _only_ looks for exactly the specified
 // blob in the current repository, with no cross-repo reuse or mounting; cache may be updated, it is not read.
 // The caller must ensure info.Digest is set.
-func (d *dockerImageDestination) tryReusingExactBlob(ctx context.Context, info types.BlobInfo, cache blobinfocache.BlobInfoCache2) (bool, types.BlobInfo, error) {
+func (d *dockerImageDestination) tryReusingExactBlob(ctx context.Context, info types.BlobInfo, cache blobinfocache.BlobInfoCache2) (bool, private.ReusedBlob, error) {
 	exists, size, err := d.blobExists(ctx, d.ref.ref, info.Digest, nil)
 	if err != nil {
-		return false, types.BlobInfo{}, err
+		return false, private.ReusedBlob{}, err
 	}
 	if exists {
 		cache.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), info.Digest, newBICLocationReference(d.ref))
-		return true, types.BlobInfo{Digest: info.Digest, MediaType: info.MediaType, Size: size}, nil
+		return true, private.ReusedBlob{Digest: info.Digest, Size: size}, nil
 	}
-	return false, types.BlobInfo{}, nil
+	return false, private.ReusedBlob{}, nil
 }
 
 // TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 // (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
 // info.Digest must not be empty.
-// If the blob has been successfully reused, returns (true, info, nil); info must contain at least a digest and size, and may
-// include CompressionOperation and CompressionAlgorithm fields to indicate that a change to the compression type should be
-// reflected in the manifest that will be written.
+// If the blob has been successfully reused, returns (true, info, nil).
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
-func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
+func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options private.TryReusingBlobOptions) (bool, private.ReusedBlob, error) {
 	if info.Digest == "" {
-		return false, types.BlobInfo{}, errors.New("Can not check for a blob with unknown digest")
+		return false, private.ReusedBlob{}, errors.New("Can not check for a blob with unknown digest")
 	}
 
 	// First, check whether the blob happens to already exist at the destination.
 	haveBlob, reusedInfo, err := d.tryReusingExactBlob(ctx, info, options.Cache)
 	if err != nil {
-		return false, types.BlobInfo{}, err
+		return false, private.ReusedBlob{}, err
 	}
 	if haveBlob {
 		return true, reusedInfo, nil
@@ -396,10 +394,14 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 			continue
 		}
 
-		return true, types.BlobInfo{Digest: candidate.Digest, MediaType: info.MediaType, Size: size, CompressionOperation: compressionOperation, CompressionAlgorithm: compressionAlgorithm}, nil
+		return true, private.ReusedBlob{
+			Digest:               candidate.Digest,
+			Size:                 size,
+			CompressionOperation: compressionOperation,
+			CompressionAlgorithm: compressionAlgorithm}, nil
 	}
 
-	return false, types.BlobInfo{}, nil
+	return false, private.ReusedBlob{}, nil
 }
 
 // PutManifest writes manifest to the destination.

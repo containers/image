@@ -59,10 +59,26 @@ func (c *Compat) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 // May use and/or update cache.
 func (c *Compat) TryReusingBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache, canSubstitute bool) (bool, types.BlobInfo, error) {
-	return c.dest.TryReusingBlobWithOptions(ctx, info, private.TryReusingBlobOptions{
+	reused, blob, err := c.dest.TryReusingBlobWithOptions(ctx, info, private.TryReusingBlobOptions{
 		Cache:         blobinfocache.FromBlobInfoCache(cache),
 		CanSubstitute: canSubstitute,
 	})
+	if !reused || err != nil {
+		return reused, types.BlobInfo{}, err
+	}
+	res := types.BlobInfo{
+		Digest:               blob.Digest,
+		Size:                 blob.Size,
+		CompressionOperation: blob.CompressionOperation,
+		CompressionAlgorithm: blob.CompressionAlgorithm,
+	}
+	// This is probably not necessary; we preserve MediaType to decrease risks of breaking for external callers.
+	// Some transports were not setting the MediaType field anyway, and others were setting the old value on substitution;
+	// provide the value in cases where it is likely to be correct.
+	if blob.Digest == info.Digest {
+		res.MediaType = info.MediaType
+	}
+	return true, res, nil
 }
 
 // PutSignatures writes a set of signatures to the destination.

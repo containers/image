@@ -169,27 +169,25 @@ func (d *ociImageDestination) PutBlobWithOptions(ctx context.Context, stream io.
 // TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 // (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
 // info.Digest must not be empty.
-// If the blob has been successfully reused, returns (true, info, nil); info must contain at least a digest and size, and may
-// include CompressionOperation and CompressionAlgorithm fields to indicate that a change to the compression type should be
-// reflected in the manifest that will be written.
+// If the blob has been successfully reused, returns (true, info, nil).
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
-func (d *ociImageDestination) TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
+func (d *ociImageDestination) TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options private.TryReusingBlobOptions) (bool, private.ReusedBlob, error) {
 	if info.Digest == "" {
-		return false, types.BlobInfo{}, errors.New("Can not check for a blob with unknown digest")
+		return false, private.ReusedBlob{}, errors.New("Can not check for a blob with unknown digest")
 	}
 	blobPath, err := d.ref.blobPath(info.Digest, d.sharedBlobDir)
 	if err != nil {
-		return false, types.BlobInfo{}, err
+		return false, private.ReusedBlob{}, err
 	}
 	finfo, err := os.Stat(blobPath)
 	if err != nil && os.IsNotExist(err) {
-		return false, types.BlobInfo{}, nil
+		return false, private.ReusedBlob{}, nil
 	}
 	if err != nil {
-		return false, types.BlobInfo{}, err
+		return false, private.ReusedBlob{}, err
 	}
 
-	return true, types.BlobInfo{Digest: info.Digest, Size: finfo.Size()}, nil
+	return true, private.ReusedBlob{Digest: info.Digest, Size: finfo.Size()}, nil
 }
 
 // PutManifest writes a manifest to the destination.  Per our list of supported manifest MIME types,

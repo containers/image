@@ -334,11 +334,11 @@ func (d *ostreeImageDestination) importConfig(repo *otbuiltin.Repo, blob *blobTo
 // include CompressionOperation and CompressionAlgorithm fields to indicate that a change to the compression type should be
 // reflected in the manifest that will be written.
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
-func (d *ostreeImageDestination) TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
+func (d *ostreeImageDestination) TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options private.TryReusingBlobOptions) (bool, private.ReusedBlob, error) {
 	if d.repo == nil {
 		repo, err := openRepo(d.ref.repo)
 		if err != nil {
-			return false, types.BlobInfo{}, err
+			return false, private.ReusedBlob{}, err
 		}
 		d.repo = repo
 	}
@@ -346,25 +346,25 @@ func (d *ostreeImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 
 	found, data, err := readMetadata(d.repo, branch, "docker.uncompressed_digest")
 	if err != nil || !found {
-		return found, types.BlobInfo{}, err
+		return found, private.ReusedBlob{}, err
 	}
 
 	found, data, err = readMetadata(d.repo, branch, "docker.uncompressed_size")
 	if err != nil || !found {
-		return found, types.BlobInfo{}, err
+		return found, private.ReusedBlob{}, err
 	}
 
 	found, data, err = readMetadata(d.repo, branch, "docker.size")
 	if err != nil || !found {
-		return found, types.BlobInfo{}, err
+		return found, private.ReusedBlob{}, err
 	}
 
 	size, err := strconv.ParseInt(data, 10, 64)
 	if err != nil {
-		return false, types.BlobInfo{}, err
+		return false, private.ReusedBlob{}, err
 	}
 
-	return true, types.BlobInfo{Digest: info.Digest, Size: size}, nil
+	return true, private.ReusedBlob{Digest: info.Digest, Size: size}, nil
 }
 
 // PutManifest writes manifest to the destination.

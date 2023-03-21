@@ -7,6 +7,7 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/signature"
+	compression "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 )
@@ -59,11 +60,9 @@ type ImageDestinationInternalOnly interface {
 	// TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 	// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
 	// info.Digest must not be empty.
-	// If the blob has been successfully reused, returns (true, info, nil); info must contain at least a digest and size, and may
-	// include CompressionOperation and CompressionAlgorithm fields to indicate that a change to the compression type should be
-	// reflected in the manifest that will be written.
+	// If the blob has been successfully reused, returns (true, info, nil).
 	// If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
-	TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options TryReusingBlobOptions) (bool, types.BlobInfo, error)
+	TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options TryReusingBlobOptions) (bool, ReusedBlob, error)
 
 	// PutSignaturesWithFormat writes a set of signatures to the destination.
 	// If instanceDigest is not nil, it contains a digest of the specific manifest instance to write or overwrite the signatures for
@@ -110,6 +109,17 @@ type TryReusingBlobOptions struct {
 	EmptyLayer bool            // True if the blob is an "empty"/"throwaway" layer, and may not necessarily be physically represented.
 	LayerIndex *int            // If the blob is a layer, a zero-based index of the layer within the image; nil otherwise.
 	SrcRef     reference.Named // A reference to the source image that contains the input blob.
+}
+
+// ReusedBlob is information about a blob reused in a destination.
+// It is the subset of types.BlobInfo fields the transport is responsible for setting.
+type ReusedBlob struct {
+	Digest digest.Digest // Must be provided
+	Size   int64         // Must be provided
+	// The following compression fields should be set when the reuse substitutes
+	// a differently-compressed blob.
+	CompressionOperation types.LayerCompression // Compress/Decompress, matching the reused blob; PreserveOriginal if N/A
+	CompressionAlgorithm *compression.Algorithm // Algorithm if compressed, nil if decompressed or N/A
 }
 
 // ImageSourceChunk is a portion of a blob.

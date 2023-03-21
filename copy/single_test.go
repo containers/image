@@ -3,17 +3,79 @@ package copy
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/pkg/compression"
 	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
+	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestUpdatedBlobInfoFromReuse(t *testing.T) {
+	srcInfo := types.BlobInfo{
+		Digest:               "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+		Size:                 51354364,
+		URLs:                 []string{"https://layer.url"},
+		Annotations:          map[string]string{"test-annotation-2": "two"},
+		MediaType:            imgspecv1.MediaTypeImageLayerGzip,
+		CompressionOperation: types.Compress,    // Might be set by blobCacheSource.LayerInfosForCopy
+		CompressionAlgorithm: &compression.Gzip, // Set e.g. in copyLayer
+		// CryptoOperation is not set by LayerInfos()
+	}
+
+	for _, c := range []struct {
+		reused   private.ReusedBlob
+		expected types.BlobInfo
+	}{
+		{ // A straightforward reuse without substitution
+			reused: private.ReusedBlob{
+				Digest: "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+				Size:   51354364,
+				// CompressionOperation not set
+				// CompressionAlgorithm not set
+			},
+			expected: types.BlobInfo{
+				Digest:               "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+				Size:                 51354364,
+				URLs:                 nil,
+				Annotations:          map[string]string{"test-annotation-2": "two"},
+				MediaType:            imgspecv1.MediaTypeImageLayerGzip,
+				CompressionOperation: types.Compress,    // Might be set by blobCacheSource.LayerInfosForCopy
+				CompressionAlgorithm: &compression.Gzip, // Set e.g. in copyLayer
+				// CryptoOperation is set to the zero value
+			},
+		},
+		{ // Reuse with substitution
+			reused: private.ReusedBlob{
+				Digest:               "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				Size:                 513543640,
+				CompressionOperation: types.Decompress,
+				CompressionAlgorithm: nil,
+			},
+			expected: types.BlobInfo{
+				Digest:               "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				Size:                 513543640,
+				URLs:                 nil,
+				Annotations:          map[string]string{"test-annotation-2": "two"},
+				MediaType:            imgspecv1.MediaTypeImageLayerGzip,
+				CompressionOperation: types.Decompress,
+				CompressionAlgorithm: nil,
+				// CryptoOperation is set to the zero value
+			},
+		},
+	} {
+		res := updatedBlobInfoFromReuse(srcInfo, c.reused)
+		assert.Equal(t, c.expected, res, fmt.Sprintf("%#v", c.reused))
+	}
+}
 
 func goDiffIDComputationGoroutineWithTimeout(layerStream io.ReadCloser, decompressor compressiontypes.DecompressorFunc) *diffIDResult {
 	ch := make(chan diffIDResult)
