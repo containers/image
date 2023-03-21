@@ -89,7 +89,6 @@ type storageImageDestination struct {
 // addedLayerInfo records data about a layer to use in this image.
 type addedLayerInfo struct {
 	digest     digest.Digest
-	Size       int64
 	MediaType  string
 	emptyLayer bool // The layer is an “empty”/“throwaway” one, and may or may not be physically represented in various transport / storage systems.  false if the manifest type does not have the concept.
 }
@@ -178,7 +177,6 @@ func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream
 
 	return info, s.queueOrCommit(*options.LayerIndex, addedLayerInfo{
 		digest:     info.Digest,
-		Size:       info.Size,
 		MediaType:  info.MediaType,
 		emptyLayer: options.EmptyLayer,
 	})
@@ -322,7 +320,6 @@ func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context,
 
 	return reused, info, s.queueOrCommit(*options.LayerIndex, addedLayerInfo{
 		digest:     info.Digest,
-		Size:       info.Size,
 		MediaType:  info.MediaType,
 		emptyLayer: options.EmptyLayer,
 	})
@@ -531,7 +528,7 @@ func (s *storageImageDestination) queueOrCommit(index int, info addedLayerInfo) 
 		}
 		s.lock.Unlock()
 		// Note: commitLayer locks on-demand.
-		if err := s.commitLayer(index, info); err != nil {
+		if err := s.commitLayer(index, info, -1); err != nil {
 			return err
 		}
 		s.lock.Lock()
@@ -546,13 +543,14 @@ func (s *storageImageDestination) queueOrCommit(index int, info addedLayerInfo) 
 }
 
 // commitLayer commits the specified layer with the given index to the storage.
-// Contrary to the general definition of addedLayerInfo, Size may be -1.
+// size can usually be -1; it can be provided if the layer is not known to be already present in blobDiffIDs.
+//
 // Note that the previous layer is expected to already be committed.
 //
 // Caution: this function must be called without holding `s.lock`.  Callers
 // must guarantee that, at any given time, at most one goroutine may execute
 // `commitLayer()`.
-func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo) error {
+func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, size int64) error {
 	// Already committed?  Return early.
 	if _, alreadyCommitted := s.indexToStorageID[index]; alreadyCommitted {
 		return nil
@@ -586,7 +584,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo) er
 		// so far we are going to accommodate that (if we should be doing that at all).
 		logrus.Debugf("looking for diffID for blob %+v", info.digest)
 		// Use tryReusingBlobAsPending, not the top-level TryReusingBlobWithOptions, to prevent recursion via queueOrCommit.
-		has, _, err := s.tryReusingBlobAsPending(info.digest, info.Size, info.MediaType, &private.TryReusingBlobOptions{
+		has, _, err := s.tryReusingBlobAsPending(info.digest, size, info.MediaType, &private.TryReusingBlobOptions{
 			Cache:         none.NoCache,
 			CanSubstitute: false,
 		})
@@ -766,10 +764,9 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	for i, blob := range layerBlobs {
 		if err := s.commitLayer(i, addedLayerInfo{
 			digest:     blob.Digest,
-			Size:       blob.Size,
 			MediaType:  blob.MediaType,
 			emptyLayer: blob.EmptyLayer,
-		}); err != nil {
+		}, blob.Size); err != nil {
 			return err
 		}
 	}
