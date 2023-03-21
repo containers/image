@@ -168,7 +168,7 @@ func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream
 		return info, nil
 	}
 
-	return info, s.queueOrCommit(ctx, info, *options.LayerIndex, options.EmptyLayer)
+	return info, s.queueOrCommit(info, *options.LayerIndex, options.EmptyLayer)
 }
 
 // putBlobToPendingFile implements ImageDestination.PutBlobWithOptions, storing stream into an on-disk file.
@@ -307,7 +307,7 @@ func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context,
 		return reused, info, err
 	}
 
-	return reused, info, s.queueOrCommit(ctx, info, *options.LayerIndex, options.EmptyLayer)
+	return reused, info, s.queueOrCommit(info, *options.LayerIndex, options.EmptyLayer)
 }
 
 // tryReusingBlobAsPending implements TryReusingBlobWithOptions, filling s.blobDiffIDs and other metadata.
@@ -473,7 +473,7 @@ func (s *storageImageDestination) getConfigBlob(info types.BlobInfo) ([]byte, er
 // queueOrCommit queues in the specified blob to be committed to the storage.
 // If no other goroutine is already committing layers, the layer and all
 // subsequent layers (if already queued) will be committed to the storage.
-func (s *storageImageDestination) queueOrCommit(ctx context.Context, blob types.BlobInfo, index int, emptyLayer bool) error {
+func (s *storageImageDestination) queueOrCommit(blob types.BlobInfo, index int, emptyLayer bool) error {
 	// NOTE: whenever the code below is touched, make sure that all code
 	// paths unlock the lock and to unlock it exactly once.
 	//
@@ -508,7 +508,7 @@ func (s *storageImageDestination) queueOrCommit(ctx context.Context, blob types.
 	for info := s.indexToPulledLayerInfo[index]; info != nil; info = s.indexToPulledLayerInfo[index] {
 		s.lock.Unlock()
 		// Note: commitLayer locks on-demand.
-		if err := s.commitLayer(ctx, *info, index); err != nil {
+		if err := s.commitLayer(*info, index); err != nil {
 			return err
 		}
 		s.lock.Lock()
@@ -528,7 +528,7 @@ func (s *storageImageDestination) queueOrCommit(ctx context.Context, blob types.
 // Caution: this function must be called without holding `s.lock`.  Callers
 // must guarantee that, at any given time, at most one goroutine may execute
 // `commitLayer()`.
-func (s *storageImageDestination) commitLayer(ctx context.Context, blob manifest.LayerInfo, index int) error {
+func (s *storageImageDestination) commitLayer(blob manifest.LayerInfo, index int) error {
 	// Already committed?  Return early.
 	if _, alreadyCommitted := s.indexToStorageID[index]; alreadyCommitted {
 		return nil
@@ -561,8 +561,11 @@ func (s *storageImageDestination) commitLayer(ctx context.Context, blob manifest
 		// TryReusingBlob; not calling PutBlob already violates the documented API, so there’s only
 		// so far we are going to accommodate that (if we should be doing that at all).
 		logrus.Debugf("looking for diffID for blob %+v", blob.Digest)
-		// NOTE: use `TryReusingBlob` to prevent recursion.
-		has, _, err := s.TryReusingBlob(ctx, blob.BlobInfo, none.NoCache, false)
+		// Use tryReusingBlobAsPending, not the top-level TryReusingBlobWithOptions, to prevent recursion via queueOrCommit.
+		has, _, err := s.tryReusingBlobAsPending(blob.BlobInfo, &private.TryReusingBlobOptions{
+			Cache:         none.NoCache,
+			CanSubstitute: false,
+		})
 		if err != nil {
 			return fmt.Errorf("checking for a layer based on blob %q: %w", blob.Digest.String(), err)
 		}
@@ -737,7 +740,7 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 
 	// Extract, commit, or find the layers.
 	for i, blob := range layerBlobs {
-		if err := s.commitLayer(ctx, blob, i); err != nil {
+		if err := s.commitLayer(blob, i); err != nil {
 			return err
 		}
 	}
