@@ -77,13 +77,19 @@ type storageImageDestination struct {
 	indexToStorageID map[int]*string
 	// All accesses to below data are protected by `lock` which is made
 	// *explicit* in the code.
-	blobDiffIDs            map[digest.Digest]digest.Digest                       // Mapping from layer blobsums to their corresponding DiffIDs
-	fileSizes              map[digest.Digest]int64                               // Mapping from layer blobsums to their sizes
-	filenames              map[digest.Digest]string                              // Mapping from layer blobsums to names of files we used to hold them
-	currentIndex           int                                                   // The index of the layer to be committed (i.e., lower indices have already been committed)
-	indexToPulledLayerInfo map[int]*manifest.LayerInfo                           // Mapping from layer (by index) to pulled down blob
-	blobAdditionalLayer    map[digest.Digest]storage.AdditionalLayer             // Mapping from layer blobsums to their corresponding additional layer
-	diffOutputs            map[digest.Digest]*graphdriver.DriverWithDifferOutput // Mapping from digest to differ output
+	blobDiffIDs           map[digest.Digest]digest.Digest                       // Mapping from layer blobsums to their corresponding DiffIDs
+	fileSizes             map[digest.Digest]int64                               // Mapping from layer blobsums to their sizes
+	filenames             map[digest.Digest]string                              // Mapping from layer blobsums to names of files we used to hold them
+	currentIndex          int                                                   // The index of the layer to be committed (i.e., lower indices have already been committed)
+	indexToAddedLayerInfo map[int]addedLayerInfo                                // Mapping from layer (by index) to blob to add to the image
+	blobAdditionalLayer   map[digest.Digest]storage.AdditionalLayer             // Mapping from layer blobsums to their corresponding additional layer
+	diffOutputs           map[digest.Digest]*graphdriver.DriverWithDifferOutput // Mapping from digest to differ output
+}
+
+// addedLayerInfo records data about a layer to use in this image.
+type addedLayerInfo struct {
+	types.BlobInfo
+	emptyLayer bool // The layer is an “empty”/“throwaway” one, and may or may not be physically represented in various transport / storage systems.  false if the manifest type does not have the concept.
 }
 
 // newImageDestination sets us up to write a new image, caching blobs in a temporary directory until
@@ -111,18 +117,18 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 			HasThreadSafePutBlob:           true,
 		}),
 
-		imageRef:               imageRef,
-		directory:              directory,
-		signatureses:           make(map[digest.Digest][]byte),
-		blobDiffIDs:            make(map[digest.Digest]digest.Digest),
-		blobAdditionalLayer:    make(map[digest.Digest]storage.AdditionalLayer),
-		fileSizes:              make(map[digest.Digest]int64),
-		filenames:              make(map[digest.Digest]string),
-		SignatureSizes:         []int{},
-		SignaturesSizes:        make(map[digest.Digest][]int),
-		indexToStorageID:       make(map[int]*string),
-		indexToPulledLayerInfo: make(map[int]*manifest.LayerInfo),
-		diffOutputs:            make(map[digest.Digest]*graphdriver.DriverWithDifferOutput),
+		imageRef:              imageRef,
+		directory:             directory,
+		signatureses:          make(map[digest.Digest][]byte),
+		blobDiffIDs:           make(map[digest.Digest]digest.Digest),
+		blobAdditionalLayer:   make(map[digest.Digest]storage.AdditionalLayer),
+		fileSizes:             make(map[digest.Digest]int64),
+		filenames:             make(map[digest.Digest]string),
+		SignatureSizes:        []int{},
+		SignaturesSizes:       make(map[digest.Digest][]int),
+		indexToStorageID:      make(map[int]*string),
+		indexToAddedLayerInfo: make(map[int]addedLayerInfo),
+		diffOutputs:           make(map[digest.Digest]*graphdriver.DriverWithDifferOutput),
 	}
 	dest.Compat = impl.AddCompat(dest)
 	return dest, nil
@@ -168,7 +174,10 @@ func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream
 		return info, nil
 	}
 
-	return info, s.queueOrCommit(info, *options.LayerIndex, options.EmptyLayer)
+	return info, s.queueOrCommit(*options.LayerIndex, addedLayerInfo{
+		BlobInfo:   info,
+		emptyLayer: options.EmptyLayer,
+	})
 }
 
 // putBlobToPendingFile implements ImageDestination.PutBlobWithOptions, storing stream into an on-disk file.
@@ -307,7 +316,10 @@ func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context,
 		return reused, info, err
 	}
 
-	return reused, info, s.queueOrCommit(info, *options.LayerIndex, options.EmptyLayer)
+	return reused, info, s.queueOrCommit(*options.LayerIndex, addedLayerInfo{
+		BlobInfo:   info,
+		emptyLayer: options.EmptyLayer,
+	})
 }
 
 // tryReusingBlobAsPending implements TryReusingBlobWithOptions, filling s.blobDiffIDs and other metadata.
@@ -470,10 +482,10 @@ func (s *storageImageDestination) getConfigBlob(info types.BlobInfo) ([]byte, er
 	return nil, errors.New("blob not found")
 }
 
-// queueOrCommit queues in the specified blob to be committed to the storage.
+// queueOrCommit queues the specified layer to be committed to the storage.
 // If no other goroutine is already committing layers, the layer and all
 // subsequent layers (if already queued) will be committed to the storage.
-func (s *storageImageDestination) queueOrCommit(blob types.BlobInfo, index int, emptyLayer bool) error {
+func (s *storageImageDestination) queueOrCommit(index int, info addedLayerInfo) error {
 	// NOTE: whenever the code below is touched, make sure that all code
 	// paths unlock the lock and to unlock it exactly once.
 	//
@@ -493,10 +505,7 @@ func (s *storageImageDestination) queueOrCommit(blob types.BlobInfo, index int, 
 	// caller is the "worker" routine committing layers.  All other routines
 	// can continue pulling and queuing in layers.
 	s.lock.Lock()
-	s.indexToPulledLayerInfo[index] = &manifest.LayerInfo{
-		BlobInfo:   blob,
-		EmptyLayer: emptyLayer,
-	}
+	s.indexToAddedLayerInfo[index] = info
 
 	// We're still waiting for at least one previous/parent layer to be
 	// committed, so there's nothing to do.
@@ -505,10 +514,14 @@ func (s *storageImageDestination) queueOrCommit(blob types.BlobInfo, index int, 
 		return nil
 	}
 
-	for info := s.indexToPulledLayerInfo[index]; info != nil; info = s.indexToPulledLayerInfo[index] {
+	for {
+		info, ok := s.indexToAddedLayerInfo[index]
+		if !ok {
+			break
+		}
 		s.lock.Unlock()
 		// Note: commitLayer locks on-demand.
-		if err := s.commitLayer(*info, index); err != nil {
+		if err := s.commitLayer(index, info); err != nil {
 			return err
 		}
 		s.lock.Lock()
@@ -528,7 +541,7 @@ func (s *storageImageDestination) queueOrCommit(blob types.BlobInfo, index int, 
 // Caution: this function must be called without holding `s.lock`.  Callers
 // must guarantee that, at any given time, at most one goroutine may execute
 // `commitLayer()`.
-func (s *storageImageDestination) commitLayer(blob manifest.LayerInfo, index int) error {
+func (s *storageImageDestination) commitLayer(index int, blob addedLayerInfo) error {
 	// Already committed?  Return early.
 	if _, alreadyCommitted := s.indexToStorageID[index]; alreadyCommitted {
 		return nil
@@ -543,7 +556,7 @@ func (s *storageImageDestination) commitLayer(blob manifest.LayerInfo, index int
 	}
 
 	// Carry over the previous ID for empty non-base layers.
-	if blob.EmptyLayer {
+	if blob.emptyLayer {
 		s.indexToStorageID[index] = &lastLayer
 		return nil
 	}
@@ -740,7 +753,10 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 
 	// Extract, commit, or find the layers.
 	for i, blob := range layerBlobs {
-		if err := s.commitLayer(blob, i); err != nil {
+		if err := s.commitLayer(i, addedLayerInfo{
+			BlobInfo:   blob.BlobInfo,
+			emptyLayer: blob.EmptyLayer,
+		}); err != nil {
 			return err
 		}
 	}
