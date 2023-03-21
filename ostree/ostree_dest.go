@@ -135,16 +135,16 @@ func (d *ostreeImageDestination) Close() error {
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (d *ostreeImageDestination) PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options private.PutBlobOptions) (types.BlobInfo, error) {
+func (d *ostreeImageDestination) PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options private.PutBlobOptions) (private.UploadedBlob, error) {
 	tmpDir, err := os.MkdirTemp(d.tmpDirPath, "blob")
 	if err != nil {
-		return types.BlobInfo{}, err
+		return private.UploadedBlob{}, err
 	}
 
 	blobPath := filepath.Join(tmpDir, "content")
 	blobFile, err := os.Create(blobPath)
 	if err != nil {
-		return types.BlobInfo{}, err
+		return private.UploadedBlob{}, err
 	}
 	defer blobFile.Close()
 
@@ -152,19 +152,19 @@ func (d *ostreeImageDestination) PutBlobWithOptions(ctx context.Context, stream 
 	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
 	size, err := io.Copy(blobFile, stream)
 	if err != nil {
-		return types.BlobInfo{}, err
+		return private.UploadedBlob{}, err
 	}
 	blobDigest := digester.Digest()
 	if inputInfo.Size != -1 && size != inputInfo.Size {
-		return types.BlobInfo{}, fmt.Errorf("Size mismatch when copying %s, expected %d, got %d", blobDigest, inputInfo.Size, size)
+		return private.UploadedBlob{}, fmt.Errorf("Size mismatch when copying %s, expected %d, got %d", blobDigest, inputInfo.Size, size)
 	}
 	if err := blobFile.Sync(); err != nil {
-		return types.BlobInfo{}, err
+		return private.UploadedBlob{}, err
 	}
 
 	hash := blobDigest.Hex()
 	d.blobs[hash] = &blobToImport{Size: size, Digest: blobDigest, BlobPath: blobPath}
-	return types.BlobInfo{Digest: blobDigest, Size: size}, nil
+	return private.UploadedBlob{Digest: blobDigest, Size: size}, nil
 }
 
 func fixFiles(selinuxHnd *C.struct_selabel_handle, root string, dir string, usermode bool) error {

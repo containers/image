@@ -164,7 +164,7 @@ func (s *storageImageDestination) computeNextBlobCacheFile() string {
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, options private.PutBlobOptions) (types.BlobInfo, error) {
+func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream io.Reader, blobinfo types.BlobInfo, options private.PutBlobOptions) (private.UploadedBlob, error) {
 	info, err := s.putBlobToPendingFile(stream, blobinfo, &options)
 	if err != nil {
 		return info, err
@@ -182,16 +182,12 @@ func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream
 
 // putBlobToPendingFile implements ImageDestination.PutBlobWithOptions, storing stream into an on-disk file.
 // The caller must arrange the blob to be eventually committed using s.commitLayer().
-func (s *storageImageDestination) putBlobToPendingFile(stream io.Reader, blobinfo types.BlobInfo, options *private.PutBlobOptions) (types.BlobInfo, error) {
+func (s *storageImageDestination) putBlobToPendingFile(stream io.Reader, blobinfo types.BlobInfo, options *private.PutBlobOptions) (private.UploadedBlob, error) {
 	// Stores a layer or data blob in our temporary directory, checking that any information
 	// in the blobinfo matches the incoming data.
-	errorBlobInfo := types.BlobInfo{
-		Digest: "",
-		Size:   -1,
-	}
 	if blobinfo.Digest != "" {
 		if err := blobinfo.Digest.Validate(); err != nil {
-			return errorBlobInfo, fmt.Errorf("invalid digest %#v: %w", blobinfo.Digest.String(), err)
+			return private.UploadedBlob{}, fmt.Errorf("invalid digest %#v: %w", blobinfo.Digest.String(), err)
 		}
 	}
 
@@ -199,7 +195,7 @@ func (s *storageImageDestination) putBlobToPendingFile(stream io.Reader, blobinf
 	filename := s.computeNextBlobCacheFile()
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY|os.O_EXCL, 0600)
 	if err != nil {
-		return errorBlobInfo, fmt.Errorf("creating temporary file %q: %w", filename, err)
+		return private.UploadedBlob{}, fmt.Errorf("creating temporary file %q: %w", filename, err)
 	}
 	defer file.Close()
 	counter := ioutils.NewWriteCounter(file)
@@ -207,7 +203,7 @@ func (s *storageImageDestination) putBlobToPendingFile(stream io.Reader, blobinf
 	digester, stream := putblobdigest.DigestIfUnknown(stream, blobinfo)
 	decompressed, err := archive.DecompressStream(stream)
 	if err != nil {
-		return errorBlobInfo, fmt.Errorf("setting up to decompress blob: %w", err)
+		return private.UploadedBlob{}, fmt.Errorf("setting up to decompress blob: %w", err)
 	}
 
 	diffID := digest.Canonical.Digester()
@@ -216,7 +212,7 @@ func (s *storageImageDestination) putBlobToPendingFile(stream io.Reader, blobinf
 	_, err = io.Copy(diffID.Hash(), decompressed)
 	decompressed.Close()
 	if err != nil {
-		return errorBlobInfo, fmt.Errorf("storing blob to file %q: %w", filename, err)
+		return private.UploadedBlob{}, fmt.Errorf("storing blob to file %q: %w", filename, err)
 	}
 
 	// Determine blob properties, and fail if information that we were given about the blob
@@ -226,7 +222,7 @@ func (s *storageImageDestination) putBlobToPendingFile(stream io.Reader, blobinf
 	if blobSize < 0 {
 		blobSize = counter.Count
 	} else if blobinfo.Size != counter.Count {
-		return errorBlobInfo, ErrBlobSizeMismatch
+		return private.UploadedBlob{}, ErrBlobSizeMismatch
 	}
 
 	// Record information about the blob.
@@ -238,10 +234,9 @@ func (s *storageImageDestination) putBlobToPendingFile(stream io.Reader, blobinf
 	// This is safe because we have just computed diffID, and blobDigest was either computed
 	// by us, or validated by the caller (usually copy.digestingReader).
 	options.Cache.RecordDigestUncompressedPair(blobDigest, diffID.Digest())
-	return types.BlobInfo{
-		Digest:    blobDigest,
-		Size:      blobSize,
-		MediaType: blobinfo.MediaType,
+	return private.UploadedBlob{
+		Digest: blobDigest,
+		Size:   blobSize,
 	}, nil
 }
 

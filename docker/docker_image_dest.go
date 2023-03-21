@@ -132,8 +132,8 @@ func (c *sizeCounter) Write(p []byte) (n int, err error) {
 // inputInfo.MediaType describes the blob format, if known.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
-// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (d *dockerImageDestination) PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options private.PutBlobOptions) (types.BlobInfo, error) {
+// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlobWithOptions MUST 1) fail, and 2) delete any data stored so far.
+func (d *dockerImageDestination) PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options private.PutBlobOptions) (private.UploadedBlob, error) {
 	// If requested, precompute the blob digest to prevent uploading layers that already exist on the registry.
 	// This functionality is particularly useful when BlobInfoCache has not been populated with compressed digests,
 	// the source blob is uncompressed, and the destination blob is being compressed "on the fly".
@@ -141,7 +141,7 @@ func (d *dockerImageDestination) PutBlobWithOptions(ctx context.Context, stream 
 		logrus.Debugf("Precomputing digest layer for %s", reference.Path(d.ref.ref))
 		streamCopy, cleanup, err := streamdigest.ComputeBlobInfo(d.c.sys, stream, &inputInfo)
 		if err != nil {
-			return types.BlobInfo{}, err
+			return private.UploadedBlob{}, err
 		}
 		defer cleanup()
 		stream = streamCopy
@@ -152,10 +152,10 @@ func (d *dockerImageDestination) PutBlobWithOptions(ctx context.Context, stream 
 		// Still, we need to check, if only because the "initiate upload" endpoint does not have a documented "blob already exists" return value.
 		haveBlob, reusedInfo, err := d.tryReusingExactBlob(ctx, inputInfo, options.Cache)
 		if err != nil {
-			return types.BlobInfo{}, err
+			return private.UploadedBlob{}, err
 		}
 		if haveBlob {
-			return types.BlobInfo{Digest: reusedInfo.Digest, Size: reusedInfo.Size}, nil
+			return private.UploadedBlob{Digest: reusedInfo.Digest, Size: reusedInfo.Size}, nil
 		}
 	}
 
@@ -164,16 +164,16 @@ func (d *dockerImageDestination) PutBlobWithOptions(ctx context.Context, stream 
 	logrus.Debugf("Uploading %s", uploadPath)
 	res, err := d.c.makeRequest(ctx, http.MethodPost, uploadPath, nil, nil, v2Auth, nil)
 	if err != nil {
-		return types.BlobInfo{}, err
+		return private.UploadedBlob{}, err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusAccepted {
 		logrus.Debugf("Error initiating layer upload, response %#v", *res)
-		return types.BlobInfo{}, fmt.Errorf("initiating layer upload to %s in %s: %w", uploadPath, d.c.registry, registryHTTPResponseToError(res))
+		return private.UploadedBlob{}, fmt.Errorf("initiating layer upload to %s in %s: %w", uploadPath, d.c.registry, registryHTTPResponseToError(res))
 	}
 	uploadLocation, err := res.Location()
 	if err != nil {
-		return types.BlobInfo{}, fmt.Errorf("determining upload URL: %w", err)
+		return private.UploadedBlob{}, fmt.Errorf("determining upload URL: %w", err)
 	}
 
 	digester, stream := putblobdigest.DigestIfCanonicalUnknown(stream, inputInfo)
@@ -201,7 +201,7 @@ func (d *dockerImageDestination) PutBlobWithOptions(ctx context.Context, stream 
 		return uploadLocation, nil
 	}()
 	if err != nil {
-		return types.BlobInfo{}, err
+		return private.UploadedBlob{}, err
 	}
 	blobDigest := digester.Digest()
 
@@ -212,17 +212,17 @@ func (d *dockerImageDestination) PutBlobWithOptions(ctx context.Context, stream 
 	uploadLocation.RawQuery = locationQuery.Encode()
 	res, err = d.c.makeRequestToResolvedURL(ctx, http.MethodPut, uploadLocation, map[string][]string{"Content-Type": {"application/octet-stream"}}, nil, -1, v2Auth, nil)
 	if err != nil {
-		return types.BlobInfo{}, err
+		return private.UploadedBlob{}, err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusCreated {
 		logrus.Debugf("Error uploading layer, response %#v", *res)
-		return types.BlobInfo{}, fmt.Errorf("uploading layer to %s: %w", uploadLocation, registryHTTPResponseToError(res))
+		return private.UploadedBlob{}, fmt.Errorf("uploading layer to %s: %w", uploadLocation, registryHTTPResponseToError(res))
 	}
 
 	logrus.Debugf("Upload of layer %s complete", blobDigest)
 	options.Cache.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), blobDigest, newBICLocationReference(d.ref))
-	return types.BlobInfo{Digest: blobDigest, Size: sizeCounter.size}, nil
+	return private.UploadedBlob{Digest: blobDigest, Size: sizeCounter.size}, nil
 }
 
 // blobExists returns true iff repo contains a blob with digest, and if so, also its size.

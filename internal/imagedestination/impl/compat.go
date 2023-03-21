@@ -43,10 +43,17 @@ func AddCompat(dest private.ImageDestinationInternalOnly) Compat {
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
 func (c *Compat) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
-	return c.dest.PutBlobWithOptions(ctx, stream, inputInfo, private.PutBlobOptions{
+	res, err := c.dest.PutBlobWithOptions(ctx, stream, inputInfo, private.PutBlobOptions{
 		Cache:    blobinfocache.FromBlobInfoCache(cache),
 		IsConfig: isConfig,
 	})
+	if err != nil {
+		return types.BlobInfo{}, err
+	}
+	return types.BlobInfo{
+		Digest: res.Digest,
+		Size:   res.Size,
+	}, nil
 }
 
 // TryReusingBlob checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination

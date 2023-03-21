@@ -47,8 +47,8 @@ type ImageDestinationInternalOnly interface {
 	// inputInfo.MediaType describes the blob format, if known.
 	// WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 	// to any other readers for download using the supplied digest.
-	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-	PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options PutBlobOptions) (types.BlobInfo, error)
+	// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlobWithOptions MUST 1) fail, and 2) delete any data stored so far.
+	PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options PutBlobOptions) (UploadedBlob, error)
 
 	// PutBlobPartial attempts to create a blob using the data that is already present
 	// at the destination. chunkAccessor is accessed in a non-sequential way to retrieve the missing chunks.
@@ -76,6 +76,13 @@ type ImageDestinationInternalOnly interface {
 type ImageDestination interface {
 	types.ImageDestination
 	ImageDestinationInternalOnly
+}
+
+// UploadedBlob is information about a blob written to a destination.
+// It is the subset of types.BlobInfo fields the transport is responsible for setting; all fields must be provided.
+type UploadedBlob struct {
+	Digest digest.Digest
+	Size   int64
 }
 
 // PutBlobOptions are used in PutBlobWithOptions.

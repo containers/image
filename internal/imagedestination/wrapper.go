@@ -46,9 +46,16 @@ func FromPublic(dest types.ImageDestination) private.ImageDestination {
 // inputInfo.MediaType describes the blob format, if known.
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
-// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (w *wrapped) PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options private.PutBlobOptions) (types.BlobInfo, error) {
-	return w.PutBlob(ctx, stream, inputInfo, options.Cache, options.IsConfig)
+// If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlobWithOptions MUST 1) fail, and 2) delete any data stored so far.
+func (w *wrapped) PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options private.PutBlobOptions) (private.UploadedBlob, error) {
+	res, err := w.PutBlob(ctx, stream, inputInfo, options.Cache, options.IsConfig)
+	if err != nil {
+		return private.UploadedBlob{}, err
+	}
+	return private.UploadedBlob{
+		Digest: res.Digest,
+		Size:   res.Size,
+	}, nil
 }
 
 // TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
