@@ -88,7 +88,9 @@ type storageImageDestination struct {
 
 // addedLayerInfo records data about a layer to use in this image.
 type addedLayerInfo struct {
-	types.BlobInfo
+	Digest     digest.Digest
+	Size       int64
+	MediaType  string
 	emptyLayer bool // The layer is an “empty”/“throwaway” one, and may or may not be physically represented in various transport / storage systems.  false if the manifest type does not have the concept.
 }
 
@@ -175,7 +177,9 @@ func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream
 	}
 
 	return info, s.queueOrCommit(*options.LayerIndex, addedLayerInfo{
-		BlobInfo:   info,
+		Digest:     info.Digest,
+		Size:       info.Size,
+		MediaType:  info.MediaType,
 		emptyLayer: options.EmptyLayer,
 	})
 }
@@ -317,7 +321,9 @@ func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context,
 	}
 
 	return reused, info, s.queueOrCommit(*options.LayerIndex, addedLayerInfo{
-		BlobInfo:   info,
+		Digest:     info.Digest,
+		Size:       info.Size,
+		MediaType:  info.MediaType,
 		emptyLayer: options.EmptyLayer,
 	})
 }
@@ -540,6 +546,7 @@ func (s *storageImageDestination) queueOrCommit(index int, info addedLayerInfo) 
 }
 
 // commitLayer commits the specified layer with the given index to the storage.
+// Contrary to the general definition of addedLayerInfo, Size may be -1.
 // Note that the previous layer is expected to already be committed.
 //
 // Caution: this function must be called without holding `s.lock`.  Callers
@@ -758,7 +765,9 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	// Extract, commit, or find the layers.
 	for i, blob := range layerBlobs {
 		if err := s.commitLayer(i, addedLayerInfo{
-			BlobInfo:   blob.BlobInfo,
+			Digest:     blob.Digest,
+			Size:       blob.Size,
+			MediaType:  blob.MediaType,
 			emptyLayer: blob.EmptyLayer,
 		}); err != nil {
 			return err
