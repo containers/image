@@ -269,7 +269,7 @@ func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.Read
 // It is available only if SupportsPutBlobPartial().
 // Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
 // should fall back to PutBlobWithOptions.
-func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, cache blobinfocache.BlobInfoCache2) (types.BlobInfo, error) {
+func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, cache blobinfocache.BlobInfoCache2) (private.UploadedBlob, error) {
 	fetcher := zstdFetcher{
 		chunkAccessor: chunkAccessor,
 		ctx:           ctx,
@@ -278,12 +278,12 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 
 	differ, err := chunked.GetDiffer(ctx, s.imageRef.transport.store, srcInfo.Size, srcInfo.Annotations, &fetcher)
 	if err != nil {
-		return srcInfo, err
+		return private.UploadedBlob{}, err
 	}
 
 	out, err := s.imageRef.transport.store.ApplyDiffWithDiffer("", nil, differ)
 	if err != nil {
-		return srcInfo, err
+		return private.UploadedBlob{}, err
 	}
 
 	blobDigest := srcInfo.Digest
@@ -295,7 +295,10 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	s.diffOutputs[blobDigest] = out
 	s.lock.Unlock()
 
-	return srcInfo, nil
+	return private.UploadedBlob{
+		Digest: blobDigest,
+		Size:   srcInfo.Size,
+	}, nil
 }
 
 // TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
