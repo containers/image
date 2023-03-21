@@ -311,7 +311,7 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 // reflected in the manifest that will be written.
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context, blobinfo types.BlobInfo, options private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
-	reused, info, err := s.tryReusingBlobAsPending(blobinfo, &options)
+	reused, info, err := s.tryReusingBlobAsPending(blobinfo.Digest, blobinfo.Size, blobinfo.MediaType, &options)
 	if err != nil || !reused || options.LayerIndex == nil {
 		return reused, info, err
 	}
@@ -322,98 +322,102 @@ func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context,
 	})
 }
 
-// tryReusingBlobAsPending implements TryReusingBlobWithOptions, filling s.blobDiffIDs and other metadata.
+// tryReusingBlobAsPending implements TryReusingBlobWithOptions for (digest, size or -1, mimeType), filling s.blobDiffIDs and other metadata.
 // The caller must arrange the blob to be eventually committed using s.commitLayer().
-func (s *storageImageDestination) tryReusingBlobAsPending(blobinfo types.BlobInfo, options *private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
+func (s *storageImageDestination) tryReusingBlobAsPending(digest digest.Digest, size int64, mimeType string, options *private.TryReusingBlobOptions) (bool, types.BlobInfo, error) {
 	// lock the entire method as it executes fairly quickly
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	if options.SrcRef != nil {
 		// Check if we have the layer in the underlying additional layer store.
-		aLayer, err := s.imageRef.transport.store.LookupAdditionalLayer(blobinfo.Digest, options.SrcRef.String())
+		aLayer, err := s.imageRef.transport.store.LookupAdditionalLayer(digest, options.SrcRef.String())
 		if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
-			return false, types.BlobInfo{}, fmt.Errorf(`looking for compressed layers with digest %q and labels: %w`, blobinfo.Digest, err)
+			return false, types.BlobInfo{}, fmt.Errorf(`looking for compressed layers with digest %q and labels: %w`, digest, err)
 		} else if err == nil {
 			// Record the uncompressed value so that we can use it to calculate layer IDs.
-			s.blobDiffIDs[blobinfo.Digest] = aLayer.UncompressedDigest()
-			s.blobAdditionalLayer[blobinfo.Digest] = aLayer
+			s.blobDiffIDs[digest] = aLayer.UncompressedDigest()
+			s.blobAdditionalLayer[digest] = aLayer
 			return true, types.BlobInfo{
-				Digest:    blobinfo.Digest,
+				Digest:    digest,
 				Size:      aLayer.CompressedSize(),
-				MediaType: blobinfo.MediaType,
+				MediaType: mimeType,
 			}, nil
 		}
 	}
 
-	if blobinfo.Digest == "" {
+	if digest == "" {
 		return false, types.BlobInfo{}, errors.New(`Can not check for a blob with unknown digest`)
 	}
-	if err := blobinfo.Digest.Validate(); err != nil {
+	if err := digest.Validate(); err != nil {
 		return false, types.BlobInfo{}, fmt.Errorf("Can not check for a blob with invalid digest: %w", err)
 	}
 
 	// Check if we've already cached it in a file.
-	if size, ok := s.fileSizes[blobinfo.Digest]; ok {
+	if size, ok := s.fileSizes[digest]; ok {
 		return true, types.BlobInfo{
-			Digest:    blobinfo.Digest,
+			Digest:    digest,
 			Size:      size,
-			MediaType: blobinfo.MediaType,
+			MediaType: mimeType,
 		}, nil
 	}
 
 	// Check if we have a wasn't-compressed layer in storage that's based on that blob.
-	layers, err := s.imageRef.transport.store.LayersByUncompressedDigest(blobinfo.Digest)
+	layers, err := s.imageRef.transport.store.LayersByUncompressedDigest(digest)
 	if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
-		return false, types.BlobInfo{}, fmt.Errorf(`looking for layers with digest %q: %w`, blobinfo.Digest, err)
+		return false, types.BlobInfo{}, fmt.Errorf(`looking for layers with digest %q: %w`, digest, err)
 	}
 	if len(layers) > 0 {
 		// Save this for completeness.
-		s.blobDiffIDs[blobinfo.Digest] = layers[0].UncompressedDigest
+		s.blobDiffIDs[digest] = layers[0].UncompressedDigest
 		return true, types.BlobInfo{
-			Digest:    blobinfo.Digest,
+			Digest:    digest,
 			Size:      layers[0].UncompressedSize,
-			MediaType: blobinfo.MediaType,
+			MediaType: mimeType,
 		}, nil
 	}
 
 	// Check if we have a was-compressed layer in storage that's based on that blob.
-	layers, err = s.imageRef.transport.store.LayersByCompressedDigest(blobinfo.Digest)
+	layers, err = s.imageRef.transport.store.LayersByCompressedDigest(digest)
 	if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
-		return false, types.BlobInfo{}, fmt.Errorf(`looking for compressed layers with digest %q: %w`, blobinfo.Digest, err)
+		return false, types.BlobInfo{}, fmt.Errorf(`looking for compressed layers with digest %q: %w`, digest, err)
 	}
 	if len(layers) > 0 {
 		// Record the uncompressed value so that we can use it to calculate layer IDs.
-		s.blobDiffIDs[blobinfo.Digest] = layers[0].UncompressedDigest
+		s.blobDiffIDs[digest] = layers[0].UncompressedDigest
 		return true, types.BlobInfo{
-			Digest:    blobinfo.Digest,
+			Digest:    digest,
 			Size:      layers[0].CompressedSize,
-			MediaType: blobinfo.MediaType,
+			MediaType: mimeType,
 		}, nil
 	}
 
 	// Does the blob correspond to a known DiffID which we already have available?
 	// Because we must return the size, which is unknown for unavailable compressed blobs, the returned BlobInfo refers to the
 	// uncompressed layer, and that can happen only if options.CanSubstitute, or if the incoming manifest already specifies the size.
-	if options.CanSubstitute || blobinfo.Size != -1 {
-		if uncompressedDigest := options.Cache.UncompressedDigest(blobinfo.Digest); uncompressedDigest != "" && uncompressedDigest != blobinfo.Digest {
+	if options.CanSubstitute || size != -1 {
+		if uncompressedDigest := options.Cache.UncompressedDigest(digest); uncompressedDigest != "" && uncompressedDigest != digest {
 			layers, err := s.imageRef.transport.store.LayersByUncompressedDigest(uncompressedDigest)
 			if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
 				return false, types.BlobInfo{}, fmt.Errorf(`looking for layers with digest %q: %w`, uncompressedDigest, err)
 			}
 			if len(layers) > 0 {
-				if blobinfo.Size != -1 {
-					s.blobDiffIDs[blobinfo.Digest] = layers[0].UncompressedDigest
-					return true, blobinfo, nil
+				if size != -1 {
+					s.blobDiffIDs[digest] = layers[0].UncompressedDigest
+					return true, types.BlobInfo{
+						Digest:    digest,
+						Size:      size,
+						MediaType: mimeType,
+					}, nil
 				}
 				if !options.CanSubstitute {
-					return false, types.BlobInfo{}, fmt.Errorf("Internal error: options.CanSubstitute was expected to be true for blobInfo %v", blobinfo)
+					return false, types.BlobInfo{}, fmt.Errorf("Internal error: options.CanSubstitute was expected to be true for blob with digest %s", digest)
 				}
 				s.blobDiffIDs[uncompressedDigest] = layers[0].UncompressedDigest
 				return true, types.BlobInfo{
 					Digest:    uncompressedDigest,
 					Size:      layers[0].UncompressedSize,
-					MediaType: blobinfo.MediaType,
+					MediaType: mimeType,
 				}, nil
 			}
 		}
@@ -575,7 +579,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo) er
 		// so far we are going to accommodate that (if we should be doing that at all).
 		logrus.Debugf("looking for diffID for blob %+v", info.Digest)
 		// Use tryReusingBlobAsPending, not the top-level TryReusingBlobWithOptions, to prevent recursion via queueOrCommit.
-		has, _, err := s.tryReusingBlobAsPending(info.BlobInfo, &private.TryReusingBlobOptions{
+		has, _, err := s.tryReusingBlobAsPending(info.Digest, info.Size, info.MediaType, &private.TryReusingBlobOptions{
 			Cache:         none.NoCache,
 			CanSubstitute: false,
 		})
