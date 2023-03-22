@@ -32,15 +32,16 @@ env:
     ####
     #### Cache-image names to test with (double-quotes around names are critical)
     ####
-    FEDORA_NAME: "fedora-37" ### c20230120t152650z-f37f36u2204
+    FEDORA_NAME: "fedora-37"
+    DEBIAN_NAME: "debian-12"
 
     # Google-cloud VM Images
-    IMAGE_SUFFIX: "c20230120t152650z-f37f36u2204"
+    IMAGE_SUFFIX: "c20230314t204248z-f37f36d12"
     FEDORA_CACHE_IMAGE_NAME: "fedora-${IMAGE_SUFFIX}"
+    DEBIAN_CACHE_IMAGE_NAME: "debian-${IMAGE_SUFFIX}"
 
     # Container FQIN's (include bleeding-edge development-level container deps.)
     FEDORA_CONTAINER_FQIN: "quay.io/libpod/fedora_podman:${IMAGE_SUFFIX}"
-    UBUNTU_CONTAINER_FQIN: "quay.io/libpod/ubuntu_podman:${IMAGE_SUFFIX}"
     # Built along with the standard PR-based workflow in c/automation_images
     SKOPEO_CIDEV_CONTAINER_FQIN: "quay.io/libpod/skopeo_cidev:${IMAGE_SUFFIX}"
 
@@ -53,14 +54,17 @@ validate_task:
     # under Cirrus-CI, due to challenges obtaining the starting commit ID.
     # Only do validation for PRs.
     only_if: $CIRRUS_PR != ''
-    # https://cirrus-ci.org/guide/docker-builder-vm/#dockerfile-as-a-ci-environment
-    container:
-        dockerfile: .cirrus.Dockerfile
-        # golangci-lint tool requires heavy cpu/memory or gets OOM'd
-        cpu: 6
-        memory: 22
-        docker_arguments:
-            BASE_IMAGE: '${UBUNTU_CONTAINER_FQIN}'
+    gce_instance: &debian_vm
+        image_project: libpod-218412
+        zone: "us-central1-f"
+        cpu: 2
+        memory: "4Gb"
+        # Required to be 200gig, do not modify - has i/o performance impact
+        # according to gcloud CLI tool warning messages.
+        disk: 200
+        image_name: ${DEBIAN_CACHE_IMAGE_NAME}
+    env:
+        HOME: "/root"  # default unset, needed by golangci-lint.
     script: |
         git remote update
         make tools
@@ -70,15 +74,8 @@ validate_task:
 
 cross_task:
     only_if: &not_docs $CIRRUS_CHANGE_TITLE !=~ '.*CI:DOCS.*'
-    container: &std_container
-        dockerfile: .cirrus.Dockerfile
-        # golangci-lint tool requires heavy cpu/memory or gets OOM'd
-        cpu: 2
-        memory: 4
-        docker_arguments:
-            BASE_IMAGE: '${UBUNTU_CONTAINER_FQIN}'
-    script: |
-        make cross
+    gce_instance: *debian_vm
+    script: make cross
 
 
 test_task:
@@ -86,7 +83,7 @@ test_task:
     depends_on:
         - validate
     only_if: *not_docs
-    container: *std_container
+    gce_instance: *debian_vm
     matrix:
         - name: "Test"
           env:
@@ -94,9 +91,7 @@ test_task:
         - name: "Test w/ opengpg"
           env:
               BUILDTAGS: &withopengpg 'btrfs_noversion libdm_no_deferred_remove containers_image_openpgp'
-    script: |
-        make tools
-        make test BUILDTAGS="$BUILDTAGS"
+    script: ${GOSRC}/${SCRIPT_BASE}/runner.sh image_tests
 
 
 #####
@@ -151,7 +146,9 @@ meta_task:
         image: quay.io/libpod/imgts:latest
     env:
         # Space-separated list of images used by this repository state
-        IMGNAMES: "${FEDORA_CACHE_IMAGE_NAME}"
+        IMGNAMES: |
+            ${FEDORA_CACHE_IMAGE_NAME}
+            ${DEBIAN_CACHE_IMAGE_NAME}
         BUILDID: "${CIRRUS_BUILD_ID}"
         REPOREF: "${CIRRUS_REPO_NAME}"
         GCPJSON: ENCRYPTED[04306103eee1933f87deb8a5af6514a7e3164aa589d6079abc0451eb2360879430ed020d6e025ca64ef667138ce9d786]
