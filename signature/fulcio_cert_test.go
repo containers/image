@@ -61,6 +61,14 @@ func TestFulcioTrustRootValidate(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// oidIssuerV1Ext creates an certificate.OIDIssuer extension
+func oidIssuerV1Ext(value string) pkix.Extension {
+	return pkix.Extension{
+		Id:    certificate.OIDIssuer,
+		Value: []byte(value),
+	}
+}
+
 func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 	fulcioCACertificates := x509.NewCertPool()
 	fulcioCABundlePEM, err := os.ReadFile("fixtures/fulcio_v1.crt.pem")
@@ -198,12 +206,7 @@ func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 		{
 			name: "Duplicate issuer extension",
 			fn: func(cert *x509.Certificate) {
-				cert.ExtraExtensions = append([]pkix.Extension{
-					{
-						Id:    certificate.OIDIssuer,
-						Value: []byte("this does not match"),
-					},
-				}, cert.ExtraExtensions...)
+				cert.ExtraExtensions = append([]pkix.Extension{oidIssuerV1Ext("this does not match")}, cert.ExtraExtensions...)
 			},
 			// Match both our message and the Go 1.19 message: "certificate contains duplicate extensions"
 			errorFragment: "duplicate",
@@ -211,12 +214,7 @@ func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 		{
 			name: "Issuer mismatch",
 			fn: func(cert *x509.Certificate) {
-				cert.ExtraExtensions = []pkix.Extension{
-					{
-						Id:    certificate.OIDIssuer,
-						Value: []byte("this does not match"),
-					},
-				}
+				cert.ExtraExtensions = []pkix.Extension{oidIssuerV1Ext("this does not match")}
 			},
 			errorFragment: "Unexpected Fulcio OIDC issuer",
 		},
@@ -254,17 +252,12 @@ func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 		testLeafSN, err := cryptoutils.GenerateSerialNumber()
 		require.NoError(t, err, c.name)
 		testLeafContents := x509.Certificate{
-			SerialNumber: testLeafSN,
-			Subject:      pkix.Name{CommonName: "leaf"},
-			NotBefore:    referenceTime.Add(-1 * time.Minute),
-			NotAfter:     referenceTime.Add(1 * time.Hour),
-			ExtraExtensions: []pkix.Extension{
-				{
-					Id:    certificate.OIDIssuer,
-					Value: []byte("https://github.com/login/oauth"),
-				},
-			},
-			EmailAddresses: []string{"test-user@example.com"},
+			SerialNumber:    testLeafSN,
+			Subject:         pkix.Name{CommonName: "leaf"},
+			NotBefore:       referenceTime.Add(-1 * time.Minute),
+			NotAfter:        referenceTime.Add(1 * time.Hour),
+			ExtraExtensions: []pkix.Extension{oidIssuerV1Ext("https://github.com/login/oauth")},
+			EmailAddresses:  []string{"test-user@example.com"},
 		}
 		c.fn(&testLeafContents)
 		testLeafCert, err := x509.CreateCertificate(rand.Reader, &testLeafContents, testCACert, testLeafKey.Public(), testCAKey)
@@ -287,7 +280,6 @@ func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 			assert.Nil(t, pk, c.name)
 		}
 	}
-
 }
 
 func TestVerifyRekorFulcio(t *testing.T) {
