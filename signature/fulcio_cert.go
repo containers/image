@@ -37,26 +37,26 @@ func (f *fulcioTrustRoot) validate() error {
 // it fails if the extension is not present in the certificate, or on any inconsistency.
 func fulcioIssuerInCertificate(untrustedCertificate *x509.Certificate) (string, error) {
 	// == Validate the recorded OIDC issuer
-	gotOIDCIssuer := false
-	var oidcIssuer string
+	gotOIDCIssuer1 := false
+	var oidcIssuer1 string
 	// certificate.ParseExtensions doesn’t reject duplicate extensions.
 	// Go 1.19 rejects duplicate extensions universally; but until we can require Go 1.19,
 	// reject duplicates manually. With Go 1.19, we could call certificate.ParseExtensions again.
 	for _, untrustedExt := range untrustedCertificate.Extensions {
 		if untrustedExt.Id.Equal(certificate.OIDIssuer) {
-			if gotOIDCIssuer {
+			if gotOIDCIssuer1 {
 				// Coverage: This is unreachable in Go ≥1.19, which rejects certificates with duplicate extensions
 				// already in ParseCertificate.
 				return "", internal.NewInvalidSignatureError("Fulcio certificate has a duplicate OIDC issuer extension")
 			}
-			oidcIssuer = string(untrustedExt.Value)
-			gotOIDCIssuer = true
+			oidcIssuer1 = string(untrustedExt.Value)
+			gotOIDCIssuer1 = true
 		}
 	}
-	if !gotOIDCIssuer {
+	if !gotOIDCIssuer1 {
 		return "", internal.NewInvalidSignatureError("Fulcio certificate is missing the issuer extension")
 	}
-	return oidcIssuer, nil
+	return oidcIssuer1, nil
 }
 
 func (f *fulcioTrustRoot) verifyFulcioCertificateAtTime(relevantTime time.Time, untrustedCertificateBytes []byte, untrustedIntermediateChainBytes []byte) (crypto.PublicKey, error) {
