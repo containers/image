@@ -9,10 +9,21 @@ const (
 	TestImageSignatureReference = "testing/manifest"
 	// TestKeyFingerprint is the fingerprint of the private key in this directory.
 	TestKeyFingerprint = "1D8230F6CDB6A06716E414C1DB72F2188BB46CC8"
+	// TestOtherFingerprint1 is a random fingerprint.
+	TestOtherFingerprint1 = "0123456789ABCDEF0123456789ABCDEF01234567"
+	// TestOtherFingerprint2 is a random fingerprint.
+	TestOtherFingerprint2 = "DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF"
 	// TestKeyShortID is the short ID of the private key in this directory.
 	TestKeyShortID = "DB72F2188BB46CC8"
 	// TestKeyFingerprintWithPassphrase is the fingerprint of the private key with passphrase in this directory.
 	TestKeyFingerprintWithPassphrase = "E3EB7611D815211F141946B5B0CDE60B42557346"
 	// TestPassphrase is the passphrase for TestKeyFingerprintWithPassphrase.
 	TestPassphrase = "WithPassphrase123"
+)
+
+var (
+	// TestFingerprintListWithKey slice of multiple fingerprints including the fingerprint of the private key in this directory.
+	TestFingerprintListWithKey = []string{TestKeyFingerprint, TestOtherFingerprint1, TestOtherFingerprint2}
+	// TestFingerprintListWithoutKey slice of multiple fingerprints not including the fingerprint of the private key in this directory.
+	TestFingerprintListWithoutKey = []string{TestOtherFingerprint1, TestOtherFingerprint2}
 )
