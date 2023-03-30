@@ -33,8 +33,8 @@ import (
 // limitations under the License.
 
 const (
-	// from sigstore/cosign/pkg/cosign.sigstorePrivateKeyPemType.
-	sigstorePrivateKeyPemType = "ENCRYPTED COSIGN PRIVATE KEY"
+	// from sigstore/cosign/pkg/cosign.cosignPrivateKeyPemType.
+	cosignPrivateKeyPemType = "ENCRYPTED COSIGN PRIVATE KEY"
 )
 
 // from sigstore/cosign/pkg/cosign.loadPrivateKey
@@ -45,7 +45,7 @@ func loadPrivateKey(key []byte, pass []byte) (signature.SignerVerifier, error) {
 	if p == nil {
 		return nil, errors.New("invalid pem block")
 	}
-	if p.Type != sigstorePrivateKeyPemType {
+	if p.Type != cosignPrivateKeyPemType {
 		return nil, fmt.Errorf("unsupported pem type: %s", p.Type)
 	}
 
@@ -86,7 +86,7 @@ func marshalKeyPair(privateKey crypto.PrivateKey, publicKey crypto.PublicKey, pa
 	// store in PEM format
 	privBytes := pem.EncodeToMemory(&pem.Block{
 		Bytes: encBytes,
-		Type:  sigstorePrivateKeyPemType,
+		Type:  cosignPrivateKeyPemType,
 	})
 
 	// Now do the public key
