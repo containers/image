@@ -43,7 +43,7 @@ func fulcioIssuerInCertificate(untrustedCertificate *x509.Certificate) (string, 
 	// Go 1.19 rejects duplicate extensions universally; but until we can require Go 1.19,
 	// reject duplicates manually. With Go 1.19, we could call certificate.ParseExtensions again.
 	for _, untrustedExt := range untrustedCertificate.Extensions {
-		if untrustedExt.Id.Equal(certificate.OIDIssuer) {
+		if untrustedExt.Id.Equal(certificate.OIDIssuer) { //nolint:staticcheck // This is deprecated, but we must continue to accept it.
 			if gotOIDCIssuer1 {
 				// Coverage: This is unreachable in Go ≥1.19, which rejects certificates with duplicate extensions
 				// already in ParseCertificate.

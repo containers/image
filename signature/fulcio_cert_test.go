@@ -64,7 +64,7 @@ func TestFulcioTrustRootValidate(t *testing.T) {
 // oidIssuerV1Ext creates an certificate.OIDIssuer extension
 func oidIssuerV1Ext(value string) pkix.Extension {
 	return pkix.Extension{
-		Id:    certificate.OIDIssuer,
+		Id:    certificate.OIDIssuer, //nolint:staticcheck // This is deprecated, but we must continue to accept it.
 		Value: []byte(value),
 	}
 }
