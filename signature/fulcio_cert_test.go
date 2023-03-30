@@ -69,6 +69,75 @@ func oidIssuerV1Ext(value string) pkix.Extension {
 	}
 }
 
+func TestFulcioIssuerInCertificate(t *testing.T) {
+	referenceTime := time.Now()
+	for _, c := range []struct {
+		name          string
+		extensions    []pkix.Extension
+		errorFragment string
+		expected      string
+	}{
+		{
+			name:          "Missing issuer",
+			extensions:    nil,
+			errorFragment: "Fulcio certificate is missing the issuer extension",
+		},
+		{
+			name: "Duplicate issuer extension",
+			extensions: []pkix.Extension{
+				oidIssuerV1Ext("https://github.com/login/oauth"),
+				oidIssuerV1Ext("this does not match"),
+			},
+			// Match both our message and the Go 1.19 message: "certificate contains duplicate extensions"
+			errorFragment: "duplicate",
+		},
+		{
+			name:       "One valid issuer",
+			extensions: []pkix.Extension{oidIssuerV1Ext("https://github.com/login/oauth")},
+			expected:   "https://github.com/login/oauth",
+		},
+	} {
+		testLeafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		require.NoError(t, err, c.name)
+		testLeafSN, err := cryptoutils.GenerateSerialNumber()
+		require.NoError(t, err, c.name)
+		testLeafContents := x509.Certificate{
+			SerialNumber:    testLeafSN,
+			Subject:         pkix.Name{CommonName: "leaf"},
+			NotBefore:       referenceTime.Add(-1 * time.Minute),
+			NotAfter:        referenceTime.Add(1 * time.Hour),
+			ExtraExtensions: c.extensions,
+			EmailAddresses:  []string{"test-user@example.com"},
+		}
+		// To be fairly representative, we do generate and parse a _real_ certificate, but we just use a self-signed certificate instead
+		// of bothering with a CA.
+		testLeafCert, err := x509.CreateCertificate(rand.Reader, &testLeafContents, &testLeafContents, testLeafKey.Public(), testLeafKey)
+		require.NoError(t, err, c.name)
+		testLeafPEM := pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: testLeafCert,
+		})
+
+		parsedLeafCerts, err := cryptoutils.UnmarshalCertificatesFromPEM(testLeafPEM)
+		if err != nil {
+			require.NotEqual(t, "", c.errorFragment)
+			assert.ErrorContains(t, err, c.errorFragment, c.name)
+		} else {
+			require.Len(t, parsedLeafCerts, 1)
+			parsedLeafCert := parsedLeafCerts[0]
+
+			res, err := fulcioIssuerInCertificate(parsedLeafCert)
+			if c.errorFragment == "" {
+				require.NoError(t, err, c.name)
+				assert.Equal(t, c.expected, res)
+			} else {
+				assert.ErrorContains(t, err, c.errorFragment, c.name)
+				assert.Equal(t, "", res)
+			}
+		}
+	}
+}
+
 func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 	fulcioCACertificates := x509.NewCertPool()
 	fulcioCABundlePEM, err := os.ReadFile("fixtures/fulcio_v1.crt.pem")
