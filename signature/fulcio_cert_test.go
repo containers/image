@@ -61,6 +61,155 @@ func TestFulcioTrustRootValidate(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// oidIssuerV1Ext creates an certificate.OIDIssuer extension
+func oidIssuerV1Ext(value string) pkix.Extension {
+	return pkix.Extension{
+		Id:    certificate.OIDIssuer, //nolint:staticcheck // This is deprecated, but we must continue to accept it.
+		Value: []byte(value),
+	}
+}
+
+// asn1MarshalTest is asn1.MarshalWithParams that must not fail
+func asn1MarshalTest(t *testing.T, value any, params string) []byte {
+	bytes, err := asn1.MarshalWithParams(value, params)
+	require.NoError(t, err)
+	return bytes
+}
+
+// oidIssuerV2Ext creates an certificate.OIDIssuerV2 extension
+func oidIssuerV2Ext(t *testing.T, value string) pkix.Extension {
+	return pkix.Extension{
+		Id:    certificate.OIDIssuerV2,
+		Value: asn1MarshalTest(t, value, "utf8"),
+	}
+}
+
+func TestFulcioIssuerInCertificate(t *testing.T) {
+	referenceTime := time.Now()
+	fulcioExtensions, err := certificate.Extensions{Issuer: "https://github.com/login/oauth"}.Render()
+	require.NoError(t, err)
+	for _, c := range []struct {
+		name          string
+		extensions    []pkix.Extension
+		errorFragment string
+		expected      string
+	}{
+		{
+			name:          "Missing issuer",
+			extensions:    nil,
+			errorFragment: "Fulcio certificate is missing the issuer extension",
+		},
+		{
+			name: "Duplicate issuer v1 extension",
+			extensions: []pkix.Extension{
+				oidIssuerV1Ext("https://github.com/login/oauth"),
+				oidIssuerV1Ext("this does not match"),
+			},
+			// Match both our message and the Go 1.19 message: "certificate contains duplicate extensions"
+			errorFragment: "duplicate",
+		},
+		{
+			name: "Duplicate issuer v2 extension",
+			extensions: []pkix.Extension{
+				oidIssuerV2Ext(t, "https://github.com/login/oauth"),
+				oidIssuerV2Ext(t, "this does not match"),
+			},
+			// Match both our message and the Go 1.19 message: "certificate contains duplicate extensions"
+			errorFragment: "duplicate",
+		},
+		{
+			name: "Completely invalid issuer v2 extension - error parsing",
+			extensions: []pkix.Extension{
+				{
+					Id:    certificate.OIDIssuerV2,
+					Value: asn1MarshalTest(t, 1, ""), // not a string type
+				},
+			},
+			errorFragment: "invalid ASN.1 in OIDC issuer v2 extension: asn1: structure error",
+		},
+		{
+			name: "Completely invalid issuer v2 extension - trailing data",
+			extensions: []pkix.Extension{
+				{
+					Id:    certificate.OIDIssuerV2,
+					Value: append(asn1MarshalTest(t, "https://", "utf8"), asn1MarshalTest(t, "example.com", "utf8")...),
+				},
+			},
+			errorFragment: "invalid ASN.1 in OIDC issuer v2 extension, trailing data",
+		},
+		{
+			name:       "One valid issuer v1",
+			extensions: []pkix.Extension{oidIssuerV1Ext("https://github.com/login/oauth")},
+			expected:   "https://github.com/login/oauth",
+		},
+		{
+			name:       "One valid issuer v2",
+			extensions: []pkix.Extension{oidIssuerV2Ext(t, "https://github.com/login/oauth")},
+			expected:   "https://github.com/login/oauth",
+		},
+		{
+			name: "Inconsistent issuer v1 and v2",
+			extensions: []pkix.Extension{
+				oidIssuerV1Ext("https://github.com/login/oauth"),
+				oidIssuerV2Ext(t, "this does not match"),
+			},
+			errorFragment: "inconsistent OIDC issuer extension values",
+		},
+		{
+			name: "Both issuer v1 and v2",
+			extensions: []pkix.Extension{
+				oidIssuerV1Ext("https://github.com/login/oauth"),
+				oidIssuerV2Ext(t, "https://github.com/login/oauth"),
+			},
+			expected: "https://github.com/login/oauth",
+		},
+		{
+			name:       "Fulcio interoperability",
+			extensions: fulcioExtensions,
+			expected:   "https://github.com/login/oauth",
+		},
+	} {
+		testLeafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		require.NoError(t, err, c.name)
+		testLeafSN, err := cryptoutils.GenerateSerialNumber()
+		require.NoError(t, err, c.name)
+		testLeafContents := x509.Certificate{
+			SerialNumber:    testLeafSN,
+			Subject:         pkix.Name{CommonName: "leaf"},
+			NotBefore:       referenceTime.Add(-1 * time.Minute),
+			NotAfter:        referenceTime.Add(1 * time.Hour),
+			ExtraExtensions: c.extensions,
+			EmailAddresses:  []string{"test-user@example.com"},
+		}
+		// To be fairly representative, we do generate and parse a _real_ certificate, but we just use a self-signed certificate instead
+		// of bothering with a CA.
+		testLeafCert, err := x509.CreateCertificate(rand.Reader, &testLeafContents, &testLeafContents, testLeafKey.Public(), testLeafKey)
+		require.NoError(t, err, c.name)
+		testLeafPEM := pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: testLeafCert,
+		})
+
+		parsedLeafCerts, err := cryptoutils.UnmarshalCertificatesFromPEM(testLeafPEM)
+		if err != nil {
+			require.NotEqual(t, "", c.errorFragment)
+			assert.ErrorContains(t, err, c.errorFragment, c.name)
+		} else {
+			require.Len(t, parsedLeafCerts, 1)
+			parsedLeafCert := parsedLeafCerts[0]
+
+			res, err := fulcioIssuerInCertificate(parsedLeafCert)
+			if c.errorFragment == "" {
+				require.NoError(t, err, c.name)
+				assert.Equal(t, c.expected, res)
+			} else {
+				assert.ErrorContains(t, err, c.errorFragment, c.name)
+				assert.Equal(t, "", res)
+			}
+		}
+	}
+}
+
 func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 	fulcioCACertificates := x509.NewCertPool()
 	fulcioCABundlePEM, err := os.ReadFile("fixtures/fulcio_v1.crt.pem")
@@ -198,12 +347,7 @@ func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 		{
 			name: "Duplicate issuer extension",
 			fn: func(cert *x509.Certificate) {
-				cert.ExtraExtensions = append([]pkix.Extension{
-					{
-						Id:    certificate.OIDIssuer,
-						Value: []byte("this does not match"),
-					},
-				}, cert.ExtraExtensions...)
+				cert.ExtraExtensions = append([]pkix.Extension{oidIssuerV1Ext("this does not match")}, cert.ExtraExtensions...)
 			},
 			// Match both our message and the Go 1.19 message: "certificate contains duplicate extensions"
 			errorFragment: "duplicate",
@@ -211,12 +355,7 @@ func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 		{
 			name: "Issuer mismatch",
 			fn: func(cert *x509.Certificate) {
-				cert.ExtraExtensions = []pkix.Extension{
-					{
-						Id:    certificate.OIDIssuer,
-						Value: []byte("this does not match"),
-					},
-				}
+				cert.ExtraExtensions = []pkix.Extension{oidIssuerV1Ext("this does not match")}
 			},
 			errorFragment: "Unexpected Fulcio OIDC issuer",
 		},
@@ -254,17 +393,12 @@ func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 		testLeafSN, err := cryptoutils.GenerateSerialNumber()
 		require.NoError(t, err, c.name)
 		testLeafContents := x509.Certificate{
-			SerialNumber: testLeafSN,
-			Subject:      pkix.Name{CommonName: "leaf"},
-			NotBefore:    referenceTime.Add(-1 * time.Minute),
-			NotAfter:     referenceTime.Add(1 * time.Hour),
-			ExtraExtensions: []pkix.Extension{
-				{
-					Id:    certificate.OIDIssuer,
-					Value: []byte("https://github.com/login/oauth"),
-				},
-			},
-			EmailAddresses: []string{"test-user@example.com"},
+			SerialNumber:    testLeafSN,
+			Subject:         pkix.Name{CommonName: "leaf"},
+			NotBefore:       referenceTime.Add(-1 * time.Minute),
+			NotAfter:        referenceTime.Add(1 * time.Hour),
+			ExtraExtensions: []pkix.Extension{oidIssuerV1Ext("https://github.com/login/oauth")},
+			EmailAddresses:  []string{"test-user@example.com"},
 		}
 		c.fn(&testLeafContents)
 		testLeafCert, err := x509.CreateCertificate(rand.Reader, &testLeafContents, testCACert, testLeafKey.Public(), testCAKey)
@@ -287,7 +421,6 @@ func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 			assert.Nil(t, pk, c.name)
 		}
 	}
-
 }
 
 func TestVerifyRekorFulcio(t *testing.T) {
