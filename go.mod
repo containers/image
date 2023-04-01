@@ -25,7 +25,7 @@ require (
 	github.com/opencontainers/selinux v1.11.0
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f
 	github.com/proglottis/gpgme v0.1.3
-	github.com/sigstore/fulcio v1.1.0
+	github.com/sigstore/fulcio v1.2.0
 	github.com/sigstore/rekor v1.1.0
 	github.com/sigstore/sigstore v1.6.0
 	github.com/sirupsen/logrus v1.9.0
@@ -75,7 +75,7 @@ require (
 	github.com/go-playground/validator/v10 v10.12.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-containerregistry v0.13.0 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect
 	github.com/google/trillian v1.5.1 // indirect
