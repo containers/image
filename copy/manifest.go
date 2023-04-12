@@ -76,7 +76,7 @@ func determineManifestConversion(in determineManifestConversionInputs) (manifest
 		destSupportedManifestMIMETypes = []string{in.forceManifestMIMEType}
 	}
 
-	if len(destSupportedManifestMIMETypes) == 0 && (!in.requiresOCIEncryption || manifest.MIMETypeSupportsEncryption(srcType)) {
+	if len(destSupportedManifestMIMETypes) == 0 {
 		return manifestConversionPlan{ // Anything goes; just use the original as is, do not try any conversions.
 			preferredMIMEType:       srcType,
 			otherMIMETypeCandidates: []string{},
