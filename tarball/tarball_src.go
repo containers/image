@@ -109,10 +109,9 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		blobIDs = append(blobIDs, blobID)
 		blobSizes = append(blobSizes, blobSize)
 
-		createdBy := fmt.Sprintf("/bin/sh -c #(nop) ADD file:%s in %c", diffID.Hex(), os.PathSeparator)
 		history = append(history, imgspecv1.History{
 			Created:   &blobTime,
-			CreatedBy: createdBy,
+			CreatedBy: fmt.Sprintf("/bin/sh -c #(nop) ADD file:%s in %c", diffID.Hex(), os.PathSeparator),
 			Comment:   comment,
 		})
 		// Use the mtime of the most recently modified file as the image's creation time.
@@ -127,12 +126,6 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		})
 	}
 
-	// Build the rootfs for the configuration blob.
-	rootfs := imgspecv1.RootFS{
-		Type:    "layers",
-		DiffIDs: diffIDs,
-	}
-
 	// Pick up other defaults from the config in the reference.
 	config := r.config
 	if config.Created == nil {
@@ -144,7 +137,10 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 	if config.OS == "" {
 		config.OS = runtime.GOOS
 	}
-	config.RootFS = rootfs
+	config.RootFS = imgspecv1.RootFS{
+		Type:    "layers",
+		DiffIDs: diffIDs,
+	}
 	config.History = history
 
 	// Encode and digest the image configuration blob.
