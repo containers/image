@@ -379,7 +379,7 @@ func TestWriteRead(t *testing.T) {
 			compression = archive.Gzip
 		}
 		digest, decompressedSize, size, blob := makeLayer(t, compression)
-		if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
+		if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
 			Size:   size,
 			Digest: digest,
 		}, cache, false); err != nil {
@@ -557,7 +557,7 @@ func TestDuplicateName(t *testing.T) {
 		t.Fatalf("NewImageDestination(%q, first pass) returned no destination", ref.StringWithinTransport())
 	}
 	digest, _, size, blob := makeLayer(t, archive.Uncompressed)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
+	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
 		Size:   size,
 		Digest: digest,
 	}, cache, false); err != nil {
@@ -598,7 +598,7 @@ func TestDuplicateName(t *testing.T) {
 		t.Fatalf("NewImageDestination(%q, second pass) returned no destination", ref.StringWithinTransport())
 	}
 	digest, _, size, blob = makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
+	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
 		Size:   size,
 		Digest: digest,
 	}, cache, false); err != nil {
@@ -656,7 +656,7 @@ func TestDuplicateID(t *testing.T) {
 		t.Fatalf("NewImageDestination(%q, first pass) returned no destination", ref.StringWithinTransport())
 	}
 	digest, _, size, blob := makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
+	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
 		Size:   size,
 		Digest: digest,
 	}, cache, false); err != nil {
@@ -697,7 +697,7 @@ func TestDuplicateID(t *testing.T) {
 		t.Fatalf("NewImageDestination(%q, second pass) returned no destination", ref.StringWithinTransport())
 	}
 	digest, _, size, blob = makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
+	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
 		Size:   size,
 		Digest: digest,
 	}, cache, false); err != nil {
@@ -758,7 +758,7 @@ func TestDuplicateNameID(t *testing.T) {
 		t.Fatalf("NewImageDestination(%q, first pass) returned no destination", ref.StringWithinTransport())
 	}
 	digest, _, size, blob := makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
+	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
 		Size:   size,
 		Digest: digest,
 	}, cache, false); err != nil {
@@ -799,7 +799,7 @@ func TestDuplicateNameID(t *testing.T) {
 		t.Fatalf("NewImageDestination(%q, second pass) returned no destination", ref.StringWithinTransport())
 	}
 	digest, _, size, blob = makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
+	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
 		Size:   size,
 		Digest: digest,
 	}, cache, false); err != nil {
@@ -909,14 +909,14 @@ func TestSize(t *testing.T) {
 		t.Fatalf("Error saving config to destination: %v", err)
 	}
 	digest1, usize1, size1, blob := makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
+	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
 		Size:   size1,
 		Digest: digest1,
 	}, cache, false); err != nil {
 		t.Fatalf("Error saving randomly-generated layer 1 to destination: %v", err)
 	}
 	digest2, usize2, size2, blob := makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob), types.BlobInfo{
+	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
 		Size:   size2,
 		Digest: digest2,
 	}, cache, false); err != nil {
@@ -1004,26 +1004,26 @@ func TestDuplicateBlob(t *testing.T) {
 		t.Fatalf("NewImageDestination(%q) returned no destination", ref.StringWithinTransport())
 	}
 	digest1, _, size1, blob1 := makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob1), types.BlobInfo{
+	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob1), types.BlobInfo{
 		Size:   size1,
 		Digest: digest1,
 	}, cache, false); err != nil {
 		t.Fatalf("Error saving randomly-generated layer 1 to destination (first copy): %v", err)
 	}
 	digest2, _, size2, blob2 := makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob2), types.BlobInfo{
+	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob2), types.BlobInfo{
 		Size:   size2,
 		Digest: digest2,
 	}, cache, false); err != nil {
 		t.Fatalf("Error saving randomly-generated layer 2 to destination (first copy): %v", err)
 	}
-	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob1), types.BlobInfo{
+	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob1), types.BlobInfo{
 		Size:   size1,
 		Digest: digest1,
 	}, cache, false); err != nil {
 		t.Fatalf("Error saving randomly-generated layer 1 to destination (second copy): %v", err)
 	}
-	if _, err := dest.PutBlob(context.Background(), bytes.NewBuffer(blob2), types.BlobInfo{
+	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob2), types.BlobInfo{
 		Size:   size2,
 		Digest: digest2,
 	}, cache, false); err != nil {

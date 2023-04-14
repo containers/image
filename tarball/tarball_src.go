@@ -214,7 +214,7 @@ func (is *tarballImageSource) Close() error {
 func (is *tarballImageSource) GetBlob(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
 	// We should only be asked about things in the manifest.  Maybe the configuration blob.
 	if blobinfo.Digest == is.configID {
-		return io.NopCloser(bytes.NewBuffer(is.config)), is.configSize, nil
+		return io.NopCloser(bytes.NewReader(is.config)), is.configSize, nil
 	}
 	// Maybe one of the layer blobs.
 	i := slices.Index(is.blobIDs, blobinfo.Digest)
@@ -223,7 +223,7 @@ func (is *tarballImageSource) GetBlob(ctx context.Context, blobinfo types.BlobIn
 	}
 	// We want to read that layer: open the file or memory block and hand it back.
 	if is.filenames[i] == "-" {
-		return io.NopCloser(bytes.NewBuffer(is.reference.stdin)), int64(len(is.reference.stdin)), nil
+		return io.NopCloser(bytes.NewReader(is.reference.stdin)), int64(len(is.reference.stdin)), nil
 	}
 	reader, err := os.Open(is.filenames[i])
 	if err != nil {
