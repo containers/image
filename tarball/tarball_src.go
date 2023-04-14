@@ -32,7 +32,6 @@ type tarballImageSource struct {
 	reference tarballReference
 	filenames []string
 	blobs     map[digest.Digest]tarballBlob
-	blobSizes []int64
 	config    []byte
 	configID  digest.Digest
 	manifest  []byte
@@ -41,6 +40,7 @@ type tarballImageSource struct {
 // tarballBlob is a blob that tarballImagSource can return by GetBlob.
 type tarballBlob struct {
 	fileIndex int
+	size      int64
 }
 
 func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
@@ -53,7 +53,6 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 	// Gather up the digests, sizes, and history information for all of the files.
 	blobs := map[digest.Digest]tarballBlob{}
 	diffIDs := []digest.Digest{}
-	blobSizes := []int64{}
 	created := time.Time{}
 	history := []imgspecv1.History{}
 	layerDescriptors := []imgspecv1.Descriptor{}
@@ -113,8 +112,8 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		diffIDs = append(diffIDs, diffID)
 		blobs[blobID] = tarballBlob{
 			fileIndex: fileIndex,
+			size:      blobSize,
 		}
-		blobSizes = append(blobSizes, blobSize)
 
 		history = append(history, imgspecv1.History{
 			Created:   &blobTime,
@@ -187,7 +186,6 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		reference: *r,
 		filenames: slices.Clone(r.filenames),
 		blobs:     blobs,
-		blobSizes: blobSizes,
 		config:    configBytes,
 		configID:  configID,
 		manifest:  manifestBytes,
@@ -222,7 +220,7 @@ func (is *tarballImageSource) GetBlob(ctx context.Context, blobinfo types.BlobIn
 	if err != nil {
 		return nil, -1, fmt.Errorf("error opening %q: %v", is.filenames[blob.fileIndex], err)
 	}
-	return reader, is.blobSizes[blob.fileIndex], nil
+	return reader, blob.size, nil
 }
 
 // GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).
