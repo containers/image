@@ -30,8 +30,6 @@ type tarballImageSource struct {
 
 	reference tarballReference
 	blobs     map[digest.Digest]tarballBlob
-	config    []byte
-	configID  digest.Digest
 	manifest  []byte
 }
 
@@ -157,6 +155,10 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		return nil, fmt.Errorf("error generating configuration blob for %q: %v", strings.Join(r.filenames, separator), err)
 	}
 	configID := digest.Canonical.FromBytes(configBytes)
+	blobs[configID] = tarballBlob{
+		contents: configBytes,
+		size:     int64(len(configBytes)),
+	}
 
 	// Populate a manifest with the configuration blob and the layers.
 	manifest := imgspecv1.Manifest{
@@ -187,8 +189,6 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 
 		reference: *r,
 		blobs:     blobs,
-		config:    configBytes,
-		configID:  configID,
 		manifest:  manifestBytes,
 	}
 	src.Compat = impl.AddCompat(src)
@@ -204,16 +204,10 @@ func (is *tarballImageSource) Close() error {
 // The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
 // May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
 func (is *tarballImageSource) GetBlob(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
-	// We should only be asked about things in the manifest.  Maybe the configuration blob.
-	if blobinfo.Digest == is.configID {
-		return io.NopCloser(bytes.NewReader(is.config)), int64(len(is.config)), nil
-	}
-	// Maybe one of the layer blobs.
 	blob, ok := is.blobs[blobinfo.Digest]
 	if !ok {
 		return nil, -1, fmt.Errorf("no blob with digest %q found", blobinfo.Digest.String())
 	}
-	// We want to read that layer: open the file or memory block and hand it back.
 	if blob.contents != nil {
 		return io.NopCloser(bytes.NewReader(blob.contents)), int64(len(blob.contents)), nil
 	}
