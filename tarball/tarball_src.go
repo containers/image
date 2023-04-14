@@ -37,7 +37,8 @@ type tarballImageSource struct {
 
 // tarballBlob is a blob that tarballImagSource can return by GetBlob.
 type tarballBlob struct {
-	filename string // or "-" to mean stdin
+	contents []byte // or nil to read from filename below
+	filename string // valid if contents == nil
 	size     int64
 }
 
@@ -55,13 +56,16 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 	history := []imgspecv1.History{}
 	layerDescriptors := []imgspecv1.Descriptor{}
 	for _, filename := range r.filenames {
-		var blobSize int64
-		var blobTime time.Time
 		var reader io.Reader
+		var blobTime time.Time
+		var blob tarballBlob
 		if filename == "-" {
-			blobSize = int64(len(r.stdin))
-			blobTime = time.Now()
 			reader = bytes.NewReader(r.stdin)
+			blobTime = time.Now()
+			blob = tarballBlob{
+				contents: r.stdin,
+				size:     int64(len(r.stdin)),
+			}
 		} else {
 			file, err := os.Open(filename)
 			if err != nil {
@@ -73,8 +77,11 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 			if err != nil {
 				return nil, fmt.Errorf("error reading size of %q: %w", filename, err)
 			}
-			blobSize = fileinfo.Size()
 			blobTime = fileinfo.ModTime()
+			blob = tarballBlob{
+				filename: filename,
+				size:     fileinfo.Size(),
+			}
 		}
 
 		// Default to assuming the layer is compressed.
@@ -108,10 +115,7 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		diffID := diffIDdigester.Digest()
 		blobID := blobIDdigester.Digest()
 		diffIDs = append(diffIDs, diffID)
-		blobs[blobID] = tarballBlob{
-			filename: filename,
-			size:     blobSize,
-		}
+		blobs[blobID] = blob
 
 		history = append(history, imgspecv1.History{
 			Created:   &blobTime,
@@ -125,7 +129,7 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 
 		layerDescriptors = append(layerDescriptors, imgspecv1.Descriptor{
 			Digest:    blobID,
-			Size:      blobSize,
+			Size:      blob.size,
 			MediaType: layerType,
 		})
 	}
@@ -210,8 +214,8 @@ func (is *tarballImageSource) GetBlob(ctx context.Context, blobinfo types.BlobIn
 		return nil, -1, fmt.Errorf("no blob with digest %q found", blobinfo.Digest.String())
 	}
 	// We want to read that layer: open the file or memory block and hand it back.
-	if blob.filename == "-" {
-		return io.NopCloser(bytes.NewReader(is.reference.stdin)), int64(len(is.reference.stdin)), nil
+	if blob.contents != nil {
+		return io.NopCloser(bytes.NewReader(blob.contents)), int64(len(blob.contents)), nil
 	}
 	reader, err := os.Open(blob.filename)
 	if err != nil {
