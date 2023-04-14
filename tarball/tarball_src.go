@@ -40,7 +40,6 @@ type tarballImageSource struct {
 
 func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
 	// Gather up the digests, sizes, and date information for all of the files.
-	filenames := []string{}
 	diffIDs := []digest.Digest{}
 	blobIDs := []digest.Digest{}
 	blobSizes := []int64{}
@@ -97,7 +96,6 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		}
 
 		// Grab our uncompressed and possibly-compressed digests and sizes.
-		filenames = append(filenames, filename)
 		diffIDs = append(diffIDs, diffIDdigester.Digest())
 		blobIDs = append(blobIDs, blobIDdigester.Digest())
 		blobSizes = append(blobSizes, blobSize)
@@ -187,7 +185,7 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		NoGetBlobAtInitialize: stubs.NoGetBlobAt(r),
 
 		reference: *r,
-		filenames: filenames,
+		filenames: slices.Clone(r.filenames),
 		blobIDs:   blobIDs,
 		blobSizes: blobSizes,
 		config:    configBytes,
