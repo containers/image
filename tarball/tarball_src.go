@@ -31,11 +31,16 @@ type tarballImageSource struct {
 
 	reference tarballReference
 	filenames []string
-	blobIDs   []digest.Digest
+	blobs     map[digest.Digest]tarballBlob
 	blobSizes []int64
 	config    []byte
 	configID  digest.Digest
 	manifest  []byte
+}
+
+// tarballBlob is a blob that tarballImagSource can return by GetBlob.
+type tarballBlob struct {
+	fileIndex int
 }
 
 func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
@@ -46,13 +51,13 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 	}
 
 	// Gather up the digests, sizes, and history information for all of the files.
+	blobs := map[digest.Digest]tarballBlob{}
 	diffIDs := []digest.Digest{}
-	blobIDs := []digest.Digest{}
 	blobSizes := []int64{}
 	created := time.Time{}
 	history := []imgspecv1.History{}
 	layerDescriptors := []imgspecv1.Descriptor{}
-	for _, filename := range r.filenames {
+	for fileIndex, filename := range r.filenames {
 		var blobSize int64
 		var blobTime time.Time
 		var reader io.Reader
@@ -106,7 +111,9 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		diffID := diffIDdigester.Digest()
 		blobID := blobIDdigester.Digest()
 		diffIDs = append(diffIDs, diffID)
-		blobIDs = append(blobIDs, blobID)
+		blobs[blobID] = tarballBlob{
+			fileIndex: fileIndex,
+		}
 		blobSizes = append(blobSizes, blobSize)
 
 		history = append(history, imgspecv1.History{
@@ -179,7 +186,7 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 
 		reference: *r,
 		filenames: slices.Clone(r.filenames),
-		blobIDs:   blobIDs,
+		blobs:     blobs,
 		blobSizes: blobSizes,
 		config:    configBytes,
 		configID:  configID,
@@ -203,19 +210,19 @@ func (is *tarballImageSource) GetBlob(ctx context.Context, blobinfo types.BlobIn
 		return io.NopCloser(bytes.NewReader(is.config)), int64(len(is.config)), nil
 	}
 	// Maybe one of the layer blobs.
-	i := slices.Index(is.blobIDs, blobinfo.Digest)
-	if i == -1 {
+	blob, ok := is.blobs[blobinfo.Digest]
+	if !ok {
 		return nil, -1, fmt.Errorf("no blob with digest %q found", blobinfo.Digest.String())
 	}
 	// We want to read that layer: open the file or memory block and hand it back.
-	if is.filenames[i] == "-" {
+	if is.filenames[blob.fileIndex] == "-" {
 		return io.NopCloser(bytes.NewReader(is.reference.stdin)), int64(len(is.reference.stdin)), nil
 	}
-	reader, err := os.Open(is.filenames[i])
+	reader, err := os.Open(is.filenames[blob.fileIndex])
 	if err != nil {
-		return nil, -1, fmt.Errorf("error opening %q: %v", is.filenames[i], err)
+		return nil, -1, fmt.Errorf("error opening %q: %v", is.filenames[blob.fileIndex], err)
 	}
-	return reader, is.blobSizes[i], nil
+	return reader, is.blobSizes[blob.fileIndex], nil
 }
 
 // GetManifest returns the image's manifest along with its MIME type (which may be empty when it can't be determined but the manifest is available).
