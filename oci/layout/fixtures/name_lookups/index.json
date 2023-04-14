@@ -1,0 +1,38 @@
+{
+    "schemaVersion": 2,
+    "mediaType": "application/vnd.oci.image.index.v1+json",
+    "manifests": [
+        {
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 1,
+            "annotations": {
+                "org.opencontainers.image.ref.name": "a"
+            }
+        },
+        {
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "size": 2,
+            "annotations": {
+                "org.opencontainers.image.ref.name": "b"
+            }
+        },
+        {
+            "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "size": 3,
+            "annotations": {
+                "org.opencontainers.image.ref.name": "invalid-mime"
+            }
+        },
+        {
+            "mediaType": "x-completely-unknown",
+            "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "size": 4,
+            "annotations": {
+                "org.opencontainers.image.ref.name": "invalid-mime"
+            }
+        }
+    ]
+}
