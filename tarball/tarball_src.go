@@ -31,11 +31,8 @@ type tarballImageSource struct {
 
 	reference  tarballReference
 	filenames  []string
-	diffIDs    []digest.Digest
-	diffSizes  []int64
 	blobIDs    []digest.Digest
 	blobSizes  []int64
-	blobTypes  []string
 	config     []byte
 	configID   digest.Digest
 	configSize int64
@@ -46,7 +43,6 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 	// Gather up the digests, sizes, and date information for all of the files.
 	filenames := []string{}
 	diffIDs := []digest.Digest{}
-	diffSizes := []int64{}
 	blobIDs := []digest.Digest{}
 	blobSizes := []int64{}
 	blobTimes := []time.Time{}
@@ -96,8 +92,7 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 			uncompressed = nil
 		}
 		// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
-		n, err := io.Copy(io.Discard, reader)
-		if err != nil {
+		if _, err := io.Copy(io.Discard, reader); err != nil {
 			return nil, fmt.Errorf("error reading %q: %v", filename, err)
 		}
 		if uncompressed != nil {
@@ -107,7 +102,6 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		// Grab our uncompressed and possibly-compressed digests and sizes.
 		filenames = append(filenames, filename)
 		diffIDs = append(diffIDs, diffIDdigester.Digest())
-		diffSizes = append(diffSizes, n)
 		blobIDs = append(blobIDs, blobIDdigester.Digest())
 		blobSizes = append(blobSizes, blobSize)
 		blobTimes = append(blobTimes, blobTime)
@@ -198,11 +192,8 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 
 		reference:  *r,
 		filenames:  filenames,
-		diffIDs:    diffIDs,
-		diffSizes:  diffSizes,
 		blobIDs:    blobIDs,
 		blobSizes:  blobSizes,
-		blobTypes:  blobTypes,
 		config:     configBytes,
 		configID:   configID,
 		configSize: configSize,
