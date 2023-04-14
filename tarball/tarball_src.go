@@ -47,8 +47,6 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 	blobTimes := []time.Time{}
 	blobTypes := []string{}
 	for _, filename := range r.filenames {
-		var file *os.File
-		var err error
 		var blobSize int64
 		var blobTime time.Time
 		var reader io.Reader
@@ -57,7 +55,7 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 			blobTime = time.Now()
 			reader = bytes.NewReader(r.stdin)
 		} else {
-			file, err = os.Open(filename)
+			file, err := os.Open(filename)
 			if err != nil {
 				return nil, fmt.Errorf("error opening %q for reading: %w", filename, err)
 			}
