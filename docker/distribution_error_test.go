@@ -23,18 +23,12 @@ import (
 	"testing"
 )
 
-type nopCloser struct {
-	io.Reader
-}
-
-func (nopCloser) Close() error { return nil }
-
 func TestHandleErrorResponse401ValidBody(t *testing.T) {
 	json := "{\"errors\":[{\"code\":\"UNAUTHORIZED\",\"message\":\"action requires authentication\"}]}"
 	response := &http.Response{
 		Status:     "401 Unauthorized",
 		StatusCode: 401,
-		Body:       nopCloser{bytes.NewBufferString(json)},
+		Body:       io.NopCloser(bytes.NewBufferString(json)),
 	}
 	err := handleErrorResponse(response)
 
@@ -49,7 +43,7 @@ func TestHandleErrorResponse401WithInvalidBody(t *testing.T) {
 	response := &http.Response{
 		Status:     "401 Unauthorized",
 		StatusCode: 401,
-		Body:       nopCloser{bytes.NewBufferString(json)},
+		Body:       io.NopCloser(bytes.NewBufferString(json)),
 	}
 	err := handleErrorResponse(response)
 
@@ -64,7 +58,7 @@ func TestHandleErrorResponseExpectedStatusCode400ValidBody(t *testing.T) {
 	response := &http.Response{
 		Status:     "400 Bad Request",
 		StatusCode: 400,
-		Body:       nopCloser{bytes.NewBufferString(json)},
+		Body:       io.NopCloser(bytes.NewBufferString(json)),
 	}
 	err := handleErrorResponse(response)
 
@@ -79,7 +73,7 @@ func TestHandleErrorResponseExpectedStatusCode404EmptyErrorSlice(t *testing.T) {
 	response := &http.Response{
 		Status:     "404 Not Found",
 		StatusCode: 404,
-		Body:       nopCloser{bytes.NewBufferString(json)},
+		Body:       io.NopCloser(bytes.NewBufferString(json)),
 	}
 	err := handleErrorResponse(response)
 
@@ -94,7 +88,7 @@ func TestHandleErrorResponseExpectedStatusCode404InvalidBody(t *testing.T) {
 	response := &http.Response{
 		Status:     "404 Not Found",
 		StatusCode: 404,
-		Body:       nopCloser{bytes.NewBufferString(json)},
+		Body:       io.NopCloser(bytes.NewBufferString(json)),
 	}
 	err := handleErrorResponse(response)
 
@@ -108,7 +102,7 @@ func TestHandleErrorResponseUnexpectedStatusCode501(t *testing.T) {
 	response := &http.Response{
 		Status:     "501 Not Implemented",
 		StatusCode: 501,
-		Body:       nopCloser{bytes.NewBufferString("{\"Error Encountered\" : \"Function not implemented.\"}")},
+		Body:       io.NopCloser(bytes.NewBufferString("{\"Error Encountered\" : \"Function not implemented.\"}")),
 	}
 	err := handleErrorResponse(response)
 
