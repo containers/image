@@ -39,11 +39,18 @@ type tarballImageSource struct {
 }
 
 func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
-	// Gather up the digests, sizes, and date information for all of the files.
+	// Pick up the layer comment from the configuration's history list, if one is set.
+	comment := "imported from tarball"
+	if len(r.config.History) > 0 && r.config.History[0].Comment != "" {
+		comment = r.config.History[0].Comment
+	}
+
+	// Gather up the digests, sizes, and history information for all of the files.
 	diffIDs := []digest.Digest{}
 	blobIDs := []digest.Digest{}
 	blobSizes := []int64{}
-	blobTimes := []time.Time{}
+	created := time.Time{}
+	history := []imgspecv1.History{}
 	blobTypes := []string{}
 	for _, filename := range r.filenames {
 		var blobSize int64
@@ -96,36 +103,28 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		}
 
 		// Grab our uncompressed and possibly-compressed digests and sizes.
-		diffIDs = append(diffIDs, diffIDdigester.Digest())
+		diffID := diffIDdigester.Digest()
+		diffIDs = append(diffIDs, diffID)
 		blobIDs = append(blobIDs, blobIDdigester.Digest())
 		blobSizes = append(blobSizes, blobSize)
-		blobTimes = append(blobTimes, blobTime)
 		blobTypes = append(blobTypes, layerType)
-	}
 
-	// Build the rootfs and history for the configuration blob.
-	rootfs := imgspecv1.RootFS{
-		Type:    "layers",
-		DiffIDs: diffIDs,
-	}
-	created := time.Time{}
-	history := []imgspecv1.History{}
-	// Pick up the layer comment from the configuration's history list, if one is set.
-	comment := "imported from tarball"
-	if len(r.config.History) > 0 && r.config.History[0].Comment != "" {
-		comment = r.config.History[0].Comment
-	}
-	for i := range diffIDs {
-		createdBy := fmt.Sprintf("/bin/sh -c #(nop) ADD file:%s in %c", diffIDs[i].Hex(), os.PathSeparator)
+		createdBy := fmt.Sprintf("/bin/sh -c #(nop) ADD file:%s in %c", diffID.Hex(), os.PathSeparator)
 		history = append(history, imgspecv1.History{
-			Created:   &blobTimes[i],
+			Created:   &blobTime,
 			CreatedBy: createdBy,
 			Comment:   comment,
 		})
 		// Use the mtime of the most recently modified file as the image's creation time.
-		if created.Before(blobTimes[i]) {
-			created = blobTimes[i]
+		if created.Before(blobTime) {
+			created = blobTime
 		}
+	}
+
+	// Build the rootfs for the configuration blob.
+	rootfs := imgspecv1.RootFS{
+		Type:    "layers",
+		DiffIDs: diffIDs,
 	}
 
 	// Pick up other defaults from the config in the reference.
