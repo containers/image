@@ -19,7 +19,6 @@ import (
 	imgspecs "github.com/opencontainers/image-spec/specs-go"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 )
 
 type tarballImageSource struct {
@@ -30,7 +29,6 @@ type tarballImageSource struct {
 	stubs.NoGetBlobAtInitialize
 
 	reference tarballReference
-	filenames []string
 	blobs     map[digest.Digest]tarballBlob
 	config    []byte
 	configID  digest.Digest
@@ -39,8 +37,8 @@ type tarballImageSource struct {
 
 // tarballBlob is a blob that tarballImagSource can return by GetBlob.
 type tarballBlob struct {
-	fileIndex int
-	size      int64
+	filename string // or "-" to mean stdin
+	size     int64
 }
 
 func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
@@ -56,7 +54,7 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 	created := time.Time{}
 	history := []imgspecv1.History{}
 	layerDescriptors := []imgspecv1.Descriptor{}
-	for fileIndex, filename := range r.filenames {
+	for _, filename := range r.filenames {
 		var blobSize int64
 		var blobTime time.Time
 		var reader io.Reader
@@ -111,8 +109,8 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		blobID := blobIDdigester.Digest()
 		diffIDs = append(diffIDs, diffID)
 		blobs[blobID] = tarballBlob{
-			fileIndex: fileIndex,
-			size:      blobSize,
+			filename: filename,
+			size:     blobSize,
 		}
 
 		history = append(history, imgspecv1.History{
@@ -184,7 +182,6 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		NoGetBlobAtInitialize: stubs.NoGetBlobAt(r),
 
 		reference: *r,
-		filenames: slices.Clone(r.filenames),
 		blobs:     blobs,
 		config:    configBytes,
 		configID:  configID,
@@ -213,12 +210,12 @@ func (is *tarballImageSource) GetBlob(ctx context.Context, blobinfo types.BlobIn
 		return nil, -1, fmt.Errorf("no blob with digest %q found", blobinfo.Digest.String())
 	}
 	// We want to read that layer: open the file or memory block and hand it back.
-	if is.filenames[blob.fileIndex] == "-" {
+	if blob.filename == "-" {
 		return io.NopCloser(bytes.NewReader(is.reference.stdin)), int64(len(is.reference.stdin)), nil
 	}
-	reader, err := os.Open(is.filenames[blob.fileIndex])
+	reader, err := os.Open(blob.filename)
 	if err != nil {
-		return nil, -1, fmt.Errorf("error opening %q: %v", is.filenames[blob.fileIndex], err)
+		return nil, -1, fmt.Errorf("error opening %q: %v", blob.filename, err)
 	}
 	return reader, blob.size, nil
 }
