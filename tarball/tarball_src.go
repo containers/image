@@ -29,14 +29,13 @@ type tarballImageSource struct {
 	impl.DoesNotAffectLayerInfosForCopy
 	stubs.NoGetBlobAtInitialize
 
-	reference  tarballReference
-	filenames  []string
-	blobIDs    []digest.Digest
-	blobSizes  []int64
-	config     []byte
-	configID   digest.Digest
-	configSize int64
-	manifest   []byte
+	reference tarballReference
+	filenames []string
+	blobIDs   []digest.Digest
+	blobSizes []int64
+	config    []byte
+	configID  digest.Digest
+	manifest  []byte
 }
 
 func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
@@ -153,7 +152,6 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		return nil, fmt.Errorf("error generating configuration blob for %q: %v", strings.Join(r.filenames, separator), err)
 	}
 	configID := digest.Canonical.FromBytes(configBytes)
-	configSize := int64(len(configBytes))
 
 	// Populate a manifest with the configuration blob and the file as the single layer.
 	layerDescriptors := []imgspecv1.Descriptor{}
@@ -170,7 +168,7 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		},
 		Config: imgspecv1.Descriptor{
 			Digest:    configID,
-			Size:      configSize,
+			Size:      int64(len(configBytes)),
 			MediaType: imgspecv1.MediaTypeImageConfig,
 		},
 		Layers:      layerDescriptors,
@@ -190,14 +188,13 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		}),
 		NoGetBlobAtInitialize: stubs.NoGetBlobAt(r),
 
-		reference:  *r,
-		filenames:  filenames,
-		blobIDs:    blobIDs,
-		blobSizes:  blobSizes,
-		config:     configBytes,
-		configID:   configID,
-		configSize: configSize,
-		manifest:   manifestBytes,
+		reference: *r,
+		filenames: filenames,
+		blobIDs:   blobIDs,
+		blobSizes: blobSizes,
+		config:    configBytes,
+		configID:  configID,
+		manifest:  manifestBytes,
 	}
 	src.Compat = impl.AddCompat(src)
 
@@ -214,7 +211,7 @@ func (is *tarballImageSource) Close() error {
 func (is *tarballImageSource) GetBlob(ctx context.Context, blobinfo types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
 	// We should only be asked about things in the manifest.  Maybe the configuration blob.
 	if blobinfo.Digest == is.configID {
-		return io.NopCloser(bytes.NewReader(is.config)), is.configSize, nil
+		return io.NopCloser(bytes.NewReader(is.config)), int64(len(is.config)), nil
 	}
 	// Maybe one of the layer blobs.
 	i := slices.Index(is.blobIDs, blobinfo.Digest)
