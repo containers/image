@@ -8,6 +8,7 @@ import (
 
 	_ "github.com/containers/image/v5/internal/testing/explicitfilepath-tmpdir"
 	"github.com/containers/image/v5/types"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,11 +18,36 @@ import (
 //
 // More info: https://github.com/containers/skopeo/issues/496
 func TestGetManifestDescriptor(t *testing.T) {
-	imageRef, err := NewReference("fixtures/two_images_manifest", "")
-	require.NoError(t, err)
+	for _, c := range []struct {
+		dir, image string
+		expected   *imgspecv1.Descriptor // nil if a failure ie expected. errorIs / errorAs allows more specific checks.
+		errorIs    error
+		errorAs    any
+	}{
+		{
+			dir:      "fixtures/two_images_manifest",
+			image:    "",
+			expected: nil,
+			errorIs:  ErrMoreThanOneImage,
+		},
+	} {
+		ref, err := NewReference(c.dir, c.image)
+		require.NoError(t, err)
 
-	_, err = imageRef.(ociReference).getManifestDescriptor()
-	assert.EqualError(t, err, ErrMoreThanOneImage.Error())
+		res, err := ref.(ociReference).getManifestDescriptor()
+		if c.expected != nil {
+			require.NoError(t, err)
+			assert.Equal(t, *c.expected, res)
+		} else {
+			require.Error(t, err)
+			if c.errorIs != nil {
+				assert.ErrorIs(t, err, c.errorIs)
+			}
+			if c.errorAs != nil {
+				assert.ErrorAs(t, err, &c.errorAs)
+			}
+		}
+	}
 }
 
 func TestTransportName(t *testing.T) {
