@@ -51,7 +51,7 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 	blobSizes := []int64{}
 	created := time.Time{}
 	history := []imgspecv1.History{}
-	blobTypes := []string{}
+	layerDescriptors := []imgspecv1.Descriptor{}
 	for _, filename := range r.filenames {
 		var blobSize int64
 		var blobTime time.Time
@@ -104,10 +104,10 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 
 		// Grab our uncompressed and possibly-compressed digests and sizes.
 		diffID := diffIDdigester.Digest()
+		blobID := blobIDdigester.Digest()
 		diffIDs = append(diffIDs, diffID)
-		blobIDs = append(blobIDs, blobIDdigester.Digest())
+		blobIDs = append(blobIDs, blobID)
 		blobSizes = append(blobSizes, blobSize)
-		blobTypes = append(blobTypes, layerType)
 
 		createdBy := fmt.Sprintf("/bin/sh -c #(nop) ADD file:%s in %c", diffID.Hex(), os.PathSeparator)
 		history = append(history, imgspecv1.History{
@@ -119,6 +119,12 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		if created.Before(blobTime) {
 			created = blobTime
 		}
+
+		layerDescriptors = append(layerDescriptors, imgspecv1.Descriptor{
+			Digest:    blobID,
+			Size:      blobSize,
+			MediaType: layerType,
+		})
 	}
 
 	// Build the rootfs for the configuration blob.
@@ -148,15 +154,7 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 	}
 	configID := digest.Canonical.FromBytes(configBytes)
 
-	// Populate a manifest with the configuration blob and the file as the single layer.
-	layerDescriptors := []imgspecv1.Descriptor{}
-	for i := range blobIDs {
-		layerDescriptors = append(layerDescriptors, imgspecv1.Descriptor{
-			Digest:    blobIDs[i],
-			Size:      blobSizes[i],
-			MediaType: blobTypes[i],
-		})
-	}
+	// Populate a manifest with the configuration blob and the layers.
 	manifest := imgspecv1.Manifest{
 		Versioned: imgspecs.Versioned{
 			SchemaVersion: 2,
