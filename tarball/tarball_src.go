@@ -67,7 +67,7 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		} else {
 			file, err := os.Open(filename)
 			if err != nil {
-				return nil, fmt.Errorf("error opening %q for reading: %w", filename, err)
+				return nil, err
 			}
 			defer file.Close()
 			reader = file
@@ -213,7 +213,7 @@ func (is *tarballImageSource) GetBlob(ctx context.Context, blobinfo types.BlobIn
 	}
 	reader, err := os.Open(blob.filename)
 	if err != nil {
-		return nil, -1, fmt.Errorf("error opening %q: %v", blob.filename, err)
+		return nil, -1, err
 	}
 	return reader, blob.size, nil
 }
