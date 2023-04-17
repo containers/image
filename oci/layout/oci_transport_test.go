@@ -8,20 +8,94 @@ import (
 
 	_ "github.com/containers/image/v5/internal/testing/explicitfilepath-tmpdir"
 	"github.com/containers/image/v5/types"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestGetManifestDescriptor is testing a regression issue where a nil error was being wrapped,
-// this causes the returned error to be nil as well and the user wasn't getting a proper error output.
-//
-// More info: https://github.com/containers/skopeo/issues/496
 func TestGetManifestDescriptor(t *testing.T) {
-	imageRef, err := NewReference("fixtures/two_images_manifest", "")
-	require.NoError(t, err)
+	emptyDir := t.TempDir()
 
-	_, err = imageRef.(ociReference).getManifestDescriptor()
-	assert.EqualError(t, err, ErrMoreThanOneImage.Error())
+	for _, c := range []struct {
+		dir, image string
+		expected   *imgspecv1.Descriptor // nil if a failure ie expected. errorIs / errorAs allows more specific checks.
+		errorIs    error
+		errorAs    any
+	}{
+		{ // Index is missing
+			dir:      emptyDir,
+			image:    "",
+			expected: nil,
+		},
+		{ // A valid reference to the only manifest
+			dir:   "fixtures/manifest",
+			image: "",
+			expected: &imgspecv1.Descriptor{
+				MediaType:   "application/vnd.oci.image.manifest.v1+json",
+				Digest:      "sha256:84afb6189c4d69f2d040c5f1dc4e0a16fed9b539ce9cfb4ac2526ae4e0576cc0",
+				Size:        496,
+				Annotations: map[string]string{"org.opencontainers.image.ref.name": "v0.1.1"},
+				Platform: &imgspecv1.Platform{
+					Architecture: "amd64",
+					OS:           "linux",
+				},
+			},
+		},
+		{ // An ambiguous reference to a multi-manifest directory
+			dir:      "fixtures/two_images_manifest",
+			image:    "",
+			expected: nil,
+			errorIs:  ErrMoreThanOneImage,
+		},
+		{ // A valid reference in a multi-manifest directory
+			dir:   "fixtures/name_lookups",
+			image: "a",
+			expected: &imgspecv1.Descriptor{
+				MediaType:   "application/vnd.oci.image.manifest.v1+json",
+				Digest:      "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				Size:        1,
+				Annotations: map[string]string{"org.opencontainers.image.ref.name": "a"},
+			},
+		},
+		{ // A valid reference in a multi-manifest directory
+			dir:   "fixtures/name_lookups",
+			image: "b",
+			expected: &imgspecv1.Descriptor{
+				MediaType:   "application/vnd.oci.image.manifest.v1+json",
+				Digest:      "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+				Size:        2,
+				Annotations: map[string]string{"org.opencontainers.image.ref.name": "b"},
+			},
+		},
+		{ // No entry found
+			dir:      "fixtures/name_lookups",
+			image:    "this-does-not-exist",
+			expected: nil,
+			errorAs:  &ImageNotFoundError{},
+		},
+		{ // Entries with invalid MIME types found
+			dir:      "fixtures/name_lookups",
+			image:    "invalid-mime",
+			expected: nil,
+		},
+	} {
+		ref, err := NewReference(c.dir, c.image)
+		require.NoError(t, err)
+
+		res, err := ref.(ociReference).getManifestDescriptor()
+		if c.expected != nil {
+			require.NoError(t, err)
+			assert.Equal(t, *c.expected, res)
+		} else {
+			require.Error(t, err)
+			if c.errorIs != nil {
+				assert.ErrorIs(t, err, c.errorIs)
+			}
+			if c.errorAs != nil {
+				assert.ErrorAs(t, err, &c.errorAs)
+			}
+		}
+	}
 }
 
 func TestTransportName(t *testing.T) {
