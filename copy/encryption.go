@@ -33,12 +33,15 @@ type bpDecryptionStepData struct {
 // blobPipelineDecryptionStep updates *stream to decrypt if, it necessary.
 // srcInfo is only used for error messages.
 // Returns data for other steps; the caller should eventually use updateCryptoOperation.
-func (c *copier) blobPipelineDecryptionStep(stream *sourceStream, srcInfo types.BlobInfo) (*bpDecryptionStepData, error) {
-	if isOciEncrypted(stream.info.MediaType) && c.ociDecryptConfig != nil {
+func (ic *imageCopier) blobPipelineDecryptionStep(stream *sourceStream, srcInfo types.BlobInfo) (*bpDecryptionStepData, error) {
+	if isOciEncrypted(stream.info.MediaType) && ic.c.ociDecryptConfig != nil {
+		if ic.cannotModifyManifestReason != "" {
+			return nil, fmt.Errorf("layer %s should be decrypted, but we can’t modify the manifest: %s", srcInfo.Digest, ic.cannotModifyManifestReason)
+		}
 		desc := imgspecv1.Descriptor{
 			Annotations: stream.info.Annotations,
 		}
-		reader, decryptedDigest, err := ocicrypt.DecryptLayer(c.ociDecryptConfig, stream.reader, desc, false)
+		reader, decryptedDigest, err := ocicrypt.DecryptLayer(ic.c.ociDecryptConfig, stream.reader, desc, false)
 		if err != nil {
 			return nil, fmt.Errorf("decrypting layer %s: %w", srcInfo.Digest, err)
 		}
@@ -74,9 +77,13 @@ type bpEncryptionStepData struct {
 // blobPipelineEncryptionStep updates *stream to encrypt if, it required by toEncrypt.
 // srcInfo is primarily used for error messages.
 // Returns data for other steps; the caller should eventually call updateCryptoOperationAndAnnotations.
-func (c *copier) blobPipelineEncryptionStep(stream *sourceStream, toEncrypt bool, srcInfo types.BlobInfo,
+func (ic *imageCopier) blobPipelineEncryptionStep(stream *sourceStream, toEncrypt bool, srcInfo types.BlobInfo,
 	decryptionStep *bpDecryptionStepData) (*bpEncryptionStepData, error) {
-	if toEncrypt && !isOciEncrypted(srcInfo.MediaType) && c.ociEncryptConfig != nil {
+	if toEncrypt && !isOciEncrypted(srcInfo.MediaType) && ic.c.ociEncryptConfig != nil {
+		if ic.cannotModifyManifestReason != "" {
+			return nil, fmt.Errorf("layer %s should be encrypted, but we can’t modify the manifest: %s", srcInfo.Digest, ic.cannotModifyManifestReason)
+		}
+
 		var annotations map[string]string
 		if !decryptionStep.decrypting {
 			annotations = srcInfo.Annotations
@@ -87,7 +94,7 @@ func (c *copier) blobPipelineEncryptionStep(stream *sourceStream, toEncrypt bool
 			Size:        srcInfo.Size,
 			Annotations: annotations,
 		}
-		reader, finalizer, err := ocicrypt.EncryptLayer(c.ociEncryptConfig, stream.reader, desc)
+		reader, finalizer, err := ocicrypt.EncryptLayer(ic.c.ociEncryptConfig, stream.reader, desc)
 		if err != nil {
 			return nil, fmt.Errorf("encrypting blob %s: %w", srcInfo.Digest, err)
 		}
