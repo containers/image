@@ -40,6 +40,10 @@ func (ic *imageCopier) blobPipelineDecryptionStep(stream *sourceStream, srcInfo 
 		}, nil
 	}
 
+	if ic.cannotModifyManifestReason != "" {
+		return nil, fmt.Errorf("layer %s should be decrypted, but we can’t modify the manifest: %s", srcInfo.Digest, ic.cannotModifyManifestReason)
+	}
+
 	desc := imgspecv1.Descriptor{
 		Annotations: stream.info.Annotations,
 	}
@@ -81,6 +85,10 @@ func (ic *imageCopier) blobPipelineEncryptionStep(stream *sourceStream, toEncryp
 		return &bpEncryptionStepData{
 			encrypting: false,
 		}, nil
+	}
+
+	if ic.cannotModifyManifestReason != "" {
+		return nil, fmt.Errorf("layer %s should be encrypted, but we can’t modify the manifest: %s", srcInfo.Digest, ic.cannotModifyManifestReason)
 	}
 
 	var annotations map[string]string
