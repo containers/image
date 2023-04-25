@@ -69,279 +69,237 @@ func TestOCI1FromManifest(t *testing.T) {
 	testValidManifestWithExtraFieldsIsRejected(t, parser, validManifest, []string{"fsLayers", "history", "manifests"})
 }
 
-func TestUpdateLayerInfosOCIGzipToZstd(t *testing.T) {
-	manifest := manifestOCI1FromFixture(t, "ociv1.manifest.json")
-
-	err := manifest.UpdateLayerInfos([]types.BlobInfo{
-		{
-			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-			Size:                 32654,
-			MediaType:            imgspecv1.MediaTypeImageLayerGzip,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Zstd,
-		},
-		{
-			Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
-			Size:                 16724,
-			MediaType:            imgspecv1.MediaTypeImageLayerGzip,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Zstd,
-		},
-		{
-			Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
-			Size:                 73109,
-			MediaType:            imgspecv1.MediaTypeImageLayerGzip,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Zstd,
-		},
-	})
-	assert.Nil(t, err)
-
-	updatedManifestBytes, err := manifest.Serialize()
-	assert.Nil(t, err)
-
-	expectedManifest := manifestOCI1FromFixture(t, "ociv1.zstd.manifest.json")
-	expectedManifestBytes, err := expectedManifest.Serialize()
-	assert.Nil(t, err)
-
-	assert.Equal(t, string(expectedManifestBytes), string(updatedManifestBytes))
-}
-
-func TestUpdateLayerInfosOCIZstdToGzip(t *testing.T) {
-	manifest := manifestOCI1FromFixture(t, "ociv1.zstd.manifest.json")
-
-	err := manifest.UpdateLayerInfos([]types.BlobInfo{
-		{
-			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-			Size:                 32654,
-			MediaType:            imgspecv1.MediaTypeImageLayerZstd,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Gzip,
-		},
-		{
-			Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
-			Size:                 16724,
-			MediaType:            imgspecv1.MediaTypeImageLayerZstd,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Gzip,
-		},
-		{
-			Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
-			Size:                 73109,
-			MediaType:            imgspecv1.MediaTypeImageLayerZstd,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Gzip,
-		},
-	})
-	assert.Nil(t, err)
-
-	updatedManifestBytes, err := manifest.Serialize()
-	assert.Nil(t, err)
-
-	expectedManifest := manifestOCI1FromFixture(t, "ociv1.manifest.json")
-	expectedManifestBytes, err := expectedManifest.Serialize()
-	assert.Nil(t, err)
-
-	assert.Equal(t, string(expectedManifestBytes), string(updatedManifestBytes))
-}
-
-func TestUpdateLayerInfosOCIZstdToUncompressed(t *testing.T) {
-	manifest := manifestOCI1FromFixture(t, "ociv1.zstd.manifest.json")
-
-	err := manifest.UpdateLayerInfos([]types.BlobInfo{
-		{
-			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-			Size:                 32654,
-			MediaType:            imgspecv1.MediaTypeImageLayerZstd,
-			CompressionOperation: types.Decompress,
-		},
-		{
-			Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
-			Size:                 16724,
-			MediaType:            imgspecv1.MediaTypeImageLayerZstd,
-			CompressionOperation: types.Decompress,
-		},
-		{
-			Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
-			Size:                 73109,
-			MediaType:            imgspecv1.MediaTypeImageLayerZstd,
-			CompressionOperation: types.Decompress,
-		},
-	})
-	assert.Nil(t, err)
-
-	updatedManifestBytes, err := manifest.Serialize()
-	assert.Nil(t, err)
-
-	expectedManifest := manifestOCI1FromFixture(t, "ociv1.uncompressed.manifest.json")
-	expectedManifestBytes, err := expectedManifest.Serialize()
-	assert.Nil(t, err)
-
-	assert.Equal(t, string(expectedManifestBytes), string(updatedManifestBytes))
-}
-
-func TestUpdateLayerInfosInvalidCompressionOperation(t *testing.T) {
-	manifest := manifestOCI1FromFixture(t, "ociv1.zstd.manifest.json")
-	err := manifest.UpdateLayerInfos([]types.BlobInfo{
-		{
-			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-			Size:                 32654,
-			MediaType:            imgspecv1.MediaTypeImageLayerZstd,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Gzip,
-		},
-		{
-			Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
-			Size:                 16724,
-			MediaType:            imgspecv1.MediaTypeImageLayerZstd,
-			CompressionOperation: 42, // MUST fail here
-			CompressionAlgorithm: &compression.Gzip,
-		},
-		{
-			Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
-			Size:                 73109,
-			MediaType:            imgspecv1.MediaTypeImageLayerZstd,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Gzip,
-		},
-	})
-	assert.NotNil(t, err)
-}
-
-func TestUpdateLayerInfosInvalidCompressionAlgorithm(t *testing.T) {
-	manifest := manifestOCI1FromFixture(t, "ociv1.zstd.manifest.json")
-
+func TestOCI1UpdateLayerInfos(t *testing.T) {
 	customCompression := compression.Algorithm{}
-	err := manifest.UpdateLayerInfos([]types.BlobInfo{
+
+	for _, c := range []struct {
+		name            string
+		sourceFixture   string
+		updates         []types.BlobInfo
+		expectedFixture string // or "" to indicate an expected failure
+	}{
 		{
-			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-			Size:                 32654,
-			MediaType:            imgspecv1.MediaTypeImageLayerZstd,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Gzip,
+			name:          "gzip → zstd",
+			sourceFixture: "ociv1.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					MediaType:            imgspecv1.MediaTypeImageLayerGzip,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Zstd,
+				},
+				{
+					Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
+					Size:                 16724,
+					MediaType:            imgspecv1.MediaTypeImageLayerGzip,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Zstd,
+				},
+				{
+					Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
+					Size:                 73109,
+					MediaType:            imgspecv1.MediaTypeImageLayerGzip,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Zstd,
+				},
+			},
+			expectedFixture: "ociv1.zstd.manifest.json",
 		},
 		{
-			Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
-			Size:                 16724,
-			MediaType:            imgspecv1.MediaTypeImageLayerZstd,
-			CompressionOperation: 42,
-			CompressionAlgorithm: &compression.Gzip,
+			name:          "zstd → gzip",
+			sourceFixture: "ociv1.zstd.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					MediaType:            imgspecv1.MediaTypeImageLayerZstd,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+				},
+				{
+					Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
+					Size:                 16724,
+					MediaType:            imgspecv1.MediaTypeImageLayerZstd,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+				},
+				{
+					Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
+					Size:                 73109,
+					MediaType:            imgspecv1.MediaTypeImageLayerZstd,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+				},
+			},
+			expectedFixture: "ociv1.manifest.json",
 		},
 		{
-			Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
-			Size:                 73109,
-			MediaType:            imgspecv1.MediaTypeImageLayerZstd,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &customCompression, // MUST fail here
-		},
-	})
-	assert.NotNil(t, err)
-}
-
-func TestUpdateLayerInfosOCIGzipToUncompressed(t *testing.T) {
-	manifest := manifestOCI1FromFixture(t, "ociv1.manifest.json")
-
-	err := manifest.UpdateLayerInfos([]types.BlobInfo{
-		{
-			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-			Size:                 32654,
-			MediaType:            imgspecv1.MediaTypeImageLayerGzip,
-			CompressionOperation: types.Decompress,
-		},
-		{
-			Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
-			Size:                 16724,
-			MediaType:            imgspecv1.MediaTypeImageLayerGzip,
-			CompressionOperation: types.Decompress,
+			name:          "zstd → uncompressed",
+			sourceFixture: "ociv1.zstd.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					MediaType:            imgspecv1.MediaTypeImageLayerZstd,
+					CompressionOperation: types.Decompress,
+				},
+				{
+					Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
+					Size:                 16724,
+					MediaType:            imgspecv1.MediaTypeImageLayerZstd,
+					CompressionOperation: types.Decompress,
+				},
+				{
+					Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
+					Size:                 73109,
+					MediaType:            imgspecv1.MediaTypeImageLayerZstd,
+					CompressionOperation: types.Decompress,
+				},
+			},
+			expectedFixture: "ociv1.uncompressed.manifest.json",
 		},
 		{
-			Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
-			Size:                 73109,
-			MediaType:            imgspecv1.MediaTypeImageLayerGzip,
-			CompressionOperation: types.Decompress,
+			name:          "invalid compression operation",
+			sourceFixture: "ociv1.zstd.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					MediaType:            imgspecv1.MediaTypeImageLayerZstd,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+				},
+				{
+					Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
+					Size:                 16724,
+					MediaType:            imgspecv1.MediaTypeImageLayerZstd,
+					CompressionOperation: 42, // MUST fail here
+					CompressionAlgorithm: &compression.Gzip,
+				},
+				{
+					Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
+					Size:                 73109,
+					MediaType:            imgspecv1.MediaTypeImageLayerZstd,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+				},
+			},
+			expectedFixture: "",
 		},
-	})
-	assert.Nil(t, err)
-
-	updatedManifestBytes, err := manifest.Serialize()
-	assert.Nil(t, err)
-
-	expectedManifest := manifestOCI1FromFixture(t, "ociv1.uncompressed.manifest.json")
-	expectedManifestBytes, err := expectedManifest.Serialize()
-	assert.Nil(t, err)
-
-	assert.Equal(t, string(expectedManifestBytes), string(updatedManifestBytes))
-}
-
-func TestUpdateLayerInfosOCINondistributableToGzip(t *testing.T) {
-	manifest := manifestOCI1FromFixture(t, "ociv1.nondistributable.manifest.json")
-
-	err := manifest.UpdateLayerInfos([]types.BlobInfo{
 		{
-			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-			Size:                 32654,
-			MediaType:            imgspecv1.MediaTypeImageLayerGzip,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Gzip,
+			name:          "invalid compression algorithm",
+			sourceFixture: "ociv1.zstd.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					MediaType:            imgspecv1.MediaTypeImageLayerZstd,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+				},
+				{
+					Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
+					Size:                 16724,
+					MediaType:            imgspecv1.MediaTypeImageLayerZstd,
+					CompressionOperation: 42,
+					CompressionAlgorithm: &compression.Gzip,
+				},
+				{
+					Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
+					Size:                 73109,
+					MediaType:            imgspecv1.MediaTypeImageLayerZstd,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &customCompression, // MUST fail here
+				},
+			},
+			expectedFixture: "",
 		},
-	})
-	assert.Nil(t, err)
-
-	updatedManifestBytes, err := manifest.Serialize()
-	assert.Nil(t, err)
-
-	expectedManifest := manifestOCI1FromFixture(t, "ociv1.nondistributable.gzip.manifest.json")
-	expectedManifestBytes, err := expectedManifest.Serialize()
-	assert.Nil(t, err)
-
-	assert.Equal(t, string(expectedManifestBytes), string(updatedManifestBytes))
-}
-
-func TestUpdateLayerInfosOCINondistributableToZstd(t *testing.T) {
-	manifest := manifestOCI1FromFixture(t, "ociv1.nondistributable.manifest.json")
-
-	err := manifest.UpdateLayerInfos([]types.BlobInfo{
 		{
-			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-			Size:                 32654,
-			MediaType:            imgspecv1.MediaTypeImageLayerGzip,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Zstd,
+			name:          "gzip → uncompressed",
+			sourceFixture: "ociv1.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					MediaType:            imgspecv1.MediaTypeImageLayerGzip,
+					CompressionOperation: types.Decompress,
+				},
+				{
+					Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
+					Size:                 16724,
+					MediaType:            imgspecv1.MediaTypeImageLayerGzip,
+					CompressionOperation: types.Decompress,
+				},
+				{
+					Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
+					Size:                 73109,
+					MediaType:            imgspecv1.MediaTypeImageLayerGzip,
+					CompressionOperation: types.Decompress,
+				},
+			},
+			expectedFixture: "ociv1.uncompressed.manifest.json",
 		},
-	})
-	assert.Nil(t, err)
-
-	updatedManifestBytes, err := manifest.Serialize()
-	assert.Nil(t, err)
-
-	expectedManifest := manifestOCI1FromFixture(t, "ociv1.nondistributable.zstd.manifest.json")
-	expectedManifestBytes, err := expectedManifest.Serialize()
-	assert.Nil(t, err)
-
-	assert.Equal(t, string(expectedManifestBytes), string(updatedManifestBytes))
-}
-
-func TestUpdateLayerInfosOCINondistributableGzipToUncompressed(t *testing.T) {
-	manifest := manifestOCI1FromFixture(t, "ociv1.nondistributable.gzip.manifest.json")
-
-	err := manifest.UpdateLayerInfos([]types.BlobInfo{
 		{
-			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-			Size:                 32654,
-			MediaType:            imgspecv1.MediaTypeImageLayerGzip,
-			CompressionOperation: types.Decompress,
+			name:          "nondistributable → gzip",
+			sourceFixture: "ociv1.nondistributable.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					MediaType:            imgspecv1.MediaTypeImageLayerGzip,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+				},
+			},
+			expectedFixture: "ociv1.nondistributable.gzip.manifest.json",
 		},
-	})
-	assert.Nil(t, err)
+		{
+			name:          "nondistributable → zstd",
+			sourceFixture: "ociv1.nondistributable.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					MediaType:            imgspecv1.MediaTypeImageLayerGzip,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Zstd,
+				},
+			},
+			expectedFixture: "ociv1.nondistributable.zstd.manifest.json",
+		},
+		{
+			name:          "nondistributable gzip → uncompressed",
+			sourceFixture: "ociv1.nondistributable.gzip.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					MediaType:            imgspecv1.MediaTypeImageLayerGzip,
+					CompressionOperation: types.Decompress,
+				},
+			},
+			expectedFixture: "ociv1.nondistributable.manifest.json",
+		},
+	} {
+		manifest := manifestOCI1FromFixture(t, c.sourceFixture)
 
-	updatedManifestBytes, err := manifest.Serialize()
-	assert.Nil(t, err)
+		err := manifest.UpdateLayerInfos(c.updates)
+		if c.expectedFixture == "" {
+			assert.Error(t, err, c.name)
+		} else {
+			require.NoError(t, err, c.name)
 
-	expectedManifest := manifestOCI1FromFixture(t, "ociv1.nondistributable.manifest.json")
-	expectedManifestBytes, err := expectedManifest.Serialize()
-	assert.Nil(t, err)
+			updatedManifestBytes, err := manifest.Serialize()
+			require.NoError(t, err, c.name)
 
-	assert.Equal(t, string(expectedManifestBytes), string(updatedManifestBytes))
+			expectedManifest := manifestOCI1FromFixture(t, c.expectedFixture)
+			expectedManifestBytes, err := expectedManifest.Serialize()
+			require.NoError(t, err, c.name)
+
+			assert.Equal(t, string(expectedManifestBytes), string(updatedManifestBytes), c.name)
+		}
+	}
 }
 
 func TestOCI1Inspect(t *testing.T) {
