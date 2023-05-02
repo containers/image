@@ -47,7 +47,12 @@ func newDockerClient(sys *types.SystemContext) (*dockerclient.Client, error) {
 		}
 	}
 
-	return dockerclient.NewClient(host, defaultAPIVersion, httpClient, nil)
+	return dockerclient.NewClientWithOpts(
+		dockerclient.WithHost(host),
+		dockerclient.WithVersion(defaultAPIVersion),
+		dockerclient.WithHTTPClient(httpClient),
+		dockerclient.WithHTTPHeaders(nil),
+	)
 }
 
 func tlsConfig(sys *types.SystemContext) (*http.Client, error) {
