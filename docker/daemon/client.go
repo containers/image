@@ -21,6 +21,11 @@ func newDockerClient(sys *types.SystemContext) (*dockerclient.Client, error) {
 		host = sys.DockerDaemonHost
 	}
 
+	opts := []dockerclient.Opt{
+		dockerclient.WithHost(host),
+		dockerclient.WithVersion(defaultAPIVersion),
+	}
+
 	// Sadly, unix:// sockets don't work transparently with dockerclient.NewClient.
 	// They work fine with a nil httpClient; with a non-nil httpClient, the transport’s
 	// TLSClientConfig must be nil (or the client will try using HTTPS over the PF_UNIX socket
@@ -46,12 +51,9 @@ func newDockerClient(sys *types.SystemContext) (*dockerclient.Client, error) {
 			httpClient = hc
 		}
 	}
+	opts = append(opts, dockerclient.WithHTTPClient(httpClient))
 
-	return dockerclient.NewClientWithOpts(
-		dockerclient.WithHost(host),
-		dockerclient.WithVersion(defaultAPIVersion),
-		dockerclient.WithHTTPClient(httpClient),
-	)
+	return dockerclient.NewClientWithOpts(opts...)
 }
 
 func tlsConfig(sys *types.SystemContext) (*http.Client, error) {
