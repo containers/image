@@ -39,19 +39,18 @@ func newDockerClient(sys *types.SystemContext) (*dockerclient.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	var httpClient *http.Client
 	if serverURL.Scheme != "unix" {
 		if serverURL.Scheme == "http" {
-			httpClient = httpConfig()
+			hc := httpConfig()
+			opts = append(opts, dockerclient.WithHTTPClient(hc))
 		} else {
 			hc, err := tlsConfig(sys)
 			if err != nil {
 				return nil, err
 			}
-			httpClient = hc
+			opts = append(opts, dockerclient.WithHTTPClient(hc))
 		}
 	}
-	opts = append(opts, dockerclient.WithHTTPClient(httpClient))
 
 	return dockerclient.NewClientWithOpts(opts...)
 }
