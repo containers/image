@@ -215,6 +215,164 @@ func TestDetermineManifestConversion(t *testing.T) {
 			otherMIMETypeCandidates:          []string{},
 		}, res, c.description)
 	}
+
+	// When encryption is required:
+	for _, c := range []struct {
+		description string
+		in          determineManifestConversionInputs // with requiresOCIEncryption implied
+		expected    manifestConversionPlan            // Or {} to expect a failure
+	}{
+		{ // Destination accepts anything - no conversion necessary
+			"OCI→anything",
+			determineManifestConversionInputs{
+				srcMIMEType:                    v1.MediaTypeImageManifest,
+				destSupportedManifestMIMETypes: nil,
+			},
+			manifestConversionPlan{
+				preferredMIMEType:                v1.MediaTypeImageManifest,
+				preferredMIMETypeNeedsConversion: false,
+				otherMIMETypeCandidates:          []string{},
+			},
+		},
+		{ // Destination accepts anything - need to convert for encryption
+			"s2→anything",
+			determineManifestConversionInputs{
+				srcMIMEType:                    manifest.DockerV2Schema2MediaType,
+				destSupportedManifestMIMETypes: nil,
+			},
+			manifestConversionPlan{
+				preferredMIMEType:                v1.MediaTypeImageManifest,
+				preferredMIMETypeNeedsConversion: true,
+				otherMIMETypeCandidates:          []string{},
+			},
+		},
+		// Destination accepts an encrypted format
+		{
+			"OCI→OCI",
+			determineManifestConversionInputs{
+				srcMIMEType:                    v1.MediaTypeImageManifest,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+			},
+			manifestConversionPlan{
+				preferredMIMEType:                v1.MediaTypeImageManifest,
+				preferredMIMETypeNeedsConversion: false,
+				otherMIMETypeCandidates:          []string{},
+			},
+		},
+		{
+			"s2→OCI",
+			determineManifestConversionInputs{
+				srcMIMEType:                    manifest.DockerV2Schema2MediaType,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+			},
+			manifestConversionPlan{
+				preferredMIMEType:                v1.MediaTypeImageManifest,
+				preferredMIMETypeNeedsConversion: true,
+				otherMIMETypeCandidates:          []string{},
+			},
+		},
+		// Destination does not accept an encrypted format
+		{
+			"OCI→s2",
+			determineManifestConversionInputs{
+				srcMIMEType:                    v1.MediaTypeImageManifest,
+				destSupportedManifestMIMETypes: supportS1S2,
+			},
+			manifestConversionPlan{},
+		},
+		{
+			"s2→s2",
+			determineManifestConversionInputs{
+				srcMIMEType:                    manifest.DockerV2Schema2MediaType,
+				destSupportedManifestMIMETypes: supportS1S2,
+			},
+			manifestConversionPlan{},
+		},
+		// Whatever the input is, with cannotModifyManifestReason we return "keep the original as is".
+		// Still, encryption is necessarily going to fail…
+		{
+			"OCI→OCI cannotModifyManifestReason",
+			determineManifestConversionInputs{
+				srcMIMEType:                    v1.MediaTypeImageManifest,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+				cannotModifyManifestReason:     "Preserving digests",
+			},
+			manifestConversionPlan{
+				preferredMIMEType:                v1.MediaTypeImageManifest,
+				preferredMIMETypeNeedsConversion: false,
+				otherMIMETypeCandidates:          []string{},
+			},
+		},
+		{
+			"s2→OCI cannotModifyManifestReason",
+			determineManifestConversionInputs{
+				srcMIMEType:                    manifest.DockerV2Schema2MediaType,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+				cannotModifyManifestReason:     "Preserving digests",
+			},
+			manifestConversionPlan{
+				preferredMIMEType:                manifest.DockerV2Schema2MediaType,
+				preferredMIMETypeNeedsConversion: false,
+				otherMIMETypeCandidates:          []string{},
+			},
+		},
+		// forceManifestMIMEType to a type that supports encryption
+		{
+			"OCI→OCI forced",
+			determineManifestConversionInputs{
+				srcMIMEType:                    v1.MediaTypeImageManifest,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+				forceManifestMIMEType:          v1.MediaTypeImageManifest,
+			},
+			manifestConversionPlan{
+				preferredMIMEType:                v1.MediaTypeImageManifest,
+				preferredMIMETypeNeedsConversion: false,
+				otherMIMETypeCandidates:          []string{},
+			},
+		},
+		{
+			"s2→OCI forced",
+			determineManifestConversionInputs{
+				srcMIMEType:                    manifest.DockerV2Schema2MediaType,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+				forceManifestMIMEType:          v1.MediaTypeImageManifest,
+			},
+			manifestConversionPlan{
+				preferredMIMEType:                v1.MediaTypeImageManifest,
+				preferredMIMETypeNeedsConversion: true,
+				otherMIMETypeCandidates:          []string{},
+			},
+		},
+		// forceManifestMIMEType to a type that does not support encryption
+		{
+			"OCI→s2 forced",
+			determineManifestConversionInputs{
+				srcMIMEType:                    v1.MediaTypeImageManifest,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+				forceManifestMIMEType:          manifest.DockerV2Schema2MediaType,
+			},
+			manifestConversionPlan{},
+		},
+		{
+			"s2→s2 forced",
+			determineManifestConversionInputs{
+				srcMIMEType:                    manifest.DockerV2Schema2MediaType,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+				forceManifestMIMEType:          manifest.DockerV2Schema2MediaType,
+			},
+			manifestConversionPlan{},
+		},
+	} {
+		in := c.in
+		in.requiresOCIEncryption = true
+		res, err := determineManifestConversion(in)
+		if c.expected.preferredMIMEType != "" {
+			require.NoError(t, err, c.description)
+			assert.Equal(t, c.expected, res, c.description)
+		} else {
+			assert.Error(t, err, c.description)
+		}
+	}
 }
 
 // fakeUnparsedImage is an implementation of types.UnparsedImage which only returns itself as a MIME type in Manifest,
