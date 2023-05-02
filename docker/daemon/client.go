@@ -51,7 +51,6 @@ func newDockerClient(sys *types.SystemContext) (*dockerclient.Client, error) {
 		dockerclient.WithHost(host),
 		dockerclient.WithVersion(defaultAPIVersion),
 		dockerclient.WithHTTPClient(httpClient),
-		dockerclient.WithHTTPHeaders(nil),
 	)
 }
 
