@@ -23,6 +23,7 @@ import (
 	"github.com/containers/image/v5/types"
 	encconfig "github.com/containers/ocicrypt/config"
 	digest "github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
 	"golang.org/x/sync/semaphore"
@@ -91,8 +92,9 @@ type Options struct {
 	PreserveDigests bool
 	// manifest MIME type of image set by user. "" is default and means use the autodetection to the manifest MIME type
 	ForceManifestMIMEType string
-	ImageListSelection    ImageListSelection // set to either CopySystemImage (the default), CopyAllImages, or CopySpecificImages to control which instances we copy when the source reference is a list; ignored if the source reference is not a list
-	Instances             []digest.Digest    // if ImageListSelection is CopySpecificImages, copy only these instances and the list itself
+	ImageListSelection    ImageListSelection   // set to either CopySystemImage (the default), CopyAllImages, or CopySpecificImages to control which instances we copy when the source reference is a list; ignored if the source reference is not a list
+	Instances             []digest.Digest      // if ImageListSelection is CopySpecificImages, copy only these instances, instances matching the InstancePlatforms list, and the list itself
+	InstancePlatforms     []imgspecv1.Platform // if ImageListSelection is CopySpecificImages, copy only matching instances, instances listed in the Instances list, and the list itself
 	// Give priority to pulling gzip images if multiple images are present when configured to OptionalBoolTrue,
 	// prefers the best compression if this is configured as OptionalBoolFalse. Choose automatically (and the choice may change over time)
 	// if this is set to OptionalBoolUndefined (which is the default behavior, and recommended for most callers).
