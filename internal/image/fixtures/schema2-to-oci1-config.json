@@ -15,6 +15,7 @@
         "Cmd": [
             "httpd-foreground"
         ],
+        "ArgsEscaped": true,
         "WorkingDir": "/usr/local/apache2"
     },
     "created": "2016-09-23T23:20:45.78976459Z",

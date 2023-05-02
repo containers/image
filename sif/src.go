@@ -96,9 +96,11 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref sifRefere
 
 	created := sifImg.ModifiedAt()
 	config := imgspecv1.Image{
-		Created:      &created,
-		Architecture: sifImg.PrimaryArch(),
-		OS:           "linux",
+		Created: &created,
+		Platform: imgspecv1.Platform{
+			Architecture: sifImg.PrimaryArch(),
+			OS:           "linux",
+		},
 		Config: imgspecv1.ImageConfig{
 			Cmd: commandLine,
 		},
