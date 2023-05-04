@@ -389,7 +389,7 @@ github.com/go-playground/universal-translator v0.18.1 h1:Bcnm0ZwsGyWbCzImXv+pAJn
 github.com/go-playground/universal-translator v0.18.1/go.mod h1:xekY+UJKNuX9WP91TpwSH2VMlDf28Uj24BCp08ZFTUY=
 github.com/go-playground/validator/v10 v10.13.0 h1:cFRQdfaSMCOSfGCCLB20MHvuoHb/s5G8L5pu2ppK5AQ=
 github.com/go-playground/validator/v10 v10.13.0/go.mod h1:dwu7+CG8/CtBiJFZDz4e+5Upb6OLw04gtBYw0mcG/z4=
-github.com/go-rod/rod v0.112.8 h1:lYFnHv/lFyjW/Ye0IhyKLeHw/zfhHbSTqawoCi2z/nI=
+github.com/go-rod/rod v0.112.9 h1:uA/yLbB+t0UlqJcLJtK2pZrCNPzd15dOKRUEOnmnt9k=
 github.com/go-sql-driver/mysql v1.7.0 h1:ueSltNNllEqE3qcWBTD0iQd3IpL/6U+mJxLkazJ7YPc=
 github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/melR3HDY=
 github.com/go-test/deep v1.1.0 h1:WOcxcdHcvdgThNXjw0t76K42FXTU7HpNQWHpA2HHNlg=
@@ -806,8 +806,8 @@ github.com/sigstore/fulcio v1.3.1 h1:0ntW9VbQbt2JytoSs8BOGB84A65eeyvGSavWteYp29Y
 github.com/sigstore/fulcio v1.3.1/go.mod h1:/XfqazOec45ulJZpyL9sq+OsVQ8g2UOVoNVi7abFgqU=
 github.com/sigstore/rekor v1.1.1 h1:JCeSss+qUHnCATmwAZh4zT9k0Frdyq0BjmRwewSfEy4=
 github.com/sigstore/rekor v1.1.1/go.mod h1:x/xK+HK08MiuJv+v4OxY/Oo3bhuz1DtJXNJrV7hrzvs=
-github.com/sigstore/sigstore v1.6.3 h1:lt/w/fZNnrT4PjjqTYsUXn57fvE1YYfIB3SElQZ1oR4=
-github.com/sigstore/sigstore v1.6.3/go.mod h1:BpLOp7N2IECbatk4sXE2toY2krw615NmwAtWs/3SJDw=
+github.com/sigstore/sigstore v1.6.4 h1:jH4AzR7qlEH/EWzm+opSpxCfuUcjHL+LJPuQE7h40WE=
+github.com/sigstore/sigstore v1.6.4/go.mod h1:pjR64lBxnjoSrAr+Ydye/FV73IfrgtoYlAI11a8xMfA=
 github.com/sirupsen/logrus v1.0.4-0.20170822132746-89742aefa4b2/go.mod h1:pMByvHTf9Beacp5x1UXfOR9xyW/9antXMhjMPG0dEzc=
 github.com/sirupsen/logrus v1.0.6/go.mod h1:pMByvHTf9Beacp5x1UXfOR9xyW/9antXMhjMPG0dEzc=
 github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
@@ -915,6 +915,7 @@ github.com/xeipuuv/gojsonschema v1.2.0/go.mod h1:anYRn/JVcOK2ZgGU+IjEV4nwlhoK5sQ
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
 github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d/go.mod h1:rHwXgn7JulP+udvsHwJoVG1YGAP6VLg4y9I5dyZdqmA=
+github.com/ysmood/fetchup v0.2.2 h1:Qn8/q5uDW7szclt4sVXCFJ1TXup3hogz94OaLf6kloo=
 github.com/ysmood/goob v0.4.0 h1:HsxXhyLBeGzWXnqVKtmT9qM7EuVs/XOgkX7T6r1o1AQ=
 github.com/ysmood/gson v0.7.3 h1:QFkWbTH8MxyUTKPkVWAENJhxqdBa4lYTQWqZCiLG6kE=
 github.com/ysmood/leakless v0.8.0 h1:BzLrVoiwxikpgEQR0Lk8NyBN5Cit2b1z+u0mgL4ZJak=
