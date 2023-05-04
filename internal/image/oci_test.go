@@ -513,6 +513,10 @@ func TestConvertToManifestSchema2(t *testing.T) {
 	assert.Equal(t, manifest.DockerV2Schema2MediaType, mt)
 	assertJSONEqualsFixture(t, convertedJSON, "oci1-to-schema2.json")
 
+	convertedConfig, err := res.ConfigBlob(context.Background())
+	require.NoError(t, err)
+	assertJSONEqualsFixture(t, convertedConfig, "oci1-to-schema2-config.json")
+
 	// This can share originalSrc because the config digest is the same between oci1-artifact.json and oci1.json
 	artifact := manifestOCI1FromFixture(t, originalSrc, "oci1-artifact.json")
 	_, err = artifact.UpdatedImage(context.Background(), types.ManifestUpdateOptions{

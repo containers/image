@@ -510,6 +510,10 @@ func TestConvertToManifestOCI(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, imgspecv1.MediaTypeImageManifest, mt)
 	assertJSONEqualsFixture(t, convertedJSON, "schema2-to-oci1.json")
+
+	convertedConfig, err := res.ConfigBlob(context.Background())
+	require.NoError(t, err)
+	assertJSONEqualsFixture(t, convertedConfig, "schema2-to-oci1-config.json")
 }
 
 func TestConvertToManifestOCIAllMediaTypes(t *testing.T) {
@@ -523,6 +527,10 @@ func TestConvertToManifestOCIAllMediaTypes(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, imgspecv1.MediaTypeImageManifest, mt)
 	assertJSONEqualsFixture(t, convertedJSON, "schema2-all-media-types-to-oci1.json")
+
+	convertedConfig, err := res.ConfigBlob(context.Background())
+	require.NoError(t, err)
+	assertJSONEqualsFixture(t, convertedConfig, "schema2-to-oci1-config.json")
 }
 
 func TestConvertToOCIWithInvalidMIMEType(t *testing.T) {
