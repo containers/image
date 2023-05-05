@@ -145,9 +145,9 @@ func TestUpdatedMIMEType(t *testing.T) {
 		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayer},
 		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerGzip},
 		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerZstd},
-		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributable},
-		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableGzip},
-		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableZstd},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributable},     //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableGzip}, //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableZstd}, //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
 		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageConfig},
 	}
 	for i, c := range preserve {
@@ -173,9 +173,9 @@ func TestUpdatedMIMEType(t *testing.T) {
 		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayer, imgspecv1.MediaTypeImageLayer},
 		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerGzip, imgspecv1.MediaTypeImageLayer},
 		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerZstd, imgspecv1.MediaTypeImageLayer},
-		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributable},
-		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributable},
-		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableZstd, imgspecv1.MediaTypeImageLayerNonDistributable},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributable},     //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributable}, //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableZstd, imgspecv1.MediaTypeImageLayerNonDistributable}, //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
 	}
 	for i, c := range decompressSuccess {
 		update := types.BlobInfo{
@@ -227,9 +227,9 @@ func TestUpdatedMIMEType(t *testing.T) {
 		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayer, imgspecv1.MediaTypeImageLayerGzip},
 		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerGzip, imgspecv1.MediaTypeImageLayerGzip},
 		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerZstd, imgspecv1.MediaTypeImageLayerGzip},
-		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributableGzip},
-		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributableGzip},
-		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableZstd, imgspecv1.MediaTypeImageLayerNonDistributableGzip},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributableGzip},     //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributableGzip}, //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableZstd, imgspecv1.MediaTypeImageLayerNonDistributableGzip}, //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
 	}
 	for i, c := range compressGzipSuccess {
 		update := types.BlobInfo{
@@ -279,9 +279,9 @@ func TestUpdatedMIMEType(t *testing.T) {
 		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayer, imgspecv1.MediaTypeImageLayerZstd},
 		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerGzip, imgspecv1.MediaTypeImageLayerZstd},
 		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerZstd, imgspecv1.MediaTypeImageLayerZstd},
-		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributableZstd},
-		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributableZstd},
-		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableZstd, imgspecv1.MediaTypeImageLayerNonDistributableZstd},
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributableZstd},     //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributableZstd}, //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
+		{oci1CompressionMIMETypeSets, imgspecv1.MediaTypeImageLayerNonDistributableZstd, imgspecv1.MediaTypeImageLayerNonDistributableZstd}, //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
 	}
 	for i, c := range compressZstdSuccess {
 		update := types.BlobInfo{

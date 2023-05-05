@@ -32,9 +32,9 @@ func TestSupportedOCI1MediaType(t *testing.T) {
 		{imgspecv1.MediaTypeImageConfig, false},
 		{imgspecv1.MediaTypeImageLayer, false},
 		{imgspecv1.MediaTypeImageLayerGzip, false},
-		{imgspecv1.MediaTypeImageLayerNonDistributable, false},
-		{imgspecv1.MediaTypeImageLayerNonDistributableGzip, false},
-		{imgspecv1.MediaTypeImageLayerNonDistributableZstd, false},
+		{imgspecv1.MediaTypeImageLayerNonDistributable, false},     //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
+		{imgspecv1.MediaTypeImageLayerNonDistributableGzip, false}, //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
+		{imgspecv1.MediaTypeImageLayerNonDistributableZstd, false}, //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
 		{imgspecv1.MediaTypeImageLayerZstd, false},
 		{imgspecv1.MediaTypeImageManifest, false},
 		{imgspecv1.MediaTypeLayoutHeader, false},

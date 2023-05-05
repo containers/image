@@ -94,20 +94,10 @@ func TestManifestOCI1Serialize(t *testing.T) {
 	} {
 		serialized, err := m.serialize()
 		require.NoError(t, err)
-		var contents map[string]any
-		err = json.Unmarshal(serialized, &contents)
-		require.NoError(t, err)
-
-		original, err := os.ReadFile("fixtures/oci1.json")
-		require.NoError(t, err)
-		var originalContents map[string]any
-		err = json.Unmarshal(original, &originalContents)
-		require.NoError(t, err)
-
 		// We would ideally like to compare “serialized” with some transformation of
-		// “original”, but the ordering of fields in JSON maps is undefined, so this is
+		// the original fixture, but the ordering of fields in JSON maps is undefined, so this is
 		// easier.
-		assert.Equal(t, originalContents, contents)
+		assertJSONEqualsFixture(t, serialized, "oci1.json")
 	}
 }
 
@@ -456,17 +446,7 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 	convertedJSON, mt, err := res.Manifest(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, manifest.DockerV2Schema1SignedMediaType, mt)
-
-	byHandJSON, err := os.ReadFile("fixtures/oci1-to-schema1.json")
-	require.NoError(t, err)
-	var converted, byHand map[string]any
-	err = json.Unmarshal(byHandJSON, &byHand)
-	require.NoError(t, err)
-	err = json.Unmarshal(convertedJSON, &converted)
-	require.NoError(t, err)
-	delete(byHand, "signatures")
-	delete(converted, "signatures")
-	assert.Equal(t, byHand, converted)
+	assertJSONEqualsFixture(t, convertedJSON, "oci1-to-schema1.json", "signatures")
 
 	assert.Equal(t, GzippedEmptyLayer, memoryDest.storedBlobs[GzippedEmptyLayerDigest])
 
@@ -531,15 +511,11 @@ func TestConvertToManifestSchema2(t *testing.T) {
 	convertedJSON, mt, err := res.Manifest(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, manifest.DockerV2Schema2MediaType, mt)
+	assertJSONEqualsFixture(t, convertedJSON, "oci1-to-schema2.json")
 
-	byHandJSON, err := os.ReadFile("fixtures/oci1-to-schema2.json")
+	convertedConfig, err := res.ConfigBlob(context.Background())
 	require.NoError(t, err)
-	var converted, byHand map[string]any
-	err = json.Unmarshal(byHandJSON, &byHand)
-	require.NoError(t, err)
-	err = json.Unmarshal(convertedJSON, &converted)
-	require.NoError(t, err)
-	assert.Equal(t, byHand, converted)
+	assertJSONEqualsFixture(t, convertedConfig, "oci1-to-schema2-config.json")
 
 	// This can share originalSrc because the config digest is the same between oci1-artifact.json and oci1.json
 	artifact := manifestOCI1FromFixture(t, originalSrc, "oci1-artifact.json")
