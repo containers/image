@@ -8,7 +8,7 @@ require (
 	github.com/containers/ocicrypt v1.1.7
 	github.com/containers/storage v1.46.1
 	github.com/cyberphone/json-canonicalization v0.0.0-20220623050100-57a0ce2678a7
-	github.com/docker/distribution v2.8.1+incompatible
+	github.com/docker/distribution v2.8.2+incompatible
 	github.com/docker/docker v23.0.6+incompatible
 	github.com/docker/docker-credential-helpers v0.7.0
 	github.com/docker/go-connections v0.4.0
