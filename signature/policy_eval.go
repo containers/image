@@ -253,7 +253,7 @@ func (pc *PolicyContext) GetSignaturesWithAcceptedAuthor(ctx context.Context, pu
 	return res, nil
 }
 
-// IsRunningImageAllowed returns true iff the policy allows running the image.
+// IsRunningImageAllowed returns true if the policy allows running the image.
 // If it returns false, err must be non-nil, and should be an PolicyRequirementError if evaluation
 // succeeded but the result was rejection.
 // WARNING: This validates signatures and the manifest, but does not download or validate the
@@ -283,7 +283,7 @@ func (pc *PolicyContext) IsRunningImageAllowed(ctx context.Context, publicImage 
 		allowed, err := req.isRunningImageAllowed(ctx, image)
 		if !allowed {
 			logrus.Debugf("Requirement %d: denied, done", reqNumber)
-			return false, err
+			return false, PolicyRequirementError(err.Error())
 		}
 		logrus.Debugf(" Requirement %d: allowed", reqNumber)
 	}

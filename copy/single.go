@@ -59,7 +59,7 @@ func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.P
 	// (The multiImage check above only matches the MIME type, which we have received anyway.
 	// Actual parsing of anything should be deferred.)
 	if allowed, err := policyContext.IsRunningImageAllowed(ctx, unparsedImage); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
-		return nil, "", "", fmt.Errorf("Source image rejected: %w", err)
+		return nil, "", "", err
 	}
 	src, err := image.FromUnparsedImage(ctx, options.SourceCtx, unparsedImage)
 	if err != nil {
