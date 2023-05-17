@@ -858,8 +858,8 @@ github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO
 github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
 github.com/stretchr/testify v1.8.2 h1:+h33VjcLVPDHtOdpUCuF+7gSuG3yGIftsP1YvFihtJ8=
 github.com/stretchr/testify v1.8.2/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
-github.com/sylabs/sif/v2 v2.11.3 h1:EQxi5zl6i5DsbVal9HHpk/zuSx7aNLeZBy8vmvFz838=
-github.com/sylabs/sif/v2 v2.11.3/go.mod h1:0ryivqvvsncJOJjU5QQIEc77a5zKK46F+urBXMdA07w=
+github.com/sylabs/sif/v2 v2.11.4 h1:4dRvsRFVkyS7e8oD8AEL0HrJocnet05+EFW+DhVb/Ic=
+github.com/sylabs/sif/v2 v2.11.4/go.mod h1:83kqbKZFRFfFLe1ui5BH+rAxF2obICM/i3zto4ivM7s=
 github.com/syndtr/gocapability v0.0.0-20170704070218-db04d3cc01c8/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
 github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
 github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 h1:kdXcSzyDtseVEc4yCz2qF8ZrQvIDBJLl4S1c3GCXmoI=
