@@ -27,7 +27,7 @@ and an auth token in the form of a base64 encoded string as value of `auth`. The
 token is built from the concatenation of the username, a colon, and the
 password. The registry name can additionally contain a repository name (an image
 name without tag or digest) and namespaces. The path (or namespace) is matched
-in its hierarchical order when checking for available authentications. For
+in its hierarchical order when checking for available credentials. For
 example, an image pull for `my-registry.local/namespace/user/image:latest` will
 result in a lookup in `auth.json` in the following order:
 
@@ -78,8 +78,8 @@ An entry can be removed by using a `logout` command from a container
 tool such as `podman logout` or `buildah logout`.
 
 In addition, credential helpers can be configured for specific registries and the credentials-helper
-software can be used to manage the credentials in a more secure way than depending on the base64 encoded authentication
-provided by `login`.  If the credential helpers are configured for specific registries, the base64 encoded authentication will not be used
+software can be used to manage the credentials in a more secure way than depending on the base64 encoded credentials
+provided by `login`.  If the credential helpers are configured for specific registries, the base64 encoded credentials will not be used
 for operations concerning credentials of the specified registries.
 
 When the credential helper is in use on a Linux platform, the auth.json file would contain keys that specify the registry domain, and values that specify the suffix of the program to use (i.e. everything after docker-credential-).  For example:
