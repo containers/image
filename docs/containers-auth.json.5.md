@@ -5,30 +5,33 @@ containers-auth.json - syntax for the registry authentication file
 
 # DESCRIPTION
 
-A credentials file in JSON format used to authenticate against container image registries.
+A file in JSON format controlling authentication against container image registries.
 The primary (read/write) file is stored at `${XDG_RUNTIME_DIR}/containers/auth.json` on Linux;
 on Windows and macOS, at `$HOME/.config/containers/auth.json`.
 
 When searching for the credential for a registry, the following files will be read in sequence until the valid credential is found:
 first reading the primary (read/write) file, or the explicit override using an option of the calling application.
-If credentials are not present, search in `${XDG_CONFIG_HOME}/containers/auth.json` (usually `~/.config/containers/auth.json`), `$HOME/.docker/config.json`, `$HOME/.dockercfg`.
+If credentials are not present there,
+the search continues in `${XDG_CONFIG_HOME}/containers/auth.json` (usually `~/.config/containers/auth.json`), `$HOME/.docker/config.json`, `$HOME/.dockercfg`.
 
-Except the primary (read/write) file, other files are read-only, unless the user use an option of the calling application explicitly points at it as an override.
+Except for the primary (read/write) file, other files are read-only unless the user, using an option of the calling application, explicitly points at it as an override.
 
 
 ## FORMAT
 
 The auth.json file stores, or references, credentials that allow the user to authenticate
-to container image registries.  The file can have zero to many entries and
-is created by a `login` command from a container tool such as `podman login`,
-`buildah login` or `skopeo login`. Each entry either contains a single
-hostname (e.g. `docker.io`) or a namespace (e.g. `quay.io/user/image`) as a key
-and an auth token in the form of a base64 encoded string as value of `auth`. The
-token is built from the concatenation of the username, a colon, and the
-password. The registry name can additionally contain a repository name (an image
-name without tag or digest) and namespaces. The path (or namespace) is matched
-in its hierarchical order when checking for available credentials. For
-example, an image pull for `my-registry.local/namespace/user/image:latest` will
+to container image registries.
+It is primarily managed by a `login` command from a container tool such as `podman login`,
+`buildah login`, or `skopeo login`.
+
+Each entry contains a single hostname (e.g., `docker.io`) or a namespace (e.g., `quay.io/user/image`) as a key,
+and credentials in the form of a base64-encoded string as value of `auth`. The
+base64-encoded string contains a concatenation of the username, a colon, and the
+password.
+
+When checking for available credentials, the relevant repository is matched
+against available keys in its hierarchical order, going from most-specific to least-specific.
+For example, an image pull for `my-registry.local/namespace/user/image:latest` will
 result in a lookup in `auth.json` in the following order:
 
 - `my-registry.local/namespace/user/image`
@@ -77,10 +80,8 @@ preserving a fallback for `my-registry.local`:
 An entry can be removed by using a `logout` command from a container
 tool such as `podman logout` or `buildah logout`.
 
-In addition, credential helpers can be configured for specific registries and the credentials-helper
-software can be used to manage the credentials in a more secure way than depending on the base64 encoded credentials
-provided by `login`.  If the credential helpers are configured for specific registries, the base64 encoded credentials will not be used
-for operations concerning credentials of the specified registries.
+In addition, credential helpers can be configured for specific registries, and the credentials-helper
+software can be used to manage the credentials more securely than storing only base64-encoded credentials in `auth.json`.
 
 When the credential helper is in use on a Linux platform, the auth.json file would contain keys that specify the registry domain, and values that specify the suffix of the program to use (i.e. everything after docker-credential-).  For example:
 
