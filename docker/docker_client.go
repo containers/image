@@ -166,8 +166,6 @@ func newBearerTokenFromJSONBlob(blob []byte) (*bearerToken, error) {
 // We'll drop this once we upgrade to docker 1.13.x deps.
 func serverDefault() *tls.Config {
 	return &tls.Config{
-		// Avoid fallback to SSL protocols < TLS1.0
-		MinVersion:   tls.VersionTLS10,
 		CipherSuites: tlsconfig.DefaultServerAcceptedCiphers,
 	}
 }
