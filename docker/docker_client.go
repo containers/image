@@ -85,10 +85,10 @@ type extensionSignatureList struct {
 }
 
 type bearerToken struct {
-	Token          string    `json:"token"`
-	AccessToken    string    `json:"access_token"`
-	ExpiresIn      int       `json:"expires_in"`
-	IssuedAt       time.Time `json:"issued_at"`
+	Token          string
+	AccessToken    string
+	ExpiresIn      int
+	IssuedAt       time.Time
 	expirationTime time.Time
 }
 
@@ -147,22 +147,35 @@ const (
 )
 
 func newBearerTokenFromJSONBlob(blob []byte) (*bearerToken, error) {
-	token := new(bearerToken)
+	var token struct {
+		Token          string    `json:"token"`
+		AccessToken    string    `json:"access_token"`
+		ExpiresIn      int       `json:"expires_in"`
+		IssuedAt       time.Time `json:"issued_at"`
+		expirationTime time.Time
+	}
 	if err := json.Unmarshal(blob, &token); err != nil {
 		return nil, err
 	}
-	if token.Token == "" {
-		token.Token = token.AccessToken
+
+	res := &bearerToken{
+		Token:       token.Token,
+		AccessToken: token.AccessToken,
+		ExpiresIn:   token.ExpiresIn,
+		IssuedAt:    token.IssuedAt,
 	}
-	if token.ExpiresIn < minimumTokenLifetimeSeconds {
-		token.ExpiresIn = minimumTokenLifetimeSeconds
-		logrus.Debugf("Increasing token expiration to: %d seconds", token.ExpiresIn)
+	if res.Token == "" {
+		res.Token = res.AccessToken
 	}
-	if token.IssuedAt.IsZero() {
-		token.IssuedAt = time.Now().UTC()
+	if res.ExpiresIn < minimumTokenLifetimeSeconds {
+		res.ExpiresIn = minimumTokenLifetimeSeconds
+		logrus.Debugf("Increasing token expiration to: %d seconds", res.ExpiresIn)
 	}
-	token.expirationTime = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
-	return token, nil
+	if res.IssuedAt.IsZero() {
+		res.IssuedAt = time.Now().UTC()
+	}
+	res.expirationTime = res.IssuedAt.Add(time.Duration(res.ExpiresIn) * time.Second)
+	return res, nil
 }
 
 // dockerCertDir returns a path to a directory to be consumed by tlsclientconfig.SetupCertificates() depending on ctx and hostPort.
