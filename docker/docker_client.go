@@ -84,8 +84,9 @@ type extensionSignatureList struct {
 	Signatures []extensionSignature `json:"signatures"`
 }
 
+// bearerToken records a cached token we can use to authenticate.
 type bearerToken struct {
-	Token          string
+	token          string
 	AccessToken    string
 	ExpiresIn      int
 	IssuedAt       time.Time
@@ -159,13 +160,13 @@ func newBearerTokenFromJSONBlob(blob []byte) (*bearerToken, error) {
 	}
 
 	res := &bearerToken{
-		Token:       token.Token,
+		token:       token.Token,
 		AccessToken: token.AccessToken,
 		ExpiresIn:   token.ExpiresIn,
 		IssuedAt:    token.IssuedAt,
 	}
-	if res.Token == "" {
-		res.Token = res.AccessToken
+	if res.token == "" {
+		res.token = res.AccessToken
 	}
 	if res.ExpiresIn < minimumTokenLifetimeSeconds {
 		res.ExpiresIn = minimumTokenLifetimeSeconds
@@ -784,7 +785,7 @@ func (c *dockerClient) setupRequestAuth(req *http.Request, extraScope *authScope
 						c.tokenCache[cacheKey] = token
 					}()
 				}
-				registryToken = token.Token
+				registryToken = token.token
 			}
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", registryToken))
 			return nil
