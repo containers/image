@@ -117,15 +117,15 @@ func TestNewBearerTokenFromHTTPResponseBody(t *testing.T) {
 		},
 		{ // "token"
 			input:    `{"token":"IAmAToken","expires_in":100,"issued_at":"2018-01-01T10:00:02+00:00"}`,
-			expected: &bearerToken{token: "IAmAToken", ExpiresIn: 100, IssuedAt: time.Unix(1514800802, 0), expirationTime: time.Unix(1514800802+100, 0)},
+			expected: &bearerToken{token: "IAmAToken", expirationTime: time.Unix(1514800802+100, 0)},
 		},
 		{ // "access_token"
 			input:    `{"access_token":"IAmAToken","expires_in":100,"issued_at":"2018-01-01T10:00:02+00:00"}`,
-			expected: &bearerToken{token: "IAmAToken", ExpiresIn: 100, IssuedAt: time.Unix(1514800802, 0), expirationTime: time.Unix(1514800802+100, 0)},
+			expected: &bearerToken{token: "IAmAToken", expirationTime: time.Unix(1514800802+100, 0)},
 		},
 		{ // Small expiry
 			input:    `{"token":"IAmAToken","expires_in":1,"issued_at":"2018-01-01T10:00:02+00:00"}`,
-			expected: &bearerToken{token: "IAmAToken", ExpiresIn: 60, IssuedAt: time.Unix(1514800802, 0), expirationTime: time.Unix(1514800802+60, 0)},
+			expected: &bearerToken{token: "IAmAToken", expirationTime: time.Unix(1514800802+60, 0)},
 		},
 	} {
 		token, err := newBearerTokenFromHTTPResponseBody(testTokenHTTPResponse(t, c.input))
@@ -134,9 +134,6 @@ func TestNewBearerTokenFromHTTPResponseBody(t *testing.T) {
 		} else {
 			require.NoError(t, err, c.input)
 			assert.Equal(t, c.expected.token, token.token, c.input)
-			assert.Equal(t, c.expected.ExpiresIn, token.ExpiresIn, c.input)
-			assert.True(t, c.expected.IssuedAt.Equal(token.IssuedAt),
-				"expected [%s] to equal [%s], it did not", token.IssuedAt, c.expected.IssuedAt)
 			assert.True(t, c.expected.expirationTime.Equal(token.expirationTime),
 				"expected [%s] to equal [%s], it did not", token.expirationTime, c.expected.expirationTime)
 		}
@@ -149,7 +146,6 @@ func TestNewBearerTokenFromHTTPResponseBodyIssuedAtZero(t *testing.T) {
 	tokenBlob := fmt.Sprintf(`{"token":"IAmAToken","expires_in":100,"issued_at":"%s"}`, zeroTime)
 	token, err := newBearerTokenFromHTTPResponseBody(testTokenHTTPResponse(t, tokenBlob))
 	require.NoError(t, err)
-	assert.False(t, token.IssuedAt.Before(now), "expected [%s] not to be before [%s]", token.IssuedAt, now)
 	expectedExpiration := now.Add(time.Duration(100) * time.Second)
 	require.False(t, token.expirationTime.Before(expectedExpiration),
 		"expected [%s] not to be before [%s]", token.expirationTime, expectedExpiration)
