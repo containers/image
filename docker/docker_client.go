@@ -118,7 +118,7 @@ type dockerClient struct {
 
 	// Private state for setupRequestAuth (key: string, value: bearerToken)
 	tokenCacheLock sync.Mutex // Protects tokenCache
-	tokenCache     map[string]bearerToken
+	tokenCache     map[string]*bearerToken
 	// Private state for detectProperties:
 	detectPropertiesOnce  sync.Once // detectPropertiesOnce is used to execute detectProperties() at most once.
 	detectPropertiesError error     // detectPropertiesError caches the initial error.
@@ -300,7 +300,7 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 		registry:         registry,
 		userAgent:        userAgent,
 		tlsClientConfig:  tlsClientConfig,
-		tokenCache:       map[string]bearerToken{},
+		tokenCache:       map[string]*bearerToken{},
 		reportedWarnings: set.New[string](),
 	}, nil
 }
@@ -782,7 +782,7 @@ func (c *dockerClient) obtainBearerToken(ctx context.Context, challenge challeng
 		scopes = append(scopes, *extraScope)
 	}
 
-	var token bearerToken
+	var token *bearerToken
 	var inCache bool
 	func() { // A scope for defer
 		c.tokenCacheLock.Lock()
@@ -803,7 +803,7 @@ func (c *dockerClient) obtainBearerToken(ctx context.Context, challenge challeng
 			return "", err
 		}
 
-		token = *t
+		token = t
 		func() { // A scope for defer
 			c.tokenCacheLock.Lock()
 			defer c.tokenCacheLock.Unlock()
