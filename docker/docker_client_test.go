@@ -106,7 +106,7 @@ func testTokenHTTPResponse(t *testing.T, body string) *http.Response {
 	}
 }
 
-func TestNewBearerTokenFromHTTPResponseBody(t *testing.T) {
+func TestBearerTokenReadFromHTTPResponseBody(t *testing.T) {
 	for _, c := range []struct {
 		input    string
 		expected *bearerToken // or nil if a failure is expected
@@ -128,7 +128,8 @@ func TestNewBearerTokenFromHTTPResponseBody(t *testing.T) {
 			expected: &bearerToken{token: "IAmAToken", expirationTime: time.Unix(1514800802+60, 0)},
 		},
 	} {
-		token, err := newBearerTokenFromHTTPResponseBody(testTokenHTTPResponse(t, c.input))
+		token := &bearerToken{}
+		err := token.readFromHTTPResponseBody(testTokenHTTPResponse(t, c.input))
 		if c.expected == nil {
 			assert.Error(t, err, c.input)
 		} else {
@@ -140,11 +141,12 @@ func TestNewBearerTokenFromHTTPResponseBody(t *testing.T) {
 	}
 }
 
-func TestNewBearerTokenFromHTTPResponseBodyIssuedAtZero(t *testing.T) {
+func TestBearerTokenReadFromHTTPResponseBodyIssuedAtZero(t *testing.T) {
 	zeroTime := time.Time{}.Format(time.RFC3339)
 	now := time.Now()
 	tokenBlob := fmt.Sprintf(`{"token":"IAmAToken","expires_in":100,"issued_at":"%s"}`, zeroTime)
-	token, err := newBearerTokenFromHTTPResponseBody(testTokenHTTPResponse(t, tokenBlob))
+	token := &bearerToken{}
+	err := token.readFromHTTPResponseBody(testTokenHTTPResponse(t, tokenBlob))
 	require.NoError(t, err)
 	expectedExpiration := now.Add(time.Duration(100) * time.Second)
 	require.False(t, token.expirationTime.Before(expectedExpiration),
