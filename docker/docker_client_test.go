@@ -91,7 +91,7 @@ func TestDockerCertDir(t *testing.T) {
 	}
 }
 
-func TestNewBearerTokenFromJSONBlob(t *testing.T) {
+func TestBearerTokenReadFromJSONBlob(t *testing.T) {
 	for _, c := range []struct {
 		input    string
 		expected *bearerToken // or nil on failure
@@ -110,7 +110,8 @@ func TestNewBearerTokenFromJSONBlob(t *testing.T) {
 			&bearerToken{token: "IAmAToken", expirationTime: time.Unix(1514800802+60, 0)},
 		},
 	} {
-		token, err := newBearerTokenFromJSONBlob([]byte(c.input))
+		token := &bearerToken{}
+		err := token.readFromJSONBlob([]byte(c.input))
 		if c.expected == nil {
 			assert.Error(t, err, c.input)
 		} else {
@@ -122,11 +123,12 @@ func TestNewBearerTokenFromJSONBlob(t *testing.T) {
 	}
 }
 
-func TestNewBearerTokenIssuedAtZeroFromJsonBlob(t *testing.T) {
+func TestBearerTokenReadFromJSONBlobIssuedAtZeroFrom(t *testing.T) {
 	zeroTime := time.Time{}.Format(time.RFC3339)
 	now := time.Now()
 	tokenBlob := []byte(fmt.Sprintf(`{"token":"IAmAToken","expires_in":100,"issued_at":"%s"}`, zeroTime))
-	token, err := newBearerTokenFromJSONBlob(tokenBlob)
+	token := &bearerToken{}
+	err := token.readFromJSONBlob(tokenBlob)
 	require.NoError(t, err)
 	expectedExpiration := now.Add(time.Duration(100) * time.Second)
 	require.False(t, token.expirationTime.Before(expectedExpiration),
