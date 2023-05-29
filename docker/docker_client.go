@@ -728,50 +728,51 @@ func (c *dockerClient) setupRequestAuth(req *http.Request, extraScope *authScope
 
 // obtainBearerToken gets an "Authorization: Bearer" token if one is available, or obtains a fresh one.
 func (c *dockerClient) obtainBearerToken(ctx context.Context, challenge challenge, extraScope *authScope) (string, error) {
-	registryToken := c.registryToken
-	if registryToken == "" {
-		cacheKey := ""
-		scopes := []authScope{c.scope}
-		if extraScope != nil {
-			// Using ':' as a separator here is unambiguous because getBearerToken below
-			// uses the same separator when formatting a remote request (and because
-			// repository names that we create can't contain colons, and extraScope values
-			// coming from a server come from `parseAuthScope`, which also splits on colons).
-			cacheKey = fmt.Sprintf("%s:%s:%s", extraScope.resourceType, extraScope.remoteName, extraScope.actions)
-			if colonCount := strings.Count(cacheKey, ":"); colonCount != 2 {
-				return "", fmt.Errorf(
-					"Internal error: there must be exactly 2 colons in the cacheKey ('%s') but got %d",
-					cacheKey,
-					colonCount,
-				)
-			}
-			scopes = append(scopes, *extraScope)
-		}
-		var token bearerToken
-		t, inCache := c.tokenCache.Load(cacheKey)
-		if inCache {
-			token = t.(bearerToken)
-		}
-		if !inCache || time.Now().After(token.expirationTime) {
-			var (
-				t   *bearerToken
-				err error
-			)
-			if c.auth.IdentityToken != "" {
-				t, err = c.getBearerTokenOAuth2(ctx, challenge, scopes)
-			} else {
-				t, err = c.getBearerToken(ctx, challenge, scopes)
-			}
-			if err != nil {
-				return "", err
-			}
-
-			token = *t
-			c.tokenCache.Store(cacheKey, token)
-		}
-		registryToken = token.token
+	if c.registryToken != "" {
+		return c.registryToken, nil
 	}
-	return registryToken, nil
+
+	cacheKey := ""
+	scopes := []authScope{c.scope}
+	if extraScope != nil {
+		// Using ':' as a separator here is unambiguous because getBearerToken below
+		// uses the same separator when formatting a remote request (and because
+		// repository names that we create can't contain colons, and extraScope values
+		// coming from a server come from `parseAuthScope`, which also splits on colons).
+		cacheKey = fmt.Sprintf("%s:%s:%s", extraScope.resourceType, extraScope.remoteName, extraScope.actions)
+		if colonCount := strings.Count(cacheKey, ":"); colonCount != 2 {
+			return "", fmt.Errorf(
+				"Internal error: there must be exactly 2 colons in the cacheKey ('%s') but got %d",
+				cacheKey,
+				colonCount,
+			)
+		}
+		scopes = append(scopes, *extraScope)
+	}
+
+	var token bearerToken
+	t, inCache := c.tokenCache.Load(cacheKey)
+	if inCache {
+		token = t.(bearerToken)
+	}
+	if !inCache || time.Now().After(token.expirationTime) {
+		var (
+			t   *bearerToken
+			err error
+		)
+		if c.auth.IdentityToken != "" {
+			t, err = c.getBearerTokenOAuth2(ctx, challenge, scopes)
+		} else {
+			t, err = c.getBearerToken(ctx, challenge, scopes)
+		}
+		if err != nil {
+			return "", err
+		}
+
+		token = *t
+		c.tokenCache.Store(cacheKey, token)
+	}
+	return token.token, nil
 }
 
 func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge challenge,
