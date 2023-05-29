@@ -145,7 +145,7 @@ func TestNewBearerTokenFromHTTPResponseBodyIssuedAtZero(t *testing.T) {
 	zeroTime := time.Time{}.Format(time.RFC3339)
 	now := time.Now()
 	tokenBlob := fmt.Sprintf(`{"token":"IAmAToken","expires_in":100,"issued_at":"%s"}`, zeroTime)
-	token, err := newBearerTokenFromHTTPResponseBody(testTokenHTTPResponse(t, string(tokenBlob)))
+	token, err := newBearerTokenFromHTTPResponseBody(testTokenHTTPResponse(t, tokenBlob))
 	require.NoError(t, err)
 	assert.False(t, token.IssuedAt.Before(now), "expected [%s] not to be before [%s]", token.IssuedAt, now)
 }
