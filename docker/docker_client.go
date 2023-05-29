@@ -145,48 +145,6 @@ const (
 	noAuth
 )
 
-// newBearerTokenFromHTTPResponseBody parses a http.Response to obtain a bearerToken.
-// The caller is still responsible for ensuring res.Body is closed.
-func newBearerTokenFromHTTPResponseBody(res *http.Response) (*bearerToken, error) {
-	blob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxAuthTokenBodySize)
-	if err != nil {
-		return nil, err
-	}
-
-	var token struct {
-		Token          string    `json:"token"`
-		AccessToken    string    `json:"access_token"`
-		ExpiresIn      int       `json:"expires_in"`
-		IssuedAt       time.Time `json:"issued_at"`
-		expirationTime time.Time
-	}
-	if err := json.Unmarshal(blob, &token); err != nil {
-		const bodySampleLength = 50
-		bodySample := blob
-		if len(bodySample) > bodySampleLength {
-			bodySample = bodySample[:bodySampleLength]
-		}
-		return nil, fmt.Errorf("decoding bearer token (last URL %q, body start %q): %w", res.Request.URL.Redacted(), string(bodySample), err)
-	}
-
-	bt := &bearerToken{
-		token: token.Token,
-	}
-	if bt.token == "" {
-		bt.token = token.AccessToken
-	}
-
-	if token.ExpiresIn < minimumTokenLifetimeSeconds {
-		token.ExpiresIn = minimumTokenLifetimeSeconds
-		logrus.Debugf("Increasing token expiration to: %d seconds", token.ExpiresIn)
-	}
-	if token.IssuedAt.IsZero() {
-		token.IssuedAt = time.Now().UTC()
-	}
-	bt.expirationTime = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
-	return bt, nil
-}
-
 // dockerCertDir returns a path to a directory to be consumed by tlsclientconfig.SetupCertificates() depending on ctx and hostPort.
 func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
 	if sys != nil && sys.DockerCertPath != "" {
@@ -896,6 +854,48 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
 	}
 
 	return newBearerTokenFromHTTPResponseBody(res)
+}
+
+// newBearerTokenFromHTTPResponseBody parses a http.Response to obtain a bearerToken.
+// The caller is still responsible for ensuring res.Body is closed.
+func newBearerTokenFromHTTPResponseBody(res *http.Response) (*bearerToken, error) {
+	blob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxAuthTokenBodySize)
+	if err != nil {
+		return nil, err
+	}
+
+	var token struct {
+		Token          string    `json:"token"`
+		AccessToken    string    `json:"access_token"`
+		ExpiresIn      int       `json:"expires_in"`
+		IssuedAt       time.Time `json:"issued_at"`
+		expirationTime time.Time
+	}
+	if err := json.Unmarshal(blob, &token); err != nil {
+		const bodySampleLength = 50
+		bodySample := blob
+		if len(bodySample) > bodySampleLength {
+			bodySample = bodySample[:bodySampleLength]
+		}
+		return nil, fmt.Errorf("decoding bearer token (last URL %q, body start %q): %w", res.Request.URL.Redacted(), string(bodySample), err)
+	}
+
+	bt := &bearerToken{
+		token: token.Token,
+	}
+	if bt.token == "" {
+		bt.token = token.AccessToken
+	}
+
+	if token.ExpiresIn < minimumTokenLifetimeSeconds {
+		token.ExpiresIn = minimumTokenLifetimeSeconds
+		logrus.Debugf("Increasing token expiration to: %d seconds", token.ExpiresIn)
+	}
+	if token.IssuedAt.IsZero() {
+		token.IssuedAt = time.Now().UTC()
+	}
+	bt.expirationTime = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
+	return bt, nil
 }
 
 // detectPropertiesHelper performs the work of detectProperties which executes
