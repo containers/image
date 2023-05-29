@@ -146,35 +146,6 @@ const (
 	noAuth
 )
 
-// readFromJSONBlob sets token data in dest from the provided JSON.
-func (bt *bearerToken) readFromJSONBlob(blob []byte) error {
-	var token struct {
-		Token          string    `json:"token"`
-		AccessToken    string    `json:"access_token"`
-		ExpiresIn      int       `json:"expires_in"`
-		IssuedAt       time.Time `json:"issued_at"`
-		expirationTime time.Time
-	}
-	if err := json.Unmarshal(blob, &token); err != nil {
-		return err
-	}
-
-	bt.token = token.Token
-	if bt.token == "" {
-		bt.token = token.AccessToken
-	}
-
-	if token.ExpiresIn < minimumTokenLifetimeSeconds {
-		token.ExpiresIn = minimumTokenLifetimeSeconds
-		logrus.Debugf("Increasing token expiration to: %d seconds", token.ExpiresIn)
-	}
-	if token.IssuedAt.IsZero() {
-		token.IssuedAt = time.Now().UTC()
-	}
-	bt.expirationTime = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
-	return nil
-}
-
 // dockerCertDir returns a path to a directory to be consumed by tlsclientconfig.SetupCertificates() depending on ctx and hostPort.
 func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
 	if sys != nil && sys.DockerCertPath != "" {
@@ -914,6 +885,35 @@ func (c *dockerClient) getBearerToken(ctx context.Context, dest *bearerToken, ch
 	}
 
 	return dest.readFromJSONBlob(tokenBlob)
+}
+
+// readFromJSONBlob sets token data in dest from the provided JSON.
+func (bt *bearerToken) readFromJSONBlob(blob []byte) error {
+	var token struct {
+		Token          string    `json:"token"`
+		AccessToken    string    `json:"access_token"`
+		ExpiresIn      int       `json:"expires_in"`
+		IssuedAt       time.Time `json:"issued_at"`
+		expirationTime time.Time
+	}
+	if err := json.Unmarshal(blob, &token); err != nil {
+		return err
+	}
+
+	bt.token = token.Token
+	if bt.token == "" {
+		bt.token = token.AccessToken
+	}
+
+	if token.ExpiresIn < minimumTokenLifetimeSeconds {
+		token.ExpiresIn = minimumTokenLifetimeSeconds
+		logrus.Debugf("Increasing token expiration to: %d seconds", token.ExpiresIn)
+	}
+	if token.IssuedAt.IsZero() {
+		token.IssuedAt = time.Now().UTC()
+	}
+	bt.expirationTime = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
+	return nil
 }
 
 // detectPropertiesHelper performs the work of detectProperties which executes
