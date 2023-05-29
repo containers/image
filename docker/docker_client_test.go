@@ -91,45 +91,33 @@ func TestDockerCertDir(t *testing.T) {
 	}
 }
 
-func TestNewBearerTokenFromJsonBlob(t *testing.T) {
-	expected := &bearerToken{Token: "IAmAToken", ExpiresIn: 100, IssuedAt: time.Unix(1514800802, 0)}
-	tokenBlob := []byte(`{"token":"IAmAToken","expires_in":100,"issued_at":"2018-01-01T10:00:02+00:00"}`)
-	token, err := newBearerTokenFromJSONBlob(tokenBlob)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestNewBearerTokenFromJSONBlob(t *testing.T) {
+	for _, c := range []struct {
+		input    string
+		expected *bearerToken // or nil on failure
+	}{
+		{"IAmNotJson", nil}, // Invalid JSON
+		{ // A typical token
+			`{"token":"IAmAToken","expires_in":100,"issued_at":"2018-01-01T10:00:02+00:00"}`,
+			&bearerToken{Token: "IAmAToken", ExpiresIn: 100, IssuedAt: time.Unix(1514800802, 0)},
+		},
+		{ // Access token
+			`{"access_token":"IAmAToken","expires_in":100,"issued_at":"2018-01-01T10:00:02+00:00"}`,
+			&bearerToken{Token: "IAmAToken", ExpiresIn: 100, IssuedAt: time.Unix(1514800802, 0)},
+		},
+		{ // Small expiry
+			`{"token":"IAmAToken","expires_in":1,"issued_at":"2018-01-01T10:00:02+00:00"}`,
+			&bearerToken{Token: "IAmAToken", ExpiresIn: 60, IssuedAt: time.Unix(1514800802, 0)},
+		},
+	} {
+		token, err := newBearerTokenFromJSONBlob([]byte(c.input))
+		if c.expected == nil {
+			assert.Error(t, err, c.input)
+		} else {
+			require.NoError(t, err, c.input)
+			assertBearerTokensEqual(t, c.expected, token)
+		}
 	}
-
-	assertBearerTokensEqual(t, expected, token)
-}
-
-func TestNewBearerAccessTokenFromJsonBlob(t *testing.T) {
-	expected := &bearerToken{Token: "IAmAToken", ExpiresIn: 100, IssuedAt: time.Unix(1514800802, 0)}
-	tokenBlob := []byte(`{"access_token":"IAmAToken","expires_in":100,"issued_at":"2018-01-01T10:00:02+00:00"}`)
-	token, err := newBearerTokenFromJSONBlob(tokenBlob)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assertBearerTokensEqual(t, expected, token)
-}
-
-func TestNewBearerTokenFromInvalidJsonBlob(t *testing.T) {
-	tokenBlob := []byte("IAmNotJson")
-	_, err := newBearerTokenFromJSONBlob(tokenBlob)
-	if err == nil {
-		t.Fatalf("unexpected an error unmarshaling JSON")
-	}
-}
-
-func TestNewBearerTokenSmallExpiryFromJsonBlob(t *testing.T) {
-	expected := &bearerToken{Token: "IAmAToken", ExpiresIn: 60, IssuedAt: time.Unix(1514800802, 0)}
-	tokenBlob := []byte(`{"token":"IAmAToken","expires_in":1,"issued_at":"2018-01-01T10:00:02+00:00"}`)
-	token, err := newBearerTokenFromJSONBlob(tokenBlob)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assertBearerTokensEqual(t, expected, token)
 }
 
 func TestNewBearerTokenIssuedAtZeroFromJsonBlob(t *testing.T) {
