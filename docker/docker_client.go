@@ -87,9 +87,6 @@ type extensionSignatureList struct {
 // bearerToken records a cached token we can use to authenticate.
 type bearerToken struct {
 	token          string
-	AccessToken    string
-	ExpiresIn      int
-	IssuedAt       time.Time
 	expirationTime time.Time
 }
 
@@ -160,22 +157,20 @@ func newBearerTokenFromJSONBlob(blob []byte) (*bearerToken, error) {
 	}
 
 	res := &bearerToken{
-		token:       token.Token,
-		AccessToken: token.AccessToken,
-		ExpiresIn:   token.ExpiresIn,
-		IssuedAt:    token.IssuedAt,
+		token: token.Token,
 	}
 	if res.token == "" {
-		res.token = res.AccessToken
+		res.token = token.AccessToken
 	}
-	if res.ExpiresIn < minimumTokenLifetimeSeconds {
-		res.ExpiresIn = minimumTokenLifetimeSeconds
-		logrus.Debugf("Increasing token expiration to: %d seconds", res.ExpiresIn)
+
+	if token.ExpiresIn < minimumTokenLifetimeSeconds {
+		token.ExpiresIn = minimumTokenLifetimeSeconds
+		logrus.Debugf("Increasing token expiration to: %d seconds", token.ExpiresIn)
 	}
-	if res.IssuedAt.IsZero() {
-		res.IssuedAt = time.Now().UTC()
+	if token.IssuedAt.IsZero() {
+		token.IssuedAt = time.Now().UTC()
 	}
-	res.expirationTime = res.IssuedAt.Add(time.Duration(res.ExpiresIn) * time.Second)
+	res.expirationTime = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
 	return res, nil
 }
 

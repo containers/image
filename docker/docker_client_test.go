@@ -100,15 +100,15 @@ func TestNewBearerTokenFromJSONBlob(t *testing.T) {
 		{"IAmNotJson", nil}, // Invalid JSON
 		{ // A typical token
 			`{"token":"IAmAToken","expires_in":100,"issued_at":"2018-01-01T10:00:02+00:00"}`,
-			&bearerToken{token: "IAmAToken", ExpiresIn: 100, IssuedAt: time.Unix(1514800802, 0), expirationTime: time.Unix(1514800802+100, 0)},
+			&bearerToken{token: "IAmAToken", expirationTime: time.Unix(1514800802+100, 0)},
 		},
 		{ // Access token
 			`{"access_token":"IAmAToken","expires_in":100,"issued_at":"2018-01-01T10:00:02+00:00"}`,
-			&bearerToken{token: "IAmAToken", ExpiresIn: 100, IssuedAt: time.Unix(1514800802, 0), expirationTime: time.Unix(1514800802+100, 0)},
+			&bearerToken{token: "IAmAToken", expirationTime: time.Unix(1514800802+100, 0)},
 		},
 		{ // Small expiry
 			`{"token":"IAmAToken","expires_in":1,"issued_at":"2018-01-01T10:00:02+00:00"}`,
-			&bearerToken{token: "IAmAToken", ExpiresIn: 60, IssuedAt: time.Unix(1514800802, 0), expirationTime: time.Unix(1514800802+60, 0)},
+			&bearerToken{token: "IAmAToken", expirationTime: time.Unix(1514800802+60, 0)},
 		},
 	} {
 		token, err := newBearerTokenFromJSONBlob([]byte(c.input))
@@ -117,9 +117,6 @@ func TestNewBearerTokenFromJSONBlob(t *testing.T) {
 		} else {
 			require.NoError(t, err, c.input)
 			assert.Equal(t, c.expected.token, token.token, c.input)
-			assert.Equal(t, c.expected.ExpiresIn, token.ExpiresIn, c.input)
-			assert.True(t, c.expected.IssuedAt.Equal(token.IssuedAt),
-				"expected [%s] to equal [%s], it did not", token.IssuedAt, c.expected.IssuedAt)
 			assert.True(t, c.expected.expirationTime.Equal(token.expirationTime),
 				"expected [%s] to equal [%s], it did not", token.expirationTime, c.expected.expirationTime)
 		}
@@ -132,7 +129,6 @@ func TestNewBearerTokenIssuedAtZeroFromJsonBlob(t *testing.T) {
 	tokenBlob := []byte(fmt.Sprintf(`{"token":"IAmAToken","expires_in":100,"issued_at":"%s"}`, zeroTime))
 	token, err := newBearerTokenFromJSONBlob(tokenBlob)
 	require.NoError(t, err)
-	require.False(t, token.IssuedAt.Before(now), "expected [%s] not to be before [%s]", token.IssuedAt, now)
 	expectedExpiration := now.Add(time.Duration(100) * time.Second)
 	require.False(t, token.expirationTime.Before(expectedExpiration),
 		"expected [%s] not to be before [%s]", token.expirationTime, expectedExpiration)
