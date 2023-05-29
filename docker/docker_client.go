@@ -144,7 +144,8 @@ const (
 	noAuth
 )
 
-func newBearerTokenFromJSONBlob(blob []byte) (*bearerToken, error) {
+// readFromJSONBlob sets token data in dest from the provided JSON.
+func (bt *bearerToken) readFromJSONBlob(blob []byte) error {
 	var token struct {
 		Token          string    `json:"token"`
 		AccessToken    string    `json:"access_token"`
@@ -153,14 +154,12 @@ func newBearerTokenFromJSONBlob(blob []byte) (*bearerToken, error) {
 		expirationTime time.Time
 	}
 	if err := json.Unmarshal(blob, &token); err != nil {
-		return nil, err
+		return err
 	}
 
-	res := &bearerToken{
-		token: token.Token,
-	}
-	if res.token == "" {
-		res.token = token.AccessToken
+	bt.token = token.Token
+	if bt.token == "" {
+		bt.token = token.AccessToken
 	}
 
 	if token.ExpiresIn < minimumTokenLifetimeSeconds {
@@ -170,8 +169,8 @@ func newBearerTokenFromJSONBlob(blob []byte) (*bearerToken, error) {
 	if token.IssuedAt.IsZero() {
 		token.IssuedAt = time.Now().UTC()
 	}
-	res.expirationTime = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
-	return res, nil
+	bt.expirationTime = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
+	return nil
 }
 
 // dockerCertDir returns a path to a directory to be consumed by tlsclientconfig.SetupCertificates() depending on ctx and hostPort.
@@ -779,20 +778,18 @@ func (c *dockerClient) obtainBearerToken(ctx context.Context, challenge challeng
 		token, inCache = c.tokenCache[cacheKey]
 	}()
 	if !inCache || time.Now().After(token.expirationTime) {
-		var (
-			t   *bearerToken
-			err error
-		)
+		token = &bearerToken{}
+
+		var err error
 		if c.auth.IdentityToken != "" {
-			t, err = c.getBearerTokenOAuth2(ctx, challenge, scopes)
+			err = c.getBearerTokenOAuth2(ctx, token, challenge, scopes)
 		} else {
-			t, err = c.getBearerToken(ctx, challenge, scopes)
+			err = c.getBearerToken(ctx, token, challenge, scopes)
 		}
 		if err != nil {
 			return "", err
 		}
 
-		token = t
 		func() { // A scope for defer
 			c.tokenCacheLock.Lock()
 			defer c.tokenCacheLock.Unlock()
@@ -802,16 +799,19 @@ func (c *dockerClient) obtainBearerToken(ctx context.Context, challenge challeng
 	return token.token, nil
 }
 
-func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge challenge,
-	scopes []authScope) (*bearerToken, error) {
+// getBearerTokenOAuth2 obtains an "Authorization: Bearer" token using a pre-existing identity token per
+// https://github.com/distribution/distribution/blob/main/docs/spec/auth/oauth.md for challenge and scopes,
+// and writes it into dest.
+func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, dest *bearerToken, challenge challenge,
+	scopes []authScope) error {
 	realm, ok := challenge.Parameters["realm"]
 	if !ok {
-		return nil, errors.New("missing realm in bearer auth challenge")
+		return errors.New("missing realm in bearer auth challenge")
 	}
 
 	authReq, err := http.NewRequestWithContext(ctx, http.MethodPost, realm, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Make the form data required against the oauth2 authentication
@@ -836,31 +836,34 @@ func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge chall
 	logrus.Debugf("%s %s", authReq.Method, authReq.URL.Redacted())
 	res, err := c.client.Do(authReq)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer res.Body.Close()
 	if err := httpResponseToError(res, "Trying to obtain access token"); err != nil {
-		return nil, err
+		return err
 	}
 
 	tokenBlob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxAuthTokenBodySize)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return newBearerTokenFromJSONBlob(tokenBlob)
+	return dest.readFromJSONBlob(tokenBlob)
 }
 
-func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
-	scopes []authScope) (*bearerToken, error) {
+// getBearerToken obtains an "Authorization: Bearer" token using a GET request, per
+// https://github.com/distribution/distribution/blob/main/docs/spec/auth/token.md for challenge and scopes,
+// and writes it into dest.
+func (c *dockerClient) getBearerToken(ctx context.Context, dest *bearerToken, challenge challenge,
+	scopes []authScope) error {
 	realm, ok := challenge.Parameters["realm"]
 	if !ok {
-		return nil, errors.New("missing realm in bearer auth challenge")
+		return errors.New("missing realm in bearer auth challenge")
 	}
 
 	authReq, err := http.NewRequestWithContext(ctx, http.MethodGet, realm, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	params := authReq.URL.Query()
@@ -888,18 +891,18 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
 	logrus.Debugf("%s %s", authReq.Method, authReq.URL.Redacted())
 	res, err := c.client.Do(authReq)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer res.Body.Close()
 	if err := httpResponseToError(res, "Requesting bearer token"); err != nil {
-		return nil, err
+		return err
 	}
 	tokenBlob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxAuthTokenBodySize)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return newBearerTokenFromJSONBlob(tokenBlob)
+	return dest.readFromJSONBlob(tokenBlob)
 }
 
 // detectPropertiesHelper performs the work of detectProperties which executes
