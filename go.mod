@@ -29,7 +29,7 @@ require (
 	github.com/sigstore/rekor v1.2.2-0.20230529154427-55a5a338d149
 	github.com/sigstore/sigstore v1.6.4
 	github.com/sirupsen/logrus v1.9.2
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.8.4
 	github.com/sylabs/sif/v2 v2.11.4
 	github.com/theupdateframework/go-tuf v0.5.2
 	github.com/ulikunitz/xz v0.5.11
