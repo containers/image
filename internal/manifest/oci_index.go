@@ -181,15 +181,15 @@ func (index *OCI1IndexPublic) chooseInstance(ctx *types.SystemContext, preferGzi
 	for manifestIndex, d := range index.Manifests {
 		candidate := instanceCandidate{platformIndex: math.MaxInt, manifestPosition: manifestIndex, isZstd: instanceIsZstd(d), digest: d.Digest}
 		if d.Platform != nil {
+			imagePlatform := imgspecv1.Platform{
+				Architecture: d.Platform.Architecture,
+				OS:           d.Platform.OS,
+				OSVersion:    d.Platform.OSVersion,
+				OSFeatures:   slices.Clone(d.Platform.OSFeatures),
+				Variant:      d.Platform.Variant,
+			}
 			foundPlatform := false
 			for platformIndex, wantedPlatform := range wantedPlatforms {
-				imagePlatform := imgspecv1.Platform{
-					Architecture: d.Platform.Architecture,
-					OS:           d.Platform.OS,
-					OSVersion:    d.Platform.OSVersion,
-					OSFeatures:   slices.Clone(d.Platform.OSFeatures),
-					Variant:      d.Platform.Variant,
-				}
 				if platform.MatchesPlatform(imagePlatform, wantedPlatform) {
 					foundPlatform = true
 					candidate.platformIndex = platformIndex
