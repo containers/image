@@ -26,7 +26,7 @@ require (
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f
 	github.com/proglottis/gpgme v0.1.3
 	github.com/sigstore/fulcio v1.3.1
-	github.com/sigstore/rekor v1.2.2-0.20230529154427-55a5a338d149
+	github.com/sigstore/rekor v1.2.2-0.20230601122533-4c81ff246d12
 	github.com/sigstore/sigstore v1.6.5
 	github.com/sirupsen/logrus v1.9.2
 	github.com/stretchr/testify v1.8.4
@@ -75,7 +75,6 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-containerregistry v0.15.2 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect
-	github.com/google/trillian v1.5.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
