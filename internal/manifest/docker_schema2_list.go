@@ -44,12 +44,6 @@ func (list *Schema2ListPublic) MIMEType() string {
 	return list.MediaType
 }
 
-func (list *Schema2ListPublic) descriptorIndex(instanceDigest digest.Digest) int {
-	return slices.IndexFunc(list.Manifests, func(m Schema2ManifestDescriptor) bool {
-		return m.Digest == instanceDigest
-	})
-}
-
 // Instances returns a slice of digests of the manifests that this list knows of.
 func (list *Schema2ListPublic) Instances() []digest.Digest {
 	results := make([]digest.Digest, len(list.Manifests))
@@ -99,8 +93,10 @@ func (index *Schema2ListPublic) editInstances(editInstances []ListEdit) error {
 			if err := editInstance.UpdateDigest.Validate(); err != nil {
 				return fmt.Errorf("Schema2List.EditInstances: Modified digest %s is an invalid digest: %w", editInstance.UpdateDigest, err)
 			}
-			targetIndex := index.descriptorIndex(editInstance.UpdateOldDigest)
-			if targetIndex < 0 {
+			targetIndex := slices.IndexFunc(index.Manifests, func(m Schema2ManifestDescriptor) bool {
+				return m.Digest == editInstance.UpdateOldDigest
+			})
+			if targetIndex == -1 {
 				return fmt.Errorf("Schema2List.EditInstances: Attempting to update %s which is an invalid digest", editInstance.UpdateOldDigest)
 			}
 			index.Manifests[targetIndex].Digest = editInstance.UpdateDigest

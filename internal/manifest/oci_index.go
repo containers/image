@@ -38,12 +38,6 @@ func (index *OCI1IndexPublic) MIMEType() string {
 	return imgspecv1.MediaTypeImageIndex
 }
 
-func (index *OCI1IndexPublic) descriptorIndex(instanceDigest digest.Digest) int {
-	return slices.IndexFunc(index.Manifests, func(m imgspecv1.Descriptor) bool {
-		return m.Digest == instanceDigest
-	})
-}
-
 // Instances returns a slice of digests of the manifests that this index knows of.
 func (index *OCI1IndexPublic) Instances() []digest.Digest {
 	results := make([]digest.Digest, len(index.Manifests))
@@ -93,8 +87,10 @@ func (index *OCI1IndexPublic) editInstances(editInstances []ListEdit) error {
 			if err := editInstance.UpdateDigest.Validate(); err != nil {
 				return fmt.Errorf("OCI1Index.EditInstances: Modified digest %s is an invalid digest: %w", editInstance.UpdateDigest, err)
 			}
-			targetIndex := index.descriptorIndex(editInstance.UpdateOldDigest)
-			if targetIndex < 0 {
+			targetIndex := slices.IndexFunc(index.Manifests, func(m imgspecv1.Descriptor) bool {
+				return m.Digest == editInstance.UpdateOldDigest
+			})
+			if targetIndex == -1 {
 				return fmt.Errorf("OCI1Index.EditInstances: Attempting to update %s which is an invalid digest", editInstance.UpdateOldDigest)
 			}
 			index.Manifests[targetIndex].Digest = editInstance.UpdateDigest
