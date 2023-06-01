@@ -606,9 +606,6 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 			return err
 		}
 
-		// FIXME: what to do with the uncompressed digest?
-		diffOutput.UncompressedDigest = info.digest
-
 		if err := s.imageRef.transport.store.ApplyDiffFromStagingDirectory(layer.ID, diffOutput.Target, diffOutput, nil); err != nil {
 			_ = s.imageRef.transport.store.Delete(layer.ID)
 			return err
