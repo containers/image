@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"runtime"
-	"sort"
 
 	platform "github.com/containers/image/v5/internal/pkg/platform"
 	"github.com/containers/image/v5/types"
@@ -40,12 +39,9 @@ func (index *OCI1IndexPublic) MIMEType() string {
 }
 
 func (index *OCI1IndexPublic) descriptorIndex(instanceDigest digest.Digest) int {
-	for i, m := range index.Manifests {
-		if m.Digest == instanceDigest {
-			return i
-		}
-	}
-	return -1
+	return slices.IndexFunc(index.Manifests, func(m imgspecv1.Descriptor) bool {
+		return m.Digest == instanceDigest
+	})
 }
 
 // Instances returns a slice of digests of the manifests that this index knows of.
@@ -123,8 +119,8 @@ func (index *OCI1IndexPublic) editInstances(editInstances []ListEdit) error {
 	}
 	if len(addedEntries) != 0 {
 		index.Manifests = append(index.Manifests, addedEntries...)
-		sort.SliceStable(index.Manifests, func(i, j int) bool {
-			return !instanceIsZstd(index.Manifests[i]) && instanceIsZstd(index.Manifests[j])
+		slices.SortStableFunc(index.Manifests, func(a, b imgspecv1.Descriptor) bool {
+			return !instanceIsZstd(a) && instanceIsZstd(b)
 		})
 	}
 	return nil
@@ -188,17 +184,13 @@ func (index *OCI1IndexPublic) chooseInstance(ctx *types.SystemContext, preferGzi
 				OSFeatures:   slices.Clone(d.Platform.OSFeatures),
 				Variant:      d.Platform.Variant,
 			}
-			foundPlatform := false
-			for platformIndex, wantedPlatform := range wantedPlatforms {
-				if platform.MatchesPlatform(imagePlatform, wantedPlatform) {
-					foundPlatform = true
-					candidate.platformIndex = platformIndex
-					break
-				}
-			}
-			if !foundPlatform {
+			platformIndex := slices.IndexFunc(wantedPlatforms, func(wantedPlatform imgspecv1.Platform) bool {
+				return platform.MatchesPlatform(imagePlatform, wantedPlatform)
+			})
+			if platformIndex == -1 {
 				continue
 			}
+			candidate.platformIndex = platformIndex
 		}
 		if bestMatch == nil || candidate.isPreferredOver(bestMatch, didPreferGzip) {
 			bestMatch = &candidate

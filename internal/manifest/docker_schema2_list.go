@@ -45,12 +45,9 @@ func (list *Schema2ListPublic) MIMEType() string {
 }
 
 func (list *Schema2ListPublic) descriptorIndex(instanceDigest digest.Digest) int {
-	for i, m := range list.Manifests {
-		if m.Digest == instanceDigest {
-			return i
-		}
-	}
-	return -1
+	return slices.IndexFunc(list.Manifests, func(m Schema2ManifestDescriptor) bool {
+		return m.Digest == instanceDigest
+	})
 }
 
 // Instances returns a slice of digests of the manifests that this list knows of.
