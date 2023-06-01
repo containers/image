@@ -97,7 +97,7 @@ func (index *Schema2ListPublic) editInstances(editInstances []ListEdit) error {
 				return m.Digest == editInstance.UpdateOldDigest
 			})
 			if targetIndex == -1 {
-				return fmt.Errorf("Schema2List.EditInstances: Attempting to update %s which is an invalid digest", editInstance.UpdateOldDigest)
+				return fmt.Errorf("Schema2List.EditInstances: digest %s not found", editInstance.UpdateOldDigest)
 			}
 			index.Manifests[targetIndex].Digest = editInstance.UpdateDigest
 			if editInstance.UpdateSize < 0 {

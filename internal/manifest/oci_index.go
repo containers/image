@@ -91,7 +91,7 @@ func (index *OCI1IndexPublic) editInstances(editInstances []ListEdit) error {
 				return m.Digest == editInstance.UpdateOldDigest
 			})
 			if targetIndex == -1 {
-				return fmt.Errorf("OCI1Index.EditInstances: Attempting to update %s which is an invalid digest", editInstance.UpdateOldDigest)
+				return fmt.Errorf("OCI1Index.EditInstances: digest %s not found", editInstance.UpdateOldDigest)
 			}
 			index.Manifests[targetIndex].Digest = editInstance.UpdateDigest
 			if editInstance.UpdateSize < 0 {
