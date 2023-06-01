@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,6 +28,60 @@ func TestSchema2ListPublicFromManifest(t *testing.T) {
 	})
 	// Extra fields are rejected
 	testValidManifestWithExtraFieldsIsRejected(t, parser, validManifest, []string{"config", "fsLayers", "history", "layers"})
+}
+
+func TestSchema2ListEditInstances(t *testing.T) {
+	validManifest, err := os.ReadFile(filepath.Join("testdata", "v2list.manifest.json"))
+	require.NoError(t, err)
+	list, err := ListFromBlob(validManifest, GuessMIMEType(validManifest))
+	require.NoError(t, err)
+
+	expectedDigests := list.Instances()
+	editInstances := []ListEdit{}
+	editInstances = append(editInstances, ListEdit{
+		UpdateOldDigest: list.Instances()[0],
+		UpdateDigest:    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		UpdateSize:      32,
+		UpdateMediaType: "something",
+		ListOperation:   ListOpUpdate})
+	err = list.EditInstances(editInstances)
+	require.NoError(t, err)
+
+	expectedDigests[0] = editInstances[0].UpdateDigest
+	// order of old elements must remain same.
+	assert.Equal(t, list.Instances(), expectedDigests)
+
+	instance, err := list.Instance(list.Instances()[0])
+	require.NoError(t, err)
+	assert.Equal(t, "something", instance.MediaType)
+	assert.Equal(t, int64(32), instance.Size)
+
+	// Create a fresh list
+	list, err = ListFromBlob(validManifest, GuessMIMEType(validManifest))
+	require.NoError(t, err)
+	originalListOrder := list.Instances()
+
+	editInstances = []ListEdit{}
+	editInstances = append(editInstances, ListEdit{
+		AddDigest:     "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		AddSize:       32,
+		AddMediaType:  "application/vnd.oci.image.manifest.v1+json",
+		AddPlatform:   &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
+		ListOperation: ListOpAdd})
+	editInstances = append(editInstances, ListEdit{
+		AddDigest:     "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+		AddSize:       32,
+		AddMediaType:  "application/vnd.oci.image.manifest.v1+json",
+		AddPlatform:   &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
+		ListOperation: ListOpAdd})
+	err = list.EditInstances(editInstances)
+	require.NoError(t, err)
+
+	// Add new elements to the end of old list to maintain order
+	originalListOrder = append(originalListOrder, digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
+	originalListOrder = append(originalListOrder, digest.Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"))
+	// Verify order
+	assert.Equal(t, list.Instances(), originalListOrder)
 }
 
 func TestSchema2ListFromManifest(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -48,6 +49,68 @@ func TestOCI1IndexFromManifest(t *testing.T) {
 	})
 	// Extra fields are rejected
 	testValidManifestWithExtraFieldsIsRejected(t, parser, validManifest, []string{"config", "fsLayers", "history", "layers"})
+}
+
+func TestOCI1EditInstances(t *testing.T) {
+	validManifest, err := os.ReadFile(filepath.Join("testdata", "ociv1.image.index.json"))
+	require.NoError(t, err)
+	list, err := ListFromBlob(validManifest, GuessMIMEType(validManifest))
+	require.NoError(t, err)
+
+	expectedDigests := list.Instances()
+	editInstances := []ListEdit{}
+	editInstances = append(editInstances, ListEdit{
+		UpdateOldDigest: list.Instances()[0],
+		UpdateDigest:    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		UpdateSize:      32,
+		UpdateMediaType: "something",
+		ListOperation:   ListOpUpdate})
+	err = list.EditInstances(editInstances)
+	require.NoError(t, err)
+
+	expectedDigests[0] = editInstances[0].UpdateDigest
+	// order of old elements must remain same.
+	assert.Equal(t, list.Instances(), expectedDigests)
+
+	instance, err := list.Instance(list.Instances()[0])
+	require.NoError(t, err)
+	assert.Equal(t, "something", instance.MediaType)
+	assert.Equal(t, int64(32), instance.Size)
+
+	// Create a fresh list
+	list, err = ListFromBlob(validManifest, GuessMIMEType(validManifest))
+	require.NoError(t, err)
+
+	// Verfiy correct zstd sorting
+	editInstances = []ListEdit{}
+	annotations := map[string]string{"io.github.containers.compression.zstd": "true"}
+	// without zstd
+	editInstances = append(editInstances, ListEdit{
+		AddDigest:     "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		AddSize:       32,
+		AddMediaType:  "application/vnd.oci.image.manifest.v1+json",
+		AddPlatform:   &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
+		ListOperation: ListOpAdd})
+	// with zstd
+	editInstances = append(editInstances, ListEdit{
+		AddDigest:      "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+		AddSize:        32,
+		AddMediaType:   "application/vnd.oci.image.manifest.v1+json",
+		AddPlatform:    &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
+		AddAnnotations: annotations,
+		ListOperation:  ListOpAdd})
+	// without zstd
+	editInstances = append(editInstances, ListEdit{
+		AddDigest:     "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+		AddSize:       32,
+		AddMediaType:  "application/vnd.oci.image.manifest.v1+json",
+		AddPlatform:   &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
+		ListOperation: ListOpAdd})
+	err = list.EditInstances(editInstances)
+	require.NoError(t, err)
+
+	// Zstd should be kept on lowest priority as compared to the default gzip ones and order of prior elements must be preserved.
+	assert.Equal(t, list.Instances(), []digest.Digest{digest.Digest("sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f"), digest.Digest("sha256:5b0bcabd1ed22e9fb1310cf6c2dec7cdef19f0ad69efa1f392e94a4333501270"), digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), digest.Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"), digest.Digest("sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")})
 }
 
 func TestOCI1IndexChooseInstanceByCompression(t *testing.T) {
