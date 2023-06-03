@@ -10,11 +10,13 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/image"
 	internalManifest "github.com/containers/image/v5/internal/manifest"
+	"github.com/containers/image/v5/internal/set"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/signature"
+	"github.com/containers/image/v5/types"
+	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/exp/slices"
 )
 
 // copyMultipleImages copies some or all of an image list's instances, using
@@ -89,15 +91,19 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	// Copy each image, or just the ones we want to copy, in turn.
 	instanceDigests := updatedList.Instances()
 	imagesToCopy := len(instanceDigests)
+	var specificImages *set.Set[digest.Digest]
 	if options.ImageListSelection == CopySpecificImages {
-		imagesToCopy = len(options.Instances)
+		if specificImages, err = determineSpecificImages(options, updatedList); err != nil {
+			return nil, err
+		}
+		imagesToCopy = specificImages.Size()
 	}
 	c.Printf("Copying %d of %d images in list\n", imagesToCopy, len(instanceDigests))
 	updates := make([]manifest.ListUpdate, len(instanceDigests))
 	instancesCopied := 0
 	for i, instanceDigest := range instanceDigests {
 		if options.ImageListSelection == CopySpecificImages &&
-			!slices.Contains(options.Instances, instanceDigest) {
+			!specificImages.Contains(instanceDigest) {
 			update, err := updatedList.Instance(instanceDigest)
 			if err != nil {
 				return nil, err
@@ -195,4 +201,31 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	}
 
 	return manifestList, nil
+}
+
+// determineSpecificImages returns a set of images to copy based on the
+// Instances and InstancePlatforms fields of the passed-in options structure
+func determineSpecificImages(options *Options, updatedList internalManifest.List) (*set.Set[digest.Digest], error) {
+	// Start with the instances that were listed by digest.
+	specificImages := set.New[digest.Digest]()
+	for _, instanceDigest := range options.Instances {
+		specificImages.Add(instanceDigest)
+	}
+	if len(options.InstancePlatforms) > 0 {
+		// Choose the best match for each platform we were asked to
+		// also copy, and add it to the set of instances to copy.
+		for _, platform := range options.InstancePlatforms {
+			platformContext := types.SystemContext{
+				OSChoice:           platform.OS,
+				ArchitectureChoice: platform.Architecture,
+				VariantChoice:      platform.Variant,
+			}
+			instanceDigest, err := updatedList.ChooseInstanceByCompression(&platformContext, options.PreferGzipInstances)
+			if err != nil {
+				return nil, fmt.Errorf("While choosing the instance for platform spec %v: %w", platform, err)
+			}
+			specificImages.Add(instanceDigest)
+		}
+	}
+	return specificImages, nil
 }
