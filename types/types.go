@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"io"
+	"net/http"
 	"time"
 
 	"github.com/containers/image/v5/docker/reference"
@@ -671,6 +672,26 @@ type SystemContext struct {
 	CompressionFormat *compression.Algorithm
 	// CompressionLevel specifies what compression level is used
 	CompressionLevel *int
+
+	// testClientRoundTripper is a http.Client.Transport hook for fake responses
+	testClientRoundTripper http.RoundTripper
+}
+
+// RegisterTestClientRoundTripper registers testClientRoundTripper, if set.
+// Calls Transport.RegisterProtocol.
+func (sys *SystemContext) RegisterTestClientRoundTripper(transport *http.Transport, schemes []string) *http.Transport {
+	if sys.testClientRoundTripper != nil {
+		for _, scheme := range schemes {
+			transport.RegisterProtocol(scheme, sys.testClientRoundTripper)
+		}
+	}
+
+	return transport
+}
+
+// SetTestClientRoundTripper sets testClientRoundTripper
+func (sys *SystemContext) SetTestClientRoundTripper(rt http.RoundTripper) {
+	sys.testClientRoundTripper = rt
 }
 
 // ProgressEvent is the type of events a progress reader can produce

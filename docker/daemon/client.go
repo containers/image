@@ -53,7 +53,7 @@ func newDockerClient(sys *types.SystemContext) (*dockerclient.Client, error) {
 	switch serverURL.Scheme {
 	case "unix": // Nothing
 	case "http":
-		hc := httpConfig()
+		hc := httpConfig(sys)
 		opts = append(opts, dockerclient.WithHTTPClient(hc))
 	default:
 		hc, err := tlsConfig(sys)
@@ -84,18 +84,22 @@ func tlsConfig(sys *types.SystemContext) (*http.Client, error) {
 	}
 
 	return &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: tlsc,
-		},
+		Transport: sys.RegisterTestClientRoundTripper(
+			&http.Transport{
+				TLSClientConfig: tlsc,
+			},
+			[]string{"https"}),
 		CheckRedirect: dockerclient.CheckRedirect,
 	}, nil
 }
 
-func httpConfig() *http.Client {
+func httpConfig(sys *types.SystemContext) *http.Client {
 	return &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: nil,
-		},
+		Transport: sys.RegisterTestClientRoundTripper(
+			&http.Transport{
+				TLSClientConfig: nil,
+			},
+			[]string{"http"}),
 		CheckRedirect: dockerclient.CheckRedirect,
 	}
 }

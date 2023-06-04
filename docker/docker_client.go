@@ -818,7 +818,7 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 	}
 	tr := tlsclientconfig.NewTransport()
 	tr.TLSClientConfig = c.tlsClientConfig
-	c.client = &http.Client{Transport: tr}
+	c.client = &http.Client{Transport: c.sys.RegisterTestClientRoundTripper(tr, []string{"http", "https"})}
 
 	ping := func(scheme string) error {
 		pingURL, err := url.Parse(fmt.Sprintf(resolvedPingV2URL, scheme, c.registry))
