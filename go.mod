@@ -28,7 +28,7 @@ require (
 	github.com/sigstore/fulcio v1.3.1
 	github.com/sigstore/rekor v1.2.2-0.20230601122533-4c81ff246d12
 	github.com/sigstore/sigstore v1.6.5
-	github.com/sirupsen/logrus v1.9.2
+	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
 	github.com/sylabs/sif/v2 v2.11.4
 	github.com/theupdateframework/go-tuf v0.5.2
