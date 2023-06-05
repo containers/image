@@ -464,9 +464,13 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 			}
 			diffIDs = append([]digest.Digest{diffID}, diffIDs...)
 		}
-	case *manifest.Schema2, *manifest.OCI1:
-		// We know the ID calculation for these formats doesn't actually use the diffIDs,
-		// so we don't need to populate the diffID list.
+	case *manifest.Schema2:
+		// We know the ID calculation doesn't actually use the diffIDs, so we don't need to populate
+		// the diffID list.
+	case *manifest.OCI1:
+		for _, l := range m.Layers {
+			diffIDs = append(diffIDs, l.Digest)
+		}
 	default:
 		return ""
 	}
