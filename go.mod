@@ -15,7 +15,7 @@ require (
 	github.com/go-openapi/strfmt v0.21.7
 	github.com/go-openapi/swag v0.22.3
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/hashicorp/go-retryablehttp v0.7.2
+	github.com/hashicorp/go-retryablehttp v0.7.3
 	github.com/imdario/mergo v0.3.16
 	github.com/klauspost/compress v1.16.5
 	github.com/klauspost/pgzip v1.2.6
