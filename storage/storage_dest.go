@@ -416,6 +416,25 @@ func (s *storageImageDestination) tryReusingBlobAsPending(digest digest.Digest, 
 		}
 	}
 
+	tocDigest := digest
+	if options.TOCDigest != nil {
+		tocDigest = *options.TOCDigest
+	}
+
+	// Check if we have a chunked layer in storage with the same TOC digest.
+	layers, err = s.imageRef.transport.store.LayersByTOCDigest(tocDigest)
+	if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
+		return false, private.ReusedBlob{}, fmt.Errorf(`looking for layers with TOC digest %q: %w`, tocDigest, err)
+	}
+	if len(layers) > 0 {
+		// Save this for completeness.
+		s.uncompressedOrTocDigest[digest] = layers[0].TOCDigest
+		return true, private.ReusedBlob{
+			Digest: layers[0].TOCDigest,
+			Size:   layers[0].UncompressedSize,
+		}, nil
+	}
+
 	// Nope, we don't have it.
 	return false, private.ReusedBlob{}, nil
 }
