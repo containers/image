@@ -3,7 +3,7 @@ module github.com/containers/image/v5
 go 1.18
 
 require (
-	github.com/BurntSushi/toml v1.3.0
+	github.com/BurntSushi/toml v1.3.1
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01
 	github.com/containers/ocicrypt v1.1.7
 	github.com/containers/storage v1.46.1
