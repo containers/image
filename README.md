@@ -45,9 +45,9 @@ in your project. Ensure that the dependencies documented [in go.mod][go.mod]
 are also available (using those exact versions or different versions of
 your choosing).
 
-This library, by default, also depends on the GpgME and libostree C libraries. Either install them:
+This library also depends on some C libraries. Either install them:
 ```sh
-Fedora$ dnf install gpgme-devel libassuan-devel ostree-devel
+Fedora$ dnf install gpgme-devel libassuan-devel # potentially also ostree-devel
 macOS$ brew install gpgme
 ```
 or use the build tags described below to avoid the dependencies (e.g. using `go build -tags …`)
