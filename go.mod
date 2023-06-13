@@ -30,7 +30,7 @@ require (
 	github.com/sigstore/sigstore v1.6.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
-	github.com/sylabs/sif/v2 v2.11.4
+	github.com/sylabs/sif/v2 v2.11.5
 	github.com/theupdateframework/go-tuf v0.5.2
 	github.com/ulikunitz/xz v0.5.11
 	github.com/vbatts/tar-split v0.11.3
