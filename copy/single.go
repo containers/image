@@ -406,6 +406,11 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 			}
 		} else {
 			cld.destInfo, cld.diffID, cld.err = ic.copyLayer(ctx, srcLayer, toEncrypt, pool, index, srcRef, manifestLayerInfos[index].EmptyLayer)
+
+			// It's already unset on cld.destInfo, this forces the manifest to be regenerated.
+			if len(srcLayer.URLs) != 0 {
+				srcInfosUpdated = true
+			}
 		}
 		data[index] = cld
 	}
