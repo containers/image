@@ -387,9 +387,9 @@ func (config *V1RegistriesConf) ConvertToV2() (*V2RegistriesConf, error) {
 // anchoredDomainRegexp is an internal implementation detail of postProcess, defining the valid values of elements of UnqualifiedSearchRegistries.
 var anchoredDomainRegexp = regexp.Delayed("^" + reference.DomainRegexp.String() + "$")
 
-// postProcess checks the consistency of all the configuration, looks for conflicts,
+// PostProcessRegistries checks the consistency of all the configuration, looks for conflicts,
 // and normalizes the configuration (e.g., sets the Prefix to Location if not set).
-func (config *V2RegistriesConf) postProcessRegistries() error {
+func (config *V2RegistriesConf) PostProcessRegistries() error {
 	regMap := make(map[string][]*Registry)
 
 	for i := range config.Registries {
@@ -415,6 +415,11 @@ func (config *V2RegistriesConf) postProcessRegistries() error {
 			// https://github.com/containers/image/pull/1191#discussion_r610622495
 			if !strings.HasPrefix(reg.Prefix, "*.") && reg.Location == "" {
 				return &InvalidRegistries{s: "invalid condition: location is unset and prefix is not in the format: *.example.com"}
+			}
+
+			if strings.HasPrefix(reg.Prefix, "*.") && strings.ContainsAny(reg.Prefix, "/@:") {
+				msg := fmt.Sprintf("wildcarded prefix should be in the format: *.example.com. Current prefix %q is incorrectly formatted", reg.Prefix)
+				return &InvalidRegistries{s: msg}
 			}
 		}
 
@@ -897,15 +902,22 @@ func FindRegistry(ctx *types.SystemContext, ref string) (*Registry, error) {
 		return nil, err
 	}
 
-	return findRegistryWithParsedConfig(config, ref)
+	return FindRegistryWithConfig(&config.partialV2, ref)
 }
 
-// findRegistryWithParsedConfig implements `FindRegistry` with a pre-loaded
-// parseConfig.
-func findRegistryWithParsedConfig(config *parsedConfig, ref string) (*Registry, error) {
+// FindRegistryWithConfig returns the Registry with the longest prefix for ref,
+// which is a registry, repository namespace repository or image reference (as formatted by
+// reference.Domain(), reference.Named.Name() or reference.Reference.String()
+// — note that this requires the name to start with an explicit hostname!).
+// If no Registry prefixes the image or config is nil, nil is returned.
+func FindRegistryWithConfig(config *V2RegistriesConf, ref string) (*Registry, error) {
+	if config == nil {
+		return nil, nil
+	}
+
 	reg := Registry{}
 	prefixLen := 0
-	for _, r := range config.partialV2.Registries {
+	for _, r := range config.Registries {
 		if refMatchingPrefix(ref, r.Prefix) != -1 {
 			length := len(r.Prefix)
 			if length > prefixLen {
@@ -962,7 +974,7 @@ func loadConfigFile(path string, forceV2 bool) (*parsedConfig, error) {
 	res := parsedConfig{partialV2: combinedTOML.V2RegistriesConf}
 
 	// Post process registries, set the correct prefixes, sanity checks, etc.
-	if err := res.partialV2.postProcessRegistries(); err != nil {
+	if err := res.partialV2.PostProcessRegistries(); err != nil {
 		return nil, err
 	}
 
@@ -976,17 +988,6 @@ func loadConfigFile(path string, forceV2 bool) (*parsedConfig, error) {
 		res.shortNameMode = mode
 	} else {
 		res.shortNameMode = types.ShortNameModeInvalid
-	}
-
-	// Valid wildcarded prefixes must be in the format: *.example.com
-	// FIXME: Move to postProcessRegistries
-	// https://github.com/containers/image/pull/1191#discussion_r610623829
-	for i := range res.partialV2.Registries {
-		prefix := res.partialV2.Registries[i].Prefix
-		if strings.HasPrefix(prefix, "*.") && strings.ContainsAny(prefix, "/@:") {
-			msg := fmt.Sprintf("Wildcarded prefix should be in the format: *.example.com. Current prefix %q is incorrectly formatted", prefix)
-			return nil, &InvalidRegistries{s: msg}
-		}
 	}
 
 	// Parse and validate short-name aliases.
