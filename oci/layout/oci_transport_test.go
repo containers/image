@@ -17,20 +17,21 @@ func TestGetManifestDescriptor(t *testing.T) {
 	emptyDir := t.TempDir()
 
 	for _, c := range []struct {
-		dir, image string
-		expected   *imgspecv1.Descriptor // nil if a failure ie expected. errorIs / errorAs allows more specific checks.
-		errorIs    error
-		errorAs    any
+		dir, image         string
+		expectedDescriptor *imgspecv1.Descriptor // nil if a failure ie expected. errorIs / errorAs allows more specific checks.
+		expectedIndex      int
+		errorIs            error
+		errorAs            any
 	}{
 		{ // Index is missing
-			dir:      emptyDir,
-			image:    "",
-			expected: nil,
+			dir:                emptyDir,
+			image:              "",
+			expectedDescriptor: nil,
 		},
 		{ // A valid reference to the only manifest
 			dir:   "fixtures/manifest",
 			image: "",
-			expected: &imgspecv1.Descriptor{
+			expectedDescriptor: &imgspecv1.Descriptor{
 				MediaType:   "application/vnd.oci.image.manifest.v1+json",
 				Digest:      "sha256:84afb6189c4d69f2d040c5f1dc4e0a16fed9b539ce9cfb4ac2526ae4e0576cc0",
 				Size:        496,
@@ -40,52 +41,56 @@ func TestGetManifestDescriptor(t *testing.T) {
 					OS:           "linux",
 				},
 			},
+			expectedIndex: 0,
 		},
 		{ // An ambiguous reference to a multi-manifest directory
-			dir:      "fixtures/two_images_manifest",
-			image:    "",
-			expected: nil,
-			errorIs:  ErrMoreThanOneImage,
+			dir:                "fixtures/two_images_manifest",
+			image:              "",
+			expectedDescriptor: nil,
+			errorIs:            ErrMoreThanOneImage,
 		},
 		{ // A valid reference in a multi-manifest directory
 			dir:   "fixtures/name_lookups",
 			image: "a",
-			expected: &imgspecv1.Descriptor{
+			expectedDescriptor: &imgspecv1.Descriptor{
 				MediaType:   "application/vnd.oci.image.manifest.v1+json",
 				Digest:      "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 				Size:        1,
 				Annotations: map[string]string{"org.opencontainers.image.ref.name": "a"},
 			},
+			expectedIndex: 0,
 		},
 		{ // A valid reference in a multi-manifest directory
 			dir:   "fixtures/name_lookups",
 			image: "b",
-			expected: &imgspecv1.Descriptor{
+			expectedDescriptor: &imgspecv1.Descriptor{
 				MediaType:   "application/vnd.oci.image.manifest.v1+json",
 				Digest:      "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 				Size:        2,
 				Annotations: map[string]string{"org.opencontainers.image.ref.name": "b"},
 			},
+			expectedIndex: 1,
 		},
 		{ // No entry found
-			dir:      "fixtures/name_lookups",
-			image:    "this-does-not-exist",
-			expected: nil,
-			errorAs:  &ImageNotFoundError{},
+			dir:                "fixtures/name_lookups",
+			image:              "this-does-not-exist",
+			expectedDescriptor: nil,
+			errorAs:            &ImageNotFoundError{},
 		},
 		{ // Entries with invalid MIME types found
-			dir:      "fixtures/name_lookups",
-			image:    "invalid-mime",
-			expected: nil,
+			dir:                "fixtures/name_lookups",
+			image:              "invalid-mime",
+			expectedDescriptor: nil,
 		},
 	} {
 		ref, err := NewReference(c.dir, c.image)
 		require.NoError(t, err)
 
-		res, err := ref.(ociReference).getManifestDescriptor()
-		if c.expected != nil {
+		res, i, err := ref.(ociReference).getManifestDescriptor()
+		if c.expectedDescriptor != nil {
 			require.NoError(t, err)
-			assert.Equal(t, *c.expected, res)
+			assert.Equal(t, c.expectedIndex, i)
+			assert.Equal(t, *c.expectedDescriptor, res)
 		} else {
 			require.Error(t, err)
 			if c.errorIs != nil {
@@ -317,12 +322,6 @@ func TestReferenceNewImageDestination(t *testing.T) {
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	assert.NoError(t, err)
 	defer dest.Close()
-}
-
-func TestReferenceDeleteImage(t *testing.T) {
-	ref, _ := refToTempOCI(t)
-	err := ref.DeleteImage(context.Background(), nil)
-	assert.Error(t, err)
 }
 
 func TestReferenceOCILayoutPath(t *testing.T) {

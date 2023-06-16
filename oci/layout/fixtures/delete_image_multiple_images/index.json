@@ -1,0 +1,61 @@
+{
+    "schemaVersion": 2,
+    "manifests": [
+        {
+            "mediaType": "application/vnd.oci.image.index.v1+json",
+            "digest": "sha256:a2f798327b3f25e3eff54badcb769953de235e62e3e32051d57a5e66246de4a1",
+            "size": 759,
+            "annotations": {
+                "org.opencontainers.image.ref.name": "latest"
+            }
+        },
+        {
+            "mediaType": "application/vnd.oci.image.index.v1+json",
+            "digest": "sha256:a2f798327b3f25e3eff54badcb769953de235e62e3e32051d57a5e66246de4a1",
+            "size": 759,
+            "annotations": {
+                "org.opencontainers.image.ref.name": "3.18.3"
+            }
+        },
+        {
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "digest": "sha256:93cbd11a4f41467a0409b975499ae711bc6f8222de38d9f1b5a4097583195ad5",
+            "size": 525,
+            "annotations": {
+                "org.opencontainers.image.ref.name": "3"
+            }
+        },
+        {
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "digest": "sha256:93cbd11a4f41467a0409b975499ae711bc6f8222de38d9f1b5a4097583195ad5",
+            "size": 525,
+            "annotations": {
+                "org.opencontainers.image.ref.name": "3.18"
+            }
+        },
+        {
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "digest": "sha256:5b2aba4d3c27bc6493633d0ec446b25c8d0a5c9cfe99894bcdff0aee80813805",
+            "size": 525,
+            "annotations": {
+                "org.opencontainers.image.ref.name": "3.17.5"
+            }
+        },
+        {
+            "mediaType": "application/vnd.oci.image.index.v1+json",
+            "digest": "sha256:861d3c014b0e3edcf80e6221247d6b2921a4f892feb9bafe9515b9975b78c44f",
+            "size": 759,
+            "annotations": {
+                "org.opencontainers.image.ref.name": "3.16.7"
+            }
+        },
+        {
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "digest": "sha256:0dc27f36a618c110ae851662c13283e9fbc1b5a5de003befc4bcefa5a05d2eef",
+            "size": 525,
+            "annotations": {
+                "org.opencontainers.image.ref.name": "1.0.0"
+            }
+        }
+    ]
+}
