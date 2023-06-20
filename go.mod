@@ -3,6 +3,7 @@ module github.com/containers/image/v5
 go 1.18
 
 require (
+	dario.cat/mergo v1.0.0
 	github.com/BurntSushi/toml v1.3.2
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01
 	github.com/containers/ocicrypt v1.1.7
@@ -16,7 +17,6 @@ require (
 	github.com/go-openapi/swag v0.22.4
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-retryablehttp v0.7.4
-	github.com/imdario/mergo v0.3.16
 	github.com/klauspost/compress v1.16.6
 	github.com/klauspost/pgzip v1.2.6
 	github.com/manifoldco/promptui v0.9.0
