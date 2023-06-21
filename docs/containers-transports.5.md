@@ -65,11 +65,15 @@ The _algo:digest_ refers to the image ID reported by docker-inspect(1).
 ### **oci:**_path[:reference]_
 
 An image in a directory structure compliant with the "Open Container Image Layout Specification" at _path_.
+
+_Path_ terminates at the first `:` character; any further `:` characters are not separators, but a part of _reference_.
 Specify a _reference_ to allow storing multiple images within the same _path_.
 
 ### **oci-archive:**_path[:reference]_
 
 An image in a tar(1) archive with contents compliant with the "Open Container Image Layout Specification" at _path_.
+
+_Path_ terminates at the first `:` character; any further `:` characters are not separators, but a part of _reference_.
 Specify a _reference_ to allow storing multiple images within the same _path_.
 
 ### **ostree:**_docker-reference[@/absolute/repo/path]_
