@@ -27,7 +27,7 @@ require (
 	github.com/proglottis/gpgme v0.1.3
 	github.com/sigstore/fulcio v1.3.1
 	github.com/sigstore/rekor v1.2.2-0.20230601122533-4c81ff246d12
-	github.com/sigstore/sigstore v1.7.0
+	github.com/sigstore/sigstore v1.7.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
 	github.com/sylabs/sif/v2 v2.11.5
