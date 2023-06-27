@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/containers/image/v5/pkg/compression"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -99,6 +100,23 @@ func TestOCI1EditInstances(t *testing.T) {
 		AddPlatform:    &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
 		AddAnnotations: annotations,
 		ListOperation:  ListOpAdd})
+	// with zstd but with compression, annotation must be added automatically
+	editInstances = append(editInstances, ListEdit{
+		AddDigest:                "sha256:hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
+		AddSize:                  32,
+		AddMediaType:             "application/vnd.oci.image.manifest.v1+json",
+		AddPlatform:              &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
+		AddCompressionAlgorithms: []compression.Algorithm{compression.Zstd},
+		AddAnnotations:           map[string]string{},
+		ListOperation:            ListOpAdd})
+	// with zstd but with compression, annotation must be added automatically and AddAnnotations is unset
+	editInstances = append(editInstances, ListEdit{
+		AddDigest:                "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+		AddSize:                  32,
+		AddMediaType:             "application/vnd.oci.image.manifest.v1+json",
+		AddPlatform:              &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
+		AddCompressionAlgorithms: []compression.Algorithm{compression.Zstd},
+		ListOperation:            ListOpAdd})
 	// without zstd
 	editInstances = append(editInstances, ListEdit{
 		AddDigest:     "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
@@ -110,7 +128,23 @@ func TestOCI1EditInstances(t *testing.T) {
 	require.NoError(t, err)
 
 	// Zstd should be kept on lowest priority as compared to the default gzip ones and order of prior elements must be preserved.
-	assert.Equal(t, list.Instances(), []digest.Digest{digest.Digest("sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f"), digest.Digest("sha256:5b0bcabd1ed22e9fb1310cf6c2dec7cdef19f0ad69efa1f392e94a4333501270"), digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), digest.Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"), digest.Digest("sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")})
+	assert.Equal(t, list.Instances(), []digest.Digest{digest.Digest("sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f"), digest.Digest("sha256:5b0bcabd1ed22e9fb1310cf6c2dec7cdef19f0ad69efa1f392e94a4333501270"), digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), digest.Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"), digest.Digest("sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"), digest.Digest("sha256:hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"), digest.Digest("sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")})
+
+	// Update list and remove zstd annotation from existing instance, and verify if resorting works
+	editInstances = []ListEdit{}
+	editInstances = append(editInstances, ListEdit{
+		UpdateOldDigest:         digest.Digest("sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+		UpdateDigest:            "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+		UpdateSize:              32,
+		UpdateMediaType:         "application/vnd.oci.image.manifest.v1+json",
+		UpdateAffectAnnotations: true,
+		UpdateAnnotations:       map[string]string{},
+		ListOperation:           ListOpUpdate})
+	err = list.EditInstances(editInstances)
+	require.NoError(t, err)
+	// Digest `ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff` should be re-ordered on update.
+	assert.Equal(t, list.Instances(), []digest.Digest{digest.Digest("sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f"), digest.Digest("sha256:5b0bcabd1ed22e9fb1310cf6c2dec7cdef19f0ad69efa1f392e94a4333501270"), digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), digest.Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"), digest.Digest("sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), digest.Digest("sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"), digest.Digest("sha256:hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh")})
+
 }
 
 func TestOCI1IndexChooseInstanceByCompression(t *testing.T) {
