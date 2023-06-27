@@ -417,7 +417,7 @@ func TestFullNameRegexp(t *testing.T) {
 		},
 	}
 	for i := range testcases {
-		checkRegexp(t, &anchoredNameRegexp, testcases[i])
+		checkRegexp(t, anchoredNameRegexp, testcases[i])
 	}
 }
 
@@ -517,7 +517,7 @@ func TestIdentifierRegexp(t *testing.T) {
 	}
 
 	for i := range fullCases {
-		checkRegexp(t, &anchoredIdentifierRegexp, fullCases[i])
+		checkRegexp(t, anchoredIdentifierRegexp, fullCases[i])
 		if IsFullIdentifier(fullCases[i].input) != fullCases[i].match {
 			t.Errorf("Expected match for %q to be %v", fullCases[i].input, fullCases[i].match)
 		}
