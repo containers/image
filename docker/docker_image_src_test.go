@@ -71,6 +71,7 @@ location = "@REGISTRY@/with-mirror"
 			DockerInsecureSkipTLSVerify: types.OptionalBoolTrue,
 		})
 		require.NoError(t, err, c.input)
+		defer src.Close()
 
 		// The observable behavior
 		assert.Equal(t, "//"+c.input, src.Reference().StringWithinTransport(), c.input)

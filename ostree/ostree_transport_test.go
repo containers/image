@@ -239,8 +239,9 @@ func TestReferenceNewImage(t *testing.T) {
 func TestReferenceNewImageSource(t *testing.T) {
 	ref, err := Transport.ParseReference("busybox")
 	require.NoError(t, err)
-	_, err = ref.NewImageSource(context.Background(), nil)
+	src, err = ref.NewImageSource(context.Background(), nil)
 	require.NoError(t, err)
+	defer src.Close()
 }
 
 func TestReferenceNewImageDestination(t *testing.T) {
