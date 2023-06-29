@@ -47,6 +47,7 @@ func TestGetBlobForRemoteLayers(t *testing.T) {
 	cache := memory.New()
 
 	imageSource := createImageSource(t, &types.SystemContext{})
+	defer imageSource.Close()
 	layerInfo := types.BlobInfo{
 		Digest: digest.FromBytes([]byte("Hello world")),
 		Size:   -1,
@@ -69,6 +70,7 @@ func TestGetBlobForRemoteLayersWithTLS(t *testing.T) {
 	imageSource := createImageSource(t, &types.SystemContext{
 		OCICertPath: "fixtures/accepted_certs",
 	})
+	defer imageSource.Close()
 	cache := memory.New()
 
 	layer, size, err := imageSource.GetBlob(context.Background(), types.BlobInfo{
@@ -85,6 +87,7 @@ func TestGetBlobForRemoteLayersOnTLSFailure(t *testing.T) {
 	imageSource := createImageSource(t, &types.SystemContext{
 		OCICertPath: "fixtures/rejected_certs",
 	})
+	defer imageSource.Close()
 	cache := memory.New()
 	layer, size, err := imageSource.GetBlob(context.Background(), types.BlobInfo{
 		URLs: []string{httpServerAddr},

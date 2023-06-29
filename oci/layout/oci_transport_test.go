@@ -307,8 +307,9 @@ func TestReferenceNewImage(t *testing.T) {
 
 func TestReferenceNewImageSource(t *testing.T) {
 	ref, _ := refToTempOCI(t)
-	_, err := ref.NewImageSource(context.Background(), nil)
+	src, err := ref.NewImageSource(context.Background(), nil)
 	assert.NoError(t, err)
+	defer src.Close()
 }
 
 func TestReferenceNewImageDestination(t *testing.T) {
