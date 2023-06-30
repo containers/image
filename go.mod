@@ -7,7 +7,7 @@ require (
 	github.com/BurntSushi/toml v1.3.2
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01
 	github.com/containers/ocicrypt v1.1.7
-	github.com/containers/storage v1.47.0
+	github.com/containers/storage v1.48.0
 	github.com/cyberphone/json-canonicalization v0.0.0-20230514072755-504adb8a8af1
 	github.com/docker/distribution v2.8.2+incompatible
 	github.com/docker/docker v24.0.2+incompatible
