@@ -68,6 +68,7 @@ type ListUpdate struct {
 	Digest    digest.Digest
 	Size      int64
 	MediaType string
+	Platform  *imgspecv1.Platform // read-only field: may be set by Instance(), ignored by UpdateInstance()
 }
 
 type ListOp int
