@@ -61,6 +61,13 @@ func (list *Schema2ListPublic) Instance(instanceDigest digest.Digest) (ListUpdat
 				Digest:    manifest.Digest,
 				Size:      manifest.Size,
 				MediaType: manifest.MediaType,
+				Platform: &imgspecv1.Platform{
+					OS:           manifest.Platform.OS,
+					Architecture: manifest.Platform.Architecture,
+					OSVersion:    manifest.Platform.OSVersion,
+					OSFeatures:   manifest.Platform.OSFeatures,
+					Variant:      manifest.Platform.Variant,
+				},
 			}, nil
 		}
 	}

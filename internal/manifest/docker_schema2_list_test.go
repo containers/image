@@ -55,6 +55,8 @@ func TestSchema2ListEditInstances(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "something", instance.MediaType)
 	assert.Equal(t, int64(32), instance.Size)
+	// platform must match with instance platform set in `v2list.manifest.json` for the first instance
+	assert.Equal(t, &imgspecv1.Platform{Architecture: "ppc64le", OS: "linux", OSVersion: "", OSFeatures: []string(nil), Variant: ""}, instance.Platform)
 
 	// Create a fresh list
 	list, err = ListFromBlob(validManifest, GuessMIMEType(validManifest))
