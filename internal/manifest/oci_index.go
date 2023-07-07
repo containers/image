@@ -57,6 +57,7 @@ func (index *OCI1IndexPublic) Instance(instanceDigest digest.Digest) (ListUpdate
 				Digest:    manifest.Digest,
 				Size:      manifest.Size,
 				MediaType: manifest.MediaType,
+				Platform:  manifest.Platform,
 			}, nil
 		}
 	}
