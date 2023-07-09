@@ -17,6 +17,7 @@ import (
 func TestGetPathToAuth(t *testing.T) {
 	const linux = "linux"
 	const darwin = "darwin"
+	const freebsd = "freebsd"
 
 	uid := fmt.Sprintf("%d", os.Getuid())
 	// We don’t have to override the home directory for this because use of this path does not depend
@@ -36,20 +37,27 @@ func TestGetPathToAuth(t *testing.T) {
 		// Default paths
 		{&types.SystemContext{}, linux, "", "/run/containers/" + uid + "/auth.json", false, false},
 		{&types.SystemContext{}, darwin, "", darwinDefault, false, false},
+		{&types.SystemContext{}, freebsd, "", darwinDefault, false, false},
 		{nil, linux, "", "/run/containers/" + uid + "/auth.json", false, false},
 		{nil, darwin, "", darwinDefault, false, false},
+		{nil, freebsd, "", darwinDefault, false, false},
 		// SystemContext overrides
 		{&types.SystemContext{AuthFilePath: "/absolute/path"}, linux, "", "/absolute/path", false, true},
 		{&types.SystemContext{AuthFilePath: "/absolute/path"}, darwin, "", "/absolute/path", false, true},
+		{&types.SystemContext{AuthFilePath: "/absolute/path"}, freebsd, "", "/absolute/path", false, true},
 		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, linux, "", "/absolute/path", true, true},
 		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, darwin, "", "/absolute/path", true, true},
+		{&types.SystemContext{LegacyFormatAuthFilePath: "/absolute/path"}, freebsd, "", "/absolute/path", true, true},
 		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, linux, "", "/prefix/run/containers/" + uid + "/auth.json", false, false},
-		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, darwin, "", "/prefix/run/containers/" + uid + "/auth.json", false, false},
+		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, darwin, "", darwinDefault, false, false},
+		{&types.SystemContext{RootForImplicitAbsolutePaths: "/prefix"}, freebsd, "", darwinDefault, false, false},
 		// XDG_RUNTIME_DIR defined
 		{nil, linux, tmpDir, tmpDir + "/containers/auth.json", false, false},
 		{nil, darwin, tmpDir, darwinDefault, false, false},
+		{nil, freebsd, tmpDir, darwinDefault, false, false},
 		{nil, linux, tmpDir + "/thisdoesnotexist", "", false, false},
 		{nil, darwin, tmpDir + "/thisdoesnotexist", darwinDefault, false, false},
+		{nil, freebsd, tmpDir + "/thisdoesnotexist", darwinDefault, false, false},
 	} {
 		t.Run(fmt.Sprintf("%d", caseIndex), func(t *testing.T) {
 			// Always use t.Setenv() to ensure XDG_RUNTIME_DIR is restored to the original value after the test.
@@ -88,7 +96,7 @@ func TestGetAuth(t *testing.T) {
 	t.Logf("using temporary home directory: %q", tmpHomeDir)
 
 	configDir1 := filepath.Join(tmpXDGRuntimeDir, "containers")
-	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+	if runtime.GOOS != "linux" {
 		configDir1 = filepath.Join(tmpHomeDir, ".config", "containers")
 	}
 	if err := os.MkdirAll(configDir1, 0700); err != nil {
@@ -401,7 +409,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	t.Logf("using temporary home directory: %q", tmpHomeDir)
 
 	configDir := filepath.Join(tmpXDGRuntimeDir, "containers")
-	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+	if runtime.GOOS != "linux" {
 		configDir = filepath.Join(tmpHomeDir, ".config", "containers")
 	}
 	if err := os.MkdirAll(configDir, 0750); err != nil {
