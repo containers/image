@@ -253,6 +253,32 @@ func (pc *PolicyContext) GetSignaturesWithAcceptedAuthor(ctx context.Context, pu
 	return res, nil
 }
 
+// IsImagePolicySigned true iff the policy requirement for the image is not insecureAcceptAnything
+func (pc *PolicyContext) IsImagePolicySigned(publicImage types.UnparsedImage) (res bool, finalErr error) {
+	if err := pc.changeState(pcReady, pcInUse); err != nil {
+		return false, err
+	}
+	defer func() {
+		if err := pc.changeState(pcInUse, pcReady); err != nil {
+			res = false
+			finalErr = err
+		}
+	}()
+
+	image := unparsedimage.FromPublic(publicImage)
+
+	logrus.Debugf("IsImagePolicySigned for image %s", policyIdentityLogName(image.Reference()))
+	reqs := pc.requirementsForImageRef(image.Reference())
+
+	for _, req := range reqs {
+		if req == NewPRInsecureAcceptAnything() {
+			return false, PolicyRequirementError("The policy defined for the image must not be InsecureAcceptAnything")
+		}
+	}
+
+	return true, nil
+}
+
 // IsRunningImageAllowed returns true iff the policy allows running the image.
 // If it returns false, err must be non-nil, and should be an PolicyRequirementError if evaluation
 // succeeded but the result was rejection.
