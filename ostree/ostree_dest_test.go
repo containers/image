@@ -3,4 +3,8 @@
 
 package ostree
 
+import (
+	"github.com/containers/image/v5/internal/private"
+)
+
 var _ private.ImageDestination = (*ostreeImageDestination)(nil)
