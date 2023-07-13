@@ -134,7 +134,7 @@ func TestNewReference(t *testing.T) {
 		require.NoError(t, err, path)
 	}
 
-	_, err = NewReference("busybox", tmpDir+"/thisparentdoesnotexist/something")
+	_, err := NewReference("busybox", tmpDir+"/thisparentdoesnotexist/something")
 	assert.Error(t, err)
 }
 
@@ -239,7 +239,7 @@ func TestReferenceNewImage(t *testing.T) {
 func TestReferenceNewImageSource(t *testing.T) {
 	ref, err := Transport.ParseReference("busybox")
 	require.NoError(t, err)
-	src, err = ref.NewImageSource(context.Background(), nil)
+	src, err := ref.NewImageSource(context.Background(), nil)
 	require.NoError(t, err)
 	defer src.Close()
 }
