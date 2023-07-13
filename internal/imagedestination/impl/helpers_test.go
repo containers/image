@@ -24,6 +24,6 @@ func TestBlobMatchesRequiredCompression(t *testing.T) {
 
 	for _, c := range cases {
 		opts = private.TryReusingBlobOptions{RequiredCompression: c.requiredCompression}
-		assert.Equal(t, BlobMatchesRequiredCompression(opts, c.candidateCompression), c.result)
+		assert.Equal(t, c.result, BlobMatchesRequiredCompression(opts, c.candidateCompression))
 	}
 }
