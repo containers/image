@@ -53,12 +53,15 @@ func (index *OCI1IndexPublic) Instances() []digest.Digest {
 func (index *OCI1IndexPublic) Instance(instanceDigest digest.Digest) (ListUpdate, error) {
 	for _, manifest := range index.Manifests {
 		if manifest.Digest == instanceDigest {
-			return ListUpdate{
+			ret := ListUpdate{
 				Digest:    manifest.Digest,
 				Size:      manifest.Size,
 				MediaType: manifest.MediaType,
-				Platform:  manifest.Platform,
-			}, nil
+			}
+			ret.ReadOnly.Platform = manifest.Platform
+			ret.ReadOnly.Annotations = manifest.Annotations
+			ret.ReadOnly.CompressionAlgorithmNames = annotationsToCompressionAlgorithmNames(manifest.Annotations)
+			return ret, nil
 		}
 	}
 	return ListUpdate{}, fmt.Errorf("unable to find instance %s in OCI1Index", instanceDigest)
@@ -77,6 +80,18 @@ func (index *OCI1IndexPublic) UpdateInstances(updates []ListUpdate) error {
 			ListOperation:   ListOpUpdate})
 	}
 	return index.editInstances(editInstances)
+}
+
+func annotationsToCompressionAlgorithmNames(annotations map[string]string) []string {
+	result := make([]string, 0, 1)
+	if annotations[OCI1InstanceAnnotationCompressionZSTD] == OCI1InstanceAnnotationCompressionZSTDValue {
+		result = append(result, compression.ZstdAlgorithmName)
+	}
+	// No compression was detected, hence assume instance has default compression `Gzip`
+	if len(result) == 0 {
+		result = append(result, compression.GzipAlgorithmName)
+	}
+	return result
 }
 
 func addCompressionAnnotations(compressionAlgorithms []compression.Algorithm, annotationsMap map[string]string) {

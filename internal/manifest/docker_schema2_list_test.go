@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	compressionTypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
@@ -56,7 +57,8 @@ func TestSchema2ListEditInstances(t *testing.T) {
 	assert.Equal(t, "something", instance.MediaType)
 	assert.Equal(t, int64(32), instance.Size)
 	// platform must match with instance platform set in `v2list.manifest.json` for the first instance
-	assert.Equal(t, &imgspecv1.Platform{Architecture: "ppc64le", OS: "linux", OSVersion: "", OSFeatures: []string(nil), Variant: ""}, instance.Platform)
+	assert.Equal(t, &imgspecv1.Platform{Architecture: "ppc64le", OS: "linux", OSVersion: "", OSFeatures: []string(nil), Variant: ""}, instance.ReadOnly.Platform)
+	assert.Equal(t, []string{compressionTypes.GzipAlgorithmName}, instance.ReadOnly.CompressionAlgorithmNames)
 
 	// Create a fresh list
 	list, err = ListFromBlob(validManifest, GuessMIMEType(validManifest))
