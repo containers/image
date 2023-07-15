@@ -538,6 +538,16 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 	var expected manifest.NonImageArtifactError
 	assert.ErrorAs(t, err, &expected)
 
+	// Conversion to schema1 with encryption fails
+	_, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		LayerInfos:       layerInfosWithCryptoOperation(original.LayerInfos(), types.Encrypt),
+		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
+		InformationOnly: types.ManifestUpdateInformation{
+			Destination: memoryDest,
+		},
+	})
+	assert.Error(t, err)
+
 	// FIXME? Test also the other failure cases, if only to see that we don't crash?
 }
 
@@ -565,6 +575,13 @@ func TestConvertToManifestSchema2(t *testing.T) {
 	})
 	var expected manifest.NonImageArtifactError
 	assert.ErrorAs(t, err, &expected)
+
+	// Conversion to schema2 with encryption fails
+	_, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		LayerInfos:       layerInfosWithCryptoOperation(original.LayerInfos(), types.Encrypt),
+		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
+	})
+	assert.Error(t, err)
 
 	// FIXME? Test also the other failure cases, if only to see that we don't crash?
 }
