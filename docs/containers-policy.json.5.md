@@ -61,17 +61,40 @@ The global `default` set of policy requirements is mandatory; all of the other f
 <!-- NOTE: Keep this in sync with transports/transports.go! -->
 ## Supported transports and their scopes
 
+See containers-transports(5) for general documentation about the transports and their reference syntax.
+
 ### `atomic:`
 
-The `atomic:` transport refers to images in an Atomic Registry.
+The deprecated `atomic:` transport refers to images in an Atomic Registry.
 
 Supported scopes use the form _hostname_[`:`_port_][`/`_namespace_[`/`_imagestream_ [`:`_tag_]]],
 i.e. either specifying a complete name of a tagged image, or prefix denoting
-a host/namespace/image stream or a wildcarded expression for matching all
+a host/namespace/image stream, or a wildcarded expression starting with `*.` for matching all
 subdomains. For wildcarded subdomain matching, `*.example.com` is a valid case, but `example*.*.com` is not.
 
 *Note:* The _hostname_ and _port_ refer to the container registry host and port (the one used
 e.g. for `docker pull`), _not_ to the OpenShift API host and port.
+
+### `containers-storage:`
+
+Supported scopes have the form `[`_storage-specifier_`]`_image-scope_.
+
+`[`_storage-specifier_`]` is usually `[`_graph-driver-name_`@`_graph-root_`]`, e.g. `[overlay@/var/lib/containers/storage]`.
+
+_image-scope_ matching the individual image is
+- a named Docker reference *in the fully expanded form*, either using a tag or digest. For example, `docker.io/library/busybox:latest` (*not* `busybox:latest`)
+- and/or (depending on which one the user’s input provides) `@`_image-id_
+
+More general scopes are prefixes of individual-image scopes, and specify a less-precisely-specified image, or a repository
+(by omitting first the image ID, if any; then the digest, if any; and finally a tag, if any),
+a repository namespace, or a registry host (by only specifying the host name and possibly a port number).
+
+Finally, two full-store specifiers matching all images in the store are valid scopes:
+- `[`_graph-driver-name_`@`_graph-root_`]` and
+- `[`_graph-root_`]`
+
+Note that some tools like Podman and Buildah hard-code overrides of the signature verification policy for “push” operations,
+allowing these oprations regardless of configuration in `policy.json`.
 
 ### `dir:`
 
@@ -80,10 +103,10 @@ The `dir:` transport refers to images stored in local directories.
 Supported scopes are paths of directories (either containing a single image or
 subdirectories possibly containing images).
 
-*Note:* The paths must be absolute and contain no symlinks. Paths violating these requirements may be silently ignored.
-
-The top-level scope `"/"` is forbidden; use the transport default scope `""`,
-for consistency with other transports.
+*Note:*
+- The paths must be absolute and contain no symlinks. Paths violating these requirements may be silently ignored.
+- The top-level scope `"/"` is forbidden; use the transport default scope `""`,
+  for consistency with other transports.
 
 ### `docker:`
 
@@ -93,24 +116,73 @@ Scopes matching individual images are named Docker references *in the fully expa
 using a tag or digest. For example, `docker.io/library/busybox:latest` (*not* `busybox:latest`).
 
 More general scopes are prefixes of individual-image scopes, and specify a repository (by omitting the tag or digest),
-a repository namespace, or a registry host (by only specifying the host name)
-or a wildcarded expression for matching all subdomains. For wildcarded subdomain
+a repository namespace, or a registry host (by only specifying the host name and possibly a port number)
+or a wildcarded expression starting with `*.`, for matching all subdomains (not including a port number). For wildcarded subdomain
+matching, `*.example.com` is a valid case, but `example*.*.com` is not.
+
+### `docker-archive:`
+
+Only the default `""` scope is supported.
+
+### `docker-daemon:`
+
+For references using the _algo:digest_ format (referring to an image ID), only the default `""` scope is used.
+
+For images using a named reference, scopes matching individual images are *in the fully expanded form*, either
+using a tag or digest. For example, `docker.io/library/busybox:latest` (*not* `busybox:latest`).
+
+More general named scopes are prefixes of individual-image scopes, and specify a repository (by omitting the tag or digest),
+a repository namespace, or a registry host (by only specifying the host name and possibly a port number)
+or a wildcarded expression starting with `*.`, for matching all subdomains (not including a port number). For wildcarded subdomain
 matching, `*.example.com` is a valid case, but `example*.*.com` is not.
 
 ### `oci:`
 
 The `oci:` transport refers to images in directories compliant with "Open Container Image Layout Specification".
 
-Supported scopes use the form _directory_`:`_tag_, and _directory_ referring to
-a directory containing one or more tags, or any of the parent directories.
+Supported scopes are paths to directories
+(either containing an OCI layout, or subdirectories possibly containing OCI layout directories).
+The _reference_ annotation value, if any, is not used.
 
-*Note:* See `dir:` above for semantics and restrictions on the directory paths, they apply to `oci:` equivalently.
+*Note:*
+- The paths must be absolute and contain no symlinks. Paths violating these requirements may be silently ignored.
+- The top-level scope `"/"` is forbidden; use the transport default scope `""`,
+  for consistency with other transports.
+
+### `oci-archive:`
+
+Supported scopes are paths to OCI archives, and their parent directories
+(either containing a single archive, or subdirectories possibly containing archives).
+The _reference_ annotation value, if any, is not used.
+
+*Note:*
+- The paths must be absolute and contain no symlinks. Paths violating these requirements may be silently ignored.
+- The top-level scope `"/"` is forbidden; use the transport default scope `""`,
+  for consistency with other transports.
+
+### `ostree`:
+
+Supported scopes have the form _repo-path_`:`_image-scope_; _repo_path_ is the path to the OSTree repository.
+
+_image-scope_ is the _docker_reference_ part of the reference, with with a `:latest` tag implied if no tag is present,
+and parent namespaces of the _docker_reference_ value (by omitting the tag, or a prefix speciyfing a higher-level namespace).
+
+*Note:*
+- The _repo_path_ must be absolute and contain no symlinks. Paths violating these requirements may be silently ignored.
+
+### `sif:`
+
+Supported scopes are paths to Singularity images, and their parent directories
+(either containing images, or subdirectories possibly containing images).
+
+*Note:*
+- The paths must be absolute and contain no symlinks. Paths violating these requirements may be silently ignored.
+- The top-level scope `"/"` is forbidden; use the transport default scope `""`,
+  for consistency with other transports.
 
 ### `tarball:`
 
-The `tarball:` transport refers to tarred up container root filesystems.
-
-Scopes are ignored.
+The `tarball:` transport is an implementation detail of some import workflows. Only the default `""` scope is supported.
 
 ## Policy Requirements
 
