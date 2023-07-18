@@ -61,7 +61,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	}
 	updatedList := originalList.CloneInternal()
 
-	sigs, err := c.sourceSignatures(ctx, unparsedToplevel, options,
+	sigs, err := c.sourceSignatures(ctx, unparsedToplevel,
 		"Getting image list signatures",
 		"Checking if image list destination supports signatures")
 	if err != nil {
