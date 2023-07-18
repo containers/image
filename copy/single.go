@@ -37,6 +37,7 @@ type imageCopier struct {
 	canSubstituteBlobs         bool
 	compressionFormat          *compressiontypes.Algorithm // Compression algorithm to use, if the user explicitly requested one, or nil.
 	compressionLevel           *int
+	requireCompressionFormatMatch bool
 }
 
 // copySingleImageResult carries data produced by copySingleImage
@@ -177,8 +178,8 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 		shouldUpdateSigs := len(sigs) > 0 || len(c.signers) != 0 // TODO: Consider allowing signatures updates only and skipping the image's layers/manifest copy if possible
 		noPendingManifestUpdates := ic.noPendingManifestUpdates()
 
-		logrus.Debugf("Checking if we can skip copying: has signatures=%t, OCI encryption=%t, no manifest updates=%t", shouldUpdateSigs, destRequiresOciEncryption, noPendingManifestUpdates)
-		if !shouldUpdateSigs && !destRequiresOciEncryption && noPendingManifestUpdates {
+		logrus.Debugf("Checking if we can skip copying: has signatures=%t, OCI encryption=%t, no manifest updates=%t, compression match required for resuing blobs=%t", shouldUpdateSigs, destRequiresOciEncryption, noPendingManifestUpdates, requireCompressionFormatMatch)
+		if !shouldUpdateSigs && !destRequiresOciEncryption && noPendingManifestUpdates && !ic.requireCompressionFormatMatch {
 			matchedResult, err := ic.compareImageDestinationManifestEqual(ctx, targetInstance)
 			if err != nil {
 				logrus.Warnf("Failed to compare destination image manifest: %v", err)
@@ -639,12 +640,20 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 		// a failure when we eventually try to update the manifest with the digest and MIME type of the reused blob.
 		// Fixing that will probably require passing more information to TryReusingBlob() than the current version of
 		// the ImageDestination interface lets us pass in.
+		var requiredCompression *compressiontypes.Algorithm
+		var originalCompression *compressiontypes.Algorithm
+		if ic.requireCompressionFormatMatch {
+			requiredCompression = ic.compressionFormat
+			originalCompression = srcInfo.CompressionAlgorithm
+		}
 		reused, reusedBlob, err := ic.c.dest.TryReusingBlobWithOptions(ctx, srcInfo, private.TryReusingBlobOptions{
-			Cache:         ic.c.blobInfoCache,
-			CanSubstitute: canSubstitute,
-			EmptyLayer:    emptyLayer,
-			LayerIndex:    &layerIndex,
-			SrcRef:        srcRef,
+			Cache:               ic.c.blobInfoCache,
+			CanSubstitute:       canSubstitute,
+			EmptyLayer:          emptyLayer,
+			LayerIndex:          &layerIndex,
+			SrcRef:              srcRef,
+			RequiredCompression: requiredCompression,
+			OriginalCompression: originalCompression,
 		})
 		if err != nil {
 			return types.BlobInfo{}, "", fmt.Errorf("trying to reuse blob %s at destination: %w", srcInfo.Digest, err)
