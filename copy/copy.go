@@ -132,8 +132,10 @@ type Options struct {
 // data shared across one or more images in a possible manifest list.
 // The owner must call close() when done.
 type copier struct {
-	dest                          private.ImageDestination
-	rawSource                     private.ImageSource
+	dest      private.ImageDestination
+	rawSource private.ImageSource
+	options   *Options // never nil
+
 	reportWriter                  io.Writer
 	progressOutput                io.Writer
 	progressInterval              time.Duration
@@ -204,8 +206,10 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 	}
 
 	c := &copier{
-		dest:             dest,
-		rawSource:        rawSource,
+		dest:      dest,
+		rawSource: rawSource,
+		options:   options,
+
 		reportWriter:     reportWriter,
 		progressOutput:   progressOutput,
 		progressInterval: options.ProgressInterval,
