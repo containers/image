@@ -49,7 +49,7 @@ func prepareInstanceCopies(instanceDigests []digest.Digest, options *Options) []
 
 // copyMultipleImages copies some or all of an image list's instances, using
 // policyContext to validate source image admissibility.
-func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signature.PolicyContext, options *Options, unparsedToplevel *image.UnparsedImage) (copiedManifest []byte, retErr error) {
+func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signature.PolicyContext, unparsedToplevel *image.UnparsedImage) (copiedManifest []byte, retErr error) {
 	// Parse the list and get a copy of the original value after it's re-encoded.
 	manifestList, manifestType, err := unparsedToplevel.Manifest(ctx)
 	if err != nil {
@@ -94,12 +94,12 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	if destIsDigestedReference {
 		cannotModifyManifestListReason = "Destination specifies a digest"
 	}
-	if options.PreserveDigests {
+	if c.options.PreserveDigests {
 		cannotModifyManifestListReason = "Instructed to preserve digests"
 	}
 
 	// Determine if we'll need to convert the manifest list to a different format.
-	forceListMIMEType := options.ForceManifestMIMEType
+	forceListMIMEType := c.options.ForceManifestMIMEType
 	switch forceListMIMEType {
 	case manifest.DockerV2Schema1MediaType, manifest.DockerV2Schema1SignedMediaType, manifest.DockerV2Schema2MediaType:
 		forceListMIMEType = manifest.DockerV2ListMediaType
@@ -119,7 +119,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	// Copy each image, or just the ones we want to copy, in turn.
 	instanceDigests := updatedList.Instances()
 	instanceEdits := []internalManifest.ListEdit{}
-	instanceCopyList := prepareInstanceCopies(instanceDigests, options)
+	instanceCopyList := prepareInstanceCopies(instanceDigests, c.options)
 	c.Printf("Copying %d of %d images in list\n", len(instanceCopyList), len(instanceDigests))
 	for i, instance := range instanceCopyList {
 		// Update instances to be edited by their `ListOperation` and
@@ -204,7 +204,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	}
 
 	// Sign the manifest list.
-	newSigs, err := c.createSignatures(ctx, manifestList, options.SignIdentity)
+	newSigs, err := c.createSignatures(ctx, manifestList, c.options.SignIdentity)
 	if err != nil {
 		return nil, err
 	}
