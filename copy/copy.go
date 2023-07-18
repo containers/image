@@ -244,7 +244,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		}
 	}
 
-	if err := c.setupSigners(options); err != nil {
+	if err := c.setupSigners(); err != nil {
 		return nil, err
 	}
 
