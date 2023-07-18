@@ -226,9 +226,9 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 
 	// Set the concurrentBlobCopiesSemaphore if we can copy layers in parallel.
 	if dest.HasThreadSafePutBlob() && rawSource.HasThreadSafeGetBlob() {
-		c.concurrentBlobCopiesSemaphore = options.ConcurrentBlobCopiesSemaphore
+		c.concurrentBlobCopiesSemaphore = c.options.ConcurrentBlobCopiesSemaphore
 		if c.concurrentBlobCopiesSemaphore == nil {
-			max := options.MaxParallelDownloads
+			max := c.options.MaxParallelDownloads
 			if max == 0 {
 				max = maxParallelDownloads
 			}
@@ -236,11 +236,11 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		}
 	} else {
 		c.concurrentBlobCopiesSemaphore = semaphore.NewWeighted(int64(1))
-		if options.ConcurrentBlobCopiesSemaphore != nil {
-			if err := options.ConcurrentBlobCopiesSemaphore.Acquire(ctx, 1); err != nil {
+		if c.options.ConcurrentBlobCopiesSemaphore != nil {
+			if err := c.options.ConcurrentBlobCopiesSemaphore.Acquire(ctx, 1); err != nil {
 				return nil, fmt.Errorf("acquiring semaphore for concurrent blob copies: %w", err)
 			}
-			defer options.ConcurrentBlobCopiesSemaphore.Release(1)
+			defer c.options.ConcurrentBlobCopiesSemaphore.Release(1)
 		}
 	}
 
@@ -259,7 +259,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		if copiedManifest, _, _, err = c.copySingleImage(ctx, policyContext, unparsedToplevel, unparsedToplevel, nil); err != nil {
 			return nil, err
 		}
-	} else if options.ImageListSelection == CopySystemImage {
+	} else if c.options.ImageListSelection == CopySystemImage {
 		// This is a manifest list, and we weren't asked to copy multiple images.  Choose a single image that
 		// matches the current system to copy, and copy it.
 		mfest, manifestType, err := unparsedToplevel.Manifest(ctx)
@@ -270,7 +270,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		if err != nil {
 			return nil, fmt.Errorf("parsing primary manifest as list for %s: %w", transports.ImageName(srcRef), err)
 		}
-		instanceDigest, err := manifestList.ChooseInstanceByCompression(options.SourceCtx, options.PreferGzipInstances) // try to pick one that matches options.SourceCtx
+		instanceDigest, err := manifestList.ChooseInstanceByCompression(c.options.SourceCtx, c.options.PreferGzipInstances) // try to pick one that matches c.options.SourceCtx
 		if err != nil {
 			return nil, fmt.Errorf("choosing an image from manifest list %s: %w", transports.ImageName(srcRef), err)
 		}
@@ -280,13 +280,13 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		if copiedManifest, _, _, err = c.copySingleImage(ctx, policyContext, unparsedToplevel, unparsedInstance, nil); err != nil {
 			return nil, fmt.Errorf("copying system image from manifest list: %w", err)
 		}
-	} else { /* options.ImageListSelection == CopyAllImages or options.ImageListSelection == CopySpecificImages, */
+	} else { /* c.options.ImageListSelection == CopyAllImages or c.options.ImageListSelection == CopySpecificImages, */
 		// If we were asked to copy multiple images and can't, that's an error.
 		if !supportsMultipleImages(c.dest) {
 			return nil, fmt.Errorf("copying multiple images: destination transport %q does not support copying multiple images as a group", destRef.Transport().Name())
 		}
 		// Copy some or all of the images.
-		switch options.ImageListSelection {
+		switch c.options.ImageListSelection {
 		case CopyAllImages:
 			logrus.Debugf("Source is a manifest list; copying all instances")
 		case CopySpecificImages:
