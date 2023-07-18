@@ -175,7 +175,7 @@ func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.P
 
 		logrus.Debugf("Checking if we can skip copying: has signatures=%t, OCI encryption=%t, no manifest updates=%t", shouldUpdateSigs, destRequiresOciEncryption, noPendingManifestUpdates)
 		if !shouldUpdateSigs && !destRequiresOciEncryption && noPendingManifestUpdates {
-			isSrcDestManifestEqual, retManifest, retManifestType, retManifestDigest, err := compareImageDestinationManifestEqual(ctx, options, src, targetInstance, c.dest)
+			isSrcDestManifestEqual, retManifest, retManifestType, retManifestDigest, err := ic.compareImageDestinationManifestEqual(ctx, targetInstance)
 			if err != nil {
 				logrus.Warnf("Failed to compare destination image manifest: %v", err)
 				return nil, "", "", err
@@ -323,17 +323,17 @@ func (ic *imageCopier) noPendingManifestUpdates() bool {
 	return reflect.DeepEqual(*ic.manifestUpdates, types.ManifestUpdateOptions{InformationOnly: ic.manifestUpdates.InformationOnly})
 }
 
-// compareImageDestinationManifestEqual compares the `src` and `dest` image manifests (reading the manifest from the
+// compareImageDestinationManifestEqual compares the source and destination image manifests (reading the manifest from the
 // (possibly remote) destination). Returning true and the destination's manifest, type and digest if they compare equal.
-func compareImageDestinationManifestEqual(ctx context.Context, options *Options, src *image.SourcedImage, targetInstance *digest.Digest, dest types.ImageDestination) (bool, []byte, string, digest.Digest, error) {
-	srcManifestDigest, err := manifest.Digest(src.ManifestBlob)
+func (ic *imageCopier) compareImageDestinationManifestEqual(ctx context.Context, targetInstance *digest.Digest) (bool, []byte, string, digest.Digest, error) {
+	srcManifestDigest, err := manifest.Digest(ic.src.ManifestBlob)
 	if err != nil {
 		return false, nil, "", "", fmt.Errorf("calculating manifest digest: %w", err)
 	}
 
-	destImageSource, err := dest.Reference().NewImageSource(ctx, options.DestinationCtx)
+	destImageSource, err := ic.c.dest.Reference().NewImageSource(ctx, ic.c.options.DestinationCtx)
 	if err != nil {
-		logrus.Debugf("Unable to create destination image %s source: %v", dest.Reference(), err)
+		logrus.Debugf("Unable to create destination image %s source: %v", ic.c.dest.Reference(), err)
 		return false, nil, "", "", nil
 	}
 	defer destImageSource.Close()
