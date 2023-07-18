@@ -134,11 +134,12 @@ func (c *copier) copyMultipleImages(ctx context.Context) (copiedManifest []byte,
 			}
 			// Record the result of a possible conversion here.
 			instanceEdits = append(instanceEdits, internalManifest.ListEdit{
-				ListOperation:   internalManifest.ListOpUpdate,
-				UpdateOldDigest: instance.sourceDigest,
-				UpdateDigest:    updated.manifestDigest,
-				UpdateSize:      int64(len(updated.manifest)),
-				UpdateMediaType: updated.manifestMIMEType})
+				ListOperation:               internalManifest.ListOpUpdate,
+				UpdateOldDigest:             instance.sourceDigest,
+				UpdateDigest:                updated.manifestDigest,
+				UpdateSize:                  int64(len(updated.manifest)),
+				UpdateCompressionAlgorithms: updated.compressionAlgorithms,
+				UpdateMediaType:             updated.manifestMIMEType})
 		default:
 			return nil, fmt.Errorf("copying image: invalid copy operation %d", instance.op)
 		}
