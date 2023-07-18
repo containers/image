@@ -11,7 +11,7 @@ require (
 	github.com/cyberphone/json-canonicalization v0.0.0-20230701045847-91eb5f1b7744
 	github.com/docker/distribution v2.8.2+incompatible
 	github.com/docker/docker v24.0.4+incompatible
-	github.com/docker/docker-credential-helpers v0.7.0
+	github.com/docker/docker-credential-helpers v0.8.0
 	github.com/docker/go-connections v0.4.0
 	github.com/go-openapi/strfmt v0.21.7
 	github.com/go-openapi/swag v0.22.4
@@ -34,7 +34,7 @@ require (
 	github.com/theupdateframework/go-tuf v0.5.2
 	github.com/ulikunitz/xz v0.5.11
 	github.com/vbatts/tar-split v0.11.3
-	github.com/vbauerster/mpb/v8 v8.5.1
+	github.com/vbauerster/mpb/v8 v8.5.2
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.7
 	golang.org/x/crypto v0.11.0

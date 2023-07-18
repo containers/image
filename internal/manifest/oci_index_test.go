@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/containers/image/v5/pkg/compression"
+	compressionTypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -78,7 +79,8 @@ func TestOCI1EditInstances(t *testing.T) {
 	assert.Equal(t, "something", instance.MediaType)
 	assert.Equal(t, int64(32), instance.Size)
 	// platform must match with what was set in `ociv1.image.index.json` for the first instance
-	assert.Equal(t, &imgspecv1.Platform{Architecture: "ppc64le", OS: "linux", OSVersion: "", OSFeatures: []string(nil), Variant: ""}, instance.Platform)
+	assert.Equal(t, &imgspecv1.Platform{Architecture: "ppc64le", OS: "linux", OSVersion: "", OSFeatures: []string(nil), Variant: ""}, instance.ReadOnly.Platform)
+	assert.Equal(t, []string{compressionTypes.GzipAlgorithmName}, instance.ReadOnly.CompressionAlgorithmNames)
 
 	// Create a fresh list
 	list, err = ListFromBlob(validManifest, GuessMIMEType(validManifest))
@@ -131,6 +133,14 @@ func TestOCI1EditInstances(t *testing.T) {
 
 	// Zstd should be kept on lowest priority as compared to the default gzip ones and order of prior elements must be preserved.
 	assert.Equal(t, list.Instances(), []digest.Digest{digest.Digest("sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f"), digest.Digest("sha256:5b0bcabd1ed22e9fb1310cf6c2dec7cdef19f0ad69efa1f392e94a4333501270"), digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), digest.Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"), digest.Digest("sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"), digest.Digest("sha256:hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"), digest.Digest("sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")})
+
+	instance, err = list.Instance(digest.Digest("sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"))
+	require.NoError(t, err)
+	// Verify if annotations are preserved and correctly set in ReadOnly field.
+	assert.Equal(t, annotations, instance.ReadOnly.Annotations)
+	// Verify compression of an instance is added to the ReadOnly CompressionAlgorithmNames where compression name
+	// is internally derived from the appropriate annotations.
+	assert.Equal(t, []string{compressionTypes.ZstdAlgorithmName}, instance.ReadOnly.CompressionAlgorithmNames)
 
 	// Update list and remove zstd annotation from existing instance, and verify if resorting works
 	editInstances = []ListEdit{}
