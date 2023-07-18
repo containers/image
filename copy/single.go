@@ -43,7 +43,7 @@ type imageCopier struct {
 
 // copySingleImage copies a single (non-manifest-list) image unparsedImage, using policyContext to validate
 // source image admissibility.
-func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.PolicyContext, options *Options, unparsedToplevel, unparsedImage *image.UnparsedImage, targetInstance *digest.Digest) (retManifest []byte, retManifestType string, retManifestDigest digest.Digest, retErr error) {
+func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.PolicyContext, unparsedToplevel, unparsedImage *image.UnparsedImage, targetInstance *digest.Digest) (retManifest []byte, retManifestType string, retManifestDigest digest.Digest, retErr error) {
 	// The caller is handling manifest lists; this could happen only if a manifest list contains a manifest list.
 	// Make sure we fail cleanly in such cases.
 	multiImage, err := isMultiImage(ctx, unparsedImage)
@@ -61,7 +61,7 @@ func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.P
 	if allowed, err := policyContext.IsRunningImageAllowed(ctx, unparsedImage); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
 		return nil, "", "", fmt.Errorf("Source image rejected: %w", err)
 	}
-	src, err := image.FromUnparsedImage(ctx, options.SourceCtx, unparsedImage)
+	src, err := image.FromUnparsedImage(ctx, c.options.SourceCtx, unparsedImage)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("initializing image from source %s: %w", transports.ImageName(c.rawSource.Reference()), err)
 	}
@@ -93,7 +93,7 @@ func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.P
 		}
 	}
 
-	if err := checkImageDestinationForCurrentRuntime(ctx, options.DestinationCtx, src, c.dest); err != nil {
+	if err := checkImageDestinationForCurrentRuntime(ctx, c.options.DestinationCtx, src, c.dest); err != nil {
 		return nil, "", "", err
 	}
 
@@ -114,7 +114,7 @@ func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.P
 	if destIsDigestedReference {
 		cannotModifyManifestReason = "Destination specifies a digest"
 	}
-	if options.PreserveDigests {
+	if c.options.PreserveDigests {
 		cannotModifyManifestReason = "Instructed to preserve digests"
 	}
 
@@ -124,12 +124,12 @@ func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.P
 		src:             src,
 		// diffIDsAreNeeded is computed later
 		cannotModifyManifestReason: cannotModifyManifestReason,
-		ociEncryptLayers:           options.OciEncryptLayers,
+		ociEncryptLayers:           c.options.OciEncryptLayers,
 	}
-	if options.DestinationCtx != nil {
+	if c.options.DestinationCtx != nil {
 		// Note that compressionFormat and compressionLevel can be nil.
-		ic.compressionFormat = options.DestinationCtx.CompressionFormat
-		ic.compressionLevel = options.DestinationCtx.CompressionLevel
+		ic.compressionFormat = c.options.DestinationCtx.CompressionFormat
+		ic.compressionLevel = c.options.DestinationCtx.CompressionLevel
 	}
 	// Decide whether we can substitute blobs with semantic equivalents:
 	// - Don’t do that if we can’t modify the manifest at all
@@ -145,12 +145,12 @@ func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.P
 		return nil, "", "", err
 	}
 
-	destRequiresOciEncryption := (isEncrypted(src) && ic.c.ociDecryptConfig != nil) || options.OciEncryptLayers != nil
+	destRequiresOciEncryption := (isEncrypted(src) && ic.c.ociDecryptConfig != nil) || c.options.OciEncryptLayers != nil
 
 	manifestConversionPlan, err := determineManifestConversion(determineManifestConversionInputs{
 		srcMIMEType:                    ic.src.ManifestMIMEType,
 		destSupportedManifestMIMETypes: ic.c.dest.SupportedManifestMIMETypes(),
-		forceManifestMIMEType:          options.ForceManifestMIMEType,
+		forceManifestMIMEType:          c.options.ForceManifestMIMEType,
 		requiresOCIEncryption:          destRequiresOciEncryption,
 		cannotModifyManifestReason:     ic.cannotModifyManifestReason,
 	})
@@ -169,7 +169,7 @@ func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.P
 	ic.diffIDsAreNeeded = src.UpdatedImageNeedsLayerDiffIDs(*ic.manifestUpdates)
 
 	// If enabled, fetch and compare the destination's manifest. And as an optimization skip updating the destination iff equal
-	if options.OptimizeDestinationImageAlreadyExists {
+	if c.options.OptimizeDestinationImageAlreadyExists {
 		shouldUpdateSigs := len(sigs) > 0 || len(c.signers) != 0 // TODO: Consider allowing signatures updates only and skipping the image's layers/manifest copy if possible
 		noPendingManifestUpdates := ic.noPendingManifestUpdates()
 
@@ -250,7 +250,7 @@ func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.P
 		targetInstance = &retManifestDigest
 	}
 
-	newSigs, err := c.createSignatures(ctx, manifestBytes, options.SignIdentity)
+	newSigs, err := c.createSignatures(ctx, manifestBytes, c.options.SignIdentity)
 	if err != nil {
 		return nil, "", "", err
 	}
