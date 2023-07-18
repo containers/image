@@ -151,11 +151,6 @@ type copier struct {
 // source image admissibility.  It returns the manifest which was written to
 // the new copy of the image.
 func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef, srcRef types.ImageReference, options *Options) (copiedManifest []byte, retErr error) {
-	// NOTE this function uses an output parameter for the error return value.
-	// Setting this and returning is the ideal way to return an error.
-	//
-	// the defers in this routine will wrap the error return with its own errors
-	// which can be valuable context in the middle of a multi-streamed copy.
 	if options == nil {
 		options = &Options{}
 	}
