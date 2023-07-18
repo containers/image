@@ -97,7 +97,7 @@ func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.P
 		return nil, "", "", err
 	}
 
-	sigs, err := c.sourceSignatures(ctx, src, options,
+	sigs, err := c.sourceSignatures(ctx, src,
 		"Getting image source signatures",
 		"Checking if image destination supports signatures")
 	if err != nil {
