@@ -50,13 +50,13 @@ func (c *copier) setupSigners() error {
 	return nil
 }
 
-// sourceSignatures returns signatures from unparsedSource based on options,
+// sourceSignatures returns signatures from unparsedSource,
 // and verifies that they can be used (to avoid copying a large image when we
 // can tell in advance that it would ultimately fail)
-func (c *copier) sourceSignatures(ctx context.Context, unparsed private.UnparsedImage, options *Options,
+func (c *copier) sourceSignatures(ctx context.Context, unparsed private.UnparsedImage,
 	gettingSignaturesMessage, checkingDestMessage string) ([]internalsig.Signature, error) {
 	var sigs []internalsig.Signature
-	if options.RemoveSignatures {
+	if c.options.RemoveSignatures {
 		sigs = []internalsig.Signature{}
 	} else {
 		c.Printf("%s\n", gettingSignaturesMessage)
