@@ -94,14 +94,17 @@ func annotationsToCompressionAlgorithmNames(annotations map[string]string) []str
 	return result
 }
 
-func addCompressionAnnotations(compressionAlgorithms []compression.Algorithm, annotationsMap map[string]string) {
+func addCompressionAnnotations(compressionAlgorithms []compression.Algorithm, annotationsMap *map[string]string) {
 	// TODO: This should also delete the algorithm if map already contains an algorithm and compressionAlgorithm
 	// list has a different algorithm. To do that, we would need to modify the callers to always provide a reliable
 	// and full compressionAlghorithms list.
+	if *annotationsMap == nil && len(compressionAlgorithms) > 0 {
+		*annotationsMap = map[string]string{}
+	}
 	for _, algo := range compressionAlgorithms {
 		switch algo.Name() {
 		case compression.ZstdAlgorithmName:
-			annotationsMap[OCI1InstanceAnnotationCompressionZSTD] = OCI1InstanceAnnotationCompressionZSTDValue
+			(*annotationsMap)[OCI1InstanceAnnotationCompressionZSTD] = OCI1InstanceAnnotationCompressionZSTDValue
 		default:
 			continue
 		}
@@ -146,13 +149,13 @@ func (index *OCI1IndexPublic) editInstances(editInstances []ListEdit) error {
 					maps.Copy(index.Manifests[targetIndex].Annotations, editInstance.UpdateAnnotations)
 				}
 			}
-			addCompressionAnnotations(editInstance.UpdateCompressionAlgorithms, index.Manifests[targetIndex].Annotations)
+			addCompressionAnnotations(editInstance.UpdateCompressionAlgorithms, &index.Manifests[targetIndex].Annotations)
 		case ListOpAdd:
 			annotations := map[string]string{}
 			if editInstance.AddAnnotations != nil {
 				annotations = maps.Clone(editInstance.AddAnnotations)
 			}
-			addCompressionAnnotations(editInstance.AddCompressionAlgorithms, annotations)
+			addCompressionAnnotations(editInstance.AddCompressionAlgorithms, &annotations)
 			addedEntries = append(addedEntries, imgspecv1.Descriptor{
 				MediaType:   editInstance.AddMediaType,
 				Size:        editInstance.AddSize,
