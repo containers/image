@@ -286,7 +286,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		case CopySpecificImages:
 			logrus.Debugf("Source is a manifest list; copying some instances")
 		}
-		if copiedManifest, err = c.copyMultipleImages(ctx, policyContext, unparsedToplevel); err != nil {
+		if copiedManifest, err = c.copyMultipleImages(ctx, policyContext); err != nil {
 			return nil, err
 		}
 	}
