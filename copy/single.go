@@ -397,7 +397,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 		defer ic.c.concurrentBlobCopiesSemaphore.Release(1)
 		defer copyGroup.Done()
 		cld := copyLayerData{}
-		if !ic.c.downloadForeignLayers && ic.c.dest.AcceptsForeignLayerURLs() && len(srcLayer.URLs) != 0 {
+		if !ic.c.options.DownloadForeignLayers && ic.c.dest.AcceptsForeignLayerURLs() && len(srcLayer.URLs) != 0 {
 			// DiffIDs are, currently, needed only when converting from schema1.
 			// In which case src.LayerInfos will not have URLs because schema1
 			// does not support them.

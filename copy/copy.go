@@ -140,9 +140,8 @@ type copier struct {
 	progressOutput                io.Writer
 	blobInfoCache                 internalblobinfocache.BlobInfoCache2
 	concurrentBlobCopiesSemaphore *semaphore.Weighted // Limits the amount of concurrently copied blobs
-	downloadForeignLayers         bool
-	signers                       []*signer.Signer // Signers to use to create new signatures for the image
-	signersToClose                []*signer.Signer // Signers that should be closed when this copier is destroyed.
+	signers                       []*signer.Signer    // Signers to use to create new signatures for the image
+	signersToClose                []*signer.Signer    // Signers that should be closed when this copier is destroyed.
 }
 
 // Image copies image from srcRef to destRef, using policyContext to validate
@@ -211,8 +210,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		// FIXME? The cache is used for sources and destinations equally, but we only have a SourceCtx and DestinationCtx.
 		// For now, use DestinationCtx (because blob reuse changes the behavior of the destination side more); eventually
 		// we might want to add a separate CommonCtx — or would that be too confusing?
-		blobInfoCache:         internalblobinfocache.FromBlobInfoCache(blobinfocache.DefaultCache(options.DestinationCtx)),
-		downloadForeignLayers: options.DownloadForeignLayers,
+		blobInfoCache: internalblobinfocache.FromBlobInfoCache(blobinfocache.DefaultCache(options.DestinationCtx)),
 	}
 	defer c.close()
 
