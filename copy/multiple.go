@@ -129,7 +129,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 			logrus.Debugf("Copying instance %s (%d/%d)", instance.sourceDigest, i+1, len(instanceCopyList))
 			c.Printf("Copying image %s (%d/%d)\n", instance.sourceDigest, i+1, len(instanceCopyList))
 			unparsedInstance := image.UnparsedInstance(c.rawSource, &instanceCopyList[i].sourceDigest)
-			updatedManifest, updatedManifestType, updatedManifestDigest, err := c.copySingleImage(ctx, policyContext, unparsedToplevel, unparsedInstance, &instanceCopyList[i].sourceDigest)
+			updatedManifest, updatedManifestType, updatedManifestDigest, err := c.copySingleImage(ctx, policyContext, unparsedInstance, &instanceCopyList[i].sourceDigest)
 			if err != nil {
 				return nil, fmt.Errorf("copying image %d/%d from manifest list: %w", i+1, len(instanceCopyList), err)
 			}
