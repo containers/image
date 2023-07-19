@@ -11,7 +11,6 @@ import (
 	"github.com/containers/image/v5/internal/image"
 	internalManifest "github.com/containers/image/v5/internal/manifest"
 	"github.com/containers/image/v5/manifest"
-	"github.com/containers/image/v5/signature"
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
@@ -48,8 +47,8 @@ func prepareInstanceCopies(instanceDigests []digest.Digest, options *Options) []
 }
 
 // copyMultipleImages copies some or all of an image list's instances, using
-// policyContext to validate source image admissibility.
-func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signature.PolicyContext) (copiedManifest []byte, retErr error) {
+// c.policyContext to validate source image admissibility.
+func (c *copier) copyMultipleImages(ctx context.Context) (copiedManifest []byte, retErr error) {
 	// Parse the list and get a copy of the original value after it's re-encoded.
 	manifestList, manifestType, err := c.unparsedToplevel.Manifest(ctx)
 	if err != nil {
