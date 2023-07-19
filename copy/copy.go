@@ -139,7 +139,6 @@ type copier struct {
 	reportWriter                  io.Writer
 	progressOutput                io.Writer
 	blobInfoCache                 internalblobinfocache.BlobInfoCache2
-	ociDecryptConfig              *encconfig.DecryptConfig
 	ociEncryptConfig              *encconfig.EncryptConfig
 	concurrentBlobCopiesSemaphore *semaphore.Weighted // Limits the amount of concurrently copied blobs
 	downloadForeignLayers         bool
@@ -214,7 +213,6 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		// For now, use DestinationCtx (because blob reuse changes the behavior of the destination side more); eventually
 		// we might want to add a separate CommonCtx — or would that be too confusing?
 		blobInfoCache:         internalblobinfocache.FromBlobInfoCache(blobinfocache.DefaultCache(options.DestinationCtx)),
-		ociDecryptConfig:      options.OciDecryptConfig,
 		ociEncryptConfig:      options.OciEncryptConfig,
 		downloadForeignLayers: options.DownloadForeignLayers,
 	}
