@@ -145,7 +145,7 @@ func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.P
 		return nil, "", "", err
 	}
 
-	destRequiresOciEncryption := (isEncrypted(src) && ic.c.ociDecryptConfig != nil) || c.options.OciEncryptLayers != nil
+	destRequiresOciEncryption := (isEncrypted(src) && ic.c.options.OciDecryptConfig != nil) || c.options.OciEncryptLayers != nil
 
 	manifestConversionPlan, err := determineManifestConversion(determineManifestConversionInputs{
 		srcMIMEType:                    ic.src.ManifestMIMEType,
@@ -609,7 +609,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 	// When encrypting to decrypting, only use the simple code path. We might be able to optimize more
 	// (e.g. if we know the DiffID of an encrypted compressed layer, it might not be necessary to pull, decrypt and decompress again),
 	// but it’s not trivially safe to do such things, so until someone takes the effort to make a comprehensive argument, let’s not.
-	encryptingOrDecrypting := toEncrypt || (isOciEncrypted(srcInfo.MediaType) && ic.c.ociDecryptConfig != nil)
+	encryptingOrDecrypting := toEncrypt || (isOciEncrypted(srcInfo.MediaType) && ic.c.options.OciDecryptConfig != nil)
 	canAvoidProcessingCompleteLayer := !diffIDIsNeeded && !encryptingOrDecrypting
 
 	// Don’t read the layer from the source if we already have the blob, and optimizations are acceptable.
