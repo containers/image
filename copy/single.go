@@ -201,8 +201,12 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 	// without actually trying to upload something and getting a types.ManifestTypeRejectedError.
 	// So, try the preferred manifest MIME type with possibly-updated blob digests, media types, and sizes if
 	// we're altering how they're compressed.  If the process succeeds, fine…
-	manifestBytes, retManifestDigest, err := ic.copyUpdatedConfigAndManifest(ctx, targetInstance)
-	retManifestType := manifestConversionPlan.preferredMIMEType
+	manifestBytes, manifestDigest, err := ic.copyUpdatedConfigAndManifest(ctx, targetInstance)
+	wipResult := copySingleImageResult{
+		manifest:         manifestBytes,
+		manifestMIMEType: manifestConversionPlan.preferredMIMEType,
+		manifestDigest:   manifestDigest,
+	}
 	if err != nil {
 		logrus.Debugf("Writing manifest using preferred type %s failed: %v", manifestConversionPlan.preferredMIMEType, err)
 		// … if it fails, and the failure is either because the manifest is rejected by the registry, or
@@ -240,9 +244,11 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 			}
 
 			// We have successfully uploaded a manifest.
-			manifestBytes = attemptedManifest
-			retManifestDigest = attemptedManifestDigest
-			retManifestType = manifestMIMEType
+			wipResult = copySingleImageResult{
+				manifest:         attemptedManifest,
+				manifestMIMEType: manifestMIMEType,
+				manifestDigest:   attemptedManifestDigest,
+			}
 			errs = nil // Mark this as a success so that we don't abort below.
 			break
 		}
@@ -251,10 +257,10 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 		}
 	}
 	if targetInstance != nil {
-		targetInstance = &retManifestDigest
+		targetInstance = &wipResult.manifestDigest
 	}
 
-	newSigs, err := c.createSignatures(ctx, manifestBytes, c.options.SignIdentity)
+	newSigs, err := c.createSignatures(ctx, wipResult.manifest, c.options.SignIdentity)
 	if err != nil {
 		return copySingleImageResult{}, err
 	}
@@ -267,11 +273,8 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 		}
 	}
 
-	return copySingleImageResult{
-		manifest:         manifestBytes,
-		manifestMIMEType: retManifestType,
-		manifestDigest:   retManifestDigest,
-	}, nil
+	res := wipResult // We are done
+	return res, nil
 }
 
 // checkImageDestinationForCurrentRuntime enforces dest.MustMatchRuntimeOS, if necessary.
