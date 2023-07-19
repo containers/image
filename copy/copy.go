@@ -136,8 +136,10 @@ type copier struct {
 	rawSource private.ImageSource
 	options   *Options // never nil
 
-	reportWriter                  io.Writer
-	progressOutput                io.Writer
+	reportWriter   io.Writer
+	progressOutput io.Writer
+
+	unparsedToplevel              *image.UnparsedImage // for rawSource
 	blobInfoCache                 internalblobinfocache.BlobInfoCache2
 	concurrentBlobCopiesSemaphore *semaphore.Weighted // Limits the amount of concurrently copied blobs
 	signers                       []*signer.Signer    // Signers to use to create new signatures for the image
@@ -207,6 +209,8 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 
 		reportWriter:   reportWriter,
 		progressOutput: progressOutput,
+
+		unparsedToplevel: image.UnparsedInstance(rawSource, nil),
 		// FIXME? The cache is used for sources and destinations equally, but we only have a SourceCtx and DestinationCtx.
 		// For now, use DestinationCtx (because blob reuse changes the behavior of the destination side more); eventually
 		// we might want to add a separate CommonCtx — or would that be too confusing?
@@ -238,7 +242,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		return nil, err
 	}
 
-	unparsedToplevel := image.UnparsedInstance(rawSource, nil)
+	unparsedToplevel := c.unparsedToplevel
 	multiImage, err := isMultiImage(ctx, unparsedToplevel)
 	if err != nil {
 		return nil, fmt.Errorf("determining manifest MIME type for %s: %w", transports.ImageName(srcRef), err)
