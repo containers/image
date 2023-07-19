@@ -179,19 +179,15 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 
 		logrus.Debugf("Checking if we can skip copying: has signatures=%t, OCI encryption=%t, no manifest updates=%t", shouldUpdateSigs, destRequiresOciEncryption, noPendingManifestUpdates)
 		if !shouldUpdateSigs && !destRequiresOciEncryption && noPendingManifestUpdates {
-			isSrcDestManifestEqual, retManifest, retManifestType, retManifestDigest, err := ic.compareImageDestinationManifestEqual(ctx, targetInstance)
+			matchedResult, err := ic.compareImageDestinationManifestEqual(ctx, targetInstance)
 			if err != nil {
 				logrus.Warnf("Failed to compare destination image manifest: %v", err)
 				return copySingleImageResult{}, err
 			}
 
-			if isSrcDestManifestEqual {
+			if matchedResult != nil {
 				c.Printf("Skipping: image already present at destination\n")
-				return copySingleImageResult{
-					manifest:         retManifest,
-					manifestMIMEType: retManifestType,
-					manifestDigest:   retManifestDigest,
-				}, nil
+				return *matchedResult, nil
 			}
 		}
 	}
@@ -336,38 +332,42 @@ func (ic *imageCopier) noPendingManifestUpdates() bool {
 }
 
 // compareImageDestinationManifestEqual compares the source and destination image manifests (reading the manifest from the
-// (possibly remote) destination). Returning true and the destination's manifest, type and digest if they compare equal.
-func (ic *imageCopier) compareImageDestinationManifestEqual(ctx context.Context, targetInstance *digest.Digest) (bool, []byte, string, digest.Digest, error) {
+// (possibly remote) destination). If they are equal, it returns a full copySingleImageResult, nil otherwise.
+func (ic *imageCopier) compareImageDestinationManifestEqual(ctx context.Context, targetInstance *digest.Digest) (*copySingleImageResult, error) {
 	srcManifestDigest, err := manifest.Digest(ic.src.ManifestBlob)
 	if err != nil {
-		return false, nil, "", "", fmt.Errorf("calculating manifest digest: %w", err)
+		return nil, fmt.Errorf("calculating manifest digest: %w", err)
 	}
 
 	destImageSource, err := ic.c.dest.Reference().NewImageSource(ctx, ic.c.options.DestinationCtx)
 	if err != nil {
 		logrus.Debugf("Unable to create destination image %s source: %v", ic.c.dest.Reference(), err)
-		return false, nil, "", "", nil
+		return nil, nil
 	}
 	defer destImageSource.Close()
 
 	destManifest, destManifestType, err := destImageSource.GetManifest(ctx, targetInstance)
 	if err != nil {
 		logrus.Debugf("Unable to get destination image %s/%s manifest: %v", destImageSource, targetInstance, err)
-		return false, nil, "", "", nil
+		return nil, nil
 	}
 
 	destManifestDigest, err := manifest.Digest(destManifest)
 	if err != nil {
-		return false, nil, "", "", fmt.Errorf("calculating manifest digest: %w", err)
+		return nil, fmt.Errorf("calculating manifest digest: %w", err)
 	}
 
 	logrus.Debugf("Comparing source and destination manifest digests: %v vs. %v", srcManifestDigest, destManifestDigest)
 	if srcManifestDigest != destManifestDigest {
-		return false, nil, "", "", nil
+		return nil, nil
 	}
 
 	// Destination and source manifests, types and digests should all be equivalent
-	return true, destManifest, destManifestType, destManifestDigest, nil
+	return &copySingleImageResult{
+		manifest:         destManifest,
+		manifestMIMEType: destManifestType,
+		manifestDigest:   srcManifestDigest,
+	}, nil
 }
 
 // copyLayers copies layers from ic.src/ic.c.rawSource to dest, using and updating ic.manifestUpdates if necessary and ic.cannotModifyManifestReason == "".
