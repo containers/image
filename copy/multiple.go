@@ -49,9 +49,9 @@ func prepareInstanceCopies(instanceDigests []digest.Digest, options *Options) []
 
 // copyMultipleImages copies some or all of an image list's instances, using
 // policyContext to validate source image admissibility.
-func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signature.PolicyContext, unparsedToplevel *image.UnparsedImage) (copiedManifest []byte, retErr error) {
+func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signature.PolicyContext) (copiedManifest []byte, retErr error) {
 	// Parse the list and get a copy of the original value after it's re-encoded.
-	manifestList, manifestType, err := unparsedToplevel.Manifest(ctx)
+	manifestList, manifestType, err := c.unparsedToplevel.Manifest(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("reading manifest list: %w", err)
 	}
@@ -61,7 +61,7 @@ func (c *copier) copyMultipleImages(ctx context.Context, policyContext *signatur
 	}
 	updatedList := originalList.CloneInternal()
 
-	sigs, err := c.sourceSignatures(ctx, unparsedToplevel,
+	sigs, err := c.sourceSignatures(ctx, c.unparsedToplevel,
 		"Getting image list signatures",
 		"Checking if image list destination supports signatures")
 	if err != nil {
