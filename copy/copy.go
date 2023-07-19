@@ -138,8 +138,6 @@ type copier struct {
 
 	reportWriter                  io.Writer
 	progressOutput                io.Writer
-	progressInterval              time.Duration
-	progress                      chan types.ProgressProperties
 	blobInfoCache                 internalblobinfocache.BlobInfoCache2
 	ociDecryptConfig              *encconfig.DecryptConfig
 	ociEncryptConfig              *encconfig.EncryptConfig
@@ -210,10 +208,8 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		rawSource: rawSource,
 		options:   options,
 
-		reportWriter:     reportWriter,
-		progressOutput:   progressOutput,
-		progressInterval: options.ProgressInterval,
-		progress:         options.Progress,
+		reportWriter:   reportWriter,
+		progressOutput: progressOutput,
 		// FIXME? The cache is used for sources and destinations equally, but we only have a SourceCtx and DestinationCtx.
 		// For now, use DestinationCtx (because blob reuse changes the behavior of the destination side more); eventually
 		// we might want to add a separate CommonCtx — or would that be too confusing?
