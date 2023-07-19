@@ -18,7 +18,6 @@ import (
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/compression"
 	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
-	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/transports"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
@@ -40,9 +39,9 @@ type imageCopier struct {
 	compressionLevel           *int
 }
 
-// copySingleImage copies a single (non-manifest-list) image unparsedImage, using policyContext to validate
+// copySingleImage copies a single (non-manifest-list) image unparsedImage, using c.policyContext to validate
 // source image admissibility.
-func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.PolicyContext, unparsedImage *image.UnparsedImage, targetInstance *digest.Digest) (retManifest []byte, retManifestType string, retManifestDigest digest.Digest, retErr error) {
+func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.UnparsedImage, targetInstance *digest.Digest) (retManifest []byte, retManifestType string, retManifestDigest digest.Digest, retErr error) {
 	// The caller is handling manifest lists; this could happen only if a manifest list contains a manifest list.
 	// Make sure we fail cleanly in such cases.
 	multiImage, err := isMultiImage(ctx, unparsedImage)
@@ -57,7 +56,7 @@ func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.P
 	// Please keep this policy check BEFORE reading any other information about the image.
 	// (The multiImage check above only matches the MIME type, which we have received anyway.
 	// Actual parsing of anything should be deferred.)
-	if allowed, err := policyContext.IsRunningImageAllowed(ctx, unparsedImage); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
+	if allowed, err := c.policyContext.IsRunningImageAllowed(ctx, unparsedImage); !allowed || err != nil { // Be paranoid and fail if either return value indicates so.
 		return nil, "", "", fmt.Errorf("Source image rejected: %w", err)
 	}
 	src, err := image.FromUnparsedImage(ctx, c.options.SourceCtx, unparsedImage)
