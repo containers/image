@@ -242,21 +242,20 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		return nil, err
 	}
 
-	unparsedToplevel := c.unparsedToplevel
-	multiImage, err := isMultiImage(ctx, unparsedToplevel)
+	multiImage, err := isMultiImage(ctx, c.unparsedToplevel)
 	if err != nil {
 		return nil, fmt.Errorf("determining manifest MIME type for %s: %w", transports.ImageName(srcRef), err)
 	}
 
 	if !multiImage {
 		// The simple case: just copy a single image.
-		if copiedManifest, _, _, err = c.copySingleImage(ctx, policyContext, unparsedToplevel, nil); err != nil {
+		if copiedManifest, _, _, err = c.copySingleImage(ctx, policyContext, c.unparsedToplevel, nil); err != nil {
 			return nil, err
 		}
 	} else if c.options.ImageListSelection == CopySystemImage {
 		// This is a manifest list, and we weren't asked to copy multiple images.  Choose a single image that
 		// matches the current system to copy, and copy it.
-		mfest, manifestType, err := unparsedToplevel.Manifest(ctx)
+		mfest, manifestType, err := c.unparsedToplevel.Manifest(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("reading manifest for %s: %w", transports.ImageName(srcRef), err)
 		}
@@ -291,7 +290,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		}
 	}
 
-	if err := c.dest.Commit(ctx, unparsedToplevel); err != nil {
+	if err := c.dest.Commit(ctx, c.unparsedToplevel); err != nil {
 		return nil, fmt.Errorf("committing the finished image: %w", err)
 	}
 
