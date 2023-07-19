@@ -38,7 +38,6 @@ type imageCopier struct {
 	canSubstituteBlobs         bool
 	compressionFormat          *compressiontypes.Algorithm // Compression algorithm to use, if the user explicitly requested one, or nil.
 	compressionLevel           *int
-	ociEncryptLayers           *[]int
 }
 
 // copySingleImage copies a single (non-manifest-list) image unparsedImage, using policyContext to validate
@@ -124,7 +123,6 @@ func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.P
 		src:             src,
 		// diffIDsAreNeeded is computed later
 		cannotModifyManifestReason: cannotModifyManifestReason,
-		ociEncryptLayers:           c.options.OciEncryptLayers,
 	}
 	if c.options.DestinationCtx != nil {
 		// Note that compressionFormat and compressionLevel can be nil.
@@ -416,10 +414,10 @@ func (ic *imageCopier) copyLayers(ctx context.Context) error {
 	// Decide which layers to encrypt
 	layersToEncrypt := set.New[int]()
 	var encryptAll bool
-	if ic.ociEncryptLayers != nil {
-		encryptAll = len(*ic.ociEncryptLayers) == 0
+	if ic.c.options.OciEncryptLayers != nil {
+		encryptAll = len(*ic.c.options.OciEncryptLayers) == 0
 		totalLayers := len(srcInfos)
-		for _, l := range *ic.ociEncryptLayers {
+		for _, l := range *ic.c.options.OciEncryptLayers {
 			// if layer is negative, it is reverse indexed.
 			layersToEncrypt.Add((totalLayers + l) % totalLayers)
 		}
