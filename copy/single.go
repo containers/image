@@ -42,7 +42,7 @@ type imageCopier struct {
 
 // copySingleImage copies a single (non-manifest-list) image unparsedImage, using policyContext to validate
 // source image admissibility.
-func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.PolicyContext, unparsedToplevel, unparsedImage *image.UnparsedImage, targetInstance *digest.Digest) (retManifest []byte, retManifestType string, retManifestDigest digest.Digest, retErr error) {
+func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.PolicyContext, unparsedImage *image.UnparsedImage, targetInstance *digest.Digest) (retManifest []byte, retManifestType string, retManifestDigest digest.Digest, retErr error) {
 	// The caller is handling manifest lists; this could happen only if a manifest list contains a manifest list.
 	// Make sure we fail cleanly in such cases.
 	multiImage, err := isMultiImage(ctx, unparsedImage)
@@ -77,7 +77,7 @@ func (c *copier) copySingleImage(ctx context.Context, policyContext *signature.P
 				return nil, "", "", fmt.Errorf("computing digest of source image's manifest: %w", err)
 			}
 			if !matches {
-				manifestList, _, err := unparsedToplevel.Manifest(ctx)
+				manifestList, _, err := c.unparsedToplevel.Manifest(ctx)
 				if err != nil {
 					return nil, "", "", fmt.Errorf("reading manifest from source image: %w", err)
 				}
