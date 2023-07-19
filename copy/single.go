@@ -642,8 +642,8 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 			}()
 
 			// Throw an event that the layer has been skipped
-			if ic.c.progress != nil && ic.c.progressInterval > 0 {
-				ic.c.progress <- types.ProgressProperties{
+			if ic.c.options.Progress != nil && ic.c.options.ProgressInterval > 0 {
+				ic.c.options.Progress <- types.ProgressProperties{
 					Event:    types.ProgressEventSkipped,
 					Artifact: srcInfo,
 				}
