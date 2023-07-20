@@ -49,7 +49,7 @@ type copySingleImageResult struct {
 
 // copySingleImage copies a single (non-manifest-list) image unparsedImage, using c.policyContext to validate
 // source image admissibility.
-func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.UnparsedImage, targetInstance *digest.Digest) (copySingleImageResult, error) {
+func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.UnparsedImage, targetInstance *digest.Digest, requireCompressionFormatMatch bool) (copySingleImageResult, error) {
 	// The caller is handling manifest lists; this could happen only if a manifest list contains a manifest list.
 	// Make sure we fail cleanly in such cases.
 	multiImage, err := isMultiImage(ctx, unparsedImage)
@@ -129,7 +129,8 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 		manifestUpdates: &types.ManifestUpdateOptions{InformationOnly: types.ManifestUpdateInformation{Destination: c.dest}},
 		src:             src,
 		// diffIDsAreNeeded is computed later
-		cannotModifyManifestReason: cannotModifyManifestReason,
+		cannotModifyManifestReason:    cannotModifyManifestReason,
+		requireCompressionFormatMatch: requireCompressionFormatMatch,
 	}
 	if c.options.DestinationCtx != nil {
 		// Note that compressionFormat and compressionLevel can be nil.
