@@ -25,6 +25,8 @@ func TestAdd(t *testing.T) {
 	assert.True(t, s.Contains(2))
 	s.Add(2) // Adding an already-present element
 	assert.True(t, s.Contains(2))
+	// should not contain duplicate value of `2`
+	assert.ElementsMatch(t, []int{1, 2}, s.Values())
 	// Unrelated elements are unaffected
 	assert.True(t, s.Contains(1))
 	assert.False(t, s.Contains(3))
@@ -61,6 +63,8 @@ func TestValues(t *testing.T) {
 	s := New[int]()
 	assert.Empty(t, s.Values())
 	s.Add(1)
+	s.Add(2)
+	// ignore duplicate
 	s.Add(2)
 	assert.ElementsMatch(t, []int{1, 2}, s.Values())
 }
