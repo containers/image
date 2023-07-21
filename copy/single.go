@@ -42,6 +42,8 @@ type imageCopier struct {
 
 type copySingleImageOptions struct {
 	requireCompressionFormatMatch bool
+	compressionFormat             *compressiontypes.Algorithm // Compression algorithm to use, if the user explicitly requested one, or nil.
+	compressionLevel              *int
 }
 
 // copySingleImageResult carries data produced by copySingleImage
@@ -139,8 +141,8 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 	}
 	if c.options.DestinationCtx != nil {
 		// Note that compressionFormat and compressionLevel can be nil.
-		ic.compressionFormat = c.options.DestinationCtx.CompressionFormat
-		ic.compressionLevel = c.options.DestinationCtx.CompressionLevel
+		ic.compressionFormat = opts.compressionFormat
+		ic.compressionLevel = opts.compressionLevel
 	}
 	// Decide whether we can substitute blobs with semantic equivalents:
 	// - Don’t do that if we can’t modify the manifest at all
