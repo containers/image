@@ -139,10 +139,13 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 		cannotModifyManifestReason:    cannotModifyManifestReason,
 		requireCompressionFormatMatch: opts.requireCompressionFormatMatch,
 	}
-	if c.options.DestinationCtx != nil {
-		// Note that compressionFormat and compressionLevel can be nil.
+	if opts.compressionFormat != nil {
 		ic.compressionFormat = opts.compressionFormat
 		ic.compressionLevel = opts.compressionLevel
+	} else if c.options.DestinationCtx != nil {
+		// Note that compressionFormat and compressionLevel can be nil.
+		ic.compressionFormat = c.options.DestinationCtx.CompressionFormat
+		ic.compressionLevel = c.options.DestinationCtx.CompressionLevel
 	}
 	// Decide whether we can substitute blobs with semantic equivalents:
 	// - Don’t do that if we can’t modify the manifest at all
