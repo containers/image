@@ -7,7 +7,7 @@ require (
 	github.com/BurntSushi/toml v1.3.2
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01
 	github.com/containers/ocicrypt v1.1.7
-	github.com/containers/storage v1.48.0
+	github.com/containers/storage v1.48.1-0.20230721123825-4a3a3019d765
 	github.com/cyberphone/json-canonicalization v0.0.0-20230701045847-91eb5f1b7744
 	github.com/docker/distribution v2.8.2+incompatible
 	github.com/docker/docker v24.0.4+incompatible
@@ -48,7 +48,7 @@ require (
 require (
 	github.com/14rcole/gopopulate v0.0.0-20180821133914-b175b219e774 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
-	github.com/Microsoft/hcsshim v0.9.9 // indirect
+	github.com/Microsoft/hcsshim v0.9.10 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
@@ -94,7 +94,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/opencontainers/runc v1.1.7 // indirect
+	github.com/opencontainers/runc v1.1.8 // indirect
 	github.com/opencontainers/runtime-spec v1.1.0-rc.3 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
