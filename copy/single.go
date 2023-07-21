@@ -40,6 +40,12 @@ type imageCopier struct {
 	requireCompressionFormatMatch bool
 }
 
+type copySingleImageOptions struct {
+	requireCompressionFormatMatch bool
+	compressionFormat             *compressiontypes.Algorithm // Compression algorithm to use, if the user explicitly requested one, or nil.
+	compressionLevel              *int
+}
+
 // copySingleImageResult carries data produced by copySingleImage
 type copySingleImageResult struct {
 	manifest              []byte
@@ -50,7 +56,7 @@ type copySingleImageResult struct {
 
 // copySingleImage copies a single (non-manifest-list) image unparsedImage, using c.policyContext to validate
 // source image admissibility.
-func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.UnparsedImage, targetInstance *digest.Digest, requireCompressionFormatMatch bool) (copySingleImageResult, error) {
+func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.UnparsedImage, targetInstance *digest.Digest, opts copySingleImageOptions) (copySingleImageResult, error) {
 	// The caller is handling manifest lists; this could happen only if a manifest list contains a manifest list.
 	// Make sure we fail cleanly in such cases.
 	multiImage, err := isMultiImage(ctx, unparsedImage)
@@ -131,9 +137,12 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 		src:             src,
 		// diffIDsAreNeeded is computed later
 		cannotModifyManifestReason:    cannotModifyManifestReason,
-		requireCompressionFormatMatch: requireCompressionFormatMatch,
+		requireCompressionFormatMatch: opts.requireCompressionFormatMatch,
 	}
-	if c.options.DestinationCtx != nil {
+	if opts.compressionFormat != nil {
+		ic.compressionFormat = opts.compressionFormat
+		ic.compressionLevel = opts.compressionLevel
+	} else if c.options.DestinationCtx != nil {
 		// Note that compressionFormat and compressionLevel can be nil.
 		ic.compressionFormat = c.options.DestinationCtx.CompressionFormat
 		ic.compressionLevel = c.options.DestinationCtx.CompressionLevel
@@ -180,7 +189,7 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 		shouldUpdateSigs := len(sigs) > 0 || len(c.signers) != 0 // TODO: Consider allowing signatures updates only and skipping the image's layers/manifest copy if possible
 		noPendingManifestUpdates := ic.noPendingManifestUpdates()
 
-		logrus.Debugf("Checking if we can skip copying: has signatures=%t, OCI encryption=%t, no manifest updates=%t, compression match required for resuing blobs=%t", shouldUpdateSigs, destRequiresOciEncryption, noPendingManifestUpdates, requireCompressionFormatMatch)
+		logrus.Debugf("Checking if we can skip copying: has signatures=%t, OCI encryption=%t, no manifest updates=%t, compression match required for resuing blobs=%t", shouldUpdateSigs, destRequiresOciEncryption, noPendingManifestUpdates, opts.requireCompressionFormatMatch)
 		if !shouldUpdateSigs && !destRequiresOciEncryption && noPendingManifestUpdates && !ic.requireCompressionFormatMatch {
 			matchedResult, err := ic.compareImageDestinationManifestEqual(ctx, targetInstance)
 			if err != nil {
