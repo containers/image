@@ -5,15 +5,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/image"
 	internalManifest "github.com/containers/image/v5/internal/manifest"
+	"github.com/containers/image/v5/internal/set"
 	"github.com/containers/image/v5/manifest"
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )
 
@@ -27,23 +30,97 @@ const (
 type instanceCopy struct {
 	op           instanceCopyKind
 	sourceDigest digest.Digest
+
+	// Fields which can be used by callers when operation
+	// is `instanceCopyClone`
+	cloneCompressionVariant OptionCompressionVariant
+	clonePlatform           *imgspecv1.Platform
+	cloneAnnotations        map[string]string
+}
+
+// internal type only to make imgspecv1.Platform comparable
+type platformComparable struct {
+	architecture string
+	os           string
+	osVersion    string
+	osFeatures   string
+	variant      string
+}
+
+// Converts imgspecv1.Platform to a comparable format.
+func platformV1ToPlatformComparable(platform *imgspecv1.Platform) platformComparable {
+	if platform == nil {
+		return platformComparable{}
+	}
+	osFeatures := slices.Clone(platform.OSFeatures)
+	sort.Strings(osFeatures)
+	return platformComparable{architecture: platform.Architecture,
+		os: platform.OS,
+		// This is strictly speaking ambiguous, fields of OSFeatures can contain a ','. Probably good enough for now.
+		osFeatures: strings.Join(osFeatures, ","),
+		osVersion:  platform.OSVersion,
+		variant:    platform.Variant,
+	}
+}
+
+// platformCompressionMap prepares a mapping of platformComparable -> CompressionAlgorithmNames for given digests
+func platformCompressionMap(list internalManifest.List, instanceDigests []digest.Digest) (map[platformComparable]*set.Set[string], error) {
+	res := make(map[platformComparable]*set.Set[string])
+	for _, instanceDigest := range instanceDigests {
+		instanceDetails, err := list.Instance(instanceDigest)
+		if err != nil {
+			return nil, fmt.Errorf("getting details for instance %s: %w", instanceDigest, err)
+		}
+		platform := platformV1ToPlatformComparable(instanceDetails.ReadOnly.Platform)
+		platformSet, ok := res[platform]
+		if !ok {
+			platformSet = set.New[string]()
+			res[platform] = platformSet
+		}
+		platformSet.AddSlice(instanceDetails.ReadOnly.CompressionAlgorithmNames)
+	}
+	return res, nil
 }
 
 // prepareInstanceCopies prepares a list of instances which needs to copied to the manifest list.
-func prepareInstanceCopies(instanceDigests []digest.Digest, options *Options) []instanceCopy {
+func prepareInstanceCopies(list internalManifest.List, instanceDigests []digest.Digest, options *Options) ([]instanceCopy, error) {
 	res := []instanceCopy{}
+	compressionsByPlatform, err := platformCompressionMap(list, instanceDigests)
+	if err != nil {
+		return nil, err
+	}
 	for i, instanceDigest := range instanceDigests {
 		if options.ImageListSelection == CopySpecificImages &&
 			!slices.Contains(options.Instances, instanceDigest) {
 			logrus.Debugf("Skipping instance %s (%d/%d)", instanceDigest, i+1, len(instanceDigests))
 			continue
 		}
+		instanceDetails, err := list.Instance(instanceDigest)
+		if err != nil {
+			return res, fmt.Errorf("getting details for instance %s: %w", instanceDigest, err)
+		}
+		platform := platformV1ToPlatformComparable(instanceDetails.ReadOnly.Platform)
+		compressionList := compressionsByPlatform[platform]
+		for _, compressionVariant := range options.EnsureCompressionVariantsExist {
+			if !compressionList.Contains(compressionVariant.Algorithm.Name()) {
+				res = append(res, instanceCopy{
+					op:                      instanceCopyClone,
+					sourceDigest:            instanceDigest,
+					cloneCompressionVariant: compressionVariant,
+					clonePlatform:           instanceDetails.ReadOnly.Platform,
+					cloneAnnotations:        maps.Clone(instanceDetails.ReadOnly.Annotations),
+				})
+				// add current compression to the list so logic acks any
+				// duplicates while processing other instances
+				compressionList.Add(compressionVariant.Algorithm.Name())
+			}
+		}
 		res = append(res, instanceCopy{
 			op:           instanceCopyCopy,
 			sourceDigest: instanceDigest,
 		})
 	}
-	return res
+	return res, nil
 }
 
 // copyMultipleImages copies some or all of an image list's instances, using
@@ -118,7 +195,10 @@ func (c *copier) copyMultipleImages(ctx context.Context) (copiedManifest []byte,
 	// Copy each image, or just the ones we want to copy, in turn.
 	instanceDigests := updatedList.Instances()
 	instanceEdits := []internalManifest.ListEdit{}
-	instanceCopyList := prepareInstanceCopies(instanceDigests, c.options)
+	instanceCopyList, err := prepareInstanceCopies(updatedList, instanceDigests, c.options)
+	if err != nil {
+		return nil, fmt.Errorf("preparing instances for copy: %w", err)
+	}
 	c.Printf("Copying %d of %d images in list\n", len(instanceCopyList), len(instanceDigests))
 	for i, instance := range instanceCopyList {
 		// Update instances to be edited by their `ListOperation` and
@@ -140,6 +220,24 @@ func (c *copier) copyMultipleImages(ctx context.Context) (copiedManifest []byte,
 				UpdateSize:                  int64(len(updated.manifest)),
 				UpdateCompressionAlgorithms: updated.compressionAlgorithms,
 				UpdateMediaType:             updated.manifestMIMEType})
+		case instanceCopyClone:
+			logrus.Debugf("Replicating instance %s (%d/%d)", instance.sourceDigest, i+1, len(instanceCopyList))
+			c.Printf("Replicating image %s (%d/%d)\n", instance.sourceDigest, i+1, len(instanceCopyList))
+			unparsedInstance := image.UnparsedInstance(c.rawSource, &instanceCopyList[i].sourceDigest)
+			updated, err := c.copySingleImage(ctx, unparsedInstance, &instanceCopyList[i].sourceDigest, copySingleImageOptions{requireCompressionFormatMatch: true})
+			if err != nil {
+				return nil, fmt.Errorf("replicating image %d/%d from manifest list: %w", i+1, len(instanceCopyList), err)
+			}
+			// Record the result of a possible conversion here.
+			instanceEdits = append(instanceEdits, internalManifest.ListEdit{
+				ListOperation:            internalManifest.ListOpAdd,
+				AddDigest:                updated.manifestDigest,
+				AddSize:                  int64(len(updated.manifest)),
+				AddMediaType:             updated.manifestMIMEType,
+				AddPlatform:              instance.clonePlatform,
+				AddAnnotations:           instance.cloneAnnotations,
+				AddCompressionAlgorithms: updated.compressionAlgorithms,
+			})
 		default:
 			return nil, fmt.Errorf("copying image: invalid copy operation %d", instance.op)
 		}
