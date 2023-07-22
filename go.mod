@@ -33,7 +33,7 @@ require (
 	github.com/sylabs/sif/v2 v2.11.5
 	github.com/theupdateframework/go-tuf v0.5.2
 	github.com/ulikunitz/xz v0.5.11
-	github.com/vbatts/tar-split v0.11.3
+	github.com/vbatts/tar-split v0.11.5
 	github.com/vbauerster/mpb/v8 v8.5.2
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.7
