@@ -16,6 +16,8 @@ they are evaluated. For example: if evaluated on a remote server, image names
 might refer to paths on that server; relative paths are relative to the current
 directory of the image consumer.
 
+<!-- atomic: is deprecated and not documented here. -->
+
 ### **containers-storage**:[**[**storage-specifier**]**]{image-id|docker-reference[@image-id]}
 
 An image located in a local containers storage.
@@ -54,7 +56,7 @@ Alternatively, for reading archives, @_source-index_ is a zero-based index in ar
 (to access untagged images).
 If neither _docker-reference_ nor @_source_index is specified when reading an archive, the archive must contain exactly one image.
 
-It is further possible to copy data to stdin by specifying `docker-archive:/dev/stdin` but note that the used file must be seekable.
+The _path_ can refer to a stream, e.g. `docker-archive:/dev/stdin`.
 
 ### **docker-daemon:**_docker-reference|algo:digest_
 
@@ -66,20 +68,30 @@ The _algo:digest_ refers to the image ID reported by docker-inspect(1).
 
 An image in a directory structure compliant with the "Open Container Image Layout Specification" at _path_.
 
-_Path_ terminates at the first `:` character; any further `:` characters are not separators, but a part of _reference_.
-Specify a _reference_ to allow storing multiple images within the same _path_.
+The _path_ value terminates at the first `:` character; any further `:` characters are not separators, but a part of _reference_.
+The _reference_ is used to set, or match, the `org.opencontainers.image.ref.name` annotation in the top-level index.
+If _reference_ is not specified when reading an image, the directory must contain exactly one image.
 
 ### **oci-archive:**_path[:reference]_
 
 An image in a tar(1) archive with contents compliant with the "Open Container Image Layout Specification" at _path_.
 
-_Path_ terminates at the first `:` character; any further `:` characters are not separators, but a part of _reference_.
-Specify a _reference_ to allow storing multiple images within the same _path_.
+The _path_ value terminates at the first `:` character; any further `:` characters are not separators, but a part of _reference_.
+The _reference_ is used to set, or match, the `org.opencontainers.image.ref.name` annotation in the top-level index.
+If _reference_ is not specified when reading an archive, the archive must contain exactly one image.
 
 ### **ostree:**_docker-reference[@/absolute/repo/path]_
 
 An image in the local ostree(1) repository.
 _/absolute/repo/path_ defaults to _/ostree/repo_.
+
+### **sif:**_path_
+
+An image using the Singularity image format at _path_.
+
+Only reading images is supported, and not all scripts can be represented in the OCI format.
+
+<!-- tarball: can only usefully be used from Go callers who call tarballReference.ConfigUpdate, and is not documented here. -->
 
 ## Examples
 
