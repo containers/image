@@ -1,36 +1,44 @@
 package copy
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	internalManifest "github.com/containers/image/v5/internal/manifest"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestPrepareCopyInstances(t *testing.T) {
+// Test `instanceCopyCopy` cases.
+func TestPrepareCopyInstancesforInstanceCopyCopy(t *testing.T) {
+	validManifest, err := os.ReadFile(filepath.Join("..", "internal", "manifest", "testdata", "oci1.index.zstd-selection.json"))
+	require.NoError(t, err)
+	list, err := internalManifest.ListFromBlob(validManifest, internalManifest.GuessMIMEType(validManifest))
+	require.NoError(t, err)
+
 	// Test CopyAllImages
 	sourceInstances := []digest.Digest{
-		digest.Digest("sha256:5b0bcabd1ed22e9fb1310cf6c2dec7cdef19f0ad69efa1f392e94a4333501270"),
+		digest.Digest("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
 		digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
 		digest.Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"),
 	}
 
-	instancesToCopy := prepareInstanceCopies(sourceInstances, &Options{})
+	instancesToCopy, err := prepareInstanceCopies(list, sourceInstances, &Options{})
+	require.NoError(t, err)
 	compare := []instanceCopy{}
+
 	for _, instance := range sourceInstances {
 		compare = append(compare, instanceCopy{op: instanceCopyCopy,
 			sourceDigest: instance})
 	}
 	assert.Equal(t, instancesToCopy, compare)
 
-	// Test with CopySpecific Images
-	copyOnly := []digest.Digest{
-		digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
-	}
-	instancesToCopy = prepareInstanceCopies(sourceInstances, &Options{
-		Instances:          copyOnly,
-		ImageListSelection: CopySpecificImages})
-	assert.Equal(t, instancesToCopy, []instanceCopy{{
-		op:           instanceCopyCopy,
-		sourceDigest: copyOnly[0]}})
+	// Test CopySpecificImages where selected instance is sourceInstances[1]
+	instancesToCopy, err = prepareInstanceCopies(list, sourceInstances, &Options{Instances: []digest.Digest{sourceInstances[1]}, ImageListSelection: CopySpecificImages})
+	require.NoError(t, err)
+	compare = []instanceCopy{{op: instanceCopyCopy,
+		sourceDigest: sourceInstances[1]}}
+	assert.Equal(t, instancesToCopy, compare)
 }
