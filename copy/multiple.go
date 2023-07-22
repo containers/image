@@ -221,7 +221,7 @@ func (c *copier) copyMultipleImages(ctx context.Context) (copiedManifest []byte,
 	if err != nil {
 		return nil, fmt.Errorf("preparing instances for copy: %w", err)
 	}
-	c.Printf("Copying %d of %d images in list\n", len(instanceCopyList), len(instanceDigests))
+	c.Printf("Copying %d images generated from %d images in list\n", len(instanceCopyList), len(instanceDigests))
 	for i, instance := range instanceCopyList {
 		// Update instances to be edited by their `ListOperation` and
 		// populate necessary fields.
