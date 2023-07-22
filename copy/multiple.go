@@ -110,8 +110,7 @@ func prepareInstanceCopies(list internalManifest.List, instanceDigests []digest.
 					clonePlatform:           instanceDetails.ReadOnly.Platform,
 					cloneAnnotations:        maps.Clone(instanceDetails.ReadOnly.Annotations),
 				})
-				// add current compression to the list so logic acks any
-				// duplicates while processing other instances
+				// add current compression to the list so that we don’t create duplicate clones
 				compressionList.Add(compressionVariant.Algorithm.Name())
 			}
 		}
@@ -224,7 +223,10 @@ func (c *copier) copyMultipleImages(ctx context.Context) (copiedManifest []byte,
 			logrus.Debugf("Replicating instance %s (%d/%d)", instance.sourceDigest, i+1, len(instanceCopyList))
 			c.Printf("Replicating image %s (%d/%d)\n", instance.sourceDigest, i+1, len(instanceCopyList))
 			unparsedInstance := image.UnparsedInstance(c.rawSource, &instanceCopyList[i].sourceDigest)
-			updated, err := c.copySingleImage(ctx, unparsedInstance, &instanceCopyList[i].sourceDigest, copySingleImageOptions{requireCompressionFormatMatch: true})
+			updated, err := c.copySingleImage(ctx, unparsedInstance, &instanceCopyList[i].sourceDigest, copySingleImageOptions{
+				requireCompressionFormatMatch: true,
+				compressionFormat:             &instance.cloneCompressionVariant.Algorithm,
+				compressionLevel:              instance.cloneCompressionVariant.Level})
 			if err != nil {
 				return nil, fmt.Errorf("replicating image %d/%d from manifest list: %w", i+1, len(instanceCopyList), err)
 			}
