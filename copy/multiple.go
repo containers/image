@@ -13,6 +13,7 @@ import (
 	internalManifest "github.com/containers/image/v5/internal/manifest"
 	"github.com/containers/image/v5/internal/set"
 	"github.com/containers/image/v5/manifest"
+	"github.com/containers/image/v5/pkg/compression"
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
@@ -82,9 +83,31 @@ func platformCompressionMap(list internalManifest.List, instanceDigests []digest
 	return res, nil
 }
 
+func validateCompressionVariantExists(input []OptionCompressionVariant) error {
+	for _, option := range input {
+		_, err := compression.AlgorithmByName(option.Algorithm.Name())
+		if err != nil {
+			return fmt.Errorf("invalid algorithm %q in option.EnsureCompressionVariantsExist: %w", option.Algorithm.Name(), err)
+		}
+	}
+	return nil
+}
+
 // prepareInstanceCopies prepares a list of instances which needs to copied to the manifest list.
 func prepareInstanceCopies(list internalManifest.List, instanceDigests []digest.Digest, options *Options) ([]instanceCopy, error) {
 	res := []instanceCopy{}
+	if options.ImageListSelection == CopySpecificImages && len(options.EnsureCompressionVariantsExist) > 0 {
+		// List can already contain compressed instance for a compression selected in `EnsureCompressionVariantsExist`
+		// It’s unclear what it means when `CopySpecificImages` includes an instance in options.Instances,
+		// EnsureCompressionVariantsExist asks for an instance with some compression,
+		// an instance with that compression already exists, but is not included in options.Instances.
+		// We might define the semantics and implement this in the future.
+		return res, fmt.Errorf("EnsureCompressionVariantsExist is not implemented for CopySpecificImages")
+	}
+	err := validateCompressionVariantExists(options.EnsureCompressionVariantsExist)
+	if err != nil {
+		return res, err
+	}
 	compressionsByPlatform, err := platformCompressionMap(list, instanceDigests)
 	if err != nil {
 		return nil, err
