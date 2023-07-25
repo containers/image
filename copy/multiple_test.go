@@ -78,7 +78,6 @@ func TestPrepareCopyInstancesforInstanceCopyClone(t *testing.T) {
 	// amd64 already has a zstd instance i.e sourceInstance[1] so it should not create replication for
 	// `sourceInstance[0]` and `sourceInstance[1]` but should do it for `sourceInstance[2]` for `arm64`
 	// and still copy `sourceInstance[2]`.
-	assert.Equal(t, 4, len(instancesToCopy))
 	expectedResponse := []simplerInstanceCopy{}
 	for _, instance := range sourceInstances {
 		// If its `arm64` and sourceDigest[2] , expect a clone to happen
@@ -91,6 +90,22 @@ func TestPrepareCopyInstancesforInstanceCopyClone(t *testing.T) {
 	actualResponse := convertInstanceCopyToSimplerInstanceCopy(instancesToCopy)
 	assert.Equal(t, expectedResponse, actualResponse)
 
+	// Test option with multiple copy request for same compression format
+	// above expection should stay same, if out ensureCompressionVariantsExist requests zstd twice
+	ensureCompressionVariantsExist = []OptionCompressionVariant{{Algorithm: compression.Zstd}, {Algorithm: compression.Zstd}}
+	instancesToCopy, err = prepareInstanceCopies(list, sourceInstances, &Options{EnsureCompressionVariantsExist: ensureCompressionVariantsExist})
+	require.NoError(t, err)
+	expectedResponse = []simplerInstanceCopy{}
+	for _, instance := range sourceInstances {
+		// If its `arm64` and sourceDigest[2] , expect a clone to happen
+		if instance == sourceInstances[2] {
+			expectedResponse = append(expectedResponse, simplerInstanceCopy{op: instanceCopyClone, sourceDigest: instance, cloneCompressionVariant: "zstd", clonePlatform: "arm64-linux-"})
+		}
+		expectedResponse = append(expectedResponse, simplerInstanceCopy{op: instanceCopyCopy,
+			sourceDigest: instance})
+	}
+	actualResponse = convertInstanceCopyToSimplerInstanceCopy(instancesToCopy)
+	assert.Equal(t, expectedResponse, actualResponse)
 }
 
 // simpler version of `instanceCopy` for testing where fields are string
