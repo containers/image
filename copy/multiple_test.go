@@ -106,6 +106,23 @@ func TestPrepareCopyInstancesforInstanceCopyClone(t *testing.T) {
 	}
 	actualResponse = convertInstanceCopyToSimplerInstanceCopy(instancesToCopy)
 	assert.Equal(t, expectedResponse, actualResponse)
+
+	// Add same instance twice but clone must appear only once.
+	ensureCompressionVariantsExist = []OptionCompressionVariant{{Algorithm: compression.Zstd}}
+	sourceInstances = []digest.Digest{
+		digest.Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"),
+		digest.Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"),
+	}
+	instancesToCopy, err = prepareInstanceCopies(list, sourceInstances, &Options{EnsureCompressionVariantsExist: ensureCompressionVariantsExist})
+	require.NoError(t, err)
+	// two copies but clone should happen only once
+	numberOfCopyClone := 0
+	for _, instance := range instancesToCopy {
+		if instance.op == instanceCopyClone {
+			numberOfCopyClone++
+		}
+	}
+	assert.Equal(t, 1, numberOfCopyClone)
 }
 
 // simpler version of `instanceCopy` for testing where fields are string
