@@ -266,6 +266,9 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 	}
 
 	if !multiImage {
+		if len(options.EnsureCompressionVariantsExist) > 0 {
+			return nil, fmt.Errorf("EnsureCompressionVariantsExist is not implemented when not creating a multi-architecture image")
+		}
 		// The simple case: just copy a single image.
 		single, err := c.copySingleImage(ctx, c.unparsedToplevel, nil, copySingleImageOptions{requireCompressionFormatMatch: false})
 		if err != nil {
@@ -273,6 +276,9 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		}
 		copiedManifest = single.manifest
 	} else if c.options.ImageListSelection == CopySystemImage {
+		if len(options.EnsureCompressionVariantsExist) > 0 {
+			return nil, fmt.Errorf("EnsureCompressionVariantsExist is not implemented when not creating a multi-architecture image")
+		}
 		// This is a manifest list, and we weren't asked to copy multiple images.  Choose a single image that
 		// matches the current system to copy, and copy it.
 		mfest, manifestType, err := c.unparsedToplevel.Manifest(ctx)
