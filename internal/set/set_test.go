@@ -32,6 +32,13 @@ func TestAdd(t *testing.T) {
 	assert.False(t, s.Contains(3))
 }
 
+func TestAddSlice(t *testing.T) {
+	s := NewWithValues(1)
+	s.Add(2)
+	s.AddSlice([]int{3, 4})
+	assert.ElementsMatch(t, []int{1, 2, 3, 4}, s.Values())
+}
+
 func TestDelete(t *testing.T) {
 	s := NewWithValues(1, 2)
 	assert.True(t, s.Contains(2))
