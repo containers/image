@@ -80,12 +80,12 @@ func TestPrepareCopyInstancesforInstanceCopyClone(t *testing.T) {
 	// and still copy `sourceInstance[2]`.
 	expectedResponse := []simplerInstanceCopy{}
 	for _, instance := range sourceInstances {
+		expectedResponse = append(expectedResponse, simplerInstanceCopy{op: instanceCopyCopy,
+			sourceDigest: instance})
 		// If its `arm64` and sourceDigest[2] , expect a clone to happen
 		if instance == sourceInstances[2] {
 			expectedResponse = append(expectedResponse, simplerInstanceCopy{op: instanceCopyClone, sourceDigest: instance, cloneCompressionVariant: "zstd", clonePlatform: "arm64-linux-"})
 		}
-		expectedResponse = append(expectedResponse, simplerInstanceCopy{op: instanceCopyCopy,
-			sourceDigest: instance})
 	}
 	actualResponse := convertInstanceCopyToSimplerInstanceCopy(instancesToCopy)
 	assert.Equal(t, expectedResponse, actualResponse)
@@ -97,12 +97,12 @@ func TestPrepareCopyInstancesforInstanceCopyClone(t *testing.T) {
 	require.NoError(t, err)
 	expectedResponse = []simplerInstanceCopy{}
 	for _, instance := range sourceInstances {
+		expectedResponse = append(expectedResponse, simplerInstanceCopy{op: instanceCopyCopy,
+			sourceDigest: instance})
 		// If its `arm64` and sourceDigest[2] , expect a clone to happen
 		if instance == sourceInstances[2] {
 			expectedResponse = append(expectedResponse, simplerInstanceCopy{op: instanceCopyClone, sourceDigest: instance, cloneCompressionVariant: "zstd", clonePlatform: "arm64-linux-"})
 		}
-		expectedResponse = append(expectedResponse, simplerInstanceCopy{op: instanceCopyCopy,
-			sourceDigest: instance})
 	}
 	actualResponse = convertInstanceCopyToSimplerInstanceCopy(instancesToCopy)
 	assert.Equal(t, expectedResponse, actualResponse)
