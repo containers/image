@@ -127,8 +127,9 @@ Referencing an image by digest ensures that the same is always used
 different images if the tag mapping is out of sync).
 
 
-*Note*: Redirection and mirrors are currently processed only when reading images, not when pushing
-to a registry; that may change in the future.
+*Note*: Redirection and mirrors are currently processed only when reading a single image,
+not when pushing to a registry nor when doing any other kind of lookup/search on a on a registry.
+This may change in the future.
 
 #### Short-Name Aliasing
 The use of unqualified-search registries entails an ambiguity as it is
