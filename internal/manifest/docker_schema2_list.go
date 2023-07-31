@@ -119,6 +119,12 @@ func (index *Schema2ListPublic) editInstances(editInstances []ListEdit) error {
 			}
 			index.Manifests[targetIndex].MediaType = editInstance.UpdateMediaType
 		case ListOpAdd:
+			if editInstance.AddPlatform == nil {
+				// Should we create a struct with empty fields instead?
+				// Right now ListOpAdd is only called when an instance with the same platform value
+				// already exists in the manifest, so this should not be reached in practice.
+				return fmt.Errorf("adding a schema2 list instance with no platform specified is not supported")
+			}
 			addInstance := Schema2ManifestDescriptor{
 				Schema2Descriptor{Digest: editInstance.AddDigest, Size: editInstance.AddSize, MediaType: editInstance.AddMediaType},
 				Schema2PlatformSpec{
