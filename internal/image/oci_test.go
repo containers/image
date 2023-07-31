@@ -15,6 +15,7 @@ import (
 	"github.com/containers/image/v5/internal/testing/mocks"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
+	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,7 +34,7 @@ func manifestOCI1FromComponentsLikeFixture(configBlob []byte) genericManifest {
 	return manifestOCI1FromComponents(imgspecv1.Descriptor{
 		MediaType: imgspecv1.MediaTypeImageConfig,
 		Size:      5940,
-		Digest:    "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f",
+		Digest:    commonFixtureConfigDigest,
 		Annotations: map[string]string{
 			"test-annotation-1": "one",
 		},
@@ -117,7 +118,7 @@ func TestManifestOCI1ConfigInfo(t *testing.T) {
 	} {
 		assert.Equal(t, types.BlobInfo{
 			Size:   5940,
-			Digest: "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f",
+			Digest: commonFixtureConfigDigest,
 			Annotations: map[string]string{
 				"test-annotation-1": "one",
 			},
@@ -156,7 +157,10 @@ func TestManifestOCI1ConfigBlob(t *testing.T) {
 	} {
 		var src types.ImageSource
 		if c.cbISfn != nil {
-			src = configBlobImageSource{f: c.cbISfn}
+			src = configBlobImageSource{
+				expectedDigest: commonFixtureConfigDigest,
+				f:              c.cbISfn,
+			}
 		} else {
 			src = nil
 		}
@@ -362,6 +366,7 @@ func newOCI1ImageSource(t *testing.T, dockerRef string) *oci1ImageSource {
 
 	return &oci1ImageSource{
 		configBlobImageSource: configBlobImageSource{
+			expectedDigest: digest.FromBytes(realConfigJSON),
 			f: func() (io.ReadCloser, int64, error) {
 				return io.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
 			},
