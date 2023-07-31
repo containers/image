@@ -331,7 +331,7 @@ func (index *OCI1IndexPublic) ToSchema2List() (*Schema2ListPublic, error) {
 				Architecture: runtime.GOARCH,
 			}
 		}
-		converted := Schema2ManifestDescriptor{
+		components = append(components, Schema2ManifestDescriptor{
 			Schema2Descriptor{
 				MediaType: manifest.MediaType,
 				Size:      manifest.Size,
@@ -339,8 +339,7 @@ func (index *OCI1IndexPublic) ToSchema2List() (*Schema2ListPublic, error) {
 				URLs:      slices.Clone(manifest.URLs),
 			},
 			schema2PlatformSpecFromOCIPlatform(*platform),
-		}
-		components = append(components, converted)
+		})
 	}
 	s2 := Schema2ListPublicFromComponents(components)
 	return s2, nil

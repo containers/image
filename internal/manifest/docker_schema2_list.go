@@ -120,11 +120,14 @@ func (index *Schema2ListPublic) editInstances(editInstances []ListEdit) error {
 				// already exists in the manifest, so this should not be reached in practice.
 				return fmt.Errorf("adding a schema2 list instance with no platform specified is not supported")
 			}
-			addInstance := Schema2ManifestDescriptor{
-				Schema2Descriptor{Digest: editInstance.AddDigest, Size: editInstance.AddSize, MediaType: editInstance.AddMediaType},
+			addedEntries = append(addedEntries, Schema2ManifestDescriptor{
+				Schema2Descriptor{
+					Digest:    editInstance.AddDigest,
+					Size:      editInstance.AddSize,
+					MediaType: editInstance.AddMediaType,
+				},
 				schema2PlatformSpecFromOCIPlatform(*editInstance.AddPlatform),
-			}
-			addedEntries = append(addedEntries, addInstance)
+			})
 		default:
 			return fmt.Errorf("internal error: invalid operation: %d", editInstance.ListOperation)
 		}
@@ -214,14 +217,13 @@ func (list *Schema2ListPublic) ToOCI1Index() (*OCI1IndexPublic, error) {
 	components := make([]imgspecv1.Descriptor, 0, len(list.Manifests))
 	for _, manifest := range list.Manifests {
 		platform := ociPlatformFromSchema2PlatformSpec(manifest.Platform)
-		converted := imgspecv1.Descriptor{
+		components = append(components, imgspecv1.Descriptor{
 			MediaType: manifest.MediaType,
 			Size:      manifest.Size,
 			Digest:    manifest.Digest,
 			URLs:      slices.Clone(manifest.URLs),
 			Platform:  &platform,
-		}
-		components = append(components, converted)
+		})
 	}
 	oci := OCI1IndexPublicFromComponents(components, nil)
 	return oci, nil
