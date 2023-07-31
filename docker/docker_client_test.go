@@ -332,6 +332,28 @@ func TestNeedsNoRetry(t *testing.T) {
 	}
 }
 
+func TestParseRegistryWarningHeader(t *testing.T) {
+	for _, c := range []struct{ header, expected string }{
+		{"completely invalid", ""},
+		{`299 - "trivial"`, "trivial"},
+		{`100 - "not-299"`, ""},
+		{`299 localhost "warn-agent set"`, ""},
+		{`299 - "no-terminating-quote`, ""},
+		{"299 - \"\x01 control\"", ""},
+		{"299 - \"\\\x01 escaped control\"", ""},
+		{"299 - \"e\\scaped\"", "escaped"},
+		{"299 - \"non-UTF8 \xA1\xA2\"", "non-UTF8 \xA1\xA2"},
+		{"299 - \"non-UTF8 escaped \\\xA1\\\xA2\"", "non-UTF8 escaped \xA1\xA2"},
+		{"299 - \"UTF8 žluťoučký\"", "UTF8 žluťoučký"},
+		{"299 - \"UTF8 \\\xC5\\\xBEluťoučký\"", "UTF8 žluťoučký"},
+		{`299 - "unterminated`, ""},
+		{`299 - "warning" "some-date"`, ""},
+	} {
+		res := parseRegistryWarningHeader(c.header)
+		assert.Equal(t, c.expected, res, c.header)
+	}
+}
+
 func TestIsManifestUnknownError(t *testing.T) {
 	// Mostly a smoke test; we can add more registries here if they need special handling.
 
