@@ -194,7 +194,7 @@ func TestManifestOCI1OCIConfig(t *testing.T) {
 	err = json.Unmarshal(configJSON, &expectedConfig)
 	require.NoError(t, err)
 
-	originalSrc := newOCI1ImageSource(t, "httpd:latest")
+	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd:latest")
 	for _, m := range []genericManifest{
 		manifestOCI1FromFixture(t, originalSrc, "oci1.json"),
 		manifestOCI1FromComponentsLikeFixture(configJSON),
@@ -357,8 +357,8 @@ func (OCIis *oci1ImageSource) Reference() types.ImageReference {
 	return refImageReferenceMock{ref: OCIis.ref}
 }
 
-func newOCI1ImageSource(t *testing.T, dockerRef string) *oci1ImageSource {
-	realConfigJSON, err := os.ReadFile("fixtures/oci1-config.json")
+func newOCI1ImageSource(t *testing.T, configFixture string, dockerRef string) *oci1ImageSource {
+	realConfigJSON, err := os.ReadFile(filepath.Join("fixtures", configFixture))
 	require.NoError(t, err)
 
 	ref, err := reference.ParseNormalizedNamed(dockerRef)
@@ -376,7 +376,7 @@ func newOCI1ImageSource(t *testing.T, dockerRef string) *oci1ImageSource {
 }
 
 func TestManifestOCI1UpdatedImage(t *testing.T) {
-	originalSrc := newOCI1ImageSource(t, "httpd:latest")
+	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd:latest")
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
 
 	// LayerInfos:
@@ -437,7 +437,7 @@ func TestManifestOCI1UpdatedImage(t *testing.T) {
 }
 
 func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
-	originalSrc := newOCI1ImageSource(t, "httpd-copy:latest")
+	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd-copy:latest")
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
 	memoryDest := &memoryImageDest{ref: originalSrc.ref}
 	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
@@ -506,7 +506,7 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 }
 
 func TestConvertToManifestSchema2(t *testing.T) {
-	originalSrc := newOCI1ImageSource(t, "httpd-copy:latest")
+	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd-copy:latest")
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
 	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
@@ -534,7 +534,7 @@ func TestConvertToManifestSchema2(t *testing.T) {
 }
 
 func TestConvertToManifestSchema2AllMediaTypes(t *testing.T) {
-	originalSrc := newOCI1ImageSource(t, "httpd-copy:latest")
+	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd-copy:latest")
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1-all-media-types.json")
 	_, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
@@ -543,7 +543,7 @@ func TestConvertToManifestSchema2AllMediaTypes(t *testing.T) {
 }
 
 func TestConvertToV2S2WithInvalidMIMEType(t *testing.T) {
-	originalSrc := newOCI1ImageSource(t, "httpd-copy:latest")
+	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd-copy:latest")
 	manifest, err := os.ReadFile(filepath.Join("fixtures", "oci1-invalid-media-type.json"))
 	require.NoError(t, err)
 
