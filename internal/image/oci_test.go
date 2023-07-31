@@ -30,6 +30,40 @@ func manifestOCI1FromFixture(t *testing.T, src types.ImageSource, fixture string
 	return m
 }
 
+var layerDescriptorsLikeFixture = []imgspecv1.Descriptor{
+	{
+		MediaType: imgspecv1.MediaTypeImageLayerGzip,
+		Digest:    "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+		Size:      51354364,
+	},
+	{
+		MediaType: imgspecv1.MediaTypeImageLayerGzip,
+		Digest:    "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+		Size:      150,
+	},
+	{
+		MediaType: imgspecv1.MediaTypeImageLayerGzip,
+		Digest:    "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
+		Size:      11739507,
+		URLs: []string{
+			"https://layer.url",
+		},
+	},
+	{
+		MediaType: imgspecv1.MediaTypeImageLayerGzip,
+		Digest:    "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
+		Size:      8841833,
+		Annotations: map[string]string{
+			"test-annotation-2": "two",
+		},
+	},
+	{
+		MediaType: imgspecv1.MediaTypeImageLayerGzip,
+		Digest:    "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
+		Size:      291,
+	},
+}
+
 func manifestOCI1FromComponentsLikeFixture(configBlob []byte) genericManifest {
 	return manifestOCI1FromComponents(imgspecv1.Descriptor{
 		MediaType: imgspecv1.MediaTypeImageConfig,
@@ -38,39 +72,20 @@ func manifestOCI1FromComponentsLikeFixture(configBlob []byte) genericManifest {
 		Annotations: map[string]string{
 			"test-annotation-1": "one",
 		},
-	}, nil, configBlob, []imgspecv1.Descriptor{
-		{
-			MediaType: imgspecv1.MediaTypeImageLayerGzip,
-			Digest:    "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
-			Size:      51354364,
+	}, nil, configBlob, layerDescriptorsLikeFixture)
+}
+
+func manifestOCI1FromComponentsWithExtraConfigFields(t *testing.T, src types.ImageSource) genericManifest {
+	configJSON, err := os.ReadFile("fixtures/oci1-config-extra-fields.json")
+	require.NoError(t, err)
+	return manifestOCI1FromComponents(imgspecv1.Descriptor{
+		MediaType: imgspecv1.MediaTypeImageConfig,
+		Size:      7693,
+		Digest:    "sha256:7f2a783ee2f07826b1856e68a40c930cd0430d6e7d4a88c29c2c8b7718706e74",
+		Annotations: map[string]string{
+			"test-annotation-1": "one",
 		},
-		{
-			MediaType: imgspecv1.MediaTypeImageLayerGzip,
-			Digest:    "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
-			Size:      150,
-		},
-		{
-			MediaType: imgspecv1.MediaTypeImageLayerGzip,
-			Digest:    "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
-			Size:      11739507,
-			URLs: []string{
-				"https://layer.url",
-			},
-		},
-		{
-			MediaType: imgspecv1.MediaTypeImageLayerGzip,
-			Digest:    "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
-			Size:      8841833,
-			Annotations: map[string]string{
-				"test-annotation-2": "two",
-			},
-		},
-		{
-			MediaType: imgspecv1.MediaTypeImageLayerGzip,
-			Digest:    "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
-			Size:      291,
-		},
-	})
+	}, src, configJSON, layerDescriptorsLikeFixture)
 }
 
 func TestManifestOCI1FromManifest(t *testing.T) {
@@ -204,6 +219,19 @@ func TestManifestOCI1OCIConfig(t *testing.T) {
 		assert.Equal(t, &expectedConfig, config)
 	}
 
+	// “Any extra fields in the Image JSON struct are considered implementation specific
+	// and MUST NOT generate an error by any implementations which are unable to interpret them.”
+	// oci1-config-extra-fields.json is the same as oci1-config.json, apart from a few added fields.
+	srcWithExtraFields := newOCI1ImageSource(t, "oci1-config-extra-fields.json", "httpd:latest")
+	for _, m := range []genericManifest{
+		manifestOCI1FromFixture(t, srcWithExtraFields, "oci1-extra-config-fields.json"),
+		manifestOCI1FromComponentsWithExtraConfigFields(t, srcWithExtraFields),
+	} {
+		config, err := m.OCIConfig(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, &expectedConfig, config)
+	}
+
 	// This can share originalSrc because the config digest is the same between oci1-artifact.json and oci1.json
 	artifact := manifestOCI1FromFixture(t, originalSrc, "oci1-artifact.json")
 	_, err = artifact.OCIConfig(context.Background())
@@ -267,67 +295,75 @@ func TestManifestOCI1EmbeddedDockerReferenceConflicts(t *testing.T) {
 }
 
 func TestManifestOCI1Inspect(t *testing.T) {
+	var emptyAnnotations map[string]string
+	created := time.Date(2016, 9, 23, 23, 20, 45, 789764590, time.UTC)
+
 	configJSON, err := os.ReadFile("fixtures/oci1-config.json")
 	require.NoError(t, err)
-	var emptyAnnotations map[string]string
-	m := manifestOCI1FromComponentsLikeFixture(configJSON)
-	ii, err := m.Inspect(context.Background())
-	require.NoError(t, err)
-	created := time.Date(2016, 9, 23, 23, 20, 45, 789764590, time.UTC)
-	assert.Equal(t, types.ImageInspectInfo{
-		Tag:           "",
-		Created:       &created,
-		DockerVersion: "1.12.1",
-		Labels:        map[string]string{},
-		Architecture:  "amd64",
-		Os:            "linux",
-		Layers: []string{
-			"sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
-			"sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
-			"sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
-			"sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
-			"sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
-		},
-		LayersData: []types.ImageInspectLayer{{
-			MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
-			Digest:      "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
-			Size:        51354364,
-			Annotations: emptyAnnotations,
-		}, {
-			MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
-			Digest:      "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
-			Size:        150,
-			Annotations: emptyAnnotations,
-		}, {
-			MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
-			Digest:      "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
-			Size:        11739507,
-			Annotations: emptyAnnotations,
-		}, {
-			MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
-			Digest:      "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
-			Size:        8841833,
-			Annotations: map[string]string{"test-annotation-2": "two"},
-		}, {
-			MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
-			Digest:      "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
-			Size:        291,
-			Annotations: emptyAnnotations,
-		},
-		},
-		Author: "",
-		Env: []string{
-			"PATH=/usr/local/apache2/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-			"HTTPD_PREFIX=/usr/local/apache2",
-			"HTTPD_VERSION=2.4.23",
-			"HTTPD_SHA1=5101be34ac4a509b245adb70a56690a84fcc4e7f",
-			"HTTPD_BZ2_URL=https://www.apache.org/dyn/closer.cgi?action=download&filename=httpd/httpd-2.4.23.tar.bz2",
-			"HTTPD_ASC_URL=https://www.apache.org/dist/httpd/httpd-2.4.23.tar.bz2.asc",
-		},
-	}, *ii)
+	for _, m := range []genericManifest{
+		manifestOCI1FromComponentsLikeFixture(configJSON),
+		// “Any extra fields in the Image JSON struct are considered implementation specific
+		// and MUST NOT generate an error by any implementations which are unable to interpret them.”
+		// oci1-config-extra-fields.json is the same as oci1-config.json, apart from a few added fields.
+		manifestOCI1FromComponentsWithExtraConfigFields(t, nil),
+	} {
+		ii, err := m.Inspect(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, types.ImageInspectInfo{
+			Tag:           "",
+			Created:       &created,
+			DockerVersion: "1.12.1",
+			Labels:        map[string]string{},
+			Architecture:  "amd64",
+			Os:            "linux",
+			Layers: []string{
+				"sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+				"sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+				"sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
+				"sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
+				"sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
+			},
+			LayersData: []types.ImageInspectLayer{{
+				MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
+				Digest:      "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+				Size:        51354364,
+				Annotations: emptyAnnotations,
+			}, {
+				MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
+				Digest:      "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+				Size:        150,
+				Annotations: emptyAnnotations,
+			}, {
+				MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
+				Digest:      "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
+				Size:        11739507,
+				Annotations: emptyAnnotations,
+			}, {
+				MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
+				Digest:      "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
+				Size:        8841833,
+				Annotations: map[string]string{"test-annotation-2": "two"},
+			}, {
+				MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
+				Digest:      "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
+				Size:        291,
+				Annotations: emptyAnnotations,
+			},
+			},
+			Author: "",
+			Env: []string{
+				"PATH=/usr/local/apache2/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+				"HTTPD_PREFIX=/usr/local/apache2",
+				"HTTPD_VERSION=2.4.23",
+				"HTTPD_SHA1=5101be34ac4a509b245adb70a56690a84fcc4e7f",
+				"HTTPD_BZ2_URL=https://www.apache.org/dyn/closer.cgi?action=download&filename=httpd/httpd-2.4.23.tar.bz2",
+				"HTTPD_ASC_URL=https://www.apache.org/dist/httpd/httpd-2.4.23.tar.bz2.asc",
+			},
+		}, *ii)
+	}
 
 	// nil configBlob will trigger an error in m.ConfigBlob()
-	m = manifestOCI1FromComponentsLikeFixture(nil)
+	m := manifestOCI1FromComponentsLikeFixture(nil)
 	_, err = m.Inspect(context.Background())
 	assert.Error(t, err)
 
