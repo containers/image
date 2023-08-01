@@ -7,7 +7,7 @@ require (
 	github.com/BurntSushi/toml v1.3.2
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01
 	github.com/containers/ocicrypt v1.1.7
-	github.com/containers/storage v1.48.1-0.20230721123825-4a3a3019d765
+	github.com/containers/storage v1.48.1-0.20230728131509-c3da76fa3f63
 	github.com/cyberphone/json-canonicalization v0.0.0-20230710064741-aa7fe85c7dbd
 	github.com/docker/distribution v2.8.2+incompatible
 	github.com/docker/docker v24.0.5+incompatible
@@ -48,12 +48,13 @@ require (
 require (
 	github.com/14rcole/gopopulate v0.0.0-20180821133914-b175b219e774 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
-	github.com/Microsoft/hcsshim v0.9.10 // indirect
+	github.com/Microsoft/hcsshim v0.10.0 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/chzyer/readline v1.5.1 // indirect
-	github.com/containerd/cgroups v1.0.4 // indirect
+	github.com/containerd/cgroups/v3 v3.0.2 // indirect
+	github.com/containerd/containerd v1.7.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/coreos/go-oidc/v3 v3.6.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
@@ -81,7 +82,6 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/kr/pretty v0.3.0 // indirect
 	github.com/letsencrypt/boulder v0.0.0-20230213213521-fdfea0d469b6 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
@@ -95,11 +95,12 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opencontainers/runc v1.1.8 // indirect
-	github.com/opencontainers/runtime-spec v1.1.0-rc.3 // indirect
+	github.com/opencontainers/runtime-spec v1.1.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
+	github.com/rogpeppe/go-internal v1.6.1 // indirect
 	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
 	github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980 // indirect
