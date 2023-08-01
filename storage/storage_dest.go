@@ -921,10 +921,7 @@ func (s *storageImageDestination) PutSignaturesWithFormat(ctx context.Context, s
 			return err
 		}
 		sizes = append(sizes, len(sig))
-		newblob := make([]byte, len(sigblob)+len(sig))
-		copy(newblob, sigblob)
-		copy(newblob[len(sigblob):], sig)
-		sigblob = newblob
+		sigblob = append(sigblob, sig...)
 	}
 	if instanceDigest == nil {
 		s.signatures = sigblob
