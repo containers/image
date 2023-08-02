@@ -6,7 +6,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"os"
-	"sort"
 	"testing"
 
 	"github.com/containers/image/v5/internal/set"
@@ -80,8 +79,7 @@ func TestSetupCertificates(t *testing.T) {
 		require.NoError(t, err)
 		names = append(names, parsed.Subject.CommonName)
 	}
-	sort.Strings(names)
-	assert.Equal(t, []string{
+	assert.ElementsMatch(t, []string{
 		"containers/image test client certificate 1",
 		"containers/image test client certificate 2",
 	}, names)
