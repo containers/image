@@ -32,7 +32,7 @@ func TestPrepareCopyInstancesforInstanceCopyCopy(t *testing.T) {
 
 	for _, instance := range sourceInstances {
 		compare = append(compare, instanceCopy{op: instanceCopyCopy,
-			sourceDigest: instance})
+			sourceDigest: instance, copyForceCompressionFormat: false})
 	}
 	assert.Equal(t, instancesToCopy, compare)
 
@@ -42,6 +42,9 @@ func TestPrepareCopyInstancesforInstanceCopyCopy(t *testing.T) {
 	compare = []instanceCopy{{op: instanceCopyCopy,
 		sourceDigest: sourceInstances[1]}}
 	assert.Equal(t, instancesToCopy, compare)
+
+	_, err = prepareInstanceCopies(list, sourceInstances, &Options{Instances: []digest.Digest{sourceInstances[1]}, ImageListSelection: CopySpecificImages, ForceCompressionFormat: true})
+	require.EqualError(t, err, "cannot use ForceCompressionFormat with undefined default compression format")
 }
 
 // Test `instanceCopyClone` cases.
