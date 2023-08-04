@@ -60,6 +60,13 @@ func NewGPGSigningMechanism() (SigningMechanism, error) {
 	return newGPGSigningMechanismInDirectory("")
 }
 
+// NewGPGSigningMechanismWithProgram returns a new GPG/OpenPGP signing mechanism using the given programm
+// instead of the default gpg binary.
+// The caller must call .Close() on the returned SigningMechanism.
+func NewGPGSigningMechanismWithProgram(program string) (SigningMechanism, error) {
+	return newGPGSigningMechanismWithProgram(program)
+}
+
 // NewEphemeralGPGSigningMechanism returns a new GPG/OpenPGP signing mechanism which
 // recognizes _only_ public keys from the supplied blob, and returns the identities
 // of these keys.

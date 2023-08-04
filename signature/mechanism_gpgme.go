@@ -22,7 +22,20 @@ type gpgmeSigningMechanism struct {
 // newGPGSigningMechanismInDirectory returns a new GPG/OpenPGP signing mechanism, using optionalDir if not empty.
 // The caller must call .Close() on the returned SigningMechanism.
 func newGPGSigningMechanismInDirectory(optionalDir string) (signingMechanismWithPassphrase, error) {
-	ctx, err := newGPGMEContext(optionalDir)
+	ctx, err := newGPGMEContext(optionalDir, "")
+	if err != nil {
+		return nil, err
+	}
+	return &gpgmeSigningMechanism{
+		ctx:          ctx,
+		ephemeralDir: "",
+	}, nil
+}
+
+// newGPGSigningMechanismWithProgram returns a new GPG/OpenPGP signing mechanism, using the given gpg program if not empty.
+// The caller must call .Close() on the returned SigningMechanism.
+func newGPGSigningMechanismWithProgram(program string) (signingMechanismWithPassphrase, error) {
+	ctx, err := newGPGMEContext("", program)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +60,7 @@ func newEphemeralGPGSigningMechanism(blobs [][]byte) (signingMechanismWithPassph
 			os.RemoveAll(dir)
 		}
 	}()
-	ctx, err := newGPGMEContext(dir)
+	ctx, err := newGPGMEContext(dir, "")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -69,7 +82,7 @@ func newEphemeralGPGSigningMechanism(blobs [][]byte) (signingMechanismWithPassph
 }
 
 // newGPGMEContext returns a new *gpgme.Context, using optionalDir if not empty.
-func newGPGMEContext(optionalDir string) (*gpgme.Context, error) {
+func newGPGMEContext(optionalDir, optionalProgram string) (*gpgme.Context, error) {
 	ctx, err := gpgme.New()
 	if err != nil {
 		return nil, err
@@ -77,8 +90,8 @@ func newGPGMEContext(optionalDir string) (*gpgme.Context, error) {
 	if err = ctx.SetProtocol(gpgme.ProtocolOpenPGP); err != nil {
 		return nil, err
 	}
-	if optionalDir != "" {
-		err := ctx.SetEngineInfo(gpgme.ProtocolOpenPGP, "", optionalDir)
+	if optionalDir != "" || optionalProgram != "" {
+		err := ctx.SetEngineInfo(gpgme.ProtocolOpenPGP, optionalProgram, optionalDir)
 		if err != nil {
 			return nil, err
 		}
