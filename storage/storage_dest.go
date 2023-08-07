@@ -57,7 +57,7 @@ type storageImageDestination struct {
 
 	imageRef        storageReference
 	directory       string                   // Temporary directory where we store blobs until Commit() time
-	nextTempFileID  int32                    // A counter that we use for computing filenames to assign to blobs
+	nextTempFileID  atomic.Int32             // A counter that we use for computing filenames to assign to blobs
 	manifest        []byte                   // Manifest contents, temporary
 	manifestDigest  digest.Digest            // Valid if len(manifest) != 0
 	signatures      []byte                   // Signature contents, temporary
@@ -154,7 +154,7 @@ func (s *storageImageDestination) Close() error {
 }
 
 func (s *storageImageDestination) computeNextBlobCacheFile() string {
-	return filepath.Join(s.directory, fmt.Sprintf("%d", atomic.AddInt32(&s.nextTempFileID, 1)))
+	return filepath.Join(s.directory, fmt.Sprintf("%d", s.nextTempFileID.Add(1)))
 }
 
 // PutBlobWithOptions writes contents of stream and returns data representing the result.
