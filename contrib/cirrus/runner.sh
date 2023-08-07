@@ -20,14 +20,14 @@ fi
 export "PATH=$PATH:$GOPATH/bin"
 
 _run_setup() {
-    req_env_vars SKOPEO_PATH SKOPEO_CI_TAG GOSRC BUILDTAGS
+    req_env_vars SKOPEO_PATH SKOPEO_CI_BRANCH GOSRC BUILDTAGS
 
     project_module=$(go list .)
 
     make tools
 
     rm -rf "${SKOPEO_PATH}"
-    git clone -b ${SKOPEO_CI_TAG} \
+    git clone -b ${SKOPEO_CI_BRANCH} \
         https://github.com/containers/skopeo.git ${SKOPEO_PATH}
 
     cd "${SKOPEO_PATH}"
@@ -37,7 +37,7 @@ _run_setup() {
         git checkout FETCH_HEAD
     fi
 
-    msg "Replacing upstream skopeo $SKOPEO_CI_TAG branch $project_module module"
+    msg "Replacing upstream skopeo $SKOPEO_CI_BRANCH branch $project_module module"
     go mod edit -replace ${project_module}=$GOSRC
 
     "${SKOPEO_PATH}/${SCRIPT_BASE}/runner.sh" setup
