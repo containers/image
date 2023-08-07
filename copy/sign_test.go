@@ -135,10 +135,11 @@ func TestCreateSignatures(t *testing.T) {
 
 		c := &copier{
 			dest:         imagedestination.FromPublic(cc.dest),
+			options:      options,
 			reportWriter: io.Discard,
 		}
 		defer c.close()
-		err := c.setupSigners(options)
+		err := c.setupSigners()
 		require.NoError(t, err, cc.name)
 		sigs, err := c.createSignatures(context.Background(), manifestBlob, identity)
 		switch {

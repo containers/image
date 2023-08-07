@@ -6,7 +6,7 @@ env:
     #### Global variables used for all tasks
     ####
     # Name of the ultimate destination branch for this CI run
-    DEST_BRANCH: "main"
+    DEST_BRANCH: "release-5.26"
     # CI container image tag (c/skopeo branch name)
     SKOPEO_CI_TAG: "release-1.13"
     # Use GO module mirror (reason unknown, travis did it this way)
