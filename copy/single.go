@@ -460,8 +460,14 @@ func (ic *imageCopier) copyLayers(ctx context.Context) ([]compressiontypes.Algor
 		encryptAll = len(*ic.c.options.OciEncryptLayers) == 0
 		totalLayers := len(srcInfos)
 		for _, l := range *ic.c.options.OciEncryptLayers {
-			// if layer is negative, it is reverse indexed.
-			layersToEncrypt.Add((totalLayers + l) % totalLayers)
+			switch {
+			case l >= 0 && l < totalLayers:
+				layersToEncrypt.Add(l)
+			case l < 0 && l+totalLayers >= 0: // Implies (l + totalLayers) < totalLayers
+				layersToEncrypt.Add(l + totalLayers) // If l is negative, it is reverse indexed.
+			default:
+				return nil, fmt.Errorf("when choosing layers to encrypt, layer index %d out of range (%d layers exist)", l, totalLayers)
+			}
 		}
 
 		if encryptAll {
