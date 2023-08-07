@@ -7,8 +7,8 @@ env:
     ####
     # Name of the ultimate destination branch for this CI run
     DEST_BRANCH: "main"
-    # CI container image tag (c/skopeo branch name)
-    SKOPEO_CI_TAG: "main"
+    # c/skopeo branch name which must work with this c/image branch
+    SKOPEO_CI_BRANCH: "main"
     # Use GO module mirror (reason unknown, travis did it this way)
     GOPROXY: https://proxy.golang.org
     # Overrides default location (/tmp/cirrus) for repo clone
