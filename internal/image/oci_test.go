@@ -15,6 +15,7 @@ import (
 	"github.com/containers/image/v5/internal/testing/mocks"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
+	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,47 +30,62 @@ func manifestOCI1FromFixture(t *testing.T, src types.ImageSource, fixture string
 	return m
 }
 
+var layerDescriptorsLikeFixture = []imgspecv1.Descriptor{
+	{
+		MediaType: imgspecv1.MediaTypeImageLayerGzip,
+		Digest:    "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+		Size:      51354364,
+	},
+	{
+		MediaType: imgspecv1.MediaTypeImageLayerGzip,
+		Digest:    "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+		Size:      150,
+	},
+	{
+		MediaType: imgspecv1.MediaTypeImageLayerGzip,
+		Digest:    "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
+		Size:      11739507,
+		URLs: []string{
+			"https://layer.url",
+		},
+	},
+	{
+		MediaType: imgspecv1.MediaTypeImageLayerGzip,
+		Digest:    "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
+		Size:      8841833,
+		Annotations: map[string]string{
+			"test-annotation-2": "two",
+		},
+	},
+	{
+		MediaType: imgspecv1.MediaTypeImageLayerGzip,
+		Digest:    "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
+		Size:      291,
+	},
+}
+
 func manifestOCI1FromComponentsLikeFixture(configBlob []byte) genericManifest {
 	return manifestOCI1FromComponents(imgspecv1.Descriptor{
 		MediaType: imgspecv1.MediaTypeImageConfig,
 		Size:      5940,
-		Digest:    "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f",
+		Digest:    commonFixtureConfigDigest,
 		Annotations: map[string]string{
 			"test-annotation-1": "one",
 		},
-	}, nil, configBlob, []imgspecv1.Descriptor{
-		{
-			MediaType: imgspecv1.MediaTypeImageLayerGzip,
-			Digest:    "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
-			Size:      51354364,
+	}, nil, configBlob, layerDescriptorsLikeFixture)
+}
+
+func manifestOCI1FromComponentsWithExtraConfigFields(t *testing.T, src types.ImageSource) genericManifest {
+	configJSON, err := os.ReadFile("fixtures/oci1-config-extra-fields.json")
+	require.NoError(t, err)
+	return manifestOCI1FromComponents(imgspecv1.Descriptor{
+		MediaType: imgspecv1.MediaTypeImageConfig,
+		Size:      7693,
+		Digest:    "sha256:7f2a783ee2f07826b1856e68a40c930cd0430d6e7d4a88c29c2c8b7718706e74",
+		Annotations: map[string]string{
+			"test-annotation-1": "one",
 		},
-		{
-			MediaType: imgspecv1.MediaTypeImageLayerGzip,
-			Digest:    "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
-			Size:      150,
-		},
-		{
-			MediaType: imgspecv1.MediaTypeImageLayerGzip,
-			Digest:    "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
-			Size:      11739507,
-			URLs: []string{
-				"https://layer.url",
-			},
-		},
-		{
-			MediaType: imgspecv1.MediaTypeImageLayerGzip,
-			Digest:    "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
-			Size:      8841833,
-			Annotations: map[string]string{
-				"test-annotation-2": "two",
-			},
-		},
-		{
-			MediaType: imgspecv1.MediaTypeImageLayerGzip,
-			Digest:    "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
-			Size:      291,
-		},
-	})
+	}, src, configJSON, layerDescriptorsLikeFixture)
 }
 
 func TestManifestOCI1FromManifest(t *testing.T) {
@@ -117,7 +133,7 @@ func TestManifestOCI1ConfigInfo(t *testing.T) {
 	} {
 		assert.Equal(t, types.BlobInfo{
 			Size:   5940,
-			Digest: "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f",
+			Digest: commonFixtureConfigDigest,
 			Annotations: map[string]string{
 				"test-annotation-1": "one",
 			},
@@ -156,7 +172,10 @@ func TestManifestOCI1ConfigBlob(t *testing.T) {
 	} {
 		var src types.ImageSource
 		if c.cbISfn != nil {
-			src = configBlobImageSource{f: c.cbISfn}
+			src = configBlobImageSource{
+				expectedDigest: commonFixtureConfigDigest,
+				f:              c.cbISfn,
+			}
 		} else {
 			src = nil
 		}
@@ -190,10 +209,23 @@ func TestManifestOCI1OCIConfig(t *testing.T) {
 	err = json.Unmarshal(configJSON, &expectedConfig)
 	require.NoError(t, err)
 
-	originalSrc := newOCI1ImageSource(t, "httpd:latest")
+	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd:latest")
 	for _, m := range []genericManifest{
 		manifestOCI1FromFixture(t, originalSrc, "oci1.json"),
 		manifestOCI1FromComponentsLikeFixture(configJSON),
+	} {
+		config, err := m.OCIConfig(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, &expectedConfig, config)
+	}
+
+	// “Any extra fields in the Image JSON struct are considered implementation specific
+	// and MUST NOT generate an error by any implementations which are unable to interpret them.”
+	// oci1-config-extra-fields.json is the same as oci1-config.json, apart from a few added fields.
+	srcWithExtraFields := newOCI1ImageSource(t, "oci1-config-extra-fields.json", "httpd:latest")
+	for _, m := range []genericManifest{
+		manifestOCI1FromFixture(t, srcWithExtraFields, "oci1-extra-config-fields.json"),
+		manifestOCI1FromComponentsWithExtraConfigFields(t, srcWithExtraFields),
 	} {
 		config, err := m.OCIConfig(context.Background())
 		require.NoError(t, err)
@@ -263,67 +295,75 @@ func TestManifestOCI1EmbeddedDockerReferenceConflicts(t *testing.T) {
 }
 
 func TestManifestOCI1Inspect(t *testing.T) {
+	var emptyAnnotations map[string]string
+	created := time.Date(2016, 9, 23, 23, 20, 45, 789764590, time.UTC)
+
 	configJSON, err := os.ReadFile("fixtures/oci1-config.json")
 	require.NoError(t, err)
-	var emptyAnnotations map[string]string
-	m := manifestOCI1FromComponentsLikeFixture(configJSON)
-	ii, err := m.Inspect(context.Background())
-	require.NoError(t, err)
-	created := time.Date(2016, 9, 23, 23, 20, 45, 789764590, time.UTC)
-	assert.Equal(t, types.ImageInspectInfo{
-		Tag:           "",
-		Created:       &created,
-		DockerVersion: "1.12.1",
-		Labels:        map[string]string{},
-		Architecture:  "amd64",
-		Os:            "linux",
-		Layers: []string{
-			"sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
-			"sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
-			"sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
-			"sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
-			"sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
-		},
-		LayersData: []types.ImageInspectLayer{{
-			MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
-			Digest:      "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
-			Size:        51354364,
-			Annotations: emptyAnnotations,
-		}, {
-			MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
-			Digest:      "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
-			Size:        150,
-			Annotations: emptyAnnotations,
-		}, {
-			MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
-			Digest:      "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
-			Size:        11739507,
-			Annotations: emptyAnnotations,
-		}, {
-			MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
-			Digest:      "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
-			Size:        8841833,
-			Annotations: map[string]string{"test-annotation-2": "two"},
-		}, {
-			MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
-			Digest:      "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
-			Size:        291,
-			Annotations: emptyAnnotations,
-		},
-		},
-		Author: "",
-		Env: []string{
-			"PATH=/usr/local/apache2/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-			"HTTPD_PREFIX=/usr/local/apache2",
-			"HTTPD_VERSION=2.4.23",
-			"HTTPD_SHA1=5101be34ac4a509b245adb70a56690a84fcc4e7f",
-			"HTTPD_BZ2_URL=https://www.apache.org/dyn/closer.cgi?action=download&filename=httpd/httpd-2.4.23.tar.bz2",
-			"HTTPD_ASC_URL=https://www.apache.org/dist/httpd/httpd-2.4.23.tar.bz2.asc",
-		},
-	}, *ii)
+	for _, m := range []genericManifest{
+		manifestOCI1FromComponentsLikeFixture(configJSON),
+		// “Any extra fields in the Image JSON struct are considered implementation specific
+		// and MUST NOT generate an error by any implementations which are unable to interpret them.”
+		// oci1-config-extra-fields.json is the same as oci1-config.json, apart from a few added fields.
+		manifestOCI1FromComponentsWithExtraConfigFields(t, nil),
+	} {
+		ii, err := m.Inspect(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, types.ImageInspectInfo{
+			Tag:           "",
+			Created:       &created,
+			DockerVersion: "1.12.1",
+			Labels:        map[string]string{},
+			Architecture:  "amd64",
+			Os:            "linux",
+			Layers: []string{
+				"sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+				"sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+				"sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
+				"sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
+				"sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
+			},
+			LayersData: []types.ImageInspectLayer{{
+				MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
+				Digest:      "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+				Size:        51354364,
+				Annotations: emptyAnnotations,
+			}, {
+				MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
+				Digest:      "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+				Size:        150,
+				Annotations: emptyAnnotations,
+			}, {
+				MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
+				Digest:      "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
+				Size:        11739507,
+				Annotations: emptyAnnotations,
+			}, {
+				MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
+				Digest:      "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
+				Size:        8841833,
+				Annotations: map[string]string{"test-annotation-2": "two"},
+			}, {
+				MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
+				Digest:      "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
+				Size:        291,
+				Annotations: emptyAnnotations,
+			},
+			},
+			Author: "",
+			Env: []string{
+				"PATH=/usr/local/apache2/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+				"HTTPD_PREFIX=/usr/local/apache2",
+				"HTTPD_VERSION=2.4.23",
+				"HTTPD_SHA1=5101be34ac4a509b245adb70a56690a84fcc4e7f",
+				"HTTPD_BZ2_URL=https://www.apache.org/dyn/closer.cgi?action=download&filename=httpd/httpd-2.4.23.tar.bz2",
+				"HTTPD_ASC_URL=https://www.apache.org/dist/httpd/httpd-2.4.23.tar.bz2.asc",
+			},
+		}, *ii)
+	}
 
 	// nil configBlob will trigger an error in m.ConfigBlob()
-	m = manifestOCI1FromComponentsLikeFixture(nil)
+	m := manifestOCI1FromComponentsLikeFixture(nil)
 	_, err = m.Inspect(context.Background())
 	assert.Error(t, err)
 
@@ -353,8 +393,8 @@ func (OCIis *oci1ImageSource) Reference() types.ImageReference {
 	return refImageReferenceMock{ref: OCIis.ref}
 }
 
-func newOCI1ImageSource(t *testing.T, dockerRef string) *oci1ImageSource {
-	realConfigJSON, err := os.ReadFile("fixtures/oci1-config.json")
+func newOCI1ImageSource(t *testing.T, configFixture string, dockerRef string) *oci1ImageSource {
+	realConfigJSON, err := os.ReadFile(filepath.Join("fixtures", configFixture))
 	require.NoError(t, err)
 
 	ref, err := reference.ParseNormalizedNamed(dockerRef)
@@ -362,6 +402,7 @@ func newOCI1ImageSource(t *testing.T, dockerRef string) *oci1ImageSource {
 
 	return &oci1ImageSource{
 		configBlobImageSource: configBlobImageSource{
+			expectedDigest: digest.FromBytes(realConfigJSON),
 			f: func() (io.ReadCloser, int64, error) {
 				return io.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
 			},
@@ -371,7 +412,7 @@ func newOCI1ImageSource(t *testing.T, dockerRef string) *oci1ImageSource {
 }
 
 func TestManifestOCI1UpdatedImage(t *testing.T) {
-	originalSrc := newOCI1ImageSource(t, "httpd:latest")
+	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd:latest")
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
 
 	// LayerInfos:
@@ -432,7 +473,7 @@ func TestManifestOCI1UpdatedImage(t *testing.T) {
 }
 
 func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
-	originalSrc := newOCI1ImageSource(t, "httpd-copy:latest")
+	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd-copy:latest")
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
 	memoryDest := &memoryImageDest{ref: originalSrc.ref}
 	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
@@ -501,7 +542,7 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 }
 
 func TestConvertToManifestSchema2(t *testing.T) {
-	originalSrc := newOCI1ImageSource(t, "httpd-copy:latest")
+	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd-copy:latest")
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
 	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
@@ -529,7 +570,7 @@ func TestConvertToManifestSchema2(t *testing.T) {
 }
 
 func TestConvertToManifestSchema2AllMediaTypes(t *testing.T) {
-	originalSrc := newOCI1ImageSource(t, "httpd-copy:latest")
+	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd-copy:latest")
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1-all-media-types.json")
 	_, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
@@ -538,7 +579,7 @@ func TestConvertToManifestSchema2AllMediaTypes(t *testing.T) {
 }
 
 func TestConvertToV2S2WithInvalidMIMEType(t *testing.T) {
-	originalSrc := newOCI1ImageSource(t, "httpd-copy:latest")
+	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd-copy:latest")
 	manifest, err := os.ReadFile(filepath.Join("fixtures", "oci1-invalid-media-type.json"))
 	require.NoError(t, err)
 

@@ -22,6 +22,8 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+const commonFixtureConfigDigest = "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f"
+
 func manifestSchema2FromFixture(t *testing.T, src types.ImageSource, fixture string, mustFail bool) genericManifest {
 	manifest, err := os.ReadFile(filepath.Join("fixtures", fixture))
 	require.NoError(t, err)
@@ -39,7 +41,7 @@ func manifestSchema2FromComponentsLikeFixture(configBlob []byte) genericManifest
 	return manifestSchema2FromComponents(manifest.Schema2Descriptor{
 		MediaType: "application/octet-stream",
 		Size:      5940,
-		Digest:    "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f",
+		Digest:    commonFixtureConfigDigest,
 	}, nil, configBlob, []manifest.Schema2Descriptor{
 		{
 			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
@@ -114,7 +116,7 @@ func TestManifestSchema2ConfigInfo(t *testing.T) {
 	} {
 		assert.Equal(t, types.BlobInfo{
 			Size:      5940,
-			Digest:    "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f",
+			Digest:    commonFixtureConfigDigest,
 			MediaType: "application/octet-stream",
 		}, m.ConfigInfo())
 	}
@@ -123,11 +125,12 @@ func TestManifestSchema2ConfigInfo(t *testing.T) {
 // configBlobImageSource allows testing various GetBlob behaviors in .ConfigBlob()
 type configBlobImageSource struct {
 	mocks.ForbiddenImageSource // We inherit almost all of the methods, which just panic()
+	expectedDigest             digest.Digest
 	f                          func() (io.ReadCloser, int64, error)
 }
 
 func (f configBlobImageSource) GetBlob(ctx context.Context, info types.BlobInfo, _ types.BlobInfoCache) (io.ReadCloser, int64, error) {
-	if info.Digest.String() != "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f" {
+	if info.Digest != f.expectedDigest {
 		panic("Unexpected digest in GetBlob")
 	}
 	return f.f()
@@ -163,7 +166,10 @@ func TestManifestSchema2ConfigBlob(t *testing.T) {
 	} {
 		var src types.ImageSource
 		if c.cbISfn != nil {
-			src = configBlobImageSource{f: c.cbISfn}
+			src = configBlobImageSource{
+				expectedDigest: commonFixtureConfigDigest,
+				f:              c.cbISfn,
+			}
 		} else {
 			src = nil
 		}
@@ -350,6 +356,7 @@ func newSchema2ImageSource(t *testing.T, dockerRef string) *schema2ImageSource {
 
 	return &schema2ImageSource{
 		configBlobImageSource: configBlobImageSource{
+			expectedDigest: commonFixtureConfigDigest,
 			f: func() (io.ReadCloser, int64, error) {
 				return io.NopCloser(bytes.NewReader(realConfigJSON)), int64(len(realConfigJSON)), nil
 			},
