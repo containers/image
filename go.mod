@@ -31,7 +31,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
 	github.com/sylabs/sif/v2 v2.12.0
-	github.com/theupdateframework/go-tuf v0.5.2
+	github.com/theupdateframework/go-tuf v0.6.1
 	github.com/ulikunitz/xz v0.5.11
 	github.com/vbatts/tar-split v0.11.5
 	github.com/vbauerster/mpb/v8 v8.5.2
