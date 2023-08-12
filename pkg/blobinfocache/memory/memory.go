@@ -114,6 +114,9 @@ func (mem *cache) RecordKnownLocation(transport types.ImageTransport, scope type
 func (mem *cache) RecordDigestCompressorName(blobDigest digest.Digest, compressorName string) {
 	mem.mutex.Lock()
 	defer mem.mutex.Unlock()
+	if previous, ok := mem.compressors[blobDigest]; ok && previous != compressorName {
+		logrus.Warnf("Compressor for blob with digest %s previously recorded as %s, now %s", blobDigest, previous, compressorName)
+	}
 	if compressorName == blobinfocache.UnknownCompression {
 		delete(mem.compressors, blobDigest)
 		return
