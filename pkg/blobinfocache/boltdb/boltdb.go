@@ -23,7 +23,7 @@ var (
 
 	// uncompressedDigestBucket stores a mapping from any digest to an uncompressed digest.
 	uncompressedDigestBucket = []byte("uncompressedDigest")
-	// digestCompressorBucket stores a mapping from any digest to a compressor, or blobinfocache.Uncompressed
+	// digestCompressorBucket stores a mapping from any digest to a compressor, or blobinfocache.Uncompressed (not blobinfocache.UnknownCompression).
 	// It may not exist in caches created by older versions, even if uncompressedDigestBucket is present.
 	digestCompressorBucket = []byte("digestCompressor")
 	// digestByUncompressedBucket stores a bucket per uncompressed digest, with the bucket containing a set of digests for that uncompressed digest
