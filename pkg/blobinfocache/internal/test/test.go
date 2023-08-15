@@ -212,7 +212,9 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 			}
 		}
 
-		// Clear any "known" compression values, except on the first loop where they've never been set
+		// Clear any "known" compression values, except on the first loop where they've never been set.
+		// This probably triggers “Compressor for blob with digest … previously recorded as …, now unknown” warnings here, for test purposes;
+		// that shouldn’t happen in real-world usage.
 		if scopeIndex != 0 {
 			for _, e := range digestNameSet {
 				cache.RecordDigestCompressorName(e.d, blobinfocache.UnknownCompression)
