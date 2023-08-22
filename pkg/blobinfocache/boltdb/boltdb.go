@@ -98,6 +98,11 @@ type cache struct {
 // New returns a BlobInfoCache implementation which uses a BoltDB file at path.
 //
 // Most users should call blobinfocache.DefaultCache instead.
+//
+// Deprecated: The BoltDB implementation triggers a panic() on some database format errors; that does not allow
+// practical error recovery / fallback.
+//
+// Use blobinfocache.DefaultCache if at all possible; if not, the pkg/blobinfocache/sqlite implementation.
 func New(path string) types.BlobInfoCache {
 	return new2(path)
 }
