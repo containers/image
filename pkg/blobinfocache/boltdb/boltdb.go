@@ -105,6 +105,15 @@ func new2(path string) *cache {
 	return &cache{path: path}
 }
 
+// Open() sets up the cache for future accesses, potentially acquiring costly state. Each Open() must be paired with a Close().
+// Note that public callers may call the types.BlobInfoCache operations without Open()/Close().
+func (bdc *cache) Open() {
+}
+
+// Close destroys state created by Open().
+func (bdc *cache) Close() {
+}
+
 // view returns runs the specified fn within a read-only transaction on the database.
 func (bdc *cache) view(fn func(tx *bolt.Tx) error) (retErr error) {
 	// bolt.Open(bdc.path, 0600, &bolt.Options{ReadOnly: true}) will, if the file does not exist,

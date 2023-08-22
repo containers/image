@@ -51,6 +51,15 @@ func new2() *cache {
 	}
 }
 
+// Open() sets up the cache for future accesses, potentially acquiring costly state. Each Open() must be paired with a Close().
+// Note that public callers may call the types.BlobInfoCache operations without Open()/Close().
+func (mem *cache) Open() {
+}
+
+// Close destroys state created by Open().
+func (mem *cache) Close() {
+}
+
 // UncompressedDigest returns an uncompressed digest corresponding to anyDigest.
 // May return anyDigest if it is known to be uncompressed.
 // Returns "" if nothing is known about the digest (it may be compressed or uncompressed).
