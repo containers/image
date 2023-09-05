@@ -185,7 +185,7 @@ func TestParseWithGraphDriverOptions(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ParseReference(%q) returned error %v", "test", err)
 		}
-		if ref == nil {
+		if ref2 == nil {
 			t.Fatalf("ParseReference returned nil reference")
 		}
 		sref, ok := ref2.(*storageReference)
