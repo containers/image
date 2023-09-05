@@ -9,8 +9,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
-	"github.com/containers/image/v5/pkg/blobinfocache/boltdb"
 	"github.com/containers/image/v5/pkg/blobinfocache/memory"
+	"github.com/containers/image/v5/pkg/blobinfocache/sqlite"
 	"github.com/containers/image/v5/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -103,8 +103,10 @@ func TestDefaultCache(t *testing.T) {
 	// Success
 	normalDir := filepath.Join(tmpDir, "normal")
 	c := DefaultCache(&types.SystemContext{BlobInfoCacheDir: normalDir})
-	// This is ugly hard-coding internals of boltDBCache:
-	assert.Equal(t, boltdb.New(filepath.Join(normalDir, blobInfoCacheFilename)), c)
+	// This is ugly hard-coding internals of sqlite.cache
+	sqliteCache, err := sqlite.New(filepath.Join(normalDir, blobInfoCacheFilename))
+	require.NoError(t, err)
+	assert.Equal(t, sqliteCache, c)
 
 	// Error running blobInfoCacheDir:
 	// Use t.Setenv() just as a way to set up cleanup to original values; then os.Unsetenv() to test a situation where the values are not set.
@@ -117,7 +119,7 @@ func TestDefaultCache(t *testing.T) {
 
 	// Error creating the parent directory:
 	unwritableDir := filepath.Join(tmpDir, "unwritable")
-	err := os.Mkdir(unwritableDir, 0700)
+	err = os.Mkdir(unwritableDir, 0700)
 	require.NoError(t, err)
 	defer func() {
 		err = os.Chmod(unwritableDir, 0700) // To make it possible to remove it again

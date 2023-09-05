@@ -23,7 +23,7 @@ var (
 
 	// uncompressedDigestBucket stores a mapping from any digest to an uncompressed digest.
 	uncompressedDigestBucket = []byte("uncompressedDigest")
-	// digestCompressorBucket stores a mapping from any digest to a compressor, or blobinfocache.Uncompressed
+	// digestCompressorBucket stores a mapping from any digest to a compressor, or blobinfocache.Uncompressed (not blobinfocache.UnknownCompression).
 	// It may not exist in caches created by older versions, even if uncompressedDigestBucket is present.
 	digestCompressorBucket = []byte("digestCompressor")
 	// digestByUncompressedBucket stores a bucket per uncompressed digest, with the bucket containing a set of digests for that uncompressed digest
@@ -98,11 +98,25 @@ type cache struct {
 // New returns a BlobInfoCache implementation which uses a BoltDB file at path.
 //
 // Most users should call blobinfocache.DefaultCache instead.
+//
+// Deprecated: The BoltDB implementation triggers a panic() on some database format errors; that does not allow
+// practical error recovery / fallback.
+//
+// Use blobinfocache.DefaultCache if at all possible; if not, the pkg/blobinfocache/sqlite implementation.
 func New(path string) types.BlobInfoCache {
 	return new2(path)
 }
 func new2(path string) *cache {
 	return &cache{path: path}
+}
+
+// Open() sets up the cache for future accesses, potentially acquiring costly state. Each Open() must be paired with a Close().
+// Note that public callers may call the types.BlobInfoCache operations without Open()/Close().
+func (bdc *cache) Open() {
+}
+
+// Close destroys state created by Open().
+func (bdc *cache) Close() {
 }
 
 // view returns runs the specified fn within a read-only transaction on the database.

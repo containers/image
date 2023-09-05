@@ -170,7 +170,7 @@ func TestReferenceNewImageSource(t *testing.T) {
 	require.NoError(t, err)
 	src, err := ref.NewImageSource(context.Background(),
 		&types.SystemContext{RegistriesDirPath: "/this/does/not/exist", DockerPerHostCertDirPath: "/this/does/not/exist"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer src.Close()
 }
 
