@@ -32,8 +32,8 @@ import (
 	"github.com/containers/storage/pkg/reexec"
 	ddigest "github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slices"
 )
 
 var (
@@ -174,28 +174,16 @@ func TestParseWithGraphDriverOptions(t *testing.T) {
 	for _, optionList := range optionLists {
 		store := newStoreWithGraphDriverOptions(t, optionList)
 		ref, err := Transport.ParseStoreReference(store, "test")
-		if err != nil {
-			t.Fatalf("ParseStoreReference(%q, graph driver options %v) returned error %v", "test", optionList, err)
-		}
-		if ref == nil {
-			t.Fatalf("ParseStoreReference returned nil reference")
-		}
+		require.NoError(t, err, optionList)
+		require.NotNil(t, ref)
 		spec := ref.StringWithinTransport()
 		ref2, err := Transport.ParseReference(spec)
-		if err != nil {
-			t.Fatalf("ParseReference(%q) returned error %v", "test", err)
-		}
-		if ref == nil {
-			t.Fatalf("ParseReference returned nil reference")
-		}
+		require.NoError(t, err)
+		require.NotNil(t, ref)
 		sref, ok := ref2.(*storageReference)
-		if !ok {
-			t.Fatalf("ParseReference returned a reference from transport %s, not one of ours", ref2.Transport().Name())
-		}
+		require.True(t, ok, "transport %s", ref2.Transport().Name())
 		parsedOptions := sref.transport.store.GraphOptions()
-		if !slices.Equal(parsedOptions, optionList) {
-			t.Fatalf("Mismatched options: %#v and %#v", optionList, parsedOptions)
-		}
+		assert.Equal(t, optionList, parsedOptions)
 	}
 }
 
