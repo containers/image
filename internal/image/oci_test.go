@@ -538,6 +538,16 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 	var expected manifest.NonImageArtifactError
 	assert.ErrorAs(t, err, &expected)
 
+	// Conversion of an encrypted image fails
+	encrypted := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
+	_, err = encrypted.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
+		InformationOnly: types.ManifestUpdateInformation{
+			Destination: memoryDest,
+		},
+	})
+	assert.Error(t, err)
+
 	// Conversion to schema1 with encryption fails
 	_, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		LayerInfos:       layerInfosWithCryptoOperation(original.LayerInfos(), types.Encrypt),
@@ -575,6 +585,13 @@ func TestConvertToManifestSchema2(t *testing.T) {
 	})
 	var expected manifest.NonImageArtifactError
 	assert.ErrorAs(t, err, &expected)
+
+	// Conversion of an encrypted image fails
+	encrypted := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
+	_, err = encrypted.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
+	})
+	assert.Error(t, err)
 
 	// Conversion to schema2 with encryption fails
 	_, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
