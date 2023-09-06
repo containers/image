@@ -161,7 +161,7 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 		return copySingleImageResult{}, err
 	}
 
-	destRequiresOciEncryption := (isEncrypted(src) && ic.c.options.OciDecryptConfig != nil) || c.options.OciEncryptLayers != nil
+	destRequiresOciEncryption := (isEncrypted(src) && ic.c.options.OciDecryptConfig == nil) || c.options.OciEncryptLayers != nil
 
 	manifestConversionPlan, err := determineManifestConversion(determineManifestConversionInputs{
 		srcMIMEType:                    ic.src.ManifestMIMEType,
