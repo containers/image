@@ -19,6 +19,7 @@ import (
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
 )
 
 func manifestOCI1FromFixture(t *testing.T, src types.ImageSource, fixture string) genericManifest {
@@ -538,6 +539,69 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 	var expected manifest.NonImageArtifactError
 	assert.ErrorAs(t, err, &expected)
 
+	// Conversion of an encrypted image fails
+	encrypted := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
+	_, err = encrypted.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
+		InformationOnly: types.ManifestUpdateInformation{
+			Destination: memoryDest,
+		},
+	})
+	assert.Error(t, err)
+
+	// Conversion to schema1 with encryption fails
+	_, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		LayerInfos:       layerInfosWithCryptoOperation(original.LayerInfos(), types.Encrypt),
+		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
+		InformationOnly: types.ManifestUpdateInformation{
+			Destination: memoryDest,
+		},
+	})
+	assert.Error(t, err)
+
+	// Conversion to schema1 with simultaneous decryption is possible
+	updatedLayers = layerInfosWithCryptoOperation(encrypted.LayerInfos(), types.Decrypt)
+	updatedLayersCopy = slices.Clone(updatedLayers)
+	res, err = encrypted.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		LayerInfos:       updatedLayers,
+		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
+		InformationOnly: types.ManifestUpdateInformation{
+			Destination: memoryDest,
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, updatedLayersCopy, updatedLayers) // updatedLayers have not been modified in place
+	convertedJSON, mt, err = res.Manifest(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, manifest.DockerV2Schema1SignedMediaType, mt)
+	// Layers have been updated as expected
+	s1Manifest, err = manifestSchema1FromManifest(convertedJSON)
+	require.NoError(t, err)
+	assert.Equal(t, []types.BlobInfo{
+		{Digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", Size: -1},
+		{Digest: "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+		{Digest: GzippedEmptyLayerDigest, Size: -1},
+	}, s1Manifest.LayerInfos())
+	// encrypted = the source Image implementation hasn’t been changed by the edits involved in the decrypt+convert+update
+	encrypted2 := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
+	typedEncrypted, ok := encrypted.(*manifestOCI1)
+	require.True(t, ok)
+	typedEncrypted2, ok := encrypted2.(*manifestOCI1)
+	require.True(t, ok)
+	assert.Equal(t, *typedEncrypted2, *typedEncrypted)
+
 	// FIXME? Test also the other failure cases, if only to see that we don't crash?
 }
 
@@ -565,6 +629,73 @@ func TestConvertToManifestSchema2(t *testing.T) {
 	})
 	var expected manifest.NonImageArtifactError
 	assert.ErrorAs(t, err, &expected)
+
+	// Conversion of an encrypted image fails
+	encrypted := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
+	_, err = encrypted.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
+	})
+	assert.Error(t, err)
+
+	// Conversion to schema2 with encryption fails
+	_, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		LayerInfos:       layerInfosWithCryptoOperation(original.LayerInfos(), types.Encrypt),
+		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
+	})
+	assert.Error(t, err)
+
+	// Conversion to schema2 with simultaneous decryption is possible
+	updatedLayers := layerInfosWithCryptoOperation(encrypted.LayerInfos(), types.Decrypt)
+	updatedLayersCopy := slices.Clone(updatedLayers)
+	res, err = encrypted.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		LayerInfos:       updatedLayers,
+		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, updatedLayersCopy, updatedLayers) // updatedLayers have not been modified in place
+	convertedJSON, mt, err = res.Manifest(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, manifest.DockerV2Schema2MediaType, mt)
+	s2Manifest, err := manifestSchema2FromManifest(originalSrc, convertedJSON)
+	require.NoError(t, err)
+	assert.Equal(t, []types.BlobInfo{
+		{
+			Digest:    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			Size:      51354364,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+		},
+		{
+			Digest:    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			Size:      150,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+		},
+		{
+			Digest:    "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+			Size:      11739507,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+			URLs:      []string{"https://layer.url"},
+		},
+		{
+			Digest:    "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+			Size:      8841833,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+		},
+		{
+			Digest:    "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+			Size:      291,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+		},
+	}, s2Manifest.LayerInfos())
+	convertedConfig, err = res.ConfigBlob(context.Background())
+	require.NoError(t, err)
+	assertJSONEqualsFixture(t, convertedConfig, "oci1-to-schema2-config.json")
+	// encrypted = the source Image implementation hasn’t been changed by the edits involved in the decrypt+convert+update
+	encrypted2 := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
+	typedEncrypted, ok := encrypted.(*manifestOCI1)
+	require.True(t, ok)
+	typedEncrypted2, ok := encrypted2.(*manifestOCI1)
+	require.True(t, ok)
+	assert.Equal(t, *typedEncrypted2, *typedEncrypted)
 
 	// FIXME? Test also the other failure cases, if only to see that we don't crash?
 }

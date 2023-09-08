@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containers/image/v5/pkg/compression"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
@@ -175,6 +176,91 @@ func TestSchema1LayerInfos(t *testing.T) {
 		{BlobInfo: types.BlobInfo{Digest: "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4", Size: -1}, EmptyLayer: true},
 		{BlobInfo: types.BlobInfo{Digest: "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4", Size: -1}, EmptyLayer: true},
 	}, m.LayerInfos())
+}
+
+func TestSchema1UpdateLayerInfos(t *testing.T) {
+	for _, c := range []struct {
+		name            string
+		sourceFixture   string
+		updates         []types.BlobInfo
+		expectedFixture string // or "" to indicate an expected failure
+	}{
+		// Many more tests cases could be added here
+		{
+			name:          "uncompressed → gzip encrypted",
+			sourceFixture: "v2s1.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					Size:                 32654,
+					Annotations:          map[string]string{"org.opencontainers.image.enc.…": "layer1"},
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+					CryptoOperation:      types.Encrypt,
+				},
+				{
+					Digest:               "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+					Size:                 16724,
+					Annotations:          map[string]string{"org.opencontainers.image.enc.…": "layer2"},
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+					CryptoOperation:      types.Encrypt,
+				},
+				{
+					Digest:               "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+					Size:                 73109,
+					Annotations:          map[string]string{"org.opencontainers.image.enc.…": "layer2"},
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+					CryptoOperation:      types.Encrypt,
+				},
+			},
+			expectedFixture: "", // Encryption is not supported
+		},
+		{
+			name:          "gzip  → uncompressed decrypted", // We can’t represent encrypted images anyway, but verify that we reject decryption attempts.
+			sourceFixture: "v2s1.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					CompressionOperation: types.Decompress,
+					CryptoOperation:      types.Decrypt,
+				},
+				{
+					Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
+					Size:                 16724,
+					CompressionOperation: types.Decompress,
+					CryptoOperation:      types.Decrypt,
+				},
+				{
+					Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
+					Size:                 73109,
+					CompressionOperation: types.Decompress,
+					CryptoOperation:      types.Decrypt,
+				},
+			},
+			expectedFixture: "", // Decryption is not supported
+		},
+	} {
+		manifest := manifestSchema1FromFixture(t, c.sourceFixture)
+
+		err := manifest.UpdateLayerInfos(c.updates)
+		if c.expectedFixture == "" {
+			assert.Error(t, err, c.name)
+		} else {
+			require.NoError(t, err, c.name)
+
+			updatedManifestBytes, err := manifest.Serialize()
+			require.NoError(t, err, c.name)
+
+			expectedManifest := manifestSchema1FromFixture(t, c.expectedFixture)
+			expectedManifestBytes, err := expectedManifest.Serialize()
+			require.NoError(t, err, c.name)
+
+			assert.Equal(t, string(expectedManifestBytes), string(updatedManifestBytes), c.name)
+		}
+	}
 }
 
 func TestSchema1ImageID(t *testing.T) {

@@ -64,132 +64,202 @@ func TestSchema2FromManifest(t *testing.T) {
 	testValidManifestWithExtraFieldsIsRejected(t, parser, validManifest, []string{"fsLayers", "history", "manifests"})
 }
 
-func TestUpdateLayerInfosV2S2GzipToZstd(t *testing.T) {
-	origManifest := manifestSchema2FromFixture(t, "v2s2.manifest.json")
-	err := origManifest.UpdateLayerInfos([]types.BlobInfo{
+func TestSchema2UpdateLayerInfos(t *testing.T) {
+	for _, c := range []struct {
+		name            string
+		sourceFixture   string
+		updates         []types.BlobInfo
+		expectedFixture string // or "" to indicate an expected failure
+	}{
 		{
-			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-			Size:                 32654,
-			MediaType:            DockerV2Schema2LayerMediaType,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Zstd,
+			name:          "gzip → zstd",
+			sourceFixture: "v2s2.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					MediaType:            DockerV2Schema2LayerMediaType,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Zstd,
+				},
+				{
+					Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
+					Size:                 16724,
+					MediaType:            DockerV2Schema2LayerMediaType,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Zstd,
+				},
+				{
+					Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
+					Size:                 73109,
+					MediaType:            DockerV2Schema2LayerMediaType,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Zstd,
+				},
+			},
+			expectedFixture: "", // zstd is not supported for docker images
 		},
 		{
-			Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
-			Size:                 16724,
-			MediaType:            DockerV2Schema2LayerMediaType,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Zstd,
+			name:          "invalid compression operation",
+			sourceFixture: "v2s2.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					MediaType:            DockerV2Schema2LayerMediaType,
+					CompressionOperation: types.Decompress,
+				},
+				{
+					Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
+					Size:                 16724,
+					MediaType:            DockerV2Schema2LayerMediaType,
+					CompressionOperation: types.Decompress,
+				},
+				{
+					Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
+					Size:                 73109,
+					MediaType:            DockerV2Schema2LayerMediaType,
+					CompressionOperation: 42, // MUST fail here
+				},
+			},
+			expectedFixture: "",
 		},
 		{
-			Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
-			Size:                 73109,
-			MediaType:            DockerV2Schema2LayerMediaType,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Zstd,
-		},
-	})
-	assert.NotNil(t, err) // zstd is not supported for docker images
-}
-
-func TestUpdateLayerInfosV2S2InvalidCompressionOperation(t *testing.T) {
-	origManifest := manifestSchema2FromFixture(t, "v2s2.manifest.json")
-	err := origManifest.UpdateLayerInfos([]types.BlobInfo{
-		{
-			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-			Size:                 32654,
-			MediaType:            DockerV2Schema2LayerMediaType,
-			CompressionOperation: types.Decompress,
-		},
-		{
-			Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
-			Size:                 16724,
-			MediaType:            DockerV2Schema2LayerMediaType,
-			CompressionOperation: types.Decompress,
-		},
-		{
-			Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
-			Size:                 73109,
-			MediaType:            DockerV2Schema2LayerMediaType,
-			CompressionOperation: 42, // MUST fail here
-		},
-	})
-	assert.NotNil(t, err)
-}
-
-func TestUpdateLayerInfosV2S2InvalidCompressionAlgorithm(t *testing.T) {
-	origManifest := manifestSchema2FromFixture(t, "v2s2.manifest.json")
-	err := origManifest.UpdateLayerInfos([]types.BlobInfo{
-		{
-			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-			Size:                 32654,
-			MediaType:            DockerV2Schema2LayerMediaType,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Gzip,
+			name:          "invalid compression algorithm",
+			sourceFixture: "v2s2.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					MediaType:            DockerV2Schema2LayerMediaType,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+				},
+				{
+					Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
+					Size:                 16724,
+					MediaType:            DockerV2Schema2LayerMediaType,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+				},
+				{
+					Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
+					Size:                 73109,
+					MediaType:            DockerV2Schema2LayerMediaType,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Zstd, // MUST fail here
+				},
+			},
+			expectedFixture: "",
 		},
 		{
-			Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
-			Size:                 16724,
-			MediaType:            DockerV2Schema2LayerMediaType,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Gzip,
+			name:          "nondistributable → gzip",
+			sourceFixture: "v2s2.nondistributable.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					MediaType:            DockerV2Schema2ForeignLayerMediaType,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+				},
+			},
+			expectedFixture: "v2s2.nondistributable.gzip.manifest.json",
 		},
 		{
-			Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
-			Size:                 73109,
-			MediaType:            DockerV2Schema2LayerMediaType,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Zstd, // MUST fail here
+			name:          "nondistributable gzip → uncompressed",
+			sourceFixture: "v2s2.nondistributable.gzip.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					MediaType:            DockerV2Schema2ForeignLayerMediaType,
+					CompressionOperation: types.Decompress,
+				},
+			},
+			expectedFixture: "v2s2.nondistributable.manifest.json",
 		},
-	})
-	assert.NotNil(t, err)
-}
-
-func TestUpdateLayerInfosV2S2NondistributableToGzip(t *testing.T) {
-	origManifest := manifestSchema2FromFixture(t, "v2s2.nondistributable.manifest.json")
-
-	err := origManifest.UpdateLayerInfos([]types.BlobInfo{
 		{
-			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-			Size:                 32654,
-			MediaType:            DockerV2Schema2ForeignLayerMediaType,
-			CompressionOperation: types.Compress,
-			CompressionAlgorithm: &compression.Gzip,
+			name:          "uncompressed → gzip encrypted",
+			sourceFixture: "v2s2.uncompressed.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					Size:                 32654,
+					Annotations:          map[string]string{"org.opencontainers.image.enc.…": "layer1"},
+					MediaType:            DockerV2SchemaLayerMediaTypeUncompressed,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+					CryptoOperation:      types.Encrypt,
+				},
+				{
+					Digest:               "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+					Size:                 16724,
+					Annotations:          map[string]string{"org.opencontainers.image.enc.…": "layer2"},
+					MediaType:            DockerV2SchemaLayerMediaTypeUncompressed,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+					CryptoOperation:      types.Encrypt,
+				},
+				{
+					Digest:               "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+					Size:                 73109,
+					Annotations:          map[string]string{"org.opencontainers.image.enc.…": "layer2"},
+					MediaType:            DockerV2SchemaLayerMediaTypeUncompressed,
+					CompressionOperation: types.Compress,
+					CompressionAlgorithm: &compression.Gzip,
+					CryptoOperation:      types.Encrypt,
+				},
+			},
+			expectedFixture: "", // Encryption is not supported
 		},
-	})
-	assert.Nil(t, err)
-
-	updatedManifestBytes, err := origManifest.Serialize()
-	assert.Nil(t, err)
-
-	expectedManifest := manifestSchema2FromFixture(t, "v2s2.nondistributable.gzip.manifest.json")
-	expectedManifestBytes, err := expectedManifest.Serialize()
-	assert.Nil(t, err)
-
-	assert.Equal(t, string(expectedManifestBytes), string(updatedManifestBytes))
-}
-
-func TestUpdateLayerInfosV2S2NondistributableGzipToUncompressed(t *testing.T) {
-	origManifest := manifestSchema2FromFixture(t, "v2s2.nondistributable.gzip.manifest.json")
-
-	err := origManifest.UpdateLayerInfos([]types.BlobInfo{
 		{
-			Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-			Size:                 32654,
-			MediaType:            DockerV2Schema2ForeignLayerMediaType,
-			CompressionOperation: types.Decompress,
+			name:          "gzip  → uncompressed decrypted", // We can’t represent encrypted images anyway, but verify that we reject decryption attempts.
+			sourceFixture: "v2s2.manifest.json",
+			updates: []types.BlobInfo{
+				{
+					Digest:               "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+					Size:                 32654,
+					MediaType:            DockerV2Schema2LayerMediaType,
+					CompressionOperation: types.Decompress,
+					CryptoOperation:      types.Decrypt,
+				},
+				{
+					Digest:               "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
+					Size:                 16724,
+					MediaType:            DockerV2Schema2LayerMediaType,
+					CompressionOperation: types.Decompress,
+					CryptoOperation:      types.Decrypt,
+				},
+				{
+					Digest:               "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
+					Size:                 73109,
+					MediaType:            DockerV2Schema2LayerMediaType,
+					CompressionOperation: types.Decompress,
+					CryptoOperation:      types.Decrypt,
+				},
+			},
+			expectedFixture: "", // Decryption is not supported
 		},
-	})
-	assert.Nil(t, err)
+	} {
+		manifest := manifestSchema2FromFixture(t, c.sourceFixture)
 
-	updatedManifestBytes, err := origManifest.Serialize()
-	assert.Nil(t, err)
+		err := manifest.UpdateLayerInfos(c.updates)
+		if c.expectedFixture == "" {
+			assert.Error(t, err, c.name)
+		} else {
+			require.NoError(t, err, c.name)
 
-	expectedManifest := manifestSchema2FromFixture(t, "v2s2.nondistributable.manifest.json")
-	expectedManifestBytes, err := expectedManifest.Serialize()
-	assert.Nil(t, err)
+			updatedManifestBytes, err := manifest.Serialize()
+			require.NoError(t, err, c.name)
 
-	assert.Equal(t, string(expectedManifestBytes), string(updatedManifestBytes))
+			expectedManifest := manifestSchema2FromFixture(t, c.expectedFixture)
+			expectedManifestBytes, err := expectedManifest.Serialize()
+			require.NoError(t, err, c.name)
+
+			assert.Equal(t, string(expectedManifestBytes), string(updatedManifestBytes), c.name)
+		}
+	}
 }
 
 func TestSchema2ImageID(t *testing.T) {
