@@ -246,9 +246,11 @@ func (ref ociReference) blobPath(digest digest.Digest, sharedBlobDir string) (st
 	if err := digest.Validate(); err != nil {
 		return "", fmt.Errorf("unexpected digest reference %s: %w", digest, err)
 	}
-	blobDir := filepath.Join(ref.dir, imgspecv1.ImageBlobsDir)
+	var blobDir string
 	if sharedBlobDir != "" {
 		blobDir = sharedBlobDir
+	} else {
+		blobDir = filepath.Join(ref.dir, imgspecv1.ImageBlobsDir)
 	}
 	return filepath.Join(blobDir, digest.Algorithm().String(), digest.Hex()), nil
 }
