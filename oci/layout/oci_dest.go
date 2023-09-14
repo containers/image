@@ -84,7 +84,7 @@ func newImageDestination(sys *types.SystemContext, ref ociReference) (private.Im
 	// Per the OCI image specification, layouts MUST have a "blobs" subdirectory,
 	// but it MAY be empty (e.g. if we never end up calling PutBlob)
 	// https://github.com/opencontainers/image-spec/blame/7c889fafd04a893f5c5f50b7ab9963d5d64e5242/image-layout.md#L19
-	if err := ensureDirectoryExists(filepath.Join(d.ref.dir, "blobs")); err != nil {
+	if err := ensureDirectoryExists(filepath.Join(d.ref.dir, imgspecv1.ImageBlobsDir)); err != nil {
 		return nil, err
 	}
 	return d, nil
@@ -283,7 +283,13 @@ func (d *ociImageDestination) addManifest(desc *imgspecv1.Descriptor) {
 // - Uploaded data MAY be visible to others before Commit() is called
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 func (d *ociImageDestination) Commit(context.Context, types.UnparsedImage) error {
-	if err := os.WriteFile(d.ref.ociLayoutPath(), []byte(`{"imageLayoutVersion": "1.0.0"}`), 0644); err != nil {
+	layoutBytes, err := json.Marshal(imgspecv1.ImageLayout{
+		Version: imgspecv1.ImageLayoutVersion,
+	})
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(d.ref.ociLayoutPath(), layoutBytes, 0644); err != nil {
 		return err
 	}
 	indexJSON, err := json.Marshal(d.index)
