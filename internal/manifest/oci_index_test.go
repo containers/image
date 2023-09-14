@@ -86,7 +86,7 @@ func TestOCI1EditInstances(t *testing.T) {
 	list, err = ListFromBlob(validManifest, GuessMIMEType(validManifest))
 	require.NoError(t, err)
 
-	// Verfiy correct zstd sorting
+	// Verify correct zstd sorting
 	editInstances = []ListEdit{}
 	annotations := map[string]string{"io.github.containers.compression.zstd": "true"}
 	// without zstd
@@ -215,7 +215,7 @@ func TestOCI1IndexChooseInstanceByCompression(t *testing.T) {
 		},
 		{
 			listFile: "oci1.index.zstd-selection2.json",
-			// out of list where first instance is gzip , select the first occurance of zstd out of many
+			// out of list where first instance is gzip , select the first occurrence of zstd out of many
 			matchedInstances: []expectedMatch{
 				{"amd64", "", "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", false},
 				{"amd64", "", "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", true},

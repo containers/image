@@ -94,7 +94,7 @@ Finally, two full-store specifiers matching all images in the store are valid sc
 - `[`_graph-root_`]`
 
 Note that some tools like Podman and Buildah hard-code overrides of the signature verification policy for “push” operations,
-allowing these oprations regardless of configuration in `policy.json`.
+allowing these operations regardless of configuration in `policy.json`.
 
 ### `dir:`
 
@@ -165,7 +165,7 @@ The _reference_ annotation value, if any, is not used.
 Supported scopes have the form _repo-path_`:`_image-scope_; _repo_path_ is the path to the OSTree repository.
 
 _image-scope_ is the _docker_reference_ part of the reference, with with a `:latest` tag implied if no tag is present,
-and parent namespaces of the _docker_reference_ value (by omitting the tag, or a prefix speciyfing a higher-level namespace).
+and parent namespaces of the _docker_reference_ value (by omitting the tag, or a prefix specifying a higher-level namespace).
 
 *Note:*
 - The _repo_path_ must be absolute and contain no symlinks. Paths violating these requirements may be silently ignored.

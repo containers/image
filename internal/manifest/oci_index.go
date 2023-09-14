@@ -220,7 +220,7 @@ func (ic instanceCandidate) isPreferredOver(other *instanceCandidate, preferGzip
 	case ic.manifestPosition != other.manifestPosition:
 		return ic.manifestPosition < other.manifestPosition
 	}
-	panic("internal error: invalid comparision between two candidates") // This should not be reachable because in all calls we make, the two candidates differ at least in manifestPosition.
+	panic("internal error: invalid comparison between two candidates") // This should not be reachable because in all calls we make, the two candidates differ at least in manifestPosition.
 }
 
 // chooseInstance is a private equivalent to ChooseInstanceByCompression,

@@ -57,7 +57,7 @@ type cache struct {
 
 	// The database/sql package says “It is rarely necessary to close a DB.”, and steers towards a long-term *sql.DB connection pool.
 	// That’s probably very applicable for database-backed services, where the database is the primary data store. That’s not necessarily
-	// the case for callers of c/image, where image operations might be a small proportion of hte total runtime, and the cache is fairly
+	// the case for callers of c/image, where image operations might be a small proportion of the total runtime, and the cache is fairly
 	// incidental even to the image operations. It’s also hard for us to use that model, because the public BlobInfoCache object doesn’t have
 	// a Close method, so creating a lot of single-use caches could leak data.
 	//
@@ -171,7 +171,7 @@ func transaction[T any](sqc *cache, fn func(tx *sql.Tx) (T, error)) (T, error) {
 
 // dbTransaction calls fn within a read-write transaction in db.
 func dbTransaction[T any](db *sql.DB, fn func(tx *sql.Tx) (T, error)) (T, error) {
-	// Ideally we should be able to distinguish between read-only and read-write transctions, see the _txlock=exclusive dicussion.
+	// Ideally we should be able to distinguish between read-only and read-write transactions, see the _txlock=exclusive dicussion.
 
 	var zeroRes T // A zero value of T
 
@@ -249,7 +249,7 @@ func ensureDBHasCurrentSchema(db *sql.DB) error {
 	// * Joins (the two that exist in appendReplacementCandidates) are based on the text representation of digests.
 	//
 	//   Using integer primary keys might make the joins themselves a bit more efficient, but then we would need to involve an extra
-	//   join to translate from/to the user-provided digests anyway. If anything, that extra join (potentialy more btree lookups)
+	//   join to translate from/to the user-provided digests anyway. If anything, that extra join (potentially more btree lookups)
 	//   is probably costlier than comparing a few more bytes of data.
 	//
 	//   Perhaps more importantly, storing digest texts directly makes the database dumps much easier to read for humans without

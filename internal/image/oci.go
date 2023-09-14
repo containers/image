@@ -212,7 +212,7 @@ func (m *manifestOCI1) prepareLayerDecryptEditsIfNecessary(options *types.Manife
 		return nil, fmt.Errorf("preparing to decrypt before conversion: %d layers vs. %d layer edits", len(originalInfos), len(options.LayerInfos))
 	}
 
-	res := slices.Clone(originalInfos) // Start with a full copy so that we don't forget to copy anything: use the current data in full unless we intentionaly deviate.
+	res := slices.Clone(originalInfos) // Start with a full copy so that we don't forget to copy anything: use the current data in full unless we intentionally deviate.
 	updatedEdits := slices.Clone(options.LayerInfos)
 	for i, info := range options.LayerInfos {
 		if info.CryptoOperation == types.Decrypt {
