@@ -380,8 +380,9 @@ func (ic *imageCopier) compareImageDestinationManifestEqual(ctx context.Context,
 
 	compressionAlgos := set.New[string]()
 	for _, srcInfo := range ic.src.LayerInfos() {
-		compression := compressionAlgorithmFromMIMEType(srcInfo)
-		compressionAlgos.Add(compression.Name())
+		if c := compressionAlgorithmFromMIMEType(srcInfo); c != nil {
+			compressionAlgos.Add(c.Name())
+		}
 	}
 
 	algos, err := algorithmsByNames(compressionAlgos.Values())
