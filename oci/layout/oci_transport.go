@@ -233,12 +233,12 @@ func (ref ociReference) DeleteImage(ctx context.Context, sys *types.SystemContex
 
 // ociLayoutPath returns a path for the oci-layout within a directory using OCI conventions.
 func (ref ociReference) ociLayoutPath() string {
-	return filepath.Join(ref.dir, "oci-layout")
+	return filepath.Join(ref.dir, imgspecv1.ImageLayoutFile)
 }
 
 // indexPath returns a path for the index.json within a directory using OCI conventions.
 func (ref ociReference) indexPath() string {
-	return filepath.Join(ref.dir, "index.json")
+	return filepath.Join(ref.dir, imgspecv1.ImageIndexFile)
 }
 
 // blobPath returns a path for a blob within a directory using OCI image-layout conventions.
@@ -246,9 +246,11 @@ func (ref ociReference) blobPath(digest digest.Digest, sharedBlobDir string) (st
 	if err := digest.Validate(); err != nil {
 		return "", fmt.Errorf("unexpected digest reference %s: %w", digest, err)
 	}
-	blobDir := filepath.Join(ref.dir, "blobs")
+	var blobDir string
 	if sharedBlobDir != "" {
 		blobDir = sharedBlobDir
+	} else {
+		blobDir = filepath.Join(ref.dir, imgspecv1.ImageBlobsDir)
 	}
 	return filepath.Join(blobDir, digest.Algorithm().String(), digest.Hex()), nil
 }
