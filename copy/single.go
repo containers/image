@@ -743,7 +743,9 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 			uploadedBlob, err := ic.c.dest.PutBlobPartial(ctx, &proxy, srcInfo, ic.c.blobInfoCache)
 			if err == nil {
 				if srcInfo.Size != -1 {
-					bar.SetRefill(srcInfo.Size - bar.Current())
+					refill := srcInfo.Size - bar.Current()
+					bar.SetCurrent(srcInfo.Size)
+					bar.SetRefill(refill)
 				}
 				bar.mark100PercentComplete()
 				hideProgressBar = false
