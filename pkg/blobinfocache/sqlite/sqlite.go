@@ -117,7 +117,7 @@ func (sqc *cache) Open() {
 	if sqc.refCount == 0 {
 		db, err := rawOpen(sqc.path)
 		if err != nil {
-			logrus.Warnf("Error opening (previously-succesfully-opened) blob info cache at %q: %v", sqc.path, err)
+			logrus.Warnf("Error opening (previously-successfully-opened) blob info cache at %q: %v", sqc.path, err)
 			db = nil // But still increase sqc.refCount, because a .Close() will happen
 		}
 		sqc.db = db
