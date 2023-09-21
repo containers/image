@@ -469,6 +469,7 @@ type ImageInspectInfo struct {
 	Tag           string
 	Created       *time.Time
 	DockerVersion string
+	Comment       string
 	Labels        map[string]string
 	Architecture  string
 	Variant       string

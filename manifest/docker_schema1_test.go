@@ -358,5 +358,5 @@ func TestSchema1ImageID(t *testing.T) {
 	require.NoError(t, err)
 	// NOTE: This value is dependent on the Schema1.ToSchema2Config implementation, and not necessarily stable over time.
 	// This is mostly a smoke-test; it’s fine to just update this value if that implementation changes.
-	assert.Equal(t, "9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f", id)
+	assert.Equal(t, "ac5a32a5f879a9a808ca5a23449f33df72b73bdf02b6d5ada534950b8b263b6b", id)
 }
