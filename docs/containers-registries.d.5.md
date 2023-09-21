@@ -73,7 +73,7 @@ If no `docker` section can be found for the container image, and no `default-doc
 A single configuration section is selected for a container image using the process
 described above.  The configuration section is a YAML mapping, with the following keys:
 
-<!-- `sigstore` and `sigstore-staging` are deprecated and intentionally not documented here. -->
+[comment]: # (`sigstore` and `sigstore-staging` are deprecated and intentionally not documented here.)
 
 - `lookaside-staging` defines an URL of of the signature storage, used for editing it (adding or deleting signatures).
 

@@ -58,7 +58,8 @@ This is expressed in JSON using the top-level syntax
 The global `default` set of policy requirements is mandatory; all of the other fields
 (`transports` itself, any specific transport, the transport-specific default, etc.) are optional.
 
-<!-- NOTE: Keep this in sync with transports/transports.go! -->
+[comment]: # (NOTE: Keep this in sync with transports/transports.go!)
+
 ## Supported transports and their scopes
 
 See containers-transports(5) for general documentation about the transports and their reference syntax.
@@ -235,7 +236,8 @@ This requirement requires an image to be signed using “simple signing” with 
     "signedIdentity": identity_requirement
 }
 ```
-<!-- Later: other keyType values -->
+
+[comment]: # (Later: other keyType values)
 
 Exactly one of `keyPath`, `keyPaths` and `keyData` must be present, containing a GPG keyring of one or more public keys.  Only signatures made by these keys are accepted.
 
@@ -309,7 +311,7 @@ If the `signedIdentity` field is missing, it is treated as `matchRepoDigestOrExa
 provided by the transport.  In particular, the `dir:` and `oci:` transports can be only
 used with `exactReference` or `exactRepository`.
 
-<!-- ### `signedBaseLayer` -->
+[comment]: # (### `signedBaseLayer`)
 
 
 ### `sigstoreSigned`

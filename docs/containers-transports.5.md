@@ -16,7 +16,7 @@ they are evaluated. For example: if evaluated on a remote server, image names
 might refer to paths on that server; relative paths are relative to the current
 directory of the image consumer.
 
-<!-- atomic: is deprecated and not documented here. -->
+[comment]: # (atomic: is deprecated and not documented here.)
 
 ### **containers-storage**:[**[**storage-specifier**]**]{image-id|docker-reference[@image-id]}
 
@@ -91,7 +91,7 @@ An image using the Singularity image format at _path_.
 
 Only reading images is supported, and not all scripts can be represented in the OCI format.
 
-<!-- tarball: can only usefully be used from Go callers who call tarballReference.ConfigUpdate, and is not documented here. -->
+[comment]: # (tarball: can only usefully be used from Go callers who call tarballReference.ConfigUpdate, and is not documented here.)
 
 ## Examples
 
