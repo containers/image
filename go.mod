@@ -27,7 +27,7 @@ require (
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f
 	github.com/proglottis/gpgme v0.1.3
 	github.com/secure-systems-lab/go-securesystemslib v0.7.0
-	github.com/sigstore/fulcio v1.4.1
+	github.com/sigstore/fulcio v1.4.2
 	github.com/sigstore/rekor v1.2.2
 	github.com/sigstore/sigstore v1.7.3
 	github.com/sirupsen/logrus v1.9.3
@@ -125,7 +125,7 @@ require (
 	golang.org/x/tools v0.14.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230920204549-e6e6cdab5c13 // indirect
-	google.golang.org/grpc v1.58.2 // indirect
+	google.golang.org/grpc v1.58.3 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/go-jose/go-jose.v2 v2.6.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
