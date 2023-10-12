@@ -28,7 +28,7 @@ require (
 	github.com/otiai10/copy v1.12.0
 	github.com/proglottis/gpgme v0.1.3
 	github.com/secure-systems-lab/go-securesystemslib v0.7.0
-	github.com/sigstore/fulcio v1.4.2
+	github.com/sigstore/fulcio v1.4.3
 	github.com/sigstore/rekor v1.2.2
 	github.com/sigstore/sigstore v1.7.3
 	github.com/sirupsen/logrus v1.9.3
@@ -120,7 +120,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.16.0 // indirect
 	go.opentelemetry.io/otel/trace v1.16.0 // indirect
 	golang.org/x/mod v0.13.0 // indirect
-	golang.org/x/net v0.16.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/tools v0.14.0 // indirect
