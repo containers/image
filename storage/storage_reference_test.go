@@ -9,6 +9,9 @@ import (
 	"testing"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/pkg/blobinfocache/memory"
+	"github.com/containers/storage"
+	"github.com/containers/storage/pkg/archive"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -97,14 +100,19 @@ func TestStorageReferenceDockerReference(t *testing.T) {
 	}
 }
 
-func TestStorageReferenceStringWithinTransport(t *testing.T) {
-	store := newStore(t)
+// The […] part of references created for store
+func storeSpecForStringWithinTransport(store storage.Store) string {
 	optionsList := ""
 	options := store.GraphOptions()
 	if len(options) > 0 {
 		optionsList = ":" + strings.Join(options, ",")
 	}
-	storeSpec := fmt.Sprintf("[%s@%s+%s%s]", store.GraphDriverName(), store.GraphRoot(), store.RunRoot(), optionsList)
+	return fmt.Sprintf("[%s@%s+%s%s]", store.GraphDriverName(), store.GraphRoot(), store.RunRoot(), optionsList)
+}
+
+func TestStorageReferenceStringWithinTransport(t *testing.T) {
+	store := newStore(t)
+	storeSpec := storeSpecForStringWithinTransport(store)
 
 	for _, c := range validReferenceTestCases {
 		ref, err := Transport.ParseReference(c.input)
@@ -142,3 +150,47 @@ func TestStorageReferencePolicyConfigurationNamespaces(t *testing.T) {
 }
 
 // NewImage, NewImageSource, NewImageDestination, DeleteImage tested in storage_test.go
+
+func TestResolveReference(t *testing.T) {
+	// This is, so far, only a minimal smoke test
+
+	ensureTestCanCreateImages(t)
+
+	store := newStore(t)
+	storeSpec := storeSpecForStringWithinTransport(store)
+	cache := memory.New()
+
+	id := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+	// Create an image with a known name and ID
+	ref, err := Transport.ParseStoreReference(store, "test@"+id)
+	require.NoError(t, err)
+	createImage(t, ref, cache, []testBlob{makeLayer(t, archive.Gzip)}, nil)
+
+	for _, c := range []struct {
+		input    string
+		expected string // "" on error
+	}{
+		{ // No ID match
+			"@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "",
+		},
+		{"@" + id, "@" + id},                                  // ID-only lookup
+		{"test", "docker.io/library/test:latest@" + id},       // Name is resolved to include ID
+		{"nottest", ""},                                       // No name match
+		{"test@" + id, "docker.io/library/test:latest@" + id}, // Name+ID works, and is unchanged
+		{"nottest@" + id, ""},                                 // Name mismatch is rejected even with an ID
+	} {
+		input, err := Transport.ParseStoreReference(store, c.input)
+		require.NoError(t, err, c.input)
+		inputClone := *input
+		resolved, img, err := ResolveReference(input)
+		if c.expected == "" {
+			assert.Error(t, err, c.input)
+		} else {
+			require.NoError(t, err, c.input)
+			require.Equal(t, &inputClone, input) // input was not modified in-place
+			assert.Equal(t, id, img.ID, c.input)
+			assert.Equal(t, storeSpec+c.expected, resolved.StringWithinTransport(), c.input)
+		}
+	}
+}
