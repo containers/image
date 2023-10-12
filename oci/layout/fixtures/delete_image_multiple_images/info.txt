@@ -1,0 +1,61 @@
+This is tree representation of the fixture to help writing the tests:
+
+7 references in the index, 10 descriptors and 19 blobs in the blob directory
+
+index.json
+│
+├── 3.17.5
+│   └── manifest: 5b2aba4d3c27bc6493633d0ec446b25c8d0a5c9cfe99894bcdff0aee80813805
+│       config:   df11bc189adeb50dadb3291a3a7f2c34b36e0efdba0df70f2c8a2d761b215cde
+│       layers:   986315a0e599fac2b80eb31db2124dab8d3de04d7ca98b254999bd913c1f73fe
+│
+├── 3.18
+│   └── manifest: 93cbd11a4f41467a0409b975499ae711bc6f8222de38d9f1b5a4097583195ad5
+│       config:   913cf3a39d377faf89ed388ad913a318a390488c9f34c46e43424795cdabffe8
+│       layers:   557ac7d133b7770216a8101268640edf4e88beab1b4e1e1bfc9b1891a1cab861
+│
+├── 3
+│   └── manifest: 93cbd11a4f41467a0409b975499ae711bc6f8222de38d9f1b5a4097583195ad5
+│       config:   913cf3a39d377faf89ed388ad913a318a390488c9f34c46e43424795cdabffe8
+│       layers:   557ac7d133b7770216a8101268640edf4e88beab1b4e1e1bfc9b1891a1cab861
+│
+├── 1.0.0
+│   └── manifest: 0dc27f36a618c110ae851662c13283e9fbc1b5a5de003befc4bcefa5a05d2eef
+│       config:   913cf3a39d377faf89ed388ad913a318a390488c9f34c46e43424795cdabffe8
+│       layers:   a6f737ac2b84bc463f2ff721af39588c69646c82f79f3808236178e02e35b922
+│
+├── latest
+│   └── index:    a2f798327b3f25e3eff54badcb769953de235e62e3e32051d57a5e66246de4a1
+│       ├── linux/am64
+│       │   └── manifest: 93cbd11a4f41467a0409b975499ae711bc6f8222de38d9f1b5a4097583195ad5
+│       │       config:   913cf3a39d377faf89ed388ad913a318a390488c9f34c46e43424795cdabffe8
+│       │       layers:   557ac7d133b7770216a8101268640edf4e88beab1b4e1e1bfc9b1891a1cab861
+│       │
+│       └── linux/386
+│           └── manifest: f6d60fd529b234d3e28837e15294d935f55da58ce57c4f9218cad38d0be82ce3
+│               config:   aab808b283c3f654d84358a40ce8766ecd552249305141de88f0ca61f3d1368f
+│               layers:   e19729d5a968c71b4b691d60f4a6f85f93c303bb88635dcfef36e23b76cb7b3a
+│
+├── 3.18.3
+│   └── index:    a2f798327b3f25e3eff54badcb769953de235e62e3e32051d57a5e66246de4a1
+│       ├── linux/am64
+│       │   └── manifest: 93cbd11a4f41467a0409b975499ae711bc6f8222de38d9f1b5a4097583195ad5
+│       │       config:   913cf3a39d377faf89ed388ad913a318a390488c9f34c46e43424795cdabffe8
+│       │       layers:   557ac7d133b7770216a8101268640edf4e88beab1b4e1e1bfc9b1891a1cab861
+│       │
+│       └── linux/386
+│           └── manifest: f6d60fd529b234d3e28837e15294d935f55da58ce57c4f9218cad38d0be82ce3
+│               config:   aab808b283c3f654d84358a40ce8766ecd552249305141de88f0ca61f3d1368f
+│               layers:   e19729d5a968c71b4b691d60f4a6f85f93c303bb88635dcfef36e23b76cb7b3a
+│
+├── 3.16.7
+│   └── index:    861d3c014b0e3edcf80e6221247d6b2921a4f892feb9bafe9515b9975b78c44f
+│       ├── linux/am64
+│       │   └── manifest: 39c524417bb4228f9fcb0aef43a680b5fd6b9f3a1df2fd50509d047e47dad8be
+│       │       config:   f732172ad8d2a666550fa3ec37a5153d59acc95744562ae64cf62ded46de101a
+│       │       layers:   02ea786cb1ff44d997661886a4186cbd8a1dc466938712bf7281379209476022
+│       │
+│       └── linux/386
+│           └── manifest: be6036f9b6a4e120a04868c47f1b8674f58b2fe5e410cba9f585a13ca8946cf0
+│               config:   7ffdfe7d276286b39a203dcc247949cf47c91d2d5e10a53a675c0962ed9e4402
+│               layers:   e2f7e0374fd6a03d9c373f4d9a0c7802045cc3ddcc1433e89d83b81fa7007242

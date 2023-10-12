@@ -1,0 +1,30 @@
+{
+  "created": "2019-08-20T20:19:55.211423266Z",
+  "architecture": "amd64",
+  "os": "linux",
+  "config": {
+    "Env": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    ],
+    "Cmd": [
+      "/bin/sh"
+    ]
+  },
+  "rootfs": {
+    "type": "layers",
+    "diff_ids": [
+      "sha256:03901b4a2ea88eeaad62dbe59b072b28b6efa00491962b8741081c5df50c65e0"
+    ]
+  },
+  "history": [
+    {
+      "created": "2019-08-20T20:19:55.062606894Z",
+      "created_by": "/bin/sh -c #(nop) ADD file:fe64057fbb83dccb960efabbf1cd8777920ef279a7fa8dbca0a8801c651bdf7c in / "
+    },
+    {
+      "created": "2019-08-20T20:19:55.211423266Z",
+      "created_by": "/bin/sh -c #(nop)  CMD [\"/bin/sh\"]",
+      "empty_layer": true
+    }
+  ]
+}
