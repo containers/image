@@ -17,7 +17,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -191,16 +190,16 @@ func systemContext() *types.SystemContext {
 	return &types.SystemContext{}
 }
 
-func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, int64, int64, []byte) {
+// makeLayerGoroutine writes to pwriter, and on success, updates uncompressedCount
+// before it terminates.
+func makeLayerGoroutine(pwriter io.Writer, uncompressedCount *int64, compression archive.Compression) error {
 	var cwriter io.WriteCloser
 	var uncompressed *ioutils.WriteCounter
 	var twriter *tar.Writer
-	preader, pwriter := io.Pipe()
-	tbuffer := bytes.Buffer{}
 	if compression != archive.Uncompressed {
 		compressor, err := archive.CompressStream(pwriter, compression)
 		if err != nil {
-			t.Fatalf("Error compressing layer: %v", err)
+			return fmt.Errorf("compressing layer: %w", err)
 		}
 		cwriter = compressor
 		uncompressed = ioutils.NewWriteCounter(cwriter)
@@ -211,64 +210,65 @@ func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, i
 	buf := make([]byte, layerSize)
 	n, err := rand.Read(buf)
 	if err != nil {
-		t.Fatalf("Error reading tar data: %v", err)
+		return fmt.Errorf("reading tar data: %w", err)
 	}
 	if n != len(buf) {
-		t.Fatalf("Short read reading tar data: %d < %d", n, len(buf))
+		return fmt.Errorf("short read reading tar data: %d < %d", n, len(buf))
 	}
 	for i := 1024; i < 2048; i++ {
 		buf[i] = 0
 	}
 
-	wg := sync.WaitGroup{}
-	errs := make(chan error)
-	wg.Add(1)
-	go func() {
-		defer pwriter.Close()
-		if cwriter != nil {
-			defer cwriter.Close()
-		}
-		defer twriter.Close()
-		err := twriter.WriteHeader(&tar.Header{
-			Name:       "/random-single-file",
-			Mode:       0600,
-			Size:       int64(len(buf)),
-			ModTime:    time.Now(),
-			AccessTime: time.Now(),
-			ChangeTime: time.Now(),
-			Typeflag:   tar.TypeReg,
-		})
-		if err != nil {
-			errs <- fmt.Errorf("Error writing tar header: %v", err)
-		}
-		n, err := twriter.Write(buf)
-		if err != nil {
-			errs <- fmt.Errorf("Error writing tar header: %v", err)
-		}
-		if n != len(buf) {
-			errs <- fmt.Errorf("Short write writing tar header: %d < %d", n, len(buf))
-		}
-		err = twriter.Flush()
-		if err != nil {
-			errs <- fmt.Errorf("Error flushing output to tar archive: %v", err)
-		}
-	}()
-	go func() {
-		wg.Wait()
-		close(errs)
-	}()
-	for err := range errs {
-		if err != nil {
-			t.Fatal(err)
-		}
+	if cwriter != nil {
+		defer cwriter.Close()
 	}
+	defer twriter.Close()
+	err = twriter.WriteHeader(&tar.Header{
+		Name:       "/random-single-file",
+		Mode:       0600,
+		Size:       int64(len(buf)),
+		ModTime:    time.Now(),
+		AccessTime: time.Now(),
+		ChangeTime: time.Now(),
+		Typeflag:   tar.TypeReg,
+	})
+	if err != nil {
+		return fmt.Errorf("Error writing tar header: %w", err)
+	}
+	n, err = twriter.Write(buf)
+	if err != nil {
+		return fmt.Errorf("Error writing tar header: %w", err)
+	}
+	if n != len(buf) {
+		return fmt.Errorf("Short write writing tar header: %d < %d", n, len(buf))
+	}
+	err = twriter.Flush()
+	if err != nil {
+		return fmt.Errorf("Error flushing output to tar archive: %w", err)
+	}
+	*uncompressedCount = uncompressed.Count
+	return nil
+}
 
-	_, err = io.Copy(&tbuffer, preader)
+func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, int64, int64, []byte) {
+	preader, pwriter := io.Pipe()
+	tbuffer := bytes.Buffer{}
+
+	var uncompressedCount int64
+	go func() {
+		err := errors.New("Internal error: unexpected panic in makeLayer")
+		defer func() { // Note that this is not the same as {defer pipeWriter.CloseWithError(err)}; we need err to be evaluated lazily.
+			_ = pwriter.CloseWithError(err)
+		}()
+		err = makeLayerGoroutine(pwriter, &uncompressedCount, compression)
+	}()
+
+	_, err := io.Copy(&tbuffer, preader)
 	if err != nil {
 		t.Fatalf("Error reading layer tar: %v", err)
 	}
 	sum := ddigest.SHA256.FromBytes(tbuffer.Bytes())
-	return sum, uncompressed.Count, int64(tbuffer.Len()), tbuffer.Bytes()
+	return sum, uncompressedCount, int64(tbuffer.Len()), tbuffer.Bytes()
 }
 
 func TestWriteRead(t *testing.T) {
