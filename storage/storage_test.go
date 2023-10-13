@@ -193,20 +193,20 @@ func systemContext() *types.SystemContext {
 // makeLayerGoroutine writes to pwriter, and on success, updates uncompressedCount
 // before it terminates.
 func makeLayerGoroutine(pwriter io.Writer, uncompressedCount *int64, compression archive.Compression) error {
-	var cwriter io.WriteCloser
 	var uncompressed *ioutils.WriteCounter
-	var twriter *tar.Writer
 	if compression != archive.Uncompressed {
 		compressor, err := archive.CompressStream(pwriter, compression)
 		if err != nil {
 			return fmt.Errorf("compressing layer: %w", err)
 		}
-		cwriter = compressor
-		uncompressed = ioutils.NewWriteCounter(cwriter)
+		defer compressor.Close()
+		uncompressed = ioutils.NewWriteCounter(compressor)
 	} else {
 		uncompressed = ioutils.NewWriteCounter(pwriter)
 	}
-	twriter = tar.NewWriter(uncompressed)
+	twriter := tar.NewWriter(uncompressed)
+	defer twriter.Close()
+
 	buf := make([]byte, layerSize)
 	n, err := rand.Read(buf)
 	if err != nil {
@@ -219,11 +219,7 @@ func makeLayerGoroutine(pwriter io.Writer, uncompressedCount *int64, compression
 		buf[i] = 0
 	}
 
-	if cwriter != nil {
-		defer cwriter.Close()
-	}
-	defer twriter.Close()
-	err = twriter.WriteHeader(&tar.Header{
+	if err := twriter.WriteHeader(&tar.Header{
 		Name:       "/random-single-file",
 		Mode:       0600,
 		Size:       int64(len(buf)),
@@ -231,8 +227,7 @@ func makeLayerGoroutine(pwriter io.Writer, uncompressedCount *int64, compression
 		AccessTime: time.Now(),
 		ChangeTime: time.Now(),
 		Typeflag:   tar.TypeReg,
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("Error writing tar header: %w", err)
 	}
 	n, err = twriter.Write(buf)
@@ -242,8 +237,7 @@ func makeLayerGoroutine(pwriter io.Writer, uncompressedCount *int64, compression
 	if n != len(buf) {
 		return fmt.Errorf("Short write writing tar header: %d < %d", n, len(buf))
 	}
-	err = twriter.Flush()
-	if err != nil {
+	if err := twriter.Flush(); err != nil {
 		return fmt.Errorf("Error flushing output to tar archive: %w", err)
 	}
 	*uncompressedCount = uncompressed.Count
@@ -252,8 +246,6 @@ func makeLayerGoroutine(pwriter io.Writer, uncompressedCount *int64, compression
 
 func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, int64, int64, []byte) {
 	preader, pwriter := io.Pipe()
-	tbuffer := bytes.Buffer{}
-
 	var uncompressedCount int64
 	go func() {
 		err := errors.New("Internal error: unexpected panic in makeLayer")
@@ -263,10 +255,9 @@ func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, i
 		err = makeLayerGoroutine(pwriter, &uncompressedCount, compression)
 	}()
 
+	tbuffer := bytes.Buffer{}
 	_, err := io.Copy(&tbuffer, preader)
-	if err != nil {
-		t.Fatalf("Error reading layer tar: %v", err)
-	}
+	require.NoError(t, err)
 	sum := ddigest.SHA256.FromBytes(tbuffer.Bytes())
 	return sum, uncompressedCount, int64(tbuffer.Len()), tbuffer.Bytes()
 }
