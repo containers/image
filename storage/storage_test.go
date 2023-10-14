@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -65,16 +66,21 @@ func newStoreWithGraphDriverOptions(t *testing.T, options []string) storage.Stor
 	wd := t.TempDir()
 	run := filepath.Join(wd, "run")
 	root := filepath.Join(wd, "root")
-	Transport.SetDefaultUIDMap([]idtools.IDMap{{
-		ContainerID: 0,
-		HostID:      os.Getuid(),
-		Size:        1,
-	}})
-	Transport.SetDefaultGIDMap([]idtools.IDMap{{
-		ContainerID: 0,
-		HostID:      os.Getgid(),
-		Size:        1,
-	}})
+	// Due to https://github.com/containers/storage/pull/811 , c/storage can be used on macOS unprivileged,
+	// and this actually causes problems because the PR linked above does not exclude UID changes on some code paths.
+	// This condition should be removed again if https://github.com/containers/storage/pull/1735 is merged.
+	if runtime.GOOS != "darwin" {
+		Transport.SetDefaultUIDMap([]idtools.IDMap{{
+			ContainerID: 0,
+			HostID:      os.Getuid(),
+			Size:        1,
+		}})
+		Transport.SetDefaultGIDMap([]idtools.IDMap{{
+			ContainerID: 0,
+			HostID:      os.Getgid(),
+			Size:        1,
+		}})
+	}
 	store, err := storage.GetStore(storage.StoreOptions{
 		RunRoot:            run,
 		GraphRoot:          root,
@@ -272,8 +278,15 @@ func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, i
 // ensureTestCanCreateImages skips the current test if it is not possible to create layers and images in a private store.
 func ensureTestCanCreateImages(t *testing.T) {
 	t.Helper()
-	if os.Geteuid() != 0 {
-		t.Skip("test requires root privileges")
+	switch runtime.GOOS {
+	case "darwin":
+		return // Due to https://github.com/containers/storage/pull/811 , c/storage can be used on macOS unprivileged.
+	case "linux":
+		if os.Geteuid() != 0 {
+			t.Skip("test requires root privileges on Linux")
+		}
+	default:
+		// Unknown, let’s leave the tests enabled so that this can be investigated when working on that architecture.
 	}
 }
 
