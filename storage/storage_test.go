@@ -15,7 +15,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -316,7 +315,7 @@ func ensureTestCanCreateImages(t *testing.T) {
 }
 
 func createUncommittedImageDest(t *testing.T, ref types.ImageReference, cache types.BlobInfoCache,
-	layers []testBlob) (types.ImageDestination, types.UnparsedImage) {
+	layers []testBlob, config *testBlob) (types.ImageDestination, types.UnparsedImage) {
 	dest, err := ref.NewImageDestination(context.Background(), nil)
 	require.NoError(t, err)
 
@@ -325,8 +324,12 @@ func createUncommittedImageDest(t *testing.T, ref types.ImageReference, cache ty
 		desc := layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
 		layerDescriptors = append(layerDescriptors, desc)
 	}
+	configDescriptor := manifest.Schema2Descriptor{} // might be good enough
+	if config != nil {
+		configDescriptor = config.storeBlob(t, dest, cache, manifest.DockerV2Schema2ConfigMediaType)
+	}
 
-	manifest := manifest.Schema2FromComponents(manifest.Schema2Descriptor{}, layerDescriptors)
+	manifest := manifest.Schema2FromComponents(configDescriptor, layerDescriptors)
 	manifestBytes, err := manifest.Serialize()
 	require.NoError(t, err)
 	err = dest.PutManifest(context.Background(), manifestBytes, nil)
@@ -340,8 +343,9 @@ func createUncommittedImageDest(t *testing.T, ref types.ImageReference, cache ty
 	return dest, &unparsedToplevel
 }
 
-func createImage(t *testing.T, ref types.ImageReference, cache types.BlobInfoCache, layers []testBlob) {
-	dest, unparsedToplevel := createUncommittedImageDest(t, ref, cache, layers)
+func createImage(t *testing.T, ref types.ImageReference, cache types.BlobInfoCache,
+	layers []testBlob, config *testBlob) {
+	dest, unparsedToplevel := createUncommittedImageDest(t, ref, cache, layers, config)
 	err := dest.Commit(context.Background(), unparsedToplevel)
 	require.NoError(t, err)
 	err = dest.Close()
@@ -351,12 +355,14 @@ func createImage(t *testing.T, ref types.ImageReference, cache types.BlobInfoCac
 func TestWriteRead(t *testing.T) {
 	ensureTestCanCreateImages(t)
 
-	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
-	sum := digest.SHA256.FromBytes([]byte(config))
-	configInfo := types.BlobInfo{
-		Digest: sum,
-		Size:   int64(len(config)),
+	configBytes := []byte(`{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`)
+	config := testBlob{
+		compressedDigest: digest.SHA256.FromBytes(configBytes),
+		uncompressedSize: int64(len(configBytes)),
+		compressedSize:   int64(len(configBytes)),
+		data:             configBytes,
 	}
+
 	manifests := []string{
 		//`{
 		//    "schemaVersion": 2,
@@ -412,31 +418,20 @@ func TestWriteRead(t *testing.T) {
 		[]byte("\xA0Signature A"),
 		[]byte("\xA0Signature B"),
 	}
+
 	newStore(t)
-	ref, err := Transport.ParseReference("test")
-	if err != nil {
-		t.Fatalf("ParseReference(%q) returned error %v", "test", err)
-	}
-	if ref == nil {
-		t.Fatalf("ParseReference returned nil reference")
-	}
 	cache := memory.New()
+
+	ref, err := Transport.ParseReference("test")
+	require.NoError(t, err)
 
 	for _, manifestFmt := range manifests {
 		dest, err := ref.NewImageDestination(context.Background(), systemContext())
-		if err != nil {
-			t.Fatalf("NewImageDestination(%q) returned error %v", ref.StringWithinTransport(), err)
-		}
-		if dest == nil {
-			t.Fatalf("NewImageDestination(%q) returned no destination", ref.StringWithinTransport())
-		}
-		if dest.Reference().StringWithinTransport() != ref.StringWithinTransport() {
-			t.Fatalf("NewImageDestination(%q) changed the reference to %q", ref.StringWithinTransport(), dest.Reference().StringWithinTransport())
-		}
+		require.NoError(t, err)
+		require.Equal(t, ref.StringWithinTransport(), dest.Reference().StringWithinTransport())
 		t.Logf("supported manifest MIME types: %v", dest.SupportedManifestMIMETypes())
-		if err := dest.SupportsSignatures(context.Background()); err != nil {
-			t.Fatalf("Destination image doesn't support signatures: %v", err)
-		}
+		err = dest.SupportsSignatures(context.Background())
+		require.NoError(t, err)
 		t.Logf("compress layers: %v", dest.DesiredLayerCompression())
 		compression := archive.Uncompressed
 		if dest.DesiredLayerCompression() == types.Compress {
@@ -445,149 +440,95 @@ func TestWriteRead(t *testing.T) {
 		layer := makeLayer(t, compression)
 		_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
 		t.Logf("Wrote randomly-generated layer %q (%d/%d bytes) to destination", layer.compressedDigest, layer.compressedSize, layer.uncompressedSize)
-		if _, err := dest.PutBlob(context.Background(), strings.NewReader(config), configInfo, cache, false); err != nil {
-			t.Fatalf("Error saving config to destination: %v", err)
-		}
+		_ = config.storeBlob(t, dest, cache, manifest.DockerV2Schema2ConfigMediaType)
+
 		manifest := strings.ReplaceAll(manifestFmt, "%lh", layer.compressedDigest.String())
-		manifest = strings.ReplaceAll(manifest, "%ch", configInfo.Digest.String())
+		manifest = strings.ReplaceAll(manifest, "%ch", config.compressedDigest.String())
 		manifest = strings.ReplaceAll(manifest, "%ls", fmt.Sprintf("%d", layer.compressedSize))
-		manifest = strings.ReplaceAll(manifest, "%cs", fmt.Sprintf("%d", configInfo.Size))
+		manifest = strings.ReplaceAll(manifest, "%cs", fmt.Sprintf("%d", config.compressedSize))
 		manifest = strings.ReplaceAll(manifest, "%li", layer.compressedDigest.Hex())
-		manifest = strings.ReplaceAll(manifest, "%ci", sum.Hex())
+		manifest = strings.ReplaceAll(manifest, "%ci", config.compressedDigest.Hex())
 		t.Logf("this manifest is %q", manifest)
-		if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
-			t.Fatalf("Error saving manifest to destination: %v", err)
-		}
-		if err := dest.PutSignatures(context.Background(), signatures, nil); err != nil {
-			t.Fatalf("Error saving signatures to destination: %v", err)
-		}
+		err = dest.PutManifest(context.Background(), []byte(manifest), nil)
+		require.NoError(t, err)
+		err = dest.PutSignatures(context.Background(), signatures, nil)
+		require.NoError(t, err)
 		unparsedToplevel := unparsedImage{
 			imageReference: nil,
 			manifestBytes:  []byte(manifest),
 			manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
 			signatures:     signatures,
 		}
-		if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
-			t.Fatalf("Error committing changes to destination: %v", err)
-		}
-		dest.Close()
+		err = dest.Commit(context.Background(), &unparsedToplevel)
+		require.NoError(t, err)
+		err = dest.Close()
+		require.NoError(t, err)
 
 		img, err := ref.NewImage(context.Background(), systemContext())
-		if err != nil {
-			t.Fatalf("NewImage(%q) returned error %v", ref.StringWithinTransport(), err)
-		}
+		require.NoError(t, err)
 		imageConfigInfo := img.ConfigInfo()
 		if imageConfigInfo.Digest != "" {
 			blob, err := img.ConfigBlob(context.Background())
-			if err != nil {
-				t.Fatalf("image %q claimed there was a config blob, but couldn't produce it: %v", ref.StringWithinTransport(), err)
-			}
+			require.NoError(t, err)
 			sum := digest.SHA256.FromBytes(blob)
-			if sum != configInfo.Digest {
-				t.Fatalf("image config blob digest for %q doesn't match", ref.StringWithinTransport())
-			}
-			if int64(len(blob)) != configInfo.Size {
-				t.Fatalf("image config size for %q changed from %d to %d", ref.StringWithinTransport(), configInfo.Size, len(blob))
-			}
+			assert.Equal(t, config.compressedDigest, sum)
+			assert.Len(t, blob, int(config.compressedSize))
 		}
 		layerInfos := img.LayerInfos()
-		if layerInfos == nil {
-			t.Fatalf("image for %q returned empty layer list", ref.StringWithinTransport())
-		}
+		assert.NotNil(t, layerInfos)
 		imageInfo, err := img.Inspect(context.Background())
-		if err != nil {
-			t.Fatalf("Inspect(%q) returned error %v", ref.StringWithinTransport(), err)
-		}
-		if imageInfo.Created.IsZero() {
-			t.Fatalf("Image %q claims to have been created at time 0", ref.StringWithinTransport())
-		}
+		require.NoError(t, err)
+		assert.False(t, imageInfo.Created.IsZero())
 
 		src, err := ref.NewImageSource(context.Background(), systemContext())
-		if err != nil {
-			t.Fatalf("NewImageSource(%q) returned error %v", ref.StringWithinTransport(), err)
-		}
-		if src == nil {
-			t.Fatalf("NewImageSource(%q) returned no source", ref.StringWithinTransport())
-		}
-		// Note that we would strip a digest here, but not a tag.
+		require.NoError(t, err)
 		if src.Reference().StringWithinTransport() != ref.StringWithinTransport() {
 			// As long as it's only the addition of an ID suffix, that's okay.
-			if !strings.HasPrefix(src.Reference().StringWithinTransport(), ref.StringWithinTransport()+"@") {
-				t.Fatalf("NewImageSource(%q) changed the reference to %q", ref.StringWithinTransport(), src.Reference().StringWithinTransport())
-			}
+			assert.True(t, strings.HasPrefix(src.Reference().StringWithinTransport(), ref.StringWithinTransport()+"@"))
 		}
 		_, manifestType, err := src.GetManifest(context.Background(), nil)
-		if err != nil {
-			t.Fatalf("GetManifest(%q) returned error %v", ref.StringWithinTransport(), err)
-		}
+		require.NoError(t, err)
 		t.Logf("this manifest's type appears to be %q", manifestType)
-		sum, err = imanifest.Digest([]byte(manifest))
-		if err != nil {
-			t.Fatalf("manifest.Digest() returned error %v", err)
-		}
-		retrieved, _, err := src.GetManifest(context.Background(), &sum)
-		if err != nil {
-			t.Fatalf("GetManifest(%q) with an instanceDigest is supposed to succeed", ref.StringWithinTransport())
-		}
-		if string(retrieved) != manifest {
-			t.Fatalf("GetManifest(%q) with an instanceDigest retrieved a different manifest", ref.StringWithinTransport())
-		}
+		instanceDigest, err := imanifest.Digest([]byte(manifest))
+		require.NoError(t, err)
+		retrieved, _, err := src.GetManifest(context.Background(), &instanceDigest)
+		require.NoError(t, err)
+		assert.Equal(t, manifest, string(retrieved))
 		sigs, err := src.GetSignatures(context.Background(), nil)
-		if err != nil {
-			t.Fatalf("GetSignatures(%q) returned error %v", ref.StringWithinTransport(), err)
-		}
-		if len(sigs) < len(signatures) {
-			t.Fatalf("Lost %d signatures", len(signatures)-len(sigs))
-		}
-		if len(sigs) > len(signatures) {
-			t.Fatalf("Gained %d signatures", len(sigs)-len(signatures))
-		}
-		for i := range sigs {
-			if !bytes.Equal(sigs[i], signatures[i]) {
-				t.Fatalf("Signature %d was corrupted", i)
-			}
-		}
-		sigs2, err := src.GetSignatures(context.Background(), &sum)
-		if err != nil {
-			t.Fatalf("GetSignatures(%q) with instance %s returned error %v", ref.StringWithinTransport(), sum.String(), err)
-		}
-		if !reflect.DeepEqual(sigs, sigs2) {
-			t.Fatalf("GetSignatures(%q) with instance %s returned a different result", ref.StringWithinTransport(), sum.String())
-		}
+		require.NoError(t, err)
+		assert.Equal(t, signatures, sigs)
+		sigs2, err := src.GetSignatures(context.Background(), &instanceDigest)
+		require.NoError(t, err)
+		assert.Equal(t, sigs, sigs2)
 		for _, layerInfo := range layerInfos {
 			buf := bytes.Buffer{}
 			layer, size, err := src.GetBlob(context.Background(), layerInfo, cache)
-			if err != nil {
-				t.Fatalf("Error reading layer %q from %q", layerInfo.Digest, ref.StringWithinTransport())
-			}
+			require.NoError(t, err)
 			t.Logf("Decompressing blob %q, blob size = %d, layerInfo.Size = %d bytes", layerInfo.Digest, size, layerInfo.Size)
 			hasher := sha256.New()
 			compressed := ioutils.NewWriteCounter(hasher)
 			countedLayer := io.TeeReader(layer, compressed)
 			decompressed, err := archive.DecompressStream(countedLayer)
-			if err != nil {
-				t.Fatalf("Error decompressing layer %q from %q", layerInfo.Digest, ref.StringWithinTransport())
-			}
+			require.NoError(t, err)
 			n, err := io.Copy(&buf, decompressed)
 			require.NoError(t, err)
 			layer.Close()
-			if layerInfo.Size >= 0 && compressed.Count != layerInfo.Size {
-				t.Fatalf("Blob size is different than expected: %d != %d, read %d", compressed.Count, layerInfo.Size, n)
+			if layerInfo.Size >= 0 {
+				assert.Equal(t, layerInfo.Size, compressed.Count)
+				assert.Equal(t, layerInfo.Size, n)
 			}
-			if size >= 0 && compressed.Count != size {
-				t.Fatalf("Blob size mismatch: %d != %d, read %d", compressed.Count, size, n)
+			if size >= 0 {
+				assert.Equal(t, size, compressed.Count)
 			}
 			sum := hasher.Sum(nil)
-			if digest.NewDigestFromBytes(digest.SHA256, sum) != layerInfo.Digest {
-				t.Fatalf("Layer blob digest for %q doesn't match", ref.StringWithinTransport())
-			}
+			assert.Equal(t, layerInfo.Digest, digest.NewDigestFromBytes(digest.SHA256, sum))
 		}
-		src.Close()
-		img.Close()
+		err = src.Close()
+		require.NoError(t, err)
+		err = img.Close()
+		require.NoError(t, err)
 		err = ref.DeleteImage(context.Background(), systemContext())
-		if err != nil {
-			t.Fatalf("DeleteImage(%q) returned error %v", ref.StringWithinTransport(), err)
-		}
+		require.NoError(t, err)
 	}
 }
 
@@ -600,8 +541,8 @@ func TestDuplicateName(t *testing.T) {
 	ref, err := Transport.ParseReference("test")
 	require.NoError(t, err)
 
-	createImage(t, ref, cache, []testBlob{makeLayer(t, archive.Uncompressed)})
-	createImage(t, ref, cache, []testBlob{makeLayer(t, archive.Gzip)})
+	createImage(t, ref, cache, []testBlob{makeLayer(t, archive.Uncompressed)}, nil)
+	createImage(t, ref, cache, []testBlob{makeLayer(t, archive.Gzip)}, nil)
 }
 
 func TestDuplicateID(t *testing.T) {
@@ -613,10 +554,10 @@ func TestDuplicateID(t *testing.T) {
 	ref, err := Transport.ParseReference("@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	require.NoError(t, err)
 
-	createImage(t, ref, cache, []testBlob{makeLayer(t, archive.Gzip)})
+	createImage(t, ref, cache, []testBlob{makeLayer(t, archive.Gzip)}, nil)
 
 	dest, unparsedToplevel := createUncommittedImageDest(t, ref, cache,
-		[]testBlob{makeLayer(t, archive.Gzip)})
+		[]testBlob{makeLayer(t, archive.Gzip)}, nil)
 	err = dest.Commit(context.Background(), unparsedToplevel)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, storage.ErrDuplicateID)
@@ -633,10 +574,10 @@ func TestDuplicateNameID(t *testing.T) {
 	ref, err := Transport.ParseReference("test@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	require.NoError(t, err)
 
-	createImage(t, ref, cache, []testBlob{makeLayer(t, archive.Gzip)})
+	createImage(t, ref, cache, []testBlob{makeLayer(t, archive.Gzip)}, nil)
 
 	dest, unparsedToplevel := createUncommittedImageDest(t, ref, cache,
-		[]testBlob{makeLayer(t, archive.Gzip)})
+		[]testBlob{makeLayer(t, archive.Gzip)}, nil)
 	err = dest.Commit(context.Background(), unparsedToplevel)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, storage.ErrDuplicateID)
@@ -686,203 +627,79 @@ func TestNamespaces(t *testing.T) {
 func TestSize(t *testing.T) {
 	ensureTestCanCreateImages(t)
 
-	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
-	sum := digest.SHA256.FromBytes([]byte(config))
-	configInfo := types.BlobInfo{
-		Digest: sum,
-		Size:   int64(len(config)),
-	}
-
 	newStore(t)
 	cache := memory.New()
 
-	ref, err := Transport.ParseReference("test")
-	if err != nil {
-		t.Fatalf("ParseReference(%q) returned error %v", "test", err)
-	}
-	if ref == nil {
-		t.Fatalf("ParseReference returned nil reference")
+	layer1 := makeLayer(t, archive.Gzip)
+	layer2 := makeLayer(t, archive.Gzip)
+	configBytes := []byte(`{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`)
+	config := testBlob{
+		compressedDigest: digest.SHA256.FromBytes(configBytes),
+		uncompressedSize: int64(len(configBytes)),
+		compressedSize:   int64(len(configBytes)),
+		data:             configBytes,
 	}
 
-	dest, err := ref.NewImageDestination(context.Background(), systemContext())
-	if err != nil {
-		t.Fatalf("NewImageDestination(%q) returned error %v", ref.StringWithinTransport(), err)
-	}
-	if dest == nil {
-		t.Fatalf("NewImageDestination(%q) returned no destination", ref.StringWithinTransport())
-	}
-	if _, err := dest.PutBlob(context.Background(), strings.NewReader(config), configInfo, cache, false); err != nil {
-		t.Fatalf("Error saving config to destination: %v", err)
-	}
-	layer1 := makeLayer(t, archive.Gzip)
-	_ = layer1.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
-	layer2 := makeLayer(t, archive.Gzip)
-	_ = layer2.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
-	manifest := fmt.Sprintf(`
-	        {
-		    "schemaVersion": 2,
-		    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-		    "config": {
-			"mediaType": "application/vnd.docker.container.image.v1+json",
-			"size": %d,
-			"digest": "%s"
-		    },
-		    "layers": [
-			{
-			    "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			    "digest": "%s",
-			    "size": %d
-			},
-			{
-			    "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			    "digest": "%s",
-			    "size": %d
-			}
-		    ]
-		}
-	`, configInfo.Size, configInfo.Digest,
-		layer1.compressedDigest, layer1.compressedSize,
-		layer2.compressedDigest, layer2.compressedSize)
-	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
-		t.Fatalf("Error storing manifest to destination: %v", err)
-	}
-	unparsedToplevel := unparsedImage{
-		imageReference: nil,
-		manifestBytes:  []byte(manifest),
-		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
-		signatures:     nil,
-	}
-	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
-		t.Fatalf("Error committing changes to destination: %v", err)
-	}
-	dest.Close()
+	ref, err := Transport.ParseReference("test")
+	require.NoError(t, err)
+
+	createImage(t, ref, cache, []testBlob{layer1, layer2}, &config)
 
 	img, err := ref.NewImage(context.Background(), systemContext())
-	if err != nil {
-		t.Fatalf("NewImage(%q) returned error %v", ref.StringWithinTransport(), err)
-	}
+	require.NoError(t, err)
+	manifest, _, err := img.Manifest(context.Background())
+	require.NoError(t, err)
+
 	usize, err := img.Size()
-	if usize == -1 || err != nil {
-		t.Fatalf("Error calculating image size: %v", err)
-	}
-	if int(usize) != len(config)+int(layer1.uncompressedSize)+int(layer2.uncompressedSize)+2*len(manifest) {
-		t.Fatalf("Unexpected image size: %d != %d + %d + %d + %d (%d)", usize, len(config), layer1.uncompressedSize, layer2.uncompressedSize, len(manifest), len(config)+int(layer1.uncompressedSize)+int(layer2.uncompressedSize)+2*len(manifest))
-	}
-	img.Close()
+	require.NoError(t, err)
+	require.NotEqual(t, -1, usize)
+
+	assert.Equal(t, config.compressedSize+layer1.uncompressedSize+layer2.uncompressedSize+2*int64(len(manifest)), usize)
+	err = img.Close()
+	require.NoError(t, err)
 }
 
 func TestDuplicateBlob(t *testing.T) {
 	ensureTestCanCreateImages(t)
 
-	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
-	sum := digest.SHA256.FromBytes([]byte(config))
-	configInfo := types.BlobInfo{
-		Digest: sum,
-		Size:   int64(len(config)),
-	}
-
 	newStore(t)
 	cache := memory.New()
 
 	ref, err := Transport.ParseReference("test")
-	if err != nil {
-		t.Fatalf("ParseReference(%q) returned error %v", "test", err)
-	}
-	if ref == nil {
-		t.Fatalf("ParseReference returned nil reference")
+	require.NoError(t, err)
+
+	layer1 := makeLayer(t, archive.Gzip)
+	layer2 := makeLayer(t, archive.Gzip)
+	configBytes := []byte(`{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`)
+	config := testBlob{
+		compressedDigest: digest.SHA256.FromBytes(configBytes),
+		uncompressedSize: int64(len(configBytes)),
+		compressedSize:   int64(len(configBytes)),
+		data:             configBytes,
 	}
 
-	dest, err := ref.NewImageDestination(context.Background(), systemContext())
-	if err != nil {
-		t.Fatalf("NewImageDestination(%q) returned error %v", ref.StringWithinTransport(), err)
-	}
-	if dest == nil {
-		t.Fatalf("NewImageDestination(%q) returned no destination", ref.StringWithinTransport())
-	}
-	layer1 := makeLayer(t, archive.Gzip)
-	_ = layer1.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
-	layer2 := makeLayer(t, archive.Gzip)
-	_ = layer2.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
-	_ = layer1.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
-	_ = layer2.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
-	manifest := fmt.Sprintf(`
-	        {
-		    "schemaVersion": 2,
-		    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-		    "config": {
-			"mediaType": "application/vnd.docker.container.image.v1+json",
-			"size": %d,
-			"digest": "%s"
-		    },
-		    "layers": [
-			{
-			    "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			    "digest": "%s",
-			    "size": %d
-			},
-			{
-			    "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			    "digest": "%s",
-			    "size": %d
-			},
-			{
-			    "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			    "digest": "%s",
-			    "size": %d
-			},
-			{
-			    "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			    "digest": "%s",
-			    "size": %d
-			}
-		    ]
-		}
-	`, configInfo.Size, configInfo.Digest, layer1.compressedDigest, layer1.compressedSize, layer2.compressedDigest, layer2.compressedSize, layer1.compressedDigest, layer1.compressedSize, layer2.compressedDigest, layer2.compressedSize)
-	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
-		t.Fatalf("Error storing manifest to destination: %v", err)
-	}
-	unparsedToplevel := unparsedImage{
-		imageReference: nil,
-		manifestBytes:  []byte(manifest),
-		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
-		signatures:     nil,
-	}
-	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
-		t.Fatalf("Error committing changes to destination: %v", err)
-	}
-	dest.Close()
+	createImage(t, ref, cache, []testBlob{layer1, layer2, layer1, layer2}, &config)
 
 	img, err := ref.NewImage(context.Background(), systemContext())
-	if err != nil {
-		t.Fatalf("NewImage(%q) returned error %v", ref.StringWithinTransport(), err)
-	}
+	require.NoError(t, err)
 	src, err := ref.NewImageSource(context.Background(), systemContext())
-	if err != nil {
-		t.Fatalf("NewImageSource(%q) returned error %v", ref.StringWithinTransport(), err)
-	}
+	require.NoError(t, err)
 	source, ok := src.(*storageImageSource)
-	if !ok {
-		t.Fatalf("ImageSource is not a storage image")
-	}
+	require.True(t, ok)
+
 	layers := []string{}
 	layersInfo, err := img.LayerInfosForCopy(context.Background())
-	if err != nil {
-		t.Fatalf("LayerInfosForCopy() returned error %v", err)
-	}
+	require.NoError(t, err)
 	for _, layerInfo := range layersInfo {
 		digestLayers, _ := source.imageRef.transport.store.LayersByUncompressedDigest(layerInfo.Digest)
 		rc, _, layerID, err := source.getBlobAndLayerID(layerInfo.Digest, digestLayers)
-		if err != nil {
-			t.Fatalf("getBlobAndLayerID(%q) returned error %v", layerInfo.Digest, err)
-		}
+		require.NoError(t, err)
 		_, err = io.Copy(io.Discard, rc)
 		require.NoError(t, err)
 		rc.Close()
 		layers = append(layers, layerID)
 	}
-	if len(layers) != 4 {
-		t.Fatalf("Incorrect number of layers: %d", len(layers))
-	}
+	assert.Len(t, layers, 4)
 	for i, layerID := range layers {
 		for j, otherID := range layers {
 			if i != j && layerID == otherID {
@@ -890,8 +707,10 @@ func TestDuplicateBlob(t *testing.T) {
 			}
 		}
 	}
-	src.Close()
-	img.Close()
+	err = src.Close()
+	require.NoError(t, err)
+	err = img.Close()
+	require.NoError(t, err)
 }
 
 type unparsedImage struct {
