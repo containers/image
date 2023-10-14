@@ -330,9 +330,10 @@ func TestWriteRead(t *testing.T) {
 		    ]
 		}`,
 	}
+	// Start signatures with 0xA0 to fool internal/signature.FromBlob into thinking it is valid GPG
 	signatures := [][]byte{
-		[]byte("Signature A"),
-		[]byte("Signature B"),
+		[]byte("\xA0Signature A"),
+		[]byte("\xA0Signature B"),
 	}
 	newStore(t)
 	ref, err := Transport.ParseReference("test")
