@@ -192,10 +192,6 @@ func TestParseWithGraphDriverOptions(t *testing.T) {
 	}
 }
 
-func systemContext() *types.SystemContext {
-	return &types.SystemContext{}
-}
-
 // makeLayerGoroutine writes to pwriter, and on success, updates uncompressedCount
 // before it terminates.
 func makeLayerGoroutine(pwriter io.Writer, uncompressedCount *int64, compression archive.Compression) error {
@@ -426,7 +422,7 @@ func TestWriteRead(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, manifestFmt := range manifests {
-		dest, err := ref.NewImageDestination(context.Background(), systemContext())
+		dest, err := ref.NewImageDestination(context.Background(), nil)
 		require.NoError(t, err)
 		require.Equal(t, ref.StringWithinTransport(), dest.Reference().StringWithinTransport())
 		t.Logf("supported manifest MIME types: %v", dest.SupportedManifestMIMETypes())
@@ -464,7 +460,7 @@ func TestWriteRead(t *testing.T) {
 		err = dest.Close()
 		require.NoError(t, err)
 
-		img, err := ref.NewImage(context.Background(), systemContext())
+		img, err := ref.NewImage(context.Background(), nil)
 		require.NoError(t, err)
 		imageConfigInfo := img.ConfigInfo()
 		if imageConfigInfo.Digest != "" {
@@ -480,7 +476,7 @@ func TestWriteRead(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, imageInfo.Created.IsZero())
 
-		src, err := ref.NewImageSource(context.Background(), systemContext())
+		src, err := ref.NewImageSource(context.Background(), nil)
 		require.NoError(t, err)
 		if src.Reference().StringWithinTransport() != ref.StringWithinTransport() {
 			// As long as it's only the addition of an ID suffix, that's okay.
@@ -527,7 +523,7 @@ func TestWriteRead(t *testing.T) {
 		require.NoError(t, err)
 		err = img.Close()
 		require.NoError(t, err)
-		err = ref.DeleteImage(context.Background(), systemContext())
+		err = ref.DeleteImage(context.Background(), nil)
 		require.NoError(t, err)
 	}
 }
@@ -645,7 +641,7 @@ func TestSize(t *testing.T) {
 
 	createImage(t, ref, cache, []testBlob{layer1, layer2}, &config)
 
-	img, err := ref.NewImage(context.Background(), systemContext())
+	img, err := ref.NewImage(context.Background(), nil)
 	require.NoError(t, err)
 	manifest, _, err := img.Manifest(context.Background())
 	require.NoError(t, err)
@@ -680,9 +676,9 @@ func TestDuplicateBlob(t *testing.T) {
 
 	createImage(t, ref, cache, []testBlob{layer1, layer2, layer1, layer2}, &config)
 
-	img, err := ref.NewImage(context.Background(), systemContext())
+	img, err := ref.NewImage(context.Background(), nil)
 	require.NoError(t, err)
-	src, err := ref.NewImageSource(context.Background(), systemContext())
+	src, err := ref.NewImageSource(context.Background(), nil)
 	require.NoError(t, err)
 	source, ok := src.(*storageImageSource)
 	require.True(t, ok)
