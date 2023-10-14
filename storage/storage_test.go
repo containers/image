@@ -315,6 +315,39 @@ func ensureTestCanCreateImages(t *testing.T) {
 	}
 }
 
+func createUncommittedImageDest(t *testing.T, ref types.ImageReference, cache types.BlobInfoCache,
+	layers []testBlob) (types.ImageDestination, types.UnparsedImage) {
+	dest, err := ref.NewImageDestination(context.Background(), nil)
+	require.NoError(t, err)
+
+	layerDescriptors := []manifest.Schema2Descriptor{}
+	for _, layer := range layers {
+		desc := layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
+		layerDescriptors = append(layerDescriptors, desc)
+	}
+
+	manifest := manifest.Schema2FromComponents(manifest.Schema2Descriptor{}, layerDescriptors)
+	manifestBytes, err := manifest.Serialize()
+	require.NoError(t, err)
+	err = dest.PutManifest(context.Background(), manifestBytes, nil)
+	require.NoError(t, err)
+	unparsedToplevel := unparsedImage{
+		imageReference: nil,
+		manifestBytes:  manifestBytes,
+		manifestType:   manifest.MediaType,
+		signatures:     nil,
+	}
+	return dest, &unparsedToplevel
+}
+
+func createImage(t *testing.T, ref types.ImageReference, cache types.BlobInfoCache, layers []testBlob) {
+	dest, unparsedToplevel := createUncommittedImageDest(t, ref, cache, layers)
+	err := dest.Commit(context.Background(), unparsedToplevel)
+	require.NoError(t, err)
+	err = dest.Close()
+	require.NoError(t, err)
+}
+
 func TestWriteRead(t *testing.T) {
 	ensureTestCanCreateImages(t)
 
@@ -565,84 +598,10 @@ func TestDuplicateName(t *testing.T) {
 	cache := memory.New()
 
 	ref, err := Transport.ParseReference("test")
-	if err != nil {
-		t.Fatalf("ParseReference(%q) returned error %v", "test", err)
-	}
-	if ref == nil {
-		t.Fatalf("ParseReference returned nil reference")
-	}
+	require.NoError(t, err)
 
-	dest, err := ref.NewImageDestination(context.Background(), systemContext())
-	if err != nil {
-		t.Fatalf("NewImageDestination(%q, first pass) returned error %v", ref.StringWithinTransport(), err)
-	}
-	if dest == nil {
-		t.Fatalf("NewImageDestination(%q, first pass) returned no destination", ref.StringWithinTransport())
-	}
-	layer := makeLayer(t, archive.Uncompressed)
-	_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
-	manifestStr := fmt.Sprintf(`
-	        {
-		    "schemaVersion": 2,
-		    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-		    "layers": [
-			{
-			    "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			    "digest": "%s",
-			    "size": %d
-			}
-		    ]
-		}
-	`, layer.compressedDigest, layer.compressedSize)
-	if err := dest.PutManifest(context.Background(), []byte(manifestStr), nil); err != nil {
-		t.Fatalf("Error storing manifest to destination: %v", err)
-	}
-	unparsedToplevel := unparsedImage{
-		imageReference: nil,
-		manifestBytes:  []byte(manifestStr),
-		manifestType:   imanifest.GuessMIMEType([]byte(manifestStr)),
-		signatures:     nil,
-	}
-	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
-		t.Fatalf("Error committing changes to destination, first pass: %v", err)
-	}
-	dest.Close()
-
-	dest, err = ref.NewImageDestination(context.Background(), systemContext())
-	if err != nil {
-		t.Fatalf("NewImageDestination(%q, second pass) returned error %v", ref.StringWithinTransport(), err)
-	}
-	if dest == nil {
-		t.Fatalf("NewImageDestination(%q, second pass) returned no destination", ref.StringWithinTransport())
-	}
-	layer = makeLayer(t, archive.Gzip)
-	_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
-	manifestStr = fmt.Sprintf(`
-	        {
-		    "schemaVersion": 2,
-		    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-		    "layers": [
-			{
-			    "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			    "digest": "%s",
-			    "size": %d
-			}
-		    ]
-		}
-	`, layer.compressedDigest, layer.compressedSize)
-	if err := dest.PutManifest(context.Background(), []byte(manifestStr), nil); err != nil {
-		t.Fatalf("Error storing manifest to destination: %v", err)
-	}
-	unparsedToplevel = unparsedImage{
-		imageReference: nil,
-		manifestBytes:  []byte(manifestStr),
-		manifestType:   imanifest.GuessMIMEType([]byte(manifestStr)),
-		signatures:     nil,
-	}
-	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
-		t.Fatalf("Error committing changes to destination, second pass: %v", err)
-	}
-	dest.Close()
+	createImage(t, ref, cache, []testBlob{makeLayer(t, archive.Uncompressed)})
+	createImage(t, ref, cache, []testBlob{makeLayer(t, archive.Gzip)})
 }
 
 func TestDuplicateID(t *testing.T) {
@@ -652,87 +611,17 @@ func TestDuplicateID(t *testing.T) {
 	cache := memory.New()
 
 	ref, err := Transport.ParseReference("@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-	if err != nil {
-		t.Fatalf("ParseReference(%q) returned error %v", "test", err)
-	}
-	if ref == nil {
-		t.Fatalf("ParseReference returned nil reference")
-	}
+	require.NoError(t, err)
 
-	dest, err := ref.NewImageDestination(context.Background(), systemContext())
-	if err != nil {
-		t.Fatalf("NewImageDestination(%q, first pass) returned error %v", ref.StringWithinTransport(), err)
-	}
-	if dest == nil {
-		t.Fatalf("NewImageDestination(%q, first pass) returned no destination", ref.StringWithinTransport())
-	}
-	layer := makeLayer(t, archive.Gzip)
-	_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
-	manifestStr := fmt.Sprintf(`
-	        {
-		    "schemaVersion": 2,
-		    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-		    "layers": [
-			{
-			    "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			    "digest": "%s",
-			    "size": %d
-			}
-		    ]
-		}
-	`, layer.compressedDigest, layer.compressedSize)
-	if err := dest.PutManifest(context.Background(), []byte(manifestStr), nil); err != nil {
-		t.Fatalf("Error storing manifest to destination: %v", err)
-	}
-	unparsedToplevel := unparsedImage{
-		imageReference: nil,
-		manifestBytes:  []byte(manifestStr),
-		manifestType:   imanifest.GuessMIMEType([]byte(manifestStr)),
-		signatures:     nil,
-	}
-	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
-		t.Fatalf("Error committing changes to destination, first pass: %v", err)
-	}
-	dest.Close()
+	createImage(t, ref, cache, []testBlob{makeLayer(t, archive.Gzip)})
 
-	dest, err = ref.NewImageDestination(context.Background(), systemContext())
-	if err != nil {
-		t.Fatalf("NewImageDestination(%q, second pass) returned error %v", ref.StringWithinTransport(), err)
-	}
-	if dest == nil {
-		t.Fatalf("NewImageDestination(%q, second pass) returned no destination", ref.StringWithinTransport())
-	}
-	layer = makeLayer(t, archive.Gzip)
-	_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
-	manifestStr = fmt.Sprintf(`
-	        {
-		    "schemaVersion": 2,
-		    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-		    "layers": [
-			{
-			    "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			    "digest": "%s",
-			    "size": %d
-			}
-		    ]
-		}
-	`, layer.compressedDigest, layer.compressedSize)
-	if err := dest.PutManifest(context.Background(), []byte(manifestStr), nil); err != nil {
-		t.Fatalf("Error storing manifest to destination: %v", err)
-	}
-	unparsedToplevel = unparsedImage{
-		imageReference: nil,
-		manifestBytes:  []byte(manifestStr),
-		manifestType:   imanifest.GuessMIMEType([]byte(manifestStr)),
-		signatures:     nil,
-	}
-	if err := dest.Commit(context.Background(), &unparsedToplevel); !errors.Is(err, storage.ErrDuplicateID) {
-		if err != nil {
-			t.Fatalf("Wrong error committing changes to destination, second pass: %v", err)
-		}
-		t.Fatal("Incorrectly succeeded committing changes to destination, second pass: no error")
-	}
-	dest.Close()
+	dest, unparsedToplevel := createUncommittedImageDest(t, ref, cache,
+		[]testBlob{makeLayer(t, archive.Gzip)})
+	err = dest.Commit(context.Background(), unparsedToplevel)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, storage.ErrDuplicateID)
+	err = dest.Close()
+	require.NoError(t, err)
 }
 
 func TestDuplicateNameID(t *testing.T) {
@@ -742,87 +631,17 @@ func TestDuplicateNameID(t *testing.T) {
 	cache := memory.New()
 
 	ref, err := Transport.ParseReference("test@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-	if err != nil {
-		t.Fatalf("ParseReference(%q) returned error %v", "test", err)
-	}
-	if ref == nil {
-		t.Fatalf("ParseReference returned nil reference")
-	}
+	require.NoError(t, err)
 
-	dest, err := ref.NewImageDestination(context.Background(), systemContext())
-	if err != nil {
-		t.Fatalf("NewImageDestination(%q, first pass) returned error %v", ref.StringWithinTransport(), err)
-	}
-	if dest == nil {
-		t.Fatalf("NewImageDestination(%q, first pass) returned no destination", ref.StringWithinTransport())
-	}
-	layer := makeLayer(t, archive.Gzip)
-	_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
-	manifestStr := fmt.Sprintf(`
-	        {
-		    "schemaVersion": 2,
-		    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-		    "layers": [
-			{
-			    "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			    "digest": "%s",
-			    "size": %d
-			}
-		    ]
-		}
-	`, layer.compressedDigest, layer.compressedSize)
-	if err := dest.PutManifest(context.Background(), []byte(manifestStr), nil); err != nil {
-		t.Fatalf("Error storing manifest to destination: %v", err)
-	}
-	unparsedToplevel := unparsedImage{
-		imageReference: nil,
-		manifestBytes:  []byte(manifestStr),
-		manifestType:   imanifest.GuessMIMEType([]byte(manifestStr)),
-		signatures:     nil,
-	}
-	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
-		t.Fatalf("Error committing changes to destination, first pass: %v", err)
-	}
-	dest.Close()
+	createImage(t, ref, cache, []testBlob{makeLayer(t, archive.Gzip)})
 
-	dest, err = ref.NewImageDestination(context.Background(), systemContext())
-	if err != nil {
-		t.Fatalf("NewImageDestination(%q, second pass) returned error %v", ref.StringWithinTransport(), err)
-	}
-	if dest == nil {
-		t.Fatalf("NewImageDestination(%q, second pass) returned no destination", ref.StringWithinTransport())
-	}
-	layer = makeLayer(t, archive.Gzip)
-	_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
-	manifestStr = fmt.Sprintf(`
-	        {
-		    "schemaVersion": 2,
-		    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-		    "layers": [
-			{
-			    "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			    "digest": "%s",
-			    "size": %d
-			}
-		    ]
-		}
-	`, layer.compressedDigest, layer.compressedSize)
-	if err := dest.PutManifest(context.Background(), []byte(manifestStr), nil); err != nil {
-		t.Fatalf("Error storing manifest to destination: %v", err)
-	}
-	unparsedToplevel = unparsedImage{
-		imageReference: nil,
-		manifestBytes:  []byte(manifestStr),
-		manifestType:   imanifest.GuessMIMEType([]byte(manifestStr)),
-		signatures:     nil,
-	}
-	if err := dest.Commit(context.Background(), &unparsedToplevel); !errors.Is(err, storage.ErrDuplicateID) {
-		if err != nil {
-			t.Fatalf("Wrong error committing changes to destination, second pass: %v", err)
-		}
-		t.Fatal("Incorrectly succeeded committing changes to destination, second pass: no error")
-	}
-	dest.Close()
+	dest, unparsedToplevel := createUncommittedImageDest(t, ref, cache,
+		[]testBlob{makeLayer(t, archive.Gzip)})
+	err = dest.Commit(context.Background(), unparsedToplevel)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, storage.ErrDuplicateID)
+	err = dest.Close()
+	require.NoError(t, err)
 }
 
 func TestNamespaces(t *testing.T) {
