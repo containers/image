@@ -23,6 +23,7 @@ import (
 
 	imanifest "github.com/containers/image/v5/internal/manifest"
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache/memory"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage"
@@ -30,7 +31,7 @@ import (
 	"github.com/containers/storage/pkg/idtools"
 	"github.com/containers/storage/pkg/ioutils"
 	"github.com/containers/storage/pkg/reexec"
-	ddigest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -257,7 +258,14 @@ func makeLayerGoroutine(pwriter io.Writer, uncompressedCount *int64, compression
 	return nil
 }
 
-func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, int64, int64, []byte) {
+type testBlob struct {
+	compressedDigest digest.Digest
+	uncompressedSize int64
+	compressedSize   int64
+	data             []byte
+}
+
+func makeLayer(t *testing.T, compression archive.Compression) testBlob {
 	preader, pwriter := io.Pipe()
 	var uncompressedCount int64
 	go func() {
@@ -271,8 +279,25 @@ func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, i
 	tbuffer := bytes.Buffer{}
 	_, err := io.Copy(&tbuffer, preader)
 	require.NoError(t, err)
-	sum := ddigest.SHA256.FromBytes(tbuffer.Bytes())
-	return sum, uncompressedCount, int64(tbuffer.Len()), tbuffer.Bytes()
+	return testBlob{
+		compressedDigest: digest.SHA256.FromBytes(tbuffer.Bytes()),
+		uncompressedSize: uncompressedCount,
+		compressedSize:   int64(tbuffer.Len()),
+		data:             tbuffer.Bytes(),
+	}
+}
+
+func (l testBlob) storeBlob(t *testing.T, dest types.ImageDestination, cache types.BlobInfoCache, mimeType string) manifest.Schema2Descriptor {
+	_, err := dest.PutBlob(context.Background(), bytes.NewReader(l.data), types.BlobInfo{
+		Size:   l.compressedSize,
+		Digest: l.compressedDigest,
+	}, cache, false)
+	require.NoError(t, err)
+	return manifest.Schema2Descriptor{
+		MediaType: mimeType,
+		Size:      l.compressedSize,
+		Digest:    l.compressedDigest,
+	}
 }
 
 // ensureTestCanCreateImages skips the current test if it is not possible to create layers and images in a private store.
@@ -294,7 +319,7 @@ func TestWriteRead(t *testing.T) {
 	ensureTestCanCreateImages(t)
 
 	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
-	sum := ddigest.SHA256.FromBytes([]byte(config))
+	sum := digest.SHA256.FromBytes([]byte(config))
 	configInfo := types.BlobInfo{
 		Digest: sum,
 		Size:   int64(len(config)),
@@ -384,23 +409,17 @@ func TestWriteRead(t *testing.T) {
 		if dest.DesiredLayerCompression() == types.Compress {
 			compression = archive.Gzip
 		}
-		digest, decompressedSize, size, blob := makeLayer(t, compression)
-		if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
-			Size:   size,
-			Digest: digest,
-		}, cache, false); err != nil {
-			t.Fatalf("Error saving randomly-generated layer to destination: %v", err)
-		}
-		t.Logf("Wrote randomly-generated layer %q (%d/%d bytes) to destination", digest, size, decompressedSize)
+		layer := makeLayer(t, compression)
+		_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
+		t.Logf("Wrote randomly-generated layer %q (%d/%d bytes) to destination", layer.compressedDigest, layer.compressedSize, layer.uncompressedSize)
 		if _, err := dest.PutBlob(context.Background(), strings.NewReader(config), configInfo, cache, false); err != nil {
 			t.Fatalf("Error saving config to destination: %v", err)
 		}
-		manifest := strings.ReplaceAll(manifestFmt, "%lh", digest.String())
+		manifest := strings.ReplaceAll(manifestFmt, "%lh", layer.compressedDigest.String())
 		manifest = strings.ReplaceAll(manifest, "%ch", configInfo.Digest.String())
-		manifest = strings.ReplaceAll(manifest, "%ls", fmt.Sprintf("%d", size))
+		manifest = strings.ReplaceAll(manifest, "%ls", fmt.Sprintf("%d", layer.compressedSize))
 		manifest = strings.ReplaceAll(manifest, "%cs", fmt.Sprintf("%d", configInfo.Size))
-		li := digest.Hex()
-		manifest = strings.ReplaceAll(manifest, "%li", li)
+		manifest = strings.ReplaceAll(manifest, "%li", layer.compressedDigest.Hex())
 		manifest = strings.ReplaceAll(manifest, "%ci", sum.Hex())
 		t.Logf("this manifest is %q", manifest)
 		if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
@@ -430,7 +449,7 @@ func TestWriteRead(t *testing.T) {
 			if err != nil {
 				t.Fatalf("image %q claimed there was a config blob, but couldn't produce it: %v", ref.StringWithinTransport(), err)
 			}
-			sum := ddigest.SHA256.FromBytes(blob)
+			sum := digest.SHA256.FromBytes(blob)
 			if sum != configInfo.Digest {
 				t.Fatalf("image config blob digest for %q doesn't match", ref.StringWithinTransport())
 			}
@@ -526,7 +545,7 @@ func TestWriteRead(t *testing.T) {
 				t.Fatalf("Blob size mismatch: %d != %d, read %d", compressed.Count, size, n)
 			}
 			sum := hasher.Sum(nil)
-			if ddigest.NewDigestFromBytes(ddigest.SHA256, sum) != layerInfo.Digest {
+			if digest.NewDigestFromBytes(digest.SHA256, sum) != layerInfo.Digest {
 				t.Fatalf("Layer blob digest for %q doesn't match", ref.StringWithinTransport())
 			}
 		}
@@ -560,14 +579,9 @@ func TestDuplicateName(t *testing.T) {
 	if dest == nil {
 		t.Fatalf("NewImageDestination(%q, first pass) returned no destination", ref.StringWithinTransport())
 	}
-	digest, _, size, blob := makeLayer(t, archive.Uncompressed)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
-		Size:   size,
-		Digest: digest,
-	}, cache, false); err != nil {
-		t.Fatalf("Error saving randomly-generated layer to destination, first pass: %v", err)
-	}
-	manifest := fmt.Sprintf(`
+	layer := makeLayer(t, archive.Uncompressed)
+	_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
+	manifestStr := fmt.Sprintf(`
 	        {
 		    "schemaVersion": 2,
 		    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -579,14 +593,14 @@ func TestDuplicateName(t *testing.T) {
 			}
 		    ]
 		}
-	`, digest, size)
-	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
+	`, layer.compressedDigest, layer.compressedSize)
+	if err := dest.PutManifest(context.Background(), []byte(manifestStr), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
 	unparsedToplevel := unparsedImage{
 		imageReference: nil,
-		manifestBytes:  []byte(manifest),
-		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
+		manifestBytes:  []byte(manifestStr),
+		manifestType:   imanifest.GuessMIMEType([]byte(manifestStr)),
 		signatures:     nil,
 	}
 	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
@@ -601,14 +615,9 @@ func TestDuplicateName(t *testing.T) {
 	if dest == nil {
 		t.Fatalf("NewImageDestination(%q, second pass) returned no destination", ref.StringWithinTransport())
 	}
-	digest, _, size, blob = makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
-		Size:   size,
-		Digest: digest,
-	}, cache, false); err != nil {
-		t.Fatalf("Error saving randomly-generated layer to destination, second pass: %v", err)
-	}
-	manifest = fmt.Sprintf(`
+	layer = makeLayer(t, archive.Gzip)
+	_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
+	manifestStr = fmt.Sprintf(`
 	        {
 		    "schemaVersion": 2,
 		    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -620,14 +629,14 @@ func TestDuplicateName(t *testing.T) {
 			}
 		    ]
 		}
-	`, digest, size)
-	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
+	`, layer.compressedDigest, layer.compressedSize)
+	if err := dest.PutManifest(context.Background(), []byte(manifestStr), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
 	unparsedToplevel = unparsedImage{
 		imageReference: nil,
-		manifestBytes:  []byte(manifest),
-		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
+		manifestBytes:  []byte(manifestStr),
+		manifestType:   imanifest.GuessMIMEType([]byte(manifestStr)),
 		signatures:     nil,
 	}
 	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
@@ -657,14 +666,9 @@ func TestDuplicateID(t *testing.T) {
 	if dest == nil {
 		t.Fatalf("NewImageDestination(%q, first pass) returned no destination", ref.StringWithinTransport())
 	}
-	digest, _, size, blob := makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
-		Size:   size,
-		Digest: digest,
-	}, cache, false); err != nil {
-		t.Fatalf("Error saving randomly-generated layer to destination, first pass: %v", err)
-	}
-	manifest := fmt.Sprintf(`
+	layer := makeLayer(t, archive.Gzip)
+	_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
+	manifestStr := fmt.Sprintf(`
 	        {
 		    "schemaVersion": 2,
 		    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -676,14 +680,14 @@ func TestDuplicateID(t *testing.T) {
 			}
 		    ]
 		}
-	`, digest, size)
-	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
+	`, layer.compressedDigest, layer.compressedSize)
+	if err := dest.PutManifest(context.Background(), []byte(manifestStr), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
 	unparsedToplevel := unparsedImage{
 		imageReference: nil,
-		manifestBytes:  []byte(manifest),
-		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
+		manifestBytes:  []byte(manifestStr),
+		manifestType:   imanifest.GuessMIMEType([]byte(manifestStr)),
 		signatures:     nil,
 	}
 	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
@@ -698,14 +702,9 @@ func TestDuplicateID(t *testing.T) {
 	if dest == nil {
 		t.Fatalf("NewImageDestination(%q, second pass) returned no destination", ref.StringWithinTransport())
 	}
-	digest, _, size, blob = makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
-		Size:   size,
-		Digest: digest,
-	}, cache, false); err != nil {
-		t.Fatalf("Error saving randomly-generated layer to destination, second pass: %v", err)
-	}
-	manifest = fmt.Sprintf(`
+	layer = makeLayer(t, archive.Gzip)
+	_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
+	manifestStr = fmt.Sprintf(`
 	        {
 		    "schemaVersion": 2,
 		    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -717,14 +716,14 @@ func TestDuplicateID(t *testing.T) {
 			}
 		    ]
 		}
-	`, digest, size)
-	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
+	`, layer.compressedDigest, layer.compressedSize)
+	if err := dest.PutManifest(context.Background(), []byte(manifestStr), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
 	unparsedToplevel = unparsedImage{
 		imageReference: nil,
-		manifestBytes:  []byte(manifest),
-		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
+		manifestBytes:  []byte(manifestStr),
+		manifestType:   imanifest.GuessMIMEType([]byte(manifestStr)),
 		signatures:     nil,
 	}
 	if err := dest.Commit(context.Background(), &unparsedToplevel); !errors.Is(err, storage.ErrDuplicateID) {
@@ -757,14 +756,9 @@ func TestDuplicateNameID(t *testing.T) {
 	if dest == nil {
 		t.Fatalf("NewImageDestination(%q, first pass) returned no destination", ref.StringWithinTransport())
 	}
-	digest, _, size, blob := makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
-		Size:   size,
-		Digest: digest,
-	}, cache, false); err != nil {
-		t.Fatalf("Error saving randomly-generated layer to destination, first pass: %v", err)
-	}
-	manifest := fmt.Sprintf(`
+	layer := makeLayer(t, archive.Gzip)
+	_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
+	manifestStr := fmt.Sprintf(`
 	        {
 		    "schemaVersion": 2,
 		    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -776,14 +770,14 @@ func TestDuplicateNameID(t *testing.T) {
 			}
 		    ]
 		}
-	`, digest, size)
-	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
+	`, layer.compressedDigest, layer.compressedSize)
+	if err := dest.PutManifest(context.Background(), []byte(manifestStr), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
 	unparsedToplevel := unparsedImage{
 		imageReference: nil,
-		manifestBytes:  []byte(manifest),
-		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
+		manifestBytes:  []byte(manifestStr),
+		manifestType:   imanifest.GuessMIMEType([]byte(manifestStr)),
 		signatures:     nil,
 	}
 	if err := dest.Commit(context.Background(), &unparsedToplevel); err != nil {
@@ -798,14 +792,9 @@ func TestDuplicateNameID(t *testing.T) {
 	if dest == nil {
 		t.Fatalf("NewImageDestination(%q, second pass) returned no destination", ref.StringWithinTransport())
 	}
-	digest, _, size, blob = makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
-		Size:   size,
-		Digest: digest,
-	}, cache, false); err != nil {
-		t.Fatalf("Error saving randomly-generated layer to destination, second pass: %v", err)
-	}
-	manifest = fmt.Sprintf(`
+	layer = makeLayer(t, archive.Gzip)
+	_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
+	manifestStr = fmt.Sprintf(`
 	        {
 		    "schemaVersion": 2,
 		    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -817,14 +806,14 @@ func TestDuplicateNameID(t *testing.T) {
 			}
 		    ]
 		}
-	`, digest, size)
-	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
+	`, layer.compressedDigest, layer.compressedSize)
+	if err := dest.PutManifest(context.Background(), []byte(manifestStr), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
 	unparsedToplevel = unparsedImage{
 		imageReference: nil,
-		manifestBytes:  []byte(manifest),
-		manifestType:   imanifest.GuessMIMEType([]byte(manifest)),
+		manifestBytes:  []byte(manifestStr),
+		manifestType:   imanifest.GuessMIMEType([]byte(manifestStr)),
 		signatures:     nil,
 	}
 	if err := dest.Commit(context.Background(), &unparsedToplevel); !errors.Is(err, storage.ErrDuplicateID) {
@@ -879,7 +868,7 @@ func TestSize(t *testing.T) {
 	ensureTestCanCreateImages(t)
 
 	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
-	sum := ddigest.SHA256.FromBytes([]byte(config))
+	sum := digest.SHA256.FromBytes([]byte(config))
 	configInfo := types.BlobInfo{
 		Digest: sum,
 		Size:   int64(len(config)),
@@ -906,20 +895,10 @@ func TestSize(t *testing.T) {
 	if _, err := dest.PutBlob(context.Background(), strings.NewReader(config), configInfo, cache, false); err != nil {
 		t.Fatalf("Error saving config to destination: %v", err)
 	}
-	digest1, usize1, size1, blob := makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
-		Size:   size1,
-		Digest: digest1,
-	}, cache, false); err != nil {
-		t.Fatalf("Error saving randomly-generated layer 1 to destination: %v", err)
-	}
-	digest2, usize2, size2, blob := makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob), types.BlobInfo{
-		Size:   size2,
-		Digest: digest2,
-	}, cache, false); err != nil {
-		t.Fatalf("Error saving randomly-generated layer 2 to destination: %v", err)
-	}
+	layer1 := makeLayer(t, archive.Gzip)
+	_ = layer1.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
+	layer2 := makeLayer(t, archive.Gzip)
+	_ = layer2.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
 	manifest := fmt.Sprintf(`
 	        {
 		    "schemaVersion": 2,
@@ -942,7 +921,9 @@ func TestSize(t *testing.T) {
 			}
 		    ]
 		}
-	`, configInfo.Size, configInfo.Digest, digest1, size1, digest2, size2)
+	`, configInfo.Size, configInfo.Digest,
+		layer1.compressedDigest, layer1.compressedSize,
+		layer2.compressedDigest, layer2.compressedSize)
 	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
@@ -965,8 +946,8 @@ func TestSize(t *testing.T) {
 	if usize == -1 || err != nil {
 		t.Fatalf("Error calculating image size: %v", err)
 	}
-	if int(usize) != len(config)+int(usize1)+int(usize2)+2*len(manifest) {
-		t.Fatalf("Unexpected image size: %d != %d + %d + %d + %d (%d)", usize, len(config), usize1, usize2, len(manifest), len(config)+int(usize1)+int(usize2)+2*len(manifest))
+	if int(usize) != len(config)+int(layer1.uncompressedSize)+int(layer2.uncompressedSize)+2*len(manifest) {
+		t.Fatalf("Unexpected image size: %d != %d + %d + %d + %d (%d)", usize, len(config), layer1.uncompressedSize, layer2.uncompressedSize, len(manifest), len(config)+int(layer1.uncompressedSize)+int(layer2.uncompressedSize)+2*len(manifest))
 	}
 	img.Close()
 }
@@ -975,7 +956,7 @@ func TestDuplicateBlob(t *testing.T) {
 	ensureTestCanCreateImages(t)
 
 	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
-	sum := ddigest.SHA256.FromBytes([]byte(config))
+	sum := digest.SHA256.FromBytes([]byte(config))
 	configInfo := types.BlobInfo{
 		Digest: sum,
 		Size:   int64(len(config)),
@@ -999,32 +980,12 @@ func TestDuplicateBlob(t *testing.T) {
 	if dest == nil {
 		t.Fatalf("NewImageDestination(%q) returned no destination", ref.StringWithinTransport())
 	}
-	digest1, _, size1, blob1 := makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob1), types.BlobInfo{
-		Size:   size1,
-		Digest: digest1,
-	}, cache, false); err != nil {
-		t.Fatalf("Error saving randomly-generated layer 1 to destination (first copy): %v", err)
-	}
-	digest2, _, size2, blob2 := makeLayer(t, archive.Gzip)
-	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob2), types.BlobInfo{
-		Size:   size2,
-		Digest: digest2,
-	}, cache, false); err != nil {
-		t.Fatalf("Error saving randomly-generated layer 2 to destination (first copy): %v", err)
-	}
-	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob1), types.BlobInfo{
-		Size:   size1,
-		Digest: digest1,
-	}, cache, false); err != nil {
-		t.Fatalf("Error saving randomly-generated layer 1 to destination (second copy): %v", err)
-	}
-	if _, err := dest.PutBlob(context.Background(), bytes.NewReader(blob2), types.BlobInfo{
-		Size:   size2,
-		Digest: digest2,
-	}, cache, false); err != nil {
-		t.Fatalf("Error saving randomly-generated layer 2 to destination (second copy): %v", err)
-	}
+	layer1 := makeLayer(t, archive.Gzip)
+	_ = layer1.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
+	layer2 := makeLayer(t, archive.Gzip)
+	_ = layer2.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
+	_ = layer1.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
+	_ = layer2.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
 	manifest := fmt.Sprintf(`
 	        {
 		    "schemaVersion": 2,
@@ -1057,7 +1018,7 @@ func TestDuplicateBlob(t *testing.T) {
 			}
 		    ]
 		}
-	`, configInfo.Size, configInfo.Digest, digest1, size1, digest2, size2, digest1, size1, digest2, size2)
+	`, configInfo.Size, configInfo.Digest, layer1.compressedDigest, layer1.compressedSize, layer2.compressedDigest, layer2.compressedSize, layer1.compressedDigest, layer1.compressedSize, layer2.compressedDigest, layer2.compressedSize)
 	if err := dest.PutManifest(context.Background(), []byte(manifest), nil); err != nil {
 		t.Fatalf("Error storing manifest to destination: %v", err)
 	}
