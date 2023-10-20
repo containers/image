@@ -196,12 +196,16 @@ func (m *manifestOCI1) convertToManifestSchema2Generic(ctx context.Context, opti
 	return m.convertToManifestSchema2(ctx, options)
 }
 
-// prepareLayerDecryptEditsIfNecessary checks if options requires layer decryptions.
+// layerEditsOfOCIOnlyFeatures checks if options requires some layer edits to be done before converting to a Docker format.
 // If not, it returns (nil, nil).
 // If decryption is required, it returns a set of edits to provide to OCI1.UpdateLayerInfos,
 // and edits *options to not try decryption again.
-func (m *manifestOCI1) prepareLayerDecryptEditsIfNecessary(options *types.ManifestUpdateOptions) ([]types.BlobInfo, error) {
-	if options == nil || !slices.ContainsFunc(options.LayerInfos, func(info types.BlobInfo) bool {
+func (m *manifestOCI1) layerEditsOfOCIOnlyFeatures(options *types.ManifestUpdateOptions) ([]types.BlobInfo, error) {
+	if options == nil {
+		return nil, nil
+	}
+
+	if !slices.ContainsFunc(options.LayerInfos, func(info types.BlobInfo) bool {
 		return info.CryptoOperation == types.Decrypt
 	}) {
 		return nil, nil
@@ -212,19 +216,19 @@ func (m *manifestOCI1) prepareLayerDecryptEditsIfNecessary(options *types.Manife
 		return nil, fmt.Errorf("preparing to decrypt before conversion: %d layers vs. %d layer edits", len(originalInfos), len(options.LayerInfos))
 	}
 
-	res := slices.Clone(originalInfos) // Start with a full copy so that we don't forget to copy anything: use the current data in full unless we intentionally deviate.
-	updatedEdits := slices.Clone(options.LayerInfos)
-	for i, info := range options.LayerInfos {
-		if info.CryptoOperation == types.Decrypt {
-			res[i].CryptoOperation = types.Decrypt
-			updatedEdits[i].CryptoOperation = types.PreserveOriginalCrypto // Don't try to decrypt in a schema[12] manifest later, that would fail.
+	ociOnlyEdits := slices.Clone(originalInfos) // Start with a full copy so that we don't forget to copy anything: use the current data in full unless we intentionally deviate.
+	laterEdits := slices.Clone(options.LayerInfos)
+	for i, edit := range options.LayerInfos {
+		if edit.CryptoOperation == types.Decrypt {
+			ociOnlyEdits[i].CryptoOperation = types.Decrypt
+			laterEdits[i].CryptoOperation = types.PreserveOriginalCrypto // Don't try to decrypt in a schema[12] manifest later, that would fail.
 		}
 		// Don't do any compression-related MIME type conversions. m.LayerInfos() should not set these edit instructions, but be explicit.
-		res[i].CompressionOperation = types.PreserveOriginal
-		res[i].CompressionAlgorithm = nil
+		ociOnlyEdits[i].CompressionOperation = types.PreserveOriginal
+		ociOnlyEdits[i].CompressionAlgorithm = nil
 	}
-	options.LayerInfos = updatedEdits
-	return res, nil
+	options.LayerInfos = laterEdits
+	return ociOnlyEdits, nil
 }
 
 // convertToManifestSchema2 returns a genericManifest implementation converted to manifest.DockerV2Schema2MediaType.
@@ -240,13 +244,13 @@ func (m *manifestOCI1) convertToManifestSchema2(_ context.Context, options *type
 	// which remove OCI-specific features, because trying to convert those layers would fail.
 	// So, do the layer updates for decryption.
 	ociManifest := m.m
-	layerDecryptEdits, err := m.prepareLayerDecryptEditsIfNecessary(options)
+	ociOnlyEdits, err := m.layerEditsOfOCIOnlyFeatures(options)
 	if err != nil {
 		return nil, err
 	}
-	if layerDecryptEdits != nil {
+	if ociOnlyEdits != nil {
 		ociManifest = manifest.OCI1Clone(ociManifest)
-		if err := ociManifest.UpdateLayerInfos(layerDecryptEdits); err != nil {
+		if err := ociManifest.UpdateLayerInfos(ociOnlyEdits); err != nil {
 			return nil, err
 		}
 	}
