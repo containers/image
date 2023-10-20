@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,6 +38,16 @@ func layerInfosWithCryptoOperation(input []types.BlobInfo, op types.LayerCrypto)
 	res := slices.Clone(input)
 	for i := range res {
 		res[i].CryptoOperation = op
+	}
+	return res
+}
+
+// layerInfosWithCompressionEdits returns a copy of input where CompressionOperation and CompressionAlgorithm is set to op and algo
+func layerInfosWithCompressionEdits(input []types.BlobInfo, op types.LayerCompression, algo *compressiontypes.Algorithm) []types.BlobInfo {
+	res := slices.Clone(input)
+	for i := range res {
+		res[i].CompressionOperation = op
+		res[i].CompressionAlgorithm = algo
 	}
 	return res
 }

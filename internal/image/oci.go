@@ -201,13 +201,7 @@ func (m *manifestOCI1) convertToManifestSchema2Generic(ctx context.Context, opti
 // If decryption is required, it returns a set of edits to provide to OCI1.UpdateLayerInfos,
 // and edits *options to not try decryption again.
 func (m *manifestOCI1) layerEditsOfOCIOnlyFeatures(options *types.ManifestUpdateOptions) ([]types.BlobInfo, error) {
-	if options == nil {
-		return nil, nil
-	}
-
-	if !slices.ContainsFunc(options.LayerInfos, func(info types.BlobInfo) bool {
-		return info.CryptoOperation == types.Decrypt
-	}) {
+	if options == nil || options.LayerInfos == nil {
 		return nil, nil
 	}
 
@@ -218,15 +212,31 @@ func (m *manifestOCI1) layerEditsOfOCIOnlyFeatures(options *types.ManifestUpdate
 
 	ociOnlyEdits := slices.Clone(originalInfos) // Start with a full copy so that we don't forget to copy anything: use the current data in full unless we intentionally deviate.
 	laterEdits := slices.Clone(options.LayerInfos)
+	needsOCIOnlyEdits := false
 	for i, edit := range options.LayerInfos {
+		// Unless determined otherwise, don't do any compression-related MIME type conversions. m.LayerInfos() should not set these edit instructions, but be explicit.
+		ociOnlyEdits[i].CompressionOperation = types.PreserveOriginal
+		ociOnlyEdits[i].CompressionAlgorithm = nil
+
 		if edit.CryptoOperation == types.Decrypt {
+			needsOCIOnlyEdits = true // Encrypted types must be removed before conversion because they can’t be represented in Docker schemas
 			ociOnlyEdits[i].CryptoOperation = types.Decrypt
 			laterEdits[i].CryptoOperation = types.PreserveOriginalCrypto // Don't try to decrypt in a schema[12] manifest later, that would fail.
 		}
-		// Don't do any compression-related MIME type conversions. m.LayerInfos() should not set these edit instructions, but be explicit.
-		ociOnlyEdits[i].CompressionOperation = types.PreserveOriginal
-		ociOnlyEdits[i].CompressionAlgorithm = nil
+
+		if originalInfos[i].MediaType == imgspecv1.MediaTypeImageLayerZstd ||
+			originalInfos[i].MediaType == imgspecv1.MediaTypeImageLayerNonDistributableZstd { //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
+			needsOCIOnlyEdits = true // Zstd MIME types must be removed before conversion because they can’t be represented in Docker schemas.
+			ociOnlyEdits[i].CompressionOperation = edit.CompressionOperation
+			ociOnlyEdits[i].CompressionAlgorithm = edit.CompressionAlgorithm
+			laterEdits[i].CompressionOperation = types.PreserveOriginal
+			laterEdits[i].CompressionAlgorithm = nil
+		}
 	}
+	if !needsOCIOnlyEdits {
+		return nil, nil
+	}
+
 	options.LayerInfos = laterEdits
 	return ociOnlyEdits, nil
 }
@@ -242,7 +252,7 @@ func (m *manifestOCI1) convertToManifestSchema2(_ context.Context, options *type
 
 	// Mostly we first make a format conversion, and _afterwards_ do layer edits. But first we need to do the layer edits
 	// which remove OCI-specific features, because trying to convert those layers would fail.
-	// So, do the layer updates for decryption.
+	// So, do the layer updates for decryption, and for conversions from Zstd.
 	ociManifest := m.m
 	ociOnlyEdits, err := m.layerEditsOfOCIOnlyFeatures(options)
 	if err != nil {
