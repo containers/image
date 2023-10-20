@@ -464,7 +464,7 @@ func TestManifestOCI1UpdatedImage(t *testing.T) {
 		assert.Error(t, err, mime)
 	}
 
-	// m hasn’t been changed:
+	// original hasn’t been changed:
 	m2 := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
 	typedOriginal, ok := original.(*manifestOCI1)
 	require.True(t, ok)
@@ -473,17 +473,34 @@ func TestManifestOCI1UpdatedImage(t *testing.T) {
 	assert.Equal(t, *typedM2, *typedOriginal)
 }
 
+// successfulOCI1Conversion verifies that an edit of original with edits suceeeds, and and original continues to match originalClone.
+// It returns the resulting image, for more checks
+func successfulOCI1Conversion(t *testing.T, original genericManifest, originalClone genericManifest,
+	edits types.ManifestUpdateOptions) types.Image {
+	res, err := original.UpdatedImage(context.Background(), edits)
+	require.NoError(t, err)
+
+	// original = the source Image implementation hasn’t been changed by the edits
+	typedOriginal, ok := original.(*manifestOCI1)
+	require.True(t, ok)
+	typedOriginalClone, ok := originalClone.(*manifestOCI1)
+	require.True(t, ok)
+	assert.Equal(t, *typedOriginalClone, *typedOriginal)
+
+	return res
+}
+
 func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd-copy:latest")
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
+	original2 := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
 	memoryDest := &memoryImageDest{ref: originalSrc.ref}
-	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+	res := successfulOCI1Conversion(t, original, original2, types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
 		InformationOnly: types.ManifestUpdateInformation{
 			Destination: memoryDest,
 		},
 	})
-	require.NoError(t, err)
 
 	convertedJSON, mt, err := res.Manifest(context.Background())
 	require.NoError(t, err)
@@ -495,14 +512,13 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 	// Conversion to schema1 together with changing LayerInfos works as expected (which requires
 	// handling schema1 empty layers):
 	updatedLayers, updatedLayersCopy := modifiedLayerInfos(t, original.LayerInfos())
-	res, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+	res = successfulOCI1Conversion(t, original, original2, types.ManifestUpdateOptions{
 		LayerInfos:       updatedLayers,
 		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
 		InformationOnly: types.ManifestUpdateInformation{
 			Destination: memoryDest,
 		},
 	})
-	require.NoError(t, err)
 	assert.Equal(t, updatedLayersCopy, updatedLayers) // updatedLayers have not been modified in place
 	convertedJSON, mt, err = res.Manifest(context.Background())
 	require.NoError(t, err)
@@ -541,6 +557,7 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 
 	// Conversion of an encrypted image fails
 	encrypted := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
+	encrypted2 := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
 	_, err = encrypted.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
 		InformationOnly: types.ManifestUpdateInformation{
@@ -562,14 +579,13 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 	// Conversion to schema1 with simultaneous decryption is possible
 	updatedLayers = layerInfosWithCryptoOperation(encrypted.LayerInfos(), types.Decrypt)
 	updatedLayersCopy = slices.Clone(updatedLayers)
-	res, err = encrypted.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+	res = successfulOCI1Conversion(t, encrypted, encrypted2, types.ManifestUpdateOptions{
 		LayerInfos:       updatedLayers,
 		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
 		InformationOnly: types.ManifestUpdateInformation{
 			Destination: memoryDest,
 		},
 	})
-	require.NoError(t, err)
 	assert.Equal(t, updatedLayersCopy, updatedLayers) // updatedLayers have not been modified in place
 	convertedJSON, mt, err = res.Manifest(context.Background())
 	require.NoError(t, err)
@@ -594,13 +610,6 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 		{Digest: GzippedEmptyLayerDigest, Size: -1},
 		{Digest: GzippedEmptyLayerDigest, Size: -1},
 	}, s1Manifest.LayerInfos())
-	// encrypted = the source Image implementation hasn’t been changed by the edits involved in the decrypt+convert+update
-	encrypted2 := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
-	typedEncrypted, ok := encrypted.(*manifestOCI1)
-	require.True(t, ok)
-	typedEncrypted2, ok := encrypted2.(*manifestOCI1)
-	require.True(t, ok)
-	assert.Equal(t, *typedEncrypted2, *typedEncrypted)
 
 	// FIXME? Test also the other failure cases, if only to see that we don't crash?
 }
@@ -608,10 +617,10 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 func TestConvertToManifestSchema2(t *testing.T) {
 	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd-copy:latest")
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
-	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+	original2 := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
+	res := successfulOCI1Conversion(t, original, original2, types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
 	})
-	require.NoError(t, err)
 
 	convertedJSON, mt, err := res.Manifest(context.Background())
 	require.NoError(t, err)
@@ -632,6 +641,7 @@ func TestConvertToManifestSchema2(t *testing.T) {
 
 	// Conversion of an encrypted image fails
 	encrypted := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
+	encrypted2 := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
 	_, err = encrypted.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
 	})
@@ -647,11 +657,10 @@ func TestConvertToManifestSchema2(t *testing.T) {
 	// Conversion to schema2 with simultaneous decryption is possible
 	updatedLayers := layerInfosWithCryptoOperation(encrypted.LayerInfos(), types.Decrypt)
 	updatedLayersCopy := slices.Clone(updatedLayers)
-	res, err = encrypted.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+	res = successfulOCI1Conversion(t, encrypted, encrypted2, types.ManifestUpdateOptions{
 		LayerInfos:       updatedLayers,
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
 	})
-	require.NoError(t, err)
 	assert.Equal(t, updatedLayersCopy, updatedLayers) // updatedLayers have not been modified in place
 	convertedJSON, mt, err = res.Manifest(context.Background())
 	require.NoError(t, err)
@@ -689,13 +698,6 @@ func TestConvertToManifestSchema2(t *testing.T) {
 	convertedConfig, err = res.ConfigBlob(context.Background())
 	require.NoError(t, err)
 	assertJSONEqualsFixture(t, convertedConfig, "oci1-to-schema2-config.json")
-	// encrypted = the source Image implementation hasn’t been changed by the edits involved in the decrypt+convert+update
-	encrypted2 := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
-	typedEncrypted, ok := encrypted.(*manifestOCI1)
-	require.True(t, ok)
-	typedEncrypted2, ok := encrypted2.(*manifestOCI1)
-	require.True(t, ok)
-	assert.Equal(t, *typedEncrypted2, *typedEncrypted)
 
 	// FIXME? Test also the other failure cases, if only to see that we don't crash?
 }
