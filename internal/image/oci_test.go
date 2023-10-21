@@ -14,6 +14,8 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/testing/mocks"
 	"github.com/containers/image/v5/manifest"
+	"github.com/containers/image/v5/pkg/compression"
+	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -464,7 +466,7 @@ func TestManifestOCI1UpdatedImage(t *testing.T) {
 		assert.Error(t, err, mime)
 	}
 
-	// m hasn’t been changed:
+	// original hasn’t been changed:
 	m2 := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
 	typedOriginal, ok := original.(*manifestOCI1)
 	require.True(t, ok)
@@ -473,17 +475,34 @@ func TestManifestOCI1UpdatedImage(t *testing.T) {
 	assert.Equal(t, *typedM2, *typedOriginal)
 }
 
+// successfulOCI1Conversion verifies that an edit of original with edits suceeeds, and and original continues to match originalClone.
+// It returns the resulting image, for more checks
+func successfulOCI1Conversion(t *testing.T, original genericManifest, originalClone genericManifest,
+	edits types.ManifestUpdateOptions) types.Image {
+	res, err := original.UpdatedImage(context.Background(), edits)
+	require.NoError(t, err)
+
+	// original = the source Image implementation hasn’t been changed by the edits
+	typedOriginal, ok := original.(*manifestOCI1)
+	require.True(t, ok)
+	typedOriginalClone, ok := originalClone.(*manifestOCI1)
+	require.True(t, ok)
+	assert.Equal(t, *typedOriginalClone, *typedOriginal)
+
+	return res
+}
+
 func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd-copy:latest")
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
+	original2 := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
 	memoryDest := &memoryImageDest{ref: originalSrc.ref}
-	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+	res := successfulOCI1Conversion(t, original, original2, types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
 		InformationOnly: types.ManifestUpdateInformation{
 			Destination: memoryDest,
 		},
 	})
-	require.NoError(t, err)
 
 	convertedJSON, mt, err := res.Manifest(context.Background())
 	require.NoError(t, err)
@@ -495,14 +514,13 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 	// Conversion to schema1 together with changing LayerInfos works as expected (which requires
 	// handling schema1 empty layers):
 	updatedLayers, updatedLayersCopy := modifiedLayerInfos(t, original.LayerInfos())
-	res, err = original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+	res = successfulOCI1Conversion(t, original, original2, types.ManifestUpdateOptions{
 		LayerInfos:       updatedLayers,
 		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
 		InformationOnly: types.ManifestUpdateInformation{
 			Destination: memoryDest,
 		},
 	})
-	require.NoError(t, err)
 	assert.Equal(t, updatedLayersCopy, updatedLayers) // updatedLayers have not been modified in place
 	convertedJSON, mt, err = res.Manifest(context.Background())
 	require.NoError(t, err)
@@ -541,6 +559,7 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 
 	// Conversion of an encrypted image fails
 	encrypted := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
+	encrypted2 := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
 	_, err = encrypted.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
 		InformationOnly: types.ManifestUpdateInformation{
@@ -562,14 +581,13 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 	// Conversion to schema1 with simultaneous decryption is possible
 	updatedLayers = layerInfosWithCryptoOperation(encrypted.LayerInfos(), types.Decrypt)
 	updatedLayersCopy = slices.Clone(updatedLayers)
-	res, err = encrypted.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+	res = successfulOCI1Conversion(t, encrypted, encrypted2, types.ManifestUpdateOptions{
 		LayerInfos:       updatedLayers,
 		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
 		InformationOnly: types.ManifestUpdateInformation{
 			Destination: memoryDest,
 		},
 	})
-	require.NoError(t, err)
 	assert.Equal(t, updatedLayersCopy, updatedLayers) // updatedLayers have not been modified in place
 	convertedJSON, mt, err = res.Manifest(context.Background())
 	require.NoError(t, err)
@@ -594,13 +612,62 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 		{Digest: GzippedEmptyLayerDigest, Size: -1},
 		{Digest: GzippedEmptyLayerDigest, Size: -1},
 	}, s1Manifest.LayerInfos())
-	// encrypted = the source Image implementation hasn’t been changed by the edits involved in the decrypt+convert+update
-	encrypted2 := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
-	typedEncrypted, ok := encrypted.(*manifestOCI1)
-	require.True(t, ok)
-	typedEncrypted2, ok := encrypted2.(*manifestOCI1)
-	require.True(t, ok)
-	assert.Equal(t, *typedEncrypted2, *typedEncrypted)
+
+	// Conversion to schema1 of an image with Zstd layers fails
+	mixedSrc := newOCI1ImageSource(t, "oci1-all-media-types-config.json", "httpd-copy:latest")
+	mixedImage := manifestOCI1FromFixture(t, mixedSrc, "oci1-all-media-types.json")
+	mixedImage2 := manifestOCI1FromFixture(t, mixedSrc, "oci1-all-media-types.json")
+	_, err = mixedImage.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+		ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
+		InformationOnly: types.ManifestUpdateInformation{
+			Destination: memoryDest,
+		},
+	})
+	assert.Error(t, err) // zstd compression is not supported for docker images
+
+	// Conversion to schema1 of an image with Zstd layers, while editing layers to be uncompressed, or gzip-compressed, is possible.
+	for _, c := range []struct {
+		op   types.LayerCompression
+		algo *compressiontypes.Algorithm
+	}{
+		{types.Decompress, nil},
+		{types.PreserveOriginal, &compression.Gzip},
+	} {
+		updatedLayers = layerInfosWithCompressionEdits(mixedImage.LayerInfos(), c.op, c.algo)
+		updatedLayersCopy = slices.Clone(updatedLayers)
+		res = successfulOCI1Conversion(t, mixedImage, mixedImage2, types.ManifestUpdateOptions{
+			LayerInfos:       updatedLayers,
+			ManifestMIMEType: manifest.DockerV2Schema1SignedMediaType,
+			InformationOnly: types.ManifestUpdateInformation{
+				Destination: memoryDest,
+			},
+		})
+		assert.Equal(t, updatedLayersCopy, updatedLayers) // updatedLayers have not been modified in place
+		convertedJSON, mt, err = res.Manifest(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, manifest.DockerV2Schema1SignedMediaType, mt)
+		s1Manifest, err = manifestSchema1FromManifest(convertedJSON)
+		require.NoError(t, err)
+		// The schema1 data does not contain a MIME type (and we don’t update the digests), so both loop iterations look the same here
+		assert.Equal(t, []types.BlobInfo{
+			{Digest: "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb", Size: -1},
+			{Digest: GzippedEmptyLayerDigest, Size: -1},
+			{Digest: GzippedEmptyLayerDigest, Size: -1},
+			{Digest: GzippedEmptyLayerDigest, Size: -1},
+			{Digest: "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c", Size: -1},
+			{Digest: GzippedEmptyLayerDigest, Size: -1},
+			{Digest: "sha256:2bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c", Size: -1},
+			{Digest: GzippedEmptyLayerDigest, Size: -1},
+			{Digest: GzippedEmptyLayerDigest, Size: -1},
+			{Digest: GzippedEmptyLayerDigest, Size: -1},
+			{Digest: GzippedEmptyLayerDigest, Size: -1},
+			{Digest: "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9", Size: -1},
+			{Digest: "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909", Size: -1},
+			{Digest: GzippedEmptyLayerDigest, Size: -1},
+			{Digest: GzippedEmptyLayerDigest, Size: -1},
+			{Digest: "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa", Size: -1},
+		}, s1Manifest.LayerInfos())
+	}
 
 	// FIXME? Test also the other failure cases, if only to see that we don't crash?
 }
@@ -608,10 +675,10 @@ func TestManifestOCI1ConvertToManifestSchema1(t *testing.T) {
 func TestConvertToManifestSchema2(t *testing.T) {
 	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd-copy:latest")
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
-	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+	original2 := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
+	res := successfulOCI1Conversion(t, original, original2, types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
 	})
-	require.NoError(t, err)
 
 	convertedJSON, mt, err := res.Manifest(context.Background())
 	require.NoError(t, err)
@@ -632,6 +699,7 @@ func TestConvertToManifestSchema2(t *testing.T) {
 
 	// Conversion of an encrypted image fails
 	encrypted := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
+	encrypted2 := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
 	_, err = encrypted.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
 	})
@@ -647,11 +715,10 @@ func TestConvertToManifestSchema2(t *testing.T) {
 	// Conversion to schema2 with simultaneous decryption is possible
 	updatedLayers := layerInfosWithCryptoOperation(encrypted.LayerInfos(), types.Decrypt)
 	updatedLayersCopy := slices.Clone(updatedLayers)
-	res, err = encrypted.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+	res = successfulOCI1Conversion(t, encrypted, encrypted2, types.ManifestUpdateOptions{
 		LayerInfos:       updatedLayers,
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
 	})
-	require.NoError(t, err)
 	assert.Equal(t, updatedLayersCopy, updatedLayers) // updatedLayers have not been modified in place
 	convertedJSON, mt, err = res.Manifest(context.Background())
 	require.NoError(t, err)
@@ -689,24 +756,115 @@ func TestConvertToManifestSchema2(t *testing.T) {
 	convertedConfig, err = res.ConfigBlob(context.Background())
 	require.NoError(t, err)
 	assertJSONEqualsFixture(t, convertedConfig, "oci1-to-schema2-config.json")
-	// encrypted = the source Image implementation hasn’t been changed by the edits involved in the decrypt+convert+update
-	encrypted2 := manifestOCI1FromFixture(t, originalSrc, "oci1.encrypted.json")
-	typedEncrypted, ok := encrypted.(*manifestOCI1)
-	require.True(t, ok)
-	typedEncrypted2, ok := encrypted2.(*manifestOCI1)
-	require.True(t, ok)
-	assert.Equal(t, *typedEncrypted2, *typedEncrypted)
 
-	// FIXME? Test also the other failure cases, if only to see that we don't crash?
-}
-
-func TestConvertToManifestSchema2AllMediaTypes(t *testing.T) {
-	originalSrc := newOCI1ImageSource(t, "oci1-config.json", "httpd-copy:latest")
-	original := manifestOCI1FromFixture(t, originalSrc, "oci1-all-media-types.json")
-	_, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
+	// Conversion to schema2 of an image with Zstd layers fails
+	mixedSrc := newOCI1ImageSource(t, "oci1-all-media-types-config.json", "httpd-copy:latest")
+	mixedImage := manifestOCI1FromFixture(t, mixedSrc, "oci1-all-media-types.json")
+	mixedImage2 := manifestOCI1FromFixture(t, mixedSrc, "oci1-all-media-types.json")
+	_, err = mixedImage.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
 	})
-	require.Error(t, err) // zstd compression is not supported for docker images
+	assert.Error(t, err) // zstd compression is not supported for docker images
+
+	// Conversion to schema2 of an image with Zstd layers, while editing layers to be uncompressed, is possible.
+	updatedLayers = layerInfosWithCompressionEdits(mixedImage.LayerInfos(), types.Decompress, nil)
+	updatedLayersCopy = slices.Clone(updatedLayers)
+	res = successfulOCI1Conversion(t, mixedImage, mixedImage2, types.ManifestUpdateOptions{
+		LayerInfos:       updatedLayers,
+		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
+	})
+	assert.Equal(t, updatedLayersCopy, updatedLayers) // updatedLayers have not been modified in place
+	convertedJSON, mt, err = res.Manifest(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, manifest.DockerV2Schema2MediaType, mt)
+	s2Manifest, err = manifestSchema2FromManifest(mixedSrc, convertedJSON)
+	require.NoError(t, err)
+	assert.Equal(t, []types.BlobInfo{
+		{
+			Digest:    "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+			Size:      51354364,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar",
+		},
+		{
+			Digest:    "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+			Size:      150,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar",
+		},
+		{
+			Digest:    "sha256:2bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+			Size:      152,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar",
+		},
+		{
+			Digest:    "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
+			Size:      11739507,
+			MediaType: "application/vnd.docker.image.rootfs.foreign.diff.tar",
+		},
+		{
+			Digest:    "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
+			Size:      8841833,
+			MediaType: "application/vnd.docker.image.rootfs.foreign.diff.tar",
+		},
+		{
+			Digest:    "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
+			Size:      291,
+			MediaType: "application/vnd.docker.image.rootfs.foreign.diff.tar",
+		},
+	}, s2Manifest.LayerInfos())
+	convertedConfig, err = res.ConfigBlob(context.Background())
+	require.NoError(t, err)
+	assertJSONEqualsFixture(t, convertedConfig, "oci1-all-media-types-to-schema2-config.json")
+
+	// Conversion to schema2 of an image with Zstd layers, while editing layers to be gzip-compressed, is possible.
+	updatedLayers = layerInfosWithCompressionEdits(mixedImage.LayerInfos(), types.PreserveOriginal, &compression.Gzip)
+	updatedLayersCopy = slices.Clone(updatedLayers)
+	res = successfulOCI1Conversion(t, mixedImage, mixedImage2, types.ManifestUpdateOptions{
+		LayerInfos:       updatedLayers,
+		ManifestMIMEType: manifest.DockerV2Schema2MediaType,
+	})
+	assert.Equal(t, updatedLayersCopy, updatedLayers) // updatedLayers have not been modified in place
+	convertedJSON, mt, err = res.Manifest(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, manifest.DockerV2Schema2MediaType, mt)
+	s2Manifest, err = manifestSchema2FromManifest(mixedSrc, convertedJSON)
+	require.NoError(t, err)
+	assert.Equal(t, []types.BlobInfo{
+		{
+			Digest:    "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+			Size:      51354364,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+		},
+		{
+			Digest:    "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+			Size:      150,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+		},
+		{
+			Digest:    "sha256:2bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+			Size:      152,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+		},
+		{
+			Digest:    "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
+			Size:      11739507,
+			MediaType: "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
+		},
+		{
+			Digest:    "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
+			Size:      8841833,
+			MediaType: "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
+		},
+		{
+			Digest:    "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
+			Size:      291,
+			MediaType: "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
+		},
+	}, s2Manifest.LayerInfos())
+	convertedConfig, err = res.ConfigBlob(context.Background())
+	require.NoError(t, err)
+	assertJSONEqualsFixture(t, convertedConfig, "oci1-all-media-types-to-schema2-config.json")
+
+	// FIXME? Test also the other failure cases, if only to see that we don't crash?
 }
 
 func TestConvertToV2S2WithInvalidMIMEType(t *testing.T) {

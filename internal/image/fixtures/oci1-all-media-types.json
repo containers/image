@@ -4,7 +4,7 @@
     "config": {
         "mediaType": "application/vnd.oci.image.config.v1+json",
         "size": 4651,
-        "digest": "sha256:a13a0762ab7bed51a1b49adec0a702b1cd99294fd460a025b465bcfb7b152745"
+        "digest": "sha256:94ac69e4413476d061116c9d05757e46a0afc744e8b9886f75cf7f6f14c78fb3"
     },
     "layers": [
         {
@@ -28,7 +28,7 @@
             "digest": "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9"
         },
         {
-            "mediaType": "application/vnd.oci.image.layer.nondistributable.v1.tar+gzip",
+            "mediaType": "application/vnd.oci.image.layer.nondistributable.v1.tar+zstd",
             "size": 8841833,
             "digest": "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909"
         },
