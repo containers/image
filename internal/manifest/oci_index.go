@@ -167,7 +167,9 @@ func (index *OCI1IndexPublic) editInstances(editInstances []ListEdit) error {
 		}
 	}
 	if len(addedEntries) != 0 {
-		index.Manifests = append(index.Manifests, addedEntries...)
+		// slices.Clone() here to ensure the slice uses a private backing array;
+		// an external caller could have manually created OCI1IndexPublic with a slice with extra capacity.
+		index.Manifests = append(slices.Clone(index.Manifests), addedEntries...)
 	}
 	if len(addedEntries) != 0 || updatedAnnotations {
 		slices.SortStableFunc(index.Manifests, func(a, b imgspecv1.Descriptor) int {

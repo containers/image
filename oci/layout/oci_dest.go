@@ -19,6 +19,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	imgspec "github.com/opencontainers/image-spec/specs-go"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/exp/slices"
 )
 
 type ociImageDestination struct {
@@ -271,8 +272,8 @@ func (d *ociImageDestination) addManifest(desc *imgspecv1.Descriptor) {
 			return
 		}
 	}
-	// It's a new entry to be added to the index.
-	d.index.Manifests = append(d.index.Manifests, *desc)
+	// It's a new entry to be added to the index. Use slices.Clone() to avoid a remote dependency on how d.index was created.
+	d.index.Manifests = append(slices.Clone(d.index.Manifests), *desc)
 }
 
 // Commit marks the process of storing the image as successful and asks for the image to be persisted.

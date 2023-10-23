@@ -10,6 +10,7 @@ import (
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
 )
 
 func TestSchema2ListPublicFromManifest(t *testing.T) {
@@ -81,11 +82,11 @@ func TestSchema2ListEditInstances(t *testing.T) {
 	err = list.EditInstances(editInstances)
 	require.NoError(t, err)
 
-	// Add new elements to the end of old list to maintain order
-	originalListOrder = append(originalListOrder, digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
-	originalListOrder = append(originalListOrder, digest.Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"))
-	// Verify order
-	assert.Equal(t, list.Instances(), originalListOrder)
+	// Verify new elements are added to the end of old list
+	assert.Equal(t, append(slices.Clone(originalListOrder),
+		digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+		digest.Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"),
+	), list.Instances())
 }
 
 func TestSchema2ListFromManifest(t *testing.T) {

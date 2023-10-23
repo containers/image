@@ -419,7 +419,7 @@ func TestManifestOCI1UpdatedImage(t *testing.T) {
 	original := manifestOCI1FromFixture(t, originalSrc, "oci1.json")
 
 	// LayerInfos:
-	layerInfos := append(original.LayerInfos()[1:], original.LayerInfos()[0])
+	layerInfos := append(slices.Clone(original.LayerInfos()[1:]), original.LayerInfos()[0])
 	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		LayerInfos: layerInfos,
 	})

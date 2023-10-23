@@ -277,7 +277,7 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 	if err != nil {
 		return copySingleImageResult{}, err
 	}
-	sigs = append(sigs, newSigs...)
+	sigs = append(slices.Clone(sigs), newSigs...)
 
 	if len(sigs) > 0 {
 		c.Printf("Storing signatures\n")

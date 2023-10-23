@@ -14,6 +14,7 @@ import (
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
 )
 
 var schema1FixtureLayerInfos = []types.BlobInfo{
@@ -372,7 +373,7 @@ func TestManifestSchema1UpdatedImage(t *testing.T) {
 	original := manifestSchema1FromFixture(t, "schema1.json")
 
 	// LayerInfos:
-	layerInfos := append(original.LayerInfos()[1:], original.LayerInfos()[0])
+	layerInfos := append(slices.Clone(original.LayerInfos()[1:]), original.LayerInfos()[0])
 	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		LayerInfos: layerInfos,
 	})

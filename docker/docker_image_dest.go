@@ -688,6 +688,10 @@ func (d *dockerImageDestination) putSignaturesToSigstoreAttachments(ctx context.
 		}
 	}
 
+	// To make sure we can safely append to the slices of ociManifest, without adding a remote dependency on the code that creates it.
+	ociManifest.Layers = slices.Clone(ociManifest.Layers)
+	// We don’t need to ^^^ for ociConfig.RootFS.DiffIDs because we have created it empty ourselves, and json.Unmarshal is documented to append() to
+	// the slice in the original object (or in a newly allocated object).
 	for _, sig := range signatures {
 		mimeType := sig.UntrustedMIMEType()
 		payloadBlob := sig.UntrustedPayload()
