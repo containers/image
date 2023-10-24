@@ -448,7 +448,7 @@ func TestManifestSchema2UpdatedImage(t *testing.T) {
 	original := manifestSchema2FromFixture(t, originalSrc, "schema2.json", false)
 
 	// LayerInfos:
-	layerInfos := append(original.LayerInfos()[1:], original.LayerInfos()[0])
+	layerInfos := append(slices.Clone(original.LayerInfos()[1:]), original.LayerInfos()[0])
 	res, err := original.UpdatedImage(context.Background(), types.ManifestUpdateOptions{
 		LayerInfos: layerInfos,
 	})

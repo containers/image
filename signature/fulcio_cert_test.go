@@ -18,6 +18,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
 )
 
 // assert that crypto.PublicKey matches the on in certPEM.
@@ -132,7 +133,7 @@ func TestFulcioIssuerInCertificate(t *testing.T) {
 			extensions: []pkix.Extension{
 				{
 					Id:    certificate.OIDIssuerV2,
-					Value: append(asn1MarshalTest(t, "https://", "utf8"), asn1MarshalTest(t, "example.com", "utf8")...),
+					Value: append(slices.Clone(asn1MarshalTest(t, "https://", "utf8")), asn1MarshalTest(t, "example.com", "utf8")...),
 				},
 			},
 			errorFragment: "invalid ASN.1 in OIDC issuer v2 extension, trailing data",
