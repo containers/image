@@ -269,10 +269,16 @@ func makeLayer(t *testing.T, compression archive.Compression) (ddigest.Digest, i
 	return sum, uncompressedCount, int64(tbuffer.Len()), tbuffer.Bytes()
 }
 
-func TestWriteRead(t *testing.T) {
+// ensureTestCanCreateImages skips the current test if it is not possible to create layers and images in a private store.
+func ensureTestCanCreateImages(t *testing.T) {
+	t.Helper()
 	if os.Geteuid() != 0 {
-		t.Skip("TestWriteRead requires root privileges")
+		t.Skip("test requires root privileges")
 	}
+}
+
+func TestWriteRead(t *testing.T) {
+	ensureTestCanCreateImages(t)
 
 	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
 	sum := ddigest.SHA256.FromBytes([]byte(config))
@@ -521,9 +527,7 @@ func TestWriteRead(t *testing.T) {
 }
 
 func TestDuplicateName(t *testing.T) {
-	if os.Geteuid() != 0 {
-		t.Skip("TestDuplicateName requires root privileges")
-	}
+	ensureTestCanCreateImages(t)
 
 	newStore(t)
 	cache := memory.New()
@@ -620,9 +624,7 @@ func TestDuplicateName(t *testing.T) {
 }
 
 func TestDuplicateID(t *testing.T) {
-	if os.Geteuid() != 0 {
-		t.Skip("TestDuplicateID requires root privileges")
-	}
+	ensureTestCanCreateImages(t)
 
 	newStore(t)
 	cache := memory.New()
@@ -722,9 +724,7 @@ func TestDuplicateID(t *testing.T) {
 }
 
 func TestDuplicateNameID(t *testing.T) {
-	if os.Geteuid() != 0 {
-		t.Skip("TestDuplicateNameID requires root privileges")
-	}
+	ensureTestCanCreateImages(t)
 
 	newStore(t)
 	cache := memory.New()
@@ -863,9 +863,7 @@ func TestNamespaces(t *testing.T) {
 }
 
 func TestSize(t *testing.T) {
-	if os.Geteuid() != 0 {
-		t.Skip("TestSize requires root privileges")
-	}
+	ensureTestCanCreateImages(t)
 
 	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
 	sum := ddigest.SHA256.FromBytes([]byte(config))
@@ -961,9 +959,7 @@ func TestSize(t *testing.T) {
 }
 
 func TestDuplicateBlob(t *testing.T) {
-	if os.Geteuid() != 0 {
-		t.Skip("TestDuplicateBlob requires root privileges")
-	}
+	ensureTestCanCreateImages(t)
 
 	config := `{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`
 	sum := ddigest.SHA256.FromBytes([]byte(config))
