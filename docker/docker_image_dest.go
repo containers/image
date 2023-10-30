@@ -644,7 +644,7 @@ func (d *dockerImageDestination) putOneSignature(sigURL *url.URL, sig signature.
 		if err != nil {
 			return err
 		}
-		err = os.WriteFile(sigURL.Path, blob, 0644)
+		err = os.WriteFile(filepath.Clean(sigURL.Path), blob, 0644)
 		if err != nil {
 			return err
 		}
@@ -794,7 +794,7 @@ func (c *dockerClient) deleteOneSignature(sigURL *url.URL) (missing bool, err er
 	switch sigURL.Scheme {
 	case "file":
 		logrus.Debugf("Deleting %s", sigURL.Path)
-		err := os.Remove(sigURL.Path)
+		err := os.Remove(filepath.Clean(sigURL.Path))
 		if err != nil && os.IsNotExist(err) {
 			return true, nil
 		}

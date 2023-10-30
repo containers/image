@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -477,7 +478,7 @@ func (s *dockerImageSource) getOneSignature(ctx context.Context, sigURL *url.URL
 	switch sigURL.Scheme {
 	case "file":
 		logrus.Debugf("Reading %s", sigURL.Path)
-		sigBlob, err := os.ReadFile(sigURL.Path)
+		sigBlob, err := os.ReadFile(filepath.Clean(sigURL.Path))
 		if err != nil {
 			if os.IsNotExist(err) {
 				return nil, true, nil
