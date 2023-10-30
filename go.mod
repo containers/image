@@ -38,7 +38,7 @@ require (
 	github.com/vbatts/tar-split v0.11.5
 	github.com/vbauerster/mpb/v8 v8.6.2
 	github.com/xeipuuv/gojsonschema v1.2.0
-	go.etcd.io/bbolt v1.3.7
+	go.etcd.io/bbolt v1.3.8
 	golang.org/x/crypto v0.14.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/oauth2 v0.13.0
