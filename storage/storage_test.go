@@ -66,21 +66,16 @@ func newStoreWithGraphDriverOptions(t *testing.T, options []string) storage.Stor
 	wd := t.TempDir()
 	run := filepath.Join(wd, "run")
 	root := filepath.Join(wd, "root")
-	// Due to https://github.com/containers/storage/pull/811 , c/storage can be used on macOS unprivileged,
-	// and this actually causes problems because the PR linked above does not exclude UID changes on some code paths.
-	// This condition should be removed again if https://github.com/containers/storage/pull/1735 is merged.
-	if runtime.GOOS != "darwin" {
-		Transport.SetDefaultUIDMap([]idtools.IDMap{{
-			ContainerID: 0,
-			HostID:      os.Getuid(),
-			Size:        1,
-		}})
-		Transport.SetDefaultGIDMap([]idtools.IDMap{{
-			ContainerID: 0,
-			HostID:      os.Getgid(),
-			Size:        1,
-		}})
-	}
+	Transport.SetDefaultUIDMap([]idtools.IDMap{{
+		ContainerID: 0,
+		HostID:      os.Getuid(),
+		Size:        1,
+	}})
+	Transport.SetDefaultGIDMap([]idtools.IDMap{{
+		ContainerID: 0,
+		HostID:      os.Getgid(),
+		Size:        1,
+	}})
 	store, err := storage.GetStore(storage.StoreOptions{
 		RunRoot:            run,
 		GraphRoot:          root,
