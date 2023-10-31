@@ -6,7 +6,7 @@ require (
 	dario.cat/mergo v1.0.0
 	github.com/BurntSushi/toml v1.3.2
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01
-	github.com/containers/ocicrypt v1.1.8
+	github.com/containers/ocicrypt v1.1.9
 	github.com/containers/storage v1.50.3-0.20231025175120-a254f71b1f55
 	github.com/cyberphone/json-canonicalization v0.0.0-20230710064741-aa7fe85c7dbd
 	github.com/docker/distribution v2.8.3+incompatible
