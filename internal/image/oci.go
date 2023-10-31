@@ -289,9 +289,8 @@ func (m *manifestOCI1) convertToManifestSchema2(_ context.Context, options *type
 			layers[idx].MediaType = manifest.DockerV2Schema2LayerMediaType
 		case imgspecv1.MediaTypeImageLayerZstd:
 			return nil, fmt.Errorf("Error during manifest conversion: %q: zstd compression is not supported for docker images", layers[idx].MediaType)
-			// FIXME: s/Zsdt/Zstd/ after ocicrypt with https://github.com/containers/ocicrypt/pull/91 is released
 		case ociencspec.MediaTypeLayerEnc, ociencspec.MediaTypeLayerGzipEnc, ociencspec.MediaTypeLayerZstdEnc,
-			ociencspec.MediaTypeLayerNonDistributableEnc, ociencspec.MediaTypeLayerNonDistributableGzipEnc, ociencspec.MediaTypeLayerNonDistributableZsdtEnc:
+			ociencspec.MediaTypeLayerNonDistributableEnc, ociencspec.MediaTypeLayerNonDistributableGzipEnc, ociencspec.MediaTypeLayerNonDistributableZstdEnc:
 			return nil, fmt.Errorf("during manifest conversion: encrypted layers (%q) are not supported in docker images", layers[idx].MediaType)
 		default:
 			return nil, fmt.Errorf("Unknown media type during manifest conversion: %q", layers[idx].MediaType)
