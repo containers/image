@@ -137,7 +137,7 @@ func (d *dockerImageDestination) PutBlobWithOptions(ctx context.Context, stream 
 	// If requested, precompute the blob digest to prevent uploading layers that already exist on the registry.
 	// This functionality is particularly useful when BlobInfoCache has not been populated with compressed digests,
 	// the source blob is uncompressed, and the destination blob is being compressed "on the fly".
-	if inputInfo.Digest == "" && d.c.sys.DockerRegistryPushPrecomputeDigests {
+	if inputInfo.Digest == "" && d.c.sys != nil && d.c.sys.DockerRegistryPushPrecomputeDigests {
 		logrus.Debugf("Precomputing digest layer for %s", reference.Path(d.ref.ref))
 		streamCopy, cleanup, err := streamdigest.ComputeBlobInfo(d.c.sys, stream, &inputInfo)
 		if err != nil {
