@@ -472,19 +472,15 @@ func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 	}
 
 	if len(res) == 0 && v2Output {
-		compressorName := blobinfocache.UnknownCompression
 		compressor, found, err := querySingleValue[string](tx, "SELECT compressor FROM DigestCompressors WHERE digest = ?", digest.String())
 		if err != nil {
 			return nil, fmt.Errorf("scanning compressorName: %w", err)
 		}
 		if found {
-			compressorName = compressor
-		}
-		if compressorName != blobinfocache.UnknownCompression {
 			res = append(res, prioritize.CandidateWithTime{
 				Candidate: blobinfocache.BICReplacementCandidate2{
 					Digest:          digest,
-					CompressorName:  compressorName,
+					CompressorName:  compressor,
 					UnknownLocation: true,
 					Location:        types.BICLocationReference{Opaque: ""},
 				},
