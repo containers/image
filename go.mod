@@ -8,7 +8,7 @@ require (
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01
 	github.com/containers/ocicrypt v1.1.9
 	github.com/containers/storage v1.50.3-0.20231101112703-6e72f11598fb
-	github.com/cyberphone/json-canonicalization v0.0.0-20230710064741-aa7fe85c7dbd
+	github.com/cyberphone/json-canonicalization v0.0.0-20231011164504-785e29786b46
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/docker/docker v24.0.7+incompatible
 	github.com/docker/docker-credential-helpers v0.8.0
