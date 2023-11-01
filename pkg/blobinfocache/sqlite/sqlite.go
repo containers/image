@@ -427,11 +427,13 @@ func (sqc *cache) RecordDigestCompressorName(anyDigest digest.Digest, compressor
 	}) // FIXME? Log error (but throttle the log volume on repeated accesses)?
 }
 
-// appendReplacementCandidates creates prioritize.CandidateWithTime values for (transport, scope, digest), and returns the result of appending them to candidates.
-func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateWithTime, tx *sql.Tx, transport types.ImageTransport, scope types.BICTransportScope, digest digest.Digest, requireCompressionInfo bool) ([]prioritize.CandidateWithTime, error) {
+// appendReplacementCandidates creates prioritize.CandidateWithTime values for (transport, scope, digest),
+// and returns the result of appending them to candidates. v2Output allows including candidates with unknown
+// location, and filters out candidates with unknown compression.
+func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateWithTime, tx *sql.Tx, transport types.ImageTransport, scope types.BICTransportScope, digest digest.Digest, v2Output bool) ([]prioritize.CandidateWithTime, error) {
 	var rows *sql.Rows
 	var err error
-	if requireCompressionInfo {
+	if v2Output {
 		rows, err = tx.Query("SELECT location, time, compressor FROM KnownLocations JOIN DigestCompressors "+
 			"ON KnownLocations.digest = DigestCompressors.digest "+
 			"WHERE transport = ? AND scope = ? AND KnownLocations.digest = ?",
@@ -448,6 +450,7 @@ func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 	}
 	defer rows.Close()
 
+	res := []prioritize.CandidateWithTime{}
 	for rows.Next() {
 		var location string
 		var time time.Time
@@ -455,7 +458,7 @@ func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 		if err := rows.Scan(&location, &time, &compressorName); err != nil {
 			return nil, fmt.Errorf("scanning candidate: %w", err)
 		}
-		candidates = append(candidates, prioritize.CandidateWithTime{
+		res = append(res, prioritize.CandidateWithTime{
 			Candidate: blobinfocache.BICReplacementCandidate2{
 				Digest:         digest,
 				CompressorName: compressorName,
@@ -467,10 +470,33 @@ func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating through locations: %w", err)
 	}
+
+	if len(res) == 0 && v2Output {
+		compressorName := blobinfocache.UnknownCompression
+		compressor, found, err := querySingleValue[string](tx, "SELECT compressor FROM DigestCompressors WHERE digest = ?", digest.String())
+		if err != nil {
+			return nil, fmt.Errorf("scanning compressorName: %w", err)
+		}
+		if found {
+			compressorName = compressor
+		}
+		if compressorName != blobinfocache.UnknownCompression {
+			res = append(res, prioritize.CandidateWithTime{
+				Candidate: blobinfocache.BICReplacementCandidate2{
+					Digest:          digest,
+					CompressorName:  compressorName,
+					UnknownLocation: true,
+					Location:        types.BICLocationReference{Opaque: ""},
+				},
+				LastSeen: time.Time{},
+			})
+		}
+	}
+	candidates = append(candidates, res...)
 	return candidates, nil
 }
 
-// CandidateLocations2 returns a prioritized, limited, number of blobs and their locations
+// CandidateLocations2 returns a prioritized, limited, number of blobs and their locations (if known)
 // that could possibly be reused within the specified (transport scope) (if they still
 // exist, which is not guaranteed).
 //
@@ -483,11 +509,11 @@ func (sqc *cache) CandidateLocations2(transport types.ImageTransport, scope type
 	return sqc.candidateLocations(transport, scope, digest, canSubstitute, true)
 }
 
-func (sqc *cache) candidateLocations(transport types.ImageTransport, scope types.BICTransportScope, primaryDigest digest.Digest, canSubstitute, requireCompressionInfo bool) []blobinfocache.BICReplacementCandidate2 {
+func (sqc *cache) candidateLocations(transport types.ImageTransport, scope types.BICTransportScope, primaryDigest digest.Digest, canSubstitute, v2Output bool) []blobinfocache.BICReplacementCandidate2 {
 	var uncompressedDigest digest.Digest // = ""
 	res, err := transaction(sqc, func(tx *sql.Tx) ([]prioritize.CandidateWithTime, error) {
 		res := []prioritize.CandidateWithTime{}
-		res, err := sqc.appendReplacementCandidates(res, tx, transport, scope, primaryDigest, requireCompressionInfo)
+		res, err := sqc.appendReplacementCandidates(res, tx, transport, scope, primaryDigest, v2Output)
 		if err != nil {
 			return nil, err
 		}
@@ -516,7 +542,7 @@ func (sqc *cache) candidateLocations(transport types.ImageTransport, scope types
 					return nil, err
 				}
 				if otherDigest != primaryDigest && otherDigest != uncompressedDigest {
-					res, err = sqc.appendReplacementCandidates(res, tx, transport, scope, otherDigest, requireCompressionInfo)
+					res, err = sqc.appendReplacementCandidates(res, tx, transport, scope, otherDigest, v2Output)
 					if err != nil {
 						return nil, err
 					}
@@ -527,7 +553,7 @@ func (sqc *cache) candidateLocations(transport types.ImageTransport, scope types
 			}
 
 			if uncompressedDigest != primaryDigest {
-				res, err = sqc.appendReplacementCandidates(res, tx, transport, scope, uncompressedDigest, requireCompressionInfo)
+				res, err = sqc.appendReplacementCandidates(res, tx, transport, scope, uncompressedDigest, v2Output)
 				if err != nil {
 					return nil, err
 				}
