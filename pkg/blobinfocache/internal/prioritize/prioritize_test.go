@@ -32,6 +32,10 @@ var (
 			{blobinfocache.BICReplacementCandidate2{Digest: digestCompressedPrimary, Location: types.BICLocationReference{Opaque: "P2"}, CompressorName: compressiontypes.GzipAlgorithmName}, time.Unix(1, 1)},
 			{blobinfocache.BICReplacementCandidate2{Digest: digestCompressedB, Location: types.BICLocationReference{Opaque: "B2"}, CompressorName: blobinfocache.Uncompressed}, time.Unix(2, 0)},
 			{blobinfocache.BICReplacementCandidate2{Digest: digestUncompressed, Location: types.BICLocationReference{Opaque: "U1"}, CompressorName: blobinfocache.UnknownCompression}, time.Unix(1, 0)},
+			{blobinfocache.BICReplacementCandidate2{Digest: digestUncompressed, UnknownLocation: true, Location: types.BICLocationReference{Opaque: ""}, CompressorName: blobinfocache.UnknownCompression}, time.Time{}},
+			{blobinfocache.BICReplacementCandidate2{Digest: digestCompressedA, UnknownLocation: true, Location: types.BICLocationReference{Opaque: ""}, CompressorName: blobinfocache.UnknownCompression}, time.Time{}},
+			{blobinfocache.BICReplacementCandidate2{Digest: digestCompressedB, UnknownLocation: true, Location: types.BICLocationReference{Opaque: ""}, CompressorName: blobinfocache.UnknownCompression}, time.Time{}},
+			{blobinfocache.BICReplacementCandidate2{Digest: digestCompressedPrimary, UnknownLocation: true, Location: types.BICLocationReference{Opaque: ""}, CompressorName: blobinfocache.UnknownCompression}, time.Time{}},
 		},
 		primaryDigest:      digestCompressedPrimary,
 		uncompressedDigest: digestUncompressed,
@@ -46,12 +50,16 @@ var (
 		{Digest: digestCompressedA, Location: types.BICLocationReference{Opaque: "A1"}, CompressorName: compressiontypes.XzAlgorithmName},
 		{Digest: digestUncompressed, Location: types.BICLocationReference{Opaque: "U2"}, CompressorName: compressiontypes.GzipAlgorithmName},
 		{Digest: digestUncompressed, Location: types.BICLocationReference{Opaque: "U1"}, CompressorName: blobinfocache.UnknownCompression},
+		{Digest: digestCompressedPrimary, UnknownLocation: true, Location: types.BICLocationReference{Opaque: ""}, CompressorName: blobinfocache.UnknownCompression},
+		{Digest: digestCompressedA, UnknownLocation: true, Location: types.BICLocationReference{Opaque: ""}, CompressorName: blobinfocache.UnknownCompression},
+		{Digest: digestCompressedB, UnknownLocation: true, Location: types.BICLocationReference{Opaque: ""}, CompressorName: blobinfocache.UnknownCompression},
+		{Digest: digestUncompressed, UnknownLocation: true, Location: types.BICLocationReference{Opaque: ""}, CompressorName: blobinfocache.UnknownCompression},
 	}
 )
 
 func TestCandidateSortStateLen(t *testing.T) {
 	css := cssLiteral
-	assert.Equal(t, 8, css.Len())
+	assert.Equal(t, 12, css.Len())
 
 	css.cs = []CandidateWithTime{}
 	assert.Equal(t, 0, css.Len())
@@ -156,13 +164,15 @@ func TestCandidateSortStateSwap(t *testing.T) {
 }
 
 func TestDestructivelyPrioritizeReplacementCandidatesWithMax(t *testing.T) {
-	for _, max := range []int{0, 1, replacementAttempts, 100} {
-		// Just a smoke test; we mostly rely on test coverage in TestCandidateSortStateLess
-		res := destructivelyPrioritizeReplacementCandidatesWithMax(slices.Clone(cssLiteral.cs), digestCompressedPrimary, digestUncompressed, max)
-		if max > len(cssExpectedReplacementCandidates) {
-			max = len(cssExpectedReplacementCandidates)
+	totalUnknownLocationCandidates := 4
+	for _, totalLimit := range []int{0, 1, replacementAttempts, 100, replacementUnknownLocationAttempts} {
+		for _, noLocationLimit := range []int{0, 1, replacementAttempts, 100, replacementUnknownLocationAttempts} {
+			totalKnownLocationCandidates := len(cssExpectedReplacementCandidates) - totalUnknownLocationCandidates
+			allowedUnknown := min(noLocationLimit, totalUnknownLocationCandidates)
+			expectedLen := min(totalKnownLocationCandidates+allowedUnknown, totalLimit)
+			res := destructivelyPrioritizeReplacementCandidatesWithMax(slices.Clone(cssLiteral.cs), digestCompressedPrimary, digestUncompressed, totalLimit, noLocationLimit)
+			assert.Equal(t, cssExpectedReplacementCandidates[:expectedLen], res)
 		}
-		assert.Equal(t, cssExpectedReplacementCandidates[:max], res)
 	}
 }
 

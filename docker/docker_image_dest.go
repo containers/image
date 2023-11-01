@@ -341,39 +341,58 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 	// Then try reusing blobs from other locations.
 	candidates := options.Cache.CandidateLocations2(d.ref.Transport(), bicTransportScope(d.ref), info.Digest, options.CanSubstitute)
 	for _, candidate := range candidates {
-		candidateRepo, err := parseBICLocationReference(candidate.Location)
-		if err != nil {
-			logrus.Debugf("Error parsing BlobInfoCache location reference: %s", err)
-			continue
-		}
+		var err error
 		compressionOperation, compressionAlgorithm, err := blobinfocache.OperationAndAlgorithmForCompressor(candidate.CompressorName)
 		if err != nil {
 			logrus.Debugf("OperationAndAlgorithmForCompressor Failed: %v", err)
 			continue
+		}
+		var candidateRepo reference.Named
+		if !candidate.UnknownLocation {
+			candidateRepo, err = parseBICLocationReference(candidate.Location)
+			if err != nil {
+				logrus.Debugf("Error parsing BlobInfoCache location reference: %s", err)
+				continue
+			}
 		}
 		if !impl.BlobMatchesRequiredCompression(options, compressionAlgorithm) {
 			requiredCompression := "nil"
 			if compressionAlgorithm != nil {
 				requiredCompression = compressionAlgorithm.Name()
 			}
-			logrus.Debugf("Ignoring candidate blob %s as reuse candidate due to compression mismatch ( %s vs %s ) in %s", candidate.Digest.String(), options.RequiredCompression.Name(), requiredCompression, candidateRepo.Name())
+			if !candidate.UnknownLocation {
+				logrus.Debugf("Ignoring candidate blob %s as reuse candidate due to compression mismatch ( %s vs %s ) in %s", candidate.Digest.String(), options.RequiredCompression.Name(), requiredCompression, candidateRepo.Name())
+			} else {
+				logrus.Debugf("Ignoring candidate blob %s as reuse candidate due to compression mismatch ( %s vs %s ) with no location match, checking current repo", candidate.Digest.String(), options.RequiredCompression.Name(), requiredCompression)
+			}
 			continue
 		}
-		if candidate.CompressorName != blobinfocache.Uncompressed {
-			logrus.Debugf("Trying to reuse cached location %s compressed with %s in %s", candidate.Digest.String(), candidate.CompressorName, candidateRepo.Name())
+		if !candidate.UnknownLocation {
+			if candidate.CompressorName != blobinfocache.Uncompressed {
+				logrus.Debugf("Trying to reuse blob with cached digest %s compressed with %s in destination repo %s", candidate.Digest.String(), candidate.CompressorName, candidateRepo.Name())
+			} else {
+				logrus.Debugf("Trying to reuse blob with cached digest %s in destination repo %s", candidate.Digest.String(), candidateRepo.Name())
+			}
+			// Sanity checks:
+			if reference.Domain(candidateRepo) != reference.Domain(d.ref.ref) {
+				// OCI distribution spec 1.1 allows mounting blobs without specifying the source repo
+				// (the "from" parameter); in that case we might try to use these candidates as well.
+				//
+				// OTOH that would mean we can’t do the “blobExists” check, and if there is no match
+				// we could get an upload request that we would have to cancel.
+				logrus.Debugf("... Internal error: domain %s does not match destination %s", reference.Domain(candidateRepo), reference.Domain(d.ref.ref))
+				continue
+			}
 		} else {
-			logrus.Debugf("Trying to reuse cached location %s with no compression in %s", candidate.Digest.String(), candidateRepo.Name())
-		}
-
-		// Sanity checks:
-		if reference.Domain(candidateRepo) != reference.Domain(d.ref.ref) {
-			// OCI distribution spec 1.1 allows mounting blobs without specifying the source repo
-			// (the "from" parameter); in that case we might try to use these candidates as well.
-			//
-			// OTOH that would mean we can’t do the “blobExists” check, and if there is no match
-			// we could get an upload request that we would have to cancel.
-			logrus.Debugf("... Internal error: domain %s does not match destination %s", reference.Domain(candidateRepo), reference.Domain(d.ref.ref))
-			continue
+			if candidate.CompressorName != blobinfocache.Uncompressed {
+				logrus.Debugf("Trying to reuse blob with cached digest %s compressed with %s with no location match, checking current repo", candidate.Digest.String(), candidate.CompressorName)
+			} else {
+				logrus.Debugf("Trying to reuse blob with cached digest %s in destination repo with no location match, checking current repo", candidate.Digest.String())
+			}
+			// This digest is a known variant of this blob but we don’t
+			// have a recorded location in this registry, let’s try looking
+			// for it in the current repo.
+			candidateRepo = reference.TrimNamed(d.ref.ref)
 		}
 		if candidateRepo.Name() == d.ref.ref.Name() && candidate.Digest == info.Digest {
 			logrus.Debug("... Already tried the primary destination")

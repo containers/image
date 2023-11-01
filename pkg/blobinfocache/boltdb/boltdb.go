@@ -296,13 +296,14 @@ func (bdc *cache) RecordKnownLocation(transport types.ImageTransport, scope type
 	}) // FIXME? Log error (but throttle the log volume on repeated accesses)?
 }
 
-// appendReplacementCandidates creates prioritize.CandidateWithTime values for digest in scopeBucket with corresponding compression info from compressionBucket (if compressionBucket is not nil), and returns the result of appending them to candidates.
-func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateWithTime, scopeBucket, compressionBucket *bolt.Bucket, digest digest.Digest, requireCompressionInfo bool) []prioritize.CandidateWithTime {
+// appendReplacementCandidates creates prioritize.CandidateWithTime values for digest in scopeBucket
+// (which might be nil) with corresponding compression
+// info from compressionBucket (which might be nil), and returns the result of appending them
+// to candidates.
+// v2Output allows including candidates with unknown location, and filters out candidates
+// with unknown compression.
+func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateWithTime, scopeBucket, compressionBucket *bolt.Bucket, digest digest.Digest, v2Output bool) []prioritize.CandidateWithTime {
 	digestKey := []byte(digest.String())
-	b := scopeBucket.Bucket(digestKey)
-	if b == nil {
-		return candidates
-	}
 	compressorName := blobinfocache.UnknownCompression
 	if compressionBucket != nil {
 		// the bucket won't exist if the cache was created by a v1 implementation and
@@ -311,28 +312,44 @@ func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 			compressorName = string(compressorNameValue)
 		}
 	}
-	if compressorName == blobinfocache.UnknownCompression && requireCompressionInfo {
+	if compressorName == blobinfocache.UnknownCompression && v2Output {
 		return candidates
 	}
-	_ = b.ForEach(func(k, v []byte) error {
-		t := time.Time{}
-		if err := t.UnmarshalBinary(v); err != nil {
-			return err
-		}
+	var b *bolt.Bucket
+	if scopeBucket != nil {
+		b = scopeBucket.Bucket(digestKey)
+	}
+	if b != nil {
+		_ = b.ForEach(func(k, v []byte) error {
+			t := time.Time{}
+			if err := t.UnmarshalBinary(v); err != nil {
+				return err
+			}
+			candidates = append(candidates, prioritize.CandidateWithTime{
+				Candidate: blobinfocache.BICReplacementCandidate2{
+					Digest:         digest,
+					CompressorName: compressorName,
+					Location:       types.BICLocationReference{Opaque: string(k)},
+				},
+				LastSeen: t,
+			})
+			return nil
+		}) // FIXME? Log error (but throttle the log volume on repeated accesses)?
+	} else if v2Output {
 		candidates = append(candidates, prioritize.CandidateWithTime{
 			Candidate: blobinfocache.BICReplacementCandidate2{
-				Digest:         digest,
-				CompressorName: compressorName,
-				Location:       types.BICLocationReference{Opaque: string(k)},
+				Digest:          digest,
+				CompressorName:  compressorName,
+				UnknownLocation: true,
+				Location:        types.BICLocationReference{Opaque: ""},
 			},
-			LastSeen: t,
+			LastSeen: time.Time{},
 		})
-		return nil
-	}) // FIXME? Log error (but throttle the log volume on repeated accesses)?
+	}
 	return candidates
 }
 
-// CandidateLocations2 returns a prioritized, limited, number of blobs and their locations that could possibly be reused
+// CandidateLocations2 returns a prioritized, limited, number of blobs and their locations (if known) that could possibly be reused
 // within the specified (transport scope) (if they still exist, which is not guaranteed).
 //
 // If !canSubstitute, the returned candidates will match the submitted digest exactly; if canSubstitute,
@@ -342,27 +359,22 @@ func (bdc *cache) CandidateLocations2(transport types.ImageTransport, scope type
 	return bdc.candidateLocations(transport, scope, primaryDigest, canSubstitute, true)
 }
 
-func (bdc *cache) candidateLocations(transport types.ImageTransport, scope types.BICTransportScope, primaryDigest digest.Digest, canSubstitute, requireCompressionInfo bool) []blobinfocache.BICReplacementCandidate2 {
+func (bdc *cache) candidateLocations(transport types.ImageTransport, scope types.BICTransportScope, primaryDigest digest.Digest, canSubstitute, v2Output bool) []blobinfocache.BICReplacementCandidate2 {
 	res := []prioritize.CandidateWithTime{}
 	var uncompressedDigestValue digest.Digest // = ""
 	if err := bdc.view(func(tx *bolt.Tx) error {
 		scopeBucket := tx.Bucket(knownLocationsBucket)
-		if scopeBucket == nil {
-			return nil
+		if scopeBucket != nil {
+			scopeBucket = scopeBucket.Bucket([]byte(transport.Name()))
 		}
-		scopeBucket = scopeBucket.Bucket([]byte(transport.Name()))
-		if scopeBucket == nil {
-			return nil
-		}
-		scopeBucket = scopeBucket.Bucket([]byte(scope.Opaque))
-		if scopeBucket == nil {
-			return nil
+		if scopeBucket != nil {
+			scopeBucket = scopeBucket.Bucket([]byte(scope.Opaque))
 		}
 		// compressionBucket won't have been created if previous writers never recorded info about compression,
 		// and we don't want to fail just because of that
 		compressionBucket := tx.Bucket(digestCompressorBucket)
 
-		res = bdc.appendReplacementCandidates(res, scopeBucket, compressionBucket, primaryDigest, requireCompressionInfo)
+		res = bdc.appendReplacementCandidates(res, scopeBucket, compressionBucket, primaryDigest, v2Output)
 		if canSubstitute {
 			if uncompressedDigestValue = bdc.uncompressedDigest(tx, primaryDigest); uncompressedDigestValue != "" {
 				b := tx.Bucket(digestByUncompressedBucket)
@@ -375,7 +387,7 @@ func (bdc *cache) candidateLocations(transport types.ImageTransport, scope types
 								return err
 							}
 							if d != primaryDigest && d != uncompressedDigestValue {
-								res = bdc.appendReplacementCandidates(res, scopeBucket, compressionBucket, d, requireCompressionInfo)
+								res = bdc.appendReplacementCandidates(res, scopeBucket, compressionBucket, d, v2Output)
 							}
 							return nil
 						}); err != nil {
@@ -384,7 +396,7 @@ func (bdc *cache) candidateLocations(transport types.ImageTransport, scope types
 					}
 				}
 				if uncompressedDigestValue != primaryDigest {
-					res = bdc.appendReplacementCandidates(res, scopeBucket, compressionBucket, uncompressedDigestValue, requireCompressionInfo)
+					res = bdc.appendReplacementCandidates(res, scopeBucket, compressionBucket, uncompressedDigestValue, v2Output)
 				}
 			}
 		}
