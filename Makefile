@@ -24,6 +24,11 @@ GOMD2MAN ?= $(shell command -v go-md2man || echo '$(GOBIN)/go-md2man')
 MANPAGES_MD = $(wildcard docs/*.5.md)
 MANPAGES ?= $(MANPAGES_MD:%.md=%)
 
+# N/B: This value is managed by Renovate, manual changes are
+# possible, as long as they don't disturb the formatting
+# (i.e. DO NOT ADD A 'v' prefix!)
+GOLANGCI_LINT_VERSION := 1.51.0
+
 export PATH := $(PATH):${GOBIN}
 
 all: tools test validate .gitvalidation
@@ -55,7 +60,7 @@ tools: .install.gitvalidation .install.golangci-lint
 
 .install.golangci-lint:
 	if [ ! -x "$(GOBIN)/golangci-lint" ]; then \
-		curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(GOBIN) v1.51.0; \
+		curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(GOBIN) v$(GOLANGCI_LINT_VERSION) ; \
 	fi
 
 clean:
