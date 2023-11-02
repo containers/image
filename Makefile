@@ -46,7 +46,7 @@ cross:
 	GOOS=windows $(MAKE) build BUILDTAGS="$(BUILDTAGS) $(BUILD_TAGS_WINDOWS_CROSS)"
 	GOOS=darwin $(MAKE) build BUILDTAGS="$(BUILDTAGS) $(BUILD_TAGS_DARWIN_CROSS)"
 
-tools: .install.gitvalidation .install.golangci-lint .install.golint
+tools: .install.gitvalidation .install.golangci-lint
 
 .install.gitvalidation:
 	if [ ! -x "$(GOBIN)/git-validation" ]; then \
@@ -56,12 +56,6 @@ tools: .install.gitvalidation .install.golangci-lint .install.golint
 .install.golangci-lint:
 	if [ ! -x "$(GOBIN)/golangci-lint" ]; then \
 		curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(GOBIN) v1.51.0; \
-	fi
-
-.install.golint:
-	# Note, golint is only needed for Skopeo's tests.
-	if [ ! -x "$(GOBIN)/golint" ]; then \
-		GO111MODULE="off" go get -u $(BUILDFLAGS) golang.org/x/lint/golint; \
 	fi
 
 clean:
