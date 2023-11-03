@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -502,6 +503,23 @@ func prepareForEdit(sys *types.SystemContext, key string, keyRelevant bool) ([]s
 		isNamespaced = ns
 	}
 
+	if sys != nil && sys.DockerCompatAuthFilePath != "" {
+		if sys.AuthFilePath != "" {
+			return nil, nil, "", false, errors.New("AuthFilePath and DockerCompatAuthFilePath can not be set simultaneously")
+		}
+		if keyRelevant {
+			if isNamespaced {
+				return nil, nil, "", false, fmt.Errorf("Credentials cannot be recorded in Docker-compatible format with namespaced key %q", key)
+			}
+			if key == "docker.io" {
+				key = "https://index.docker.io/v1/"
+			}
+		}
+
+		// Do not use helpers defined in sysregistriesv2 because Docker isn’t aware of them.
+		return []string{sysregistriesv2.AuthenticationFileHelper}, modifyDockerConfigJSON, key, false, nil
+	}
+
 	helpers, err := sysregistriesv2.CredentialHelpers(sys)
 	if err != nil {
 		return nil, nil, "", false, err
@@ -526,8 +544,16 @@ func getPathToAuth(sys *types.SystemContext) (authPath, bool, error) {
 // it exists only to allow testing it with an artificial runtime.GOOS.
 func getPathToAuthWithOS(sys *types.SystemContext, goOS string) (authPath, bool, error) {
 	if sys != nil {
+		if sys.AuthFilePath != "" && sys.DockerCompatAuthFilePath != "" {
+			return authPath{}, false, errors.New("AuthFilePath and DockerCompatAuthFilePath can not be set simultaneously")
+		}
 		if sys.AuthFilePath != "" {
 			return newAuthPathDefault(sys.AuthFilePath), true, nil
+		}
+		// When reading, we can process auth.json and Docker’s config.json with the same code.
+		// When writing, prepareForEdit chooses an appropriate jsonEditor implementation.
+		if sys.DockerCompatAuthFilePath != "" {
+			return newAuthPathDefault(sys.DockerCompatAuthFilePath), true, nil
 		}
 		if sys.LegacyFormatAuthFilePath != "" {
 			return authPath{path: sys.LegacyFormatAuthFilePath, legacyFormat: true}, true, nil
@@ -635,6 +661,86 @@ func modifyJSON(sys *types.SystemContext, editor func(fileContents *dockerConfig
 
 	if description == "" {
 		description = path.path
+	}
+	return description, nil
+}
+
+// modifyDockerConfigJSON finds a docker config.json file, calls editor on the contents, and
+// writes it back if editor returns true.
+// Returns a human-readable description of the file, to be returned by SetCredentials.
+//
+// The editor may also return a human-readable description of the updated location; if it is "",
+// the file itself is used.
+func modifyDockerConfigJSON(sys *types.SystemContext, editor func(fileContents *dockerConfigFile) (bool, string, error)) (string, error) {
+	if sys == nil || sys.DockerCompatAuthFilePath == "" {
+		return "", errors.New("internal error: modifyDockerConfigJSON called with DockerCompatAuthFilePath not set")
+	}
+	path := sys.DockerCompatAuthFilePath
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return "", err
+	}
+
+	// Try hard not to clobber fields we don’t understand, even fields which may be added in future Docker versions.
+	var rawContents map[string]json.RawMessage
+	originalBytes, err := os.ReadFile(path)
+	switch {
+	case err == nil:
+		if err := json.Unmarshal(originalBytes, &rawContents); err != nil {
+			return "", fmt.Errorf("unmarshaling JSON at %q: %w", path, err)
+		}
+	case errors.Is(err, fs.ErrNotExist):
+		rawContents = map[string]json.RawMessage{}
+	default: // err != nil
+		return "", err
+	}
+
+	syntheticContents := dockerConfigFile{
+		AuthConfigs: map[string]dockerAuthConfig{},
+		CredHelpers: map[string]string{},
+	}
+	// json.Unmarshal also falls back to case-insensitive field matching; this code does not do that. Presumably
+	// config.json is mostly maintained by machines doing `docker login`, so the files should, hopefully, not contain field names with
+	// unexpected case.
+	if rawAuths, ok := rawContents["auths"]; ok {
+		// This conversion will lose fields we don’t know about; when updating an entry, we can’t tell whether an unknown field
+		// should be preserved or discarded (because it is made obsolete/unwanted with the new credentials).
+		// It might make sense to track which entries of "auths" we actually modified, and to not touch any others.
+		if err := json.Unmarshal(rawAuths, &syntheticContents.AuthConfigs); err != nil {
+			return "", fmt.Errorf(`unmarshaling "auths" in JSON at %q: %w`, path, err)
+		}
+	}
+	if rawCH, ok := rawContents["credHelpers"]; ok {
+		if err := json.Unmarshal(rawCH, &syntheticContents.CredHelpers); err != nil {
+			return "", fmt.Errorf(`unmarshaling "credHelpers" in JSON at %q: %w`, path, err)
+
+		}
+	}
+
+	updated, description, err := editor(&syntheticContents)
+	if err != nil {
+		return "", fmt.Errorf("updating %q: %w", path, err)
+	}
+	if updated {
+		rawAuths, err := json.MarshalIndent(syntheticContents.AuthConfigs, "", "\t")
+		if err != nil {
+			return "", fmt.Errorf("marshaling JSON %q: %w", path, err)
+		}
+		rawContents["auths"] = rawAuths
+		// We never modify syntheticContents.CredHelpers, so we don’t need to update it.
+		newData, err := json.MarshalIndent(rawContents, "", "\t")
+		if err != nil {
+			return "", fmt.Errorf("marshaling JSON %q: %w", path, err)
+		}
+
+		if err = ioutils.AtomicWriteFile(path, newData, 0600); err != nil {
+			return "", fmt.Errorf("writing to file %q: %w", path, err)
+		}
+	}
+
+	if description == "" {
+		description = path
 	}
 	return description, nil
 }

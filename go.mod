@@ -9,6 +9,7 @@ require (
 	github.com/containers/ocicrypt v1.1.9
 	github.com/containers/storage v1.50.3-0.20231101112703-6e72f11598fb
 	github.com/cyberphone/json-canonicalization v0.0.0-20231011164504-785e29786b46
+	github.com/distribution/reference v0.5.0
 	github.com/docker/cli v24.0.0+incompatible
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/docker/docker v24.0.7+incompatible
@@ -65,7 +66,6 @@ require (
 	github.com/coreos/go-oidc/v3 v3.7.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
