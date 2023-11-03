@@ -61,78 +61,6 @@ func newAuthPathDefault(path string) authPath {
 	return authPath{path: path, legacyFormat: false}
 }
 
-// SetCredentials stores the username and password in a location
-// appropriate for sys and the users’ configuration.
-// A valid key is a repository, a namespace within a registry, or a registry hostname;
-// using forms other than just a registry may fail depending on configuration.
-// Returns a human-readable description of the location that was updated.
-// NOTE: The return value is only intended to be read by humans; its form is not an API,
-// it may change (or new forms can be added) any time.
-func SetCredentials(sys *types.SystemContext, key, username, password string) (string, error) {
-	isNamespaced, err := validateKey(key)
-	if err != nil {
-		return "", err
-	}
-
-	helpers, err := sysregistriesv2.CredentialHelpers(sys)
-	if err != nil {
-		return "", err
-	}
-
-	// Make sure to collect all errors.
-	var multiErr error
-	for _, helper := range helpers {
-		var desc string
-		var err error
-		switch helper {
-		// Special-case the built-in helpers for auth files.
-		case sysregistriesv2.AuthenticationFileHelper:
-			desc, err = modifyJSON(sys, func(fileContents *dockerConfigFile) (bool, string, error) {
-				if ch, exists := fileContents.CredHelpers[key]; exists {
-					if isNamespaced {
-						return false, "", unsupportedNamespaceErr(ch)
-					}
-					desc, err := setCredsInCredHelper(ch, key, username, password)
-					if err != nil {
-						return false, "", err
-					}
-					return false, desc, nil
-				}
-				creds := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
-				newCreds := dockerAuthConfig{Auth: creds}
-				fileContents.AuthConfigs[key] = newCreds
-				return true, "", nil
-			})
-		// External helpers.
-		default:
-			if isNamespaced {
-				err = unsupportedNamespaceErr(helper)
-			} else {
-				desc, err = setCredsInCredHelper(helper, key, username, password)
-			}
-		}
-		if err != nil {
-			multiErr = multierror.Append(multiErr, err)
-			logrus.Debugf("Error storing credentials for %s in credential helper %s: %v", key, helper, err)
-			continue
-		}
-		logrus.Debugf("Stored credentials for %s in credential helper %s", key, helper)
-		return desc, nil
-	}
-	return "", multiErr
-}
-
-func unsupportedNamespaceErr(helper string) error {
-	return fmt.Errorf("namespaced key is not supported for credential helper %s", helper)
-}
-
-// SetAuthentication stores the username and password in the credential helper or file
-// See the documentation of SetCredentials for format of "key"
-func SetAuthentication(sys *types.SystemContext, key, username, password string) error {
-	_, err := SetCredentials(sys, key, username, password)
-	return err
-}
-
 // GetAllCredentials returns the registry credentials for all registries stored
 // in any of the configured credential helpers.
 func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthConfig, error) {
@@ -368,6 +296,78 @@ func getAuthenticationWithHomeDir(sys *types.SystemContext, key, homeDir string)
 		return "", "", fmt.Errorf("non-empty identity token found and this API doesn't support it: %w", ErrNotSupported)
 	}
 	return creds.Username, creds.Password, nil
+}
+
+// SetCredentials stores the username and password in a location
+// appropriate for sys and the users’ configuration.
+// A valid key is a repository, a namespace within a registry, or a registry hostname;
+// using forms other than just a registry may fail depending on configuration.
+// Returns a human-readable description of the location that was updated.
+// NOTE: The return value is only intended to be read by humans; its form is not an API,
+// it may change (or new forms can be added) any time.
+func SetCredentials(sys *types.SystemContext, key, username, password string) (string, error) {
+	isNamespaced, err := validateKey(key)
+	if err != nil {
+		return "", err
+	}
+
+	helpers, err := sysregistriesv2.CredentialHelpers(sys)
+	if err != nil {
+		return "", err
+	}
+
+	// Make sure to collect all errors.
+	var multiErr error
+	for _, helper := range helpers {
+		var desc string
+		var err error
+		switch helper {
+		// Special-case the built-in helpers for auth files.
+		case sysregistriesv2.AuthenticationFileHelper:
+			desc, err = modifyJSON(sys, func(fileContents *dockerConfigFile) (bool, string, error) {
+				if ch, exists := fileContents.CredHelpers[key]; exists {
+					if isNamespaced {
+						return false, "", unsupportedNamespaceErr(ch)
+					}
+					desc, err := setCredsInCredHelper(ch, key, username, password)
+					if err != nil {
+						return false, "", err
+					}
+					return false, desc, nil
+				}
+				creds := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
+				newCreds := dockerAuthConfig{Auth: creds}
+				fileContents.AuthConfigs[key] = newCreds
+				return true, "", nil
+			})
+		// External helpers.
+		default:
+			if isNamespaced {
+				err = unsupportedNamespaceErr(helper)
+			} else {
+				desc, err = setCredsInCredHelper(helper, key, username, password)
+			}
+		}
+		if err != nil {
+			multiErr = multierror.Append(multiErr, err)
+			logrus.Debugf("Error storing credentials for %s in credential helper %s: %v", key, helper, err)
+			continue
+		}
+		logrus.Debugf("Stored credentials for %s in credential helper %s", key, helper)
+		return desc, nil
+	}
+	return "", multiErr
+}
+
+func unsupportedNamespaceErr(helper string) error {
+	return fmt.Errorf("namespaced key is not supported for credential helper %s", helper)
+}
+
+// SetAuthentication stores the username and password in the credential helper or file
+// See the documentation of SetCredentials for format of "key"
+func SetAuthentication(sys *types.SystemContext, key, username, password string) error {
+	_, err := SetCredentials(sys, key, username, password)
+	return err
 }
 
 // RemoveAuthentication removes credentials for `key` from all possible
