@@ -306,12 +306,7 @@ func getAuthenticationWithHomeDir(sys *types.SystemContext, key, homeDir string)
 // NOTE: The return value is only intended to be read by humans; its form is not an API,
 // it may change (or new forms can be added) any time.
 func SetCredentials(sys *types.SystemContext, key, username, password string) (string, error) {
-	isNamespaced, err := validateKey(key)
-	if err != nil {
-		return "", err
-	}
-
-	helpers, err := sysregistriesv2.CredentialHelpers(sys)
+	helpers, jsonEditor, key, isNamespaced, err := prepareForEdit(sys, key, true)
 	if err != nil {
 		return "", err
 	}
@@ -324,7 +319,7 @@ func SetCredentials(sys *types.SystemContext, key, username, password string) (s
 		switch helper {
 		// Special-case the built-in helpers for auth files.
 		case sysregistriesv2.AuthenticationFileHelper:
-			desc, err = modifyJSON(sys, func(fileContents *dockerConfigFile) (bool, string, error) {
+			desc, err = jsonEditor(sys, func(fileContents *dockerConfigFile) (bool, string, error) {
 				if ch, exists := fileContents.CredHelpers[key]; exists {
 					if isNamespaced {
 						return false, "", unsupportedNamespaceErr(ch)
@@ -375,12 +370,7 @@ func SetAuthentication(sys *types.SystemContext, key, username, password string)
 // A valid key is a repository, a namespace within a registry, or a registry hostname;
 // using forms other than just a registry may fail depending on configuration.
 func RemoveAuthentication(sys *types.SystemContext, key string) error {
-	isNamespaced, err := validateKey(key)
-	if err != nil {
-		return err
-	}
-
-	helpers, err := sysregistriesv2.CredentialHelpers(sys)
+	helpers, jsonEditor, key, isNamespaced, err := prepareForEdit(sys, key, true)
 	if err != nil {
 		return err
 	}
@@ -411,7 +401,7 @@ func RemoveAuthentication(sys *types.SystemContext, key string) error {
 		switch helper {
 		// Special-case the built-in helper for auth files.
 		case sysregistriesv2.AuthenticationFileHelper:
-			_, err = modifyJSON(sys, func(fileContents *dockerConfigFile) (bool, string, error) {
+			_, err = jsonEditor(sys, func(fileContents *dockerConfigFile) (bool, string, error) {
 				if innerHelper, exists := fileContents.CredHelpers[key]; exists {
 					removeFromCredHelper(innerHelper)
 				}
@@ -443,7 +433,7 @@ func RemoveAuthentication(sys *types.SystemContext, key string) error {
 // RemoveAllAuthentication deletes all the credentials stored in credential
 // helpers and auth files.
 func RemoveAllAuthentication(sys *types.SystemContext) error {
-	helpers, err := sysregistriesv2.CredentialHelpers(sys)
+	helpers, jsonEditor, _, _, err := prepareForEdit(sys, "", false)
 	if err != nil {
 		return err
 	}
@@ -454,7 +444,7 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 		switch helper {
 		// Special-case the built-in helper for auth files.
 		case sysregistriesv2.AuthenticationFileHelper:
-			_, err = modifyJSON(sys, func(fileContents *dockerConfigFile) (bool, string, error) {
+			_, err = jsonEditor(sys, func(fileContents *dockerConfigFile) (bool, string, error) {
 				for registry, helper := range fileContents.CredHelpers {
 					// Helpers in auth files are expected
 					// to exist, so no special treatment
@@ -495,6 +485,29 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 	}
 
 	return multiErr
+}
+
+// prepareForEdit processes sys and key (if keyRelevant) to return:
+// - a list of credential helpers
+// - a function which can be used to edit the JSON file
+// - the key value to actually use in credential helpers / JSON
+// - a boolean which is true if key is namespaced (and should not be used with credential helpers).
+func prepareForEdit(sys *types.SystemContext, key string, keyRelevant bool) ([]string, func(*types.SystemContext, func(*dockerConfigFile) (bool, string, error)) (string, error), string, bool, error) {
+	var isNamespaced bool
+	if keyRelevant {
+		ns, err := validateKey(key)
+		if err != nil {
+			return nil, nil, "", false, err
+		}
+		isNamespaced = ns
+	}
+
+	helpers, err := sysregistriesv2.CredentialHelpers(sys)
+	if err != nil {
+		return nil, nil, "", false, err
+	}
+
+	return helpers, modifyJSON, key, isNamespaced, nil
 }
 
 func listCredsInCredHelper(credHelper string) (map[string]string, error) {
