@@ -37,15 +37,19 @@ var (
 		XzDecompressor, xzCompressor, func(x []byte) bool {
 			return hasPrefix(x, []byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00})
 		})
+
+	// zstdChunkedPrefix is the magic prefix for zstd chunked files.
+	zstdChunkedPrefix = []byte{0x28, 0xb5, 0x2f, 0xfd, 0x04, 0x70, 0x01, 0x00, 0x00, 0x99, 0xe9, 0xd8, 0x51, 0x50, 0x2a, 0x4d, 0x18, 0x0c, 0x00, 0x00, 0x00, 0x7a, 0x73, 0x74, 0x64, 0x3a, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x65, 0x64}
+
 	// Zstd compression.
 	Zstd = internal.NewAlgorithm(types.ZstdAlgorithmName, types.ZstdAlgorithmName,
 		ZstdDecompressor, zstdCompressor, func(x []byte) bool {
-			return hasPrefix(x, []byte{0x28, 0xb5, 0x2f, 0xfd})
+			return hasPrefix(x, []byte{0x28, 0xb5, 0x2f, 0xfd}) && !hasPrefix(x, zstdChunkedPrefix)
 		})
 	// ZstdChunked is a Zstd compression with chunk metadta which allows random access to individual files.
 	ZstdChunked = internal.NewAlgorithm(types.ZstdChunkedAlgorithmName, types.ZstdAlgorithmName, /* Note: InternalUnstableUndocumentedMIMEQuestionMark is not ZstdChunkedAlgorithmName */
 		ZstdDecompressor, compressor.ZstdCompressor, func(x []byte) bool {
-			return hasPrefix(x, []byte{0x28, 0xb5, 0x2f, 0xfd})
+			return hasPrefix(x, zstdChunkedPrefix)
 		})
 
 	compressionAlgorithms = map[string]Algorithm{
@@ -123,7 +127,7 @@ func CompressStreamWithMetadata(dest io.Writer, metadata map[string]string, algo
 // value and nil otherwise.
 // Because it consumes the start of input, other consumers must use the returned io.Reader instead to also read from the beginning.
 func DetectCompressionFormat(input io.Reader) (Algorithm, DecompressorFunc, io.Reader, error) {
-	buffer := [8]byte{}
+	buffer := [36]byte{}
 
 	n, err := io.ReadAtLeast(input, buffer[:], len(buffer))
 	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
