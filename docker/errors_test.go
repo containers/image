@@ -43,7 +43,7 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"Header1: Value1\r\n" +
 				"\r\n" +
 				"<html><body>JSON? What JSON?</body></html>\r\n",
-			errorString:       "StatusCode: 400, <html><body>JSON? What JSON?</body></html>\r\n",
+			errorString:       `StatusCode: 400, "<html><body>JSON? What JSON?</body></html>\r\n"`,
 			errorType:         nil,
 			unwrappedErrorPtr: &unwrappedUnexpectedHTTPResponseError,
 		},
@@ -161,7 +161,7 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"X-Docker-Size: -1\r\n" +
 				"\r\n" +
 				"Not found\r\n",
-			errorString:       "StatusCode: 404, Not found\r",
+			errorString:       `StatusCode: 404, "Not found\r"`,
 			errorType:         nil,
 			unwrappedErrorPtr: &unwrappedUnexpectedHTTPResponseError,
 			fn: func(t *testing.T, err error) {
