@@ -12,6 +12,6 @@ import (
 
 func WithRekor(rekorURL *url.URL) signerInternal.Option {
 	return func(s *signerInternal.SigstoreSigner) error {
-		return fmt.Errorf("Rekor disabled at build time")
+		return fmt.Errorf("rekor disabled at build time")
 	}
 }

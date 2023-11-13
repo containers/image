@@ -13,7 +13,7 @@ import (
 
 func WithFulcioAndPreexistingOIDCIDToken(fulcioURL *url.URL, oidcIDToken string) internal.Option {
 	return func(s *internal.SigstoreSigner) error {
-		return fmt.Errorf("Fulcio disabled at compile time")
+		return fmt.Errorf("fulcio disabled at compile time")
 	}
 }
 
@@ -24,7 +24,7 @@ func WithFulcioAndPreexistingOIDCIDToken(fulcioURL *url.URL, oidcIDToken string)
 func WithFulcioAndDeviceAuthorizationGrantOIDC(fulcioURL *url.URL, oidcIssuerURL *url.URL, oidcClientID, oidcClientSecret string,
 	interactiveOutput io.Writer) internal.Option {
 	return func(s *internal.SigstoreSigner) error {
-		return fmt.Errorf("Fulcio disabled at compile time")
+		return fmt.Errorf("fulcio disabled at compile time")
 	}
 }
 
@@ -40,6 +40,6 @@ func WithFulcioAndDeviceAuthorizationGrantOIDC(fulcioURL *url.URL, oidcIssuerURL
 func WithFulcioAndInteractiveOIDC(fulcioURL *url.URL, oidcIssuerURL *url.URL, oidcClientID, oidcClientSecret string,
 	interactiveInput io.Reader, interactiveOutput io.Writer) internal.Option {
 	return func(s *internal.SigstoreSigner) error {
-		return fmt.Errorf("Fulcio disabled at compile time")
+		return fmt.Errorf("fulcio disabled at compile time")
 	}
 }
