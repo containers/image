@@ -10,6 +10,10 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/types"
+	dockerReference "github.com/distribution/reference"
+	"github.com/docker/cli/cli/config"
+	configtypes "github.com/docker/cli/cli/config/types"
+	"github.com/docker/docker/registry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -447,6 +451,74 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	assert.ErrorContains(t, err, "unmarshaling JSON")
 }
 
+// TestGetCredentialsInteroperability verifies that Docker-created config files can be consumed by GetCredentials.
+func TestGetCredentialsInteroperability(t *testing.T) {
+	const testUser = "some-user"
+	const testPassword = "some-password"
+
+	for _, c := range []struct {
+		loginKey string // or "" for Docker's default. We must special-case that because (docker login docker.io) works, but (docker logout docker.io) doesn't!
+		queryKey string
+	}{
+		{"example.com", "example.com"},
+		{"example.com", "example.com/ns/repo"},
+		{"example.com:8000", "example.com:8000"},
+		{"example.com:8000", "example.com:8000/ns/repo"},
+		{"", "docker.io"},
+		{"", "docker.io/library/busybox"},
+		{"", "docker.io/notlibrary/busybox"},
+	} {
+		configDir := t.TempDir()
+		configPath := filepath.Join(configDir, config.ConfigFileName)
+
+		// Initially, there are no credentials
+		creds, err := GetCredentials(&types.SystemContext{DockerCompatAuthFilePath: configPath}, c.queryKey)
+		require.NoError(t, err)
+		assert.Equal(t, types.DockerAuthConfig{}, creds)
+
+		// Log in. This is intended to match github.com/docker/cli/command/registry.runLogin
+		serverAddress := c.loginKey
+		if serverAddress == "" {
+			serverAddress = registry.IndexServer
+		}
+		configFile, err := config.Load(configDir)
+		require.NoError(t, err)
+		err = configFile.GetCredentialsStore(serverAddress).Store(configtypes.AuthConfig{
+			ServerAddress: serverAddress,
+			Username:      testUser,
+			Password:      testPassword,
+		})
+		require.NoError(t, err)
+		// We can find the credentials.
+		creds, err = GetCredentials(&types.SystemContext{DockerCompatAuthFilePath: configPath}, c.queryKey)
+		require.NoError(t, err)
+		assert.Equal(t, types.DockerAuthConfig{
+			Username: testUser,
+			Password: testPassword,
+		}, creds)
+
+		// Log out. This is intended to match github.com/docker/cli/command/registry.runLogout
+		var regsToLogout []string
+		if c.loginKey == "" {
+			regsToLogout = []string{registry.IndexServer}
+		} else {
+			hostnameAddress := registry.ConvertToHostname(c.loginKey)
+			regsToLogout = []string{c.loginKey, hostnameAddress, "http://" + hostnameAddress, "https://" + hostnameAddress}
+		}
+		succeeded := false
+		for _, r := range regsToLogout {
+			if err := configFile.GetCredentialsStore(r).Erase(r); err == nil {
+				succeeded = true
+			}
+		}
+		require.True(t, succeeded)
+		// We can’t find the credentials any more.
+		creds, err = GetCredentials(&types.SystemContext{DockerCompatAuthFilePath: configPath}, c.queryKey)
+		require.NoError(t, err)
+		assert.Equal(t, types.DockerAuthConfig{}, creds)
+	}
+}
+
 func TestGetAllCredentials(t *testing.T) {
 	// Create a temporary authentication file.
 	tmpFile, err := os.CreateTemp("", "auth.json.")
@@ -784,6 +856,95 @@ func TestRemoveAuthentication(t *testing.T) {
 		require.NoError(t, err)
 
 		tc.assert(auth)
+	}
+}
+
+// TestSetCredentialsInteroperability verifies that our config files can be consumed by Docker.
+func TestSetCredentialsInteroperability(t *testing.T) {
+	const testUser = "some-user"
+	const testPassword = "some-password"
+
+	for _, c := range []struct {
+		loginKey      string // or "" for Docker's default. We must special-case that because (docker login docker.io) works, but (docker logout docker.io) doesn't!
+		queryRepo     string
+		otherContents bool
+		loginKeyError bool
+	}{
+		{loginKey: "example.com", queryRepo: "example.com/ns/repo"},
+		{loginKey: "example.com:8000", queryRepo: "example.com:8000/ns/repo"},
+		{loginKey: "docker.io", queryRepo: "docker.io/library/busybox"},
+		{loginKey: "docker.io", queryRepo: "docker.io/notlibrary/busybox"},
+		{loginKey: "example.com", queryRepo: "example.com/ns/repo", otherContents: true},
+		{loginKey: "example.com/ns", queryRepo: "example.com/ns/repo", loginKeyError: true},
+		{loginKey: "example.com:8000/ns", queryRepo: "example.com:8000/ns/repo", loginKeyError: true},
+	} {
+		configDir := t.TempDir()
+		configPath := filepath.Join(configDir, config.ConfigFileName)
+
+		// The credential lookups are intended to match github.com/docker/cli/command/image.RunPull .
+		dockerRef, err := dockerReference.ParseNormalizedNamed(c.queryRepo)
+		require.NoError(t, err)
+		dockerRef = dockerReference.TagNameOnly(dockerRef)
+		repoInfo, err := registry.ParseRepositoryInfo(dockerRef)
+		require.NoError(t, err)
+		configKey := repoInfo.Index.Name
+		if repoInfo.Index.Official {
+			configKey = registry.IndexServer
+		}
+
+		if c.otherContents {
+			err := os.WriteFile(configPath, []byte(`{"auths":{"unmodified-domain.example":{"identitytoken":"identity"}},`+
+				`"psFormat":"psFormatValue",`+
+				`"credHelpers":{"helper-domain.example":"helper-name"}`+
+				`}`), 0o700)
+			require.NoError(t, err)
+		}
+
+		// Initially, there are no credentials
+		configFile, err := config.Load(configDir)
+		require.NoError(t, err)
+		creds, err := configFile.GetCredentialsStore(configKey).Get(configKey)
+		require.NoError(t, err)
+		assert.Equal(t, configtypes.AuthConfig{}, creds)
+
+		// Log in.
+		_, err = SetCredentials(&types.SystemContext{DockerCompatAuthFilePath: configPath}, c.loginKey, testUser, testPassword)
+		if c.loginKeyError {
+			assert.Error(t, err)
+			continue
+		}
+		require.NoError(t, err)
+		// We can find the credentials.
+		configFile, err = config.Load(configDir)
+		require.NoError(t, err)
+		creds, err = configFile.GetCredentialsStore(configKey).Get(configKey)
+		require.NoError(t, err)
+		assert.Equal(t, configtypes.AuthConfig{
+			ServerAddress: configKey,
+			Username:      testUser,
+			Password:      testPassword,
+		}, creds)
+
+		// Log out.
+		err = RemoveAuthentication(&types.SystemContext{DockerCompatAuthFilePath: configPath}, c.loginKey)
+		require.NoError(t, err)
+		// We can’t find the credentials any more.
+		configFile, err = config.Load(configDir)
+		require.NoError(t, err)
+		creds, err = configFile.GetCredentialsStore(configKey).Get(configKey)
+		require.NoError(t, err)
+		assert.Equal(t, configtypes.AuthConfig{}, creds)
+
+		if c.otherContents {
+			creds, err = configFile.GetCredentialsStore("unmodified-domain.example").Get("unmodified-domain.example")
+			require.NoError(t, err)
+			assert.Equal(t, configtypes.AuthConfig{
+				ServerAddress: "unmodified-domain.example",
+				IdentityToken: "identity",
+			}, creds)
+			assert.Equal(t, "psFormatValue", configFile.PsFormat)
+			assert.Equal(t, map[string]string{"helper-domain.example": "helper-name"}, configFile.CredentialHelpers)
+		}
 	}
 }
 
