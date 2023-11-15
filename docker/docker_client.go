@@ -671,10 +671,14 @@ func parseRegistryWarningHeader(header string) string {
 
 	// warning-value = warn-code SP warn-agent SP warn-text	[ SP warn-date ]
 	// distribution-spec requires warn-code=299, warn-agent="-", warn-date missing
-	if !strings.HasPrefix(header, expectedPrefix) || !strings.HasSuffix(header, expectedSuffix) {
+	header, ok := strings.CutPrefix(header, expectedPrefix)
+	if !ok {
 		return ""
 	}
-	header = header[len(expectedPrefix) : len(header)-len(expectedSuffix)]
+	header, ok = strings.CutSuffix(header, expectedSuffix)
+	if !ok {
+		return ""
+	}
 
 	// ”Recipients that process the value of a quoted-string MUST handle a quoted-pair
 	// as if it were replaced by the octet following the backslash.”, so let’s do that…
