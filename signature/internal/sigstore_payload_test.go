@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -14,7 +15,6 @@ import (
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slices"
 )
 
 // A short-hand way to get a JSON object field value or panic. No error handling done, we know
@@ -284,7 +284,7 @@ func TestVerifySigstorePayload(t *testing.T) {
 	for _, invalidSig := range [][]byte{
 		{}, // Empty signature
 		[]byte("invalid signature"),
-		append(slices.Clone(validSignatureBytes), validSignatureBytes...),
+		append(bytes.Clone(validSignatureBytes), validSignatureBytes...),
 	} {
 		recorded = acceptanceData{}
 		res, err = VerifySigstorePayload(publicKey, sigstoreSig.UntrustedPayload(), base64.StdEncoding.EncodeToString(invalidSig), recordingRules)
