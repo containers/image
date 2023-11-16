@@ -15,9 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/swag"
-	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	sigstoreSignature "github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
@@ -171,6 +168,11 @@ func TestUntrustedRekorPayloadUnmarshalJSON(t *testing.T) {
 	}
 }
 
+// stringPointer is a helper to create *string fields in JSON data.
+func stringPointer(s string) *string {
+	return &s
+}
+
 func TestVerifyRekorSET(t *testing.T) {
 	cosignRekorKeyPEM, err := os.ReadFile("testdata/rekor.pub")
 	require.NoError(t, err)
@@ -246,22 +248,24 @@ func TestVerifyRekorSET(t *testing.T) {
 	cosignPayloadSHA256 := sha256.Sum256(cosignPayloadBytes)
 	cosignSigBytes, err := base64.StdEncoding.DecodeString(string(cosignSigBase64))
 	require.NoError(t, err)
-	validHashedRekord := models.Hashedrekord{
-		APIVersion: swag.String(HashedRekordV001APIVersion),
-		Spec: models.HashedrekordV001Schema{
-			Data: &models.HashedrekordV001SchemaData{
-				Hash: &models.HashedrekordV001SchemaDataHash{
-					Algorithm: swag.String(models.HashedrekordV001SchemaDataHashAlgorithmSha256),
-					Value:     swag.String(hex.EncodeToString(cosignPayloadSHA256[:])),
-				},
-			},
-			Signature: &models.HashedrekordV001SchemaSignature{
-				Content: strfmt.Base64(cosignSigBytes),
-				PublicKey: &models.HashedrekordV001SchemaSignaturePublicKey{
-					Content: strfmt.Base64(cosignCertBytes),
-				},
+	validHashedRekordSpec, err := json.Marshal(RekorHashedrekordV001Schema{
+		Data: &RekorHashedrekordV001SchemaData{
+			Hash: &RekorHashedrekordV001SchemaDataHash{
+				Algorithm: stringPointer(RekorHashedrekordV001SchemaDataHashAlgorithmSha256),
+				Value:     stringPointer(hex.EncodeToString(cosignPayloadSHA256[:])),
 			},
 		},
+		Signature: &RekorHashedrekordV001SchemaSignature{
+			Content: cosignSigBytes,
+			PublicKey: &RekorHashedrekordV001SchemaSignaturePublicKey{
+				Content: cosignCertBytes,
+			},
+		},
+	})
+	require.NoError(t, err)
+	validHashedRekord := RekorHashedrekord{
+		APIVersion: stringPointer(RekorHashedRekordV001APIVersion),
+		Spec:       validHashedRekordSpec,
 	}
 	validHashedRekordJSON, err := json.Marshal(validHashedRekord)
 	require.NoError(t, err)
