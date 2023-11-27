@@ -184,6 +184,12 @@ Supported scopes are paths to Singularity images, and their parent directories
 
 The `tarball:` transport is an implementation detail of some import workflows. Only the default `""` scope is supported.
 
+### `containers-storage:`
+
+The `containers-storage` transport refers to the image location in a local containers storage.
+
+Supported scopes are for a specific image(s) or `""` for all images located in the containers-storage.
+
 ## Policy Requirements
 
 Using the mechanisms above, a set of policy requirements is looked up.  The policy requirements
@@ -472,6 +478,9 @@ selectively allow individual transports and scopes as desired.
                     }
                 }
             ]
+        },
+        "containers-storage": {
+            "": [{"type": "insecureAcceptAnything"}] /* Allow copy operations on any images stored in containers storage */
         }
     }
 }
