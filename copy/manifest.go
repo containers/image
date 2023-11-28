@@ -19,8 +19,8 @@ import (
 // Include v2s1 signed but not v2s1 unsigned, because docker/distribution requires a signature even if the unsigned MIME type is used.
 var preferredManifestMIMETypes = []string{manifest.DockerV2Schema2MediaType, manifest.DockerV2Schema1SignedMediaType}
 
-// ociEncryptionMIMETypes lists manifest MIME types that are known to support OCI encryption.
-var ociEncryptionMIMETypes = []string{v1.MediaTypeImageManifest}
+// allManifestMIMETypes lists all possible manifest MIME types.
+var allManifestMIMETypes = []string{v1.MediaTypeImageManifest, manifest.DockerV2Schema2MediaType, manifest.DockerV2Schema1SignedMediaType, manifest.DockerV2Schema1MediaType}
 
 // orderedSet is a list of strings (MIME types or platform descriptors in our case), with each string appearing at most once.
 type orderedSet struct {
@@ -87,7 +87,7 @@ func determineManifestConversion(in determineManifestConversionInputs) (manifest
 				otherMIMETypeCandidates: []string{},
 			}, nil
 		}
-		destSupportedManifestMIMETypes = ociEncryptionMIMETypes
+		destSupportedManifestMIMETypes = allManifestMIMETypes
 	}
 	supportedByDest := set.New[string]()
 	for _, t := range destSupportedManifestMIMETypes {
@@ -96,7 +96,7 @@ func determineManifestConversion(in determineManifestConversionInputs) (manifest
 		}
 	}
 	if supportedByDest.Empty() {
-		if len(destSupportedManifestMIMETypes) == 0 { // Coverage: This should never happen, empty values were replaced by ociEncryptionMIMETypes
+		if len(destSupportedManifestMIMETypes) == 0 { // Coverage: This should never happen, empty values were replaced by allManifestMIMETypes
 			return manifestConversionPlan{}, errors.New("internal error: destSupportedManifestMIMETypes is empty")
 		}
 		// We know, and have verified, that destSupportedManifestMIMETypes is not empty, so encryption must have been involved.
@@ -108,8 +108,8 @@ func determineManifestConversion(in determineManifestConversionInputs) (manifest
 			return manifestConversionPlan{}, fmt.Errorf("encryption required together with format %s, which does not support encryption",
 				in.forceManifestMIMEType)
 		}
-		if len(in.destSupportedManifestMIMETypes) == 0 { // 2. destination accepts anything and we have chosen ociEncryptionMIMETypes
-			// Coverage: This should never happen, ociEncryptionMIMETypes all support encryption
+		if len(in.destSupportedManifestMIMETypes) == 0 { // 2. destination accepts anything and we have chosen allManifestTypes
+			// Coverage: This should never happen, allManifestTypes includes OCI, which supports encryption
 			return manifestConversionPlan{}, errors.New("internal error: in.destSupportedManifestMIMETypes is empty but supportedByDest is empty as well")
 		}
 		// 3. destination does not support encryption.
@@ -156,7 +156,7 @@ func determineManifestConversion(in determineManifestConversionInputs) (manifest
 	}
 
 	logrus.Debugf("Manifest has MIME type %s, ordered candidate list [%s]", srcType, strings.Join(prioritizedTypes.list, ", "))
-	if len(prioritizedTypes.list) == 0 { // Coverage: destSupportedManifestMIMETypes and supportedByDest, which is a subset, is not empty (or we would have exited  above), so this should never happen.
+	if len(prioritizedTypes.list) == 0 { // Coverage: destSupportedManifestMIMETypes and supportedByDest, which is a subset, is not empty (or we would have exited above), so this should never happen.
 		return manifestConversionPlan{}, errors.New("Internal error: no candidate MIME types")
 	}
 	res := manifestConversionPlan{
