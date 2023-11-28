@@ -61,6 +61,10 @@ type Schema2HealthConfig struct {
 	// Retries is the number of consecutive failures needed to consider a container as unhealthy.
 	// Zero means inherit.
 	Retries int `json:",omitempty"`
+
+	// IsKubeHealthCheck is used to keep track of whether we are running health check from a kube yaml. If it is from a kube yaml
+	// then the start period will behave differently to match what k8s does
+	IsKubeHealthCheck bool `json:",omitempty"`
 }
 
 // Schema2Config is a Config in docker/docker/api/types/container.
