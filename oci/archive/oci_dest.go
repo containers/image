@@ -173,6 +173,7 @@ func tarDirectory(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("retrieving stream of bytes from %q: %w", src, err)
 	}
+	defer input.Close()
 
 	// creates the tar file
 	outFile, err := os.Create(dst)
