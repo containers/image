@@ -1,10 +1,12 @@
 package manifest
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/containers/image/v5/pkg/compression"
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
@@ -130,5 +132,53 @@ func TestNormalizedMIMEType(t *testing.T) {
 	} {
 		res := NormalizedMIMEType(c)
 		assert.Equal(t, DockerV2Schema1SignedMediaType, res, c)
+	}
+}
+
+func TestCompressionAlgorithmIsUniversallySupported(t *testing.T) {
+	for _, algo := range []compression.Algorithm{compression.Gzip} {
+		res := CompressionAlgorithmIsUniversallySupported(algo)
+		assert.True(t, res, algo.Name())
+	}
+
+	for _, algo := range []compression.Algorithm{
+		compression.Bzip2,
+		compression.Xz,
+		compression.Zstd,
+		compression.ZstdChunked,
+	} {
+		res := CompressionAlgorithmIsUniversallySupported(algo)
+		assert.False(t, res, algo.Name())
+	}
+}
+
+func TestMIMETypeSupportsCompressionAlgorithm(t *testing.T) {
+	allMIMETypes := []string{imgspecv1.MediaTypeImageManifest, DockerV2Schema2MediaType, DockerV2Schema1SignedMediaType, DockerV2Schema1MediaType}
+
+	for _, algo := range []compression.Algorithm{compression.Gzip} {
+		for _, mt := range allMIMETypes {
+			res := MIMETypeSupportsCompressionAlgorithm(mt, algo)
+			assert.True(t, res, fmt.Sprintf("%s, %s", mt, algo.Name()))
+		}
+	}
+
+	for _, algo := range []compression.Algorithm{
+		compression.Bzip2,
+		compression.Xz,
+	} {
+		for _, mt := range allMIMETypes {
+			res := MIMETypeSupportsCompressionAlgorithm(mt, algo)
+			assert.False(t, res, fmt.Sprintf("%s, %s", mt, algo.Name()))
+		}
+	}
+
+	for _, algo := range []compression.Algorithm{
+		compression.Zstd,
+		compression.ZstdChunked,
+	} {
+		for _, mt := range allMIMETypes {
+			res := MIMETypeSupportsCompressionAlgorithm(mt, algo)
+			assert.Equal(t, mt == imgspecv1.MediaTypeImageManifest, res, fmt.Sprintf("%s, %s", mt, algo.Name()))
+		}
 	}
 }
