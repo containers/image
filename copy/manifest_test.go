@@ -8,6 +8,7 @@ import (
 
 	"github.com/containers/image/v5/internal/testing/mocks"
 	"github.com/containers/image/v5/manifest"
+	"github.com/containers/image/v5/pkg/compression"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -216,10 +217,11 @@ func TestDetermineManifestConversion(t *testing.T) {
 		}, res, c.description)
 	}
 
-	// When encryption is required:
+	// When encryption or zstd is required:
+	// In both of these cases, we we are restricted to OCI
 	for _, c := range []struct {
 		description string
-		in          determineManifestConversionInputs // with requiresOCIEncryption implied
+		in          determineManifestConversionInputs // with requiresOCIEncryption or requestedCompressionFormat: zstd implied
 		expected    manifestConversionPlan            // Or {} to expect a failure
 	}{
 		{ // Destination accepts anything - no conversion necessary
@@ -234,7 +236,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 				otherMIMETypeCandidates:          []string{},
 			},
 		},
-		{ // Destination accepts anything - need to convert for encryption
+		{ // Destination accepts anything - need to convert to OCI
 			"s2→anything",
 			determineManifestConversionInputs{
 				srcMIMEType:                    manifest.DockerV2Schema2MediaType,
@@ -246,7 +248,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 				otherMIMETypeCandidates:          []string{},
 			},
 		},
-		// Destination accepts an encrypted format
+		// Destination accepts OCI
 		{
 			"OCI→OCI",
 			determineManifestConversionInputs{
@@ -271,7 +273,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 				otherMIMETypeCandidates:          []string{},
 			},
 		},
-		// Destination does not accept an encrypted format
+		// Destination does not accept OCI
 		{
 			"OCI→s2",
 			determineManifestConversionInputs{
@@ -289,9 +291,9 @@ func TestDetermineManifestConversion(t *testing.T) {
 			manifestConversionPlan{},
 		},
 		// Whatever the input is, with cannotModifyManifestReason we return "keep the original as is".
-		// Still, encryption is necessarily going to fail…
+		// Still, encryption/compression is necessarily going to fail…
 		{
-			"OCI→OCI cannotModifyManifestReason",
+			"OCI cannotModifyManifestReason",
 			determineManifestConversionInputs{
 				srcMIMEType:                    v1.MediaTypeImageManifest,
 				destSupportedManifestMIMETypes: supportS1S2OCI,
@@ -304,7 +306,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 			},
 		},
 		{
-			"s2→OCI cannotModifyManifestReason",
+			"s2 cannotModifyManifestReason",
 			determineManifestConversionInputs{
 				srcMIMEType:                    manifest.DockerV2Schema2MediaType,
 				destSupportedManifestMIMETypes: supportS1S2OCI,
@@ -316,7 +318,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 				otherMIMETypeCandidates:          []string{},
 			},
 		},
-		// forceManifestMIMEType to a type that supports encryption
+		// forceManifestMIMEType to a type that supports OCI features
 		{
 			"OCI→OCI forced",
 			determineManifestConversionInputs{
@@ -343,7 +345,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 				otherMIMETypeCandidates:          []string{},
 			},
 		},
-		// forceManifestMIMEType to a type that does not support encryption
+		// forceManifestMIMEType to a type that does not support OCI features
 		{
 			"OCI→s2 forced",
 			determineManifestConversionInputs{
@@ -363,15 +365,153 @@ func TestDetermineManifestConversion(t *testing.T) {
 			manifestConversionPlan{},
 		},
 	} {
-		in := c.in
-		in.requiresOCIEncryption = true
-		res, err := determineManifestConversion(in)
-		if c.expected.preferredMIMEType != "" {
-			require.NoError(t, err, c.description)
-			assert.Equal(t, c.expected, res, c.description)
-		} else {
-			assert.Error(t, err, c.description)
+		for _, restriction := range []struct {
+			description string
+			edit        func(in *determineManifestConversionInputs)
+		}{
+			{
+				description: "encrypted",
+				edit: func(in *determineManifestConversionInputs) {
+					in.requiresOCIEncryption = true
+				},
+			},
+			{
+				description: "zstd",
+				edit: func(in *determineManifestConversionInputs) {
+					in.requestedCompressionFormat = &compression.Zstd
+				},
+			},
+			{
+				description: "zstd:chunked",
+				edit: func(in *determineManifestConversionInputs) {
+					in.requestedCompressionFormat = &compression.ZstdChunked
+				},
+			},
+			{
+				description: "encrypted+zstd",
+				edit: func(in *determineManifestConversionInputs) {
+					in.requiresOCIEncryption = true
+					in.requestedCompressionFormat = &compression.Zstd
+				},
+			},
+		} {
+			desc := c.description + " / " + restriction.description
+
+			in := c.in
+			restriction.edit(&in)
+			res, err := determineManifestConversion(in)
+			if c.expected.preferredMIMEType != "" {
+				require.NoError(t, err, desc)
+				assert.Equal(t, c.expected, res, desc)
+			} else {
+				assert.Error(t, err, desc)
+			}
 		}
+	}
+
+	// When encryption using a completely unsupported algorithm is required:
+	for _, c := range []struct {
+		description string
+		in          determineManifestConversionInputs // with requiresOCIEncryption or requestedCompressionFormat: zstd implied
+	}{
+		{ // Destination accepts anything
+			"OCI→anything",
+			determineManifestConversionInputs{
+				srcMIMEType:                    v1.MediaTypeImageManifest,
+				destSupportedManifestMIMETypes: nil,
+			},
+		},
+		{ // Destination accepts anything - need to convert to OCI
+			"s2→anything",
+			determineManifestConversionInputs{
+				srcMIMEType:                    manifest.DockerV2Schema2MediaType,
+				destSupportedManifestMIMETypes: nil,
+			},
+		},
+		// Destination only supports some formats
+		{
+			"OCI→OCI",
+			determineManifestConversionInputs{
+				srcMIMEType:                    v1.MediaTypeImageManifest,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+			},
+		},
+		{
+			"s2→OCI",
+			determineManifestConversionInputs{
+				srcMIMEType:                    manifest.DockerV2Schema2MediaType,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+			},
+		},
+		{
+			"OCI→s2",
+			determineManifestConversionInputs{
+				srcMIMEType:                    v1.MediaTypeImageManifest,
+				destSupportedManifestMIMETypes: supportS1S2,
+			},
+		},
+		{
+			"s2→s2",
+			determineManifestConversionInputs{
+				srcMIMEType:                    manifest.DockerV2Schema2MediaType,
+				destSupportedManifestMIMETypes: supportS1S2,
+			},
+		},
+		// cannotModifyManifestReason
+		{
+			"OCI cannotModifyManifestReason",
+			determineManifestConversionInputs{
+				srcMIMEType:                    v1.MediaTypeImageManifest,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+				cannotModifyManifestReason:     "Preserving digests",
+			},
+		},
+		{
+			"s2 cannotModifyManifestReason",
+			determineManifestConversionInputs{
+				srcMIMEType:                    manifest.DockerV2Schema2MediaType,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+				cannotModifyManifestReason:     "Preserving digests",
+			},
+		},
+		// forceManifestMIMEType
+		{
+			"OCI→OCI forced",
+			determineManifestConversionInputs{
+				srcMIMEType:                    v1.MediaTypeImageManifest,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+				forceManifestMIMEType:          v1.MediaTypeImageManifest,
+			},
+		},
+		{
+			"s2→OCI forced",
+			determineManifestConversionInputs{
+				srcMIMEType:                    manifest.DockerV2Schema2MediaType,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+				forceManifestMIMEType:          v1.MediaTypeImageManifest,
+			},
+		},
+		{
+			"OCI→s2 forced",
+			determineManifestConversionInputs{
+				srcMIMEType:                    v1.MediaTypeImageManifest,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+				forceManifestMIMEType:          manifest.DockerV2Schema2MediaType,
+			},
+		},
+		{
+			"s2→s2 forced",
+			determineManifestConversionInputs{
+				srcMIMEType:                    manifest.DockerV2Schema2MediaType,
+				destSupportedManifestMIMETypes: supportS1S2OCI,
+				forceManifestMIMEType:          manifest.DockerV2Schema2MediaType,
+			},
+		},
+	} {
+		in := c.in
+		in.requestedCompressionFormat = &compression.Xz
+		_, err := determineManifestConversion(in)
+		assert.Error(t, err, c.description)
 	}
 }
 
