@@ -40,10 +40,13 @@ By default, uses the authorization state in `$XDG_RUNTIME_DIR/containers/auth.js
 If the authorization state is not found there, `$HOME/.docker/config.json` is checked, which is set using docker-login(1).
 The containers-registries.conf(5) further allows for configuring various settings of a registry.
 
-Note that a _docker-reference_ has the following format: `name[:tag|@digest]`.
+Note that a _docker-reference_ has the following format: _name_[**:**_tag_ | **@**_digest_].
 While the docker transport does not support both a tag and a digest at the same time some formats like containers-storage do.
 Digests can also be used in an image destination as long as the manifest matches the provided digest.
+
+The docker transport supports pushing images without a tag or digest to a registry when the image name is suffixed with **@@unknown-digest@@**. The _name_**@@unknown-digest@@** reference format cannot be used with a reference that has a tag or digest.
 The digest of images can be explored with skopeo-inspect(1).
+
 If `name` does not contain a slash, it is treated as `docker.io/library/name`.
 Otherwise, the component before the first slash is checked if it is recognized as a `hostname[:port]` (i.e., it contains either a . or a :, or the component is exactly localhost).
 If the first component of name is not recognized as a `hostname[:port]`, `name` is treated as `docker.io/name`.
