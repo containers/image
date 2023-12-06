@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBlobMatchesRequiredCompression(t *testing.T) {
+func TestCandidateMatchesTryReusingBlobOptions(t *testing.T) {
 	var opts private.TryReusingBlobOptions
 	cases := []struct {
 		requiredCompression  *compressionTypes.Algorithm
@@ -24,6 +24,6 @@ func TestBlobMatchesRequiredCompression(t *testing.T) {
 
 	for _, c := range cases {
 		opts = private.TryReusingBlobOptions{RequiredCompression: c.requiredCompression}
-		assert.Equal(t, c.result, BlobMatchesRequiredCompression(opts, c.candidateCompression))
+		assert.Equal(t, c.result, CandidateMatchesTryReusingBlobOptions(opts, c.candidateCompression))
 	}
 }

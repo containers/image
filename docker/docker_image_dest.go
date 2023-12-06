@@ -321,7 +321,7 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 		return false, private.ReusedBlob{}, errors.New("Can not check for a blob with unknown digest")
 	}
 
-	if impl.OriginalBlobMatchesRequiredCompression(options) {
+	if impl.OriginalCandidateMatchesTryReusingBlobOptions(options) {
 		// First, check whether the blob happens to already exist at the destination.
 		haveBlob, reusedInfo, err := d.tryReusingExactBlob(ctx, info, options.Cache)
 		if err != nil {
@@ -355,7 +355,7 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 				continue
 			}
 		}
-		if !impl.BlobMatchesRequiredCompression(options, compressionAlgorithm) {
+		if !impl.CandidateMatchesTryReusingBlobOptions(options, compressionAlgorithm) {
 			requiredCompression := "nil"
 			if compressionAlgorithm != nil {
 				requiredCompression = compressionAlgorithm.Name()
