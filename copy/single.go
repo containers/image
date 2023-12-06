@@ -691,10 +691,8 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 		// Fixing that will probably require passing more information to TryReusingBlob() than the current version of
 		// the ImageDestination interface lets us pass in.
 		var requiredCompression *compressiontypes.Algorithm
-		var originalCompression *compressiontypes.Algorithm
 		if ic.requireCompressionFormatMatch {
 			requiredCompression = ic.compressionFormat
-			originalCompression = srcInfo.CompressionAlgorithm
 		}
 
 		// Check if we have a chunked layer in storage that's based on that blob.  These layers are stored by their TOC digest.
@@ -710,7 +708,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 			LayerIndex:          &layerIndex,
 			SrcRef:              srcRef,
 			RequiredCompression: requiredCompression,
-			OriginalCompression: originalCompression,
+			OriginalCompression: srcInfo.CompressionAlgorithm,
 			TOCDigest:           tocDigest,
 		})
 		if err != nil {
