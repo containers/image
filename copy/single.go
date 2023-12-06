@@ -33,6 +33,7 @@ type imageCopier struct {
 	c                             *copier
 	manifestUpdates               *types.ManifestUpdateOptions
 	src                           *image.SourcedImage
+	manifestConversionPlan        manifestConversionPlan
 	diffIDsAreNeeded              bool
 	cannotModifyManifestReason    string // The reason the manifest cannot be modified, or an empty string if it can
 	canSubstituteBlobs            bool
@@ -136,7 +137,7 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 		c:               c,
 		manifestUpdates: &types.ManifestUpdateOptions{InformationOnly: types.ManifestUpdateInformation{Destination: c.dest}},
 		src:             src,
-		// diffIDsAreNeeded is computed later
+		// manifestConversionPlan and diffIDsAreNeeded are computed later
 		cannotModifyManifestReason:    cannotModifyManifestReason,
 		requireCompressionFormatMatch: opts.requireCompressionFormatMatch,
 	}
@@ -164,7 +165,7 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 
 	destRequiresOciEncryption := (isEncrypted(src) && ic.c.options.OciDecryptConfig == nil) || c.options.OciEncryptLayers != nil
 
-	manifestConversionPlan, err := determineManifestConversion(determineManifestConversionInputs{
+	ic.manifestConversionPlan, err = determineManifestConversion(determineManifestConversionInputs{
 		srcMIMEType:                    ic.src.ManifestMIMEType,
 		destSupportedManifestMIMETypes: ic.c.dest.SupportedManifestMIMETypes(),
 		forceManifestMIMEType:          c.options.ForceManifestMIMEType,
@@ -179,8 +180,8 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 	// code that calls copyUpdatedConfigAndManifest, so that other parts of the copy code
 	// (e.g. the UpdatedImageNeedsLayerDiffIDs check just below) can make decisions based
 	// on the expected destination format.
-	if manifestConversionPlan.preferredMIMETypeNeedsConversion {
-		ic.manifestUpdates.ManifestMIMEType = manifestConversionPlan.preferredMIMEType
+	if ic.manifestConversionPlan.preferredMIMETypeNeedsConversion {
+		ic.manifestUpdates.ManifestMIMEType = ic.manifestConversionPlan.preferredMIMEType
 	}
 
 	// If src.UpdatedImageNeedsLayerDiffIDs(ic.manifestUpdates) will be true, it needs to be true by the time we get here.
@@ -219,11 +220,11 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 	manifestBytes, manifestDigest, err := ic.copyUpdatedConfigAndManifest(ctx, targetInstance)
 	wipResult := copySingleImageResult{
 		manifest:         manifestBytes,
-		manifestMIMEType: manifestConversionPlan.preferredMIMEType,
+		manifestMIMEType: ic.manifestConversionPlan.preferredMIMEType,
 		manifestDigest:   manifestDigest,
 	}
 	if err != nil {
-		logrus.Debugf("Writing manifest using preferred type %s failed: %v", manifestConversionPlan.preferredMIMEType, err)
+		logrus.Debugf("Writing manifest using preferred type %s failed: %v", ic.manifestConversionPlan.preferredMIMEType, err)
 		// … if it fails, and the failure is either because the manifest is rejected by the registry, or
 		// because we failed to create a manifest of the specified type because the specific manifest type
 		// doesn't support the type of compression we're trying to use (e.g. docker v2s2 and zstd), we may
@@ -232,13 +233,13 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 		var manifestLayerCompressionIncompatibilityError manifest.ManifestLayerCompressionIncompatibilityError
 		isManifestRejected := errors.As(err, &manifestTypeRejectedError)
 		isCompressionIncompatible := errors.As(err, &manifestLayerCompressionIncompatibilityError)
-		if (!isManifestRejected && !isCompressionIncompatible) || len(manifestConversionPlan.otherMIMETypeCandidates) == 0 {
+		if (!isManifestRejected && !isCompressionIncompatible) || len(ic.manifestConversionPlan.otherMIMETypeCandidates) == 0 {
 			// We don’t have other options.
 			// In principle the code below would handle this as well, but the resulting  error message is fairly ugly.
 			// Don’t bother the user with MIME types if we have no choice.
 			return copySingleImageResult{}, err
 		}
-		// If the original MIME type is acceptable, determineManifestConversion always uses it as manifestConversionPlan.preferredMIMEType.
+		// If the original MIME type is acceptable, determineManifestConversion always uses it as ic.manifestConversionPlan.preferredMIMEType.
 		// So if we are here, we will definitely be trying to convert the manifest.
 		// With ic.cannotModifyManifestReason != "", that would just be a string of repeated failures for the same reason,
 		// so let’s bail out early and with a better error message.
@@ -247,8 +248,8 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 		}
 
 		// errs is a list of errors when trying various manifest types. Also serves as an "upload succeeded" flag when set to nil.
-		errs := []string{fmt.Sprintf("%s(%v)", manifestConversionPlan.preferredMIMEType, err)}
-		for _, manifestMIMEType := range manifestConversionPlan.otherMIMETypeCandidates {
+		errs := []string{fmt.Sprintf("%s(%v)", ic.manifestConversionPlan.preferredMIMEType, err)}
+		for _, manifestMIMEType := range ic.manifestConversionPlan.otherMIMETypeCandidates {
 			logrus.Debugf("Trying to use manifest type %s…", manifestMIMEType)
 			ic.manifestUpdates.ManifestMIMEType = manifestMIMEType
 			attemptedManifest, attemptedManifestDigest, err := ic.copyUpdatedConfigAndManifest(ctx, targetInstance)
