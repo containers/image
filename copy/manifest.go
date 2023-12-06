@@ -82,11 +82,11 @@ func determineManifestConversion(in determineManifestConversionInputs) (manifest
 	if in.forceManifestMIMEType != "" {
 		destSupportedManifestMIMETypes = []string{in.forceManifestMIMEType}
 	}
-
-	restrictiveCompressionRequired := in.requestedCompressionFormat != nil && !internalManifest.CompressionAlgorithmIsUniversallySupported(*in.requestedCompressionFormat)
 	if len(destSupportedManifestMIMETypes) == 0 {
 		destSupportedManifestMIMETypes = allManifestMIMETypes
 	}
+
+	restrictiveCompressionRequired := in.requestedCompressionFormat != nil && !internalManifest.CompressionAlgorithmIsUniversallySupported(*in.requestedCompressionFormat)
 	supportedByDest := set.New[string]()
 	for _, t := range destSupportedManifestMIMETypes {
 		if in.requiresOCIEncryption && !manifest.MIMETypeSupportsEncryption(t) {
