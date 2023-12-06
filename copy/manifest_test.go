@@ -56,13 +56,13 @@ func TestDetermineManifestConversion(t *testing.T) {
 		destTypes   []string
 		expected    manifestConversionPlan
 	}{
-		// Destination accepts anything — no conversion necessary
+		// Destination accepts anything — consider all options, prefer the source format
 		{
 			"s1→anything", manifest.DockerV2Schema1SignedMediaType, nil,
 			manifestConversionPlan{
 				preferredMIMEType:                manifest.DockerV2Schema1SignedMediaType,
 				preferredMIMETypeNeedsConversion: false,
-				otherMIMETypeCandidates:          []string{},
+				otherMIMETypeCandidates:          []string{manifest.DockerV2Schema2MediaType, v1.MediaTypeImageManifest, manifest.DockerV2Schema1MediaType},
 			},
 		},
 		{
@@ -70,7 +70,7 @@ func TestDetermineManifestConversion(t *testing.T) {
 			manifestConversionPlan{
 				preferredMIMEType:                manifest.DockerV2Schema2MediaType,
 				preferredMIMETypeNeedsConversion: false,
-				otherMIMETypeCandidates:          []string{},
+				otherMIMETypeCandidates:          []string{manifest.DockerV2Schema1SignedMediaType, v1.MediaTypeImageManifest, manifest.DockerV2Schema1MediaType},
 			},
 		},
 		// Destination accepts the unmodified original
