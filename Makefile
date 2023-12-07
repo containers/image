@@ -24,6 +24,13 @@ GOMD2MAN ?= $(shell command -v go-md2man || echo '$(GOBIN)/go-md2man')
 MANPAGES_MD = $(wildcard docs/*.5.md)
 MANPAGES ?= $(MANPAGES_MD:%.md=%)
 
+ifeq ($(shell uname -s),FreeBSD)
+CONTAINERSCONFDIR ?= /usr/local/etc/containers
+else
+CONTAINERSCONFDIR ?= /etc/containers
+endif
+REGISTRIESDDIR ?= ${CONTAINERSCONFDIR}/registries.d
+
 # N/B: This value is managed by Renovate, manual changes are
 # possible, as long as they don't disturb the formatting
 # (i.e. DO NOT ADD A 'v' prefix!)
@@ -46,6 +53,10 @@ install-docs: docs
 	install -m 644 docs/*.5 ${MANINSTALLDIR}/man5/
 
 install: install-docs
+	install -d -m 755 ${DESTDIR}${CONTAINERSCONFDIR}
+	install -m 644 default-policy.json ${DESTDIR}${CONTAINERSCONFDIR}/policy.json
+	install -d -m 755 ${DESTDIR}${REGISTRIESDDIR}
+	install -m 644 default.yaml ${DESTDIR}${REGISTRIESDDIR}/default.yaml
 
 cross:
 	GOOS=windows $(MAKE) build BUILDTAGS="$(BUILDTAGS) $(BUILD_TAGS_WINDOWS_CROSS)"
