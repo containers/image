@@ -81,8 +81,9 @@ type ImageDestination interface {
 // UploadedBlob is information about a blob written to a destination.
 // It is the subset of types.BlobInfo fields the transport is responsible for setting; all fields must be provided.
 type UploadedBlob struct {
-	Digest digest.Digest
-	Size   int64
+	Digest    digest.Digest
+	Size      int64
+	TOCDigest digest.Digest
 }
 
 // PutBlobOptions are used in PutBlobWithOptions.
@@ -118,14 +119,15 @@ type TryReusingBlobOptions struct {
 	PossibleManifestFormats []string               // A set of possible manifest formats; at least one should support the reused layer blob.
 	RequiredCompression     *compression.Algorithm // If set, reuse blobs with a matching algorithm as per implementations in internal/imagedestination/impl.helpers.go
 	OriginalCompression     *compression.Algorithm // May be nil to indicate “uncompressed” or “unknown”.
-	TOCDigest               *digest.Digest         // If specified, the blob can be looked up in the destination also by its TOC digest.
+	TOCDigest               digest.Digest          // If specified, the blob can be looked up in the destination also by its TOC digest.
 }
 
 // ReusedBlob is information about a blob reused in a destination.
 // It is the subset of types.BlobInfo fields the transport is responsible for setting.
 type ReusedBlob struct {
-	Digest digest.Digest // Must be provided
-	Size   int64         // Must be provided
+	Digest    digest.Digest // Must be provided, can be empty if TOCDigest is present
+	TOCDigest digest.Digest // Must be provided, can be empty if Digest is present
+	Size      int64         // Must be provided
 	// The following compression fields should be set when the reuse substitutes
 	// a differently-compressed blob.
 	CompressionOperation types.LayerCompression // Compress/Decompress, matching the reused blob; PreserveOriginal if N/A
