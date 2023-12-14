@@ -411,7 +411,7 @@ func (bdc *cache) candidateLocations(transport types.ImageTransport, scope types
 // CandidateLocations returns a prioritized, limited, number of blobs and their locations that could possibly be reused
 // within the specified (transport scope) (if they still exist, which is not guaranteed).
 //
-// If !canSubstitute, the returned cadidates will match the submitted digest exactly; if canSubstitute,
+// If !canSubstitute, the returned candidates will match the submitted digest exactly; if canSubstitute,
 // data from previous RecordDigestUncompressedPair calls is used to also look up variants of the blob which have the same
 // uncompressed digest.
 func (bdc *cache) CandidateLocations(transport types.ImageTransport, scope types.BICTransportScope, primaryDigest digest.Digest, canSubstitute bool) []types.BICReplacementCandidate {

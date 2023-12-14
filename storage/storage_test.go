@@ -207,7 +207,7 @@ func makeLayerGoroutine(pwriter io.Writer, uncompressedCount *int64, compression
 	// We do not do that, to workaround https://github.com/containers/storage/issues/1729 :
 	// tar-split runs a goroutine that consumes/forwards tar content and might access
 	// concurrently-freed objects if it sees a valid EOF marker.
-	// Instead, realy on raw EOF to terminate the goroutine.
+	// Instead, really on raw EOF to terminate the goroutine.
 	// This depends on implementation details of tar.Writer (that it does not do any
 	// internal buffering).
 

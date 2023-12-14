@@ -103,7 +103,7 @@ func TestSimpleSignerSignImageManifest(t *testing.T) {
 
 	// Failures to sign need to be tested in two parts: First the failures that involve the wrong passphrase, then failures that
 	// should manifest even with a valid passphrase or unlocked key (because the GPG agent is caching unlocked keys).
-	// Alternatively, we could be caling gpgagent.KillGPGAgent() all the time...
+	// Alternatively, we could be calling gpgagent.KillGPGAgent() all the time...
 	type failingCase struct {
 		name string
 		opts []Option

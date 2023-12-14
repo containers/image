@@ -177,13 +177,13 @@ func TestOCI1IndexChooseInstanceByCompression(t *testing.T) {
 				{"amd64", "", "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", false},
 				// out of multiple gzip in arm64 select the first one to ensure original logic is prevented
 				{"arm64", "", "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", false},
-				// select a signle gzip s390x image
+				// select a single gzip s390x image
 				{"s390x", "", "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", false},
 				// out of gzip and zstd in amd64 select the first gzip image
 				{"amd64", "", "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", true},
 				// out of multiple gzip in arm64 select the first one to ensure original logic is prevented
 				{"arm64", "", "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", true},
-				// select a signle gzip s390x image
+				// select a single gzip s390x image
 				{"s390x", "", "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", true},
 			},
 			unmatchedInstances: []string{
