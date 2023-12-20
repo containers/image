@@ -154,6 +154,8 @@ type prSigstoreSignedFulcio struct {
 	OIDCIssuer string `json:"oidcIssuer,omitempty"`
 	// SubjectEmail specifies the expected email address of the authenticated OIDC identity, recorded by Fulcio into the generated certificates.
 	SubjectEmail string `json:"subjectEmail,omitempty"`
+	// URI specifies the expected URI of the authenticated OIDC identity, recorded by Fulcio into the generated certificates.
+	URI string `json:"URI,omitempty"`
 }
 
 // PolicyReferenceMatch specifies a set of image identities accepted in PolicyRequirement.

@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/containers/image/v5/signature/internal"
@@ -24,14 +25,15 @@ type fulcioTrustRoot struct {
 	caCertificates *x509.CertPool
 	oidcIssuer     string
 	subjectEmail   string
+	URI            string
 }
 
 func (f *fulcioTrustRoot) validate() error {
 	if f.oidcIssuer == "" {
 		return errors.New("Internal inconsistency: Fulcio use set up without OIDC issuer")
 	}
-	if f.subjectEmail == "" {
-		return errors.New("Internal inconsistency: Fulcio use set up without subject email")
+	if f.subjectEmail == "" && f.URI == "" {
+		return errors.New("Internal inconsistency: Fulcio use set up without subject email or URI")
 	}
 	return nil
 }
@@ -177,10 +179,17 @@ func (f *fulcioTrustRoot) verifyFulcioCertificateAtTime(relevantTime time.Time, 
 	}
 
 	// == Validate the OIDC subject
-	if !slices.Contains(untrustedCertificate.EmailAddresses, f.subjectEmail) {
-		return nil, internal.NewInvalidSignatureError(fmt.Sprintf("Required email %q not found (got %q)",
-			f.subjectEmail,
-			untrustedCertificate.EmailAddresses))
+	if !slices.Contains(untrustedCertificate.EmailAddresses, f.subjectEmail) && !strings.Contains(untrustedCertificate.URIs[0].String(), f.URI) {
+		if len(untrustedCertificate.EmailAddresses) > 0 {
+			return nil, internal.NewInvalidSignatureError(fmt.Sprintf("Required email %s not found (got %#v)",
+				f.subjectEmail,
+				untrustedCertificate.EmailAddresses))
+		}
+		if len(untrustedCertificate.URIs) > 0 {
+			return nil, internal.NewInvalidSignatureError(fmt.Sprintf("Required URI %s not found (got %#v)",
+				f.URI,
+				untrustedCertificate.URIs))
+		}
 	}
 	// FIXME: Match more subject types? Cosign does:
 	// - .DNSNames (can’t be issued by Fulcio)
