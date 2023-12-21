@@ -15,8 +15,8 @@ require (
 	github.com/docker/docker v24.0.7+incompatible
 	github.com/docker/docker-credential-helpers v0.8.0
 	github.com/docker/go-connections v0.4.0
-	github.com/go-openapi/strfmt v0.21.9
-	github.com/go-openapi/swag v0.22.4
+	github.com/go-openapi/strfmt v0.21.10
+	github.com/go-openapi/swag v0.22.5
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-retryablehttp v0.7.5
 	github.com/klauspost/compress v1.17.4
@@ -73,7 +73,7 @@ require (
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/analysis v0.21.4 // indirect
-	github.com/go-openapi/errors v0.20.4 // indirect
+	github.com/go-openapi/errors v0.21.0 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/loads v0.21.2 // indirect
@@ -123,7 +123,7 @@ require (
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
-	go.mongodb.org/mongo-driver v1.13.0 // indirect
+	go.mongodb.org/mongo-driver v1.13.1 // indirect
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel v1.16.0 // indirect
