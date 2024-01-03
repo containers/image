@@ -140,7 +140,7 @@ func loadAndMergeConfig(dirPath string) (*registryConfiguration, error) {
 
 		if config.DefaultDocker != nil {
 			if mergedConfig.DefaultDocker != nil {
-				return nil, fmt.Errorf(`Error parsing signature storage configuration: "default-docker" defined both in "%s" and "%s"`,
+				return nil, fmt.Errorf(`Error parsing signature storage configuration: "default-docker" defined both in %q and %q`,
 					dockerDefaultMergedFrom, configPath)
 			}
 			mergedConfig.DefaultDocker = config.DefaultDocker
@@ -149,7 +149,7 @@ func loadAndMergeConfig(dirPath string) (*registryConfiguration, error) {
 
 		for nsName, nsConfig := range config.Docker { // includes config.Docker == nil
 			if _, ok := mergedConfig.Docker[nsName]; ok {
-				return nil, fmt.Errorf(`Error parsing signature storage configuration: "docker" namespace "%s" defined both in "%s" and "%s"`,
+				return nil, fmt.Errorf(`Error parsing signature storage configuration: "docker" namespace %q defined both in %q and %q`,
 					nsName, nsMergedFrom[nsName], configPath)
 			}
 			mergedConfig.Docker[nsName] = nsConfig
