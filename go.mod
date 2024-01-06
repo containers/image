@@ -27,7 +27,6 @@ require (
 	github.com/opencontainers/image-spec v1.1.0-rc5
 	github.com/opencontainers/selinux v1.11.0
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f
-	github.com/otiai10/copy v1.14.0
 	github.com/proglottis/gpgme v0.1.3
 	github.com/secure-systems-lab/go-securesystemslib v0.8.0
 	github.com/sigstore/fulcio v1.4.3

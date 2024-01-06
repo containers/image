@@ -2,7 +2,7 @@ package layout
 
 import (
 	"context"
-	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,7 +10,6 @@ import (
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
-	cp "github.com/otiai10/copy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -276,7 +275,7 @@ func TestReferenceDeleteImage_multipleImages_twoIdenticalReferences(t *testing.T
 
 func loadFixture(t *testing.T, fixtureName string) string {
 	tmpDir := t.TempDir()
-	err := cp.Copy(fmt.Sprintf("fixtures/%v/", fixtureName), tmpDir)
+	err := copyDir(filepath.Join("fixtures", fixtureName), tmpDir)
 	require.NoError(t, err)
 	return tmpDir
 }
@@ -295,4 +294,62 @@ func assertBlobDoesNotExist(t *testing.T, blobsDir string, blobDigest string) {
 	blobPath := filepath.Join(blobsDir, digest.Algorithm().String(), digest.Hex())
 	_, err = os.Stat(blobPath)
 	require.True(t, os.IsNotExist(err))
+}
+
+// copyDir copies a whole directory src recursively to dst.
+func copyDir(src, dst string) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(dst, info.Mode()); err != nil {
+		return err
+	}
+
+	dirEntries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, dirEntry := range dirEntries {
+		srcPath := filepath.Join(src, dirEntry.Name())
+		dstPath := filepath.Join(dst, dirEntry.Name())
+
+		copy := copyFile
+		if dirEntry.IsDir() {
+			copy = copyDir
+		}
+
+		if err := copy(srcPath, dstPath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// copyFile copies src file to dst file.
+func copyFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		return err
+	}
+
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	return os.Chmod(dst, info.Mode())
 }
