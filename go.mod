@@ -41,7 +41,7 @@ require (
 	github.com/vbauerster/mpb/v8 v8.7.2
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.8
-	golang.org/x/crypto v0.17.0
+	golang.org/x/crypto v0.18.0
 	golang.org/x/exp v0.0.0-20231226003508-02704c960a9b
 	golang.org/x/oauth2 v0.15.0
 	golang.org/x/sync v0.6.0
