@@ -316,12 +316,13 @@ func copyDir(src, dst string) error {
 		srcPath := filepath.Join(src, dirEntry.Name())
 		dstPath := filepath.Join(dst, dirEntry.Name())
 
-		copy := copyFile
+		var err error
 		if dirEntry.IsDir() {
-			copy = copyDir
+			err = copyDir(srcPath, dstPath)
+		} else {
+			err = copyFile(srcPath, dstPath)
 		}
-
-		if err := copy(srcPath, dstPath); err != nil {
+		if err != nil {
 			return err
 		}
 	}
