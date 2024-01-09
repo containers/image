@@ -3,6 +3,7 @@ package layout
 import (
 	"context"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -298,35 +299,23 @@ func assertBlobDoesNotExist(t *testing.T, blobsDir string, blobDigest string) {
 
 // copyDir copies a whole directory src recursively to dst.
 func copyDir(src, dst string) error {
-	info, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	if err := os.MkdirAll(dst, info.Mode()); err != nil {
-		return err
-	}
-
-	dirEntries, err := os.ReadDir(src)
-	if err != nil {
-		return err
-	}
-
-	for _, dirEntry := range dirEntries {
-		srcPath := filepath.Join(src, dirEntry.Name())
-		dstPath := filepath.Join(dst, dirEntry.Name())
-
-		var err error
-		if dirEntry.IsDir() {
-			err = copyDir(srcPath, dstPath)
-		} else {
-			err = copyFile(srcPath, dstPath)
-		}
+	return filepath.WalkDir(src, func(srcPath string, srcDirEntry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-	}
-	return nil
+
+		srcRel, err := filepath.Rel(src, srcPath)
+		if err != nil {
+			return err
+		}
+
+		dstPath := filepath.Join(dst, srcRel)
+		if srcDirEntry.IsDir() {
+			return os.MkdirAll(dstPath, os.ModePerm)
+		}
+
+		return copyFile(srcPath, dstPath)
+	})
 }
 
 // copyFile copies src file to dst file.
