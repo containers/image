@@ -87,7 +87,7 @@ validate: lint
 	@BUILDTAGS="$(BUILDTAGS)" hack/validate.sh
 
 lint:
-	$(GOBIN)/golangci-lint run --build-tags "$(BUILDTAGS)"
+	$(GOBIN)/golangci-lint run
 
 # When this is running in CI, it will only check the CI commit range
 .gitvalidation:

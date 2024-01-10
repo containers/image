@@ -714,7 +714,6 @@ func modifyDockerConfigJSON(sys *types.SystemContext, editor func(fileContents *
 	if rawCH, ok := rawContents["credHelpers"]; ok {
 		if err := json.Unmarshal(rawCH, &syntheticContents.CredHelpers); err != nil {
 			return "", fmt.Errorf(`unmarshaling "credHelpers" in JSON at %q: %w`, path, err)
-
 		}
 	}
 

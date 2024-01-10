@@ -145,7 +145,6 @@ func TestNewBearerTokenIssuedAtZeroFromJsonBlob(t *testing.T) {
 	if token.IssuedAt.Before(now) {
 		t.Fatalf("expected [%s] not to be before [%s]", token.IssuedAt, now)
 	}
-
 }
 
 func assertBearerTokensEqual(t *testing.T, expected, subject *bearerToken) {

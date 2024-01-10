@@ -329,7 +329,6 @@ func (sqc *cache) uncompressedDigest(tx *sql.Tx, anyDigest digest.Digest) (diges
 			return "", err
 		}
 		return d, nil
-
 	}
 	// A record as uncompressedDigest implies that anyDigest must already refer to an uncompressed digest.
 	// This way we don't have to waste storage space with trivial (uncompressed, uncompressed) mappings
@@ -561,7 +560,6 @@ func (sqc *cache) candidateLocations(transport types.ImageTransport, scope types
 		return []blobinfocache.BICReplacementCandidate2{} // FIXME? Log err (but throttle the log volume on repeated accesses)?
 	}
 	return prioritize.DestructivelyPrioritizeReplacementCandidates(res, primaryDigest, uncompressedDigest)
-
 }
 
 // CandidateLocations returns a prioritized, limited, number of blobs and their locations that could possibly be reused

@@ -803,7 +803,6 @@ func TestInvalidMirrorConfig(t *testing.T) {
 		_, err := GetRegistries(tc.sys)
 		assert.ErrorContains(t, err, tc.expectErr)
 	}
-
 }
 
 func TestTryUpdatingCache(t *testing.T) {

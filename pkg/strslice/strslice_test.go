@@ -43,7 +43,6 @@ func TestStrSliceUnmarshalJSON(t *testing.T) {
 		if !reflect.DeepEqual(actualParts, expectedParts) {
 			t.Fatalf("%#v: expected %v, got %v", json, expectedParts, actualParts)
 		}
-
 	}
 }
 

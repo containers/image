@@ -156,7 +156,6 @@ func TestOCI1EditInstances(t *testing.T) {
 	require.NoError(t, err)
 	// Digest `ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff` should be re-ordered on update.
 	assert.Equal(t, list.Instances(), []digest.Digest{digest.Digest("sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f"), digest.Digest("sha256:5b0bcabd1ed22e9fb1310cf6c2dec7cdef19f0ad69efa1f392e94a4333501270"), digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), digest.Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"), digest.Digest("sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), digest.Digest("sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"), digest.Digest("sha256:hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh")})
-
 }
 
 func TestOCI1IndexChooseInstanceByCompression(t *testing.T) {

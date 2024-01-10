@@ -127,7 +127,6 @@ func TestPolicyContextRequirementsForImageRefNotRegisteredTransport(t *testing.T
 	reqs := pc.requirementsForImageRef(pcImageReferenceMock{transportName: "docker", ref: ref})
 	assert.True(t, &(reqs[0]) == &(pr[0]))
 	assert.True(t, len(reqs) == len(pr))
-
 }
 
 func TestPolicyContextRequirementsForImageRef(t *testing.T) {
