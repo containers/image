@@ -6,7 +6,7 @@ env:
     #### Global variables used for all tasks
     ####
     # Name of the ultimate destination branch for this CI run
-    DEST_BRANCH: "main"
+    DEST_BRANCH: "release-5.29"
     # c/skopeo branch name which must work with this c/image branch
     SKOPEO_CI_BRANCH: "main"
     # Use GO module mirror (reason unknown, travis did it this way)
