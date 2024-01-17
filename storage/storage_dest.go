@@ -321,6 +321,13 @@ func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context,
 // tryReusingBlobAsPending implements TryReusingBlobWithOptions for (digest, size or -1), filling s.blobDiffIDs and other metadata.
 // The caller must arrange the blob to be eventually committed using s.commitLayer().
 func (s *storageImageDestination) tryReusingBlobAsPending(digest digest.Digest, size int64, options *private.TryReusingBlobOptions) (bool, private.ReusedBlob, error) {
+	if digest == "" {
+		return false, private.ReusedBlob{}, errors.New(`Can not check for a blob with unknown digest`)
+	}
+	if err := digest.Validate(); err != nil {
+		return false, private.ReusedBlob{}, fmt.Errorf("Can not check for a blob with invalid digest: %w", err)
+	}
+
 	// lock the entire method as it executes fairly quickly
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -339,13 +346,6 @@ func (s *storageImageDestination) tryReusingBlobAsPending(digest digest.Digest, 
 				Size:   aLayer.CompressedSize(),
 			}, nil
 		}
-	}
-
-	if digest == "" {
-		return false, private.ReusedBlob{}, errors.New(`Can not check for a blob with unknown digest`)
-	}
-	if err := digest.Validate(); err != nil {
-		return false, private.ReusedBlob{}, fmt.Errorf("Can not check for a blob with invalid digest: %w", err)
 	}
 
 	// Check if we've already cached it in a file.
