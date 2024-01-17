@@ -361,6 +361,18 @@ func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context,
 // tryReusingBlobAsPending implements TryReusingBlobWithOptions for (blobDigest, size or -1), filling s.blobDiffIDs and other metadata.
 // The caller must arrange the blob to be eventually committed using s.commitLayer().
 func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Digest, size int64, options *private.TryReusingBlobOptions) (bool, private.ReusedBlob, error) {
+	if blobDigest == "" {
+		return false, private.ReusedBlob{}, errors.New(`Can not check for a blob with unknown digest`)
+	}
+	if err := blobDigest.Validate(); err != nil {
+		return false, private.ReusedBlob{}, fmt.Errorf("Can not check for a blob with invalid digest: %w", err)
+	}
+	if options.TOCDigest != "" {
+		if err := options.TOCDigest.Validate(); err != nil {
+			return false, private.ReusedBlob{}, fmt.Errorf("Can not check for a blob with invalid digest: %w", err)
+		}
+	}
+
 	// lock the entire method as it executes fairly quickly
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -377,18 +389,6 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 				Digest: blobDigest,
 				Size:   aLayer.CompressedSize(),
 			}, nil
-		}
-	}
-
-	if blobDigest == "" {
-		return false, private.ReusedBlob{}, errors.New(`Can not check for a blob with unknown digest`)
-	}
-	if err := blobDigest.Validate(); err != nil {
-		return false, private.ReusedBlob{}, fmt.Errorf("Can not check for a blob with invalid digest: %w", err)
-	}
-	if options.TOCDigest != "" {
-		if err := options.TOCDigest.Validate(); err != nil {
-			return false, private.ReusedBlob{}, fmt.Errorf("Can not check for a blob with invalid digest: %w", err)
 		}
 	}
 
