@@ -31,7 +31,8 @@
                     "additionalProperties": false,
                     "properties": {
                         "docker-manifest-digest": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern":"^[a-z0-9]+(?:[.+_-][a-z0-9]+)*:[a-zA-Z0-9=_-]+$"
                         }
                     }
                 },

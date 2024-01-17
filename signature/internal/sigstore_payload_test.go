@@ -43,6 +43,8 @@ func TestNewUntrustedSigstorePayload(t *testing.T) {
 }
 
 func TestUntrustedSigstorePayloadMarshalJSON(t *testing.T) {
+	const testDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
 	// Empty string values
 	s := NewUntrustedSigstorePayload("", "_")
 	_, err := s.MarshalJSON()
@@ -61,19 +63,19 @@ func TestUntrustedSigstorePayloadMarshalJSON(t *testing.T) {
 	}{
 		{
 			UntrustedSigstorePayload{
-				untrustedDockerManifestDigest: "digest!@#",
+				untrustedDockerManifestDigest: testDigest,
 				untrustedDockerReference:      "reference#@!",
 				untrustedCreatorID:            &creatorID,
 				untrustedTimestamp:            &timestamp,
 			},
-			"{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"digest!@#\"},\"type\":\"cosign container image signature\"},\"optional\":{\"creator\":\"CREATOR\",\"timestamp\":1484683104}}",
+			"{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"" + testDigest + "\"},\"type\":\"cosign container image signature\"},\"optional\":{\"creator\":\"CREATOR\",\"timestamp\":1484683104}}",
 		},
 		{
 			UntrustedSigstorePayload{
-				untrustedDockerManifestDigest: "digest!@#",
+				untrustedDockerManifestDigest: testDigest,
 				untrustedDockerReference:      "reference#@!",
 			},
-			"{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"digest!@#\"},\"type\":\"cosign container image signature\"},\"optional\":{}}",
+			"{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"" + testDigest + "\"},\"type\":\"cosign container image signature\"},\"optional\":{}}",
 		},
 	} {
 		marshaled, err := c.input.MarshalJSON()
@@ -104,6 +106,8 @@ func assertUnmarshalUntrustedSigstorePayloadFails(t *testing.T, input []byte) {
 }
 
 func TestUntrustedSigstorePayloadUnmarshalJSON(t *testing.T) {
+	const testDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
 	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
 	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
 	assertUnmarshalUntrustedSigstorePayloadFails(t, []byte("&"))
@@ -115,7 +119,7 @@ func TestUntrustedSigstorePayloadUnmarshalJSON(t *testing.T) {
 	assertUnmarshalUntrustedSigstorePayloadFails(t, []byte("1"))
 
 	// Start with a valid JSON.
-	validSig := NewUntrustedSigstorePayload("digest!@#", "reference#@!")
+	validSig := NewUntrustedSigstorePayload(testDigest, "reference#@!")
 	validJSON, err := validSig.MarshalJSON()
 	require.NoError(t, err)
 
@@ -158,6 +162,7 @@ func TestUntrustedSigstorePayloadUnmarshalJSON(t *testing.T) {
 		func(v mSA) { x(v, "critical", "image")["unexpected"] = 1 },
 		// Invalid "docker-manifest-digest"
 		func(v mSA) { x(v, "critical", "image")["docker-manifest-digest"] = 1 },
+		func(v mSA) { x(v, "critical", "image")["docker-manifest-digest"] = "sha256:../.." },
 		// Invalid "identity" object
 		func(v mSA) { x(v, "critical")["identity"] = 1 },
 		func(v mSA) { delete(x(v, "critical", "identity"), "docker-reference") },
@@ -188,7 +193,7 @@ func TestUntrustedSigstorePayloadUnmarshalJSON(t *testing.T) {
 
 	// Optional fields can be missing
 	validSig = UntrustedSigstorePayload{
-		untrustedDockerManifestDigest: "digest!@#",
+		untrustedDockerManifestDigest: testDigest,
 		untrustedDockerReference:      "reference#@!",
 		untrustedCreatorID:            nil,
 		untrustedTimestamp:            nil,
