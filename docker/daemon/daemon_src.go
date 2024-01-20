@@ -24,7 +24,7 @@ type daemonImageSource struct {
 // is the config, and that the following len(RootFS) files are the layers, but that feels
 // way too brittle.)
 func newImageSource(ctx context.Context, sys *types.SystemContext, ref daemonReference) (private.ImageSource, error) {
-	c, err := newDockerClient(sys)
+	c, err := newDockerClient(ctx, sys)
 	if err != nil {
 		return nil, fmt.Errorf("initializing docker engine client: %w", err)
 	}

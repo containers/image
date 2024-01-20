@@ -43,7 +43,7 @@ func newImageDestination(ctx context.Context, sys *types.SystemContext, ref daem
 		mustMatchRuntimeOS = false
 	}
 
-	c, err := newDockerClient(sys)
+	c, err := newDockerClient(ctx, sys)
 	if err != nil {
 		return nil, fmt.Errorf("initializing docker engine client: %w", err)
 	}

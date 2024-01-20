@@ -1,9 +1,12 @@
 package daemon
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/containers/image/v5/types"
@@ -12,13 +15,23 @@ import (
 )
 
 func TestDockerClientFromNilSystemContext(t *testing.T) {
-	client, err := newDockerClient(nil)
+	client, err := newDockerClient(context.Background(), nil)
 
 	assert.Nil(t, err, "There should be no error creating the Docker client")
 	assert.NotNil(t, client, "A Docker client reference should have been returned")
 
 	assert.Equal(t, dockerclient.DefaultDockerHost, client.DaemonHost(), "The default docker host should have been used")
-	assert.Equal(t, defaultAPIVersion, client.ClientVersion(), "The default api version should have been used")
+
+	clientVersionNumbers := strings.Split(client.ClientVersion(), ".")
+
+	major, err := strconv.Atoi(clientVersionNumbers[0])
+	assert.NoError(t, err, "The client major version should be a number")
+
+	minor, err := strconv.Atoi(clientVersionNumbers[1])
+	assert.NoError(t, err, "The client minor version should be a number")
+
+	// The client defaults to 1.24 if negotiation fails.
+	assert.True(t, major == 1 && minor > 24, client.ClientVersion(), "Should have successfully negotiated a client version")
 
 	assert.NoError(t, client.Close())
 }
@@ -33,13 +46,19 @@ func TestDockerClientFromCertContext(t *testing.T) {
 		DockerDaemonInsecureSkipTLSVerify: true,
 	}
 
-	client, err := newDockerClient(systemCtx)
+	client, err := newDockerClient(context.Background(), systemCtx)
 
 	assert.Nil(t, err, "There should be no error creating the Docker client")
 	assert.NotNil(t, client, "A Docker client reference should have been returned")
 
 	assert.Equal(t, host, client.DaemonHost())
-	assert.Equal(t, "1.22", client.ClientVersion())
+
+	clientVersionNumbers := strings.Split(client.ClientVersion(), ".")
+
+	major, err := strconv.Atoi(clientVersionNumbers[0])
+	assert.NoError(t, err, "The client major version should be a number")
+
+	assert.Equal(t, 1, major, "The client major version should be 1")
 
 	assert.NoError(t, client.Close())
 }
@@ -88,11 +107,11 @@ func TestSkipTLSVerifyOnly(t *testing.T) {
 
 func TestSpecifyPlainHTTPViaHostScheme(t *testing.T) {
 	host := "http://127.0.0.1:2376"
-	ctx := &types.SystemContext{
+	systemCtx := &types.SystemContext{
 		DockerDaemonHost: host,
 	}
 
-	client, err := newDockerClient(ctx)
+	client, err := newDockerClient(context.Background(), systemCtx)
 
 	assert.Nil(t, err, "There should be no error creating the Docker client")
 	assert.NotNil(t, client, "A Docker client reference should have been returned")

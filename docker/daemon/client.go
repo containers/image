@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"context"
 	"net/http"
 	"path/filepath"
 
@@ -9,13 +10,8 @@ import (
 	"github.com/docker/go-connections/tlsconfig"
 )
 
-const (
-	// The default API version to be used in case none is explicitly specified
-	defaultAPIVersion = "1.22"
-)
-
 // NewDockerClient initializes a new API client based on the passed SystemContext.
-func newDockerClient(sys *types.SystemContext) (*dockerclient.Client, error) {
+func newDockerClient(ctx context.Context, sys *types.SystemContext) (*dockerclient.Client, error) {
 	host := dockerclient.DefaultDockerHost
 	if sys != nil && sys.DockerDaemonHost != "" {
 		host = sys.DockerDaemonHost
@@ -23,7 +19,6 @@ func newDockerClient(sys *types.SystemContext) (*dockerclient.Client, error) {
 
 	opts := []dockerclient.Opt{
 		dockerclient.WithHost(host),
-		dockerclient.WithVersion(defaultAPIVersion),
 	}
 
 	// We conditionalize building the TLS configuration only to TLS sockets:
@@ -63,7 +58,14 @@ func newDockerClient(sys *types.SystemContext) (*dockerclient.Client, error) {
 		opts = append(opts, dockerclient.WithHTTPClient(hc))
 	}
 
-	return dockerclient.NewClientWithOpts(opts...)
+	cli, err := dockerclient.NewClientWithOpts(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	cli.NegotiateAPIVersion(ctx)
+
+	return cli, nil
 }
 
 func tlsConfig(sys *types.SystemContext) (*http.Client, error) {
