@@ -339,7 +339,8 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 			return true, reusedInfo, nil
 		}
 	} else {
-		logrus.Debugf("Ignoring exact blob match case due to compression mismatch ( %s vs %s )", options.RequiredCompression.Name(), optionalCompressionName(options.OriginalCompression))
+		logrus.Debugf("Ignoring exact blob match, compression %s does not match required %s or MIME types %#v",
+			optionalCompressionName(options.OriginalCompression), optionalCompressionName(options.RequiredCompression), options.PossibleManifestFormats)
 	}
 
 	// Then try reusing blobs from other locations.
@@ -361,9 +362,11 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 		}
 		if !impl.CandidateMatchesTryReusingBlobOptions(options, compressionAlgorithm) {
 			if !candidate.UnknownLocation {
-				logrus.Debugf("Ignoring candidate blob %s as reuse candidate due to compression mismatch ( %s vs %s ) in %s", candidate.Digest.String(), options.RequiredCompression.Name(), optionalCompressionName(compressionAlgorithm), candidateRepo.Name())
+				logrus.Debugf("Ignoring candidate blob %s in %s, compression %s does not match required %s or MIME types %#v", candidate.Digest.String(), candidateRepo.Name(),
+					optionalCompressionName(compressionAlgorithm), optionalCompressionName(options.RequiredCompression), options.PossibleManifestFormats)
 			} else {
-				logrus.Debugf("Ignoring candidate blob %s as reuse candidate due to compression mismatch ( %s vs %s ) with no location match, checking current repo", candidate.Digest.String(), options.RequiredCompression.Name(), optionalCompressionName(compressionAlgorithm))
+				logrus.Debugf("Ignoring candidate blob %s with no known location, compression %s does not match required %s or MIME types %#v", candidate.Digest.String(),
+					optionalCompressionName(compressionAlgorithm), optionalCompressionName(options.RequiredCompression), options.PossibleManifestFormats)
 			}
 			continue
 		}

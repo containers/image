@@ -684,12 +684,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 		logrus.Debugf("Checking if we can reuse blob %s: general substitution = %v, compression for MIME type %q = %v",
 			srcInfo.Digest, ic.canSubstituteBlobs, srcInfo.MediaType, canChangeLayerCompression)
 		canSubstitute := ic.canSubstituteBlobs && ic.src.CanChangeLayerCompression(srcInfo.MediaType)
-		// TODO: at this point we don't know whether or not a blob we end up reusing is compressed using an algorithm
-		// that is acceptable for use on layers in the manifest that we'll be writing later, so if we end up reusing
-		// a blob that's compressed with e.g. zstd, but we're only allowed to write a v2s2 manifest, this will cause
-		// a failure when we eventually try to update the manifest with the digest and MIME type of the reused blob.
-		// Fixing that will probably require passing more information to TryReusingBlob() than the current version of
-		// the ImageDestination interface lets us pass in.
+
 		var requiredCompression *compressiontypes.Algorithm
 		if ic.requireCompressionFormatMatch {
 			requiredCompression = ic.compressionFormat
@@ -702,14 +697,15 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 		}
 
 		reused, reusedBlob, err := ic.c.dest.TryReusingBlobWithOptions(ctx, srcInfo, private.TryReusingBlobOptions{
-			Cache:               ic.c.blobInfoCache,
-			CanSubstitute:       canSubstitute,
-			EmptyLayer:          emptyLayer,
-			LayerIndex:          &layerIndex,
-			SrcRef:              srcRef,
-			RequiredCompression: requiredCompression,
-			OriginalCompression: srcInfo.CompressionAlgorithm,
-			TOCDigest:           tocDigest,
+			Cache:                   ic.c.blobInfoCache,
+			CanSubstitute:           canSubstitute,
+			EmptyLayer:              emptyLayer,
+			LayerIndex:              &layerIndex,
+			SrcRef:                  srcRef,
+			PossibleManifestFormats: append([]string{ic.manifestConversionPlan.preferredMIMEType}, ic.manifestConversionPlan.otherMIMETypeCandidates...),
+			RequiredCompression:     requiredCompression,
+			OriginalCompression:     srcInfo.CompressionAlgorithm,
+			TOCDigest:               tocDigest,
 		})
 		if err != nil {
 			return types.BlobInfo{}, "", fmt.Errorf("trying to reuse blob %s at destination: %w", srcInfo.Digest, err)
