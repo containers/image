@@ -269,7 +269,7 @@ func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.Read
 // It is available only if SupportsPutBlobPartial().
 // Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
 // should fall back to PutBlobWithOptions.
-func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, cache blobinfocache.BlobInfoCache2) (private.UploadedBlob, error) {
+func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, index *int, cache blobinfocache.BlobInfoCache2) (private.UploadedBlob, error) {
 	fetcher := zstdFetcher{
 		chunkAccessor: chunkAccessor,
 		ctx:           ctx,
