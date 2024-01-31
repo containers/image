@@ -250,21 +250,25 @@ func (ic *imageCopier) bpcPreserveOriginal(_ *sourceStream, detected bpDetectCom
 	// so that src.UpdatedImage() doesn’t fail; assume that for such blobs
 	// LayerInfosForCopy() should not be making any changes in the first place.
 	var bpcOp bpcOperation
+	var uploadedOp types.LayerCompression
 	var algorithm *compressiontypes.Algorithm
 	switch {
 	case !layerCompressionChangeSupported:
 		bpcOp = bpcOpPreserveOpaque
+		uploadedOp = types.PreserveOriginal
 		algorithm = nil
 	case detected.isCompressed:
 		bpcOp = bpcOpPreserveCompressed
+		uploadedOp = types.PreserveOriginal
 		algorithm = &detected.format
 	default:
 		bpcOp = bpcOpPreserveUncompressed
+		uploadedOp = types.Decompress
 		algorithm = nil
 	}
 	return &bpCompressionStepData{
 		operation:              bpcOp,
-		uploadedOperation:      types.PreserveOriginal,
+		uploadedOperation:      uploadedOp,
 		uploadedAlgorithm:      algorithm,
 		srcCompressorName:      detected.srcCompressorName,
 		uploadedCompressorName: detected.srcCompressorName,
