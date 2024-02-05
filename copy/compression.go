@@ -286,7 +286,7 @@ func (d *bpCompressionStepData) recordValidatedDigestData(c *copier, uploadedInf
 	if d.uploadedCompressorName != "" && d.uploadedCompressorName != internalblobinfocache.UnknownCompression {
 		if d.uploadedCompressorName != compressiontypes.ZstdChunkedAlgorithmName {
 			// HACK: Don’t record zstd:chunked algorithms.
-			// There is already a similar hack in internal/imagedestination/impl/helpers.BlobMatchesRequiredCompression,
+			// There is already a similar hack in internal/imagedestination/impl/helpers.CandidateMatchesTryReusingBlobOptions,
 			// and that one prevents reusing zstd:chunked blobs, so recording the algorithm here would be mostly harmless.
 			//
 			// We skip that here anyway to work around the inability of blobPipelineDetectCompressionStep to differentiate
