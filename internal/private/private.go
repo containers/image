@@ -81,9 +81,8 @@ type ImageDestination interface {
 // UploadedBlob is information about a blob written to a destination.
 // It is the subset of types.BlobInfo fields the transport is responsible for setting; all fields must be provided.
 type UploadedBlob struct {
-	Digest    digest.Digest
-	Size      int64
-	TOCDigest digest.Digest
+	Digest digest.Digest
+	Size   int64
 }
 
 // PutBlobOptions are used in PutBlobWithOptions.
