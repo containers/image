@@ -383,7 +383,7 @@ func (ic *imageCopier) compareImageDestinationManifestEqual(ctx context.Context,
 
 	compressionAlgos := set.New[string]()
 	for _, srcInfo := range ic.src.LayerInfos() {
-		if c := compressionAlgorithmFromMIMEType(srcInfo); c != nil {
+		if _, c := compressionEditsFromMIMEType(srcInfo); c != nil {
 			compressionAlgos.Add(c.Name())
 		}
 	}
@@ -636,17 +636,22 @@ type diffIDResult struct {
 	err    error
 }
 
-func compressionAlgorithmFromMIMEType(srcInfo types.BlobInfo) *compressiontypes.Algorithm {
+// compressionEditsFromMIMEType returns a (CompressionOperation, CompressionAlgorithm) value pair suitable
+// for types.BlobInfo, based on a MIME type of srcInfo.
+func compressionEditsFromMIMEType(srcInfo types.BlobInfo) (types.LayerCompression, *compressiontypes.Algorithm) {
 	// This MIME type → compression mapping belongs in manifest-specific code in our manifest
 	// package (but we should preferably replace/change UpdatedImage instead of productizing
 	// this workaround).
 	switch srcInfo.MediaType {
 	case manifest.DockerV2Schema2LayerMediaType, imgspecv1.MediaTypeImageLayerGzip:
-		return &compression.Gzip
+		return types.PreserveOriginal, &compression.Gzip
 	case imgspecv1.MediaTypeImageLayerZstd:
-		return &compression.Zstd
+		return types.PreserveOriginal, &compression.Zstd
+	case manifest.DockerV2SchemaLayerMediaTypeUncompressed, imgspecv1.MediaTypeImageLayer:
+		return types.Decompress, nil
+	default:
+		return types.PreserveOriginal, nil
 	}
-	return nil
 }
 
 // copyLayer copies a layer with srcInfo (with known Digest and Annotations and possibly known Size) in src to dest, perhaps (de/re/)compressing it,
@@ -660,8 +665,8 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 	// which uses the compression information to compute the updated MediaType values.
 	// (Sadly UpdatedImage() is documented to not update MediaTypes from
 	//  ManifestUpdateOptions.LayerInfos[].MediaType, so we are doing it indirectly.)
-	if srcInfo.CompressionAlgorithm == nil {
-		srcInfo.CompressionAlgorithm = compressionAlgorithmFromMIMEType(srcInfo)
+	if srcInfo.CompressionOperation == types.PreserveOriginal && srcInfo.CompressionAlgorithm == nil {
+		srcInfo.CompressionOperation, srcInfo.CompressionAlgorithm = compressionEditsFromMIMEType(srcInfo)
 	}
 
 	ic.c.printCopyInfo("blob", srcInfo)
