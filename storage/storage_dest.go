@@ -80,8 +80,12 @@ type storageImageDestination struct {
 // _During the concurrent TryReusingBlob/PutBlob/* calls_ (but not necessarily during the final Commit)
 // uses must hold storageImageDestination.lock.
 type storageImageDestinationLockProtected struct {
+	// In general, a layer is identified either by (compressed) digest, or by TOC digest.
+	// When creating a layer, the c/storage layer metadata and image IDs must _only_ be based on trusted values
+	// we have computed ourselves. (Layer reuse can then look up against such trusted values, but it might not
+	// recompute those values for incomding layers — the point of the reuse is that we don’t need to consume the incoming layer.)
 	blobDiffIDs           map[digest.Digest]digest.Digest                       // Mapping from layer blobsums to their corresponding DiffIDs
-	indexToTocDigest      map[int]digest.Digest                                 // Mapping from layer index to their corresponding TOC Digest, if used
+	indexToTOCDigest      map[int]digest.Digest                                 // Mapping from layer index to a TOC Digest, IFF the layer was created/found/reused by TOC digest
 	fileSizes             map[digest.Digest]int64                               // Mapping from layer blobsums to their sizes
 	filenames             map[digest.Digest]string                              // Mapping from layer blobsums to names of files we used to hold them
 	currentIndex          int                                                   // The index of the layer to be committed (i.e., lower indices have already been committed)
@@ -132,7 +136,7 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 		indexToStorageID: make(map[int]string),
 		lockProtected: storageImageDestinationLockProtected{
 			blobDiffIDs:           make(map[digest.Digest]digest.Digest),
-			indexToTocDigest:      make(map[int]digest.Digest),
+			indexToTOCDigest:      make(map[int]digest.Digest),
 			fileSizes:             make(map[digest.Digest]int64),
 			filenames:             make(map[digest.Digest]string),
 			indexToAddedLayerInfo: make(map[int]addedLayerInfo),
@@ -307,7 +311,7 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	s.lockProtected.fileSizes[blobDigest] = 0
 	s.lockProtected.filenames[blobDigest] = ""
 	s.lockProtected.diffOutputs[blobDigest] = out
-	s.lockProtected.indexToTocDigest[options.LayerIndex] = out.TOCDigest
+	s.lockProtected.indexToTOCDigest[options.LayerIndex] = out.TOCDigest
 	s.lock.Unlock()
 
 	return private.UploadedBlob{
@@ -448,7 +452,7 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 		if len(layers) > 0 {
 			if options.LayerIndex != nil {
 				// Save this for completeness.
-				s.lockProtected.indexToTocDigest[*options.LayerIndex] = options.TOCDigest
+				s.lockProtected.indexToTOCDigest[*options.LayerIndex] = options.TOCDigest
 			}
 
 			return true, private.ReusedBlob{
@@ -499,7 +503,7 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 			if l.Digest != "" {
 				// if a layer was pulled using a partial blob, we need to use the TOC digest
 				// to calculate the image ID, since the layer digest was not validated.
-				if tocDigest, found := s.lockProtected.indexToTocDigest[i]; found {
+				if tocDigest, found := s.lockProtected.indexToTOCDigest[i]; found {
 					diffIDs = append(diffIDs, tocDigest)
 				} else {
 					diffIDs = append(diffIDs, l.Digest)
@@ -595,7 +599,7 @@ func (s *storageImageDestination) getLayerID(uncompressedDigest digest.Digest, t
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if d, found := s.lockProtected.indexToTocDigest[index]; found {
+	if d, found := s.lockProtected.indexToTOCDigest[index]; found {
 		return d.Hex() + "-toc", found
 	}
 
