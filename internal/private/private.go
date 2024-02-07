@@ -130,13 +130,14 @@ type TryReusingBlobOptions struct {
 // ReusedBlob is information about a blob reused in a destination.
 // It is the subset of types.BlobInfo fields the transport is responsible for setting.
 type ReusedBlob struct {
-	Digest    digest.Digest // Must be provided, can be empty if TOCDigest is present
-	TOCDigest digest.Digest // Must be provided, can be empty if Digest is present
-	Size      int64         // Must be provided
+	Digest digest.Digest // Must be provided
+	Size   int64         // Must be provided
 	// The following compression fields should be set when the reuse substitutes
 	// a differently-compressed blob.
 	CompressionOperation types.LayerCompression // Compress/Decompress, matching the reused blob; PreserveOriginal if N/A
 	CompressionAlgorithm *compression.Algorithm // Algorithm if compressed, nil if decompressed or N/A
+
+	MatchedByTOCDigest bool // Whether the layer was reused/matched by TOC digest. Used only for UI purposes.
 }
 
 // ImageSourceChunk is a portion of a blob.

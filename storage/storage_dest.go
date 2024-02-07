@@ -452,9 +452,9 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 			}
 
 			return true, private.ReusedBlob{
-				Digest:    blobDigest,
-				TOCDigest: layers[0].TOCDigest,
-				Size:      layers[0].UncompressedSize,
+				Digest:             blobDigest,
+				Size:               layers[0].UncompressedSize,
+				MatchedByTOCDigest: true,
 			}, nil
 		}
 	}
