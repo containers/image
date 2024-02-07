@@ -47,11 +47,10 @@ type storageImageSource struct {
 	imageRef              storageReference
 	image                 *storage.Image
 	systemContext         *types.SystemContext // SystemContext used in GetBlob() to create temporary files
-	cachedManifest        []byte               // A cached copy of the manifest, if already known, or nil
-	getBlobMutex          sync.Mutex           // Mutex to sync state for parallel GetBlob executions (it guards layerPosition and digestToLayerID)
+	metadata              storageImageMetadata
+	cachedManifest        []byte     // A cached copy of the manifest, if already known, or nil
+	getBlobMutex          sync.Mutex // Mutex to sync state for parallel GetBlob executions (it guards layerPosition and digestToLayerID)
 	getBlobMutexProtected getBlobMutexProtected
-	SignatureSizes        []int                   `json:"signature-sizes,omitempty"`  // List of sizes of each signature slice
-	SignaturesSizes       map[digest.Digest][]int `json:"signatures-sizes,omitempty"` // List of sizes of each signature slice
 }
 
 const expectedLayerDiffIDFlag = "expected-layer-diffid"
@@ -71,11 +70,13 @@ func newImageSource(sys *types.SystemContext, imageRef storageReference) (*stora
 		}),
 		NoGetBlobAtInitialize: stubs.NoGetBlobAt(imageRef),
 
-		imageRef:        imageRef,
-		systemContext:   sys,
-		image:           img,
-		SignatureSizes:  []int{},
-		SignaturesSizes: make(map[digest.Digest][]int),
+		imageRef:      imageRef,
+		systemContext: sys,
+		image:         img,
+		metadata: storageImageMetadata{
+			SignatureSizes:  []int{},
+			SignaturesSizes: make(map[digest.Digest][]int),
+		},
 		getBlobMutexProtected: getBlobMutexProtected{
 			digestToLayerID: make(map[digest.Digest]string),
 			layerPosition:   make(map[digest.Digest]int),
@@ -83,7 +84,7 @@ func newImageSource(sys *types.SystemContext, imageRef storageReference) (*stora
 	}
 	image.Compat = impl.AddCompat(image)
 	if img.Metadata != "" {
-		if err := json.Unmarshal([]byte(img.Metadata), image); err != nil {
+		if err := json.Unmarshal([]byte(img.Metadata), &image.metadata); err != nil {
 			return nil, fmt.Errorf("decoding metadata for source image: %w", err)
 		}
 	}
@@ -375,11 +376,11 @@ func buildLayerInfosForCopy(manifestInfos []manifest.LayerInfo, physicalInfos []
 func (s *storageImageSource) GetSignaturesWithFormat(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error) {
 	var offset int
 	signatureBlobs := []byte{}
-	signatureSizes := s.SignatureSizes
+	signatureSizes := s.metadata.SignatureSizes
 	key := "signatures"
 	instance := "default instance"
 	if instanceDigest != nil {
-		signatureSizes = s.SignaturesSizes[*instanceDigest]
+		signatureSizes = s.metadata.SignaturesSizes[*instanceDigest]
 		key = signatureBigDataKey(*instanceDigest)
 		instance = instanceDigest.Encoded()
 	}
@@ -425,7 +426,7 @@ func (s *storageImageSource) getSize() (int64, error) {
 		sum += bigSize
 	}
 	// Add the signature sizes.
-	for _, sigSize := range s.SignatureSizes {
+	for _, sigSize := range s.metadata.SignatureSizes {
 		sum += int64(sigSize)
 	}
 	// Walk the layer list.

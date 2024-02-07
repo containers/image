@@ -55,15 +55,14 @@ type storageImageDestination struct {
 	stubs.ImplementsPutBlobPartial
 	stubs.AlwaysSupportsSignatures
 
-	imageRef        storageReference
-	directory       string                   // Temporary directory where we store blobs until Commit() time
-	nextTempFileID  atomic.Int32             // A counter that we use for computing filenames to assign to blobs
-	manifest        []byte                   // Manifest contents, temporary
-	manifestDigest  digest.Digest            // Valid if len(manifest) != 0
-	signatures      []byte                   // Signature contents, temporary
-	signatureses    map[digest.Digest][]byte // Instance signature contents, temporary
-	SignatureSizes  []int                    `json:"signature-sizes,omitempty"`  // List of sizes of each signature slice
-	SignaturesSizes map[digest.Digest][]int  `json:"signatures-sizes,omitempty"` // Sizes of each manifest's signature slice
+	imageRef       storageReference
+	directory      string                   // Temporary directory where we store blobs until Commit() time
+	nextTempFileID atomic.Int32             // A counter that we use for computing filenames to assign to blobs
+	manifest       []byte                   // Manifest contents, temporary
+	manifestDigest digest.Digest            // Valid if len(manifest) != 0
+	signatures     []byte                   // Signature contents, temporary
+	signatureses   map[digest.Digest][]byte // Instance signature contents, temporary
+	metadata       storageImageMetadata     // Metadata contents being built
 
 	// A storage destination may be used concurrently.  Accesses are
 	// serialized via a mutex.  Please refer to the individual comments
@@ -124,11 +123,13 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 		blobAdditionalLayer:     make(map[digest.Digest]storage.AdditionalLayer),
 		fileSizes:               make(map[digest.Digest]int64),
 		filenames:               make(map[digest.Digest]string),
-		SignatureSizes:          []int{},
-		SignaturesSizes:         make(map[digest.Digest][]int),
-		indexToStorageID:        make(map[int]*string),
-		indexToAddedLayerInfo:   make(map[int]addedLayerInfo),
-		diffOutputs:             make(map[digest.Digest]*graphdriver.DriverWithDifferOutput),
+		metadata: storageImageMetadata{
+			SignatureSizes:  []int{},
+			SignaturesSizes: make(map[digest.Digest][]int),
+		},
+		indexToStorageID:      make(map[int]*string),
+		indexToAddedLayerInfo: make(map[int]addedLayerInfo),
+		diffOutputs:           make(map[digest.Digest]*graphdriver.DriverWithDifferOutput),
 	}
 	dest.Compat = impl.AddCompat(dest)
 	return dest, nil
@@ -906,7 +907,7 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	}
 
 	// Set up to save our metadata.
-	metadata, err := json.Marshal(s)
+	metadata, err := json.Marshal(s.metadata)
 	if err != nil {
 		return fmt.Errorf("encoding metadata for image: %w", err)
 	}
@@ -1011,7 +1012,7 @@ func (s *storageImageDestination) PutSignaturesWithFormat(ctx context.Context, s
 	}
 	if instanceDigest == nil {
 		s.signatures = sigblob
-		s.SignatureSizes = sizes
+		s.metadata.SignatureSizes = sizes
 		if len(s.manifest) > 0 {
 			manifestDigest := s.manifestDigest
 			instanceDigest = &manifestDigest
@@ -1019,7 +1020,7 @@ func (s *storageImageDestination) PutSignaturesWithFormat(ctx context.Context, s
 	}
 	if instanceDigest != nil {
 		s.signatureses[*instanceDigest] = sigblob
-		s.SignaturesSizes[*instanceDigest] = sizes
+		s.metadata.SignaturesSizes[*instanceDigest] = sizes
 	}
 	return nil
 }

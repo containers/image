@@ -31,6 +31,12 @@ func signatureBigDataKey(digest digest.Digest) string {
 	return "signature-" + digest.Encoded()
 }
 
+// storageImageMetadata is stored, as JSON, in storage.Image.Metadata
+type storageImageMetadata struct {
+	SignatureSizes  []int                   `json:"signature-sizes,omitempty"`  // List of sizes of each signature slice
+	SignaturesSizes map[digest.Digest][]int `json:"signatures-sizes,omitempty"` // Sizes of each manifest's signature slice
+}
+
 type storageImageCloser struct {
 	types.ImageCloser
 	size int64
