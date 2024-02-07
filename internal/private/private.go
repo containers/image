@@ -103,8 +103,8 @@ type PutBlobOptions struct {
 
 // PutBlobPartialOptions are used in PutBlobPartial.
 type PutBlobPartialOptions struct {
-	Index *int
-	Cache blobinfocache.BlobInfoCache2
+	Cache      blobinfocache.BlobInfoCache2 // Cache to use and/or update.
+	LayerIndex int                          // A zero-based index of the layer within the image (PutBlobPartial is only called with layer-like blobs, not configs)
 }
 
 // TryReusingBlobOptions are used in TryReusingBlobWithOptions.

@@ -307,9 +307,7 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	s.lockProtected.fileSizes[blobDigest] = 0
 	s.lockProtected.filenames[blobDigest] = ""
 	s.lockProtected.diffOutputs[blobDigest] = out
-	if options.Index != nil {
-		s.lockProtected.indexToTocDigest[*options.Index] = out.TOCDigest
-	}
+	s.lockProtected.indexToTocDigest[options.LayerIndex] = out.TOCDigest
 	s.lock.Unlock()
 
 	return private.UploadedBlob{
