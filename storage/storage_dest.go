@@ -442,18 +442,6 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 	}
 
 	if options.TOCDigest != "" && options.LayerIndex != nil {
-		// we are already holding s.lock
-		diffOutput, ok := s.lockProtected.diffOutputs[blobDigest]
-		if ok {
-			// Save this for completeness.
-			s.lockProtected.indexToTocDigest[*options.LayerIndex] = options.TOCDigest
-			return true, private.ReusedBlob{
-				Digest:    blobDigest,
-				TOCDigest: diffOutput.TOCDigest,
-				Size:      diffOutput.Size,
-			}, nil
-		}
-
 		// Check if we have a chunked layer in storage with the same TOC digest.
 		layers, err := s.imageRef.transport.store.LayersByTOCDigest(options.TOCDigest)
 
