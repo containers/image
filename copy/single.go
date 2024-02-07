@@ -723,12 +723,11 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 		if reused {
 			logrus.Debugf("Skipping blob %s (already present):", srcInfo.Digest)
 			func() { // A scope for defer
-				d := reusedBlob.Digest
 				label := "skipped: already exists"
 				if reusedBlob.TOCDigest != "" {
 					label = "skipped: already exists (found by TOC)"
 				}
-				bar := ic.c.createProgressBar(pool, false, types.BlobInfo{Digest: d, Size: 0}, "blob", label)
+				bar := ic.c.createProgressBar(pool, false, types.BlobInfo{Digest: reusedBlob.Digest, Size: 0}, "blob", label)
 				defer bar.Abort(false)
 				bar.mark100PercentComplete()
 			}()
