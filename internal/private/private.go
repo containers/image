@@ -55,7 +55,7 @@ type ImageDestinationInternalOnly interface {
 	// It is available only if SupportsPutBlobPartial().
 	// Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
 	// should fall back to PutBlobWithOptions.
-	PutBlobPartial(ctx context.Context, chunkAccessor BlobChunkAccessor, srcInfo types.BlobInfo, index *int, cache blobinfocache.BlobInfoCache2) (UploadedBlob, error)
+	PutBlobPartial(ctx context.Context, chunkAccessor BlobChunkAccessor, srcInfo types.BlobInfo, options PutBlobPartialOptions) (UploadedBlob, error)
 
 	// TryReusingBlobWithOptions checks whether the transport already contains, or can efficiently reuse, a blob, and if so, applies it to the current destination
 	// (e.g. if the blob is a filesystem layer, this signifies that the changes it describes need to be applied again when composing a filesystem tree).
@@ -99,6 +99,12 @@ type PutBlobOptions struct {
 
 	EmptyLayer bool // True if the blob is an "empty"/"throwaway" layer, and may not necessarily be physically represented.
 	LayerIndex *int // If the blob is a layer, a zero-based index of the layer within the image; nil otherwise.
+}
+
+// PutBlobPartialOptions are used in PutBlobPartial.
+type PutBlobPartialOptions struct {
+	Index *int
+	Cache blobinfocache.BlobInfoCache2
 }
 
 // TryReusingBlobOptions are used in TryReusingBlobWithOptions.

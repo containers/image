@@ -16,7 +16,6 @@ import (
 	"sync/atomic"
 
 	"github.com/containers/image/v5/docker/reference"
-	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/imagedestination/impl"
 	"github.com/containers/image/v5/internal/imagedestination/stubs"
 	"github.com/containers/image/v5/internal/private"
@@ -281,7 +280,7 @@ func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.Read
 // It is available only if SupportsPutBlobPartial().
 // Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
 // should fall back to PutBlobWithOptions.
-func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, index *int, cache blobinfocache.BlobInfoCache2) (private.UploadedBlob, error) {
+func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, options private.PutBlobPartialOptions) (private.UploadedBlob, error) {
 	fetcher := zstdFetcher{
 		chunkAccessor: chunkAccessor,
 		ctx:           ctx,
@@ -308,8 +307,8 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	s.lockProtected.fileSizes[blobDigest] = 0
 	s.lockProtected.filenames[blobDigest] = ""
 	s.lockProtected.diffOutputs[blobDigest] = out
-	if index != nil {
-		s.lockProtected.indexToTocDigest[*index] = out.TOCDigest
+	if options.Index != nil {
+		s.lockProtected.indexToTocDigest[*options.Index] = out.TOCDigest
 	}
 	s.lock.Unlock()
 
