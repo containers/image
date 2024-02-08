@@ -587,18 +587,18 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	// Start with an empty string or the previous layer ID.  Note that
 	// `s.indexToStorageID` can only be accessed by *one* goroutine at any
 	// given time. Hence, we don't need to lock accesses.
-	var lastLayer string
+	var parentLayer string
 	if index != 0 {
 		prev, ok := s.indexToStorageID[index-1]
 		if !ok {
 			return false, fmt.Errorf("Internal error: commitLayer called with previous layer %d not committed yet", index-1)
 		}
-		lastLayer = prev
+		parentLayer = prev
 	}
 
 	// Carry over the previous ID for empty non-base layers.
 	if info.emptyLayer {
-		s.indexToStorageID[index] = lastLayer
+		s.indexToStorageID[index] = parentLayer
 		return false, nil
 	}
 
@@ -631,8 +631,8 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 		}
 	}
 	id := diffIDOrTOCDigest.Hex()
-	if lastLayer != "" {
-		id = digest.Canonical.FromBytes([]byte(lastLayer + "+" + diffIDOrTOCDigest.Hex())).Hex()
+	if parentLayer != "" {
+		id = digest.Canonical.FromBytes([]byte(parentLayer + "+" + diffIDOrTOCDigest.Hex())).Hex()
 	}
 	if layer, err2 := s.imageRef.transport.store.Layer(id); layer != nil && err2 == nil {
 		// There's already a layer that should have the right contents, just reuse it.
@@ -668,7 +668,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 			return false, fmt.Errorf("index %d out of range for configOCI.RootFS.DiffIDs", index)
 		}
 
-		layer, err := s.imageRef.transport.store.CreateLayer(id, lastLayer, nil, "", false, nil)
+		layer, err := s.imageRef.transport.store.CreateLayer(id, parentLayer, nil, "", false, nil)
 		if err != nil {
 			return false, err
 		}
@@ -694,7 +694,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	al, ok := s.blobAdditionalLayer[info.digest]
 	s.lock.Unlock()
 	if ok {
-		layer, err := al.PutAs(id, lastLayer, nil)
+		layer, err := al.PutAs(id, parentLayer, nil)
 		if err != nil && !errors.Is(err, storage.ErrDuplicateID) {
 			return false, fmt.Errorf("failed to put layer from digest and labels: %w", err)
 		}
@@ -764,7 +764,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	defer file.Close()
 	// Build the new layer using the diff, regardless of where it came from.
 	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
-	layer, _, err := s.imageRef.transport.store.PutLayer(id, lastLayer, nil, "", false, &storage.LayerOptions{
+	layer, _, err := s.imageRef.transport.store.PutLayer(id, parentLayer, nil, "", false, &storage.LayerOptions{
 		OriginalDigest:     info.digest,
 		UncompressedDigest: diffIDOrTOCDigest,
 	}, file)
