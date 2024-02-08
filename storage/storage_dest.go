@@ -588,7 +588,11 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	// `s.indexToStorageID` can only be accessed by *one* goroutine at any
 	// given time. Hence, we don't need to lock accesses.
 	var lastLayer string
-	if prev, ok := s.indexToStorageID[index-1]; ok {
+	if index != 0 {
+		prev, ok := s.indexToStorageID[index-1]
+		if !ok {
+			return false, fmt.Errorf("Internal error: commitLayer called with previous layer %d not committed yet", index-1)
+		}
 		lastLayer = prev
 	}
 
