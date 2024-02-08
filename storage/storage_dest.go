@@ -828,7 +828,7 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		}
 	}
 	var lastLayer string
-	if len(layerBlobs) > 0 { // Can happen when using caches
+	if len(layerBlobs) > 0 { // Zero-layer images rarely make sense, but it is technically possible, and may happen for non-image artifacts.
 		prev, ok := s.indexToStorageID[len(layerBlobs)-1]
 		if !ok {
 			return fmt.Errorf("Internal error: storageImageDestination.Commit(): previous layer %d hasn't been committed (lastLayer == nil)", len(layerBlobs)-1)
