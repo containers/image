@@ -495,29 +495,51 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 			}
 			diffIDs = append([]digest.Digest{diffID}, diffIDs...)
 		}
-	case *manifest.Schema2:
+	case *manifest.Schema2, *manifest.OCI1:
 		// We know the ID calculation doesn't actually use the diffIDs, so we don't need to populate
 		// the diffID list.
-	case *manifest.OCI1:
-		for i, l := range m.Layers {
-			if l.Digest != "" {
-				// if a layer was pulled using a partial blob, we need to use the TOC digest
-				// to calculate the image ID, since the layer digest was not validated.
-				if tocDigest, found := s.lockProtected.indexToTOCDigest[i]; found {
-					diffIDs = append(diffIDs, tocDigest)
-				} else {
-					diffIDs = append(diffIDs, l.Digest)
-				}
-			}
-		}
 	default:
 		return ""
 	}
-	id, err := m.ImageID(diffIDs)
+
+	// We want to use the same ID for “the same” images, but without risking unwanted sharing / malicious image corruption.
+	//
+	// Traditionally that means the same ~config digest, as computed by m.ImageID;
+	// but if we pull a layer by TOC, we verify the layer against neither the (compressed) blob digest in the manifest,
+	// nor against the config’s RootFS.DiffIDs. We don’t really want to do either, to allow partial layer pulls where we never see
+	// most of the data.
+	//
+	// So, if a layer is pulled by TOC (and we do validate against the TOC), the fact that we used the TOC, and the value of the TOC,
+	// must enter into the image ID computation.
+	// But for images where no TOC was used, continue to use IDs computed the traditional way, to maximize image reuse on upgrades,
+	// and to introduce the changed behavior only when partial pulls are used.
+	//
+	// Note that it’s not 100% guaranteed that an image pulled by TOC uses an OCI manifest; consider
+	// (skopeo copy --format v2s2 docker://…/zstd-chunked-image containers-storage:… ). So this is not happening only in the OCI case above.
+	ordinaryImageID, err := m.ImageID(diffIDs)
 	if err != nil {
 		return ""
 	}
-	return id
+	tocIDInput := ""
+	hasLayerPulledByTOC := false
+	for i := range m.LayerInfos() {
+		layerValue := ""                                     // An empty string is not a valid digest, so this is unambiguous with the TOC case.
+		tocDigest, ok := s.lockProtected.indexToTOCDigest[i] // "" if not a TOC
+		if ok {
+			hasLayerPulledByTOC = true
+			layerValue = tocDigest.String()
+		}
+		tocIDInput += layerValue + "|" // "|" can not be present in a TOC digest, so this is an unambiguous separator.
+	}
+
+	if !hasLayerPulledByTOC {
+		return ordinaryImageID
+	}
+	// ordinaryImageID is a digest of a config, which is a JSON value.
+	// To avoid the risk of collisions, start the input with @ so that the input is not a valid JSON.
+	tocImageID := digest.FromString("@With TOC:" + tocIDInput).Hex()
+	logrus.Debugf("Ordinary storage image ID %s; a layer was looked up by TOC, so using image ID %s", ordinaryImageID, tocImageID)
+	return tocImageID
 }
 
 // getConfigBlob exists only to let us retrieve the configuration blob so that the manifest package can dig
