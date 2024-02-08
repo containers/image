@@ -633,7 +633,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	}
 	id := diffIDOrTOCDigest.Hex()
 	if parentLayer != "" {
-		id = digest.Canonical.FromBytes([]byte(parentLayer + "+" + diffIDOrTOCDigest.Hex())).Hex()
+		id = digest.Canonical.FromString(parentLayer + "+" + diffIDOrTOCDigest.Hex()).Hex()
 	}
 	if layer, err2 := s.imageRef.transport.store.Layer(id); layer != nil && err2 == nil {
 		// There's already a layer that should have the right contents, just reuse it.
