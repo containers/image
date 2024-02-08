@@ -74,7 +74,8 @@ type storageImageDestination struct {
 	// `queueOrCommit()` for further details on how the single-caller
 	// guarantee is implemented.
 	indexToStorageID map[int]string
-	// All accesses to below data are protected by `lock` which is made
+	// All accesses to below data are, during the concurrent TryReusingBlob/PutBlob/* calls
+	// (but not necessarily during the final Commit) protected by `lock` which is made
 	// *explicit* in the code.
 	uncompressedOrTocDigest map[digest.Digest]digest.Digest                       // Mapping from layer blobsums to their corresponding DiffIDs or TOC IDs.
 	fileSizes               map[digest.Digest]int64                               // Mapping from layer blobsums to their sizes
