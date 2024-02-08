@@ -595,17 +595,12 @@ func (s *storageImageDestination) queueOrCommit(index int, info addedLayerInfo) 
 }
 
 // getLayerID returns the diffID for the specified digest or the digest for the TOC, if known.
-func (s *storageImageDestination) getLayerID(uncompressedDigest digest.Digest, tocDigest digest.Digest, index int) (string, bool) {
+func (s *storageImageDestination) getLayerID(uncompressedDigest digest.Digest, index int) (string, bool) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	if d, found := s.lockProtected.indexToTOCDigest[index]; found {
 		return d.Hex() + "-toc", found
-	}
-
-	if d, found := s.lockProtected.diffOutputs[tocDigest]; found {
-		// the layer was pulled by its TOC.
-		return d.TOCDigest.Hex() + "-toc", found
 	}
 
 	d, found := s.lockProtected.blobDiffIDs[uncompressedDigest]
@@ -649,7 +644,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	// Check if there's already a layer with the ID that we'd give to the result of applying
 	// this layer blob to its parent, if it has one, or the blob's hex value otherwise.
 	// The layerID refers either to the DiffID or the digest of the TOC.
-	layerID, haveLayerID := s.getLayerID(info.digest, info.tocDigest, index)
+	layerID, haveLayerID := s.getLayerID(info.digest, index)
 	if !haveLayerID {
 		// Check if it's elsewhere and the caller just forgot to pass it to us in a PutBlob(),
 		// or to even check if we had it.
@@ -672,7 +667,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 			return false, fmt.Errorf("error determining uncompressed digest or TOC digest for blob %q", info.digest.String())
 		}
 
-		layerID, haveLayerID = s.getLayerID(info.digest, info.tocDigest, index)
+		layerID, haveLayerID = s.getLayerID(info.digest, index)
 		if !haveLayerID {
 			d := info.digest
 			if d == "" {
