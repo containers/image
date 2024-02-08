@@ -73,7 +73,7 @@ type storageImageDestination struct {
 	// time, can only be executed by *one* goroutine.  Please refer to
 	// `queueOrCommit()` for further details on how the single-caller
 	// guarantee is implemented.
-	indexToStorageID map[int]*string
+	indexToStorageID map[int]string
 	// All accesses to below data are protected by `lock` which is made
 	// *explicit* in the code.
 	uncompressedOrTocDigest map[digest.Digest]digest.Digest                       // Mapping from layer blobsums to their corresponding DiffIDs or TOC IDs.
@@ -127,7 +127,7 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 			SignatureSizes:  []int{},
 			SignaturesSizes: make(map[digest.Digest][]int),
 		},
-		indexToStorageID:      make(map[int]*string),
+		indexToStorageID:      make(map[int]string),
 		indexToAddedLayerInfo: make(map[int]addedLayerInfo),
 		diffOutputs:           make(map[digest.Digest]*graphdriver.DriverWithDifferOutput),
 	}
@@ -588,13 +588,13 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	// `s.indexToStorageID` can only be accessed by *one* goroutine at any
 	// given time. Hence, we don't need to lock accesses.
 	var lastLayer string
-	if prev := s.indexToStorageID[index-1]; prev != nil {
-		lastLayer = *prev
+	if prev, ok := s.indexToStorageID[index-1]; ok {
+		lastLayer = prev
 	}
 
 	// Carry over the previous ID for empty non-base layers.
 	if info.emptyLayer {
-		s.indexToStorageID[index] = &lastLayer
+		s.indexToStorageID[index] = lastLayer
 		return false, nil
 	}
 
@@ -633,7 +633,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	if layer, err2 := s.imageRef.transport.store.Layer(id); layer != nil && err2 == nil {
 		// There's already a layer that should have the right contents, just reuse it.
 		lastLayer = layer.ID
-		s.indexToStorageID[index] = &lastLayer
+		s.indexToStorageID[index] = lastLayer
 		return false, nil
 	}
 
@@ -683,7 +683,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 			return false, err
 		}
 
-		s.indexToStorageID[index] = &layer.ID
+		s.indexToStorageID[index] = layer.ID
 		return false, nil
 	}
 
@@ -696,7 +696,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 			return false, fmt.Errorf("failed to put layer from digest and labels: %w", err)
 		}
 		lastLayer = layer.ID
-		s.indexToStorageID[index] = &lastLayer
+		s.indexToStorageID[index] = lastLayer
 		return false, nil
 	}
 
@@ -770,7 +770,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 		return false, fmt.Errorf("adding layer with blob %q: %w", info.digest, err)
 	}
 
-	s.indexToStorageID[index] = &layer.ID
+	s.indexToStorageID[index] = layer.ID
 	return false, nil
 }
 
@@ -829,11 +829,11 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	}
 	var lastLayer string
 	if len(layerBlobs) > 0 { // Can happen when using caches
-		prev := s.indexToStorageID[len(layerBlobs)-1]
-		if prev == nil {
+		prev, ok := s.indexToStorageID[len(layerBlobs)-1]
+		if !ok {
 			return fmt.Errorf("Internal error: storageImageDestination.Commit(): previous layer %d hasn't been committed (lastLayer == nil)", len(layerBlobs)-1)
 		}
-		lastLayer = *prev
+		lastLayer = prev
 	}
 
 	// If one of those blobs was a configuration blob, then we can try to dig out the date when the image
