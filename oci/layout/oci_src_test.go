@@ -49,7 +49,7 @@ func TestGetBlobForRemoteLayers(t *testing.T) {
 	imageSource := createImageSource(t, &types.SystemContext{})
 	defer imageSource.Close()
 	layerInfo := types.BlobInfo{
-		Digest: digest.FromBytes([]byte("Hello world")),
+		Digest: digest.FromString("Hello world"),
 		Size:   -1,
 		URLs: []string{
 			"brokenurl",

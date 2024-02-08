@@ -55,15 +55,14 @@ type storageImageDestination struct {
 	stubs.ImplementsPutBlobPartial
 	stubs.AlwaysSupportsSignatures
 
-	imageRef        storageReference
-	directory       string                   // Temporary directory where we store blobs until Commit() time
-	nextTempFileID  atomic.Int32             // A counter that we use for computing filenames to assign to blobs
-	manifest        []byte                   // Manifest contents, temporary
-	manifestDigest  digest.Digest            // Valid if len(manifest) != 0
-	signatures      []byte                   // Signature contents, temporary
-	signatureses    map[digest.Digest][]byte // Instance signature contents, temporary
-	SignatureSizes  []int                    `json:"signature-sizes,omitempty"`  // List of sizes of each signature slice
-	SignaturesSizes map[digest.Digest][]int  `json:"signatures-sizes,omitempty"` // Sizes of each manifest's signature slice
+	imageRef       storageReference
+	directory      string                   // Temporary directory where we store blobs until Commit() time
+	nextTempFileID atomic.Int32             // A counter that we use for computing filenames to assign to blobs
+	manifest       []byte                   // Manifest contents, temporary
+	manifestDigest digest.Digest            // Valid if len(manifest) != 0
+	signatures     []byte                   // Signature contents, temporary
+	signatureses   map[digest.Digest][]byte // Instance signature contents, temporary
+	metadata       storageImageMetadata     // Metadata contents being built
 
 	// A storage destination may be used concurrently.  Accesses are
 	// serialized via a mutex.  Please refer to the individual comments
@@ -74,8 +73,9 @@ type storageImageDestination struct {
 	// time, can only be executed by *one* goroutine.  Please refer to
 	// `queueOrCommit()` for further details on how the single-caller
 	// guarantee is implemented.
-	indexToStorageID map[int]*string
-	// All accesses to below data are protected by `lock` which is made
+	indexToStorageID map[int]string
+	// All accesses to below data are, during the concurrent TryReusingBlob/PutBlob/* calls
+	// (but not necessarily during the final Commit) protected by `lock` which is made
 	// *explicit* in the code.
 	uncompressedOrTocDigest map[digest.Digest]digest.Digest                       // Mapping from layer blobsums to their corresponding DiffIDs or TOC IDs.
 	fileSizes               map[digest.Digest]int64                               // Mapping from layer blobsums to their sizes
@@ -124,11 +124,13 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 		blobAdditionalLayer:     make(map[digest.Digest]storage.AdditionalLayer),
 		fileSizes:               make(map[digest.Digest]int64),
 		filenames:               make(map[digest.Digest]string),
-		SignatureSizes:          []int{},
-		SignaturesSizes:         make(map[digest.Digest][]int),
-		indexToStorageID:        make(map[int]*string),
-		indexToAddedLayerInfo:   make(map[int]addedLayerInfo),
-		diffOutputs:             make(map[digest.Digest]*graphdriver.DriverWithDifferOutput),
+		metadata: storageImageMetadata{
+			SignatureSizes:  []int{},
+			SignaturesSizes: make(map[digest.Digest][]int),
+		},
+		indexToStorageID:      make(map[int]string),
+		indexToAddedLayerInfo: make(map[int]addedLayerInfo),
+		diffOutputs:           make(map[digest.Digest]*graphdriver.DriverWithDifferOutput),
 	}
 	dest.Compat = impl.AddCompat(dest)
 	return dest, nil
@@ -586,14 +588,18 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	// Start with an empty string or the previous layer ID.  Note that
 	// `s.indexToStorageID` can only be accessed by *one* goroutine at any
 	// given time. Hence, we don't need to lock accesses.
-	var lastLayer string
-	if prev := s.indexToStorageID[index-1]; prev != nil {
-		lastLayer = *prev
+	var parentLayer string
+	if index != 0 {
+		prev, ok := s.indexToStorageID[index-1]
+		if !ok {
+			return false, fmt.Errorf("Internal error: commitLayer called with previous layer %d not committed yet", index-1)
+		}
+		parentLayer = prev
 	}
 
 	// Carry over the previous ID for empty non-base layers.
 	if info.emptyLayer {
-		s.indexToStorageID[index] = &lastLayer
+		s.indexToStorageID[index] = parentLayer
 		return false, nil
 	}
 
@@ -626,13 +632,12 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 		}
 	}
 	id := diffIDOrTOCDigest.Hex()
-	if lastLayer != "" {
-		id = digest.Canonical.FromBytes([]byte(lastLayer + "+" + diffIDOrTOCDigest.Hex())).Hex()
+	if parentLayer != "" {
+		id = digest.Canonical.FromString(parentLayer + "+" + diffIDOrTOCDigest.Hex()).Hex()
 	}
 	if layer, err2 := s.imageRef.transport.store.Layer(id); layer != nil && err2 == nil {
 		// There's already a layer that should have the right contents, just reuse it.
-		lastLayer = layer.ID
-		s.indexToStorageID[index] = &lastLayer
+		s.indexToStorageID[index] = layer.ID
 		return false, nil
 	}
 
@@ -664,7 +669,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 			return false, fmt.Errorf("index %d out of range for configOCI.RootFS.DiffIDs", index)
 		}
 
-		layer, err := s.imageRef.transport.store.CreateLayer(id, lastLayer, nil, "", false, nil)
+		layer, err := s.imageRef.transport.store.CreateLayer(id, parentLayer, nil, "", false, nil)
 		if err != nil {
 			return false, err
 		}
@@ -682,7 +687,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 			return false, err
 		}
 
-		s.indexToStorageID[index] = &layer.ID
+		s.indexToStorageID[index] = layer.ID
 		return false, nil
 	}
 
@@ -690,12 +695,11 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	al, ok := s.blobAdditionalLayer[info.digest]
 	s.lock.Unlock()
 	if ok {
-		layer, err := al.PutAs(id, lastLayer, nil)
+		layer, err := al.PutAs(id, parentLayer, nil)
 		if err != nil && !errors.Is(err, storage.ErrDuplicateID) {
 			return false, fmt.Errorf("failed to put layer from digest and labels: %w", err)
 		}
-		lastLayer = layer.ID
-		s.indexToStorageID[index] = &lastLayer
+		s.indexToStorageID[index] = layer.ID
 		return false, nil
 	}
 
@@ -761,7 +765,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	defer file.Close()
 	// Build the new layer using the diff, regardless of where it came from.
 	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
-	layer, _, err := s.imageRef.transport.store.PutLayer(id, lastLayer, nil, "", false, &storage.LayerOptions{
+	layer, _, err := s.imageRef.transport.store.PutLayer(id, parentLayer, nil, "", false, &storage.LayerOptions{
 		OriginalDigest:     info.digest,
 		UncompressedDigest: diffIDOrTOCDigest,
 	}, file)
@@ -769,7 +773,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 		return false, fmt.Errorf("adding layer with blob %q: %w", info.digest, err)
 	}
 
-	s.indexToStorageID[index] = &layer.ID
+	s.indexToStorageID[index] = layer.ID
 	return false, nil
 }
 
@@ -827,12 +831,12 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		}
 	}
 	var lastLayer string
-	if len(layerBlobs) > 0 { // Can happen when using caches
-		prev := s.indexToStorageID[len(layerBlobs)-1]
-		if prev == nil {
+	if len(layerBlobs) > 0 { // Zero-layer images rarely make sense, but it is technically possible, and may happen for non-image artifacts.
+		prev, ok := s.indexToStorageID[len(layerBlobs)-1]
+		if !ok {
 			return fmt.Errorf("Internal error: storageImageDestination.Commit(): previous layer %d hasn't been committed (lastLayer == nil)", len(layerBlobs)-1)
 		}
-		lastLayer = *prev
+		lastLayer = prev
 	}
 
 	// If one of those blobs was a configuration blob, then we can try to dig out the date when the image
@@ -906,7 +910,7 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	}
 
 	// Set up to save our metadata.
-	metadata, err := json.Marshal(s)
+	metadata, err := json.Marshal(s.metadata)
 	if err != nil {
 		return fmt.Errorf("encoding metadata for image: %w", err)
 	}
@@ -1011,7 +1015,7 @@ func (s *storageImageDestination) PutSignaturesWithFormat(ctx context.Context, s
 	}
 	if instanceDigest == nil {
 		s.signatures = sigblob
-		s.SignatureSizes = sizes
+		s.metadata.SignatureSizes = sizes
 		if len(s.manifest) > 0 {
 			manifestDigest := s.manifestDigest
 			instanceDigest = &manifestDigest
@@ -1019,7 +1023,7 @@ func (s *storageImageDestination) PutSignaturesWithFormat(ctx context.Context, s
 	}
 	if instanceDigest != nil {
 		s.signatureses[*instanceDigest] = sigblob
-		s.SignaturesSizes[*instanceDigest] = sizes
+		s.metadata.SignaturesSizes[*instanceDigest] = sizes
 	}
 	return nil
 }
