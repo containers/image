@@ -668,34 +668,33 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	// The layerID refers either to the DiffID or the digest of the TOC.
 	layerID, haveLayerID := s.getLayerID(info.digest, index)
 	if !haveLayerID {
-		// Check if it's elsewhere and the caller just forgot to pass it to us in a PutBlob(),
-		// or to even check if we had it.
-		// Use none.NoCache to avoid a repeated DiffID lookup in the BlobInfoCache; a caller
+		// Check if it's elsewhere and the caller just forgot to pass it to us in a PutBlob() / TryReusingBlob() / …
+		//
+		// Use none.NoCache to avoid a repeated DiffID lookup in the BlobInfoCache: a caller
 		// that relies on using a blob digest that has never been seen by the store had better call
 		// TryReusingBlob; not calling PutBlob already violates the documented API, so there’s only
 		// so far we are going to accommodate that (if we should be doing that at all).
-		logrus.Debugf("looking for diffID or TOC digest for blob=%+v tocDigest=+%v", info.digest, info.tocDigest)
+		//
+		// We are also ignoring lookups by TOC, and other non-trivial situations.
+		// Those can only happen using the c/image/internal/private API,
+		// so those internal callers should be fixed to follow the API instead of expanding this fallback.
+		logrus.Debugf("looking for diffID for blob=%+v", info.digest)
 
 		// Use tryReusingBlobAsPending, not the top-level TryReusingBlobWithOptions, to prevent recursion via queueOrCommit.
 		has, _, err := s.tryReusingBlobAsPending(info.digest, size, &private.TryReusingBlobOptions{
-			TOCDigest:     info.tocDigest,
 			Cache:         none.NoCache,
 			CanSubstitute: false,
 		})
 		if err != nil {
-			return false, fmt.Errorf("checking for a layer based on blob %q (tocDigest %q): %w", info.digest.String(), info.tocDigest.String(), err)
+			return false, fmt.Errorf("checking for a layer based on blob %q: %w", info.digest.String(), err)
 		}
 		if !has {
-			return false, fmt.Errorf("error determining uncompressed digest or TOC digest for blob %q", info.digest.String())
+			return false, fmt.Errorf("error determining uncompressed digest for blob %q", info.digest.String())
 		}
 
 		layerID, haveLayerID = s.getLayerID(info.digest, index)
 		if !haveLayerID {
-			d := info.digest
-			if d == "" {
-				d = info.tocDigest
-			}
-			return false, fmt.Errorf("we have blob %q, but don't know its uncompressed or TOC digest", d.String())
+			return false, fmt.Errorf("we have blob %q, but don't know its layer ID", info.digest.String())
 		}
 	}
 
