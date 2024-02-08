@@ -97,7 +97,6 @@ type storageImageDestinationLockProtected struct {
 // addedLayerInfo records data about a layer to use in this image.
 type addedLayerInfo struct {
 	digest     digest.Digest // Mandatory, the digest of the layer.
-	tocDigest  digest.Digest // Optional.  If tocDigest != "", the layer was pulled by its TOC.
 	emptyLayer bool          // The layer is an “empty”/“throwaway” one, and may or may not be physically represented in various transport / storage systems.  false if the manifest type does not have the concept.
 }
 
@@ -336,7 +335,6 @@ func (s *storageImageDestination) TryReusingBlobWithOptions(ctx context.Context,
 
 	return reused, info, s.queueOrCommit(*options.LayerIndex, addedLayerInfo{
 		digest:     info.Digest,
-		tocDigest:  options.TOCDigest,
 		emptyLayer: options.EmptyLayer,
 	})
 }
@@ -898,18 +896,8 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 
 	// Extract, commit, or find the layers.
 	for i, blob := range layerBlobs {
-		s.lock.Lock()
-		diffOutput, ok := s.lockProtected.diffOutputs[blob.Digest]
-		s.lock.Unlock()
-
-		var tocDigest digest.Digest
-		if ok {
-			tocDigest = diffOutput.TOCDigest
-		}
-
 		if stopQueue, err := s.commitLayer(i, addedLayerInfo{
 			digest:     blob.Digest,
-			tocDigest:  tocDigest,
 			emptyLayer: blob.EmptyLayer,
 		}, blob.Size); err != nil {
 			return err
