@@ -84,14 +84,14 @@ type storageImageDestinationLockProtected struct {
 	// When creating a layer, the c/storage layer metadata and image IDs must _only_ be based on trusted values
 	// we have computed ourselves. (Layer reuse can then look up against such trusted values, but it might not
 	// recompute those values for incomding layers — the point of the reuse is that we don’t need to consume the incoming layer.)
-	blobDiffIDs           map[digest.Digest]digest.Digest                       // Mapping from layer blobsums to their corresponding DiffIDs
-	indexToTOCDigest      map[int]digest.Digest                                 // Mapping from layer index to a TOC Digest, IFF the layer was created/found/reused by TOC digest
-	fileSizes             map[digest.Digest]int64                               // Mapping from layer blobsums to their sizes
-	filenames             map[digest.Digest]string                              // Mapping from layer blobsums to names of files we used to hold them
-	currentIndex          int                                                   // The index of the layer to be committed (i.e., lower indices have already been committed)
-	indexToAddedLayerInfo map[int]addedLayerInfo                                // Mapping from layer (by index) to blob to add to the image
-	blobAdditionalLayer   map[digest.Digest]storage.AdditionalLayer             // Mapping from layer blobsums to their corresponding additional layer
-	diffOutputs           map[digest.Digest]*graphdriver.DriverWithDifferOutput // Mapping from digest to differ output
+	blobDiffIDs           map[digest.Digest]digest.Digest             // Mapping from layer blobsums to their corresponding DiffIDs
+	indexToTOCDigest      map[int]digest.Digest                       // Mapping from layer index to a TOC Digest, IFF the layer was created/found/reused by TOC digest
+	fileSizes             map[digest.Digest]int64                     // Mapping from layer blobsums to their sizes
+	filenames             map[digest.Digest]string                    // Mapping from layer blobsums to names of files we used to hold them
+	currentIndex          int                                         // The index of the layer to be committed (i.e., lower indices have already been committed)
+	indexToAddedLayerInfo map[int]addedLayerInfo                      // Mapping from layer (by index) to blob to add to the image
+	blobAdditionalLayer   map[digest.Digest]storage.AdditionalLayer   // Mapping from layer blobsums to their corresponding additional layer
+	diffOutputs           map[int]*graphdriver.DriverWithDifferOutput // Mapping from layer index to a partially-pulled layer intermediate data
 }
 
 // addedLayerInfo records data about a layer to use in this image.
@@ -140,7 +140,7 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 			filenames:             make(map[digest.Digest]string),
 			indexToAddedLayerInfo: make(map[int]addedLayerInfo),
 			blobAdditionalLayer:   make(map[digest.Digest]storage.AdditionalLayer),
-			diffOutputs:           make(map[digest.Digest]*graphdriver.DriverWithDifferOutput),
+			diffOutputs:           make(map[int]*graphdriver.DriverWithDifferOutput),
 		},
 	}
 	dest.Compat = impl.AddCompat(dest)
@@ -309,7 +309,7 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	s.lock.Lock()
 	s.lockProtected.fileSizes[blobDigest] = 0
 	s.lockProtected.filenames[blobDigest] = ""
-	s.lockProtected.diffOutputs[blobDigest] = out
+	s.lockProtected.diffOutputs[options.LayerIndex] = out
 	s.lockProtected.indexToTOCDigest[options.LayerIndex] = out.TOCDigest
 	s.lock.Unlock()
 
@@ -707,7 +707,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	}
 
 	s.lock.Lock()
-	diffOutput, ok := s.lockProtected.diffOutputs[info.digest]
+	diffOutput, ok := s.lockProtected.diffOutputs[index]
 	s.lock.Unlock()
 	if ok {
 		if s.manifest == nil {
