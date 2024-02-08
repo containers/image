@@ -632,8 +632,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	}
 	if layer, err2 := s.imageRef.transport.store.Layer(id); layer != nil && err2 == nil {
 		// There's already a layer that should have the right contents, just reuse it.
-		lastLayer = layer.ID
-		s.indexToStorageID[index] = lastLayer
+		s.indexToStorageID[index] = layer.ID
 		return false, nil
 	}
 
@@ -695,8 +694,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 		if err != nil && !errors.Is(err, storage.ErrDuplicateID) {
 			return false, fmt.Errorf("failed to put layer from digest and labels: %w", err)
 		}
-		lastLayer = layer.ID
-		s.indexToStorageID[index] = lastLayer
+		s.indexToStorageID[index] = layer.ID
 		return false, nil
 	}
 
