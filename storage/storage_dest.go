@@ -300,8 +300,8 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 		return private.UploadedBlob{}, err
 	}
 
-	if out.TOCDigest == "" {
-		return private.UploadedBlob{}, errors.New("TOC digest is empty")
+	if out.TOCDigest == "" && out.UncompressedDigest == "" {
+		return private.UploadedBlob{}, errors.New("internal error: ApplyDiffWithDiffer succeeded with neither TOCDigest nor UncompressedDigest set")
 	}
 
 	blobDigest := srcInfo.Digest
@@ -310,7 +310,17 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	s.lockProtected.fileSizes[blobDigest] = 0
 	s.lockProtected.filenames[blobDigest] = ""
 	s.lockProtected.diffOutputs[options.LayerIndex] = out
-	s.lockProtected.indexToTOCDigest[options.LayerIndex] = out.TOCDigest
+	if out.UncompressedDigest != "" {
+		// The computation of UncompressedDigest means the whole layer has been consumed; while doing that, chunked.GetDiffer is
+		// responsible for ensuring blobDigest has been validated.
+		s.lockProtected.blobDiffIDs[blobDigest] = out.UncompressedDigest
+	} else {
+		// Don’t identify layers by TOC if UncompressedDigest is available.
+		// - Using UncompressedDigest allows image reuse with non-partially-pulled layers
+		// - If UncompressedDigest has been computed, that means the layer was read completely, and the TOC has been created from scratch.
+		//   That TOC is quite unlikely to match with any other TOC value.
+		s.lockProtected.indexToTOCDigest[options.LayerIndex] = out.TOCDigest
+	}
 	s.lock.Unlock()
 
 	return private.UploadedBlob{
@@ -725,28 +735,32 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 	diffOutput, ok := s.lockProtected.diffOutputs[index]
 	s.lock.Unlock()
 	if ok {
-		if s.manifest == nil {
-			logrus.Debugf("Skipping commit for layer %q, manifest not yet available", newLayerID)
-			return nil, nil
-		}
+		var untrustedUncompressedDigest digest.Digest
+		if diffOutput.UncompressedDigest == "" {
+			if s.manifest == nil {
+				logrus.Debugf("Skipping commit for layer %q, manifest not yet available", newLayerID)
+				return nil, nil
+			}
 
-		man, err := manifest.FromBlob(s.manifest, manifest.GuessMIMEType(s.manifest))
-		if err != nil {
-			return nil, fmt.Errorf("parsing manifest: %w", err)
-		}
+			man, err := manifest.FromBlob(s.manifest, manifest.GuessMIMEType(s.manifest))
+			if err != nil {
+				return nil, fmt.Errorf("parsing manifest: %w", err)
+			}
 
-		cb, err := s.getConfigBlob(man.ConfigInfo())
-		if err != nil {
-			return nil, err
-		}
+			cb, err := s.getConfigBlob(man.ConfigInfo())
+			if err != nil {
+				return nil, err
+			}
 
-		// retrieve the expected uncompressed digest from the config blob.
-		configOCI := &imgspecv1.Image{}
-		if err := json.Unmarshal(cb, configOCI); err != nil {
-			return nil, err
-		}
-		if index >= len(configOCI.RootFS.DiffIDs) {
-			return nil, fmt.Errorf("index %d out of range for configOCI.RootFS.DiffIDs", index)
+			// retrieve the expected uncompressed digest from the config blob.
+			configOCI := &imgspecv1.Image{}
+			if err := json.Unmarshal(cb, configOCI); err != nil {
+				return nil, err
+			}
+			if index >= len(configOCI.RootFS.DiffIDs) {
+				return nil, fmt.Errorf("index %d out of range for configOCI.RootFS.DiffIDs", index)
+			}
+			untrustedUncompressedDigest = configOCI.RootFS.DiffIDs[index]
 		}
 
 		layer, err := s.imageRef.transport.store.CreateLayer(newLayerID, parentLayer, nil, "", false, nil)
@@ -754,14 +768,14 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 			return nil, err
 		}
 
-		// let the storage layer know what was the original uncompressed layer.
 		flags := make(map[string]interface{})
-		flags[expectedLayerDiffIDFlag] = configOCI.RootFS.DiffIDs[index]
-		logrus.Debugf("Setting uncompressed digest to %q for layer %q", configOCI.RootFS.DiffIDs[index], newLayerID)
+		if untrustedUncompressedDigest != "" {
+			flags[expectedLayerDiffIDFlag] = untrustedUncompressedDigest
+			logrus.Debugf("Setting uncompressed digest to %q for layer %q", untrustedUncompressedDigest, newLayerID)
+		}
 		options := &graphdriver.ApplyDiffWithDifferOpts{
 			Flags: flags,
 		}
-
 		if err := s.imageRef.transport.store.ApplyDiffFromStagingDirectory(layer.ID, diffOutput.Target, diffOutput, options); err != nil {
 			_ = s.imageRef.transport.store.Delete(layer.ID)
 			return nil, err

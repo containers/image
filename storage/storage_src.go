@@ -301,16 +301,15 @@ func (s *storageImageSource) LayerInfosForCopy(ctx context.Context, instanceDige
 		if err != nil {
 			return nil, fmt.Errorf("reading layer %q in image %q: %w", layerID, s.image.ID, err)
 		}
-		if layer.UncompressedDigest == "" && layer.TOCDigest == "" {
-			return nil, fmt.Errorf("uncompressed digest and TOC digest for layer %q is unknown", layerID)
-		}
 		if layer.UncompressedSize < 0 {
 			return nil, fmt.Errorf("uncompressed size for layer %q is unknown", layerID)
 		}
 
 		blobDigest := layer.UncompressedDigest
-
-		if layer.TOCDigest != "" {
+		if blobDigest == "" {
+			if layer.TOCDigest == "" {
+				return nil, fmt.Errorf("uncompressed digest and TOC digest for layer %q is unknown", layerID)
+			}
 			if layer.Flags == nil || layer.Flags[expectedLayerDiffIDFlag] == nil {
 				return nil, fmt.Errorf("TOC digest %q for layer %q is present but %q flag is not set", layer.TOCDigest, layerID, expectedLayerDiffIDFlag)
 			}
