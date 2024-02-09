@@ -448,11 +448,8 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 			return false, private.ReusedBlob{}, fmt.Errorf(`looking for layers with TOC digest %q: %w`, options.TOCDigest, err)
 		}
 		if len(layers) > 0 {
-			if options.LayerIndex != nil {
-				// Save this for completeness.
-				s.lockProtected.indexToTOCDigest[*options.LayerIndex] = options.TOCDigest
-			}
-
+			// Save this for completeness.
+			s.lockProtected.indexToTOCDigest[*options.LayerIndex] = options.TOCDigest
 			return true, private.ReusedBlob{
 				Digest:             blobDigest,
 				Size:               layers[0].UncompressedSize,
