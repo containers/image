@@ -93,12 +93,15 @@ type storageImageDestinationLockProtected struct {
 	blobDiffIDs      map[digest.Digest]digest.Digest // Mapping from layer blobsums to their corresponding DiffIDs
 	indexToTOCDigest map[int]digest.Digest           // Mapping from layer index to a TOC Digest, IFF the layer was created/found/reused by TOC digest
 
+	// Layer data: Before commitLayer is called, either at least one of (diffOutputs, blobAdditionalLayer, filenames)
+	// should be available; or indexToTOCDigest/blobDiffIDs should be enough to locate an existing c/storage layer.
+	// They are looked up in the order they are mentioned above.
+	diffOutputs         map[int]*graphdriver.DriverWithDifferOutput // Mapping from layer index to a partially-pulled layer intermediate data
+	blobAdditionalLayer map[digest.Digest]storage.AdditionalLayer   // Mapping from layer blobsums to their corresponding additional layer
 	// Mapping from layer blobsums to names of files we used to hold them. If set, fileSizes and blobDiffIDs must also be set.
 	filenames map[digest.Digest]string
 	// Mapping from layer blobsums to their sizes. If set, filenames and blobDiffIDs must also be set.
-	fileSizes           map[digest.Digest]int64
-	blobAdditionalLayer map[digest.Digest]storage.AdditionalLayer   // Mapping from layer blobsums to their corresponding additional layer
-	diffOutputs         map[int]*graphdriver.DriverWithDifferOutput // Mapping from layer index to a partially-pulled layer intermediate data
+	fileSizes map[digest.Digest]int64
 }
 
 // addedLayerInfo records data about a layer to use in this image.
@@ -144,10 +147,10 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 			indexToAddedLayerInfo: make(map[int]addedLayerInfo),
 			blobDiffIDs:           make(map[digest.Digest]digest.Digest),
 			indexToTOCDigest:      make(map[int]digest.Digest),
+			diffOutputs:           make(map[int]*graphdriver.DriverWithDifferOutput),
+			blobAdditionalLayer:   make(map[digest.Digest]storage.AdditionalLayer),
 			filenames:             make(map[digest.Digest]string),
 			fileSizes:             make(map[digest.Digest]int64),
-			blobAdditionalLayer:   make(map[digest.Digest]storage.AdditionalLayer),
-			diffOutputs:           make(map[int]*graphdriver.DriverWithDifferOutput),
 		},
 	}
 	dest.Compat = impl.AddCompat(dest)
