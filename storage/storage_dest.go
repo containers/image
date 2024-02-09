@@ -87,8 +87,12 @@ type storageImageDestinationLockProtected struct {
 	// When creating a layer, the c/storage layer metadata and image IDs must _only_ be based on trusted values
 	// we have computed ourselves. (Layer reuse can then look up against such trusted values, but it might not
 	// recompute those values for incomding layers — the point of the reuse is that we don’t need to consume the incoming layer.)
+
+	// Layer identification: For a layer, at least one of indexToTOCDigest and blobDiffIDs must be available before commitLayer is called.
+	// The presence of an indexToTOCDigest is what decides how the layer is identified, i.e. which fields must be trusted.
 	blobDiffIDs      map[digest.Digest]digest.Digest // Mapping from layer blobsums to their corresponding DiffIDs
 	indexToTOCDigest map[int]digest.Digest           // Mapping from layer index to a TOC Digest, IFF the layer was created/found/reused by TOC digest
+
 	// Mapping from layer blobsums to names of files we used to hold them. If set, fileSizes and blobDiffIDs must also be set.
 	filenames map[digest.Digest]string
 	// Mapping from layer blobsums to their sizes. If set, filenames and blobDiffIDs must also be set.
@@ -310,7 +314,6 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	blobDigest := srcInfo.Digest
 
 	s.lock.Lock()
-	s.lockProtected.diffOutputs[options.LayerIndex] = out
 	if out.UncompressedDigest != "" {
 		// The computation of UncompressedDigest means the whole layer has been consumed; while doing that, chunked.GetDiffer is
 		// responsible for ensuring blobDigest has been validated.
@@ -322,6 +325,7 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 		//   That TOC is quite unlikely to match with any other TOC value.
 		s.lockProtected.indexToTOCDigest[options.LayerIndex] = out.TOCDigest
 	}
+	s.lockProtected.diffOutputs[options.LayerIndex] = out
 	s.lock.Unlock()
 
 	return private.UploadedBlob{
@@ -363,7 +367,6 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 		if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
 			return false, private.ReusedBlob{}, fmt.Errorf(`looking for compressed layers with digest %q and labels: %w`, blobDigest, err)
 		} else if err == nil {
-			// Record the uncompressed value so that we can use it to calculate layer IDs.
 			s.lockProtected.blobDiffIDs[blobDigest] = aLayer.UncompressedDigest()
 			s.lockProtected.blobAdditionalLayer[blobDigest] = aLayer
 			return true, private.ReusedBlob{
@@ -402,7 +405,6 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 		return false, private.ReusedBlob{}, fmt.Errorf(`looking for layers with digest %q: %w`, blobDigest, err)
 	}
 	if len(layers) > 0 {
-		// Save this for completeness.
 		s.lockProtected.blobDiffIDs[blobDigest] = blobDigest
 		return true, private.ReusedBlob{
 			Digest: blobDigest,
@@ -416,8 +418,13 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 		return false, private.ReusedBlob{}, fmt.Errorf(`looking for compressed layers with digest %q: %w`, blobDigest, err)
 	}
 	if len(layers) > 0 {
-		// Record the uncompressed value so that we can use it to calculate layer IDs.
-		s.lockProtected.blobDiffIDs[blobDigest] = layers[0].UncompressedDigest
+		// LayersByCompressedDigest only finds layers which were created from a full layer blob, and extracting that
+		// always sets UncompressedDigest.
+		diffID := layers[0].UncompressedDigest
+		if diffID == "" {
+			return false, private.ReusedBlob{}, fmt.Errorf("internal error: compressed layer %q (for compressed digest %q) does not have an uncompressed digest", layers[0].ID, blobDigest.String())
+		}
+		s.lockProtected.blobDiffIDs[blobDigest] = diffID
 		return true, private.ReusedBlob{
 			Digest: blobDigest,
 			Size:   layers[0].CompressedSize,
@@ -461,7 +468,6 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 			return false, private.ReusedBlob{}, fmt.Errorf(`looking for layers with TOC digest %q: %w`, options.TOCDigest, err)
 		}
 		if len(layers) > 0 {
-			// Save this for completeness.
 			s.lockProtected.indexToTOCDigest[*options.LayerIndex] = options.TOCDigest
 			return true, private.ReusedBlob{
 				Digest:             blobDigest,
