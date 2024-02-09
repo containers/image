@@ -614,16 +614,16 @@ func (s *storageImageDestination) queueOrCommit(index int, info addedLayerInfo) 
 	return nil
 }
 
-// getLayerID returns the diffID for the specified digest or the digest for the TOC, if known.
-func (s *storageImageDestination) getLayerID(uncompressedDigest digest.Digest, index int) (string, bool) {
+// singleLayerIDComponent returns the diffID for the specified digest or the digest for the TOC, if known.
+func (s *storageImageDestination) singleLayerIDComponent(layerIndex int, blobDigest digest.Digest) (string, bool) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if d, found := s.lockProtected.indexToTOCDigest[index]; found {
+	if d, found := s.lockProtected.indexToTOCDigest[layerIndex]; found {
 		return d.Hex() + "-toc", found
 	}
 
-	d, found := s.lockProtected.blobDiffIDs[uncompressedDigest]
+	d, found := s.lockProtected.blobDiffIDs[blobDigest]
 	return d.Hex(), found
 }
 
@@ -664,7 +664,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	// Check if there's already a layer with the ID that we'd give to the result of applying
 	// this layer blob to its parent, if it has one, or the blob's hex value otherwise.
 	// The layerID refers either to the DiffID or the digest of the TOC.
-	layerID, haveLayerID := s.getLayerID(info.digest, index)
+	layerID, haveLayerID := s.singleLayerIDComponent(index, info.digest)
 	if !haveLayerID {
 		// Check if it's elsewhere and the caller just forgot to pass it to us in a PutBlob() / TryReusingBlob() / …
 		//
@@ -690,7 +690,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 			return false, fmt.Errorf("error determining uncompressed digest for blob %q", info.digest.String())
 		}
 
-		layerID, haveLayerID = s.getLayerID(info.digest, index)
+		layerID, haveLayerID = s.singleLayerIDComponent(index, info.digest)
 		if !haveLayerID {
 			return false, fmt.Errorf("we have blob %q, but don't know its layer ID", info.digest.String())
 		}
