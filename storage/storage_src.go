@@ -53,6 +53,9 @@ type storageImageSource struct {
 	getBlobMutexProtected getBlobMutexProtected
 }
 
+// expectedLayerDiffIDFlag is a per-layer flag containing an UNTRUSTED uncompressed digest of the layer.
+// It is set when pulling a layer by TOC; later, this value is used with digestToLayerID
+// to allow identifying the layer — and the consumer is expected to verify the blob returned by GetBlob against the digest.
 const expectedLayerDiffIDFlag = "expected-layer-diffid"
 
 // newImageSource sets up an image for reading.
