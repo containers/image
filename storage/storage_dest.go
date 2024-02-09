@@ -710,80 +710,91 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 		return false, nil
 	}
 
+	layer, err := s.createNewLayer(index, info.digest, parentLayer, id)
+	if err != nil {
+		return false, err
+	}
+	if layer == nil {
+		return true, nil
+	}
+	s.indexToStorageID[index] = layer.ID
+	return false, nil
+}
+
+// createNewLayer creates a new layer newLayerID for (index, layerDigest) on top of parentLayer (which may be "").
+// If the layer cannot be committed yet, the function returns (nil, nil).
+func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.Digest, parentLayer, newLayerID string) (*storage.Layer, error) {
 	s.lock.Lock()
 	diffOutput, ok := s.lockProtected.diffOutputs[index]
 	s.lock.Unlock()
 	if ok {
 		if s.manifest == nil {
-			logrus.Debugf("Skipping commit for TOC=%q, manifest not yet available", id)
-			return true, nil
+			logrus.Debugf("Skipping commit for layer %q, manifest not yet available", newLayerID)
+			return nil, nil
 		}
 
 		man, err := manifest.FromBlob(s.manifest, manifest.GuessMIMEType(s.manifest))
 		if err != nil {
-			return false, fmt.Errorf("parsing manifest: %w", err)
+			return nil, fmt.Errorf("parsing manifest: %w", err)
 		}
 
 		cb, err := s.getConfigBlob(man.ConfigInfo())
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 
 		// retrieve the expected uncompressed digest from the config blob.
 		configOCI := &imgspecv1.Image{}
 		if err := json.Unmarshal(cb, configOCI); err != nil {
-			return false, err
+			return nil, err
 		}
 		if index >= len(configOCI.RootFS.DiffIDs) {
-			return false, fmt.Errorf("index %d out of range for configOCI.RootFS.DiffIDs", index)
+			return nil, fmt.Errorf("index %d out of range for configOCI.RootFS.DiffIDs", index)
 		}
 
-		layer, err := s.imageRef.transport.store.CreateLayer(id, parentLayer, nil, "", false, nil)
+		layer, err := s.imageRef.transport.store.CreateLayer(newLayerID, parentLayer, nil, "", false, nil)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 
 		// let the storage layer know what was the original uncompressed layer.
 		flags := make(map[string]interface{})
 		flags[expectedLayerDiffIDFlag] = configOCI.RootFS.DiffIDs[index]
-		logrus.Debugf("Setting uncompressed digest to %q for layer %q", configOCI.RootFS.DiffIDs[index], id)
+		logrus.Debugf("Setting uncompressed digest to %q for layer %q", configOCI.RootFS.DiffIDs[index], newLayerID)
 		options := &graphdriver.ApplyDiffWithDifferOpts{
 			Flags: flags,
 		}
 
 		if err := s.imageRef.transport.store.ApplyDiffFromStagingDirectory(layer.ID, diffOutput.Target, diffOutput, options); err != nil {
 			_ = s.imageRef.transport.store.Delete(layer.ID)
-			return false, err
+			return nil, err
 		}
-
-		s.indexToStorageID[index] = layer.ID
-		return false, nil
+		return layer, nil
 	}
 
 	s.lock.Lock()
-	diffID, ok := s.lockProtected.blobDiffIDs[info.digest]
+	diffID, ok := s.lockProtected.blobDiffIDs[layerDigest]
 	s.lock.Unlock()
 
 	if !ok {
-		return false, fmt.Errorf("failed to find diffID for layer: %q", info.digest)
+		return nil, fmt.Errorf("failed to find diffID for layer: %q", layerDigest)
 	}
 
 	s.lock.Lock()
-	al, ok := s.lockProtected.blobAdditionalLayer[info.digest]
+	al, ok := s.lockProtected.blobAdditionalLayer[layerDigest]
 	s.lock.Unlock()
 	if ok {
-		layer, err := al.PutAs(id, parentLayer, nil)
+		layer, err := al.PutAs(newLayerID, parentLayer, nil)
 		if err != nil && !errors.Is(err, storage.ErrDuplicateID) {
-			return false, fmt.Errorf("failed to put layer from digest and labels: %w", err)
+			return nil, fmt.Errorf("failed to put layer from digest and labels: %w", err)
 		}
-		s.indexToStorageID[index] = layer.ID
-		return false, nil
+		return layer, nil
 	}
 
 	// Check if we previously cached a file with that blob's contents.  If we didn't,
 	// then we need to read the desired contents from a layer.
 	s.lock.Lock()
-	filename, ok := s.lockProtected.filenames[info.digest]
+	filename, ok := s.lockProtected.filenames[layerDigest]
 	s.lock.Unlock()
 	if !ok {
 		// Try to find the layer with contents matching that blobsum.
@@ -792,13 +803,13 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 		if err2 == nil && len(layers) > 0 {
 			layer = layers[0].ID
 		} else {
-			layers, err2 = s.imageRef.transport.store.LayersByCompressedDigest(info.digest)
+			layers, err2 = s.imageRef.transport.store.LayersByCompressedDigest(layerDigest)
 			if err2 == nil && len(layers) > 0 {
 				layer = layers[0].ID
 			}
 		}
 		if layer == "" {
-			return false, fmt.Errorf("locating layer for blob %q: %w", info.digest, err2)
+			return nil, fmt.Errorf("locating layer for blob %q: %w", layerDigest, err2)
 		}
 		// Read the layer's contents.
 		noCompression := archive.Uncompressed
@@ -807,7 +818,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 		}
 		diff, err2 := s.imageRef.transport.store.Diff("", layer, diffOptions)
 		if err2 != nil {
-			return false, fmt.Errorf("reading layer %q for blob %q: %w", layer, info.digest, err2)
+			return nil, fmt.Errorf("reading layer %q for blob %q: %w", layer, layerDigest, err2)
 		}
 		// Copy the layer diff to a file.  Diff() takes a lock that it holds
 		// until the ReadCloser that it returns is closed, and PutLayer() wants
@@ -817,7 +828,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 		file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY|os.O_EXCL, 0o600)
 		if err != nil {
 			diff.Close()
-			return false, fmt.Errorf("creating temporary file %q: %w", filename, err)
+			return nil, fmt.Errorf("creating temporary file %q: %w", filename, err)
 		}
 		// Copy the data to the file.
 		// TODO: This can take quite some time, and should ideally be cancellable using
@@ -826,32 +837,30 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 		diff.Close()
 		file.Close()
 		if err != nil {
-			return false, fmt.Errorf("storing blob to file %q: %w", filename, err)
+			return nil, fmt.Errorf("storing blob to file %q: %w", filename, err)
 		}
 		// Make sure that we can find this file later, should we need the layer's
 		// contents again.
 		s.lock.Lock()
-		s.lockProtected.filenames[info.digest] = filename
+		s.lockProtected.filenames[layerDigest] = filename
 		s.lock.Unlock()
 	}
 	// Read the cached blob and use it as a diff.
 	file, err := os.Open(filename)
 	if err != nil {
-		return false, fmt.Errorf("opening file %q: %w", filename, err)
+		return nil, fmt.Errorf("opening file %q: %w", filename, err)
 	}
 	defer file.Close()
 	// Build the new layer using the diff, regardless of where it came from.
 	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
-	layer, _, err := s.imageRef.transport.store.PutLayer(id, parentLayer, nil, "", false, &storage.LayerOptions{
-		OriginalDigest:     info.digest,
+	layer, _, err := s.imageRef.transport.store.PutLayer(newLayerID, parentLayer, nil, "", false, &storage.LayerOptions{
+		OriginalDigest:     layerDigest,
 		UncompressedDigest: diffID,
 	}, file)
 	if err != nil && !errors.Is(err, storage.ErrDuplicateID) {
-		return false, fmt.Errorf("adding layer with blob %q: %w", info.digest, err)
+		return nil, fmt.Errorf("adding layer with blob %q: %w", layerDigest, err)
 	}
-
-	s.indexToStorageID[index] = layer.ID
-	return false, nil
+	return layer, nil
 }
 
 // Commit marks the process of storing the image as successful and asks for the image to be persisted.
