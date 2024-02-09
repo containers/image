@@ -307,8 +307,6 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	blobDigest := srcInfo.Digest
 
 	s.lock.Lock()
-	s.lockProtected.fileSizes[blobDigest] = 0
-	s.lockProtected.filenames[blobDigest] = ""
 	s.lockProtected.diffOutputs[options.LayerIndex] = out
 	if out.UncompressedDigest != "" {
 		// The computation of UncompressedDigest means the whole layer has been consumed; while doing that, chunked.GetDiffer is
