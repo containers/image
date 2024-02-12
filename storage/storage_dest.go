@@ -815,10 +815,14 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 
 	// Check if we previously cached a file with that blob's contents.  If we didn't,
 	// then we need to read the desired contents from a layer.
+	var trustedUncompressedDigest, trustedOriginalDigest digest.Digest // For storage.LayerOptions
 	s.lock.Lock()
 	filename, ok := s.lockProtected.filenames[layerDigest]
 	s.lock.Unlock()
-	if !ok {
+	if ok {
+		trustedUncompressedDigest = diffID
+		trustedOriginalDigest = layerDigest // The code setting .filenames[layerDigest] is responsible for the contents matching.
+	} else {
 		// Try to find the layer with contents matching that blobsum.
 		var layer *storage.Layer // = nil
 		layers, err2 := s.imageRef.transport.store.LayersByUncompressedDigest(diffID)
@@ -861,6 +865,18 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		if err != nil {
 			return nil, fmt.Errorf("storing blob to file %q: %w", filename, err)
 		}
+
+		// The stream we have is uncompressed, this matches contents of the stream.
+		trustedUncompressedDigest = diffID
+		// FIXME? trustedOriginalDigest could be set to layerDigest.
+		// But for c/storage to reasonably use it (as a CompressedDigest value), we should also ensure the CompressedSize of the created
+		// layer is correct, and the API does not currently make it possible (.CompressedSize is set from the input stream).
+		//
+		// We can legitimately set storage.LayerOptions.OriginalDigest to "",
+		// but that would just result in PutLayer computing the digest of the input stream == diffID.
+		// So, instead, set .OriginalDigest to the value we know already, to avoid that digest computation.
+		trustedOriginalDigest = diffID
+
 		// Allow using the already-collected layer contents without extracting the layer again.
 		//
 		// This only matches against the uncompressed digest.
@@ -882,8 +898,8 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 	// Build the new layer using the diff, regardless of where it came from.
 	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
 	layer, _, err := s.imageRef.transport.store.PutLayer(newLayerID, parentLayer, nil, "", false, &storage.LayerOptions{
-		OriginalDigest:     layerDigest,
-		UncompressedDigest: diffID,
+		OriginalDigest:     trustedOriginalDigest,
+		UncompressedDigest: trustedUncompressedDigest,
 	}, file)
 	if err != nil && !errors.Is(err, storage.ErrDuplicateID) {
 		return nil, fmt.Errorf("adding layer with blob %q: %w", layerDigest, err)
