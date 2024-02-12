@@ -87,10 +87,12 @@ type storageImageDestinationLockProtected struct {
 	// When creating a layer, the c/storage layer metadata and image IDs must _only_ be based on trusted values
 	// we have computed ourselves. (Layer reuse can then look up against such trusted values, but it might not
 	// recompute those values for incomding layers — the point of the reuse is that we don’t need to consume the incoming layer.)
-	blobDiffIDs         map[digest.Digest]digest.Digest             // Mapping from layer blobsums to their corresponding DiffIDs
-	indexToTOCDigest    map[int]digest.Digest                       // Mapping from layer index to a TOC Digest, IFF the layer was created/found/reused by TOC digest
-	fileSizes           map[digest.Digest]int64                     // Mapping from layer blobsums to their sizes
-	filenames           map[digest.Digest]string                    // Mapping from layer blobsums to names of files we used to hold them
+	blobDiffIDs      map[digest.Digest]digest.Digest // Mapping from layer blobsums to their corresponding DiffIDs
+	indexToTOCDigest map[int]digest.Digest           // Mapping from layer index to a TOC Digest, IFF the layer was created/found/reused by TOC digest
+	// Mapping from layer blobsums to names of files we used to hold them. If set, fileSizes and blobDiffIDs must also be set.
+	filenames map[digest.Digest]string
+	// Mapping from layer blobsums to their sizes. If set, filenames and blobDiffIDs must also be set.
+	fileSizes           map[digest.Digest]int64
 	blobAdditionalLayer map[digest.Digest]storage.AdditionalLayer   // Mapping from layer blobsums to their corresponding additional layer
 	diffOutputs         map[int]*graphdriver.DriverWithDifferOutput // Mapping from layer index to a partially-pulled layer intermediate data
 }
@@ -138,8 +140,8 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 			indexToAddedLayerInfo: make(map[int]addedLayerInfo),
 			blobDiffIDs:           make(map[digest.Digest]digest.Digest),
 			indexToTOCDigest:      make(map[int]digest.Digest),
-			fileSizes:             make(map[digest.Digest]int64),
 			filenames:             make(map[digest.Digest]string),
+			fileSizes:             make(map[digest.Digest]int64),
 			blobAdditionalLayer:   make(map[digest.Digest]storage.AdditionalLayer),
 			diffOutputs:           make(map[int]*graphdriver.DriverWithDifferOutput),
 		},
@@ -387,6 +389,8 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 
 	// Check if we've already cached it in a file.
 	if size, ok := s.lockProtected.fileSizes[blobDigest]; ok {
+		// s.lockProtected.blobDiffIDs is set either by putBlobToPendingFile or in createNewLayer when creating the
+		// filenames/fileSizes entry.
 		return true, private.ReusedBlob{
 			Digest: blobDigest,
 			Size:   size,
@@ -843,16 +847,22 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		// Copy the data to the file.
 		// TODO: This can take quite some time, and should ideally be cancellable using
 		// ctx.Done().
-		_, err = io.Copy(file, diff)
+		fileSize, err := io.Copy(file, diff)
 		diff.Close()
 		file.Close()
 		if err != nil {
 			return nil, fmt.Errorf("storing blob to file %q: %w", filename, err)
 		}
-		// Make sure that we can find this file later, should we need the layer's
-		// contents again.
+		// Allow using the already-collected layer contents without extracting the layer again.
+		//
+		// This only matches against the uncompressed digest.
+		// We don’t have the original compressed data here to trivially set filenames[layerDigest].
+		// In particular we can’t achieve the correct Layer.CompressedSize value with the current c/storage API.
+		// Within-image layer reuse is probably very rare, for now we prefer to avoid that complexity.
 		s.lock.Lock()
-		s.lockProtected.filenames[layerDigest] = filename
+		s.lockProtected.blobDiffIDs[diffID] = diffID
+		s.lockProtected.filenames[diffID] = filename
+		s.lockProtected.fileSizes[diffID] = fileSize
 		s.lock.Unlock()
 	}
 	// Read the cached blob and use it as a diff.
