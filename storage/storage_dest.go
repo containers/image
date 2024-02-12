@@ -806,36 +806,48 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		return layer, nil
 	}
 
-	s.lock.Lock()
-	diffID, ok := s.lockProtected.blobDiffIDs[layerDigest]
-	s.lock.Unlock()
-	if !ok {
-		return nil, fmt.Errorf("failed to find diffID for layer: %q", layerDigest)
-	}
-
 	// Check if we previously cached a file with that blob's contents.  If we didn't,
 	// then we need to read the desired contents from a layer.
 	var trustedUncompressedDigest, trustedOriginalDigest digest.Digest // For storage.LayerOptions
 	s.lock.Lock()
-	filename, ok := s.lockProtected.filenames[layerDigest]
+	tocDigest := s.lockProtected.indexToTOCDigest[index]       // "" if not set
+	optionalDiffID := s.lockProtected.blobDiffIDs[layerDigest] // "" if not set
+	filename, gotFilename := s.lockProtected.filenames[layerDigest]
 	s.lock.Unlock()
-	if ok {
-		trustedUncompressedDigest = diffID
+	if gotFilename && tocDigest == "" {
+		// If tocDigest != "", if we now happen to find a layerDigest match, the newLayerID has already been computed as TOC-based,
+		// and we don't know the relationship of the layerDigest and TOC digest.
+		// We could recompute newLayerID to be DiffID-based and use the file, but such a within-image layer
+		// reuse is expected to be pretty rare; instead, ignore the unexpected file match and proceed to the
+		// originally-planned TOC match.
+
+		// Because tocDigest == "", optionaldiffID must have been set; and even if it weren’t, PutLayer will recompute the digest from the stream.
+		trustedUncompressedDigest = optionalDiffID
 		trustedOriginalDigest = layerDigest // The code setting .filenames[layerDigest] is responsible for the contents matching.
 	} else {
-		// Try to find the layer with contents matching that blobsum.
+		// Try to find the layer with contents matching the data we use.
 		var layer *storage.Layer // = nil
-		layers, err2 := s.imageRef.transport.store.LayersByUncompressedDigest(diffID)
-		if err2 == nil && len(layers) > 0 {
-			layer = &layers[0]
-		} else {
-			layers, err2 = s.imageRef.transport.store.LayersByCompressedDigest(layerDigest)
+		if tocDigest != "" {
+			layers, err2 := s.imageRef.transport.store.LayersByTOCDigest(tocDigest)
 			if err2 == nil && len(layers) > 0 {
 				layer = &layers[0]
+			} else {
+				return nil, fmt.Errorf("locating layer for TOC digest %q: %w", tocDigest, err2)
 			}
-		}
-		if layer == nil {
-			return nil, fmt.Errorf("locating layer for blob %q: %w", layerDigest, err2)
+		} else {
+			// Because tocDigest == "", optionaldiffID must have been set
+			layers, err2 := s.imageRef.transport.store.LayersByUncompressedDigest(optionalDiffID)
+			if err2 == nil && len(layers) > 0 {
+				layer = &layers[0]
+			} else {
+				layers, err2 = s.imageRef.transport.store.LayersByCompressedDigest(layerDigest)
+				if err2 == nil && len(layers) > 0 {
+					layer = &layers[0]
+				}
+			}
+			if layer == nil {
+				return nil, fmt.Errorf("locating layer for blob %q: %w", layerDigest, err2)
+			}
 		}
 		// Read the layer's contents.
 		noCompression := archive.Uncompressed
@@ -866,16 +878,22 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 			return nil, fmt.Errorf("storing blob to file %q: %w", filename, err)
 		}
 
+		if optionalDiffID == "" && layer.UncompressedDigest != "" {
+			optionalDiffID = layer.UncompressedDigest
+		}
 		// The stream we have is uncompressed, this matches contents of the stream.
-		trustedUncompressedDigest = diffID
-		// FIXME? trustedOriginalDigest could be set to layerDigest.
+		// If tocDigest != "", trustedUncompressedDigest might still be ""; in that case PutLayer will compute the value from the stream.
+		trustedUncompressedDigest = optionalDiffID
+		// FIXME? trustedOriginalDigest could be set to layerDigest IF tocDigest == "" (otherwise layerDigest is untrusted).
 		// But for c/storage to reasonably use it (as a CompressedDigest value), we should also ensure the CompressedSize of the created
 		// layer is correct, and the API does not currently make it possible (.CompressedSize is set from the input stream).
 		//
 		// We can legitimately set storage.LayerOptions.OriginalDigest to "",
-		// but that would just result in PutLayer computing the digest of the input stream == diffID.
+		// but that would just result in PutLayer computing the digest of the input stream == optionalDiffID.
 		// So, instead, set .OriginalDigest to the value we know already, to avoid that digest computation.
-		trustedOriginalDigest = diffID
+		// FIXME? If both trustedUncompressedDigest and trustedOriginalDigest are "", PutLayer currently digests the uncompressed layer
+		// twice. We could compute the digest here, but fixing that in c/storage would be more general.
+		trustedOriginalDigest = optionalDiffID
 
 		// Allow using the already-collected layer contents without extracting the layer again.
 		//
@@ -883,11 +901,13 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		// We don’t have the original compressed data here to trivially set filenames[layerDigest].
 		// In particular we can’t achieve the correct Layer.CompressedSize value with the current c/storage API.
 		// Within-image layer reuse is probably very rare, for now we prefer to avoid that complexity.
-		s.lock.Lock()
-		s.lockProtected.blobDiffIDs[diffID] = diffID
-		s.lockProtected.filenames[diffID] = filename
-		s.lockProtected.fileSizes[diffID] = fileSize
-		s.lock.Unlock()
+		if trustedUncompressedDigest != "" {
+			s.lock.Lock()
+			s.lockProtected.blobDiffIDs[trustedUncompressedDigest] = trustedUncompressedDigest
+			s.lockProtected.filenames[trustedUncompressedDigest] = filename
+			s.lockProtected.fileSizes[trustedUncompressedDigest] = fileSize
+			s.lock.Unlock()
+		}
 	}
 	// Read the cached blob and use it as a diff.
 	file, err := os.Open(filename)
