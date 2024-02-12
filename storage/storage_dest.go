@@ -398,7 +398,7 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 	}
 	if len(layers) > 0 {
 		// Save this for completeness.
-		s.lockProtected.blobDiffIDs[blobDigest] = layers[0].UncompressedDigest
+		s.lockProtected.blobDiffIDs[blobDigest] = blobDigest
 		return true, private.ReusedBlob{
 			Digest: blobDigest,
 			Size:   layers[0].UncompressedSize,
@@ -430,7 +430,7 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 			}
 			if len(layers) > 0 {
 				if size != -1 {
-					s.lockProtected.blobDiffIDs[blobDigest] = layers[0].UncompressedDigest
+					s.lockProtected.blobDiffIDs[blobDigest] = uncompressedDigest
 					return true, private.ReusedBlob{
 						Digest: blobDigest,
 						Size:   size,
@@ -439,7 +439,7 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 				if !options.CanSubstitute {
 					return false, private.ReusedBlob{}, fmt.Errorf("Internal error: options.CanSubstitute was expected to be true for blob with digest %s", blobDigest)
 				}
-				s.lockProtected.blobDiffIDs[uncompressedDigest] = layers[0].UncompressedDigest
+				s.lockProtected.blobDiffIDs[uncompressedDigest] = uncompressedDigest
 				return true, private.ReusedBlob{
 					Digest: uncompressedDigest,
 					Size:   layers[0].UncompressedSize,
