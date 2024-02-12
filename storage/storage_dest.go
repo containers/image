@@ -787,14 +787,6 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 	}
 
 	s.lock.Lock()
-	diffID, ok := s.lockProtected.blobDiffIDs[layerDigest]
-	s.lock.Unlock()
-
-	if !ok {
-		return nil, fmt.Errorf("failed to find diffID for layer: %q", layerDigest)
-	}
-
-	s.lock.Lock()
 	al, ok := s.lockProtected.blobAdditionalLayer[layerDigest]
 	s.lock.Unlock()
 	if ok {
@@ -803,6 +795,13 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 			return nil, fmt.Errorf("failed to put layer from digest and labels: %w", err)
 		}
 		return layer, nil
+	}
+
+	s.lock.Lock()
+	diffID, ok := s.lockProtected.blobDiffIDs[layerDigest]
+	s.lock.Unlock()
+	if !ok {
+		return nil, fmt.Errorf("failed to find diffID for layer: %q", layerDigest)
 	}
 
 	// Check if we previously cached a file with that blob's contents.  If we didn't,
