@@ -80,18 +80,19 @@ type storageImageDestination struct {
 // _During the concurrent TryReusingBlob/PutBlob/* calls_ (but not necessarily during the final Commit)
 // uses must hold storageImageDestination.lock.
 type storageImageDestinationLockProtected struct {
+	currentIndex          int                    // The index of the layer to be committed (i.e., lower indices have already been committed)
+	indexToAddedLayerInfo map[int]addedLayerInfo // Mapping from layer (by index) to blob to add to the image
+
 	// In general, a layer is identified either by (compressed) digest, or by TOC digest.
 	// When creating a layer, the c/storage layer metadata and image IDs must _only_ be based on trusted values
 	// we have computed ourselves. (Layer reuse can then look up against such trusted values, but it might not
 	// recompute those values for incomding layers — the point of the reuse is that we don’t need to consume the incoming layer.)
-	blobDiffIDs           map[digest.Digest]digest.Digest             // Mapping from layer blobsums to their corresponding DiffIDs
-	indexToTOCDigest      map[int]digest.Digest                       // Mapping from layer index to a TOC Digest, IFF the layer was created/found/reused by TOC digest
-	fileSizes             map[digest.Digest]int64                     // Mapping from layer blobsums to their sizes
-	filenames             map[digest.Digest]string                    // Mapping from layer blobsums to names of files we used to hold them
-	currentIndex          int                                         // The index of the layer to be committed (i.e., lower indices have already been committed)
-	indexToAddedLayerInfo map[int]addedLayerInfo                      // Mapping from layer (by index) to blob to add to the image
-	blobAdditionalLayer   map[digest.Digest]storage.AdditionalLayer   // Mapping from layer blobsums to their corresponding additional layer
-	diffOutputs           map[int]*graphdriver.DriverWithDifferOutput // Mapping from layer index to a partially-pulled layer intermediate data
+	blobDiffIDs         map[digest.Digest]digest.Digest             // Mapping from layer blobsums to their corresponding DiffIDs
+	indexToTOCDigest    map[int]digest.Digest                       // Mapping from layer index to a TOC Digest, IFF the layer was created/found/reused by TOC digest
+	fileSizes           map[digest.Digest]int64                     // Mapping from layer blobsums to their sizes
+	filenames           map[digest.Digest]string                    // Mapping from layer blobsums to names of files we used to hold them
+	blobAdditionalLayer map[digest.Digest]storage.AdditionalLayer   // Mapping from layer blobsums to their corresponding additional layer
+	diffOutputs         map[int]*graphdriver.DriverWithDifferOutput // Mapping from layer index to a partially-pulled layer intermediate data
 }
 
 // addedLayerInfo records data about a layer to use in this image.
@@ -134,11 +135,11 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 		},
 		indexToStorageID: make(map[int]string),
 		lockProtected: storageImageDestinationLockProtected{
+			indexToAddedLayerInfo: make(map[int]addedLayerInfo),
 			blobDiffIDs:           make(map[digest.Digest]digest.Digest),
 			indexToTOCDigest:      make(map[int]digest.Digest),
 			fileSizes:             make(map[digest.Digest]int64),
 			filenames:             make(map[digest.Digest]string),
-			indexToAddedLayerInfo: make(map[int]addedLayerInfo),
 			blobAdditionalLayer:   make(map[digest.Digest]storage.AdditionalLayer),
 			diffOutputs:           make(map[int]*graphdriver.DriverWithDifferOutput),
 		},
