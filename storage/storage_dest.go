@@ -812,17 +812,17 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 	s.lock.Unlock()
 	if !ok {
 		// Try to find the layer with contents matching that blobsum.
-		layer := ""
+		var layer *storage.Layer // = nil
 		layers, err2 := s.imageRef.transport.store.LayersByUncompressedDigest(diffID)
 		if err2 == nil && len(layers) > 0 {
-			layer = layers[0].ID
+			layer = &layers[0]
 		} else {
 			layers, err2 = s.imageRef.transport.store.LayersByCompressedDigest(layerDigest)
 			if err2 == nil && len(layers) > 0 {
-				layer = layers[0].ID
+				layer = &layers[0]
 			}
 		}
-		if layer == "" {
+		if layer == nil {
 			return nil, fmt.Errorf("locating layer for blob %q: %w", layerDigest, err2)
 		}
 		// Read the layer's contents.
@@ -830,9 +830,9 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		diffOptions := &storage.DiffOptions{
 			Compression: &noCompression,
 		}
-		diff, err2 := s.imageRef.transport.store.Diff("", layer, diffOptions)
+		diff, err2 := s.imageRef.transport.store.Diff("", layer.ID, diffOptions)
 		if err2 != nil {
-			return nil, fmt.Errorf("reading layer %q for blob %q: %w", layer, layerDigest, err2)
+			return nil, fmt.Errorf("reading layer %q for blob %q: %w", layer.ID, layerDigest, err2)
 		}
 		// Copy the layer diff to a file.  Diff() takes a lock that it holds
 		// until the ReadCloser that it returns is closed, and PutLayer() wants
