@@ -614,17 +614,21 @@ func (s *storageImageDestination) queueOrCommit(index int, info addedLayerInfo) 
 	return nil
 }
 
-// singleLayerIDComponent returns the diffID for the specified digest or the digest for the TOC, if known.
+// singleLayerIDComponent returns a single layer’s the input to computing a layer (chain) ID,
+// and an indication whether the input already has the shape of a layer ID.
+// It returns ("", false) if the layer is not found at all (which should never happen)
 func (s *storageImageDestination) singleLayerIDComponent(layerIndex int, blobDigest digest.Digest) (string, bool) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	if d, found := s.lockProtected.indexToTOCDigest[layerIndex]; found {
-		return d.Hex() + "-toc", found
+		return "@TOC=" + d.Hex(), false // "@" is not a valid start of a digest.Digest, so this is unambiguous.
 	}
 
-	d, found := s.lockProtected.blobDiffIDs[blobDigest]
-	return d.Hex(), found
+	if d, found := s.lockProtected.blobDiffIDs[blobDigest]; found {
+		return d.Hex(), true // This looks like chain IDs, and it uses the traditional value.
+	}
+	return "", false
 }
 
 // commitLayer commits the specified layer with the given index to the storage.
@@ -664,8 +668,8 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	// Check if there's already a layer with the ID that we'd give to the result of applying
 	// this layer blob to its parent, if it has one, or the blob's hex value otherwise.
 	// The layerID refers either to the DiffID or the digest of the TOC.
-	layerID, haveLayerID := s.singleLayerIDComponent(index, info.digest)
-	if !haveLayerID {
+	layerIDComponent, layerIDComponentStandalone := s.singleLayerIDComponent(index, info.digest)
+	if layerIDComponent == "" {
 		// Check if it's elsewhere and the caller just forgot to pass it to us in a PutBlob() / TryReusingBlob() / …
 		//
 		// Use none.NoCache to avoid a repeated DiffID lookup in the BlobInfoCache: a caller
@@ -690,15 +694,15 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 			return false, fmt.Errorf("error determining uncompressed digest for blob %q", info.digest.String())
 		}
 
-		layerID, haveLayerID = s.singleLayerIDComponent(index, info.digest)
-		if !haveLayerID {
+		layerIDComponent, layerIDComponentStandalone = s.singleLayerIDComponent(index, info.digest)
+		if layerIDComponent == "" {
 			return false, fmt.Errorf("we have blob %q, but don't know its layer ID", info.digest.String())
 		}
 	}
 
-	id := layerID
-	if parentLayer != "" {
-		id = digest.Canonical.FromString(parentLayer + "+" + layerID).Hex()
+	id := layerIDComponent
+	if !layerIDComponentStandalone || parentLayer != "" {
+		id = digest.Canonical.FromString(parentLayer + "+" + layerIDComponent).Hex()
 	}
 	if layer, err2 := s.imageRef.transport.store.Layer(id); layer != nil && err2 == nil {
 		// There's already a layer that should have the right contents, just reuse it.
