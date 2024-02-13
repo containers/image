@@ -29,16 +29,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// getBlobMutexProtected is a struct to hold the state of the getBlobMutex mutex.
-type getBlobMutexProtected struct {
-	// digestToLayerID is a lookup map from the layer digest (either the uncompressed digest or the TOC digest) to the
-	// layer ID in the store.
-	digestToLayerID map[digest.Digest]string
-
-	// layerPosition stores where we are in reading a blob's layers
-	layerPosition map[digest.Digest]int
-}
-
 type storageImageSource struct {
 	impl.Compat
 	impl.PropertyMethodsInitialize
@@ -49,10 +39,23 @@ type storageImageSource struct {
 	systemContext         *types.SystemContext // SystemContext used in GetBlob() to create temporary files
 	metadata              storageImageMetadata
 	cachedManifest        []byte     // A cached copy of the manifest, if already known, or nil
-	getBlobMutex          sync.Mutex // Mutex to sync state for parallel GetBlob executions (it guards layerPosition and digestToLayerID)
+	getBlobMutex          sync.Mutex // Mutex to sync state for parallel GetBlob executions
 	getBlobMutexProtected getBlobMutexProtected
 }
 
+// getBlobMutexProtected contains storageImageSource data protected by getBlobMutex.
+type getBlobMutexProtected struct {
+	// digestToLayerID is a lookup map from a possibly-untrusted uncompressed layer digest (as returned by LayerInfosForCopy) to the
+	// layer ID in the store.
+	digestToLayerID map[digest.Digest]string
+
+	// layerPosition stores where we are in reading a blob's layers
+	layerPosition map[digest.Digest]int
+}
+
+// expectedLayerDiffIDFlag is a per-layer flag containing an UNTRUSTED uncompressed digest of the layer.
+// It is set when pulling a layer by TOC; later, this value is used with digestToLayerID
+// to allow identifying the layer — and the consumer is expected to verify the blob returned by GetBlob against the digest.
 const expectedLayerDiffIDFlag = "expected-layer-diffid"
 
 // newImageSource sets up an image for reading.
