@@ -471,12 +471,21 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 			return false, private.ReusedBlob{}, fmt.Errorf(`looking for layers with TOC digest %q: %w`, options.TOCDigest, err)
 		}
 		if len(layers) > 0 {
-			s.lockProtected.indexToTOCDigest[*options.LayerIndex] = options.TOCDigest
-			return true, private.ReusedBlob{
-				Digest:             blobDigest,
-				Size:               layers[0].UncompressedSize,
-				MatchedByTOCDigest: true,
-			}, nil
+			if size != -1 {
+				s.lockProtected.indexToTOCDigest[*options.LayerIndex] = options.TOCDigest
+				return true, private.ReusedBlob{
+					Digest:             blobDigest,
+					Size:               size,
+					MatchedByTOCDigest: true,
+				}, nil
+			} else if options.CanSubstitute && layers[0].UncompressedDigest != "" {
+				s.lockProtected.indexToTOCDigest[*options.LayerIndex] = options.TOCDigest
+				return true, private.ReusedBlob{
+					Digest:             layers[0].UncompressedDigest,
+					Size:               layers[0].UncompressedSize,
+					MatchedByTOCDigest: true,
+				}, nil
+			}
 		}
 	}
 
