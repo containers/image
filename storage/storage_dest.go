@@ -758,30 +758,15 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 	if ok {
 		var untrustedUncompressedDigest digest.Digest
 		if diffOutput.UncompressedDigest == "" {
-			if s.manifest == nil {
+			d, err := s.untrustedLayerDiffID(index)
+			if err != nil {
+				return nil, err
+			}
+			if d == "" {
 				logrus.Debugf("Skipping commit for layer %q, manifest not yet available", newLayerID)
 				return nil, nil
 			}
-
-			man, err := manifest.FromBlob(s.manifest, manifest.GuessMIMEType(s.manifest))
-			if err != nil {
-				return nil, fmt.Errorf("parsing manifest: %w", err)
-			}
-
-			cb, err := s.getConfigBlob(man.ConfigInfo())
-			if err != nil {
-				return nil, err
-			}
-
-			// retrieve the expected uncompressed digest from the config blob.
-			configOCI := &imgspecv1.Image{}
-			if err := json.Unmarshal(cb, configOCI); err != nil {
-				return nil, err
-			}
-			if index >= len(configOCI.RootFS.DiffIDs) {
-				return nil, fmt.Errorf("index %d out of range for configOCI.RootFS.DiffIDs", index)
-			}
-			untrustedUncompressedDigest = configOCI.RootFS.DiffIDs[index]
+			untrustedUncompressedDigest = d
 		}
 
 		layer, err := s.imageRef.transport.store.CreateLayer(newLayerID, parentLayer, nil, "", false, nil)
@@ -934,6 +919,36 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		return nil, fmt.Errorf("adding layer with blob %q: %w", layerDigest, err)
 	}
 	return layer, nil
+}
+
+// untrustedLayerDiffID returns a DiffID value for layerIndex from the image’s config.
+// If the value is not yet available (but it can be available after s.manifets is set), it returns ("", nil).
+// WARNING: We don’t validate the DiffID value against the layer contents; it must not be used for any deduplication.
+func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.Digest, error) {
+	if s.manifest == nil {
+		logrus.Debugf("Skipping commit for layer %d, manifest not yet available", layerIndex)
+		return "", nil
+	}
+
+	man, err := manifest.FromBlob(s.manifest, manifest.GuessMIMEType(s.manifest))
+	if err != nil {
+		return "", fmt.Errorf("parsing manifest: %w", err)
+	}
+
+	cb, err := s.getConfigBlob(man.ConfigInfo())
+	if err != nil {
+		return "", err
+	}
+
+	// retrieve the expected uncompressed digest from the config blob.
+	configOCI := &imgspecv1.Image{}
+	if err := json.Unmarshal(cb, configOCI); err != nil {
+		return "", err
+	}
+	if layerIndex >= len(configOCI.RootFS.DiffIDs) {
+		return "", fmt.Errorf("index %d out of range for configOCI.RootFS.DiffIDs", layerIndex)
+	}
+	return configOCI.RootFS.DiffIDs[layerIndex], nil
 }
 
 // Commit marks the process of storing the image as successful and asks for the image to be persisted.
