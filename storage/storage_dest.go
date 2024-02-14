@@ -930,7 +930,17 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 		return "", nil
 	}
 
-	man, err := manifest.FromBlob(s.manifest, manifest.GuessMIMEType(s.manifest))
+	mt := manifest.GuessMIMEType(s.manifest)
+	if mt != imgspecv1.MediaTypeImageManifest {
+		// We could, in principle, build an ImageSource, support arbitrary image formats using image.FromUnparsedImage,
+		// and then use types.Image.OCIConfig so that we can parse the image.
+		//
+		// In practice, this should, right now, only matter for pulls of OCI images (this code path implies that a layer has annotation),
+		// while converting to a non-OCI formats, using a manual (skopeo copy) or something similar, not (podman pull).
+		// So it is not implemented yet.
+		return "", fmt.Errorf("determining DiffID for manifest type %q is not yet supported", mt)
+	}
+	man, err := manifest.FromBlob(s.manifest, mt)
 	if err != nil {
 		return "", fmt.Errorf("parsing manifest: %w", err)
 	}
