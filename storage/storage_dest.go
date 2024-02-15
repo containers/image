@@ -888,8 +888,6 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		// We can legitimately set storage.LayerOptions.OriginalDigest to "",
 		// but that would just result in PutLayer computing the digest of the input stream == optionalDiffID.
 		// So, instead, set .OriginalDigest to the value we know already, to avoid that digest computation.
-		// FIXME? If both trustedUncompressedDigest and trustedOriginalDigest are "", PutLayer currently digests the uncompressed layer
-		// twice. We could compute the digest here, but fixing that in c/storage would be more general.
 		trustedOriginalDigest = optionalDiffID
 
 		// Allow using the already-collected layer contents without extracting the layer again.
