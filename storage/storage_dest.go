@@ -172,7 +172,7 @@ func (s *storageImageDestination) Close() error {
 	}
 	for _, v := range s.lockProtected.diffOutputs {
 		if v.Target != "" {
-			_ = s.imageRef.transport.store.CleanupStagingDirectory(v.Target)
+			_ = s.imageRef.transport.store.CleanupStagedLayer(v)
 		}
 	}
 	return os.RemoveAll(s.directory)
@@ -770,22 +770,24 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 			untrustedUncompressedDigest = d
 		}
 
-		layer, err := s.imageRef.transport.store.CreateLayer(newLayerID, parentLayer, nil, "", false, nil)
-		if err != nil {
-			return nil, err
-		}
-
 		flags := make(map[string]interface{})
 		if untrustedUncompressedDigest != "" {
 			flags[expectedLayerDiffIDFlag] = untrustedUncompressedDigest
 			logrus.Debugf("Setting uncompressed digest to %q for layer %q", untrustedUncompressedDigest, newLayerID)
 		}
-		options := &graphdriver.ApplyDiffWithDifferOpts{
-			Flags: flags,
+
+		args := storage.ApplyStagedLayerOptions{
+			ID:          newLayerID,
+			ParentLayer: parentLayer,
+
+			DiffOutput: diffOutput,
+			DiffOptions: &graphdriver.ApplyDiffWithDifferOpts{
+				Flags: flags,
+			},
 		}
-		if err := s.imageRef.transport.store.ApplyDiffFromStagingDirectory(layer.ID, diffOutput.Target, diffOutput, options); err != nil {
-			_ = s.imageRef.transport.store.Delete(layer.ID)
-			return nil, err
+		layer, err := s.imageRef.transport.store.ApplyStagedLayer(args)
+		if err != nil && !errors.Is(err, storage.ErrDuplicateID) {
+			return nil, fmt.Errorf("failed to put layer using a partial pull: %w", err)
 		}
 		return layer, nil
 	}
