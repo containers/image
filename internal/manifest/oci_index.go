@@ -103,7 +103,7 @@ func addCompressionAnnotations(compressionAlgorithms []compression.Algorithm, an
 	}
 	for _, algo := range compressionAlgorithms {
 		switch algo.Name() {
-		case compression.ZstdAlgorithmName:
+		case compression.ZstdAlgorithmName, compression.ZstdChunkedAlgorithmName:
 			(*annotationsMap)[OCI1InstanceAnnotationCompressionZSTD] = OCI1InstanceAnnotationCompressionZSTDValue
 		default:
 			continue
