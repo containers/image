@@ -22,6 +22,16 @@
           "sse4"
         ]
       }
+    },
+    {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "artifactType": "application/x-tar",
+      "size": 8221,
+      "digest": "sha256:615e8db5ae085b39e9cd24e5bc887d03fbd30ee4f55f5fedf9b697fafea4fbdd",
+      "platform": {
+        "architecture": "arm64",
+        "os": "linux"
+      }
     }
   ],
   "annotations": {

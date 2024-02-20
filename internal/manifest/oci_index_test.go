@@ -66,7 +66,8 @@ func TestOCI1EditInstances(t *testing.T) {
 		UpdateDigest:    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 		UpdateSize:      32,
 		UpdateMediaType: "something",
-		ListOperation:   ListOpUpdate})
+		ListOperation:   ListOpUpdate,
+	})
 	err = list.EditInstances(editInstances)
 	require.NoError(t, err)
 
@@ -98,12 +99,14 @@ func TestOCI1EditInstances(t *testing.T) {
 		ListOperation: ListOpAdd})
 	// with zstd
 	editInstances = append(editInstances, ListEdit{
-		AddDigest:      "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-		AddSize:        32,
-		AddMediaType:   "application/vnd.oci.image.manifest.v1+json",
-		AddPlatform:    &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
-		AddAnnotations: annotations,
-		ListOperation:  ListOpAdd})
+		AddDigest:       "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+		AddSize:         32,
+		AddMediaType:    "application/vnd.oci.image.manifest.v1+json",
+		AddArtifactType: "application/x-tar",
+		AddPlatform:     &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
+		AddAnnotations:  annotations,
+		ListOperation:   ListOpAdd,
+	})
 	// with zstd but with compression, annotation must be added automatically
 	editInstances = append(editInstances, ListEdit{
 		AddDigest:                "sha256:hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
@@ -138,6 +141,8 @@ func TestOCI1EditInstances(t *testing.T) {
 	require.NoError(t, err)
 	// Verify if annotations are preserved and correctly set in ReadOnly field.
 	assert.Equal(t, annotations, instance.ReadOnly.Annotations)
+	// Verify artifactType is preserved.
+	assert.Equal(t, "application/x-tar", instance.ReadOnly.ArtifactType)
 	// Verify compression of an instance is added to the ReadOnly CompressionAlgorithmNames where compression name
 	// is internally derived from the appropriate annotations.
 	assert.Equal(t, []string{compressionTypes.ZstdAlgorithmName}, instance.ReadOnly.CompressionAlgorithmNames)
@@ -157,6 +162,32 @@ func TestOCI1EditInstances(t *testing.T) {
 	// Digest `ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff` should be re-ordered on update.
 	assert.Equal(t, list.Instances(), []digest.Digest{digest.Digest("sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f"), digest.Digest("sha256:5b0bcabd1ed22e9fb1310cf6c2dec7cdef19f0ad69efa1f392e94a4333501270"), digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), digest.Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"), digest.Digest("sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), digest.Digest("sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"), digest.Digest("sha256:hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh")})
 
+	instance, err = list.Instance(digest.Digest("sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"))
+	require.NoError(t, err)
+	// Verify if annotations are preserved and correctly set in ReadOnly field.
+	assert.Equal(t, annotations, instance.ReadOnly.Annotations)
+
+	// Create a fresh list
+	artifactBearingManifest, err := os.ReadFile(filepath.Join("testdata", "oci1index.json"))
+	require.NoError(t, err)
+	list, err = ListFromBlob(artifactBearingManifest, GuessMIMEType(artifactBearingManifest))
+	require.NoError(t, err)
+	// Edit the parts of the instance that we can change.
+	editInstances = []ListEdit{{
+		ListOperation:           ListOpUpdate,
+		UpdateOldDigest:         digest.Digest("sha256:615e8db5ae085b39e9cd24e5bc887d03fbd30ee4f55f5fedf9b697fafea4fbdd"),
+		UpdateDigest:            "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+		UpdateSize:              32,
+		UpdateMediaType:         "application/vnd.oci.image.manifest.v1+json",
+		UpdateAffectAnnotations: true,
+		UpdateAnnotations:       map[string]string{},
+	}}
+	err = list.EditInstances(editInstances)
+	require.NoError(t, err)
+	// Verify that the artifactType wasn't lost.
+	instance, err = list.Instance(digest.Digest("sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+	require.NoError(t, err)
+	assert.Equal(t, "application/x-tar", instance.ReadOnly.ArtifactType)
 }
 
 func TestOCI1IndexChooseInstanceByCompression(t *testing.T) {
