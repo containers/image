@@ -978,10 +978,7 @@ func (c *dockerClient) fetchManifest(ctx context.Context, ref dockerReference, t
 // This function can return nil reader when no url is supported by this function. In this case, the caller
 // should fallback to fetch the non-external blob (i.e. pull from the registry).
 func (c *dockerClient) getExternalBlob(ctx context.Context, urls []string) (io.ReadCloser, int64, error) {
-	var (
-		resp         *http.Response
-		remoteErrors error
-	)
+	var remoteErrors error
 	if len(urls) == 0 {
 		return nil, 0, errors.New("internal error: getExternalBlob called with no URLs")
 	}
@@ -990,6 +987,7 @@ func (c *dockerClient) getExternalBlob(ctx context.Context, urls []string) (io.R
 		if err != nil || (blobURL.Scheme != "http" && blobURL.Scheme != "https") {
 			continue // unsupported url. skip this url.
 		}
+		var resp *http.Response
 		// NOTE: we must not authenticate on additional URLs as those
 		//       can be abused to leak credentials or tokens.  Please
 		//       refer to CVE-2020-15157 for more information.
@@ -1001,16 +999,13 @@ func (c *dockerClient) getExternalBlob(ctx context.Context, urls []string) (io.R
 				resp.Body.Close()
 				continue
 			}
-			break
+			return resp.Body, getBlobSize(resp), nil
 		}
 	}
-	if resp == nil && remoteErrors == nil {
+	if remoteErrors == nil {
 		return nil, 0, nil // fallback to non-external blob
 	}
-	if remoteErrors != nil {
-		return nil, 0, remoteErrors
-	}
-	return resp.Body, getBlobSize(resp), nil
+	return nil, 0, remoteErrors
 }
 
 func getBlobSize(resp *http.Response) int64 {
