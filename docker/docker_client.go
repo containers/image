@@ -979,8 +979,8 @@ func (c *dockerClient) fetchManifest(ctx context.Context, ref dockerReference, t
 // should fallback to fetch the non-external blob (i.e. pull from the registry).
 func (c *dockerClient) getExternalBlob(ctx context.Context, urls []string) (io.ReadCloser, int64, error) {
 	var (
-		resp *http.Response
-		err  error
+		resp         *http.Response
+		remoteErrors error
 	)
 	if len(urls) == 0 {
 		return nil, 0, errors.New("internal error: getExternalBlob called with no URLs")
@@ -1004,11 +1004,11 @@ func (c *dockerClient) getExternalBlob(ctx context.Context, urls []string) (io.R
 			break
 		}
 	}
-	if resp == nil && err == nil {
+	if resp == nil && remoteErrors == nil {
 		return nil, 0, nil // fallback to non-external blob
 	}
-	if err != nil {
-		return nil, 0, err
+	if remoteErrors != nil {
+		return nil, 0, remoteErrors
 	}
 	return resp.Body, getBlobSize(resp), nil
 }
