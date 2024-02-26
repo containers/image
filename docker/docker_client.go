@@ -993,11 +993,11 @@ func (c *dockerClient) getExternalBlob(ctx context.Context, urls []string) (io.R
 		// NOTE: we must not authenticate on additional URLs as those
 		//       can be abused to leak credentials or tokens.  Please
 		//       refer to CVE-2020-15157 for more information.
-		resp, err = c.makeRequestToResolvedURL(ctx, http.MethodGet, blobURL, nil, nil, -1, noAuth, nil)
-		if err == nil {
+		resp, remoteErrors = c.makeRequestToResolvedURL(ctx, http.MethodGet, blobURL, nil, nil, -1, noAuth, nil)
+		if remoteErrors == nil {
 			if resp.StatusCode != http.StatusOK {
-				err = fmt.Errorf("error fetching external blob from %q: %d (%s)", u, resp.StatusCode, http.StatusText(resp.StatusCode))
-				logrus.Debug(err)
+				remoteErrors = fmt.Errorf("error fetching external blob from %q: %d (%s)", u, resp.StatusCode, http.StatusText(resp.StatusCode))
+				logrus.Debug(remoteErrors)
 				resp.Body.Close()
 				continue
 			}
