@@ -20,9 +20,14 @@ type Algorithm struct {
 }
 
 // NewAlgorithm creates an Algorithm instance.
+// nontrivialBaseVariantName is typically "".
 // This function exists so that Algorithm instances can only be created by code that
 // is allowed to import this internal subpackage.
-func NewAlgorithm(name, baseVariantName string, prefix []byte, decompressor DecompressorFunc, compressor CompressorFunc) Algorithm {
+func NewAlgorithm(name, nontrivialBaseVariantName string, prefix []byte, decompressor DecompressorFunc, compressor CompressorFunc) Algorithm {
+	baseVariantName := name
+	if nontrivialBaseVariantName != "" {
+		baseVariantName = nontrivialBaseVariantName
+	}
 	return Algorithm{
 		name:            name,
 		baseVariantName: baseVariantName,
