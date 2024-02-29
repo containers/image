@@ -43,6 +43,8 @@ func GenericCache(t *testing.T, newTestCache func(t *testing.T) blobinfocache.Bl
 	}{
 		{"UncompressedDigest", testGenericUncompressedDigest},
 		{"RecordDigestUncompressedPair", testGenericRecordDigestUncompressedPair},
+		{"UncompressedDigestForTOC", testGenericUncompressedDigestForTOC},
+		{"RecordTOCUncompressedPair", testGenericRecordTOCUncompressedPair},
 		{"RecordKnownLocations", testGenericRecordKnownLocations},
 		{"CandidateLocations", testGenericCandidateLocations},
 		{"CandidateLocations2", testGenericCandidateLocations2},
@@ -96,6 +98,28 @@ func testGenericRecordDigestUncompressedPair(t *testing.T, cache blobinfocache.B
 		// Mapping an uncompressed digest to self
 		cache.RecordDigestUncompressedPair(digestUncompressed, digestUncompressed)
 		assert.Equal(t, digestUncompressed, cache.UncompressedDigest(digestUncompressed))
+	}
+}
+
+func testGenericUncompressedDigestForTOC(t *testing.T, cache blobinfocache.BlobInfoCache2) {
+	// Nothing is known.
+	assert.Equal(t, digest.Digest(""), cache.UncompressedDigestForTOC(digestUnknown))
+
+	cache.RecordTOCUncompressedPair(digestCompressedA, digestUncompressed)
+	cache.RecordTOCUncompressedPair(digestCompressedB, digestUncompressed)
+	// Known TOC→uncompressed mapping
+	assert.Equal(t, digestUncompressed, cache.UncompressedDigestForTOC(digestCompressedA))
+	assert.Equal(t, digestUncompressed, cache.UncompressedDigestForTOC(digestCompressedB))
+}
+
+func testGenericRecordTOCUncompressedPair(t *testing.T, cache blobinfocache.BlobInfoCache2) {
+	for i := 0; i < 2; i++ { // Record the same data twice to ensure redundant writes don’t break things.
+		// Known TOC→uncompressed mapping
+		cache.RecordTOCUncompressedPair(digestCompressedA, digestUncompressed)
+		assert.Equal(t, digestUncompressed, cache.UncompressedDigestForTOC(digestCompressedA))
+		// Two mappings to the same uncompressed digest
+		cache.RecordTOCUncompressedPair(digestCompressedB, digestUncompressed)
+		assert.Equal(t, digestUncompressed, cache.UncompressedDigestForTOC(digestCompressedB))
 	}
 }
 
