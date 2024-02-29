@@ -346,6 +346,7 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 		// responsible for ensuring blobDigest has been validated.
 		// So, record also information about blobDigest, that might benefit reuse.
 		s.lockProtected.blobDiffIDs[blobDigest] = out.UncompressedDigest
+		options.Cache.RecordDigestUncompressedPair(blobDigest, out.UncompressedDigest)
 	} else {
 		// Use diffID for layer identity if it is known.
 		if uncompressedDigest := options.Cache.UncompressedDigestForTOC(out.TOCDigest); uncompressedDigest != "" {
