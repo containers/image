@@ -344,20 +344,30 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 
 	s.lock.Lock()
 	if out.UncompressedDigest != "" {
+		s.lockProtected.indexToDiffID[options.LayerIndex] = out.UncompressedDigest
+		if out.TOCDigest != "" {
+			options.Cache.RecordTOCUncompressedPair(out.TOCDigest, out.UncompressedDigest)
+		}
+		// Don’t set indexToTOCDigest on this path:
+		// - Using UncompressedDigest allows image reuse with non-partially-pulled layers, so we want to set indexToDiffID.
+		// - If UncompressedDigest has been computed, that means the layer was read completely, and the TOC has been created from scratch.
+		//   That TOC is quite unlikely to match any other TOC value.
+
 		// The computation of UncompressedDigest means the whole layer has been consumed; while doing that, chunked.GetDiffer is
 		// responsible for ensuring blobDigest has been validated.
 		if out.CompressedDigest != blobDigest {
 			return private.UploadedBlob{}, fmt.Errorf("internal error: ApplyDiffWithDiffer returned CompressedDigest %q not matching expected %q",
 				out.CompressedDigest, blobDigest)
 		}
-		s.lockProtected.blobDiffIDs[blobDigest] = out.UncompressedDigest
+		// So, record also information about blobDigest, that might benefit reuse.
 		// We trust ApplyDiffWithDiffer to validate or create both values correctly.
+		s.lockProtected.blobDiffIDs[blobDigest] = out.UncompressedDigest
 		options.Cache.RecordDigestUncompressedPair(out.CompressedDigest, out.UncompressedDigest)
 	} else {
-		// Don’t identify layers by TOC if UncompressedDigest is available.
-		// - Using UncompressedDigest allows image reuse with non-partially-pulled layers
-		// - If UncompressedDigest has been computed, that means the layer was read completely, and the TOC has been created from scratch.
-		//   That TOC is quite unlikely to match with any other TOC value.
+		// Use diffID for layer identity if it is known.
+		if uncompressedDigest := options.Cache.UncompressedDigestForTOC(out.TOCDigest); uncompressedDigest != "" {
+			s.lockProtected.indexToDiffID[options.LayerIndex] = uncompressedDigest
+		}
 		s.lockProtected.indexToTOCDigest[options.LayerIndex] = out.TOCDigest
 	}
 	s.lockProtected.diffOutputs[options.LayerIndex] = out
@@ -494,12 +504,29 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 	}
 
 	if options.TOCDigest != "" && options.LayerIndex != nil {
+		// Check if we know which which UncompressedDigest the TOC digest resolves to, and we have a match for that.
+		// Prefer this over LayersByTOCDigest because we can identify the layer using UncompressedDigest, maximizing reuse.
+		uncompressedDigest := options.Cache.UncompressedDigestForTOC(options.TOCDigest)
+		if uncompressedDigest != "" {
+			layers, err = s.imageRef.transport.store.LayersByUncompressedDigest(uncompressedDigest)
+			if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
+				return false, private.ReusedBlob{}, fmt.Errorf(`looking for layers with digest %q: %w`, uncompressedDigest, err)
+			}
+			if found, reused := reusedBlobFromLayerLookup(layers, blobDigest, size, options); found {
+				s.lockProtected.indexToDiffID[*options.LayerIndex] = uncompressedDigest
+				reused.MatchedByTOCDigest = true
+				return true, reused, nil
+			}
+		}
 		// Check if we have a chunked layer in storage with the same TOC digest.
 		layers, err := s.imageRef.transport.store.LayersByTOCDigest(options.TOCDigest)
 		if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
 			return false, private.ReusedBlob{}, fmt.Errorf(`looking for layers with TOC digest %q: %w`, options.TOCDigest, err)
 		}
 		if found, reused := reusedBlobFromLayerLookup(layers, blobDigest, size, options); found {
+			if uncompressedDigest != "" {
+				s.lockProtected.indexToDiffID[*options.LayerIndex] = uncompressedDigest
+			}
 			s.lockProtected.indexToTOCDigest[*options.LayerIndex] = options.TOCDigest
 			reused.MatchedByTOCDigest = true
 			return true, reused, nil
