@@ -335,6 +335,7 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 		// responsible for ensuring blobDigest has been validated.
 		// So, record also information about blobDigest, that might benefit reuse.
 		s.lockProtected.blobDiffIDs[blobDigest] = out.UncompressedDigest
+		options.Cache.RecordDigestUncompressedPair(blobDigest, out.UncompressedDigest)
 	} else {
 		// Don’t identify layers by TOC if UncompressedDigest is available.
 		// - Using UncompressedDigest allows image reuse with non-partially-pulled layers
