@@ -91,18 +91,29 @@ type storageImageDestinationLockProtected struct {
 	//
 	// When creating a layer, the c/storage layer metadata and image IDs must _only_ be based on trusted values
 	// we have computed ourselves. (Layer reuse can then look up against such trusted values, but it might not
-	// recompute those values for incomding layers — the point of the reuse is that we don’t need to consume the incoming layer.)
-
-	// Layer identification: For a layer, at least one of indexToTOCDigest and blobDiffIDs must be available before commitLayer is called.
-	// The presence of an indexToTOCDigest is what decides how the layer is identified, i.e. which fields must be trusted.
+	// recompute those values for incoming layers — the point of the reuse is that we don’t need to consume the incoming layer.)
 	//
+	// Layer identification: For a layer, at least one of (indexToDiffID, indexToTOCDigest, blobDiffIDs) must be available
+	// before commitLayer is called.
+	// The layer is identified by the first of the three fields which exists, in that order (and the value must be trusted).
+	//
+	// WARNING: All values in indexToDiffID, indexToTOCDigest, and blobDiffIDs are _individually_ trusted, but blobDiffIDs is more subtle.
+	// The values in indexTo* are all consistent, because the code writing them processed them all at once, and consistently.
+	// But it is possible for a layer’s indexToDiffID an indexToTOCDigest to be based on a TOC, without setting blobDiffIDs
+	// for the compressed digest of that index, and for blobDiffIDs[compressedDigest] to be set _separately_ while processing some
+	// other layer entry. In particular it is possible for indexToDiffID[index] and blobDiffIDs[compressedDigestAtIndex]] to refer
+	// to mismatching contents.
 	// Users of these fields should use trustedLayerIdentityDataLocked, which centralizes the validity logic,
 	// instead of interpreting these fields, especially blobDiffIDs, directly.
-	blobDiffIDs      map[digest.Digest]digest.Digest // Mapping from layer blobsums to their corresponding DiffIDs
-	indexToTOCDigest map[int]digest.Digest           // Mapping from layer index to a TOC Digest, IFF the layer was created/found/reused by TOC digest
+	//
+	// Ideally we wouldn’t have blobDiffIDs, and we would just keep records by index, but the public API does not require the caller
+	// to provide layer indices; and configs don’t have layer indices. blobDiffIDs needs to exist for those cases.
+	indexToDiffID    map[int]digest.Digest           // Mapping from layer index to DiffID
+	indexToTOCDigest map[int]digest.Digest           // Mapping from layer index to a TOC Digest
+	blobDiffIDs      map[digest.Digest]digest.Digest // Mapping from layer blobsums to their corresponding DiffIDs. CAREFUL: See the WARNING above.
 
 	// Layer data: Before commitLayer is called, either at least one of (diffOutputs, indexToAdditionalLayer, filenames)
-	// should be available; or indexToTOCDigest/blobDiffIDs should be enough to locate an existing c/storage layer.
+	// should be available; or indexToDiffID/indexToTOCDigest/blobDiffIDs should be enough to locate an existing c/storage layer.
 	// They are looked up in the order they are mentioned above.
 	diffOutputs            map[int]*graphdriver.DriverWithDifferOutput // Mapping from layer index to a partially-pulled layer intermediate data
 	indexToAdditionalLayer map[int]storage.AdditionalLayer             // Mapping from layer index to their corresponding additional layer
@@ -152,9 +163,12 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 		},
 		indexToStorageID: make(map[int]string),
 		lockProtected: storageImageDestinationLockProtected{
-			indexToAddedLayerInfo:  make(map[int]addedLayerInfo),
-			blobDiffIDs:            make(map[digest.Digest]digest.Digest),
-			indexToTOCDigest:       make(map[int]digest.Digest),
+			indexToAddedLayerInfo: make(map[int]addedLayerInfo),
+
+			indexToDiffID:    make(map[int]digest.Digest),
+			indexToTOCDigest: make(map[int]digest.Digest),
+			blobDiffIDs:      make(map[digest.Digest]digest.Digest),
+
 			diffOutputs:            make(map[int]*graphdriver.DriverWithDifferOutput),
 			indexToAdditionalLayer: make(map[int]storage.AdditionalLayer),
 			filenames:              make(map[digest.Digest]string),
@@ -548,25 +562,40 @@ func (s *storageImageDestination) trustedLayerIdentityDataLocked(layerIndex int,
 	//
 	// Such a within-image layer reuse is expected to be pretty rare; instead, ignore the unexpected file match
 	// and proceed to the originally-planned TOC match.
+
+	res := trustedLayerIdentityData{}
+	diffID, layerIdentifiedByDiffID := s.lockProtected.indexToDiffID[layerIndex]
+	if layerIdentifiedByDiffID {
+		res.layerIdentifiedByTOC = false
+		res.diffID = diffID
+	}
 	if tocDigest, ok := s.lockProtected.indexToTOCDigest[layerIndex]; ok {
-		return trustedLayerIdentityData{
-			layerIdentifiedByTOC: true,
-			diffID:               "",
-			tocDigest:            tocDigest,
-			// Don’t set blobDigest even if we can find a blobDiffIDs[blobDigest] entry: layerIdentifiedByTOC == true,
-			// tocDigest is the layer identifier, and an attacker might have used a manifest with non-matching tocDigest and blobDigest.
-			blobDigest: "",
-		}, true
+		res.tocDigest = tocDigest
+		if !layerIdentifiedByDiffID {
+			res.layerIdentifiedByTOC = true
+		}
 	}
-	if diffID, ok := s.lockProtected.blobDiffIDs[blobDigest]; ok {
-		return trustedLayerIdentityData{
-			layerIdentifiedByTOC: false,
-			diffID:               diffID,
-			tocDigest:            "",
-			blobDigest:           blobDigest,
-		}, true
+	if otherDiffID, ok := s.lockProtected.blobDiffIDs[blobDigest]; ok {
+		if !layerIdentifiedByDiffID && !res.layerIdentifiedByTOC {
+			// This is the only data we have, so it is clearly self-consistent.
+			res.layerIdentifiedByTOC = false
+			res.diffID = otherDiffID
+			res.blobDigest = blobDigest
+			layerIdentifiedByDiffID = true
+		} else {
+			// We have set up the layer identity without referring to blobDigest:
+			// an attacker might have used a manifest with non-matching tocDigest and blobDigest.
+			// But, if we know a trusted diffID value from other sources, and it matches the one for blobDigest,
+			// we know blobDigest is fine as well.
+			if res.diffID != "" && otherDiffID == res.diffID {
+				res.blobDigest = blobDigest
+			}
+		}
 	}
-	return trustedLayerIdentityData{}, false
+	if !layerIdentifiedByDiffID && !res.layerIdentifiedByTOC {
+		return trustedLayerIdentityData{}, false // We found nothing at all
+	}
+	return res, true
 }
 
 // computeID computes a recommended image ID based on information we have so far.  If
@@ -912,28 +941,25 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 	} else {
 		// Try to find the layer with contents matching the data we use.
 		var layer *storage.Layer // = nil
-		if trusted.tocDigest != "" {
-			layers, err2 := s.imageRef.transport.store.LayersByTOCDigest(trusted.tocDigest)
-			if err2 == nil && len(layers) > 0 {
+		if trusted.diffID != "" {
+			if layers, err2 := s.imageRef.transport.store.LayersByUncompressedDigest(trusted.diffID); err2 == nil && len(layers) > 0 {
 				layer = &layers[0]
-			} else {
-				return nil, fmt.Errorf("locating layer for TOC digest %q: %w", trusted.tocDigest, err2)
-			}
-		} else {
-			// When trusted.tocDigest == "", trusted.layerIdentifiedByTOC == false, and trusted.diffID must have been set
-			layers, err2 := s.imageRef.transport.store.LayersByUncompressedDigest(trusted.diffID)
-			if err2 == nil && len(layers) > 0 {
-				layer = &layers[0]
-			} else if trusted.blobDigest != "" {
-				layers, err2 = s.imageRef.transport.store.LayersByCompressedDigest(trusted.blobDigest)
-				if err2 == nil && len(layers) > 0 {
-					layer = &layers[0]
-				}
-			}
-			if layer == nil {
-				return nil, fmt.Errorf("locating layer for blob %q: %w", layerDigest, err2)
 			}
 		}
+		if layer == nil && trusted.tocDigest != "" {
+			if layers, err2 := s.imageRef.transport.store.LayersByTOCDigest(trusted.tocDigest); err2 == nil && len(layers) > 0 {
+				layer = &layers[0]
+			}
+		}
+		if layer == nil && trusted.blobDigest != "" {
+			if layers, err2 := s.imageRef.transport.store.LayersByCompressedDigest(trusted.blobDigest); err2 == nil && len(layers) > 0 {
+				layer = &layers[0]
+			}
+		}
+		if layer == nil {
+			return nil, fmt.Errorf("layer for blob %q/%q/%q not found", trusted.blobDigest, trusted.tocDigest, trusted.diffID)
+		}
+
 		// Read the layer's contents.
 		noCompression := archive.Uncompressed
 		diffOptions := &storage.DiffOptions{
@@ -941,7 +967,7 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		}
 		diff, err2 := s.imageRef.transport.store.Diff("", layer.ID, diffOptions)
 		if err2 != nil {
-			return nil, fmt.Errorf("reading layer %q for blob %q: %w", layer.ID, layerDigest, err2)
+			return nil, fmt.Errorf("reading layer %q for blob %q/%q/%q: %w", layer.ID, trusted.blobDigest, trusted.tocDigest, trusted.diffID, err2)
 		}
 		// Copy the layer diff to a file.  Diff() takes a lock that it holds
 		// until the ReadCloser that it returns is closed, and PutLayer() wants
@@ -1005,7 +1031,7 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		UncompressedDigest: trusted.diffID,
 	}, file)
 	if err != nil && !errors.Is(err, storage.ErrDuplicateID) {
-		return nil, fmt.Errorf("adding layer with blob %q: %w", layerDigest, err)
+		return nil, fmt.Errorf("adding layer with blob %q/%q/%q: %w", trusted.blobDigest, trusted.tocDigest, trusted.diffID, err)
 	}
 	return layer, nil
 }
