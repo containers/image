@@ -452,22 +452,9 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 			if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
 				return false, private.ReusedBlob{}, fmt.Errorf(`looking for layers with digest %q: %w`, uncompressedDigest, err)
 			}
-			if len(layers) > 0 {
-				if size != -1 {
-					s.lockProtected.blobDiffIDs[blobDigest] = uncompressedDigest
-					return true, private.ReusedBlob{
-						Digest: blobDigest,
-						Size:   size,
-					}, nil
-				}
-				if !options.CanSubstitute {
-					return false, private.ReusedBlob{}, fmt.Errorf("Internal error: options.CanSubstitute was expected to be true for blob with digest %s", blobDigest)
-				}
-				s.lockProtected.blobDiffIDs[uncompressedDigest] = uncompressedDigest
-				return true, private.ReusedBlob{
-					Digest: uncompressedDigest,
-					Size:   layers[0].UncompressedSize,
-				}, nil
+			if found, reused := reusedBlobFromLayerLookupLocked(layers, blobDigest, size, options); found {
+				s.lockProtected.blobDiffIDs[blobDigest] = uncompressedDigest
+				return true, reused, nil
 			}
 		}
 	}
@@ -475,31 +462,38 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 	if options.TOCDigest != "" && options.LayerIndex != nil {
 		// Check if we have a chunked layer in storage with the same TOC digest.
 		layers, err := s.imageRef.transport.store.LayersByTOCDigest(options.TOCDigest)
-
 		if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
 			return false, private.ReusedBlob{}, fmt.Errorf(`looking for layers with TOC digest %q: %w`, options.TOCDigest, err)
 		}
-		if len(layers) > 0 {
-			if size != -1 {
-				s.lockProtected.indexToTOCDigest[*options.LayerIndex] = options.TOCDigest
-				return true, private.ReusedBlob{
-					Digest:             blobDigest,
-					Size:               size,
-					MatchedByTOCDigest: true,
-				}, nil
-			} else if options.CanSubstitute && layers[0].UncompressedDigest != "" {
-				s.lockProtected.indexToTOCDigest[*options.LayerIndex] = options.TOCDigest
-				return true, private.ReusedBlob{
-					Digest:             layers[0].UncompressedDigest,
-					Size:               layers[0].UncompressedSize,
-					MatchedByTOCDigest: true,
-				}, nil
-			}
+		if found, reused := reusedBlobFromLayerLookupLocked(layers, blobDigest, size, options); found {
+			s.lockProtected.indexToTOCDigest[*options.LayerIndex] = options.TOCDigest
+			reused.MatchedByTOCDigest = true
+			return true, reused, nil
 		}
 	}
 
 	// Nope, we don't have it.
 	return false, private.ReusedBlob{}, nil
+}
+
+// reusedBlobFromLayerLookupLocked returns (true, ReusedBlob) if layers contain a usable match; or (false, ...) if not.
+// The caller is still responsible for setting the layer identification fields, to allow the layer to be found again.
+// The caller must hold s.lock.
+func reusedBlobFromLayerLookupLocked(layers []storage.Layer, blobDigest digest.Digest, blobSize int64, options *private.TryReusingBlobOptions) (bool, private.ReusedBlob) {
+	if len(layers) > 0 {
+		if blobSize != -1 {
+			return true, private.ReusedBlob{
+				Digest: blobDigest,
+				Size:   blobSize,
+			}
+		} else if options.CanSubstitute && layers[0].UncompressedDigest != "" {
+			return true, private.ReusedBlob{
+				Digest: layers[0].UncompressedDigest,
+				Size:   layers[0].UncompressedSize,
+			}
+		}
+	}
+	return false, private.ReusedBlob{}
 }
 
 // computeID computes a recommended image ID based on information we have so far.  If
