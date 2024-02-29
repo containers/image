@@ -385,6 +385,21 @@ func (sqc *cache) RecordDigestUncompressedPair(anyDigest digest.Digest, uncompre
 	}) // FIXME? Log error (but throttle the log volume on repeated accesses)?
 }
 
+// UncompressedDigest returns an uncompressed digest corresponding to anyDigest.
+// Returns "" if the uncompressed digest is unknown.
+// FIXME: Does this need to record TOC/compression type?
+func (sqc *cache) UncompressedDigestForTOC(tocDigest digest.Digest) digest.Digest {
+	return "" // FIXME: UNIMPLEMENTED
+}
+
+// RecordDigestUncompressedPair records that the tocDigest corresponds to uncompressed.
+// WARNING: Only call this for LOCALLY VERIFIED data; don’t record a digest pair just because some remote author claims so (e.g.
+// because a manifest/config pair exists); otherwise the cache could be poisoned and allow substituting unexpected blobs.
+// (Eventually, the DiffIDs in image config could detect the substitution, but that may be too late, and not all image formats contain that data.)
+func (sqc *cache) RecordTOCUncompressedPair(tocDigest digest.Digest, uncompressed digest.Digest) {
+	// FIXME: UNIMPLEMENTED
+}
+
 // RecordKnownLocation records that a blob with the specified digest exists within the specified (transport, scope) scope,
 // and can be reused given the opaque location data.
 func (sqc *cache) RecordKnownLocation(transport types.ImageTransport, scope types.BICTransportScope, digest digest.Digest, location types.BICLocationReference) {
