@@ -25,6 +25,8 @@ var (
 
 	// uncompressedDigestBucket stores a mapping from any digest to an uncompressed digest.
 	uncompressedDigestBucket = []byte("uncompressedDigest")
+	// uncompressedDigestByTOCBucket stores a mapping from a TOC digest to an uncompressed digest.
+	uncompressedDigestByTOCBucket = []byte("uncompressedDigestByTOC")
 	// digestCompressorBucket stores a mapping from any digest to a compressor, or blobinfocache.Uncompressed (not blobinfocache.UnknownCompression).
 	// It may not exist in caches created by older versions, even if uncompressedDigestBucket is present.
 	digestCompressorBucket = []byte("digestCompressor")
@@ -237,6 +239,56 @@ func (bdc *cache) RecordDigestUncompressedPair(anyDigest digest.Digest, uncompre
 			return err
 		}
 		if err := b.Put([]byte(anyDigest.String()), []byte{}); err != nil { // Possibly writing the same []byte{} presence marker again.
+			return err
+		}
+		return nil
+	}) // FIXME? Log error (but throttle the log volume on repeated accesses)?
+}
+
+// UncompressedDigestForTOC returns an uncompressed digest corresponding to anyDigest.
+// Returns "" if the uncompressed digest is unknown.
+func (bdc *cache) UncompressedDigestForTOC(tocDigest digest.Digest) digest.Digest {
+	var res digest.Digest
+	if err := bdc.view(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(uncompressedDigestByTOCBucket); b != nil {
+			if uncompressedBytes := b.Get([]byte(tocDigest.String())); uncompressedBytes != nil {
+				d, err := digest.Parse(string(uncompressedBytes))
+				if err == nil {
+					res = d
+					return nil
+				}
+				// FIXME? Log err (but throttle the log volume on repeated accesses)?
+			}
+		}
+		res = ""
+		return nil
+	}); err != nil { // Including os.IsNotExist(err)
+		return "" // FIXME? Log err (but throttle the log volume on repeated accesses)?
+	}
+	return res
+}
+
+// RecordTOCUncompressedPair records that the tocDigest corresponds to uncompressed.
+// WARNING: Only call this for LOCALLY VERIFIED data; don’t record a digest pair just because some remote author claims so (e.g.
+// because a manifest/config pair exists); otherwise the cache could be poisoned and allow substituting unexpected blobs.
+// (Eventually, the DiffIDs in image config could detect the substitution, but that may be too late, and not all image formats contain that data.)
+func (bdc *cache) RecordTOCUncompressedPair(tocDigest digest.Digest, uncompressed digest.Digest) {
+	_ = bdc.update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists(uncompressedDigestByTOCBucket)
+		if err != nil {
+			return err
+		}
+		key := []byte(tocDigest.String())
+		if previousBytes := b.Get(key); previousBytes != nil {
+			previous, err := digest.Parse(string(previousBytes))
+			if err != nil {
+				return err
+			}
+			if previous != uncompressed {
+				logrus.Warnf("Uncompressed digest for blob with TOC %q previously recorded as %q, now %q", tocDigest, previous, uncompressed)
+			}
+		}
+		if err := b.Put(key, []byte(uncompressed.String())); err != nil {
 			return err
 		}
 		return nil
