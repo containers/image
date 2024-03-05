@@ -2,3 +2,94 @@
 run:
   concurrency: 6
   deadline: 5m
+
+linters:
+  enable-all: true
+  disable:
+    # linters deprecated by upstreams ...
+    - interfacer
+    - varcheck
+    - deadcode
+    - scopelint
+    - maligned
+    - nosnakecase
+    - exhaustivestruct
+    - structcheck
+    - ifshort
+    - golint
+    # linters explicitly disabled for the below mentioned reasons ...
+    - funlen # too aggressive/wishful size/statement limit
+    - gochecknoinits # too many hard to fix init() funcs across the code
+    - gocognit # too aggressive default
+    - wsl # useful but too opinionated
+    # others to be re-enabled one-by-one ...
+    - goconst
+    - godox
+    - lll
+    - nestif
+    - cyclop
+    - depguard
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - exhaustivestruct
+    - ginkgolinter
+    - gochecknoglobals
+    - goerr113
+    - gomnd
+    - nolintlint
+    - wrapcheck
+    - varnamelen
+    - testpackage
+    - tenv
+    - tagliatelle
+    - stylecheck
+    - paralleltest
+    - nonamedreturns
+    - nlreturn
+    - nakedret
+    - musttag
+    - maintidx
+    - ireturn
+    - exhaustruct
+    - gosec
+    - godot
+    - gocyclo
+    - dogsled
+    - tparallel
+    - thelper
+    - nilnil
+    - nilerr
+    - interfacebloat
+    - forcetypeassert
+    - gomoddirectives
+    - testifylint # way to many issues to fix right now, however it is a great linter for better test errors
+    - inamedparam # opinionated style
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+  gocyclo:
+    min-complexity: 35
+  gofmt:
+    rewrite-rules:
+      - pattern: 'interface{}'
+        replacement: 'any'
+  revive:
+    rules:
+      - name: dot-imports
+        disabled: true
+
+issues:
+    # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: _test\.go
+      linters:
+        - dupl
+        - perfsprint
+    # Exclude "should pass the context parameter" for libimage.LookupImage because of backward compatibility.
+    - path: "libimage"
+      text: "LookupImage"
+      linters:
+        - contextcheck
