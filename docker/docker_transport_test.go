@@ -125,14 +125,14 @@ func TestNewReference(t *testing.T) {
 func TestNewReferenceUnknownDigest(t *testing.T) {
 	// References with tags and digests should be rejected
 	for _, c := range validReferenceTestCases {
-		if !strings.Contains(c.input, unknownDigestSuffixTest) {
+		in, ok := strings.CutSuffix(c.input, unknownDigestSuffixTest)
+		if !ok {
 			parsed, err := reference.ParseNormalizedNamed(c.input)
 			require.NoError(t, err)
 			_, err = NewReferenceUnknownDigest(parsed)
 			assert.Error(t, err)
 			continue
 		}
-		in := strings.TrimSuffix(c.input, unknownDigestSuffixTest)
 		parsed, err := reference.ParseNormalizedNamed(in)
 		require.NoError(t, err)
 		ref, err := NewReferenceUnknownDigest(parsed)

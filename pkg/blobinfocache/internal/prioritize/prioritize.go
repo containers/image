@@ -3,7 +3,7 @@
 package prioritize
 
 import (
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/containers/image/v5/internal/blobinfocache"
@@ -26,22 +26,14 @@ type CandidateWithTime struct {
 	LastSeen  time.Time                              // Time the candidate was last known to exist (either read or written) (not set for Candidate.UnknownLocation)
 }
 
-// candidateSortState is a local state implementing sort.Interface on candidates to prioritize,
-// along with the specially-treated digest values for the implementation of sort.Interface.Less
+// candidateSortState is a closure for a comparison used by slices.SortFunc on candidates to prioritize,
+// along with the specially-treated digest values relevant to the ordering.
 type candidateSortState struct {
-	cs                 []CandidateWithTime // The entries to sort
-	primaryDigest      digest.Digest       // The digest the user actually asked for
-	uncompressedDigest digest.Digest       // The uncompressed digest corresponding to primaryDigest. May be "", or even equal to primaryDigest
+	primaryDigest      digest.Digest // The digest the user actually asked for
+	uncompressedDigest digest.Digest // The uncompressed digest corresponding to primaryDigest. May be "", or even equal to primaryDigest
 }
 
-func (css *candidateSortState) Len() int {
-	return len(css.cs)
-}
-
-func (css *candidateSortState) Less(i, j int) bool {
-	xi := css.cs[i]
-	xj := css.cs[j]
-
+func (css *candidateSortState) compare(xi, xj CandidateWithTime) int {
 	// primaryDigest entries come first, more recent first.
 	// uncompressedDigest entries, if uncompressedDigest is set and != primaryDigest, come last, more recent entry first.
 	// Other digest values are primarily sorted by time (more recent first), secondarily by digest (to provide a deterministic order)
@@ -50,36 +42,40 @@ func (css *candidateSortState) Less(i, j int) bool {
 	if xi.Candidate.Digest != xj.Candidate.Digest {
 		// - The two digests are different, and one (or both) of the digests is primaryDigest or uncompressedDigest: time does not matter
 		if xi.Candidate.Digest == css.primaryDigest {
-			return true
+			return -1
 		}
 		if xj.Candidate.Digest == css.primaryDigest {
-			return false
+			return 1
 		}
 		if css.uncompressedDigest != "" {
 			if xi.Candidate.Digest == css.uncompressedDigest {
-				return false
+				return 1
 			}
 			if xj.Candidate.Digest == css.uncompressedDigest {
-				return true
+				return -1
 			}
 		}
 	} else { // xi.Candidate.Digest == xj.Candidate.Digest
 		// The two digests are the same, and are either primaryDigest or uncompressedDigest: order by time
 		if xi.Candidate.Digest == css.primaryDigest || (css.uncompressedDigest != "" && xi.Candidate.Digest == css.uncompressedDigest) {
-			return xi.LastSeen.After(xj.LastSeen)
+			return -xi.LastSeen.Compare(xj.LastSeen)
 		}
 	}
 
 	// Neither of the digests are primaryDigest/uncompressedDigest:
-	if !xi.LastSeen.Equal(xj.LastSeen) { // Order primarily by time
-		return xi.LastSeen.After(xj.LastSeen)
+	if cmp := xi.LastSeen.Compare(xj.LastSeen); cmp != 0 { // Order primarily by time
+		return -cmp
 	}
 	// Fall back to digest, if timestamps end up _exactly_ the same (how?!)
-	return xi.Candidate.Digest < xj.Candidate.Digest
-}
-
-func (css *candidateSortState) Swap(i, j int) {
-	css.cs[i], css.cs[j] = css.cs[j], css.cs[i]
+	// FIXME: Use cmp.Compare after we update to Go 1.21.
+	switch {
+	case xi.Candidate.Digest < xj.Candidate.Digest:
+		return -1
+	case xi.Candidate.Digest > xj.Candidate.Digest:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func min(a, b int) int {
@@ -100,12 +96,10 @@ func destructivelyPrioritizeReplacementCandidatesWithMax(cs []CandidateWithTime,
 	var unknownLocationCandidates []CandidateWithTime
 	// We don't need to use sort.Stable() because nanosecond timestamps are (presumably?) unique, so no two elements should
 	// compare equal.
-	// FIXME: Use slices.SortFunc after we update to Go 1.20 (Go 1.21?) and Time.Compare and cmp.Compare are available.
-	sort.Sort(&candidateSortState{
-		cs:                 cs,
+	slices.SortFunc(cs, (&candidateSortState{
 		primaryDigest:      primaryDigest,
 		uncompressedDigest: uncompressedDigest,
-	})
+	}).compare)
 	for _, candidate := range cs {
 		if candidate.Candidate.UnknownLocation {
 			unknownLocationCandidates = append(unknownLocationCandidates, candidate)
