@@ -73,7 +73,7 @@ type bpCompressionStepData struct {
 	operation              bpcOperation                // What we are actually doing
 	uploadedOperation      types.LayerCompression      // Operation to use for updating the blob metadata (matching the end state, not necessarily what we do)
 	uploadedAlgorithm      *compressiontypes.Algorithm // An algorithm parameter for the compressionOperation edits.
-	uploadedAnnotations    map[string]string           // Annotations that should be set on the uploaded blob. WARNING: This is only set after the srcStream.reader is fully consumed.
+	uploadedAnnotations    map[string]string           // Compression-related annotations that should be set on the uploaded blob. WARNING: This is only set after the srcStream.reader is fully consumed.
 	srcCompressorName      string                      // Compressor name to record in the blob info cache for the source blob.
 	uploadedCompressorName string                      // Compressor name to record in the blob info cache for the uploaded blob.
 	closers                []io.Closer                 // Objects to close after the upload is done, if any.
