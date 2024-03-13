@@ -323,7 +323,11 @@ func (d *bpCompressionStepData) recordValidatedDigestData(c *copier, uploadedInf
 			return fmt.Errorf("Internal error: Unexpected d.operation value %#v", d.operation)
 		}
 	}
-	if d.uploadedCompressorName != "" && d.uploadedCompressorName != internalblobinfocache.UnknownCompression {
+	if d.srcCompressorName == "" || d.uploadedCompressorName == "" {
+		return fmt.Errorf("internal error: missing compressor names (src: %q, uploaded: %q)",
+			d.srcCompressorName, d.uploadedCompressorName)
+	}
+	if d.uploadedCompressorName != internalblobinfocache.UnknownCompression {
 		if d.uploadedCompressorName != compressiontypes.ZstdChunkedAlgorithmName {
 			// HACK: Don’t record zstd:chunked algorithms.
 			// There is already a similar hack in internal/imagedestination/impl/helpers.CandidateMatchesTryReusingBlobOptions,
@@ -337,7 +341,7 @@ func (d *bpCompressionStepData) recordValidatedDigestData(c *copier, uploadedInf
 		}
 	}
 	if srcInfo.Digest != "" && srcInfo.Digest != uploadedInfo.Digest &&
-		d.srcCompressorName != "" && d.srcCompressorName != internalblobinfocache.UnknownCompression {
+		d.srcCompressorName != internalblobinfocache.UnknownCompression {
 		if d.srcCompressorName != compressiontypes.ZstdChunkedAlgorithmName {
 			// HACK: Don’t record zstd:chunked algorithms, see above.
 			c.blobInfoCache.RecordDigestCompressorName(srcInfo.Digest, d.srcCompressorName)
