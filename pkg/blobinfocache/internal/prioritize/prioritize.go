@@ -33,12 +33,12 @@ type CandidateTemplate struct {
 	compressionAlgorithm *compression.Algorithm // An algorithm when the candidate is compressed, or nil when it is uncompressed
 }
 
-// CandidateTemplateWithCompression returns a CandidateTemplate if a blob with compressionName (which can be Uncompressed
-// or UnknownCompression) is acceptable for a CandidateLocations* call with v2Options.
+// CandidateTemplateWithCompression returns a CandidateTemplate if a blob with data is acceptable
+// for a CandidateLocations* call with v2Options.
 //
 // v2Options can be set to nil if the call is CandidateLocations (i.e. compression is not required to be known);
 // if not nil, the call is assumed to be CandidateLocations2.
-func CandidateTemplateWithCompression(v2Options *blobinfocache.CandidateLocations2Options, digest digest.Digest, compressorName string) *CandidateTemplate {
+func CandidateTemplateWithCompression(v2Options *blobinfocache.CandidateLocations2Options, digest digest.Digest, data blobinfocache.DigestCompressorData) *CandidateTemplate {
 	if v2Options == nil {
 		return &CandidateTemplate{ // Anything goes. The compressionOperation, compressionAlgorithm values are not used.
 			digest: digest,
@@ -49,7 +49,7 @@ func CandidateTemplateWithCompression(v2Options *blobinfocache.CandidateLocation
 	if v2Options.RequiredCompression != nil {
 		requiredCompression = v2Options.RequiredCompression.Name()
 	}
-	switch compressorName {
+	switch data.BaseVariantCompressor {
 	case blobinfocache.Uncompressed:
 		if !manifest.CandidateCompressionMatchesReuseConditions(manifest.ReuseConditions{
 			PossibleManifestFormats: v2Options.PossibleManifestFormats,
@@ -68,10 +68,10 @@ func CandidateTemplateWithCompression(v2Options *blobinfocache.CandidateLocation
 		logrus.Debugf("Ignoring BlobInfoCache record of digest %q with unknown compression", digest.String())
 		return nil // Not allowed with CandidateLocations2
 	default:
-		algo, err := compression.AlgorithmByName(compressorName)
+		algo, err := compression.AlgorithmByName(data.BaseVariantCompressor)
 		if err != nil {
 			logrus.Debugf("Ignoring BlobInfoCache record of digest %q with unrecognized compression %q: %v",
-				digest.String(), compressorName, err)
+				digest.String(), data.BaseVariantCompressor, err)
 			return nil // The BICReplacementCandidate2.CompressionAlgorithm field is required
 		}
 		if !manifest.CandidateCompressionMatchesReuseConditions(manifest.ReuseConditions{
@@ -79,7 +79,7 @@ func CandidateTemplateWithCompression(v2Options *blobinfocache.CandidateLocation
 			RequiredCompression:     v2Options.RequiredCompression,
 		}, &algo) {
 			logrus.Debugf("Ignoring BlobInfoCache record of digest %q, compression %q does not match required %s or MIME types %#v",
-				digest.String(), compressorName, requiredCompression, v2Options.PossibleManifestFormats)
+				digest.String(), data.BaseVariantCompressor, requiredCompression, v2Options.PossibleManifestFormats)
 			return nil
 		}
 		return &CandidateTemplate{
