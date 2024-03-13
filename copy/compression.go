@@ -351,7 +351,9 @@ func (d *bpCompressionStepData) recordValidatedDigestData(c *copier, uploadedInf
 			// with the same digest and both ZstdAlgorithmName and ZstdChunkedAlgorithmName , which causes warnings about
 			// inconsistent data to be logged.
 			c.blobInfoCache.RecordDigestCompressorData(uploadedInfo.Digest, internalblobinfocache.DigestCompressorData{
-				BaseVariantCompressor: d.uploadedCompressorName,
+				BaseVariantCompressor:      d.uploadedCompressorName,
+				SpecificVariantCompressor:  internalblobinfocache.UnknownCompression,
+				SpecificVariantAnnotations: nil,
 			})
 		}
 	}
@@ -361,7 +363,9 @@ func (d *bpCompressionStepData) recordValidatedDigestData(c *copier, uploadedInf
 		// blob as is, or perhaps decompressed it; either way we don’t trust the TOC digest,
 		// so record neither the variant name, nor the TOC digest.
 		c.blobInfoCache.RecordDigestCompressorData(srcInfo.Digest, internalblobinfocache.DigestCompressorData{
-			BaseVariantCompressor: d.srcCompressorBaseVariantName,
+			BaseVariantCompressor:      d.srcCompressorBaseVariantName,
+			SpecificVariantCompressor:  internalblobinfocache.UnknownCompression,
+			SpecificVariantAnnotations: nil,
 		})
 	}
 	return nil
