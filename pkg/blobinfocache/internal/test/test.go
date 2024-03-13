@@ -314,7 +314,9 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		// ----------------------------
 		// If a record exists with compression without Location then
 		// then return a record without location and with `UnknownLocation: true`
-		cache.RecordDigestCompressorName(digestUnknownLocation, compressiontypes.Bzip2AlgorithmName)
+		cache.RecordDigestCompressorData(digestUnknownLocation, blobinfocache.DigestCompressorData{
+			BaseVariantCompressor: compressiontypes.Bzip2AlgorithmName,
+		})
 		res = cache.CandidateLocations2(transport, scope, digestUnknownLocation, blobinfocache.CandidateLocations2Options{
 			CanSubstitute: true,
 		})
@@ -355,7 +357,9 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		// that shouldn’t happen in real-world usage.
 		if scopeIndex != 0 {
 			for _, e := range digestNameSetPrioritization {
-				cache.RecordDigestCompressorName(e.d, blobinfocache.UnknownCompression)
+				cache.RecordDigestCompressorData(e.d, blobinfocache.DigestCompressorData{
+					BaseVariantCompressor: blobinfocache.UnknownCompression,
+				})
 			}
 		}
 
@@ -423,7 +427,9 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 
 		// Set the "known" compression values
 		for _, e := range digestNameSetPrioritization {
-			cache.RecordDigestCompressorName(e.d, e.m)
+			cache.RecordDigestCompressorData(e.d, blobinfocache.DigestCompressorData{
+				BaseVariantCompressor: e.m,
+			})
 		}
 
 		// No substitutions allowed:
@@ -505,7 +511,9 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 			cache.RecordKnownLocation(transport, scope, e.d, types.BICLocationReference{Opaque: scopeName + e.n})
 		}
 		for _, e := range digestNameSetFiltering {
-			cache.RecordDigestCompressorName(e.d, e.m)
+			cache.RecordDigestCompressorData(e.d, blobinfocache.DigestCompressorData{
+				BaseVariantCompressor: e.m,
+			})
 		}
 
 		// No filtering

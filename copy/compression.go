@@ -347,14 +347,18 @@ func (d *bpCompressionStepData) recordValidatedDigestData(c *copier, uploadedInf
 			// between zstd and zstd:chunked; so we could, in varying situations over time, call RecordDigestCompressorName
 			// with the same digest and both ZstdAlgorithmName and ZstdChunkedAlgorithmName , which causes warnings about
 			// inconsistent data to be logged.
-			c.blobInfoCache.RecordDigestCompressorName(uploadedInfo.Digest, d.uploadedCompressorName)
+			c.blobInfoCache.RecordDigestCompressorData(uploadedInfo.Digest, internalblobinfocache.DigestCompressorData{
+				BaseVariantCompressor: d.uploadedCompressorName,
+			})
 		}
 	}
 	if srcInfo.Digest != "" && srcInfo.Digest != uploadedInfo.Digest &&
 		d.srcCompressorName != internalblobinfocache.UnknownCompression {
 		if d.srcCompressorName != compressiontypes.ZstdChunkedAlgorithmName {
 			// HACK: Don’t record zstd:chunked algorithms, see above.
-			c.blobInfoCache.RecordDigestCompressorName(srcInfo.Digest, d.srcCompressorName)
+			c.blobInfoCache.RecordDigestCompressorData(srcInfo.Digest, internalblobinfocache.DigestCompressorData{
+				BaseVariantCompressor: d.srcCompressorName,
+			})
 		}
 	}
 	return nil
