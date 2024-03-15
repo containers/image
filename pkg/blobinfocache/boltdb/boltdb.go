@@ -300,9 +300,10 @@ func (bdc *cache) RecordKnownLocation(transport types.ImageTransport, scope type
 // (which might be nil) with corresponding compression
 // info from compressionBucket (which might be nil), and returns the result of appending them
 // to candidates.
-// v2Output allows including candidates with unknown location, and filters out candidates
+// v2Options is not nil if the caller is CandidateLocations2: this allows including candidates with unknown location, and filters out candidates
 // with unknown compression.
-func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateWithTime, scopeBucket, compressionBucket *bolt.Bucket, digest digest.Digest, v2Output bool) []prioritize.CandidateWithTime {
+func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateWithTime, scopeBucket, compressionBucket *bolt.Bucket, digest digest.Digest,
+	v2Options *blobinfocache.CandidateLocations2Options) []prioritize.CandidateWithTime {
 	digestKey := []byte(digest.String())
 	compressorName := blobinfocache.UnknownCompression
 	if compressionBucket != nil {
@@ -312,7 +313,7 @@ func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 			compressorName = string(compressorNameValue)
 		}
 	}
-	if compressorName == blobinfocache.UnknownCompression && v2Output {
+	if compressorName == blobinfocache.UnknownCompression && v2Options != nil {
 		return candidates
 	}
 	var b *bolt.Bucket
@@ -335,7 +336,7 @@ func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 			})
 			return nil
 		}) // FIXME? Log error (but throttle the log volume on repeated accesses)?
-	} else if v2Output {
+	} else if v2Options != nil {
 		candidates = append(candidates, prioritize.CandidateWithTime{
 			Candidate: blobinfocache.BICReplacementCandidate2{
 				Digest:          digest,
@@ -355,10 +356,13 @@ func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 //
 // The CompressorName fields in returned data must never be UnknownCompression.
 func (bdc *cache) CandidateLocations2(transport types.ImageTransport, scope types.BICTransportScope, primaryDigest digest.Digest, options blobinfocache.CandidateLocations2Options) []blobinfocache.BICReplacementCandidate2 {
-	return bdc.candidateLocations(transport, scope, primaryDigest, options.CanSubstitute, true)
+	return bdc.candidateLocations(transport, scope, primaryDigest, options.CanSubstitute, &options)
 }
 
-func (bdc *cache) candidateLocations(transport types.ImageTransport, scope types.BICTransportScope, primaryDigest digest.Digest, canSubstitute, v2Output bool) []blobinfocache.BICReplacementCandidate2 {
+// candidateLocations implements CandidateLocations / CandidateLocations2.
+// v2Options is not nil if the caller is CandidateLocations2.
+func (bdc *cache) candidateLocations(transport types.ImageTransport, scope types.BICTransportScope, primaryDigest digest.Digest, canSubstitute bool,
+	v2Options *blobinfocache.CandidateLocations2Options) []blobinfocache.BICReplacementCandidate2 {
 	res := []prioritize.CandidateWithTime{}
 	var uncompressedDigestValue digest.Digest // = ""
 	if err := bdc.view(func(tx *bolt.Tx) error {
@@ -373,7 +377,7 @@ func (bdc *cache) candidateLocations(transport types.ImageTransport, scope types
 		// and we don't want to fail just because of that
 		compressionBucket := tx.Bucket(digestCompressorBucket)
 
-		res = bdc.appendReplacementCandidates(res, scopeBucket, compressionBucket, primaryDigest, v2Output)
+		res = bdc.appendReplacementCandidates(res, scopeBucket, compressionBucket, primaryDigest, v2Options)
 		if canSubstitute {
 			if uncompressedDigestValue = bdc.uncompressedDigest(tx, primaryDigest); uncompressedDigestValue != "" {
 				b := tx.Bucket(digestByUncompressedBucket)
@@ -386,7 +390,7 @@ func (bdc *cache) candidateLocations(transport types.ImageTransport, scope types
 								return err
 							}
 							if d != primaryDigest && d != uncompressedDigestValue {
-								res = bdc.appendReplacementCandidates(res, scopeBucket, compressionBucket, d, v2Output)
+								res = bdc.appendReplacementCandidates(res, scopeBucket, compressionBucket, d, v2Options)
 							}
 							return nil
 						}); err != nil {
@@ -395,7 +399,7 @@ func (bdc *cache) candidateLocations(transport types.ImageTransport, scope types
 					}
 				}
 				if uncompressedDigestValue != primaryDigest {
-					res = bdc.appendReplacementCandidates(res, scopeBucket, compressionBucket, uncompressedDigestValue, v2Output)
+					res = bdc.appendReplacementCandidates(res, scopeBucket, compressionBucket, uncompressedDigestValue, v2Options)
 				}
 			}
 		}
@@ -414,5 +418,5 @@ func (bdc *cache) candidateLocations(transport types.ImageTransport, scope types
 // data from previous RecordDigestUncompressedPair calls is used to also look up variants of the blob which have the same
 // uncompressed digest.
 func (bdc *cache) CandidateLocations(transport types.ImageTransport, scope types.BICTransportScope, primaryDigest digest.Digest, canSubstitute bool) []types.BICReplacementCandidate {
-	return blobinfocache.CandidateLocationsFromV2(bdc.candidateLocations(transport, scope, primaryDigest, canSubstitute, false))
+	return blobinfocache.CandidateLocationsFromV2(bdc.candidateLocations(transport, scope, primaryDigest, canSubstitute, nil))
 }
