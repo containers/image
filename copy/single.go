@@ -163,7 +163,7 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 		if format == nil {
 			format = defaultCompressionFormat
 		}
-		if format.Name() == compression.ZstdChunked.Name() {
+		if format.Name() == compressiontypes.ZstdChunkedAlgorithmName {
 			if ic.requireCompressionFormatMatch {
 				return copySingleImageResult{}, errors.New("explicitly requested to combine zstd:chunked with encryption, which is not beneficial; use plain zstd instead")
 			}
