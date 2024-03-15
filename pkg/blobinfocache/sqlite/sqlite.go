@@ -455,14 +455,14 @@ func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 	}
 	defer rows.Close()
 
-	res := []prioritize.CandidateWithTime{}
+	rowAdded := false
 	for rows.Next() {
 		var location string
 		var time time.Time
 		if err := rows.Scan(&location, &time); err != nil {
 			return nil, fmt.Errorf("scanning candidate: %w", err)
 		}
-		res = append(res, prioritize.CandidateWithTime{
+		candidates = append(candidates, prioritize.CandidateWithTime{
 			Candidate: blobinfocache.BICReplacementCandidate2{
 				Digest:         digest,
 				CompressorName: compressorName,
@@ -470,13 +470,14 @@ func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 			},
 			LastSeen: time,
 		})
+		rowAdded = true
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating through locations: %w", err)
 	}
 
-	if len(res) == 0 && v2Options != nil {
-		res = append(res, prioritize.CandidateWithTime{
+	if !rowAdded && v2Options != nil {
+		candidates = append(candidates, prioritize.CandidateWithTime{
 			Candidate: blobinfocache.BICReplacementCandidate2{
 				Digest:          digest,
 				CompressorName:  compressorName,
@@ -486,7 +487,6 @@ func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 			LastSeen: time.Time{},
 		})
 	}
-	candidates = append(candidates, res...)
 	return candidates, nil
 }
 
