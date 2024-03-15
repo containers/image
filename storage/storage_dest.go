@@ -548,8 +548,10 @@ func reusedBlobFromLayerLookup(layers []storage.Layer, blobDigest digest.Digest,
 			}
 		} else if options.CanSubstitute && layers[0].UncompressedDigest != "" {
 			return true, private.ReusedBlob{
-				Digest: layers[0].UncompressedDigest,
-				Size:   layers[0].UncompressedSize,
+				Digest:               layers[0].UncompressedDigest,
+				Size:                 layers[0].UncompressedSize,
+				CompressionOperation: types.Decompress,
+				CompressionAlgorithm: nil,
 			}
 		}
 	}
