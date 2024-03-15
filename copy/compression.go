@@ -52,6 +52,16 @@ func blobPipelineDetectCompressionStep(stream *sourceStream, srcInfo types.BlobI
 	}
 	stream.reader = reader
 
+	if decompressor != nil && format.Name() == compressiontypes.ZstdAlgorithmName {
+		tocDigest, err := chunkedToc.GetTOCDigest(srcInfo.Annotations)
+		if err != nil {
+			return bpDetectCompressionStepData{}, err
+		}
+		if tocDigest != nil {
+			format = compression.ZstdChunked
+		}
+
+	}
 	res := bpDetectCompressionStepData{
 		isCompressed: decompressor != nil,
 		format:       format,
