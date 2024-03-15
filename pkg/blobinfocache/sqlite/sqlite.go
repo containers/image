@@ -433,20 +433,23 @@ func (sqc *cache) RecordDigestCompressorName(anyDigest digest.Digest, compressor
 // with unknown compression.
 func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateWithTime, tx *sql.Tx, transport types.ImageTransport, scope types.BICTransportScope, digest digest.Digest,
 	v2Options *blobinfocache.CandidateLocations2Options) ([]prioritize.CandidateWithTime, error) {
-	var rows *sql.Rows
-	var err error
+	compressorName := blobinfocache.UnknownCompression
 	if v2Options != nil {
-		rows, err = tx.Query("SELECT location, time, compressor FROM KnownLocations JOIN DigestCompressors "+
-			"ON KnownLocations.digest = DigestCompressors.digest "+
-			"WHERE transport = ? AND scope = ? AND KnownLocations.digest = ?",
-			transport.Name(), scope.Opaque, digest.String())
-	} else {
-		rows, err = tx.Query("SELECT location, time, IFNULL(compressor, ?) FROM KnownLocations "+
-			"LEFT JOIN DigestCompressors ON KnownLocations.digest = DigestCompressors.digest "+
-			"WHERE transport = ? AND scope = ? AND KnownLocations.digest = ?",
-			blobinfocache.UnknownCompression,
-			transport.Name(), scope.Opaque, digest.String())
+		compressor, found, err := querySingleValue[string](tx, "SELECT compressor FROM DigestCompressors WHERE digest = ?", digest.String())
+		if err != nil {
+			return nil, fmt.Errorf("scanning compressorName: %w", err)
+		}
+		if found {
+			compressorName = compressor
+		}
 	}
+	if compressorName == blobinfocache.UnknownCompression && v2Options != nil {
+		return candidates, nil
+	}
+
+	rows, err := tx.Query("SELECT location, time FROM KnownLocations "+
+		"WHERE transport = ? AND scope = ? AND KnownLocations.digest = ?",
+		transport.Name(), scope.Opaque, digest.String())
 	if err != nil {
 		return nil, fmt.Errorf("looking up candidate locations: %w", err)
 	}
@@ -456,8 +459,7 @@ func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 	for rows.Next() {
 		var location string
 		var time time.Time
-		var compressorName string
-		if err := rows.Scan(&location, &time, &compressorName); err != nil {
+		if err := rows.Scan(&location, &time); err != nil {
 			return nil, fmt.Errorf("scanning candidate: %w", err)
 		}
 		res = append(res, prioritize.CandidateWithTime{
@@ -474,21 +476,15 @@ func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 	}
 
 	if len(res) == 0 && v2Options != nil {
-		compressor, found, err := querySingleValue[string](tx, "SELECT compressor FROM DigestCompressors WHERE digest = ?", digest.String())
-		if err != nil {
-			return nil, fmt.Errorf("scanning compressorName: %w", err)
-		}
-		if found {
-			res = append(res, prioritize.CandidateWithTime{
-				Candidate: blobinfocache.BICReplacementCandidate2{
-					Digest:          digest,
-					CompressorName:  compressor,
-					UnknownLocation: true,
-					Location:        types.BICLocationReference{Opaque: ""},
-				},
-				LastSeen: time.Time{},
-			})
-		}
+		res = append(res, prioritize.CandidateWithTime{
+			Candidate: blobinfocache.BICReplacementCandidate2{
+				Digest:          digest,
+				CompressorName:  compressorName,
+				UnknownLocation: true,
+				Location:        types.BICLocationReference{Opaque: ""},
+			},
+			LastSeen: time.Time{},
+		})
 	}
 	candidates = append(candidates, res...)
 	return candidates, nil
