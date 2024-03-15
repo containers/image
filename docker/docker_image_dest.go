@@ -344,7 +344,9 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 	}
 
 	// Then try reusing blobs from other locations.
-	candidates := options.Cache.CandidateLocations2(d.ref.Transport(), bicTransportScope(d.ref), info.Digest, options.CanSubstitute)
+	candidates := options.Cache.CandidateLocations2(d.ref.Transport(), bicTransportScope(d.ref), info.Digest, blobinfocache.CandidateLocations2Options{
+		CanSubstitute: options.CanSubstitute,
+	})
 	for _, candidate := range candidates {
 		var err error
 		compressionOperation, compressionAlgorithm, err := blobinfocache.OperationAndAlgorithmForCompressor(candidate.CompressorName)

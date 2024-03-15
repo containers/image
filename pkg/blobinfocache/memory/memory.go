@@ -181,14 +181,13 @@ func (mem *cache) CandidateLocations(transport types.ImageTransport, scope types
 	return blobinfocache.CandidateLocationsFromV2(mem.candidateLocations(transport, scope, primaryDigest, canSubstitute, false))
 }
 
-// CandidateLocations2 returns a prioritized, limited, number of blobs and their locations (if known) that could possibly be reused
-// within the specified (transport scope) (if they still exist, which is not guaranteed).
+// CandidateLocations2 returns a prioritized, limited, number of blobs and their locations (if known)
+// that could possibly be reused within the specified (transport scope) (if they still
+// exist, which is not guaranteed).
 //
-// If !canSubstitute, the returned candidates will match the submitted digest exactly; if canSubstitute,
-// data from previous RecordDigestUncompressedPair calls is used to also look up variants of the blob which have the same
-// uncompressed digest.
-func (mem *cache) CandidateLocations2(transport types.ImageTransport, scope types.BICTransportScope, primaryDigest digest.Digest, canSubstitute bool) []blobinfocache.BICReplacementCandidate2 {
-	return mem.candidateLocations(transport, scope, primaryDigest, canSubstitute, true)
+// The CompressorName fields in returned data must never be UnknownCompression.
+func (mem *cache) CandidateLocations2(transport types.ImageTransport, scope types.BICTransportScope, primaryDigest digest.Digest, options blobinfocache.CandidateLocations2Options) []blobinfocache.BICReplacementCandidate2 {
+	return mem.candidateLocations(transport, scope, primaryDigest, options.CanSubstitute, true)
 }
 
 func (mem *cache) candidateLocations(transport types.ImageTransport, scope types.BICTransportScope, primaryDigest digest.Digest, canSubstitute, v2Output bool) []blobinfocache.BICReplacementCandidate2 {

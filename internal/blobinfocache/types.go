@@ -36,12 +36,16 @@ type BlobInfoCache2 interface {
 	// that could possibly be reused within the specified (transport scope) (if they still
 	// exist, which is not guaranteed).
 	//
-	// If !canSubstitute, the returned candidates will match the submitted digest exactly; if
-	// canSubstitute, data from previous RecordDigestUncompressedPair calls is used to also look
-	// up variants of the blob which have the same uncompressed digest.
-	//
 	// The CompressorName fields in returned data must never be UnknownCompression.
-	CandidateLocations2(transport types.ImageTransport, scope types.BICTransportScope, digest digest.Digest, canSubstitute bool) []BICReplacementCandidate2
+	CandidateLocations2(transport types.ImageTransport, scope types.BICTransportScope, digest digest.Digest, options CandidateLocations2Options) []BICReplacementCandidate2
+}
+
+// CandidateLocations2Options are used in CandidateLocations2.
+type CandidateLocations2Options struct {
+	// If !CanSubstitute, the returned candidates will match the submitted digest exactly; if
+	// CanSubstitute, data from previous RecordDigestUncompressedPair calls is used to also look
+	// up variants of the blob which have the same uncompressed digest.
+	CanSubstitute bool
 }
 
 // BICReplacementCandidate2 is an item returned by BlobInfoCache2.CandidateLocations2.
