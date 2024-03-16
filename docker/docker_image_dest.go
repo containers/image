@@ -345,7 +345,9 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 
 	// Then try reusing blobs from other locations.
 	candidates := options.Cache.CandidateLocations2(d.ref.Transport(), bicTransportScope(d.ref), info.Digest, blobinfocache.CandidateLocations2Options{
-		CanSubstitute: options.CanSubstitute,
+		CanSubstitute:           options.CanSubstitute,
+		PossibleManifestFormats: options.PossibleManifestFormats,
+		RequiredCompression:     options.RequiredCompression,
 	})
 	for _, candidate := range candidates {
 		var err error
@@ -361,16 +363,6 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 				logrus.Debugf("Error parsing BlobInfoCache location reference: %s", err)
 				continue
 			}
-		}
-		if !impl.CandidateMatchesTryReusingBlobOptions(options, compressionAlgorithm) {
-			if !candidate.UnknownLocation {
-				logrus.Debugf("Ignoring candidate blob %s in %s, compression %s does not match required %s or MIME types %#v", candidate.Digest.String(), candidateRepo.Name(),
-					optionalCompressionName(compressionAlgorithm), optionalCompressionName(options.RequiredCompression), options.PossibleManifestFormats)
-			} else {
-				logrus.Debugf("Ignoring candidate blob %s with no known location, compression %s does not match required %s or MIME types %#v", candidate.Digest.String(),
-					optionalCompressionName(compressionAlgorithm), optionalCompressionName(options.RequiredCompression), options.PossibleManifestFormats)
-			}
-			continue
 		}
 		if !candidate.UnknownLocation {
 			if candidate.CompressorName != blobinfocache.Uncompressed {

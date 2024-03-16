@@ -443,7 +443,7 @@ func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 			compressorName = compressor
 		}
 	}
-	if compressorName == blobinfocache.UnknownCompression && v2Options != nil {
+	if !prioritize.CandidateCompressionMatchesOptions(v2Options, digest, compressorName) {
 		return candidates, nil
 	}
 

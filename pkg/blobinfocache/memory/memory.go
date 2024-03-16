@@ -144,7 +144,7 @@ func (mem *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 	if v, ok := mem.compressors[digest]; ok {
 		compressorName = v
 	}
-	if compressorName == blobinfocache.UnknownCompression && v2Options != nil {
+	if !prioritize.CandidateCompressionMatchesOptions(v2Options, digest, compressorName) {
 		return candidates
 	}
 	locations := mem.knownLocations[locationKey{transport: transport.Name(), scope: scope, blobDigest: digest}] // nil if not present

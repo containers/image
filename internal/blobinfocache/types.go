@@ -1,6 +1,7 @@
 package blobinfocache
 
 import (
+	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
 )
@@ -45,7 +46,9 @@ type CandidateLocations2Options struct {
 	// If !CanSubstitute, the returned candidates will match the submitted digest exactly; if
 	// CanSubstitute, data from previous RecordDigestUncompressedPair calls is used to also look
 	// up variants of the blob which have the same uncompressed digest.
-	CanSubstitute bool
+	CanSubstitute           bool
+	PossibleManifestFormats []string                    // If set, a set of possible manifest formats; at least one should support the reused layer
+	RequiredCompression     *compressiontypes.Algorithm // If set, only reuse layers with a matching algorithm
 }
 
 // BICReplacementCandidate2 is an item returned by BlobInfoCache2.CandidateLocations2.

@@ -6,9 +6,12 @@ import (
 
 	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/testing/mocks"
+	"github.com/containers/image/v5/manifest"
+	"github.com/containers/image/v5/pkg/compression"
 	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +26,11 @@ const (
 	compressorNameB           = compressiontypes.ZstdAlgorithmName
 	compressorNameCU          = compressiontypes.ZstdChunkedAlgorithmName
 
-	digestUnknownLocation = digest.Digest("sha256:7777777777777777777777777777777777777777777777777777777777777777")
+	digestUnknownLocation       = digest.Digest("sha256:7777777777777777777777777777777777777777777777777777777777777777")
+	digestFilteringUncompressed = digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	digestGzip                  = digest.Digest("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+	digestZstd                  = digest.Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")
+	digestZstdChunked           = digest.Digest("sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd")
 )
 
 // GenericCache runs an implementation-independent set of tests, given a
@@ -206,7 +213,7 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 	cache.RecordDigestUncompressedPair(digestCompressedA, digestUncompressed)
 	cache.RecordDigestUncompressedPair(digestCompressedB, digestUncompressed)
 	cache.RecordDigestUncompressedPair(digestUncompressed, digestUncompressed)
-	digestNameSet := []struct {
+	digestNameSetPrioritization := []struct { // Used primarily to test prioritization
 		n string
 		d digest.Digest
 		m string
@@ -216,11 +223,24 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		{"B", digestCompressedB, compressorNameB},
 		{"CU", digestCompressedUnrelated, compressorNameCU},
 	}
+	digestNameSetFiltering := []struct { // Used primarily to test filtering in CandidateLocations2Options
+		n string
+		d digest.Digest
+		m string
+	}{
+		{"gzip", digestGzip, compressiontypes.GzipAlgorithmName},
+		{"zstd", digestZstd, compressiontypes.ZstdAlgorithmName},
+		{"zstdChunked", digestZstdChunked, compressiontypes.ZstdChunkedAlgorithmName},
+	}
+	for _, e := range digestNameSetFiltering { // digestFilteringUncompressed exists only to allow the three entries to be considered as candidates
+		cache.RecordDigestUncompressedPair(e.d, digestFilteringUncompressed)
+	}
 
 	for scopeIndex, scopeName := range []string{"A", "B", "C"} { // Run the test in two different scopes to verify they don't affect each other.
 		scope := types.BICTransportScope{Opaque: scopeName}
 
 		// Nothing is known.
+		// -----------------
 		res := cache.CandidateLocations2(transport, scope, digestUnknown, blobinfocache.CandidateLocations2Options{
 			CanSubstitute: false,
 		})
@@ -230,6 +250,8 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		})
 		assert.Equal(t, []blobinfocache.BICReplacementCandidate2{}, res)
 
+		// Results with UnknownLocation
+		// ----------------------------
 		// If a record exists with compression without Location then
 		// then return a record without location and with `UnknownLocation: true`
 		cache.RecordDigestCompressorName(digestUnknownLocation, compressiontypes.Bzip2AlgorithmName)
@@ -257,24 +279,26 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 				Location:        types.BICLocationReference{Opaque: "somelocation"},
 			}}, res)
 
+		// Tests of lookups / prioritization when compression is unknown
+		// -------------------------------------------------------------
+
 		// Record "2" entries before "1" entries; then results should sort "1" (more recent) before "2" (older)
 		for _, suffix := range []string{"2", "1"} {
-			for _, e := range digestNameSet {
+			for _, e := range digestNameSetPrioritization {
 				cache.RecordKnownLocation(transport, scope, e.d, types.BICLocationReference{Opaque: scopeName + e.n + suffix})
 			}
 		}
-
 		// Clear any "known" compression values, except on the first loop where they've never been set.
 		// This probably triggers “Compressor for blob with digest … previously recorded as …, now unknown” warnings here, for test purposes;
 		// that shouldn’t happen in real-world usage.
 		if scopeIndex != 0 {
-			for _, e := range digestNameSet {
+			for _, e := range digestNameSetPrioritization {
 				cache.RecordDigestCompressorName(e.d, blobinfocache.UnknownCompression)
 			}
 		}
 
 		// No substitutions allowed:
-		for _, e := range digestNameSet {
+		for _, e := range digestNameSetPrioritization {
 			assertCandidatesMatch(t, scopeName, []candidate{
 				{d: e.d, lr: e.n + "1"}, {d: e.d, lr: e.n + "2"},
 			}, cache.CandidateLocations(transport, scope, e.d, false))
@@ -310,7 +334,7 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 
 		assertCandidatesMatch(t, scopeName, []candidate{
 			{d: digestUncompressed, lr: "U1"}, {d: digestUncompressed, lr: "U2"},
-			// "1" entries were added after "2", and A/Bs are sorted in the reverse of digestNameSet order
+			// "1" entries were added after "2", and A/Bs are sorted in the reverse of digestNameSetPrioritization order
 			{d: digestCompressedB, lr: "B1"},
 			{d: digestCompressedA, lr: "A1"},
 			{d: digestCompressedB, lr: "B2"},
@@ -332,13 +356,16 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		})
 		assertCandidatesMatch2(t, scopeName, []candidate{}, res)
 
+		// Tests of lookups / prioritization when compression is unknown
+		// -------------------------------------------------------------
+
 		// Set the "known" compression values
-		for _, e := range digestNameSet {
+		for _, e := range digestNameSetPrioritization {
 			cache.RecordDigestCompressorName(e.d, e.m)
 		}
 
 		// No substitutions allowed:
-		for _, e := range digestNameSet {
+		for _, e := range digestNameSetPrioritization {
 			assertCandidatesMatch(t, scopeName, []candidate{
 				{d: e.d, lr: e.n + "1"}, {d: e.d, lr: e.n + "2"},
 			}, cache.CandidateLocations(transport, scope, e.d, false))
@@ -381,7 +408,7 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 
 		assertCandidatesMatch(t, scopeName, []candidate{
 			{d: digestUncompressed, lr: "U1"}, {d: digestUncompressed, lr: "U2"},
-			// "1" entries were added after "2", and A/Bs are sorted in the reverse of digestNameSet order
+			// "1" entries were added after "2", and A/Bs are sorted in the reverse of digestNameSetPrioritization order
 			{d: digestCompressedB, lr: "B1"},
 			{d: digestCompressedA, lr: "A1"},
 			{d: digestCompressedB, lr: "B2"},
@@ -392,7 +419,7 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		})
 		assertCandidatesMatch2(t, scopeName, []candidate{
 			{d: digestUncompressed, cn: compressorNameU, lr: "U1"}, {d: digestUncompressed, cn: compressorNameU, lr: "U2"},
-			// "1" entries were added after "2", and A/Bs are sorted in the reverse of digestNameSet order
+			// "1" entries were added after "2", and A/Bs are sorted in the reverse of digestNameSetPrioritization order
 			{d: digestCompressedB, cn: compressorNameB, lr: "B1"},
 			{d: digestCompressedA, cn: compressorNameA, lr: "A1"},
 			{d: digestCompressedB, cn: compressorNameB, lr: "B2"},
@@ -408,6 +435,66 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		})
 		assertCandidatesMatch2(t, scopeName, []candidate{
 			{d: digestCompressedUnrelated, cn: compressorNameCU, lr: "CU1"}, {d: digestCompressedUnrelated, cn: compressorNameCU, lr: "CU2"},
+		}, res)
+
+		// Tests of candidate filtering
+		// ----------------------------
+		for _, e := range digestNameSetFiltering {
+			cache.RecordKnownLocation(transport, scope, e.d, types.BICLocationReference{Opaque: scopeName + e.n})
+		}
+		for _, e := range digestNameSetFiltering {
+			cache.RecordDigestCompressorName(e.d, e.m)
+		}
+
+		// No filtering
+		res = cache.CandidateLocations2(transport, scope, digestFilteringUncompressed, blobinfocache.CandidateLocations2Options{
+			CanSubstitute: true,
+		})
+		assertCandidatesMatch2(t, scopeName, []candidate{ // Sorted in the reverse of digestNameSetFiltering order
+			{d: digestZstdChunked, cn: compressiontypes.ZstdChunkedAlgorithmName, lr: "zstdChunked"},
+			{d: digestZstd, cn: compressiontypes.ZstdAlgorithmName, lr: "zstd"},
+			{d: digestGzip, cn: compressiontypes.GzipAlgorithmName, lr: "gzip"},
+		}, res)
+
+		// Manifest format filters
+		res = cache.CandidateLocations2(transport, scope, digestFilteringUncompressed, blobinfocache.CandidateLocations2Options{
+			CanSubstitute:           true,
+			PossibleManifestFormats: []string{manifest.DockerV2Schema2MediaType},
+		})
+		assertCandidatesMatch2(t, scopeName, []candidate{
+			{d: digestGzip, cn: compressiontypes.GzipAlgorithmName, lr: "gzip"},
+		}, res)
+		res = cache.CandidateLocations2(transport, scope, digestFilteringUncompressed, blobinfocache.CandidateLocations2Options{
+			CanSubstitute:           true,
+			PossibleManifestFormats: []string{imgspecv1.MediaTypeImageManifest},
+		})
+		assertCandidatesMatch2(t, scopeName, []candidate{ // Sorted in the reverse of digestNameSetFiltering order
+			{d: digestZstdChunked, cn: compressiontypes.ZstdChunkedAlgorithmName, lr: "zstdChunked"},
+			{d: digestZstd, cn: compressiontypes.ZstdAlgorithmName, lr: "zstd"},
+			{d: digestGzip, cn: compressiontypes.GzipAlgorithmName, lr: "gzip"},
+		}, res)
+
+		// Compression algorithm filters
+		res = cache.CandidateLocations2(transport, scope, digestFilteringUncompressed, blobinfocache.CandidateLocations2Options{
+			CanSubstitute:       true,
+			RequiredCompression: &compression.Gzip,
+		})
+		assertCandidatesMatch2(t, scopeName, []candidate{
+			{d: digestGzip, cn: compressiontypes.GzipAlgorithmName, lr: "gzip"},
+		}, res)
+		res = cache.CandidateLocations2(transport, scope, digestFilteringUncompressed, blobinfocache.CandidateLocations2Options{
+			CanSubstitute:       true,
+			RequiredCompression: &compression.ZstdChunked,
+		})
+		// Right now, zstd:chunked requests never match a candidate, see CandidateCompressionMatchesReuseConditions().
+		assertCandidatesMatch2(t, scopeName, []candidate{}, res)
+		res = cache.CandidateLocations2(transport, scope, digestFilteringUncompressed, blobinfocache.CandidateLocations2Options{
+			CanSubstitute:       true,
+			RequiredCompression: &compression.Zstd,
+		})
+		assertCandidatesMatch2(t, scopeName, []candidate{ // When the user asks for zstd, zstd:chunked candidates are also acceptable.
+			{d: digestZstdChunked, cn: compressiontypes.ZstdChunkedAlgorithmName, lr: "zstdChunked"},
+			{d: digestZstd, cn: compressiontypes.ZstdAlgorithmName, lr: "zstd"},
 		}, res)
 	}
 }

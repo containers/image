@@ -313,7 +313,7 @@ func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 			compressorName = string(compressorNameValue)
 		}
 	}
-	if compressorName == blobinfocache.UnknownCompression && v2Options != nil {
+	if !prioritize.CandidateCompressionMatchesOptions(v2Options, digest, compressorName) {
 		return candidates
 	}
 	var b *bolt.Bucket
