@@ -350,14 +350,9 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 		RequiredCompression:     options.RequiredCompression,
 	})
 	for _, candidate := range candidates {
-		var err error
-		compressionOperation, compressionAlgorithm, err := blobinfocache.OperationAndAlgorithmForCompressor(candidate.CompressorName)
-		if err != nil {
-			logrus.Debugf("OperationAndAlgorithmForCompressor Failed: %v", err)
-			continue
-		}
 		var candidateRepo reference.Named
 		if !candidate.UnknownLocation {
+			var err error
 			candidateRepo, err = parseBICLocationReference(candidate.Location)
 			if err != nil {
 				logrus.Debugf("Error parsing BlobInfoCache location reference: %s", err)
@@ -433,8 +428,8 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 		return true, private.ReusedBlob{
 			Digest:               candidate.Digest,
 			Size:                 size,
-			CompressionOperation: compressionOperation,
-			CompressionAlgorithm: compressionAlgorithm}, nil
+			CompressionOperation: candidate.CompressionOperation,
+			CompressionAlgorithm: candidate.CompressionAlgorithm}, nil
 	}
 
 	return false, private.ReusedBlob{}, nil

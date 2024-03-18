@@ -13,6 +13,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -136,12 +137,48 @@ func assertCandidatesMatch(t *testing.T, scopeName string, expected []candidate,
 	assert.Equal(t, e, actual)
 }
 
+func assertCandidateMatches2(t *testing.T, expected, actual blobinfocache.BICReplacementCandidate2) {
+	// Verify actual[i].CompressionAlgorithm separately; assert.Equal would do a pointer comparison, and fail.
+	if expected.CompressionAlgorithm != nil {
+		require.NotNil(t, actual.CompressionAlgorithm)
+		assert.Equal(t, expected.CompressionAlgorithm.Name(), actual.CompressionAlgorithm.Name())
+	} else {
+		assert.Nil(t, actual.CompressionAlgorithm)
+	}
+	c := expected                                        // A shallow copy
+	c.CompressionAlgorithm = actual.CompressionAlgorithm // Already verified above
+
+	assert.Equal(t, c, actual)
+}
+
+func assertCandidatesMatch2Native(t *testing.T, expected, actual []blobinfocache.BICReplacementCandidate2) {
+	assert.Len(t, actual, len(expected))
+	for i := range expected {
+		assertCandidateMatches2(t, expected[i], actual[i])
+	}
+}
+
 func assertCandidatesMatch2(t *testing.T, scopeName string, expected []candidate, actual []blobinfocache.BICReplacementCandidate2) {
 	e := make([]blobinfocache.BICReplacementCandidate2, len(expected))
 	for i, ev := range expected {
-		e[i] = blobinfocache.BICReplacementCandidate2{Digest: ev.d, CompressorName: ev.cn, Location: types.BICLocationReference{Opaque: scopeName + ev.lr}}
+		op := types.Decompress
+		var algo *compressiontypes.Algorithm = nil
+		if ev.cn != blobinfocache.Uncompressed {
+			algo_, err := compression.AlgorithmByName(ev.cn)
+			require.NoError(t, err)
+			op = types.Compress
+			algo = &algo_
+		}
+		e[i] = blobinfocache.BICReplacementCandidate2{
+			Digest:               ev.d,
+			CompressorName:       ev.cn,
+			CompressionOperation: op,
+			CompressionAlgorithm: algo,
+			UnknownLocation:      false,
+			Location:             types.BICLocationReference{Opaque: scopeName + ev.lr},
+		}
 	}
-	assert.Equal(t, e, actual)
+	assertCandidatesMatch2Native(t, e, actual)
 }
 
 func testGenericCandidateLocations(t *testing.T, cache blobinfocache.BlobInfoCache2) {
@@ -258,12 +295,14 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		res = cache.CandidateLocations2(transport, scope, digestUnknownLocation, blobinfocache.CandidateLocations2Options{
 			CanSubstitute: true,
 		})
-		assert.Equal(t, []blobinfocache.BICReplacementCandidate2{
+		assertCandidatesMatch2Native(t, []blobinfocache.BICReplacementCandidate2{
 			{
-				Digest:          digestUnknownLocation,
-				CompressorName:  compressiontypes.Bzip2AlgorithmName,
-				UnknownLocation: true,
-				Location:        types.BICLocationReference{Opaque: ""},
+				Digest:               digestUnknownLocation,
+				CompressorName:       compressiontypes.Bzip2AlgorithmName,
+				CompressionOperation: types.Compress,
+				CompressionAlgorithm: &compression.Bzip2,
+				UnknownLocation:      true,
+				Location:             types.BICLocationReference{Opaque: ""},
 			}}, res)
 		// When another entry with scope and Location is set then it should be returned as it has higher
 		// priority.
@@ -271,12 +310,14 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		res = cache.CandidateLocations2(transport, scope, digestUnknownLocation, blobinfocache.CandidateLocations2Options{
 			CanSubstitute: true,
 		})
-		assert.Equal(t, []blobinfocache.BICReplacementCandidate2{
+		assertCandidatesMatch2Native(t, []blobinfocache.BICReplacementCandidate2{
 			{
-				Digest:          digestUnknownLocation,
-				CompressorName:  compressiontypes.Bzip2AlgorithmName,
-				UnknownLocation: false,
-				Location:        types.BICLocationReference{Opaque: "somelocation"},
+				Digest:               digestUnknownLocation,
+				CompressorName:       compressiontypes.Bzip2AlgorithmName,
+				CompressionOperation: types.Compress,
+				CompressionAlgorithm: &compression.Bzip2,
+				UnknownLocation:      false,
+				Location:             types.BICLocationReference{Opaque: "somelocation"},
 			}}, res)
 
 		// Tests of lookups / prioritization when compression is unknown

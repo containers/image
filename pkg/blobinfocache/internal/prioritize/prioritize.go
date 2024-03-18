@@ -8,6 +8,7 @@ import (
 	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/manifest"
 	"github.com/containers/image/v5/pkg/compression"
+	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
@@ -23,13 +24,16 @@ const replacementAttempts = 5
 // This is a heuristic/guess, and could well use a different value.
 const replacementUnknownLocationAttempts = 2
 
-// CandidateCompressionMatchesOptions returns true if a blob with compressionName (which can be Uncompressed or UnknownCompression)
-// is acceptable for a CandidateLocations* call with v2Options.
+// CandidateCompression returns (true, compressionOp, compressionAlgo) if a blob
+// with compressionName (which can be Uncompressed or UnknownCompression) is acceptable for a CandidateLocations* call with v2Options.
+//
 // v2Options can be set to nil if the call is CandidateLocations (i.e. compression is not required to be known);
-// if not nil, the call is assumed to be CandidateLocations2
-func CandidateCompressionMatchesOptions(v2Options *blobinfocache.CandidateLocations2Options, digest digest.Digest, compressorName string) bool {
+// if not nil, the call is assumed to be CandidateLocations2.
+//
+// The (compressionOp, compressionAlgo) values are suitable for BICReplacementCandidate2
+func CandidateCompression(v2Options *blobinfocache.CandidateLocations2Options, digest digest.Digest, compressorName string) (bool, types.LayerCompression, *compression.Algorithm) {
 	if v2Options == nil {
-		return true // Anything goes
+		return true, types.PreserveOriginal, nil // Anything goes. The (compressionOp, compressionAlgo) values are not used.
 	}
 
 	var algo *compression.Algorithm
@@ -38,13 +42,13 @@ func CandidateCompressionMatchesOptions(v2Options *blobinfocache.CandidateLocati
 		algo = nil
 	case blobinfocache.UnknownCompression:
 		logrus.Debugf("Ignoring BlobInfoCache record of digest %q with unknown compression", digest.String())
-		return false // Not allowed with CandidateLocations2
+		return false, types.PreserveOriginal, nil // Not allowed with CandidateLocations2
 	default:
 		algo_, err := compression.AlgorithmByName(compressorName)
 		if err != nil {
 			logrus.Debugf("Ignoring BlobInfoCache record of digest %q with unrecognized compression %q: %v",
 				digest.String(), compressorName, err)
-			return false // The consumer of the candidate would fail in blobinfocache.OperationAndAlgorithmForCompressor anyway
+			return false, types.PreserveOriginal, nil // The consumer of the candidate would fail in blobinfocache.OperationAndAlgorithmForCompressor anyway
 		}
 		algo = &algo_
 	}
@@ -58,10 +62,15 @@ func CandidateCompressionMatchesOptions(v2Options *blobinfocache.CandidateLocati
 		}
 		logrus.Debugf("Ignoring BlobInfoCache record of digest %q, compression %q does not match required %s or MIME types %#v",
 			digest.String(), compressorName, requiredCompresssion, v2Options.PossibleManifestFormats)
-		return false
+		return false, types.PreserveOriginal, nil
 	}
 
-	return true
+	op, algo, err := blobinfocache.OperationAndAlgorithmForCompressor(compressorName)
+	if err != nil {
+		return false, types.PreserveOriginal, nil
+	}
+
+	return true, op, algo
 }
 
 // CandidateWithTime is the input to types.BICReplacementCandidate prioritization.

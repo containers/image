@@ -313,9 +313,11 @@ func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 			compressorName = string(compressorNameValue)
 		}
 	}
-	if !prioritize.CandidateCompressionMatchesOptions(v2Options, digest, compressorName) {
+	ok, compressionOp, compressionAlgo := prioritize.CandidateCompression(v2Options, digest, compressorName)
+	if !ok {
 		return candidates
 	}
+
 	var b *bolt.Bucket
 	if scopeBucket != nil {
 		b = scopeBucket.Bucket(digestKey)
@@ -328,9 +330,11 @@ func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 			}
 			candidates = append(candidates, prioritize.CandidateWithTime{
 				Candidate: blobinfocache.BICReplacementCandidate2{
-					Digest:         digest,
-					CompressorName: compressorName,
-					Location:       types.BICLocationReference{Opaque: string(k)},
+					Digest:               digest,
+					CompressorName:       compressorName,
+					CompressionOperation: compressionOp,
+					CompressionAlgorithm: compressionAlgo,
+					Location:             types.BICLocationReference{Opaque: string(k)},
 				},
 				LastSeen: t,
 			})
@@ -339,10 +343,12 @@ func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 	} else if v2Options != nil {
 		candidates = append(candidates, prioritize.CandidateWithTime{
 			Candidate: blobinfocache.BICReplacementCandidate2{
-				Digest:          digest,
-				CompressorName:  compressorName,
-				UnknownLocation: true,
-				Location:        types.BICLocationReference{Opaque: ""},
+				Digest:               digest,
+				CompressorName:       compressorName,
+				CompressionOperation: compressionOp,
+				CompressionAlgorithm: compressionAlgo,
+				UnknownLocation:      true,
+				Location:             types.BICLocationReference{Opaque: ""},
 			},
 			LastSeen: time.Time{},
 		})
