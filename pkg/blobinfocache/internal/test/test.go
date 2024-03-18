@@ -16,12 +16,13 @@ const (
 	digestUncompressed        = digest.Digest("sha256:2222222222222222222222222222222222222222222222222222222222222222")
 	digestCompressedA         = digest.Digest("sha256:3333333333333333333333333333333333333333333333333333333333333333")
 	digestCompressedB         = digest.Digest("sha256:4444444444444444444444444444444444444444444444444444444444444444")
-	digestUncompressedC       = digest.Digest("sha256:7777777777777777777777777777777777777777777777777777777777777777")
 	digestCompressedUnrelated = digest.Digest("sha256:5555555555555555555555555555555555555555555555555555555555555555")
 	compressorNameU           = "compressorName/U"
 	compressorNameA           = "compressorName/A"
 	compressorNameB           = "compressorName/B"
 	compressorNameCU          = "compressorName/CU"
+
+	digestUnknownLocation = digest.Digest("sha256:7777777777777777777777777777777777777777777777777777777777777777")
 )
 
 // GenericCache runs an implementation-independent set of tests, given a
@@ -221,24 +222,24 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 
 		// If a record exists with compression without Location then
 		// then return a record without location and with `UnknownLocation: true`
-		cache.RecordDigestCompressorName(digestUncompressedC, "somecompression")
+		cache.RecordDigestCompressorName(digestUnknownLocation, "somecompression")
 		assert.Equal(t, []blobinfocache.BICReplacementCandidate2{
 			{
-				Digest:          digestUncompressedC,
+				Digest:          digestUnknownLocation,
 				CompressorName:  "somecompression",
 				UnknownLocation: true,
 				Location:        types.BICLocationReference{Opaque: ""},
-			}}, cache.CandidateLocations2(transport, scope, digestUncompressedC, true))
+			}}, cache.CandidateLocations2(transport, scope, digestUnknownLocation, true))
 		// When another entry with scope and Location is set then it should be returned as it has higher
 		// priority.
-		cache.RecordKnownLocation(transport, scope, digestUncompressedC, types.BICLocationReference{Opaque: "somelocation"})
+		cache.RecordKnownLocation(transport, scope, digestUnknownLocation, types.BICLocationReference{Opaque: "somelocation"})
 		assert.Equal(t, []blobinfocache.BICReplacementCandidate2{
 			{
-				Digest:          digestUncompressedC,
+				Digest:          digestUnknownLocation,
 				CompressorName:  "somecompression",
 				UnknownLocation: false,
 				Location:        types.BICLocationReference{Opaque: "somelocation"},
-			}}, cache.CandidateLocations2(transport, scope, digestUncompressedC, true))
+			}}, cache.CandidateLocations2(transport, scope, digestUnknownLocation, true))
 
 		// Record "2" entries before "1" entries; then results should sort "1" (more recent) before "2" (older)
 		for _, suffix := range []string{"2", "1"} {
