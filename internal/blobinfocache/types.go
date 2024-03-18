@@ -36,8 +36,6 @@ type BlobInfoCache2 interface {
 	// CandidateLocations2 returns a prioritized, limited, number of blobs and their locations (if known)
 	// that could possibly be reused within the specified (transport scope) (if they still
 	// exist, which is not guaranteed).
-	//
-	// The CompressorName fields in returned data must never be UnknownCompression.
 	CandidateLocations2(transport types.ImageTransport, scope types.BICTransportScope, digest digest.Digest, options CandidateLocations2Options) []BICReplacementCandidate2
 }
 
@@ -54,7 +52,6 @@ type CandidateLocations2Options struct {
 // BICReplacementCandidate2 is an item returned by BlobInfoCache2.CandidateLocations2.
 type BICReplacementCandidate2 struct {
 	Digest               digest.Digest
-	CompressorName       string                      // either the Name() of a known pkg/compression.Algorithm, or Uncompressed or UnknownCompression
 	CompressionOperation types.LayerCompression      // Either types.Decompress for uncompressed, or types.Compress for compressed
 	CompressionAlgorithm *compressiontypes.Algorithm // An algorithm when the candidate is compressed, or nil when it is uncompressed
 	UnknownLocation      bool                        // is true when `Location` for this blob is not set

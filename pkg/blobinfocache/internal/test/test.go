@@ -171,7 +171,6 @@ func assertCandidatesMatch2(t *testing.T, scopeName string, expected []candidate
 		}
 		e[i] = blobinfocache.BICReplacementCandidate2{
 			Digest:               ev.d,
-			CompressorName:       ev.cn,
 			CompressionOperation: op,
 			CompressionAlgorithm: algo,
 			UnknownLocation:      false,
@@ -298,7 +297,6 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		assertCandidatesMatch2Native(t, []blobinfocache.BICReplacementCandidate2{
 			{
 				Digest:               digestUnknownLocation,
-				CompressorName:       compressiontypes.Bzip2AlgorithmName,
 				CompressionOperation: types.Compress,
 				CompressionAlgorithm: &compression.Bzip2,
 				UnknownLocation:      true,
@@ -313,7 +311,6 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		assertCandidatesMatch2Native(t, []blobinfocache.BICReplacementCandidate2{
 			{
 				Digest:               digestUnknownLocation,
-				CompressorName:       compressiontypes.Bzip2AlgorithmName,
 				CompressionOperation: types.Compress,
 				CompressionAlgorithm: &compression.Bzip2,
 				UnknownLocation:      false,

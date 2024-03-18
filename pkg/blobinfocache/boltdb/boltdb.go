@@ -331,7 +331,6 @@ func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 			candidates = append(candidates, prioritize.CandidateWithTime{
 				Candidate: blobinfocache.BICReplacementCandidate2{
 					Digest:               digest,
-					CompressorName:       compressorName,
 					CompressionOperation: compressionOp,
 					CompressionAlgorithm: compressionAlgo,
 					Location:             types.BICLocationReference{Opaque: string(k)},
@@ -344,7 +343,6 @@ func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 		candidates = append(candidates, prioritize.CandidateWithTime{
 			Candidate: blobinfocache.BICReplacementCandidate2{
 				Digest:               digest,
-				CompressorName:       compressorName,
 				CompressionOperation: compressionOp,
 				CompressionAlgorithm: compressionAlgo,
 				UnknownLocation:      true,
@@ -359,8 +357,6 @@ func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 // CandidateLocations2 returns a prioritized, limited, number of blobs and their locations (if known)
 // that could possibly be reused within the specified (transport scope) (if they still
 // exist, which is not guaranteed).
-//
-// The CompressorName fields in returned data must never be UnknownCompression.
 func (bdc *cache) CandidateLocations2(transport types.ImageTransport, scope types.BICTransportScope, primaryDigest digest.Digest, options blobinfocache.CandidateLocations2Options) []blobinfocache.BICReplacementCandidate2 {
 	return bdc.candidateLocations(transport, scope, primaryDigest, options.CanSubstitute, &options)
 }

@@ -360,8 +360,8 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 			}
 		}
 		if !candidate.UnknownLocation {
-			if candidate.CompressorName != blobinfocache.Uncompressed {
-				logrus.Debugf("Trying to reuse blob with cached digest %s compressed with %s in destination repo %s", candidate.Digest.String(), candidate.CompressorName, candidateRepo.Name())
+			if candidate.CompressionAlgorithm != nil {
+				logrus.Debugf("Trying to reuse blob with cached digest %s compressed with %s in destination repo %s", candidate.Digest.String(), candidate.CompressionAlgorithm.Name(), candidateRepo.Name())
 			} else {
 				logrus.Debugf("Trying to reuse blob with cached digest %s in destination repo %s", candidate.Digest.String(), candidateRepo.Name())
 			}
@@ -376,8 +376,8 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 				continue
 			}
 		} else {
-			if candidate.CompressorName != blobinfocache.Uncompressed {
-				logrus.Debugf("Trying to reuse blob with cached digest %s compressed with %s with no location match, checking current repo", candidate.Digest.String(), candidate.CompressorName)
+			if candidate.CompressionAlgorithm != nil {
+				logrus.Debugf("Trying to reuse blob with cached digest %s compressed with %s with no location match, checking current repo", candidate.Digest.String(), candidate.CompressionAlgorithm.Name())
 			} else {
 				logrus.Debugf("Trying to reuse blob with cached digest %s in destination repo with no location match, checking current repo", candidate.Digest.String())
 			}
