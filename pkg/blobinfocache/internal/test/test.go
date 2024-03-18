@@ -6,6 +6,7 @@ import (
 
 	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/internal/testing/mocks"
+	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
@@ -17,10 +18,10 @@ const (
 	digestCompressedA         = digest.Digest("sha256:3333333333333333333333333333333333333333333333333333333333333333")
 	digestCompressedB         = digest.Digest("sha256:4444444444444444444444444444444444444444444444444444444444444444")
 	digestCompressedUnrelated = digest.Digest("sha256:5555555555555555555555555555555555555555555555555555555555555555")
-	compressorNameU           = "compressorName/U"
-	compressorNameA           = "compressorName/A"
-	compressorNameB           = "compressorName/B"
-	compressorNameCU          = "compressorName/CU"
+	compressorNameU           = blobinfocache.Uncompressed
+	compressorNameA           = compressiontypes.GzipAlgorithmName
+	compressorNameB           = compressiontypes.ZstdAlgorithmName
+	compressorNameCU          = compressiontypes.ZstdChunkedAlgorithmName
 
 	digestUnknownLocation = digest.Digest("sha256:7777777777777777777777777777777777777777777777777777777777777777")
 )
@@ -225,12 +226,12 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 
 		// If a record exists with compression without Location then
 		// then return a record without location and with `UnknownLocation: true`
-		cache.RecordDigestCompressorName(digestUnknownLocation, "somecompression")
+		cache.RecordDigestCompressorName(digestUnknownLocation, compressiontypes.Bzip2AlgorithmName)
 		res = cache.CandidateLocations2(transport, scope, digestUnknownLocation, true)
 		assert.Equal(t, []blobinfocache.BICReplacementCandidate2{
 			{
 				Digest:          digestUnknownLocation,
-				CompressorName:  "somecompression",
+				CompressorName:  compressiontypes.Bzip2AlgorithmName,
 				UnknownLocation: true,
 				Location:        types.BICLocationReference{Opaque: ""},
 			}}, res)
@@ -241,7 +242,7 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		assert.Equal(t, []blobinfocache.BICReplacementCandidate2{
 			{
 				Digest:          digestUnknownLocation,
-				CompressorName:  "somecompression",
+				CompressorName:  compressiontypes.Bzip2AlgorithmName,
 				UnknownLocation: false,
 				Location:        types.BICLocationReference{Opaque: "somelocation"},
 			}}, res)
