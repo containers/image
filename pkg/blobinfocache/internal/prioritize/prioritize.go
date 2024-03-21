@@ -3,6 +3,7 @@
 package prioritize
 
 import (
+	"slices"
 	"time"
 
 	"github.com/containers/image/v5/internal/blobinfocache"
@@ -11,7 +12,6 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/exp/slices"
 )
 
 // replacementAttempts is the number of blob replacement candidates with known location returned by destructivelyPrioritizeReplacementCandidates,

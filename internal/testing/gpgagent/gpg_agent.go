@@ -3,8 +3,7 @@ package gpgagent
 import (
 	"os"
 	"os/exec"
-
-	"golang.org/x/exp/slices"
+	"slices"
 )
 
 // Kill the running gpg-agent to drop unlocked keys.
