@@ -129,13 +129,6 @@ func (css *candidateSortState) compare(xi, xj CandidateWithTime) int {
 	}
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // destructivelyPrioritizeReplacementCandidatesWithMax is destructivelyPrioritizeReplacementCandidates with parameters for the
 // number of entries to limit for known and unknown location separately, only to make testing simpler.
 // TODO: following function is not destructive any more in the nature instead prioritized result is actually copies of the original
@@ -161,7 +154,7 @@ func destructivelyPrioritizeReplacementCandidatesWithMax(cs []CandidateWithTime,
 
 	knownLocationCandidatesUsed := min(len(knownLocationCandidates), totalLimit)
 	remainingCapacity := totalLimit - knownLocationCandidatesUsed
-	unknownLocationCandidatesUsed := min(noLocationLimit, min(remainingCapacity, len(unknownLocationCandidates)))
+	unknownLocationCandidatesUsed := min(noLocationLimit, remainingCapacity, len(unknownLocationCandidates))
 	res := make([]blobinfocache.BICReplacementCandidate2, knownLocationCandidatesUsed)
 	for i := 0; i < knownLocationCandidatesUsed; i++ {
 		res[i] = knownLocationCandidates[i].Candidate
