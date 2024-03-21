@@ -15,7 +15,7 @@ if [[ -z $(type -P gofmt) ]]; then
 fi
 
 echo "Executing go vet"
-GO111MODULE="on" go vet -tags="$BUILDTAGS" ./...
+go vet -tags="$BUILDTAGS" ./...
 
 echo "Executing gofmt"
 OUTPUT=$(gofmt -s -l . | sed -e '/^vendor/d')
