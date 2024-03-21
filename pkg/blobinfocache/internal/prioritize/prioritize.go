@@ -3,6 +3,7 @@
 package prioritize
 
 import (
+	"cmp"
 	"slices"
 	"time"
 
@@ -118,15 +119,7 @@ func (css *candidateSortState) compare(xi, xj CandidateWithTime) int {
 		return -cmp
 	}
 	// Fall back to digest, if timestamps end up _exactly_ the same (how?!)
-	// FIXME: Use cmp.Compare after we update to Go 1.21.
-	switch {
-	case xi.Candidate.Digest < xj.Candidate.Digest:
-		return -1
-	case xi.Candidate.Digest > xj.Candidate.Digest:
-		return 1
-	default:
-		return 0
-	}
+	return cmp.Compare(xi.Candidate.Digest, xj.Candidate.Digest)
 }
 
 // destructivelyPrioritizeReplacementCandidatesWithMax is destructivelyPrioritizeReplacementCandidates with parameters for the
