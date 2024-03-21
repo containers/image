@@ -315,6 +315,7 @@ func TestManifestOCI1Inspect(t *testing.T) {
 		assert.Equal(t, types.ImageInspectInfo{
 			Tag:           "",
 			Created:       &created,
+			Comment:       "test comment",
 			DockerVersion: "1.12.1",
 			Labels:        map[string]string{},
 			Architecture:  "amd64",

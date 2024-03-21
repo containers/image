@@ -22,7 +22,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-const commonFixtureConfigDigest = "sha256:9ca4bda0a6b3727a6ffcc43e981cad0f24e2ec79d338f6ba325b4dfd0756fb8f"
+const commonFixtureConfigDigest = "sha256:89d33d1a487fd8712d87c8c92ba9c5ca5d80ee94127e62fbcaee7709e1ed9a0f"
 
 func manifestSchema2FromFixture(t *testing.T, src types.ImageSource, fixture string, mustFail bool) genericManifest {
 	manifest, err := os.ReadFile(filepath.Join("fixtures", fixture))
@@ -257,6 +257,7 @@ func TestManifestSchema2Inspect(t *testing.T) {
 	assert.Equal(t, types.ImageInspectInfo{
 		Tag:           "",
 		Created:       &created,
+		Comment:       "test comment",
 		DockerVersion: "1.12.1",
 		Labels:        map[string]string{},
 		Architecture:  "amd64",
