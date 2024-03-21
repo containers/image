@@ -1,6 +1,8 @@
 module github.com/containers/image/v5
 
-go 1.20
+go 1.21
+
+toolchain go1.21.0
 
 require (
 	dario.cat/mergo v1.0.0
