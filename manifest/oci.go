@@ -179,7 +179,7 @@ func getEncryptedMediaType(mediatype string) (string, error) {
 	return "", fmt.Errorf("unsupported mediaType to encrypt: %v", mediatype)
 }
 
-// getEncryptedMediaType will return the mediatype to its encrypted counterpart and return
+// getDecryptedMediaType will return the mediatype to its encrypted counterpart and return
 // an error if the mediatype does not support decryption
 func getDecryptedMediaType(mediatype string) (string, error) {
 	res, ok := strings.CutSuffix(mediatype, "+encrypted")
