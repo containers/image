@@ -367,8 +367,8 @@ func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 			compressorName = string(compressorNameValue)
 		}
 	}
-	ok, compressionOp, compressionAlgo := prioritize.CandidateCompression(v2Options, digest, compressorName)
-	if !ok {
+	template := prioritize.CandidateTemplateWithCompression(v2Options, digest, compressorName)
+	if template == nil {
 		return candidates
 	}
 
@@ -382,28 +382,11 @@ func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 			if err := t.UnmarshalBinary(v); err != nil {
 				return err
 			}
-			candidates = append(candidates, prioritize.CandidateWithTime{
-				Candidate: blobinfocache.BICReplacementCandidate2{
-					Digest:               digest,
-					CompressionOperation: compressionOp,
-					CompressionAlgorithm: compressionAlgo,
-					Location:             types.BICLocationReference{Opaque: string(k)},
-				},
-				LastSeen: t,
-			})
+			candidates = append(candidates, template.CandidateWithLocation(types.BICLocationReference{Opaque: string(k)}, t))
 			return nil
 		}) // FIXME? Log error (but throttle the log volume on repeated accesses)?
 	} else if v2Options != nil {
-		candidates = append(candidates, prioritize.CandidateWithTime{
-			Candidate: blobinfocache.BICReplacementCandidate2{
-				Digest:               digest,
-				CompressionOperation: compressionOp,
-				CompressionAlgorithm: compressionAlgo,
-				UnknownLocation:      true,
-				Location:             types.BICLocationReference{Opaque: ""},
-			},
-			LastSeen: time.Time{},
-		})
+		candidates = append(candidates, template.CandidateWithUnknownLocation())
 	}
 	return candidates
 }

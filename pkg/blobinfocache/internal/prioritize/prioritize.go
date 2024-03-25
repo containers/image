@@ -25,16 +25,24 @@ const replacementAttempts = 5
 // This is a heuristic/guess, and could well use a different value.
 const replacementUnknownLocationAttempts = 2
 
-// CandidateCompression returns (true, compressionOp, compressionAlgo) if a blob
-// with compressionName (which can be Uncompressed or UnknownCompression) is acceptable for a CandidateLocations* call with v2Options.
+// CandidateTemplate is a subset of BICReplacementCandidate2 with data related to a specific digest,
+// which can be later combined with information about a location.
+type CandidateTemplate struct {
+	digest               digest.Digest
+	compressionOperation types.LayerCompression // Either types.Decompress for uncompressed, or types.Compress for compressed
+	compressionAlgorithm *compression.Algorithm // An algorithm when the candidate is compressed, or nil when it is uncompressed
+}
+
+// CandidateTemplateWithCompression returns a CandidateTemplate if a blob with compressionName (which can be Uncompressed
+// or UnknownCompression) is acceptable for a CandidateLocations* call with v2Options.
 //
 // v2Options can be set to nil if the call is CandidateLocations (i.e. compression is not required to be known);
 // if not nil, the call is assumed to be CandidateLocations2.
-//
-// The (compressionOp, compressionAlgo) values are suitable for BICReplacementCandidate2
-func CandidateCompression(v2Options *blobinfocache.CandidateLocations2Options, digest digest.Digest, compressorName string) (bool, types.LayerCompression, *compression.Algorithm) {
+func CandidateTemplateWithCompression(v2Options *blobinfocache.CandidateLocations2Options, digest digest.Digest, compressorName string) *CandidateTemplate {
 	if v2Options == nil {
-		return true, types.PreserveOriginal, nil // Anything goes. The (compressionOp, compressionAlgo) values are not used.
+		return &CandidateTemplate{ // Anything goes. The compressionOperation, compressionAlgorithm values are not used.
+			digest: digest,
+		}
 	}
 
 	var op types.LayerCompression
@@ -45,14 +53,14 @@ func CandidateCompression(v2Options *blobinfocache.CandidateLocations2Options, d
 		algo = nil
 	case blobinfocache.UnknownCompression:
 		logrus.Debugf("Ignoring BlobInfoCache record of digest %q with unknown compression", digest.String())
-		return false, types.PreserveOriginal, nil // Not allowed with CandidateLocations2
+		return nil // Not allowed with CandidateLocations2
 	default:
 		op = types.Compress
 		algo_, err := compression.AlgorithmByName(compressorName)
 		if err != nil {
 			logrus.Debugf("Ignoring BlobInfoCache record of digest %q with unrecognized compression %q: %v",
 				digest.String(), compressorName, err)
-			return false, types.PreserveOriginal, nil // The BICReplacementCandidate2.CompressionAlgorithm field is required
+			return nil // The BICReplacementCandidate2.CompressionAlgorithm field is required
 		}
 		algo = &algo_
 	}
@@ -66,16 +74,48 @@ func CandidateCompression(v2Options *blobinfocache.CandidateLocations2Options, d
 		}
 		logrus.Debugf("Ignoring BlobInfoCache record of digest %q, compression %q does not match required %s or MIME types %#v",
 			digest.String(), compressorName, requiredCompresssion, v2Options.PossibleManifestFormats)
-		return false, types.PreserveOriginal, nil
+		return nil
 	}
 
-	return true, op, algo
+	return &CandidateTemplate{
+		digest:               digest,
+		compressionOperation: op,
+		compressionAlgorithm: algo,
+	}
 }
 
 // CandidateWithTime is the input to types.BICReplacementCandidate prioritization.
 type CandidateWithTime struct {
 	Candidate blobinfocache.BICReplacementCandidate2 // The replacement candidate
 	LastSeen  time.Time                              // Time the candidate was last known to exist (either read or written) (not set for Candidate.UnknownLocation)
+}
+
+// CandidateWithLocation returns a complete CandidateWithTime combining (template from CandidateTemplateWithCompression, location, lastSeen)
+func (template CandidateTemplate) CandidateWithLocation(location types.BICLocationReference, lastSeen time.Time) CandidateWithTime {
+	return CandidateWithTime{
+		Candidate: blobinfocache.BICReplacementCandidate2{
+			Digest:               template.digest,
+			CompressionOperation: template.compressionOperation,
+			CompressionAlgorithm: template.compressionAlgorithm,
+			UnknownLocation:      false,
+			Location:             location,
+		},
+		LastSeen: lastSeen,
+	}
+}
+
+// CandidateWithUnknownLocation returns a complete CandidateWithTime for a template from CandidateTemplateWithCompression and an unknown location.
+func (template CandidateTemplate) CandidateWithUnknownLocation() CandidateWithTime {
+	return CandidateWithTime{
+		Candidate: blobinfocache.BICReplacementCandidate2{
+			Digest:               template.digest,
+			CompressionOperation: template.compressionOperation,
+			CompressionAlgorithm: template.compressionAlgorithm,
+			UnknownLocation:      true,
+			Location:             types.BICLocationReference{Opaque: ""},
+		},
+		LastSeen: time.Time{},
+	}
 }
 
 // candidateSortState is a closure for a comparison used by slices.SortFunc on candidates to prioritize,
