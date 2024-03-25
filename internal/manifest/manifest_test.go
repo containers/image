@@ -182,3 +182,38 @@ func TestMIMETypeSupportsCompressionAlgorithm(t *testing.T) {
 		}
 	}
 }
+
+func TestCandidateCompressionMatchesReuseConditions(t *testing.T) {
+	cases := []struct {
+		requiredCompression     *compression.Algorithm
+		possibleManifestFormats []string
+		candidateCompression    *compression.Algorithm
+		result                  bool
+	}{
+		// RequiredCompression restrictions
+		{&compression.Zstd, nil, &compression.Zstd, true},
+		{&compression.Gzip, nil, &compression.Zstd, false},
+		{&compression.Zstd, nil, nil, false},
+		{nil, nil, &compression.Zstd, true},
+		// PossibleManifestFormats restrictions
+		{nil, []string{imgspecv1.MediaTypeImageManifest}, &compression.Zstd, true},
+		{nil, []string{DockerV2Schema2MediaType}, &compression.Zstd, false},
+		{nil, []string{DockerV2Schema2MediaType, DockerV2Schema1SignedMediaType, imgspecv1.MediaTypeImageManifest}, &compression.Zstd, true},
+		{nil, nil, &compression.Zstd, true},
+		{nil, []string{imgspecv1.MediaTypeImageManifest}, &compression.Gzip, true},
+		{nil, []string{DockerV2Schema2MediaType}, &compression.Gzip, true},
+		{nil, []string{DockerV2Schema2MediaType, DockerV2Schema1SignedMediaType, imgspecv1.MediaTypeImageManifest}, &compression.Gzip, true},
+		{nil, nil, &compression.Gzip, true},
+		// Some possible combinations (always 1 constraint not matching)
+		{&compression.Zstd, []string{DockerV2Schema2MediaType}, &compression.Zstd, false},
+		{&compression.Gzip, []string{DockerV2Schema2MediaType, DockerV2Schema1SignedMediaType, imgspecv1.MediaTypeImageManifest}, &compression.Zstd, false},
+	}
+
+	for _, c := range cases {
+		conds := ReuseConditions{
+			RequiredCompression:     c.requiredCompression,
+			PossibleManifestFormats: c.possibleManifestFormats,
+		}
+		assert.Equal(t, c.result, CandidateCompressionMatchesReuseConditions(conds, c.candidateCompression))
+	}
+}
