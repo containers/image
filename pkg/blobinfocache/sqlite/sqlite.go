@@ -502,8 +502,8 @@ func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 			compressorName = compressor
 		}
 	}
-	ok, compressionOp, compressionAlgo := prioritize.CandidateCompression(v2Options, digest, compressorName)
-	if !ok {
+	template := prioritize.CandidateTemplateWithCompression(v2Options, digest, compressorName)
+	if template == nil {
 		return candidates, nil
 	}
 
@@ -522,15 +522,7 @@ func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 		if err := rows.Scan(&location, &time); err != nil {
 			return nil, fmt.Errorf("scanning candidate: %w", err)
 		}
-		candidates = append(candidates, prioritize.CandidateWithTime{
-			Candidate: blobinfocache.BICReplacementCandidate2{
-				Digest:               digest,
-				CompressionOperation: compressionOp,
-				CompressionAlgorithm: compressionAlgo,
-				Location:             types.BICLocationReference{Opaque: location},
-			},
-			LastSeen: time,
-		})
+		candidates = append(candidates, template.CandidateWithLocation(types.BICLocationReference{Opaque: location}, time))
 		rowAdded = true
 	}
 	if err := rows.Err(); err != nil {
@@ -538,16 +530,7 @@ func (sqc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 	}
 
 	if !rowAdded && v2Options != nil {
-		candidates = append(candidates, prioritize.CandidateWithTime{
-			Candidate: blobinfocache.BICReplacementCandidate2{
-				Digest:               digest,
-				CompressionOperation: compressionOp,
-				CompressionAlgorithm: compressionAlgo,
-				UnknownLocation:      true,
-				Location:             types.BICLocationReference{Opaque: ""},
-			},
-			LastSeen: time.Time{},
-		})
+		candidates = append(candidates, template.CandidateWithUnknownLocation())
 	}
 	return candidates, nil
 }

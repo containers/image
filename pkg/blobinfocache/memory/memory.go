@@ -170,34 +170,17 @@ func (mem *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 	if v, ok := mem.compressors[digest]; ok {
 		compressorName = v
 	}
-	ok, compressionOp, compressionAlgo := prioritize.CandidateCompression(v2Options, digest, compressorName)
-	if !ok {
+	template := prioritize.CandidateTemplateWithCompression(v2Options, digest, compressorName)
+	if template == nil {
 		return candidates
 	}
 	locations := mem.knownLocations[locationKey{transport: transport.Name(), scope: scope, blobDigest: digest}] // nil if not present
 	if len(locations) > 0 {
 		for l, t := range locations {
-			candidates = append(candidates, prioritize.CandidateWithTime{
-				Candidate: blobinfocache.BICReplacementCandidate2{
-					Digest:               digest,
-					CompressionOperation: compressionOp,
-					CompressionAlgorithm: compressionAlgo,
-					Location:             l,
-				},
-				LastSeen: t,
-			})
+			candidates = append(candidates, template.CandidateWithLocation(l, t))
 		}
 	} else if v2Options != nil {
-		candidates = append(candidates, prioritize.CandidateWithTime{
-			Candidate: blobinfocache.BICReplacementCandidate2{
-				Digest:               digest,
-				CompressionOperation: compressionOp,
-				CompressionAlgorithm: compressionAlgo,
-				UnknownLocation:      true,
-				Location:             types.BICLocationReference{Opaque: ""},
-			},
-			LastSeen: time.Time{},
-		})
+		candidates = append(candidates, template.CandidateWithUnknownLocation())
 	}
 	return candidates
 }
