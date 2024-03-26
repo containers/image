@@ -15,7 +15,7 @@ BUILD_TAGS_DARWIN_CROSS = containers_image_openpgp
 BUILDTAGS = btrfs_noversion libdm_no_deferred_remove
 BUILDFLAGS := -tags "$(BUILDTAGS)"
 
-PACKAGES := $(shell GO111MODULE=on go list $(BUILDFLAGS) ./...)
+PACKAGES := $(shell go list $(BUILDFLAGS) ./...)
 SOURCE_DIRS = $(shell echo $(PACKAGES) | awk 'BEGIN{FS="/"; RS=" "}{print $$4}' | uniq)
 
 PREFIX ?= ${DESTDIR}/usr
@@ -41,7 +41,7 @@ export PATH := $(PATH):${GOBIN}
 all: tools test validate .gitvalidation
 
 build:
-	GO111MODULE="on" go build $(BUILDFLAGS) ./...
+	go build $(BUILDFLAGS) ./...
 
 $(MANPAGES): %: %.md
 	$(GOMD2MAN) -in $< -out $@
@@ -66,7 +66,7 @@ tools: .install.gitvalidation .install.golangci-lint
 
 .install.gitvalidation:
 	if [ ! -x "$(GOBIN)/git-validation" ]; then \
-		GO111MODULE="off" go get $(BUILDFLAGS) github.com/vbatts/git-validation; \
+		go install github.com/vbatts/git-validation@latest; \
 	fi
 
 .install.golangci-lint:
@@ -78,7 +78,7 @@ clean:
 	rm -rf $(MANPAGES)
 
 test:
-	@GO111MODULE="on" go test $(BUILDFLAGS) -cover ./...
+	@go test $(BUILDFLAGS) -cover ./...
 
 fmt:
 	@gofmt -l -s -w $(SOURCE_DIRS)
