@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/httpdump"
 	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/version"
 	"github.com/sirupsen/logrus"
@@ -95,7 +96,7 @@ func (c *openshiftClient) doRequest(ctx context.Context, method, path string, re
 	}
 
 	logrus.Debugf("%s %s", method, requestURL.Redacted())
-	res, err := c.httpClient.Do(req)
+	res, err := httpdump.DoRequest(c.httpClient, req)
 	if err != nil {
 		return nil, err
 	}
@@ -104,9 +105,7 @@ func (c *openshiftClient) doRequest(ctx context.Context, method, path string, re
 	if err != nil {
 		return nil, err
 	}
-	logrus.Debugf("Got body: %s", body)
-	// FIXME: Just throwing this useful information away only to try to guess later...
-	logrus.Debugf("Got content-type: %s", res.Header.Get("Content-Type"))
+	// FIXME: Just throwing Content-Type away only to try to guess later...
 
 	var status status
 	statusValid := false
