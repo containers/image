@@ -261,6 +261,17 @@ func PRSigstoreSignedFulcioWithSubjectEmail(subjectEmail string) PRSigstoreSigne
 	}
 }
 
+// PRSigstoreSignedFulcioWithURI specifies a value for the "URI" field when calling NewPRSigstoreSignedFulcio
+func PRSigstoreSignedFulcioWithURI(URI string) PRSigstoreSignedFulcioOption {
+	return func(f *prSigstoreSignedFulcio) error {
+		if f.URI != "" {
+			return errors.New(`"URI" already specified`)
+		}
+		f.URI = URI
+		return nil
+	}
+}
+
 // newPRSigstoreSignedFulcio is NewPRSigstoreSignedFulcio, except it returns the private type
 func newPRSigstoreSignedFulcio(options ...PRSigstoreSignedFulcioOption) (*prSigstoreSignedFulcio, error) {
 	res := prSigstoreSignedFulcio{}
@@ -279,8 +290,8 @@ func newPRSigstoreSignedFulcio(options ...PRSigstoreSignedFulcioOption) (*prSigs
 	if res.OIDCIssuer == "" {
 		return nil, InvalidPolicyFormatError("oidcIssuer not specified")
 	}
-	if res.SubjectEmail == "" {
-		return nil, InvalidPolicyFormatError("subjectEmail not specified")
+	if res.SubjectEmail == "" && res.URI == "" {
+		return nil, InvalidPolicyFormatError("subjectEmail and URI not specified")
 	}
 
 	return &res, nil
@@ -297,7 +308,7 @@ var _ json.Unmarshaler = (*prSigstoreSignedFulcio)(nil)
 func (f *prSigstoreSignedFulcio) UnmarshalJSON(data []byte) error {
 	*f = prSigstoreSignedFulcio{}
 	var tmp prSigstoreSignedFulcio
-	var gotCAPath, gotCAData, gotOIDCIssuer, gotSubjectEmail bool // = false...
+	var gotCAPath, gotCAData, gotOIDCIssuer, gotSubjectEmail, gotURI bool // = false...
 	if err := internal.ParanoidUnmarshalJSONObject(data, func(key string) any {
 		switch key {
 		case "caPath":
@@ -312,6 +323,9 @@ func (f *prSigstoreSignedFulcio) UnmarshalJSON(data []byte) error {
 		case "subjectEmail":
 			gotSubjectEmail = true
 			return &tmp.SubjectEmail
+		case "URI":
+			gotURI = true
+			return &tmp.URI
 		default:
 			return nil
 		}
@@ -329,8 +343,11 @@ func (f *prSigstoreSignedFulcio) UnmarshalJSON(data []byte) error {
 	if gotOIDCIssuer {
 		opts = append(opts, PRSigstoreSignedFulcioWithOIDCIssuer(tmp.OIDCIssuer))
 	}
-	if gotSubjectEmail {
+	if gotSubjectEmail && !gotURI {
 		opts = append(opts, PRSigstoreSignedFulcioWithSubjectEmail(tmp.SubjectEmail))
+	}
+	if !gotSubjectEmail && gotURI {
+		opts = append(opts, PRSigstoreSignedFulcioWithURI(tmp.URI))
 	}
 
 	res, err := newPRSigstoreSignedFulcio(opts...)
