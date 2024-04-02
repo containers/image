@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -192,13 +191,6 @@ func TestUserAgent(t *testing.T) {
 	}
 }
 
-func TestNeedsRetryOnError(t *testing.T) {
-	needsRetry, _ := needsRetryWithUpdatedScope(errors.New("generic"), nil)
-	if needsRetry {
-		t.Fatal("Got needRetry for a connection that included an error")
-	}
-}
-
 var registrySuseComResp = http.Response{
 	Status:     "401 Unauthorized",
 	StatusCode: http.StatusUnauthorized,
@@ -227,7 +219,7 @@ func TestNeedsRetryOnInsuficientScope(t *testing.T) {
 		actions:      "*",
 	}
 
-	needsRetry, scope := needsRetryWithUpdatedScope(nil, &resp)
+	needsRetry, scope := needsRetryWithUpdatedScope(&resp)
 
 	if !needsRetry {
 		t.Fatal("Expected needing to retry")
@@ -242,7 +234,7 @@ func TestNeedsRetryNoRetryWhenNoAuthHeader(t *testing.T) {
 	resp := registrySuseComResp
 	delete(resp.Header, "Www-Authenticate")
 
-	needsRetry, _ := needsRetryWithUpdatedScope(nil, &resp)
+	needsRetry, _ := needsRetryWithUpdatedScope(&resp)
 
 	if needsRetry {
 		t.Fatal("Expected no need to retry, as no Authentication headers are present")
@@ -255,7 +247,7 @@ func TestNeedsRetryNoRetryWhenNoBearerAuthHeader(t *testing.T) {
 		`OAuth2 realm="https://registry.suse.com/auth",service="SUSE Linux Docker Registry",scope="registry:catalog:*"`,
 	}
 
-	needsRetry, _ := needsRetryWithUpdatedScope(nil, &resp)
+	needsRetry, _ := needsRetryWithUpdatedScope(&resp)
 
 	if needsRetry {
 		t.Fatal("Expected no need to retry, as no bearer authentication header is present")
@@ -268,7 +260,7 @@ func TestNeedsRetryNoRetryWhenNoErrorInBearer(t *testing.T) {
 		`Bearer realm="https://registry.suse.com/auth",service="SUSE Linux Docker Registry",scope="registry:catalog:*"`,
 	}
 
-	needsRetry, _ := needsRetryWithUpdatedScope(nil, &resp)
+	needsRetry, _ := needsRetryWithUpdatedScope(&resp)
 
 	if needsRetry {
 		t.Fatal("Expected no need to retry, as no insufficient error is present in the authentication header")
@@ -281,7 +273,7 @@ func TestNeedsRetryNoRetryWhenInvalidErrorInBearer(t *testing.T) {
 		`Bearer realm="https://registry.suse.com/auth",service="SUSE Linux Docker Registry",scope="registry:catalog:*,error="random_error"`,
 	}
 
-	needsRetry, _ := needsRetryWithUpdatedScope(nil, &resp)
+	needsRetry, _ := needsRetryWithUpdatedScope(&resp)
 
 	if needsRetry {
 		t.Fatal("Expected no need to retry, as no insufficient_error is present in the authentication header")
@@ -294,7 +286,7 @@ func TestNeedsRetryNoRetryWhenInvalidScope(t *testing.T) {
 		`Bearer realm="https://registry.suse.com/auth",service="SUSE Linux Docker Registry",scope="foo:bar",error="insufficient_scope"`,
 	}
 
-	needsRetry, _ := needsRetryWithUpdatedScope(nil, &resp)
+	needsRetry, _ := needsRetryWithUpdatedScope(&resp)
 
 	if needsRetry {
 		t.Fatal("Expected no need to retry, as no insufficient_error is present in the authentication header")
@@ -326,7 +318,7 @@ func TestNeedsNoRetry(t *testing.T) {
 		},
 	}
 
-	needsRetry, _ := needsRetryWithUpdatedScope(nil, &resp)
+	needsRetry, _ := needsRetryWithUpdatedScope(&resp)
 	if needsRetry {
 		t.Fatal("Got the need to retry, but none should be required")
 	}
