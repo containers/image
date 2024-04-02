@@ -565,6 +565,7 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method stri
 		if attempts == 1 && stream == nil && auth != noAuth {
 			if retry, newScope := needsRetryWithUpdatedScope(err, res); retry {
 				logrus.Debug("Detected insufficient_scope error, will retry request with updated scope")
+				res.Body.Close()
 				// Note: This retry ignores extraScope. That’s, strictly speaking, incorrect, but we don’t currently
 				// expect the insufficient_scope errors to happen for those callers. If that changes, we can add support
 				// for more than one extra scope.
