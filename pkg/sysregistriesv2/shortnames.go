@@ -298,7 +298,7 @@ func newShortNameAliasCache(path string, conf *shortNameAliasConf) (*shortNameAl
 		}
 	}
 	if len(errs) > 0 {
-		return nil, multierr.Format("", "\n: ", "", errs)
+		return nil, multierr.Format("", "\n", "", errs)
 	}
 	return &res, nil
 }
