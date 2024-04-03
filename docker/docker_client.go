@@ -18,6 +18,7 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/iolimits"
+	"github.com/containers/image/v5/internal/multierr"
 	"github.com/containers/image/v5/internal/set"
 	"github.com/containers/image/v5/internal/useragent"
 	"github.com/containers/image/v5/manifest"
@@ -1011,11 +1012,7 @@ func (c *dockerClient) getExternalBlob(ctx context.Context, urls []string) (io.R
 	if remoteErrors == nil {
 		return nil, 0, nil // fallback to non-external blob
 	}
-	err := fmt.Errorf("failed fetching external blob from all urls: %w", remoteErrors[0])
-	for _, e := range remoteErrors[1:] {
-		err = fmt.Errorf("%s, %w", err, e)
-	}
-	return nil, 0, err
+	return nil, 0, fmt.Errorf("failed fetching external blob from all urls: %w", multierr.Format("", ", ", "", remoteErrors))
 }
 
 func getBlobSize(resp *http.Response) int64 {
