@@ -1,4 +1,4 @@
-// Package prioritize provides utilities for prioritizing locations in
+// Package prioritize provides utilities for filtering and prioritizing locations in
 // types.BlobInfoCache.CandidateLocations.
 package prioritize
 
@@ -6,7 +6,11 @@ import (
 	"time"
 
 	"github.com/containers/image/v5/internal/blobinfocache"
+	"github.com/containers/image/v5/internal/manifest"
+	"github.com/containers/image/v5/pkg/compression"
+	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
 )
 
@@ -19,6 +23,53 @@ const replacementAttempts = 5
 // and therefore ultimately by blobinfocache.BlobInfoCache2.CandidateLocations2.
 // This is a heuristic/guess, and could well use a different value.
 const replacementUnknownLocationAttempts = 2
+
+// CandidateCompression returns (true, compressionOp, compressionAlgo) if a blob
+// with compressionName (which can be Uncompressed or UnknownCompression) is acceptable for a CandidateLocations* call with v2Options.
+//
+// v2Options can be set to nil if the call is CandidateLocations (i.e. compression is not required to be known);
+// if not nil, the call is assumed to be CandidateLocations2.
+//
+// The (compressionOp, compressionAlgo) values are suitable for BICReplacementCandidate2
+func CandidateCompression(v2Options *blobinfocache.CandidateLocations2Options, digest digest.Digest, compressorName string) (bool, types.LayerCompression, *compression.Algorithm) {
+	if v2Options == nil {
+		return true, types.PreserveOriginal, nil // Anything goes. The (compressionOp, compressionAlgo) values are not used.
+	}
+
+	var op types.LayerCompression
+	var algo *compression.Algorithm
+	switch compressorName {
+	case blobinfocache.Uncompressed:
+		op = types.Decompress
+		algo = nil
+	case blobinfocache.UnknownCompression:
+		logrus.Debugf("Ignoring BlobInfoCache record of digest %q with unknown compression", digest.String())
+		return false, types.PreserveOriginal, nil // Not allowed with CandidateLocations2
+	default:
+		op = types.Compress
+		algo_, err := compression.AlgorithmByName(compressorName)
+		if err != nil {
+			logrus.Debugf("Ignoring BlobInfoCache record of digest %q with unrecognized compression %q: %v",
+				digest.String(), compressorName, err)
+			return false, types.PreserveOriginal, nil // The BICReplacementCandidate2.CompressionAlgorithm field is required
+		}
+		algo = &algo_
+	}
+	if !manifest.CandidateCompressionMatchesReuseConditions(manifest.ReuseConditions{
+		PossibleManifestFormats: v2Options.PossibleManifestFormats,
+		RequiredCompression:     v2Options.RequiredCompression,
+	}, algo) {
+		requiredCompresssion := "nil"
+		if v2Options.RequiredCompression != nil {
+			requiredCompresssion = v2Options.RequiredCompression.Name()
+		}
+		logrus.Debugf("Ignoring BlobInfoCache record of digest %q, compression %q does not match required %s or MIME types %#v",
+			digest.String(), compressorName, requiredCompresssion, v2Options.PossibleManifestFormats)
+		return false, types.PreserveOriginal, nil
+	}
+
+	return true, op, algo
+}
 
 // CandidateWithTime is the input to types.BICReplacementCandidate prioritization.
 type CandidateWithTime struct {
