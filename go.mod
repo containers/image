@@ -35,7 +35,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	github.com/sylabs/sif/v2 v2.15.2
-	github.com/ulikunitz/xz v0.5.11
+	github.com/ulikunitz/xz v0.5.12
 	github.com/vbatts/tar-split v0.11.5
 	github.com/vbauerster/mpb/v8 v8.7.2
 	github.com/xeipuuv/gojsonschema v1.2.0
