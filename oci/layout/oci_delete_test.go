@@ -3,6 +3,8 @@ package layout
 import (
 	"context"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,7 +12,6 @@ import (
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
-	cp "github.com/otiai10/copy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -275,10 +276,43 @@ func TestReferenceDeleteImage_multipleImages_twoIdenticalReferences(t *testing.T
 }
 
 func loadFixture(t *testing.T, fixtureName string) string {
-	tmpDir := t.TempDir()
-	err := cp.Copy(fmt.Sprintf("fixtures/%v/", fixtureName), tmpDir)
+	destDir := t.TempDir()
+	srcDir := filepath.Join("fixtures", fixtureName)
+	err := filepath.WalkDir(srcDir, func(path string, d fs.DirEntry, err error) (retErr error) {
+		if err != nil {
+			return err
+		}
+		relPath, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return err
+		}
+		destPath := filepath.Join(destDir, relPath)
+		switch d.Type() {
+		case fs.ModeDir:
+			return os.MkdirAll(destPath, 0o700)
+		case 0: // regular file
+			src, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			defer src.Close()
+			dest, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				if err := dest.Close(); err != nil && retErr == nil {
+					retErr = err
+				}
+			}()
+			_, err = io.Copy(dest, src)
+			return err
+		default:
+			return fmt.Errorf("unexpected file type %#v", d.Type())
+		}
+	})
 	require.NoError(t, err)
-	return tmpDir
+	return destDir
 }
 
 func assertBlobExists(t *testing.T, blobsDir string, blobDigest string) {

@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/swag"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	sigstoreSignature "github.com/sigstore/sigstore/pkg/signature"
@@ -174,6 +173,11 @@ func TestUntrustedRekorPayloadUnmarshalJSON(t *testing.T) {
 	}
 }
 
+// stringPtr returns a pointer to the provided string value.
+func stringPtr(s string) *string {
+	return &s
+}
+
 func TestVerifyRekorSET(t *testing.T) {
 	cosignRekorKeyPEM, err := os.ReadFile("testdata/rekor.pub")
 	require.NoError(t, err)
@@ -250,12 +254,12 @@ func TestVerifyRekorSET(t *testing.T) {
 	cosignSigBytes, err := base64.StdEncoding.DecodeString(string(cosignSigBase64))
 	require.NoError(t, err)
 	validHashedRekord := models.Hashedrekord{
-		APIVersion: swag.String(HashedRekordV001APIVersion),
+		APIVersion: stringPtr(HashedRekordV001APIVersion),
 		Spec: models.HashedrekordV001Schema{
 			Data: &models.HashedrekordV001SchemaData{
 				Hash: &models.HashedrekordV001SchemaDataHash{
-					Algorithm: swag.String(models.HashedrekordV001SchemaDataHashAlgorithmSha256),
-					Value:     swag.String(hex.EncodeToString(cosignPayloadSHA256[:])),
+					Algorithm: stringPtr(models.HashedrekordV001SchemaDataHashAlgorithmSha256),
+					Value:     stringPtr(hex.EncodeToString(cosignPayloadSHA256[:])),
 				},
 			},
 			Signature: &models.HashedrekordV001SchemaSignature{
