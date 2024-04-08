@@ -27,7 +27,7 @@ require (
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f
 	github.com/proglottis/gpgme v0.1.3
 	github.com/secure-systems-lab/go-securesystemslib v0.8.0
-	github.com/sigstore/fulcio v1.4.3
+	github.com/sigstore/fulcio v1.4.5
 	github.com/sigstore/rekor v1.2.2
 	github.com/sigstore/sigstore v1.8.3
 	github.com/sirupsen/logrus v1.9.3
