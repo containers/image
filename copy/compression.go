@@ -11,6 +11,7 @@ import (
 	"github.com/containers/image/v5/pkg/compression"
 	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
+	chunkedToc "github.com/containers/storage/pkg/chunked/toc"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 )
@@ -308,6 +309,15 @@ func (d *bpCompressionStepData) recordValidatedDigestData(c *copier, uploadedInf
 			// No useful information
 		case bpcOpCompressUncompressed:
 			c.blobInfoCache.RecordDigestUncompressedPair(uploadedInfo.Digest, srcInfo.Digest)
+			if d.uploadedAnnotations != nil {
+				tocDigest, err := chunkedToc.GetTOCDigest(d.uploadedAnnotations)
+				if err != nil {
+					return fmt.Errorf("parsing just-created compression annotations: %w", err)
+				}
+				if tocDigest != nil {
+					c.blobInfoCache.RecordTOCUncompressedPair(*tocDigest, srcInfo.Digest)
+				}
+			}
 		case bpcOpDecompressCompressed:
 			c.blobInfoCache.RecordDigestUncompressedPair(srcInfo.Digest, uploadedInfo.Digest)
 		case bpcOpRecompressCompressed, bpcOpPreserveCompressed:
