@@ -35,7 +35,7 @@ require (
 	github.com/sylabs/sif/v2 v2.15.2
 	github.com/ulikunitz/xz v0.5.12
 	github.com/vbatts/tar-split v0.11.5
-	github.com/vbauerster/mpb/v8 v8.7.2
+	github.com/vbauerster/mpb/v8 v8.7.3
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.9
 	golang.org/x/crypto v0.22.0
@@ -114,7 +114,7 @@ require (
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.11.1 // indirect
-	github.com/rivo/uniseg v0.4.4 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
