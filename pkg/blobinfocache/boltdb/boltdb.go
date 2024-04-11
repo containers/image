@@ -2,14 +2,16 @@
 package boltdb
 
 import (
+	"errors"
 	"fmt"
-	"os"
+	"io/fs"
 	"sync"
 	"time"
 
 	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/pkg/blobinfocache/internal/prioritize"
 	"github.com/containers/image/v5/types"
+	"github.com/containers/storage/pkg/fileutils"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 	bolt "go.etcd.io/bbolt"
@@ -125,8 +127,8 @@ func (bdc *cache) view(fn func(tx *bolt.Tx) error) (retErr error) {
 	// nevertheless create it, but with an O_RDONLY file descriptor, try to initialize it, and fail — while holding
 	// a read lock, blocking any future writes.
 	// Hence this preliminary check, which is RACY: Another process could remove the file
-	// between the Lstat call and opening the database.
-	if _, err := os.Lstat(bdc.path); err != nil && os.IsNotExist(err) {
+	// between the Lexists call and opening the database.
+	if err := fileutils.Lexists(bdc.path); err != nil && errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 

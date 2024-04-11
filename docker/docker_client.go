@@ -26,6 +26,7 @@ import (
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/pkg/tlsclientconfig"
 	"github.com/containers/image/v5/types"
+	"github.com/containers/storage/pkg/fileutils"
 	"github.com/containers/storage/pkg/homedir"
 	"github.com/docker/distribution/registry/api/errcode"
 	v2 "github.com/docker/distribution/registry/api/v2"
@@ -187,7 +188,7 @@ func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
 		}
 
 		fullCertDirPath = filepath.Join(hostCertDir, hostPort)
-		_, err := os.Stat(fullCertDirPath)
+		err := fileutils.Exists(fullCertDirPath)
 		if err == nil {
 			break
 		}
