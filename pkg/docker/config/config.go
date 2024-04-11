@@ -17,6 +17,7 @@ import (
 	"github.com/containers/image/v5/internal/set"
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/types"
+	"github.com/containers/storage/pkg/fileutils"
 	"github.com/containers/storage/pkg/homedir"
 	"github.com/containers/storage/pkg/ioutils"
 	helperclient "github.com/docker/docker-credential-helpers/client"
@@ -576,9 +577,9 @@ func getPathToAuthWithOS(sys *types.SystemContext, goOS string) (authPath, bool,
 	runtimeDir := os.Getenv("XDG_RUNTIME_DIR")
 	if runtimeDir != "" {
 		// This function does not in general need to separately check that the returned path exists; that’s racy, and callers will fail accessing the file anyway.
-		// We are checking for os.IsNotExist here only to give the user better guidance what to do in this special case.
-		_, err := os.Stat(runtimeDir)
-		if os.IsNotExist(err) {
+		// We are checking for fs.ErrNotExist here only to give the user better guidance what to do in this special case.
+		err := fileutils.Exists(runtimeDir)
+		if errors.Is(err, fs.ErrNotExist) {
 			// This means the user set the XDG_RUNTIME_DIR variable and either forgot to create the directory
 			// or made a typo while setting the environment variable,
 			// so return an error referring to $XDG_RUNTIME_DIR instead of xdgRuntimeDirPath inside.
