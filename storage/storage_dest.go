@@ -84,7 +84,9 @@ type storageImageDestinationLockProtected struct {
 	currentIndex          int                    // The index of the layer to be committed (i.e., lower indices have already been committed)
 	indexToAddedLayerInfo map[int]addedLayerInfo // Mapping from layer (by index) to blob to add to the image
 
-	// In general, a layer is identified either by (compressed) digest, or by TOC digest.
+	// In general, a layer is identified either by (compressed) digest, or by TOC digest
+	// (and we assume the TOC digest also uniquely identifies the contents, i.e. there aren’t two
+	// different formats/ways to parse a single TOC).
 	// When creating a layer, the c/storage layer metadata and image IDs must _only_ be based on trusted values
 	// we have computed ourselves. (Layer reuse can then look up against such trusted values, but it might not
 	// recompute those values for incomding layers — the point of the reuse is that we don’t need to consume the incoming layer.)
