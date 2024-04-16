@@ -704,7 +704,7 @@ func (ic *imageCopier) copyLayer(ctx context.Context, srcInfo types.BlobInfo, to
 		canChangeLayerCompression := ic.src.CanChangeLayerCompression(srcInfo.MediaType)
 		logrus.Debugf("Checking if we can reuse blob %s: general substitution = %v, compression for MIME type %q = %v",
 			srcInfo.Digest, ic.canSubstituteBlobs, srcInfo.MediaType, canChangeLayerCompression)
-		canSubstitute := ic.canSubstituteBlobs && ic.src.CanChangeLayerCompression(srcInfo.MediaType)
+		canSubstitute := ic.canSubstituteBlobs && canChangeLayerCompression
 
 		var requiredCompression *compressiontypes.Algorithm
 		if ic.requireCompressionFormatMatch {
