@@ -835,7 +835,10 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		if err != nil {
 			return fmt.Errorf("digesting top-level manifest: %w", err)
 		}
-		key := manifestBigDataKey(manifestDigest)
+		key, err := manifestBigDataKey(manifestDigest)
+		if err != nil {
+			return err
+		}
 		if err := s.imageRef.transport.store.SetImageBigData(img.ID, key, toplevelManifest, manifest.Digest); err != nil {
 			logrus.Debugf("error saving top-level manifest for image %q: %v", img.ID, err)
 			return fmt.Errorf("saving top-level manifest for image %q: %w", img.ID, err)
@@ -844,7 +847,10 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	// Save the image's manifest.  Allow looking it up by digest by using the key convention defined by the Store.
 	// Record the manifest twice: using a digest-specific key to allow references to that specific digest instance,
 	// and using storage.ImageDigestBigDataKey for future users that don’t specify any digest and for compatibility with older readers.
-	key := manifestBigDataKey(s.manifestDigest)
+	key, err := manifestBigDataKey(s.manifestDigest)
+	if err != nil {
+		return err
+	}
 	if err := s.imageRef.transport.store.SetImageBigData(img.ID, key, s.manifest, manifest.Digest); err != nil {
 		logrus.Debugf("error saving manifest for image %q: %v", img.ID, err)
 		return fmt.Errorf("saving manifest for image %q: %w", img.ID, err)
