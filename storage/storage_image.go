@@ -32,8 +32,11 @@ func manifestBigDataKey(digest digest.Digest) string {
 
 // signatureBigDataKey returns a key suitable for recording the signatures associated with the manifest with the specified digest using storage.Store.ImageBigData and related functions.
 // If a specific manifest digest is explicitly requested by the user, the key returned by this function should be used preferably;
-func signatureBigDataKey(digest digest.Digest) string {
-	return "signature-" + digest.Encoded()
+func signatureBigDataKey(digest digest.Digest) (string, error) {
+	if err := digest.Validate(); err != nil { // digest.Digest.Encoded() panics on failure, so validate explicitly.
+		return "", err
+	}
+	return "signature-" + digest.Encoded(), nil
 }
 
 // Size() returns the previously-computed size of the image, with no error.

@@ -197,8 +197,15 @@ func TestReferenceManifestPath(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	dirRef, ok := ref.(dirReference)
 	require.True(t, ok)
-	assert.Equal(t, tmpDir+"/manifest.json", dirRef.manifestPath(nil))
-	assert.Equal(t, tmpDir+"/"+dhex.Encoded()+".manifest.json", dirRef.manifestPath(&dhex))
+	res, err := dirRef.manifestPath(nil)
+	require.NoError(t, err)
+	assert.Equal(t, tmpDir+"/manifest.json", res)
+	res, err = dirRef.manifestPath(&dhex)
+	require.NoError(t, err)
+	assert.Equal(t, tmpDir+"/"+dhex.Encoded()+".manifest.json", res)
+	invalidDigest := digest.Digest("sha256:../hello")
+	_, err = dirRef.manifestPath(&invalidDigest)
+	assert.Error(t, err)
 }
 
 func TestReferenceLayerPath(t *testing.T) {
@@ -207,7 +214,11 @@ func TestReferenceLayerPath(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	dirRef, ok := ref.(dirReference)
 	require.True(t, ok)
-	assert.Equal(t, tmpDir+"/"+hex, dirRef.layerPath("sha256:"+hex))
+	res, err := dirRef.layerPath("sha256:" + hex)
+	require.NoError(t, err)
+	assert.Equal(t, tmpDir+"/"+hex, res)
+	_, err = dirRef.layerPath(digest.Digest("sha256:../hello"))
+	assert.Error(t, err)
 }
 
 func TestReferenceSignaturePath(t *testing.T) {
@@ -216,10 +227,21 @@ func TestReferenceSignaturePath(t *testing.T) {
 	ref, tmpDir := refToTempDir(t)
 	dirRef, ok := ref.(dirReference)
 	require.True(t, ok)
-	assert.Equal(t, tmpDir+"/signature-1", dirRef.signaturePath(0, nil))
-	assert.Equal(t, tmpDir+"/signature-10", dirRef.signaturePath(9, nil))
-	assert.Equal(t, tmpDir+"/"+dhex.Encoded()+".signature-1", dirRef.signaturePath(0, &dhex))
-	assert.Equal(t, tmpDir+"/"+dhex.Encoded()+".signature-10", dirRef.signaturePath(9, &dhex))
+	res, err := dirRef.signaturePath(0, nil)
+	require.NoError(t, err)
+	assert.Equal(t, tmpDir+"/signature-1", res)
+	res, err = dirRef.signaturePath(9, nil)
+	require.NoError(t, err)
+	assert.Equal(t, tmpDir+"/signature-10", res)
+	res, err = dirRef.signaturePath(0, &dhex)
+	require.NoError(t, err)
+	assert.Equal(t, tmpDir+"/"+dhex.Encoded()+".signature-1", res)
+	res, err = dirRef.signaturePath(9, &dhex)
+	require.NoError(t, err)
+	assert.Equal(t, tmpDir+"/"+dhex.Encoded()+".signature-10", res)
+	invalidDigest := digest.Digest("sha256:../hello")
+	_, err = dirRef.signaturePath(0, &invalidDigest)
+	assert.Error(t, err)
 }
 
 func TestReferenceVersionPath(t *testing.T) {

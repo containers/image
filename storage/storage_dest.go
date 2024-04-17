@@ -845,7 +845,10 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		}
 	}
 	for instanceDigest, signatures := range s.signatureses {
-		key := signatureBigDataKey(instanceDigest)
+		key, err := signatureBigDataKey(instanceDigest)
+		if err != nil {
+			return err
+		}
 		if err := s.imageRef.transport.store.SetImageBigData(img.ID, key, signatures, manifest.Digest); err != nil {
 			logrus.Debugf("error saving signatures for image %q: %v", img.ID, err)
 			return fmt.Errorf("saving signatures for image %q: %w", img.ID, err)
