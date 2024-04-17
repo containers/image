@@ -26,8 +26,11 @@ type storageImageCloser struct {
 // manifestBigDataKey returns a key suitable for recording a manifest with the specified digest using storage.Store.ImageBigData and related functions.
 // If a specific manifest digest is explicitly requested by the user, the key returned by this function should be used preferably;
 // for compatibility, if a manifest is not available under this key, check also storage.ImageDigestBigDataKey
-func manifestBigDataKey(digest digest.Digest) string {
-	return storage.ImageDigestManifestBigDataNamePrefix + "-" + digest.String()
+func manifestBigDataKey(digest digest.Digest) (string, error) {
+	if err := digest.Validate(); err != nil { // Make sure info.Digest.String() uses the expected format and does not collide with other BigData keys.
+		return "", err
+	}
+	return storage.ImageDigestManifestBigDataNamePrefix + "-" + digest.String(), nil
 }
 
 // signatureBigDataKey returns a key suitable for recording the signatures associated with the manifest with the specified digest using storage.Store.ImageBigData and related functions.
