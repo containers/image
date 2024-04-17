@@ -831,8 +831,12 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		})
 	}
 	for instanceDigest, signatures := range s.signatureses {
+		key, err := signatureBigDataKey(instanceDigest)
+		if err != nil {
+			return err
+		}
 		options.BigData = append(options.BigData, storage.ImageBigDataOption{
-			Key:    signatureBigDataKey(instanceDigest),
+			Key:    key,
 			Data:   signatures,
 			Digest: digest.Canonical.FromBytes(signatures),
 		})
