@@ -585,9 +585,11 @@ func (d *dockerImageDestination) putSignaturesToLookaside(signatures []signature
 
 	// NOTE: Keep this in sync with docs/signature-protocols.md!
 	for i, signature := range signatures {
-		sigURL := lookasideStorageURL(d.c.signatureBase, manifestDigest, i)
-		err := d.putOneSignature(sigURL, signature)
+		sigURL, err := lookasideStorageURL(d.c.signatureBase, manifestDigest, i)
 		if err != nil {
+			return err
+		}
+		if err := d.putOneSignature(sigURL, signature); err != nil {
 			return err
 		}
 	}
@@ -597,7 +599,10 @@ func (d *dockerImageDestination) putSignaturesToLookaside(signatures []signature
 	// is enough for dockerImageSource to stop looking for other signatures, so that
 	// is sufficient.
 	for i := len(signatures); ; i++ {
-		sigURL := lookasideStorageURL(d.c.signatureBase, manifestDigest, i)
+		sigURL, err := lookasideStorageURL(d.c.signatureBase, manifestDigest, i)
+		if err != nil {
+			return err
+		}
 		missing, err := d.c.deleteOneSignature(sigURL)
 		if err != nil {
 			return err
