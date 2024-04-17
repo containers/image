@@ -194,6 +194,9 @@ func simplifyContentType(contentType string) string {
 // this never happens if the primary manifest is not a manifest list (e.g. if the source never returns manifest lists).
 func (s *dockerImageSource) GetManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error) {
 	if instanceDigest != nil {
+		if err := instanceDigest.Validate(); err != nil { // Make sure instanceDigest.String() does not contain any unexpected characters
+			return nil, "", err
+		}
 		return s.fetchManifest(ctx, instanceDigest.String())
 	}
 	err := s.ensureManifestIsLoaded(ctx)
@@ -203,6 +206,8 @@ func (s *dockerImageSource) GetManifest(ctx context.Context, instanceDigest *dig
 	return s.cachedManifest, s.cachedManifestMIMEType, nil
 }
 
+// fetchManifest fetches a manifest for tagOrDigest.
+// The caller is responsible for ensuring tagOrDigest uses the expected format.
 func (s *dockerImageSource) fetchManifest(ctx context.Context, tagOrDigest string) ([]byte, string, error) {
 	return s.c.fetchManifest(ctx, s.physicalRef, tagOrDigest)
 }
@@ -352,6 +357,9 @@ func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, 
 		return nil, nil, fmt.Errorf("external URLs not supported with GetBlobAt")
 	}
 
+	if err := info.Digest.Validate(); err != nil { // Make sure info.Digest.String() does not contain any unexpected characters
+		return nil, nil, err
+	}
 	path := fmt.Sprintf(blobsPath, reference.Path(s.physicalRef.ref), info.Digest.String())
 	logrus.Debugf("Downloading %s", path)
 	res, err := s.c.makeRequest(ctx, http.MethodGet, path, headers, nil, v2Auth, nil)
