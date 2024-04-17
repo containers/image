@@ -80,6 +80,17 @@ func (d *blobCacheDestination) IgnoresEmbeddedDockerReference() bool {
 // and this new file.
 func (d *blobCacheDestination) saveStream(wg *sync.WaitGroup, decompressReader io.ReadCloser, tempFile *os.File, compressedFilename string, compressedDigest digest.Digest, isConfig bool, alternateDigest *digest.Digest) {
 	defer wg.Done()
+
+	succeeded := false
+	defer func() {
+		if !succeeded {
+			// Remove the temporary file.
+			if err := os.Remove(tempFile.Name()); err != nil {
+				logrus.Debugf("error cleaning up temporary file %q for decompressed copy of blob %q: %v", tempFile.Name(), compressedDigest.String(), err)
+			}
+		}
+	}()
+
 	// Decompress from and digest the reading end of that pipe.
 	decompressed, err3 := archive.DecompressStream(decompressReader)
 	digester := digest.Canonical.Digester()
@@ -96,31 +107,25 @@ func (d *blobCacheDestination) saveStream(wg *sync.WaitGroup, decompressReader i
 	decompressReader.Close()
 	decompressed.Close()
 	tempFile.Close()
+
 	// Determine the name that we should give to the uncompressed copy of the blob.
 	decompressedFilename := d.reference.blobPath(digester.Digest(), isConfig)
-	if err3 == nil {
-		// Rename the temporary file.
-		if err3 = os.Rename(tempFile.Name(), decompressedFilename); err3 != nil {
-			logrus.Debugf("error renaming new decompressed copy of blob %q into place at %q: %v", digester.Digest().String(), decompressedFilename, err3)
-			// Remove the temporary file.
-			if err3 = os.Remove(tempFile.Name()); err3 != nil {
-				logrus.Debugf("error cleaning up temporary file %q for decompressed copy of blob %q: %v", tempFile.Name(), compressedDigest.String(), err3)
-			}
-		} else {
-			*alternateDigest = digester.Digest()
-			// Note the relationship between the two files.
-			if err3 = ioutils.AtomicWriteFile(decompressedFilename+compressedNote, []byte(compressedDigest.String()), 0600); err3 != nil {
-				logrus.Debugf("error noting that the compressed version of %q is %q: %v", digester.Digest().String(), compressedDigest.String(), err3)
-			}
-			if err3 = ioutils.AtomicWriteFile(compressedFilename+decompressedNote, []byte(digester.Digest().String()), 0600); err3 != nil {
-				logrus.Debugf("error noting that the decompressed version of %q is %q: %v", compressedDigest.String(), digester.Digest().String(), err3)
-			}
-		}
-	} else {
-		// Remove the temporary file.
-		if err3 = os.Remove(tempFile.Name()); err3 != nil {
-			logrus.Debugf("error cleaning up temporary file %q for decompressed copy of blob %q: %v", tempFile.Name(), compressedDigest.String(), err3)
-		}
+	if err3 != nil {
+		return
+	}
+	// Rename the temporary file.
+	if err := os.Rename(tempFile.Name(), decompressedFilename); err != nil {
+		logrus.Debugf("error renaming new decompressed copy of blob %q into place at %q: %v", digester.Digest().String(), decompressedFilename, err)
+		return
+	}
+	succeeded = true
+	*alternateDigest = digester.Digest()
+	// Note the relationship between the two files.
+	if err := ioutils.AtomicWriteFile(decompressedFilename+compressedNote, []byte(compressedDigest.String()), 0600); err != nil {
+		logrus.Debugf("error noting that the compressed version of %q is %q: %v", digester.Digest().String(), compressedDigest.String(), err)
+	}
+	if err := ioutils.AtomicWriteFile(compressedFilename+decompressedNote, []byte(digester.Digest().String()), 0600); err != nil {
+		logrus.Debugf("error noting that the decompressed version of %q is %q: %v", compressedDigest.String(), digester.Digest().String(), err)
 	}
 }
 
