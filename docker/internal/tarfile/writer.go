@@ -142,6 +142,9 @@ func (w *Writer) writeLegacyMetadataLocked(layerDescriptors []manifest.Schema2De
 		}
 
 		// This chainID value matches the computation in docker/docker/layer.CreateChainID …
+		if err := l.Digest.Validate(); err != nil { // This should never fail on this code path, still: make sure the chainID computation is unambiguous.
+			return err
+		}
 		if chainID == "" {
 			chainID = l.Digest
 		} else {
