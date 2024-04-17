@@ -457,7 +457,10 @@ func (s *dockerImageSource) getSignaturesFromLookaside(ctx context.Context, inst
 			return nil, fmt.Errorf("server provided %d signatures, assuming that's unreasonable and a server error", maxLookasideSignatures)
 		}
 
-		sigURL := lookasideStorageURL(s.c.signatureBase, manifestDigest, i)
+		sigURL, err := lookasideStorageURL(s.c.signatureBase, manifestDigest, i)
+		if err != nil {
+			return nil, err
+		}
 		signature, missing, err := s.getOneSignature(ctx, sigURL)
 		if err != nil {
 			return nil, err
@@ -651,7 +654,10 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 	}
 
 	for i := 0; ; i++ {
-		sigURL := lookasideStorageURL(c.signatureBase, manifestDigest, i)
+		sigURL, err := lookasideStorageURL(c.signatureBase, manifestDigest, i)
+		if err != nil {
+			return err
+		}
 		missing, err := c.deleteOneSignature(sigURL)
 		if err != nil {
 			return err
