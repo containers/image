@@ -803,8 +803,12 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		if err != nil {
 			return fmt.Errorf("digesting top-level manifest: %w", err)
 		}
+		key, err := manifestBigDataKey(manifestDigest)
+		if err != nil {
+			return err
+		}
 		options.BigData = append(options.BigData, storage.ImageBigDataOption{
-			Key:    manifestBigDataKey(manifestDigest),
+			Key:    key,
 			Data:   toplevelManifest,
 			Digest: manifestDigest,
 		})
@@ -812,8 +816,12 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	// Set up to save the image's manifest.  Allow looking it up by digest by using the key convention defined by the Store.
 	// Record the manifest twice: using a digest-specific key to allow references to that specific digest instance,
 	// and using storage.ImageDigestBigDataKey for future users that don’t specify any digest and for compatibility with older readers.
+	key, err := manifestBigDataKey(s.manifestDigest)
+	if err != nil {
+		return err
+	}
 	options.BigData = append(options.BigData, storage.ImageBigDataOption{
-		Key:    manifestBigDataKey(s.manifestDigest),
+		Key:    key,
 		Data:   s.manifest,
 		Digest: s.manifestDigest,
 	})
