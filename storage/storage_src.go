@@ -315,7 +315,14 @@ func (s *storageImageSource) GetSignaturesWithFormat(ctx context.Context, instan
 	instance := "default instance"
 	if instanceDigest != nil {
 		signatureSizes = s.SignaturesSizes[*instanceDigest]
-		key = signatureBigDataKey(*instanceDigest)
+		k, err := signatureBigDataKey(*instanceDigest)
+		if err != nil {
+			return nil, err
+		}
+		key = k
+		if err := instanceDigest.Validate(); err != nil { // digest.Digest.Encoded() panics on failure, so validate explicitly.
+			return nil, err
+		}
 		instance = instanceDigest.Encoded()
 	}
 	if len(signatureSizes) > 0 {
