@@ -132,40 +132,46 @@ func (s *blobCacheSource) layerInfoForCopy(info types.BlobInfo) (types.BlobInfo,
 		alternate = blobFile + decompressedNote
 		replaceDigest, err = os.ReadFile(alternate)
 	}
-	if err == nil && digest.Digest(replaceDigest).Validate() == nil {
-		alternate, err = s.reference.blobPath(digest.Digest(replaceDigest), false)
-		if err != nil {
-			return types.BlobInfo{}, err
+	if err != nil {
+		return info, nil
+	}
+	if digest.Digest(replaceDigest).Validate() != nil {
+		return info, nil
+	}
+	alternate, err = s.reference.blobPath(digest.Digest(replaceDigest), false)
+	if err != nil {
+		return types.BlobInfo{}, err
+	}
+	fileInfo, err := os.Stat(alternate)
+	if err != nil {
+		return info, nil
+	}
+
+	switch info.MediaType {
+	case v1.MediaTypeImageLayer, v1.MediaTypeImageLayerGzip:
+		switch s.reference.compress {
+		case types.Compress:
+			info.MediaType = v1.MediaTypeImageLayerGzip
+			info.CompressionAlgorithm = &compression.Gzip
+		case types.Decompress: // FIXME: This should remove zstd:chunked annotations (but those annotations being left with incorrect values should not break pulls)
+			info.MediaType = v1.MediaTypeImageLayer
+			info.CompressionAlgorithm = nil
 		}
-		fileInfo, err := os.Stat(alternate)
-		if err == nil {
-			switch info.MediaType {
-			case v1.MediaTypeImageLayer, v1.MediaTypeImageLayerGzip:
-				switch s.reference.compress {
-				case types.Compress:
-					info.MediaType = v1.MediaTypeImageLayerGzip
-					info.CompressionAlgorithm = &compression.Gzip
-				case types.Decompress: // FIXME: This should remove zstd:chunked annotations (but those annotations being left with incorrect values should not break pulls)
-					info.MediaType = v1.MediaTypeImageLayer
-					info.CompressionAlgorithm = nil
-				}
-			case manifest.DockerV2SchemaLayerMediaTypeUncompressed, manifest.DockerV2Schema2LayerMediaType:
-				switch s.reference.compress {
-				case types.Compress:
-					info.MediaType = manifest.DockerV2Schema2LayerMediaType
-					info.CompressionAlgorithm = &compression.Gzip
-				case types.Decompress:
-					// nope, not going to suggest anything, it's not allowed by the spec
-					return info, nil
-				}
-			}
-			logrus.Debugf("suggesting cached blob with digest %q, type %q, and compression %v in place of blob with digest %q", string(replaceDigest), info.MediaType, s.reference.compress, info.Digest.String())
-			info.CompressionOperation = s.reference.compress
-			info.Digest = digest.Digest(replaceDigest)
-			info.Size = fileInfo.Size()
-			logrus.Debugf("info = %#v", info)
+	case manifest.DockerV2SchemaLayerMediaTypeUncompressed, manifest.DockerV2Schema2LayerMediaType:
+		switch s.reference.compress {
+		case types.Compress:
+			info.MediaType = manifest.DockerV2Schema2LayerMediaType
+			info.CompressionAlgorithm = &compression.Gzip
+		case types.Decompress:
+			// nope, not going to suggest anything, it's not allowed by the spec
+			return info, nil
 		}
 	}
+	logrus.Debugf("suggesting cached blob with digest %q, type %q, and compression %v in place of blob with digest %q", string(replaceDigest), info.MediaType, s.reference.compress, info.Digest.String())
+	info.CompressionOperation = s.reference.compress
+	info.Digest = digest.Digest(replaceDigest)
+	info.Size = fileInfo.Size()
+	logrus.Debugf("info = %#v", info)
 	return info, nil
 }
 
