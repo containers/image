@@ -123,14 +123,11 @@ func (s *blobCacheSource) layerInfoForCopy(info types.BlobInfo) (types.BlobInfo,
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
-	var alternate string
 	switch s.reference.compress {
 	case types.Compress:
-		alternate = blobFile + compressedNote
-		replaceDigest, err = os.ReadFile(alternate)
+		replaceDigest, err = os.ReadFile(blobFile + compressedNote)
 	case types.Decompress:
-		alternate = blobFile + decompressedNote
-		replaceDigest, err = os.ReadFile(alternate)
+		replaceDigest, err = os.ReadFile(blobFile + decompressedNote)
 	}
 	if err != nil {
 		return info, nil
@@ -138,7 +135,7 @@ func (s *blobCacheSource) layerInfoForCopy(info types.BlobInfo) (types.BlobInfo,
 	if digest.Digest(replaceDigest).Validate() != nil {
 		return info, nil
 	}
-	alternate, err = s.reference.blobPath(digest.Digest(replaceDigest), false)
+	alternate, err := s.reference.blobPath(digest.Digest(replaceDigest), false)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
