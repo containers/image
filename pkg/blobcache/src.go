@@ -118,24 +118,25 @@ func (s *blobCacheSource) GetSignaturesWithFormat(ctx context.Context, instanceD
 
 // layerInfoForCopy returns a possibly-updated version of info for LayerInfosForCopy
 func (s *blobCacheSource) layerInfoForCopy(info types.BlobInfo) (types.BlobInfo, error) {
-	var replaceDigest []byte
+	var replaceDigestBytes []byte
 	blobFile, err := s.reference.blobPath(info.Digest, false)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
 	switch s.reference.compress {
 	case types.Compress:
-		replaceDigest, err = os.ReadFile(blobFile + compressedNote)
+		replaceDigestBytes, err = os.ReadFile(blobFile + compressedNote)
 	case types.Decompress:
-		replaceDigest, err = os.ReadFile(blobFile + decompressedNote)
+		replaceDigestBytes, err = os.ReadFile(blobFile + decompressedNote)
 	}
 	if err != nil {
 		return info, nil
 	}
-	if digest.Digest(replaceDigest).Validate() != nil {
+	replaceDigest, err := digest.Parse(string(replaceDigestBytes))
+	if err != nil {
 		return info, nil
 	}
-	alternate, err := s.reference.blobPath(digest.Digest(replaceDigest), false)
+	alternate, err := s.reference.blobPath(replaceDigest, false)
 	if err != nil {
 		return types.BlobInfo{}, err
 	}
@@ -164,9 +165,9 @@ func (s *blobCacheSource) layerInfoForCopy(info types.BlobInfo) (types.BlobInfo,
 			return info, nil
 		}
 	}
-	logrus.Debugf("suggesting cached blob with digest %q, type %q, and compression %v in place of blob with digest %q", string(replaceDigest), info.MediaType, s.reference.compress, info.Digest.String())
+	logrus.Debugf("suggesting cached blob with digest %q, type %q, and compression %v in place of blob with digest %q", replaceDigest.String(), info.MediaType, s.reference.compress, info.Digest.String())
 	info.CompressionOperation = s.reference.compress
-	info.Digest = digest.Digest(replaceDigest)
+	info.Digest = replaceDigest
 	info.Size = fileInfo.Size()
 	logrus.Debugf("info = %#v", info)
 	return info, nil
