@@ -930,7 +930,6 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 	// nothing is writing to s.manifest yet, or PutManifest has been called and s.manifest != nil.
 	// Either way this function does not need the protection of s.lock.
 	if s.manifest == nil {
-		logrus.Debugf("Skipping commit for layer %d, manifest not yet available", layerIndex)
 		return "", nil
 	}
 
