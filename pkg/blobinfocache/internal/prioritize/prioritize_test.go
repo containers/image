@@ -2,6 +2,7 @@ package prioritize
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/exp/slices"
 )
 
 const (

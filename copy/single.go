@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 
@@ -25,7 +26,6 @@ import (
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/vbauerster/mpb/v8"
-	"golang.org/x/exp/slices"
 )
 
 // imageCopier tracks state specific to a single image (possibly an item of a manifest list)
