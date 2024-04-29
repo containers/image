@@ -1,4 +1,4 @@
-[![GoDoc](https://godoc.org/github.com/containers/image?status.svg)](https://godoc.org/github.com/containers/image) [![Build Status](https://api.cirrus-ci.com/github/containers/image.svg)](https://cirrus-ci.com/github/containers/image)
+[![Go Reference](https://pkg.go.dev/badge/github.com/containers/image/v5.svg)](https://pkg.go.dev/github.com/containers/image/v5) [![Build Status](https://api.cirrus-ci.com/github/containers/image.svg)](https://cirrus-ci.com/github/containers/image)
 =
 
 `image` is a set of Go libraries aimed at working in various way with
