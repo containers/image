@@ -889,6 +889,16 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 	diffOutput, ok := s.lockProtected.diffOutputs[index]
 	s.lock.Unlock()
 	if ok {
+		// If we know a trusted DiffID value (e.g. from a BlobInfoCache), set it in diffOutput.
+		// That way it will be persisted in storage even if the cache is deleted; also
+		// we can use the value below to avoid the untrustedUncompressedDigest logic (and notably
+		// the costly commit delay until a manifest is available).
+		s.lock.Lock()
+		if d, ok := s.lockProtected.indexToDiffID[index]; ok {
+			diffOutput.UncompressedDigest = d
+		}
+		s.lock.Unlock()
+
 		var untrustedUncompressedDigest digest.Digest
 		if diffOutput.UncompressedDigest == "" {
 			d, err := s.untrustedLayerDiffID(index)
