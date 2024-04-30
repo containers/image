@@ -810,6 +810,13 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 	diffOutput, ok := s.lockProtected.diffOutputs[index]
 	s.lock.Unlock()
 	if ok {
+		s.lock.Lock()
+		trustedUncompressedDigest, ok := s.lockProtected.indexToDiffID[index]
+		s.lock.Unlock()
+		if ok {
+			diffOutput.UncompressedDigest = trustedUncompressedDigest
+		}
+
 		var untrustedUncompressedDigest digest.Digest
 		if diffOutput.UncompressedDigest == "" {
 			d, err := s.untrustedLayerDiffID(index)
