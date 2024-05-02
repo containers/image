@@ -308,6 +308,12 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	if err != nil {
 		return private.UploadedBlob{}, err
 	}
+	succeeded := false
+	defer func() {
+		if !succeeded {
+			_ = s.imageRef.transport.store.CleanupStagedLayer(out)
+		}
+	}()
 
 	if out.TOCDigest == "" && out.UncompressedDigest == "" {
 		return private.UploadedBlob{}, errors.New("internal error: ApplyDiffWithDiffer succeeded with neither TOCDigest nor UncompressedDigest set")
@@ -330,6 +336,7 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	s.lockProtected.diffOutputs[options.LayerIndex] = out
 	s.lock.Unlock()
 
+	succeeded = true
 	return private.UploadedBlob{
 		Digest: blobDigest,
 		Size:   srcInfo.Size,
