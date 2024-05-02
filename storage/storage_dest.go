@@ -171,9 +171,7 @@ func (s *storageImageDestination) Close() error {
 		al.Release()
 	}
 	for _, v := range s.lockProtected.diffOutputs {
-		if v.Target != "" {
-			_ = s.imageRef.transport.store.CleanupStagedLayer(v)
-		}
+		_ = s.imageRef.transport.store.CleanupStagedLayer(v)
 	}
 	return os.RemoveAll(s.directory)
 }
