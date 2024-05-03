@@ -176,7 +176,7 @@ func (s *storageImageSource) GetBlob(ctx context.Context, info types.BlobInfo, c
 	// On Unix and modern Windows (2022 at least) we can eagerly unlink the file to ensure it's automatically
 	// cleaned up on process termination (or if the caller forgets to invoke Close())
 	// On older versions of Windows we will have to fallback to relying on the caller to invoke Close()
-	if err := os.Remove(tmpFile.Name()); err != nil {
+	if err := os.Remove(tmpFile.Name()); err == nil {
 		tmpFileRemovePending = false
 	}
 
