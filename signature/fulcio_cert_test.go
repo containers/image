@@ -327,7 +327,7 @@ func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 					Value:    sansBytes,
 				})
 			},
-			errorFragment: "Required email test-user@example.com not found",
+			errorFragment: `Required email "test-user@example.com" not found`,
 		},
 		{ // Other completely unrecognized critical extensions still cause failures
 			name: "Unhandled critical extension",
@@ -367,7 +367,7 @@ func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 			fn: func(cert *x509.Certificate) {
 				cert.EmailAddresses = nil
 			},
-			errorFragment: "Required email test-user@example.com not found",
+			errorFragment: `Required email "test-user@example.com" not found`,
 		},
 		{
 			name: "Multiple emails, one matches",
@@ -381,14 +381,14 @@ func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 			fn: func(cert *x509.Certificate) {
 				cert.EmailAddresses = []string{"a@example.com"}
 			},
-			errorFragment: "Required email test-user@example.com not found",
+			errorFragment: `Required email "test-user@example.com" not found`,
 		},
 		{
 			name: "Multiple emails, no matches",
 			fn: func(cert *x509.Certificate) {
 				cert.EmailAddresses = []string{"a@example.com", "b@example.com", "c@example.com"}
 			},
-			errorFragment: "Required email test-user@example.com not found",
+			errorFragment: `Required email "test-user@example.com" not found`,
 		},
 	} {
 		testLeafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
