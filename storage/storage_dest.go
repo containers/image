@@ -564,7 +564,7 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 	}
 	// ordinaryImageID is a digest of a config, which is a JSON value.
 	// To avoid the risk of collisions, start the input with @ so that the input is not a valid JSON.
-	tocImageID := digest.FromString("@With TOC:" + tocIDInput).Hex()
+	tocImageID := digest.FromString("@With TOC:" + tocIDInput).Encoded()
 	logrus.Debugf("Ordinary storage image ID %s; a layer was looked up by TOC, so using image ID %s", ordinaryImageID, tocImageID)
 	return tocImageID
 }
@@ -651,11 +651,11 @@ func (s *storageImageDestination) singleLayerIDComponent(layerIndex int, blobDig
 	defer s.lock.Unlock()
 
 	if d, found := s.lockProtected.indexToTOCDigest[layerIndex]; found {
-		return "@TOC=" + d.Hex(), false // "@" is not a valid start of a digest.Digest, so this is unambiguous.
+		return "@TOC=" + d.Encoded(), false // "@" is not a valid start of a digest.Digest, so this is unambiguous.
 	}
 
 	if d, found := s.lockProtected.blobDiffIDs[blobDigest]; found {
-		return d.Hex(), true // This looks like chain IDs, and it uses the traditional value.
+		return d.Encoded(), true // This looks like chain IDs, and it uses the traditional value.
 	}
 	return "", false
 }
@@ -731,7 +731,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 
 	id := layerIDComponent
 	if !layerIDComponentStandalone || parentLayer != "" {
-		id = digest.Canonical.FromString(parentLayer + "+" + layerIDComponent).Hex()
+		id = digest.Canonical.FromString(parentLayer + "+" + layerIDComponent).Encoded()
 	}
 	if layer, err2 := s.imageRef.transport.store.Layer(id); layer != nil && err2 == nil {
 		// There's already a layer that should have the right contents, just reuse it.

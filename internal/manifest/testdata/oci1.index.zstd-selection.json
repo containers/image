@@ -52,7 +52,7 @@
         },
         {
             "mediaType": "application/vnd.oci.image.manifest.v1+json",
-            "digest": "sha256:gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+            "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
             "size": 772,
             "annotations": {
                 "io.github.containers.compression.zstd": "true"

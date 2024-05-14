@@ -318,7 +318,7 @@ func loadFixture(t *testing.T, fixtureName string) string {
 func assertBlobExists(t *testing.T, blobsDir string, blobDigest string) {
 	digest, err := digest.Parse(blobDigest)
 	require.NoError(t, err)
-	blobPath := filepath.Join(blobsDir, digest.Algorithm().String(), digest.Hex())
+	blobPath := filepath.Join(blobsDir, digest.Algorithm().String(), digest.Encoded())
 	_, err = os.Stat(blobPath)
 	require.NoError(t, err)
 }
@@ -326,7 +326,7 @@ func assertBlobExists(t *testing.T, blobsDir string, blobDigest string) {
 func assertBlobDoesNotExist(t *testing.T, blobsDir string, blobDigest string) {
 	digest, err := digest.Parse(blobDigest)
 	require.NoError(t, err)
-	blobPath := filepath.Join(blobsDir, digest.Algorithm().String(), digest.Hex())
+	blobPath := filepath.Join(blobsDir, digest.Algorithm().String(), digest.Encoded())
 	_, err = os.Stat(blobPath)
 	require.True(t, os.IsNotExist(err))
 }
