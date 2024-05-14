@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"sync"
 
@@ -226,9 +227,15 @@ func streamChunksFromFile(streams chan io.ReadCloser, errs chan error, file io.R
 			errs <- err
 			break
 		}
+		var stream io.Reader
+		if c.Length != math.MaxUint64 {
+			stream = io.LimitReader(file, int64(c.Length))
+		} else {
+			stream = file
+		}
 		s := signalCloseReader{
 			closed: make(chan struct{}),
-			stream: io.LimitReader(file, int64(c.Length)),
+			stream: stream,
 		}
 		streams <- s
 
@@ -256,6 +263,8 @@ func (s signalCloseReader) Close() error {
 // The specified chunks must be not overlapping and sorted by their offset.
 // The readers must be fully consumed, in the order they are returned, before blocking
 // to read the next chunk.
+// If the Length for the last chunk is set to math.MaxUint64, then it
+// fully fetches the remaining data from the offset to the end of the blob.
 func (s *blobCacheSource) GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []private.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
 	blobPath, _, _, err := s.reference.findBlob(info)
 	if err != nil {
