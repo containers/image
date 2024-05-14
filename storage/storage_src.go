@@ -308,7 +308,7 @@ func (s *storageImageSource) LayerInfosForCopy(ctx context.Context, instanceDige
 			return nil, fmt.Errorf("reading layer %q in image %q: %w", layerID, s.image.ID, err)
 		}
 		if layer.UncompressedSize < 0 {
-			return nil, fmt.Errorf("uncompressed size for layer %q is unknown", layerID)
+			layer.UncompressedSize = -1
 		}
 
 		blobDigest := layer.UncompressedDigest
@@ -452,8 +452,11 @@ func (s *storageImageSource) getSize() (int64, error) {
 		if err != nil {
 			return -1, err
 		}
-		if (layer.TOCDigest == "" && layer.UncompressedDigest == "") || layer.UncompressedSize < 0 {
+		if (layer.TOCDigest == "" && layer.UncompressedDigest == "") || (layer.TOCDigest == "" && layer.UncompressedSize < 0) {
 			return -1, fmt.Errorf("size for layer %q is unknown, failing getSize()", layerID)
+		}
+		if layer.UncompressedSize < 0 {
+			sum = 0
 		}
 		sum += layer.UncompressedSize
 		if layer.Parent == "" {
