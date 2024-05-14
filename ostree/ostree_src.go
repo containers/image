@@ -439,7 +439,10 @@ func (s *ostreeImageSource) LayerInfosForCopy(ctx context.Context, instanceDiges
 		if err != nil {
 			return nil, err
 		}
-		uncompressedDigest := digest.Digest(uncompressedDigestStr)
+		uncompressedDigest, err := digest.Parse(uncompressedDigestStr)
+		if err != nil {
+			return nil, err
+		}
 		blobInfo := types.BlobInfo{
 			Digest:    uncompressedDigest,
 			Size:      uncompressedSize,

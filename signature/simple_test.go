@@ -29,6 +29,8 @@ func TestNewUntrustedSignature(t *testing.T) {
 }
 
 func TestMarshalJSON(t *testing.T) {
+	const testDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
 	// Empty string values
 	s := newUntrustedSignature("", "_")
 	_, err := s.MarshalJSON()
@@ -47,19 +49,19 @@ func TestMarshalJSON(t *testing.T) {
 	}{
 		{
 			untrustedSignature{
-				untrustedDockerManifestDigest: "digest!@#",
+				untrustedDockerManifestDigest: testDigest,
 				untrustedDockerReference:      "reference#@!",
 				untrustedCreatorID:            &creatorID,
 				untrustedTimestamp:            &timestamp,
 			},
-			"{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"digest!@#\"},\"type\":\"atomic container signature\"},\"optional\":{\"creator\":\"CREATOR\",\"timestamp\":1484683104}}",
+			"{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"" + testDigest + "\"},\"type\":\"atomic container signature\"},\"optional\":{\"creator\":\"CREATOR\",\"timestamp\":1484683104}}",
 		},
 		{
 			untrustedSignature{
-				untrustedDockerManifestDigest: "digest!@#",
+				untrustedDockerManifestDigest: testDigest,
 				untrustedDockerReference:      "reference#@!",
 			},
-			"{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"digest!@#\"},\"type\":\"atomic container signature\"},\"optional\":{}}",
+			"{\"critical\":{\"identity\":{\"docker-reference\":\"reference#@!\"},\"image\":{\"docker-manifest-digest\":\"" + testDigest + "\"},\"type\":\"atomic container signature\"},\"optional\":{}}",
 		},
 	} {
 		marshaled, err := c.input.MarshalJSON()
@@ -114,6 +116,8 @@ func assertUnmarshalUntrustedSignatureFails(t *testing.T, schemaLoader gojsonsch
 }
 
 func TestUnmarshalJSON(t *testing.T) {
+	const testDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
 	// NOTE: The schema at schemaPath is NOT authoritative; docs/atomic-signature.json and the code is, rather!
 	// The schemaPath references are not testing that the code follows the behavior declared by the schema,
 	// they are testing that the schema follows the behavior of the code!
@@ -132,7 +136,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	assertUnmarshalUntrustedSignatureFails(t, schemaLoader, []byte("1"))
 
 	// Start with a valid JSON.
-	validSig := newUntrustedSignature("digest!@#", "reference#@!")
+	validSig := newUntrustedSignature(testDigest, "reference#@!")
 	validJSON, err := validSig.MarshalJSON()
 	require.NoError(t, err)
 
@@ -166,6 +170,7 @@ func TestUnmarshalJSON(t *testing.T) {
 		func(v mSA) { x(v, "critical", "image")["unexpected"] = 1 },
 		// Invalid "docker-manifest-digest"
 		func(v mSA) { x(v, "critical", "image")["docker-manifest-digest"] = 1 },
+		func(v mSA) { x(v, "critical", "image")["docker-manifest-digest"] = "sha256:../.." },
 		// Invalid "identity" object
 		func(v mSA) { x(v, "critical")["identity"] = 1 },
 		func(v mSA) { delete(x(v, "critical", "identity"), "docker-reference") },
@@ -196,7 +201,7 @@ func TestUnmarshalJSON(t *testing.T) {
 
 	// Optional fields can be missing
 	validSig = untrustedSignature{
-		untrustedDockerManifestDigest: "digest!@#",
+		untrustedDockerManifestDigest: testDigest,
 		untrustedDockerReference:      "reference#@!",
 		untrustedCreatorID:            nil,
 		untrustedTimestamp:            nil,
@@ -208,6 +213,8 @@ func TestUnmarshalJSON(t *testing.T) {
 }
 
 func TestSign(t *testing.T) {
+	const testDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
 	mech, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
 	require.NoError(t, err)
 	defer mech.Close()
@@ -216,7 +223,7 @@ func TestSign(t *testing.T) {
 		t.Skipf("Signing not supported: %v", err)
 	}
 
-	sig := newUntrustedSignature("digest!@#", "reference#@!")
+	sig := newUntrustedSignature(testDigest, "reference#@!")
 
 	// Successful signing
 	signature, err := sig.sign(mech, TestKeyFingerprint, "")

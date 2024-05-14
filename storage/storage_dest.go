@@ -59,7 +59,7 @@ type storageImageDestination struct {
 	nextTempFileID        atomic.Int32             // A counter that we use for computing filenames to assign to blobs
 	manifest              []byte                   // Manifest contents, temporary
 	manifestDigest        digest.Digest            // Valid if len(manifest) != 0
-	untrustedDiffIDValues []digest.Digest          // From config’s RootFS.DiffIDs, valid if not nil
+	untrustedDiffIDValues []digest.Digest          // From config’s RootFS.DiffIDs (not even validated to be valid digest.Digest!); or nil if not read yet
 	signatures            []byte                   // Signature contents, temporary
 	signatureses          map[digest.Digest][]byte // Instance signature contents, temporary
 	metadata              storageImageMetadata     // Metadata contents being built
@@ -767,7 +767,13 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 				logrus.Debugf("Skipping commit for layer %q, manifest not yet available", newLayerID)
 				return nil, nil
 			}
+
 			untrustedUncompressedDigest = d
+			// While the contents of the digest are untrusted, make sure at least the _format_ is valid,
+			// because we are going to write it to durable storage in expectedLayerDiffIDFlag .
+			if err := untrustedUncompressedDigest.Validate(); err != nil {
+				return nil, err
+			}
 		}
 
 		flags := make(map[string]interface{})
