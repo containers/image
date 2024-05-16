@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/containers/image/v5/types"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -320,9 +321,15 @@ func TestLookasideStorageURL(t *testing.T) {
 		require.NoError(t, err)
 		expectedURL, err := url.Parse(c.expected)
 		require.NoError(t, err)
-		res := lookasideStorageURL(baseURL, mdInput, c.index)
+		res, err := lookasideStorageURL(baseURL, mdInput, c.index)
+		require.NoError(t, err)
 		assert.Equal(t, expectedURL, res, c.expected)
 	}
+
+	baseURL, err := url.Parse("file:///tmp")
+	require.NoError(t, err)
+	_, err = lookasideStorageURL(baseURL, digest.Digest("sha256:../hello"), 0)
+	assert.Error(t, err)
 }
 
 func TestBuiltinDefaultLookasideStorageDir(t *testing.T) {
