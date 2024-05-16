@@ -392,6 +392,19 @@ func TestIsManifestUnknownError(t *testing.T) {
 				"\r\n" +
 				"Not found\r\n",
 		},
+		{
+			name: "Harbor v2.10.2",
+			response: "HTTP/1.1 404 Not Found\r\n" +
+				"Content-Length: 153\r\n" +
+				"Connection: keep-alive\r\n" +
+				"Content-Type: application/json; charset=utf-8\r\n" +
+				"Date: Wed, 08 May 2024 08:14:59 GMT\r\n" +
+				"Server: nginx\r\n" +
+				"Set-Cookie: sid=f617c257877837614ada2561513d6827; Path=/; HttpOnly\r\n" +
+				"X-Request-Id: 1b151fb1-c943-4190-a9ce-5156ed5e3200\r\n" +
+				"\r\n" +
+				"{\"errors\":[{\"code\":\"NOT_FOUND\",\"message\":\"artifact test/alpine:sha256-443205b0cfcc78444321d56a2fe273f06e27b2c72b5058f8d7e975997d45b015.sig not found\"}]}\n",
+		},
 	} {
 		resp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader([]byte(c.response))), nil)
 		require.NoError(t, err, c.name)
@@ -399,6 +412,6 @@ func TestIsManifestUnknownError(t *testing.T) {
 		err = fmt.Errorf("wrapped: %w", registryHTTPResponseToError(resp))
 
 		res := isManifestUnknownError(err)
-		assert.True(t, res, "%#v", err, c.name)
+		assert.True(t, res, "%s: %#v", c.name, err)
 	}
 }
