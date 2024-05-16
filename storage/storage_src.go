@@ -107,12 +107,11 @@ func (s *storageImageSource) Close() error {
 // GetBlob returns a stream for the specified blob, and the blob’s size (or -1 if unknown).
 // The Digest field in BlobInfo is guaranteed to be provided, Size may be -1 and MediaType may be optionally provided.
 // May update BlobInfoCache, preferably after it knows for certain that a blob truly exists at a specific location.
-func (s *storageImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (rc io.ReadCloser, n int64, err error) {
+func (s *storageImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
 	// We need a valid digest value.
 	digest := info.Digest
 
-	err = digest.Validate()
-	if err != nil {
+	if err := digest.Validate(); err != nil {
 		return nil, 0, err
 	}
 
@@ -154,7 +153,7 @@ func (s *storageImageSource) GetBlob(ctx context.Context, info types.BlobInfo, c
 	// NOTE: the blob is first written to a temporary file and subsequently
 	// closed.  The intention is to keep the time we own the storage lock
 	// as short as possible to allow other processes to access the storage.
-	rc, n, _, err = s.getBlobAndLayerID(digest, layers)
+	rc, n, _, err := s.getBlobAndLayerID(digest, layers)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -177,7 +176,7 @@ func (s *storageImageSource) GetBlob(ctx context.Context, info types.BlobInfo, c
 	// On Unix and modern Windows (2022 at least) we can eagerly unlink the file to ensure it's automatically
 	// cleaned up on process termination (or if the caller forgets to invoke Close())
 	// On older versions of Windows we will have to fallback to relying on the caller to invoke Close()
-	if err := os.Remove(tmpFile.Name()); err != nil {
+	if err := os.Remove(tmpFile.Name()); err == nil {
 		tmpFileRemovePending = false
 	}
 
