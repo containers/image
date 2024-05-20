@@ -89,6 +89,7 @@ func tlsConfig(sys *types.SystemContext) (*http.Client, error) {
 func httpConfig() *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
+			Proxy:           http.ProxyFromEnvironment,
 			TLSClientConfig: nil,
 		},
 		CheckRedirect: dockerclient.CheckRedirect,
