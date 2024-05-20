@@ -307,9 +307,6 @@ func (s *storageImageSource) LayerInfosForCopy(ctx context.Context, instanceDige
 		if err != nil {
 			return nil, fmt.Errorf("reading layer %q in image %q: %w", layerID, s.image.ID, err)
 		}
-		if layer.UncompressedSize < 0 {
-			layer.UncompressedSize = -1
-		}
 
 		blobDigest := layer.UncompressedDigest
 		if blobDigest == "" {
@@ -331,12 +328,16 @@ func (s *storageImageSource) LayerInfosForCopy(ctx context.Context, instanceDige
 				return nil, fmt.Errorf("parsing expected diffID %q for layer %q: %w", expectedDigest, layerID, err)
 			}
 		}
+		size := layer.UncompressedSize
+		if size < 0 {
+			size = -1
+		}
 		s.getBlobMutex.Lock()
 		s.getBlobMutexProtected.digestToLayerID[blobDigest] = layer.ID
 		s.getBlobMutex.Unlock()
 		blobInfo := types.BlobInfo{
 			Digest:    blobDigest,
-			Size:      layer.UncompressedSize,
+			Size:      size,
 			MediaType: uncompressedLayerType,
 		}
 		physicalBlobInfos = append([]types.BlobInfo{blobInfo}, physicalBlobInfos...)
