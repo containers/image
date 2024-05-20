@@ -388,11 +388,17 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 		if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
 			return false, private.ReusedBlob{}, fmt.Errorf(`looking for compressed layers with digest %q and labels: %w`, blobDigest, err)
 		} else if err == nil {
-			d := aLayer.TOCDigest()
-			if d == "" {
-				return false, private.ReusedBlob{}, fmt.Errorf(`failed to get TOCDigest of %q: %w`, blobDigest, err)
+			alsTOCDigest := aLayer.TOCDigest()
+			if alsTOCDigest != options.TOCDigest {
+				// FIXME: If alsTOCDigest is "", the Additional Layer Store FUSE server is probably just too old, and we could
+				// probably go on reading the layer from other sources.
+				//
+				// Currently it should not be possible for alsTOCDigest to be set and not the expected value, but there’s
+				// not that much benefit to checking for equality — we trust the FUSE server to validate the digest either way.
+				return false, private.ReusedBlob{}, fmt.Errorf("additional layer for TOCDigest %q reports unexpected TOCDigest %q",
+					options.TOCDigest, alsTOCDigest)
 			}
-			s.lockProtected.indexToTOCDigest[*options.LayerIndex] = d
+			s.lockProtected.indexToTOCDigest[*options.LayerIndex] = options.TOCDigest
 			s.lockProtected.indexToAdditionalLayer[*options.LayerIndex] = aLayer
 			return true, private.ReusedBlob{
 				Digest: blobDigest,
