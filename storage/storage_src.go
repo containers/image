@@ -456,10 +456,13 @@ func (s *storageImageSource) getSize() (int64, error) {
 		if (layer.TOCDigest == "" && layer.UncompressedDigest == "") || (layer.TOCDigest == "" && layer.UncompressedSize < 0) {
 			return -1, fmt.Errorf("size for layer %q is unknown, failing getSize()", layerID)
 		}
-		if layer.UncompressedSize < 0 {
-			sum = 0
+		// FIXME: We allow layer.UncompressedSize < 0 above, because currently images in an Additional Layer Store don’t provide that value.
+		// Right now, various callers in Podman (and, also, newImage in this package) don’t expect the size computation to fail.
+		// Should we update the callers, or do we need to continue returning inaccurate information here? Or should we pay the cost
+		// to compute the size from the diff?
+		if layer.UncompressedSize >= 0 {
+			sum += layer.UncompressedSize
 		}
-		sum += layer.UncompressedSize
 		if layer.Parent == "" {
 			break
 		}
