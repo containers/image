@@ -94,11 +94,11 @@ type storageImageDestinationLockProtected struct {
 	blobDiffIDs      map[digest.Digest]digest.Digest // Mapping from layer blobsums to their corresponding DiffIDs
 	indexToTOCDigest map[int]digest.Digest           // Mapping from layer index to a TOC Digest, IFF the layer was created/found/reused by TOC digest
 
-	// Layer data: Before commitLayer is called, either at least one of (diffOutputs, blobAdditionalLayer, filenames)
+	// Layer data: Before commitLayer is called, either at least one of (diffOutputs, indexToAdditionalLayer, filenames)
 	// should be available; or indexToTOCDigest/blobDiffIDs should be enough to locate an existing c/storage layer.
 	// They are looked up in the order they are mentioned above.
-	diffOutputs         map[int]*graphdriver.DriverWithDifferOutput // Mapping from layer index to a partially-pulled layer intermediate data
-	blobAdditionalLayer map[digest.Digest]storage.AdditionalLayer   // Mapping from layer blobsums to their corresponding additional layer
+	diffOutputs            map[int]*graphdriver.DriverWithDifferOutput // Mapping from layer index to a partially-pulled layer intermediate data
+	indexToAdditionalLayer map[int]storage.AdditionalLayer             // Mapping from layer index to their corresponding additional layer
 	// Mapping from layer blobsums to names of files we used to hold them. If set, fileSizes and blobDiffIDs must also be set.
 	filenames map[digest.Digest]string
 	// Mapping from layer blobsums to their sizes. If set, filenames and blobDiffIDs must also be set.
@@ -145,13 +145,13 @@ func newImageDestination(sys *types.SystemContext, imageRef storageReference) (*
 		},
 		indexToStorageID: make(map[int]string),
 		lockProtected: storageImageDestinationLockProtected{
-			indexToAddedLayerInfo: make(map[int]addedLayerInfo),
-			blobDiffIDs:           make(map[digest.Digest]digest.Digest),
-			indexToTOCDigest:      make(map[int]digest.Digest),
-			diffOutputs:           make(map[int]*graphdriver.DriverWithDifferOutput),
-			blobAdditionalLayer:   make(map[digest.Digest]storage.AdditionalLayer),
-			filenames:             make(map[digest.Digest]string),
-			fileSizes:             make(map[digest.Digest]int64),
+			indexToAddedLayerInfo:  make(map[int]addedLayerInfo),
+			blobDiffIDs:            make(map[digest.Digest]digest.Digest),
+			indexToTOCDigest:       make(map[int]digest.Digest),
+			diffOutputs:            make(map[int]*graphdriver.DriverWithDifferOutput),
+			indexToAdditionalLayer: make(map[int]storage.AdditionalLayer),
+			filenames:              make(map[digest.Digest]string),
+			fileSizes:              make(map[digest.Digest]int64),
 		},
 	}
 	dest.Compat = impl.AddCompat(dest)
@@ -167,7 +167,7 @@ func (s *storageImageDestination) Reference() types.ImageReference {
 // Close cleans up the temporary directory and additional layer store handlers.
 func (s *storageImageDestination) Close() error {
 	// This is outside of the scope of HasThreadSafePutBlob, so we don’t need to hold s.lock.
-	for _, al := range s.lockProtected.blobAdditionalLayer {
+	for _, al := range s.lockProtected.indexToAdditionalLayer {
 		al.Release()
 	}
 	for _, v := range s.lockProtected.diffOutputs {
@@ -382,14 +382,18 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if options.SrcRef != nil {
+	if options.SrcRef != nil && options.TOCDigest != "" && options.LayerIndex != nil {
 		// Check if we have the layer in the underlying additional layer store.
-		aLayer, err := s.imageRef.transport.store.LookupAdditionalLayer(blobDigest, options.SrcRef.String())
+		aLayer, err := s.imageRef.transport.store.LookupAdditionalLayer(options.TOCDigest, options.SrcRef.String())
 		if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
 			return false, private.ReusedBlob{}, fmt.Errorf(`looking for compressed layers with digest %q and labels: %w`, blobDigest, err)
 		} else if err == nil {
-			s.lockProtected.blobDiffIDs[blobDigest] = aLayer.UncompressedDigest()
-			s.lockProtected.blobAdditionalLayer[blobDigest] = aLayer
+			d := aLayer.TOCDigest()
+			if d == "" {
+				return false, private.ReusedBlob{}, fmt.Errorf(`failed to get TOCDigest of %q: %w`, blobDigest, err)
+			}
+			s.lockProtected.indexToTOCDigest[*options.LayerIndex] = d
+			s.lockProtected.indexToAdditionalLayer[*options.LayerIndex] = aLayer
 			return true, private.ReusedBlob{
 				Digest: blobDigest,
 				Size:   aLayer.CompressedSize(),
@@ -804,7 +808,7 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 	}
 
 	s.lock.Lock()
-	al, ok := s.lockProtected.blobAdditionalLayer[layerDigest]
+	al, ok := s.lockProtected.indexToAdditionalLayer[index]
 	s.lock.Unlock()
 	if ok {
 		layer, err := al.PutAs(newLayerID, parentLayer, nil)
