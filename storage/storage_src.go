@@ -307,9 +307,6 @@ func (s *storageImageSource) LayerInfosForCopy(ctx context.Context, instanceDige
 		if err != nil {
 			return nil, fmt.Errorf("reading layer %q in image %q: %w", layerID, s.image.ID, err)
 		}
-		if layer.UncompressedSize < 0 {
-			layer.UncompressedSize = -1
-		}
 
 		blobDigest := layer.UncompressedDigest
 		if blobDigest == "" {
@@ -331,12 +328,16 @@ func (s *storageImageSource) LayerInfosForCopy(ctx context.Context, instanceDige
 				return nil, fmt.Errorf("parsing expected diffID %q for layer %q: %w", expectedDigest, layerID, err)
 			}
 		}
+		size := layer.UncompressedSize
+		if size < 0 {
+			size = -1
+		}
 		s.getBlobMutex.Lock()
 		s.getBlobMutexProtected.digestToLayerID[blobDigest] = layer.ID
 		s.getBlobMutex.Unlock()
 		blobInfo := types.BlobInfo{
 			Digest:    blobDigest,
-			Size:      layer.UncompressedSize,
+			Size:      size,
 			MediaType: uncompressedLayerType,
 		}
 		physicalBlobInfos = append([]types.BlobInfo{blobInfo}, physicalBlobInfos...)
@@ -455,10 +456,13 @@ func (s *storageImageSource) getSize() (int64, error) {
 		if (layer.TOCDigest == "" && layer.UncompressedDigest == "") || (layer.TOCDigest == "" && layer.UncompressedSize < 0) {
 			return -1, fmt.Errorf("size for layer %q is unknown, failing getSize()", layerID)
 		}
-		if layer.UncompressedSize < 0 {
-			sum = 0
+		// FIXME: We allow layer.UncompressedSize < 0 above, because currently images in an Additional Layer Store don’t provide that value.
+		// Right now, various callers in Podman (and, also, newImage in this package) don’t expect the size computation to fail.
+		// Should we update the callers, or do we need to continue returning inaccurate information here? Or should we pay the cost
+		// to compute the size from the diff?
+		if layer.UncompressedSize >= 0 {
+			sum += layer.UncompressedSize
 		}
-		sum += layer.UncompressedSize
 		if layer.Parent == "" {
 			break
 		}
