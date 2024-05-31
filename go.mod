@@ -94,7 +94,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/letsencrypt/boulder v0.0.0-20230907030200-6d76a0f91e1e // indirect
+	github.com/letsencrypt/boulder v0.0.0-20240418210053-89b07f4543e0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
@@ -140,6 +140,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240318140521-94a12d6c2237 // indirect
 	google.golang.org/grpc v1.62.1 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
-	gopkg.in/go-jose/go-jose.v2 v2.6.3 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
 )
