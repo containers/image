@@ -57,6 +57,7 @@ var v2RegistriesConfEmptyTestData = []struct {
 	{nonempty: true, hasSetField: true, v: V2RegistriesConf{CredentialHelpers: []string{"a"}}},
 	{nonempty: true, hasSetField: true, v: V2RegistriesConf{ShortNameMode: "enforcing"}},
 	{nonempty: true, hasSetField: true, v: V2RegistriesConf{shortNameAliasConf: shortNameAliasConf{Aliases: map[string]string{"a": "example.com/b"}}}},
+	{nonempty: true, hasSetField: true, v: V2RegistriesConf{AdditionalLayerStoreAuthHelper: "example"}},
 }
 
 func TestV2RegistriesConfNonempty(t *testing.T) {

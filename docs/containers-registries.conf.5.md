@@ -19,6 +19,12 @@ Container engines will use the `$HOME/.config/containers/registries.conf` if it 
 `credential-helpers`
 : An array of default credential helpers used as external credential stores.  Note that "containers-auth.json" is a reserved value to use auth files as specified in containers-auth.json(5).  The credential helpers are set to `["containers-auth.json"]` if none are specified.
 
+`additional-layer-store-auth-helper`
+: A string containing the helper binary name. This enables passing registry credentials to an
+  Additional Layer Store every time an image is read using the `docker://`
+  transport so that it can access private registries. See the 'Enabling Additional Layer Store to access to private registries' section below for
+  more details.
+
 ### NAMESPACED `[[registry]]` SETTINGS
 
 The bulk of the configuration is represented as an array of `[[registry]]`
@@ -253,6 +259,30 @@ Given the above, a pull of `example.com/foo/image:latest` will try:
 in order, and use the first one that exists.
 
 Note that a mirror is associated only with the current `[[registry]]` TOML table. If using the example above, pulling the image `registry.com/image:latest` will hence only reach out to `mirror.registry.com`, and the mirrors associated with `example.com/foo` will not be considered.
+
+### Enabling Additional Layer Store to access to private registries
+
+The `additional-layer-store-auth-helper` option enables passing registry
+credentials to an Additional Layer Store so that it can access private registries.
+
+When accessing a private registry via an Additional Layer Store, a helper binary needs to be provided. This helper binary is
+registered via the `additional-layer-store-auth-helper` option. Every time an image
+is read using the `docker://` transport, the specified helper binary is executed
+and receives registry credentials from stdin in the following format.
+
+```json
+{
+  "$image_reference": {
+    "username": "$username",
+    "password": "$password",
+    "identityToken": "$identityToken"
+  }
+}
+```
+
+The format of `$image_reference` is `$repo{:$tag|@$digest}`.
+
+Additional Layer Stores can use this helper binary to access the private registry.
 
 ## VERSION 1 FORMAT - DEPRECATED
 VERSION 1 format is still supported but it does not support
