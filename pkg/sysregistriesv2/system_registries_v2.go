@@ -72,10 +72,10 @@ type Endpoint struct {
 }
 
 // userRegistriesFile is the path to the per user registry configuration file.
-var userRegistriesFile = filepath.FromSlash(".config/containers/registries.conf")
+var userRegistriesFile = filepath.FromSlash("containers/registries.conf")
 
 // userRegistriesDir is the path to the per user registry configuration file.
-var userRegistriesDir = filepath.FromSlash(".config/containers/registries.conf.d")
+var userRegistriesDir = filepath.FromSlash("containers/registries.conf.d")
 
 // rewriteReference will substitute the provided reference `prefix` to the
 // endpoints `location` from the `ref` and creates a new named reference from it.
@@ -564,8 +564,14 @@ func newConfigWrapper(ctx *types.SystemContext) configWrapper {
 // it exists only to allow testing it with an artificial home directory.
 func newConfigWrapperWithHomeDir(ctx *types.SystemContext, homeDir string) configWrapper {
 	var wrapper configWrapper
-	userRegistriesFilePath := filepath.Join(homeDir, userRegistriesFile)
-	userRegistriesDirPath := filepath.Join(homeDir, userRegistriesDir)
+	var configHome string
+	var envVarFound bool
+
+	if configHome, envVarFound = os.LookupEnv("XDG_CONFIG_HOME"); !envVarFound {
+		configHome = filepath.Join(homeDir, ".config")
+	}
+	userRegistriesFilePath := filepath.Join(configHome, userRegistriesFile)
+	userRegistriesDirPath := filepath.Join(configHome, userRegistriesDir)
 
 	// decide configPath using per-user path or system file
 	if ctx != nil && ctx.SystemRegistriesConfPath != "" {
