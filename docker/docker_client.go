@@ -34,6 +34,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -86,11 +87,20 @@ type extensionSignatureList struct {
 	Signatures []extensionSignature `json:"signatures"`
 }
 
+// bearerToken records a cached token we can use to authenticate, or a pending process to obtain one.
+//
+// The goroutine obtaining the token holds lock to block concurrent token requests, and fills the structure (err and possibly the other fields)
+// before releasing the lock.
+// Other goroutines obtain lock to block on the token request, if any; and then inspect err to see if the token is usable.
+// If it is not, they try to get a new one.
 type bearerToken struct {
-	Token          string    `json:"token"`
-	AccessToken    string    `json:"access_token"`
-	ExpiresIn      int       `json:"expires_in"`
-	IssuedAt       time.Time `json:"issued_at"`
+	// lock is held while obtaining the token. Potentially nested inside dockerClient.tokenCacheLock.
+	// This is a counting semaphore only because we need a cancellable lock operation.
+	lock *semaphore.Weighted
+
+	// The following fields can only be accessed with lock held.
+	err            error // nil if the token was successfully obtained (but may be expired); an error if the next lock holder _must_ obtain a new token.
+	token          string
 	expirationTime time.Time
 }
 
@@ -119,7 +129,8 @@ type dockerClient struct {
 	supportsSignatures bool
 
 	// Private state for setupRequestAuth (key: string, value: bearerToken)
-	tokenCache sync.Map
+	tokenCacheLock sync.Mutex // Protects tokenCache.
+	tokenCache     map[string]*bearerToken
 	// Private state for detectProperties:
 	detectPropertiesOnce  sync.Once // detectPropertiesOnce is used to execute detectProperties() at most once.
 	detectPropertiesError error     // detectPropertiesError caches the initial error.
@@ -146,25 +157,6 @@ const (
 	// no authentication, works for both v1 and v2.
 	noAuth
 )
-
-func newBearerTokenFromJSONBlob(blob []byte) (*bearerToken, error) {
-	token := new(bearerToken)
-	if err := json.Unmarshal(blob, &token); err != nil {
-		return nil, err
-	}
-	if token.Token == "" {
-		token.Token = token.AccessToken
-	}
-	if token.ExpiresIn < minimumTokenLifetimeSeconds {
-		token.ExpiresIn = minimumTokenLifetimeSeconds
-		logrus.Debugf("Increasing token expiration to: %d seconds", token.ExpiresIn)
-	}
-	if token.IssuedAt.IsZero() {
-		token.IssuedAt = time.Now().UTC()
-	}
-	token.expirationTime = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
-	return token, nil
-}
 
 // dockerCertDir returns a path to a directory to be consumed by tlsclientconfig.SetupCertificates() depending on ctx and hostPort.
 func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
@@ -290,6 +282,7 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 		registry:         registry,
 		userAgent:        userAgent,
 		tlsClientConfig:  tlsClientConfig,
+		tokenCache:       map[string]*bearerToken{},
 		reportedWarnings: set.New[string](),
 	}, nil
 }
@@ -733,50 +726,11 @@ func (c *dockerClient) setupRequestAuth(req *http.Request, extraScope *authScope
 			req.SetBasicAuth(c.auth.Username, c.auth.Password)
 			return nil
 		case "bearer":
-			registryToken := c.registryToken
-			if registryToken == "" {
-				cacheKey := ""
-				scopes := []authScope{c.scope}
-				if extraScope != nil {
-					// Using ':' as a separator here is unambiguous because getBearerToken below
-					// uses the same separator when formatting a remote request (and because
-					// repository names that we create can't contain colons, and extraScope values
-					// coming from a server come from `parseAuthScope`, which also splits on colons).
-					cacheKey = fmt.Sprintf("%s:%s:%s", extraScope.resourceType, extraScope.remoteName, extraScope.actions)
-					if colonCount := strings.Count(cacheKey, ":"); colonCount != 2 {
-						return fmt.Errorf(
-							"Internal error: there must be exactly 2 colons in the cacheKey ('%s') but got %d",
-							cacheKey,
-							colonCount,
-						)
-					}
-					scopes = append(scopes, *extraScope)
-				}
-				var token bearerToken
-				t, inCache := c.tokenCache.Load(cacheKey)
-				if inCache {
-					token = t.(bearerToken)
-				}
-				if !inCache || time.Now().After(token.expirationTime) {
-					var (
-						t   *bearerToken
-						err error
-					)
-					if c.auth.IdentityToken != "" {
-						t, err = c.getBearerTokenOAuth2(req.Context(), challenge, scopes)
-					} else {
-						t, err = c.getBearerToken(req.Context(), challenge, scopes)
-					}
-					if err != nil {
-						return err
-					}
-
-					token = *t
-					c.tokenCache.Store(cacheKey, token)
-				}
-				registryToken = token.Token
+			token, err := c.obtainBearerToken(req.Context(), challenge, extraScope)
+			if err != nil {
+				return err
 			}
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", registryToken))
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 			return nil
 		default:
 			logrus.Debugf("no handler for %s authentication", challenge.Scheme)
@@ -786,16 +740,115 @@ func (c *dockerClient) setupRequestAuth(req *http.Request, extraScope *authScope
 	return nil
 }
 
-func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge challenge,
-	scopes []authScope) (*bearerToken, error) {
+// obtainBearerToken gets an "Authorization: Bearer" token if one is available, or obtains a fresh one.
+func (c *dockerClient) obtainBearerToken(ctx context.Context, challenge challenge, extraScope *authScope) (string, error) {
+	if c.registryToken != "" {
+		return c.registryToken, nil
+	}
+
+	cacheKey := ""
+	scopes := []authScope{c.scope}
+	if extraScope != nil {
+		// Using ':' as a separator here is unambiguous because getBearerToken below
+		// uses the same separator when formatting a remote request (and because
+		// repository names that we create can't contain colons, and extraScope values
+		// coming from a server come from `parseAuthScope`, which also splits on colons).
+		cacheKey = fmt.Sprintf("%s:%s:%s", extraScope.resourceType, extraScope.remoteName, extraScope.actions)
+		if colonCount := strings.Count(cacheKey, ":"); colonCount != 2 {
+			return "", fmt.Errorf(
+				"Internal error: there must be exactly 2 colons in the cacheKey ('%s') but got %d",
+				cacheKey,
+				colonCount,
+			)
+		}
+		scopes = append(scopes, *extraScope)
+	}
+
+	logrus.Debugf("REMOVE: Checking token cache for key %q", cacheKey)
+	token, newEntry, err := func() (*bearerToken, bool, error) { // A scope for defer
+		c.tokenCacheLock.Lock()
+		defer c.tokenCacheLock.Unlock()
+		token, ok := c.tokenCache[cacheKey]
+		if ok {
+			return token, false, nil
+		} else {
+			logrus.Debugf("REMOVE: No token cache for key %q, allocating one…", cacheKey)
+			token = &bearerToken{
+				lock: semaphore.NewWeighted(1),
+			}
+			// If this is a new *bearerToken, lock the entry before adding it to the cache, so that any other goroutine that finds
+			// this entry blocks until we obtain the token for the first time, and does not see an empty object
+			// (and does not try to obtain the token itself when we are going to do so).
+			if err := token.lock.Acquire(ctx, 1); err != nil {
+				// We do not block on this Acquire, so we don’t really expect to fail here — but if ctx is canceled,
+				// there is no point in trying to continue anyway.
+				return nil, false, err
+			}
+			c.tokenCache[cacheKey] = token
+			return token, true, nil
+		}
+	}()
+	if err != nil {
+		return "", err
+	}
+	if !newEntry {
+		// If this is an existing *bearerToken, obtain the lock only after releasing c.tokenCacheLock,
+		// so that users of other cacheKey values are not blocked for the whole duration of our HTTP roundtrip.
+		logrus.Debugf("REMOVE: Found existing token cache for key %q, getting lock", cacheKey)
+		if err := token.lock.Acquire(ctx, 1); err != nil {
+			return "", err
+		}
+		logrus.Debugf("REMOVE: Locked existing token cache for key %q", cacheKey)
+	}
+
+	defer token.lock.Release(1)
+
+	// Determine if the bearerToken is usable: if it is not, log the cause and fall through, otherwise return early.
+	switch {
+	case newEntry:
+		logrus.Debugf("REMOVE: New token cache entry for key %q, getting first token", cacheKey)
+	case token.err != nil:
+		// If obtaining a token fails for any reason, the request that triggered that will fail;
+		// other requests will see token.err and try obtaining their own token, one goroutine at a time.
+		// (Consider that a request can fail because a very short timeout was provided to _that one operation_ using a context.Context;
+		// that clearly shouldn’t prevent other operations from trying with a longer timeout.)
+		//
+		// If we got here while holding token.lock, we are the goroutine responsible for trying again; others are blocked
+		// on token.lock.
+		logrus.Debugf("REMOVE: Token cache for key %q records failure %v, getting new token", cacheKey, token.err)
+	case time.Now().After(token.expirationTime):
+		logrus.Debugf("REMOVE: Token cache for key %q is expired, getting new token", cacheKey)
+
+	default:
+		return token.token, nil
+	}
+
+	if c.auth.IdentityToken != "" {
+		err = c.getBearerTokenOAuth2(ctx, token, challenge, scopes)
+	} else {
+		err = c.getBearerToken(ctx, token, challenge, scopes)
+	}
+	logrus.Debugf("REMOVE: Obtaining a token for key %q, error %v", cacheKey, err)
+	token.err = err
+	if token.err != nil {
+		return "", token.err
+	}
+	return token.token, nil
+}
+
+// getBearerTokenOAuth2 obtains an "Authorization: Bearer" token using a pre-existing identity token per
+// https://github.com/distribution/distribution/blob/main/docs/spec/auth/oauth.md for challenge and scopes,
+// and writes it into dest.
+func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, dest *bearerToken, challenge challenge,
+	scopes []authScope) error {
 	realm, ok := challenge.Parameters["realm"]
 	if !ok {
-		return nil, errors.New("missing realm in bearer auth challenge")
+		return errors.New("missing realm in bearer auth challenge")
 	}
 
 	authReq, err := http.NewRequestWithContext(ctx, http.MethodPost, realm, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Make the form data required against the oauth2 authentication
@@ -820,31 +873,34 @@ func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge chall
 	logrus.Debugf("%s %s", authReq.Method, authReq.URL.Redacted())
 	res, err := c.client.Do(authReq)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer res.Body.Close()
 	if err := httpResponseToError(res, "Trying to obtain access token"); err != nil {
-		return nil, err
+		return err
 	}
 
 	tokenBlob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxAuthTokenBodySize)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return newBearerTokenFromJSONBlob(tokenBlob)
+	return dest.readFromJSONBlob(tokenBlob)
 }
 
-func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
-	scopes []authScope) (*bearerToken, error) {
+// getBearerToken obtains an "Authorization: Bearer" token using a GET request, per
+// https://github.com/distribution/distribution/blob/main/docs/spec/auth/token.md for challenge and scopes,
+// and writes it into dest.
+func (c *dockerClient) getBearerToken(ctx context.Context, dest *bearerToken, challenge challenge,
+	scopes []authScope) error {
 	realm, ok := challenge.Parameters["realm"]
 	if !ok {
-		return nil, errors.New("missing realm in bearer auth challenge")
+		return errors.New("missing realm in bearer auth challenge")
 	}
 
 	authReq, err := http.NewRequestWithContext(ctx, http.MethodGet, realm, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	params := authReq.URL.Query()
@@ -872,18 +928,47 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
 	logrus.Debugf("%s %s", authReq.Method, authReq.URL.Redacted())
 	res, err := c.client.Do(authReq)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer res.Body.Close()
 	if err := httpResponseToError(res, "Requesting bearer token"); err != nil {
-		return nil, err
+		return err
 	}
 	tokenBlob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxAuthTokenBodySize)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return newBearerTokenFromJSONBlob(tokenBlob)
+	return dest.readFromJSONBlob(tokenBlob)
+}
+
+// readFromJSONBlob sets token data in dest from the provided JSON.
+func (bt *bearerToken) readFromJSONBlob(blob []byte) error {
+	var token struct {
+		Token          string    `json:"token"`
+		AccessToken    string    `json:"access_token"`
+		ExpiresIn      int       `json:"expires_in"`
+		IssuedAt       time.Time `json:"issued_at"`
+		expirationTime time.Time
+	}
+	if err := json.Unmarshal(blob, &token); err != nil {
+		return err
+	}
+
+	bt.token = token.Token
+	if bt.token == "" {
+		bt.token = token.AccessToken
+	}
+
+	if token.ExpiresIn < minimumTokenLifetimeSeconds {
+		token.ExpiresIn = minimumTokenLifetimeSeconds
+		logrus.Debugf("Increasing token expiration to: %d seconds", token.ExpiresIn)
+	}
+	if token.IssuedAt.IsZero() {
+		token.IssuedAt = time.Now().UTC()
+	}
+	bt.expirationTime = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
+	return nil
 }
 
 // detectPropertiesHelper performs the work of detectProperties which executes
