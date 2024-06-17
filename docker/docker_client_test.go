@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -91,7 +93,20 @@ func TestDockerCertDir(t *testing.T) {
 	}
 }
 
-func TestNewBearerTokenFromJSONBlob(t *testing.T) {
+// testTokenHTTPResponse creates just enough of a *http.Response to work with newBearerTokenFromHTTPResponseBody.
+func testTokenHTTPResponse(t *testing.T, body string) *http.Response {
+	requestURL, err := url.Parse("https://example.com/token")
+	require.NoError(t, err)
+	return &http.Response{
+		Body: io.NopCloser(bytes.NewReader([]byte(body))),
+		Request: &http.Request{
+			Method: "",
+			URL:    requestURL,
+		},
+	}
+}
+
+func TestNewBearerTokenFromHTTPResponseBody(t *testing.T) {
 	for _, c := range []struct {
 		input    string
 		expected *bearerToken // or nil if a failure is expected
@@ -113,7 +128,7 @@ func TestNewBearerTokenFromJSONBlob(t *testing.T) {
 			expected: &bearerToken{Token: "IAmAToken", ExpiresIn: 60, IssuedAt: time.Unix(1514800802, 0)},
 		},
 	} {
-		token, err := newBearerTokenFromJSONBlob([]byte(c.input))
+		token, err := newBearerTokenFromHTTPResponseBody(testTokenHTTPResponse(t, c.input))
 		if c.expected == nil {
 			assert.Error(t, err, c.input)
 		} else {
@@ -126,11 +141,11 @@ func TestNewBearerTokenFromJSONBlob(t *testing.T) {
 	}
 }
 
-func TestNewBearerTokenFromJSONBlobIssuedAtZero(t *testing.T) {
+func TestNewBearerTokenFromHTTPResponseBodyIssuedAtZero(t *testing.T) {
 	zeroTime := time.Time{}.Format(time.RFC3339)
 	now := time.Now()
-	tokenBlob := []byte(fmt.Sprintf(`{"token":"IAmAToken","expires_in":100,"issued_at":"%s"}`, zeroTime))
-	token, err := newBearerTokenFromJSONBlob(tokenBlob)
+	tokenBlob := fmt.Sprintf(`{"token":"IAmAToken","expires_in":100,"issued_at":"%s"}`, zeroTime)
+	token, err := newBearerTokenFromHTTPResponseBody(testTokenHTTPResponse(t, string(tokenBlob)))
 	require.NoError(t, err)
 	assert.False(t, token.IssuedAt.Before(now), "expected [%s] not to be before [%s]", token.IssuedAt, now)
 }
