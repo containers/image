@@ -91,72 +91,48 @@ func TestDockerCertDir(t *testing.T) {
 	}
 }
 
-func TestNewBearerTokenFromJsonBlob(t *testing.T) {
-	expected := &bearerToken{Token: "IAmAToken", ExpiresIn: 100, IssuedAt: time.Unix(1514800802, 0)}
-	tokenBlob := []byte(`{"token":"IAmAToken","expires_in":100,"issued_at":"2018-01-01T10:00:02+00:00"}`)
-	token, err := newBearerTokenFromJSONBlob(tokenBlob)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestNewBearerTokenFromJSONBlob(t *testing.T) {
+	for _, c := range []struct {
+		input    string
+		expected *bearerToken // or nil if a failure is expected
+	}{
+		{ // Invalid JSON
+			input:    "IAmNotJson",
+			expected: nil,
+		},
+		{ // "token"
+			input:    `{"token":"IAmAToken","expires_in":100,"issued_at":"2018-01-01T10:00:02+00:00"}`,
+			expected: &bearerToken{Token: "IAmAToken", ExpiresIn: 100, IssuedAt: time.Unix(1514800802, 0)},
+		},
+		{ // "access_token"
+			input:    `{"access_token":"IAmAToken","expires_in":100,"issued_at":"2018-01-01T10:00:02+00:00"}`,
+			expected: &bearerToken{Token: "IAmAToken", ExpiresIn: 100, IssuedAt: time.Unix(1514800802, 0)},
+		},
+		{ // Small expiry
+			input:    `{"token":"IAmAToken","expires_in":1,"issued_at":"2018-01-01T10:00:02+00:00"}`,
+			expected: &bearerToken{Token: "IAmAToken", ExpiresIn: 60, IssuedAt: time.Unix(1514800802, 0)},
+		},
+	} {
+		token, err := newBearerTokenFromJSONBlob([]byte(c.input))
+		if c.expected == nil {
+			assert.Error(t, err, c.input)
+		} else {
+			require.NoError(t, err, c.input)
+			assert.Equal(t, c.expected.Token, token.Token, c.input)
+			assert.Equal(t, c.expected.ExpiresIn, token.ExpiresIn, c.input)
+			assert.True(t, c.expected.IssuedAt.Equal(token.IssuedAt),
+				"expected [%s] to equal [%s], it did not", token.IssuedAt, c.expected.IssuedAt)
+		}
 	}
-
-	assertBearerTokensEqual(t, expected, token)
 }
 
-func TestNewBearerAccessTokenFromJsonBlob(t *testing.T) {
-	expected := &bearerToken{Token: "IAmAToken", ExpiresIn: 100, IssuedAt: time.Unix(1514800802, 0)}
-	tokenBlob := []byte(`{"access_token":"IAmAToken","expires_in":100,"issued_at":"2018-01-01T10:00:02+00:00"}`)
-	token, err := newBearerTokenFromJSONBlob(tokenBlob)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assertBearerTokensEqual(t, expected, token)
-}
-
-func TestNewBearerTokenFromInvalidJsonBlob(t *testing.T) {
-	tokenBlob := []byte("IAmNotJson")
-	_, err := newBearerTokenFromJSONBlob(tokenBlob)
-	if err == nil {
-		t.Fatalf("unexpected an error unmarshaling JSON")
-	}
-}
-
-func TestNewBearerTokenSmallExpiryFromJsonBlob(t *testing.T) {
-	expected := &bearerToken{Token: "IAmAToken", ExpiresIn: 60, IssuedAt: time.Unix(1514800802, 0)}
-	tokenBlob := []byte(`{"token":"IAmAToken","expires_in":1,"issued_at":"2018-01-01T10:00:02+00:00"}`)
-	token, err := newBearerTokenFromJSONBlob(tokenBlob)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assertBearerTokensEqual(t, expected, token)
-}
-
-func TestNewBearerTokenIssuedAtZeroFromJsonBlob(t *testing.T) {
+func TestNewBearerTokenFromJSONBlobIssuedAtZero(t *testing.T) {
 	zeroTime := time.Time{}.Format(time.RFC3339)
 	now := time.Now()
 	tokenBlob := []byte(fmt.Sprintf(`{"token":"IAmAToken","expires_in":100,"issued_at":"%s"}`, zeroTime))
 	token, err := newBearerTokenFromJSONBlob(tokenBlob)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if token.IssuedAt.Before(now) {
-		t.Fatalf("expected [%s] not to be before [%s]", token.IssuedAt, now)
-	}
-
-}
-
-func assertBearerTokensEqual(t *testing.T, expected, subject *bearerToken) {
-	if expected.Token != subject.Token {
-		t.Fatalf("expected [%s] to equal [%s], it did not", subject.Token, expected.Token)
-	}
-	if expected.ExpiresIn != subject.ExpiresIn {
-		t.Fatalf("expected [%d] to equal [%d], it did not", subject.ExpiresIn, expected.ExpiresIn)
-	}
-	if !expected.IssuedAt.Equal(subject.IssuedAt) {
-		t.Fatalf("expected [%s] to equal [%s], it did not", subject.IssuedAt, expected.IssuedAt)
-	}
+	require.NoError(t, err)
+	assert.False(t, token.IssuedAt.Before(now), "expected [%s] not to be before [%s]", token.IssuedAt, now)
 }
 
 func TestUserAgent(t *testing.T) {
