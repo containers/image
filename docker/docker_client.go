@@ -157,7 +157,12 @@ func newBearerTokenFromHTTPResponseBody(res *http.Response) (*bearerToken, error
 
 	token := new(bearerToken)
 	if err := json.Unmarshal(blob, &token); err != nil {
-		return nil, err
+		const bodySampleLength = 50
+		bodySample := blob
+		if len(bodySample) > bodySampleLength {
+			bodySample = bodySample[:bodySampleLength]
+		}
+		return nil, fmt.Errorf("decoding bearer token (last URL %q, body start %q): %w", res.Request.URL.Redacted(), string(bodySample), err)
 	}
 	if token.Token == "" {
 		token.Token = token.AccessToken
