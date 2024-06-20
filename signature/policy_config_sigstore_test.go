@@ -20,7 +20,9 @@ func xNewPRSigstoreSigned(options ...PRSigstoreSignedOption) PolicyRequirement {
 
 func TestNewPRSigstoreSigned(t *testing.T) {
 	const testKeyPath = "/foo/bar"
+	const testKeyPath2 = "/baz/bar"
 	testKeyData := []byte("abc")
+	testKeyData2 := []byte("def")
 	testFulcio, err := NewPRSigstoreSignedFulcio(
 		PRSigstoreSignedFulcioWithCAPath("fixtures/fulcio_v1.crt.pem"),
 		PRSigstoreSignedFulcioWithOIDCIssuer("https://github.com/login/oauth"),
@@ -52,6 +54,18 @@ func TestNewPRSigstoreSigned(t *testing.T) {
 		},
 		{
 			options: []PRSigstoreSignedOption{
+				PRSigstoreSignedWithKeyPaths([]string{testKeyPath, testKeyPath2}),
+				PRSigstoreSignedWithSignedIdentity(testIdentity),
+			},
+			expected: prSigstoreSigned{
+				prCommon:       prCommon{prTypeSigstoreSigned},
+				KeyPaths:       []string{testKeyPath, testKeyPath2},
+				Fulcio:         nil,
+				SignedIdentity: testIdentity,
+			},
+		},
+		{
+			options: []PRSigstoreSignedOption{
 				PRSigstoreSignedWithKeyData(testKeyData),
 				PRSigstoreSignedWithSignedIdentity(testIdentity),
 			},
@@ -59,6 +73,19 @@ func TestNewPRSigstoreSigned(t *testing.T) {
 				prCommon:       prCommon{prTypeSigstoreSigned},
 				KeyPath:        "",
 				KeyData:        testKeyData,
+				Fulcio:         nil,
+				SignedIdentity: testIdentity,
+			},
+		},
+		{
+			options: []PRSigstoreSignedOption{
+				PRSigstoreSignedWithKeyDatas([][]byte{testKeyData, testKeyData2}),
+				PRSigstoreSignedWithSignedIdentity(testIdentity),
+			},
+			expected: prSigstoreSigned{
+				prCommon:       prCommon{prTypeSigstoreSigned},
+				KeyPath:        "",
+				KeyDatas:       [][]byte{testKeyData, testKeyData2},
 				Fulcio:         nil,
 				SignedIdentity: testIdentity,
 			},
@@ -146,9 +173,31 @@ func TestNewPRSigstoreSigned(t *testing.T) {
 			PRSigstoreSignedWithKeyPath(testKeyPath + "1"),
 			PRSigstoreSignedWithSignedIdentity(testIdentity),
 		},
+		{ // empty keypaths
+			PRSigstoreSignedWithKeyPaths([]string{}),
+		},
 		{ // Duplicate keyData
 			PRSigstoreSignedWithKeyData(testKeyData),
 			PRSigstoreSignedWithKeyData([]byte("def")),
+			PRSigstoreSignedWithSignedIdentity(testIdentity),
+		},
+		{ // empty keydatas
+			PRSigstoreSignedWithKeyDatas([][]byte{}),
+		},
+		{ // Duplicate keyData
+			PRSigstoreSignedWithKeyPath(testKeyPath),
+			PRSigstoreSignedWithRekorPublicKeyData(testRekorKeyData),
+			PRSigstoreSignedWithRekorPublicKeyData([]byte("def")),
+			PRSigstoreSignedWithSignedIdentity(testIdentity),
+		},
+		{ // keyPath & keyPaths both set
+			PRSigstoreSignedWithKeyPaths([]string{"foobar"}),
+			PRSigstoreSignedWithSignedIdentity(testIdentity),
+			PRSigstoreSignedWithKeyPath("foobar"),
+		},
+		{ // keyData & keyDatas both set
+			PRSigstoreSignedWithKeyDatas([][]byte{[]byte("foo")}),
+			PRSigstoreSignedWithKeyData([]byte("bar")),
 			PRSigstoreSignedWithSignedIdentity(testIdentity),
 		},
 		{ // Duplicate fulcio
@@ -173,16 +222,10 @@ func TestNewPRSigstoreSigned(t *testing.T) {
 			PRSigstoreSignedWithRekorPublicKeyPath(testRekorKeyPath + "1"),
 			PRSigstoreSignedWithSignedIdentity(testIdentity),
 		},
-		{ // Duplicate keyData
-			PRSigstoreSignedWithKeyPath(testKeyPath),
-			PRSigstoreSignedWithRekorPublicKeyData(testRekorKeyData),
-			PRSigstoreSignedWithRekorPublicKeyData([]byte("def")),
-			PRSigstoreSignedWithSignedIdentity(testIdentity),
-		},
 		{ // Missing signedIdentity
 			PRSigstoreSignedWithKeyPath(testKeyPath),
 		},
-		{ // Duplicate signedIdentity}
+		{ // Duplicate signedIdentity
 			PRSigstoreSignedWithKeyPath(testKeyPath),
 			PRSigstoreSignedWithSignedIdentity(testIdentity),
 			PRSigstoreSignedWithSignedIdentity(newPRMMatchRepository()),
