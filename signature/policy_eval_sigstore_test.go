@@ -131,7 +131,7 @@ func TestPRSigstoreSignedPrepareTrustRoot(t *testing.T) {
 	require.NoError(t, err)
 	res, err := pr.prepareTrustRoot()
 	require.NoError(t, err)
-	assert.Nil(t, res.publicKey)
+	assert.Len(t, res.publicKey, 0)
 	assert.NotNil(t, res.fulcio)
 	assert.NotNil(t, res.rekorPublicKey)
 	// Success with Rekor public key
@@ -326,6 +326,7 @@ func TestPRrSigstoreSignedIsSignatureAccepted(t *testing.T) {
 	)
 	require.NoError(t, err)
 	sar, err = pr.isSignatureAccepted(context.Background(), testKeyRekorImage, testKeyRekorImageSig)
+	require.NoError(t, err)
 	assertAccepted(sar, err)
 
 	// key+Rekor, missing Rekor SET annotation
@@ -365,6 +366,7 @@ func TestPRrSigstoreSignedIsSignatureAccepted(t *testing.T) {
 	require.NoError(t, err)
 	sar, err = pr.isSignatureAccepted(context.Background(), testFulcioRekorImage,
 		testFulcioRekorImageSig)
+	require.NoError(t, err)
 	assertAccepted(sar, err)
 
 	// Fulcio, no Rekor requirement

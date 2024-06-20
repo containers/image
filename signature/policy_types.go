@@ -111,11 +111,13 @@ type prSignedBaseLayer struct {
 type prSigstoreSigned struct {
 	prCommon
 
-	// KeyPath is a pathname to a local file containing the trusted key. Exactly one of KeyPath, KeyData, Fulcio must be specified.
+	// KeyPath is a pathname to a local file containing the trusted key. Exactly one of KeyPath, KeyPaths, Fulcio must be specified.
 	KeyPath string `json:"keyPath,omitempty"`
 	// KeyData contains the trusted key, base64-encoded. Exactly one of KeyPath, KeyData, Fulcio must be specified.
 	KeyData []byte `json:"keyData,omitempty"`
-	// FIXME: Multiple public keys?
+
+	// KeyPaths if a set of pathnames to local files containing the trusted key(s). Exactly one of KeyPath, KeyPaths, KeyData or Fulcio must be specified.
+	KeyPaths []string `json:"keyPaths,omitempty"`
 
 	// Fulcio specifies which Fulcio-generated certificates are accepted. Exactly one of KeyPath, KeyData, Fulcio must be specified.
 	// If Fulcio is specified, one of RekorPublicKeyPath or RekorPublicKeyData must be specified as well.
