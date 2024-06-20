@@ -2,6 +2,7 @@ package sigstore
 
 import (
 	"context"
+	"crypto"
 	"os"
 	"path/filepath"
 	"testing"
@@ -44,7 +45,7 @@ func TestGenerateKeyPair(t *testing.T) {
 	publicKey, err := cryptoutils.UnmarshalPEMToPublicKey(keyPair.PublicKey)
 	require.NoError(t, err)
 
-	_, err = internal.VerifySigstorePayload(publicKey, sig.UntrustedPayload(),
+	_, err = internal.VerifySigstorePayload([]crypto.PublicKey{publicKey}, sig.UntrustedPayload(),
 		sig.UntrustedAnnotations()[signature.SigstoreSignatureAnnotationKey],
 		internal.SigstorePayloadAcceptanceRules{
 			ValidateSignedDockerReference: func(ref string) error {
