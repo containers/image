@@ -21,6 +21,20 @@ func PRSigstoreSignedWithKeyPath(keyPath string) PRSigstoreSignedOption {
 	}
 }
 
+// PRSigstoreSignedWithKeyPaths specifies a value for the "keyPaths" field when calling NewPRSigstoreSigned.
+func PRSigstoreSignedWithKeyPaths(keyPaths []string) PRSigstoreSignedOption {
+	return func(pr *prSigstoreSigned) error {
+		if pr.KeyPaths != nil {
+			return InvalidPolicyFormatError(`"keyPaths" already specified`)
+		}
+		if len(keyPaths) == 0 {
+			return InvalidPolicyFormatError(`"keyPaths" contains no entries`)
+		}
+		pr.KeyPaths = keyPaths
+		return nil
+	}
+}
+
 // PRSigstoreSignedWithKeyData specifies a value for the "keyData" field when calling NewPRSigstoreSigned.
 func PRSigstoreSignedWithKeyData(keyData []byte) PRSigstoreSignedOption {
 	return func(pr *prSigstoreSigned) error {
@@ -28,6 +42,20 @@ func PRSigstoreSignedWithKeyData(keyData []byte) PRSigstoreSignedOption {
 			return InvalidPolicyFormatError(`"keyData" already specified`)
 		}
 		pr.KeyData = keyData
+		return nil
+	}
+}
+
+// PRSigstoreSignedWithKeyDatas specifies a value for the "keyDatas" field when calling NewPRSigstoreSigned.
+func PRSigstoreSignedWithKeyDatas(keyDatas [][]byte) PRSigstoreSignedOption {
+	return func(pr *prSigstoreSigned) error {
+		if pr.KeyDatas != nil {
+			return InvalidPolicyFormatError(`"keyDatas" already specified`)
+		}
+		if len(keyDatas) == 0 {
+			return InvalidPolicyFormatError(`"keyDatas" contains no entries`)
+		}
+		pr.KeyDatas = keyDatas
 		return nil
 	}
 }
@@ -91,14 +119,20 @@ func newPRSigstoreSigned(options ...PRSigstoreSignedOption) (*prSigstoreSigned, 
 	if res.KeyPath != "" {
 		keySources++
 	}
+	if res.KeyPaths != nil {
+		keySources++
+	}
 	if res.KeyData != nil {
+		keySources++
+	}
+	if res.KeyDatas != nil {
 		keySources++
 	}
 	if res.Fulcio != nil {
 		keySources++
 	}
 	if keySources != 1 {
-		return nil, InvalidPolicyFormatError("exactly one of keyPath, keyData and fulcio must be specified")
+		return nil, InvalidPolicyFormatError("exactly one of keyPath, keyPaths, keyData, keyDatas and fulcio must be specified")
 	}
 
 	if res.RekorPublicKeyPath != "" && res.RekorPublicKeyData != nil {
@@ -143,7 +177,7 @@ var _ json.Unmarshaler = (*prSigstoreSigned)(nil)
 func (pr *prSigstoreSigned) UnmarshalJSON(data []byte) error {
 	*pr = prSigstoreSigned{}
 	var tmp prSigstoreSigned
-	var gotKeyPath, gotKeyData, gotFulcio, gotRekorPublicKeyPath, gotRekorPublicKeyData bool
+	var gotKeyPath, gotKeyPaths, gotKeyData, gotKeyDatas, gotFulcio, gotRekorPublicKeyPath, gotRekorPublicKeyData bool
 	var fulcio prSigstoreSignedFulcio
 	var signedIdentity json.RawMessage
 	if err := internal.ParanoidUnmarshalJSONObject(data, func(key string) any {
@@ -153,9 +187,15 @@ func (pr *prSigstoreSigned) UnmarshalJSON(data []byte) error {
 		case "keyPath":
 			gotKeyPath = true
 			return &tmp.KeyPath
+		case "keyPaths":
+			gotKeyPaths = true
+			return &tmp.KeyPaths
 		case "keyData":
 			gotKeyData = true
 			return &tmp.KeyData
+		case "keyDatas":
+			gotKeyDatas = true
+			return &tmp.KeyDatas
 		case "fulcio":
 			gotFulcio = true
 			return &fulcio
@@ -191,8 +231,14 @@ func (pr *prSigstoreSigned) UnmarshalJSON(data []byte) error {
 	if gotKeyPath {
 		opts = append(opts, PRSigstoreSignedWithKeyPath(tmp.KeyPath))
 	}
+	if gotKeyPaths {
+		opts = append(opts, PRSigstoreSignedWithKeyPaths(tmp.KeyPaths))
+	}
 	if gotKeyData {
 		opts = append(opts, PRSigstoreSignedWithKeyData(tmp.KeyData))
+	}
+	if gotKeyDatas {
+		opts = append(opts, PRSigstoreSignedWithKeyDatas(tmp.KeyDatas))
 	}
 	if gotFulcio {
 		opts = append(opts, PRSigstoreSignedWithFulcio(&fulcio))

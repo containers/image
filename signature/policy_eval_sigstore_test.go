@@ -89,7 +89,10 @@ func TestPRSigstoreSignedFulcioPrepareTrustRoot(t *testing.T) {
 
 func TestPRSigstoreSignedPrepareTrustRoot(t *testing.T) {
 	const testKeyPath = "fixtures/cosign.pub"
+	const testKeyPath2 = "fixtures/cosign2.pub"
 	testKeyData, err := os.ReadFile(testKeyPath)
+	require.NoError(t, err)
+	testKeyData2, err := os.ReadFile(testKeyPath2)
 	require.NoError(t, err)
 	testFulcio, err := NewPRSigstoreSignedFulcio(
 		PRSigstoreSignedFulcioWithCAPath("fixtures/fulcio_v1.crt.pem"),
@@ -104,21 +107,21 @@ func TestPRSigstoreSignedPrepareTrustRoot(t *testing.T) {
 	testIdentityOption := PRSigstoreSignedWithSignedIdentity(testIdentity)
 
 	// Success with public key
-	for _, c := range [][]PRSigstoreSignedOption{
-		{
-			PRSigstoreSignedWithKeyPath(testKeyPath),
-			testIdentityOption,
-		},
-		{
-			PRSigstoreSignedWithKeyData(testKeyData),
-			testIdentityOption,
-		},
+	for _, c := range []struct {
+		option  PRSigstoreSignedOption
+		numKeys int
+	}{
+		{PRSigstoreSignedWithKeyPath(testKeyPath), 1},
+		{PRSigstoreSignedWithKeyPaths([]string{testKeyPath, testKeyPath2}), 2},
+		{PRSigstoreSignedWithKeyData(testKeyData), 1},
+		{PRSigstoreSignedWithKeyDatas([][]byte{testKeyData, testKeyData2}), 2},
 	} {
-		pr, err := newPRSigstoreSigned(c...)
+		pr, err := newPRSigstoreSigned(c.option, testIdentityOption)
 		require.NoError(t, err)
 		res, err := pr.prepareTrustRoot()
 		require.NoError(t, err)
-		assert.NotNil(t, res.publicKey)
+		assert.NotNil(t, res.publicKeys)
+		assert.Len(t, res.publicKeys, c.numKeys)
 		assert.Nil(t, res.fulcio)
 		assert.Nil(t, res.rekorPublicKey)
 	}
@@ -131,7 +134,7 @@ func TestPRSigstoreSignedPrepareTrustRoot(t *testing.T) {
 	require.NoError(t, err)
 	res, err := pr.prepareTrustRoot()
 	require.NoError(t, err)
-	assert.Nil(t, res.publicKey)
+	assert.Nil(t, res.publicKeys)
 	assert.NotNil(t, res.fulcio)
 	assert.NotNil(t, res.rekorPublicKey)
 	// Success with Rekor public key
@@ -142,7 +145,17 @@ func TestPRSigstoreSignedPrepareTrustRoot(t *testing.T) {
 			testIdentityOption,
 		},
 		{
+			PRSigstoreSignedWithKeyPaths([]string{testKeyPath, testKeyPath2}),
+			PRSigstoreSignedWithRekorPublicKeyPath(testRekorPublicKeyPath),
+			testIdentityOption,
+		},
+		{
 			PRSigstoreSignedWithKeyData(testKeyData),
+			PRSigstoreSignedWithRekorPublicKeyData(testRekorPublicKeyData),
+			testIdentityOption,
+		},
+		{
+			PRSigstoreSignedWithKeyDatas([][]byte{testKeyData, testKeyData2}),
 			PRSigstoreSignedWithRekorPublicKeyData(testRekorPublicKeyData),
 			testIdentityOption,
 		},
@@ -151,7 +164,7 @@ func TestPRSigstoreSignedPrepareTrustRoot(t *testing.T) {
 		require.NoError(t, err)
 		res, err := pr.prepareTrustRoot()
 		require.NoError(t, err)
-		assert.NotNil(t, res.publicKey)
+		assert.NotNil(t, res.publicKeys)
 		assert.Nil(t, res.fulcio)
 		assert.NotNil(t, res.rekorPublicKey)
 	}
@@ -171,8 +184,50 @@ func TestPRSigstoreSignedPrepareTrustRoot(t *testing.T) {
 			KeyPath:        "fixtures/this/does/not/exist",
 			SignedIdentity: testIdentity,
 		},
+		{ // Both KeyPath and KeyPaths specified
+			KeyPath:        testKeyPath,
+			KeyPaths:       []string{testKeyPath, testKeyPath2},
+			SignedIdentity: testIdentity,
+		},
+		{ // Empty KeyPaths
+			KeyPaths:       []string{},
+			SignedIdentity: testIdentity,
+		},
+		{ // Invalid KeyPaths element
+			KeyPaths:       []string{"fixtures/image.signature", testKeyPath2},
+			SignedIdentity: testIdentity,
+		},
+		{
+			KeyPaths:       []string{testKeyPath2, "fixtures/image.signature"},
+			SignedIdentity: testIdentity,
+		},
+		{ // Unusable KeyPaths element
+			KeyPaths:       []string{"fixtures/this/does/not/exist", testKeyPath2},
+			SignedIdentity: testIdentity,
+		},
+		{
+			KeyPaths:       []string{testKeyPath2, "fixtures/this/does/not/exist"},
+			SignedIdentity: testIdentity,
+		},
 		{ // Invalid public key data
 			KeyData:        []byte("this is invalid"),
+			SignedIdentity: testIdentity,
+		},
+		{ // Both KeyData and KeyDatas specified
+			KeyData:        testKeyData,
+			KeyDatas:       [][]byte{testKeyData, testKeyData2},
+			SignedIdentity: testIdentity,
+		},
+		{ // Empty KeyDatas
+			KeyDatas:       [][]byte{},
+			SignedIdentity: testIdentity,
+		},
+		{ // Invalid KeyDatas element
+			KeyDatas:       [][]byte{[]byte("this is invalid"), testKeyData2},
+			SignedIdentity: testIdentity,
+		},
+		{
+			KeyDatas:       [][]byte{testKeyData, []byte("this is invalid")},
 			SignedIdentity: testIdentity,
 		},
 		{ // Invalid Fulcio configuration
@@ -272,6 +327,8 @@ func TestPRrSigstoreSignedIsSignatureAccepted(t *testing.T) {
 	testFulcioRekorImageSig := sigstoreSignatureFromFile(t, "fixtures/dir-img-cosign-fulcio-rekor-valid/signature-1")
 	keyData, err := os.ReadFile("fixtures/cosign.pub")
 	require.NoError(t, err)
+	keyData2, err := os.ReadFile("fixtures/cosign2.pub")
+	require.NoError(t, err)
 
 	// prepareTrustRoot fails
 	pr := &prSigstoreSigned{
@@ -319,16 +376,29 @@ func TestPRrSigstoreSignedIsSignatureAccepted(t *testing.T) {
 	assertRejected(sar, err)
 
 	// Successful key+Rekor use
+	for _, keyPaths := range [][]string{
+		{"fixtures/cosign2.pub"},
+		{"fixtures/cosign2.pub", "fixtures/cosign.pub"},
+		{"fixtures/cosign.pub", "fixtures/cosign2.pub"},
+	} {
+		pr, err := newPRSigstoreSigned(
+			PRSigstoreSignedWithKeyPaths(keyPaths),
+			PRSigstoreSignedWithRekorPublicKeyPath("fixtures/rekor.pub"),
+			PRSigstoreSignedWithSignedIdentity(prm),
+		)
+		require.NoError(t, err)
+		sar, err := pr.isSignatureAccepted(context.Background(), testKeyRekorImage, testKeyRekorImageSig)
+		require.NoError(t, err)
+		assertAccepted(sar, err)
+	}
+
+	// key+Rekor, missing Rekor SET annotation
 	pr, err = newPRSigstoreSigned(
 		PRSigstoreSignedWithKeyPath("fixtures/cosign2.pub"),
 		PRSigstoreSignedWithRekorPublicKeyPath("fixtures/rekor.pub"),
 		PRSigstoreSignedWithSignedIdentity(prm),
 	)
 	require.NoError(t, err)
-	sar, err = pr.isSignatureAccepted(context.Background(), testKeyRekorImage, testKeyRekorImageSig)
-	assertAccepted(sar, err)
-
-	// key+Rekor, missing Rekor SET annotation
 	sar, err = pr.isSignatureAccepted(context.Background(), nil,
 		sigstoreSignatureWithoutAnnotation(t, testKeyRekorImageSig, signature.SigstoreSETAnnotationKey))
 	assertRejected(sar, err)
@@ -339,15 +409,36 @@ func TestPRrSigstoreSignedIsSignatureAccepted(t *testing.T) {
 		sigstoreSignatureWithModifiedAnnotation(testKeyRekorImageSig, signature.SigstoreSETAnnotationKey,
 			"this is not a valid SET"))
 	assertRejected(sar, err)
-	// Fulcio: A Rekor SET which we don’t accept (one of many reasons)
-	pr2, err := newPRSigstoreSigned(
-		PRSigstoreSignedWithKeyPath("fixtures/cosign2.pub"),
-		PRSigstoreSignedWithRekorPublicKeyPath("fixtures/cosign.pub"), // not rekor.pub = a key mismatch
+	// key+Rekor: A Rekor SET which we don’t accept (one of many reasons)
+	for _, keyPaths := range [][]string{
+		{"fixtures/cosign2.pub"},
+		{"fixtures/cosign2.pub", "fixtures/cosign.pub"},
+		{"fixtures/cosign.pub", "fixtures/cosign2.pub"},
+	} {
+		pr, err := newPRSigstoreSigned(
+			PRSigstoreSignedWithKeyPaths(keyPaths),
+			PRSigstoreSignedWithRekorPublicKeyPath("fixtures/cosign.pub"), // not rekor.pub = a key mismatch
+			PRSigstoreSignedWithSignedIdentity(prm),
+		)
+		require.NoError(t, err)
+		// Pass a nil pointer to, kind of, test that the return value does not depend on the image.
+		sar, err = pr.isSignatureAccepted(context.Background(), nil, testKeyRekorImageSig)
+		assertRejected(sar, err)
+	}
+	// key+Rekor: A valid Rekor SET for one accepted key, but a signature with a _different_ accepted key
+	pr, err = newPRSigstoreSigned(
+		PRSigstoreSignedWithKeyPaths([]string{"fixtures/cosign.pub", "fixtures/cosign2.pub"}),
+		PRSigstoreSignedWithRekorPublicKeyPath("fixtures/rekor.pub"),
 		PRSigstoreSignedWithSignedIdentity(prm),
 	)
 	require.NoError(t, err)
 	// Pass a nil pointer to, kind of, test that the return value does not depend on the image.
-	sar, err = pr2.isSignatureAccepted(context.Background(), nil, testKeyRekorImageSig)
+	// testKeyImageSig is signed by cosign.pub; the SET contains cosign2.pub.
+	// The SET includes the signature contents… so this actually fails on "signature in Rekor SET does not match"
+	// rather than accepting the SET and later failing to validate payload; we’d need a way to generate the same signature
+	// using two different private keys.
+	sar, err = pr.isSignatureAccepted(context.Background(), nil, sigstoreSignatureWithModifiedAnnotation(testKeyImageSig,
+		signature.SigstoreSETAnnotationKey, testKeyRekorImageSig.UntrustedAnnotations()[signature.SigstoreSETAnnotationKey]))
 	assertRejected(sar, err)
 
 	// Successful Fulcio certificate use
@@ -368,7 +459,7 @@ func TestPRrSigstoreSignedIsSignatureAccepted(t *testing.T) {
 	assertAccepted(sar, err)
 
 	// Fulcio, no Rekor requirement
-	pr2 = &prSigstoreSigned{
+	pr2 := &prSigstoreSigned{
 		Fulcio:         fulcio,
 		SignedIdentity: prm,
 	}
@@ -449,22 +540,23 @@ func TestPRrSigstoreSignedIsSignatureAccepted(t *testing.T) {
 	sar, err = pr2.isSignatureAccepted(context.Background(), nil, testFulcioRekorImageSig)
 	assertRejected(sar, err)
 
-	// Successful validation, with KeyData and KeyPath
-	pr, err = newPRSigstoreSigned(
+	// Successful validation, with KeyPath/KeyPaths/KeyData/KeyDatas
+	for _, opt := range []PRSigstoreSignedOption{
 		PRSigstoreSignedWithKeyPath("fixtures/cosign.pub"),
-		PRSigstoreSignedWithSignedIdentity(prm),
-	)
-	require.NoError(t, err)
-	sar, err = pr.isSignatureAccepted(context.Background(), testKeyImage, testKeyImageSig)
-	assertAccepted(sar, err)
-
-	pr, err = newPRSigstoreSigned(
+		PRSigstoreSignedWithKeyPaths([]string{"fixtures/cosign.pub", "fixtures/cosign2.pub"}),
+		PRSigstoreSignedWithKeyPaths([]string{"fixtures/cosign2.pub", "fixtures/cosign.pub"}),
 		PRSigstoreSignedWithKeyData(keyData),
-		PRSigstoreSignedWithSignedIdentity(prm),
-	)
-	require.NoError(t, err)
-	sar, err = pr.isSignatureAccepted(context.Background(), testKeyImage, testKeyImageSig)
-	assertAccepted(sar, err)
+		PRSigstoreSignedWithKeyDatas([][]byte{keyData, keyData2}),
+		PRSigstoreSignedWithKeyDatas([][]byte{keyData2, keyData}),
+	} {
+		pr, err := newPRSigstoreSigned(
+			opt,
+			PRSigstoreSignedWithSignedIdentity(prm),
+		)
+		require.NoError(t, err)
+		sar, err = pr.isSignatureAccepted(context.Background(), testKeyImage, testKeyImageSig)
+		assertAccepted(sar, err)
+	}
 
 	// A signature which does not verify
 	pr, err = newPRSigstoreSigned(
