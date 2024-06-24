@@ -147,10 +147,22 @@ const (
 	noAuth
 )
 
-func newBearerTokenFromJSONBlob(blob []byte) (*bearerToken, error) {
+// newBearerTokenFromHTTPResponseBody parses a http.Response to obtain a bearerToken.
+// The caller is still responsible for ensuring res.Body is closed.
+func newBearerTokenFromHTTPResponseBody(res *http.Response) (*bearerToken, error) {
+	blob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxAuthTokenBodySize)
+	if err != nil {
+		return nil, err
+	}
+
 	token := new(bearerToken)
 	if err := json.Unmarshal(blob, &token); err != nil {
-		return nil, err
+		const bodySampleLength = 50
+		bodySample := blob
+		if len(bodySample) > bodySampleLength {
+			bodySample = bodySample[:bodySampleLength]
+		}
+		return nil, fmt.Errorf("decoding bearer token (last URL %q, body start %q): %w", res.Request.URL.Redacted(), string(bodySample), err)
 	}
 	if token.Token == "" {
 		token.Token = token.AccessToken
@@ -827,12 +839,7 @@ func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge chall
 		return nil, err
 	}
 
-	tokenBlob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxAuthTokenBodySize)
-	if err != nil {
-		return nil, err
-	}
-
-	return newBearerTokenFromJSONBlob(tokenBlob)
+	return newBearerTokenFromHTTPResponseBody(res)
 }
 
 func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
@@ -878,12 +885,8 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
 	if err := httpResponseToError(res, "Requesting bearer token"); err != nil {
 		return nil, err
 	}
-	tokenBlob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxAuthTokenBodySize)
-	if err != nil {
-		return nil, err
-	}
 
-	return newBearerTokenFromJSONBlob(tokenBlob)
+	return newBearerTokenFromHTTPResponseBody(res)
 }
 
 // detectPropertiesHelper performs the work of detectProperties which executes
