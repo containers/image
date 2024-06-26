@@ -1,11 +1,11 @@
 package copy
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -301,26 +301,23 @@ func (c *copier) copyMultipleImages(ctx context.Context) (copiedManifest []byte,
 			}
 		}
 
-		// Check if the updates or a type conversion meaningfully changed the list of images
-		// by serializing them both so that we can compare them.
-		attemptedManifestList, err := attemptedList.Serialize()
-		if err != nil {
-			return nil, fmt.Errorf("encoding updated manifest list (%q: %#v): %w", updatedList.MIMEType(), updatedList.Instances(), err)
-		}
-		originalManifestList, err := originalList.Serialize()
-		if err != nil {
-			return nil, fmt.Errorf("encoding original manifest list for comparison (%q: %#v): %w", originalList.MIMEType(), originalList.Instances(), err)
-		}
+		// If possible use the original value instead of the one we just rebuilt,
+		// so that we don't change the digest and keep any additional fields.
+		attemptedManifestList := manifestList
 
+		// Check if the updates or a type conversion meaningfully changed the list of images,
+		// that is if MIME type or the referenced instances changed.
 		// If we can't just use the original value, but we have to change it, flag an error.
-		if !bytes.Equal(attemptedManifestList, originalManifestList) {
+		if attemptedList.MIMEType() != originalList.MIMEType() || !reflect.DeepEqual(attemptedList.Instances(), originalList.Instances()) {
 			if cannotModifyManifestListReason != "" {
 				return nil, fmt.Errorf("Manifest list must be converted to type %q to be written to destination, but we cannot modify it: %q", thisListType, cannotModifyManifestListReason)
 			}
 			logrus.Debugf("Manifest list has been updated")
-		} else {
-			// We can just use the original value, so use it instead of the one we just rebuilt, so that we don't change the digest.
-			attemptedManifestList = manifestList
+
+			attemptedManifestList, err = attemptedList.Serialize()
+			if err != nil {
+				return nil, fmt.Errorf("encoding updated manifest list (%q: %#v): %w", updatedList.MIMEType(), updatedList.Instances(), err)
+			}
 		}
 
 		// Save the manifest list.
