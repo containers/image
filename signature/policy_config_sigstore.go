@@ -98,6 +98,9 @@ func newPRSigstoreSigned(options ...PRSigstoreSignedOption) (*prSigstoreSigned, 
 	if res.Fulcio != nil {
 		keySources++
 	}
+
+	keySources += len(res.KeyPaths)
+
 	if keySources != 1 {
 		return nil, InvalidPolicyFormatError("exactly one of keyPath, keyData and fulcio must be specified")
 	}
