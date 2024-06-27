@@ -490,8 +490,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) ([]compressiontypes.Algor
 		defer copyGroup.Wait()
 
 		for i, srcLayer := range srcInfos {
-			err = ic.c.concurrentBlobCopiesSemaphore.Acquire(ctx, 1)
-			if err != nil {
+			if err := ic.c.concurrentBlobCopiesSemaphore.Acquire(ctx, 1); err != nil {
 				// This can only fail with ctx.Err(), so no need to blame acquiring the semaphore.
 				return fmt.Errorf("copying layer: %w", err)
 			}
