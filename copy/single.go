@@ -409,7 +409,6 @@ func (ic *imageCopier) compareImageDestinationManifestEqual(ctx context.Context,
 // copyLayers copies layers from ic.src/ic.c.rawSource to dest, using and updating ic.manifestUpdates if necessary and ic.cannotModifyManifestReason == "".
 func (ic *imageCopier) copyLayers(ctx context.Context) ([]compressiontypes.Algorithm, error) {
 	srcInfos := ic.src.LayerInfos()
-	numLayers := len(srcInfos)
 	updatedSrcInfos, err := ic.src.LayerInfosForCopy(ctx)
 	if err != nil {
 		return nil, err
@@ -440,7 +439,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) ([]compressiontypes.Algor
 	// copyGroup is used to determine if all layers are copied
 	copyGroup := sync.WaitGroup{}
 
-	data := make([]copyLayerData, numLayers)
+	data := make([]copyLayerData, len(srcInfos))
 	copyLayerHelper := func(index int, srcLayer types.BlobInfo, toEncrypt bool, pool *mpb.Progress, srcRef reference.Named) {
 		defer ic.c.concurrentBlobCopiesSemaphore.Release(1)
 		defer copyGroup.Done()
@@ -509,8 +508,8 @@ func (ic *imageCopier) copyLayers(ctx context.Context) ([]compressiontypes.Algor
 	}
 
 	compressionAlgos := set.New[string]()
-	destInfos := make([]types.BlobInfo, numLayers)
-	diffIDs := make([]digest.Digest, numLayers)
+	destInfos := make([]types.BlobInfo, len(srcInfos))
+	diffIDs := make([]digest.Digest, len(srcInfos))
 	for i, cld := range data {
 		if cld.err != nil {
 			return nil, cld.err
