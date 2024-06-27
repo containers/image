@@ -462,9 +462,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) ([]compressiontypes.Algor
 
 	// Decide which layers to encrypt
 	layersToEncrypt := set.New[int]()
-	var encryptAll bool
 	if ic.c.options.OciEncryptLayers != nil {
-		encryptAll = len(*ic.c.options.OciEncryptLayers) == 0
 		totalLayers := len(srcInfos)
 		for _, l := range *ic.c.options.OciEncryptLayers {
 			switch {
@@ -477,7 +475,7 @@ func (ic *imageCopier) copyLayers(ctx context.Context) ([]compressiontypes.Algor
 			}
 		}
 
-		if encryptAll {
+		if len(*ic.c.options.OciEncryptLayers) == 0 { // “encrypt all layers”
 			for i := 0; i < len(srcInfos); i++ {
 				layersToEncrypt.Add(i)
 			}
