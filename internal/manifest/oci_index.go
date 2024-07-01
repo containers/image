@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -296,23 +297,27 @@ func OCI1IndexPublicFromComponents(components []imgspecv1.Descriptor, annotation
 		},
 	}
 	for i, component := range components {
-		var platform *imgspecv1.Platform
-		if component.Platform != nil {
-			platformCopy := ociPlatformClone(*component.Platform)
-			platform = &platformCopy
-		}
-		m := imgspecv1.Descriptor{
-			MediaType:    component.MediaType,
-			ArtifactType: component.ArtifactType,
-			Size:         component.Size,
-			Digest:       component.Digest,
-			URLs:         slices.Clone(component.URLs),
-			Annotations:  maps.Clone(component.Annotations),
-			Platform:     platform,
-		}
-		index.Manifests[i] = m
+		index.Manifests[i] = oci1DescriptorClone(component)
 	}
 	return &index
+}
+
+func oci1DescriptorClone(d imgspecv1.Descriptor) imgspecv1.Descriptor {
+	var platform *imgspecv1.Platform
+	if d.Platform != nil {
+		platformCopy := ociPlatformClone(*d.Platform)
+		platform = &platformCopy
+	}
+	return imgspecv1.Descriptor{
+		MediaType:    d.MediaType,
+		Digest:       d.Digest,
+		Size:         d.Size,
+		URLs:         slices.Clone(d.URLs),
+		Annotations:  maps.Clone(d.Annotations),
+		Data:         bytes.Clone(d.Data),
+		Platform:     platform,
+		ArtifactType: d.ArtifactType,
+	}
 }
 
 // OCI1IndexPublicClone creates a deep copy of the passed-in index.
