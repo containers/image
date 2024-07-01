@@ -1,0 +1,40 @@
+{
+    "schemaVersion": 2,
+    "mediaType": "application/vnd.oci.image.index.v1+json",
+    "artifactType": "application/our-top-artifact",
+    "manifests": [
+        {
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 1,
+            "urls": ["https://some.example/manifest"],
+            "annotations": {"manifest": "1"},
+            "data": "YQ==",
+            "platform": {
+                "architecture": "A",
+                "os": "B",
+                "os.version": "C",
+                "os.features": ["D"],
+                "variant": "E"
+            },
+            "artifactType": "application/our-sub-artifact"
+        }
+    ],
+    "subject": {
+        "mediaType": "application/vnd.oci.image.manifest.v1+json",
+        "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "size": 2,
+        "urls": ["https://some.example/subject"],
+        "annotations": {"subject": "2"},
+        "data": "YmM=",
+        "platform": {
+            "architecture": "a",
+            "os": "b",
+            "os.version": "c",
+            "os.features": ["d"],
+            "variant": "e"
+        },
+        "artifactType": "application/our-subject"
+    },
+    "annotations": {"top": "0"}
+}
