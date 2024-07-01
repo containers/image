@@ -54,12 +54,16 @@ If the first component of name is not recognized as a _hostname_[`:`_port_], _na
 ### **docker-archive:**_path_[`:`{_docker-reference_|`@`_source-index_}]
 
 An image is stored in the docker-save(1) formatted file.
+
+Unless a tool explicitly documents otherwise,
+a write to a **docker-archive:** destination completely overwrites _path_, replacing it with the single provided image.
+
+The _path_ can refer to a stream, e.g. `docker-archive:/dev/stdin`.
+
 _docker-reference_ must not contain a digest.
 Alternatively, for reading archives, `@`_source-index_ is a zero-based index in archive manifest
 (to access untagged images).
 If neither _docker-reference_ nor `@`_source_index is specified when reading an archive, the archive must contain exactly one image.
-
-The _path_ can refer to a stream, e.g. `docker-archive:/dev/stdin`.
 
 ### **docker-daemon:**_docker-reference_|_algo_`:`_digest_
 
@@ -78,6 +82,9 @@ If _reference_ is not specified when reading an image, the directory must contai
 ### **oci-archive:**_path_[`:`_reference_]
 
 An image in a tar(1) archive with contents compliant with the "Open Container Image Layout Specification" at _path_.
+
+Unless a tool explicitly documents otherwise,
+a write to an **oci-archive:** destination completely overwrites _path_, replacing it with the single provided image.
 
 The _path_ value terminates at the first `:` character; any further `:` characters are not separators, but a part of _reference_.
 The _reference_ is used to set, or match, the `org.opencontainers.image.ref.name` annotation in the top-level index.
