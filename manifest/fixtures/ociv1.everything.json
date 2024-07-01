@@ -1,0 +1,40 @@
+{
+    "schemaVersion": 2,
+    "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    "artifactType": "application/our-artifact",
+    "config": {
+        "mediaType": "application/our-artifact-config",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 1,
+        "urls": ["https://some.example/config"],
+        "annotations": {"config": "1"},
+        "data": "YQ=="
+    },
+    "layers": [
+        {
+            "mediaType": "application/our-artifact-layer",
+            "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "size": 2,
+            "urls": ["https://some.example/layer"],
+            "annotations": {"layer": "2"},
+            "data": "YmM="
+        }
+    ],
+    "subject": {
+        "mediaType": "application/vnd.oci.image.manifest.v1+json",
+        "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "size": 3,
+        "urls": ["https://some.example/subject"],
+        "annotations": {"subject": "3"},
+        "data": "ZGVm",
+        "platform": {
+            "architecture": "a",
+            "os": "b",
+            "os.version": "c",
+            "os.features": ["d"],
+            "variant": "e"
+        },
+        "artifactType": "application/our-subject"
+    },
+    "annotations": {"top": "0"}
+}
