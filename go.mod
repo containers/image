@@ -2,8 +2,6 @@ module github.com/containers/image/v5
 
 go 1.21.0
 
-toolchain go1.21.11
-
 require (
 	dario.cat/mergo v1.0.0
 	github.com/BurntSushi/toml v1.4.0
