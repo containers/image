@@ -1,0 +1,12 @@
+{
+    "name": "registry.example/foo",
+    "tag": "notlatest",
+    "architecture": "a",
+    "fsLayers": [
+        {"blobSum": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+    ],
+    "history": [
+        {"v1Compatibility": "{\"id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"comment\":\"comment\",\"created\":\"1970-01-01T01:00:01+01:00\",\"container_config\":{\"Cmd\":[\"cmd\"]},\"author\":\"author\",\"throwaway\":true}"}
+    ],
+    "schemaVersion": 1
+}

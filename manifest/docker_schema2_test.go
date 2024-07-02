@@ -64,6 +64,13 @@ func TestSchema2FromManifest(t *testing.T) {
 	testValidManifestWithExtraFieldsIsRejected(t, parser, validManifest, []string{"fsLayers", "history", "manifests"})
 }
 
+func TestSchema2Clone(t *testing.T) {
+	// This fixture should be kept updated to have all known fields set to non-empty values
+	m := manifestSchema2FromFixture(t, "v2s2.everything.json")
+	clone := Schema2Clone(m)
+	assert.Equal(t, m, clone)
+}
+
 func TestSchema2UpdateLayerInfos(t *testing.T) {
 	for _, c := range []struct {
 		name            string

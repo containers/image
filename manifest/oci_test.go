@@ -69,6 +69,13 @@ func TestOCI1FromManifest(t *testing.T) {
 	testValidManifestWithExtraFieldsIsRejected(t, parser, validManifest, []string{"fsLayers", "history", "manifests"})
 }
 
+func TestOCI1Clone(t *testing.T) {
+	// This fixture should be kept updated to have all known fields set to non-empty values
+	m := manifestOCI1FromFixture(t, "ociv1.everything.json")
+	clone := OCI1Clone(m)
+	assert.Equal(t, m.Manifest, clone.Manifest)
+}
+
 func TestOCI1UpdateLayerInfos(t *testing.T) {
 	customCompression := compression.Algorithm{}
 

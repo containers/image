@@ -78,6 +78,13 @@ func TestSchema1FromManifest(t *testing.T) {
 	testValidManifestWithExtraFieldsIsRejected(t, parser, validManifest, []string{"config", "layers", "manifests"})
 }
 
+func TestSchema1Clone(t *testing.T) {
+	// This fixture should be kept updated to have all known fields set to non-empty values
+	m := manifestSchema1FromFixture(t, "v2s1.everything.json")
+	clone := Schema1Clone(m)
+	assert.Equal(t, m, clone)
+}
+
 func TestSchema1Initialize(t *testing.T) {
 	// Test this indirectly via Schema1FromComponents; otherwise we would have to break the API and create an instance manually.
 

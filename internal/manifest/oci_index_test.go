@@ -294,3 +294,15 @@ func TestOCI1IndexChooseInstanceByCompression(t *testing.T) {
 		}
 	}
 }
+
+func TestOCI1IndexCloneInternal(t *testing.T) {
+	// This fixture should be kept updated to have all known fields set to non-empty values
+	blob, err := os.ReadFile(filepath.Join("testdata", "oci1.index.everything.json"))
+	require.NoError(t, err)
+	m, err := OCI1IndexFromManifest(blob)
+	require.NoError(t, err)
+	clone_ := m.CloneInternal()
+	clone, ok := clone_.(*OCI1Index)
+	require.True(t, ok)
+	assert.Equal(t, m.OCI1IndexPublic.Index, clone.OCI1IndexPublic.Index)
+}

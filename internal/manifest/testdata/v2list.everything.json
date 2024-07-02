@@ -1,0 +1,20 @@
+{
+    "schemaVersion": 2,
+    "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
+    "manifests": [
+        {
+            "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "size": 1,
+            "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "urls": ["https://some.example/manifest"],
+            "platform": {
+                "architecture": "a",
+                "os": "b",
+                "os.version": "c",
+                "os.features": ["d"],
+                "variant": "e",
+                "features": ["f"]
+            }
+        }
+    ]
+}
