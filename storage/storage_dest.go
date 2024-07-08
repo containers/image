@@ -325,6 +325,10 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	if out.UncompressedDigest != "" {
 		// The computation of UncompressedDigest means the whole layer has been consumed; while doing that, chunked.GetDiffer is
 		// responsible for ensuring blobDigest has been validated.
+		if out.CompressedDigest != blobDigest {
+			return private.UploadedBlob{}, fmt.Errorf("internal error: ApplyDiffWithDiffer returned CompressedDigest %q not matching expected %q",
+				out.CompressedDigest, blobDigest)
+		}
 		s.lockProtected.blobDiffIDs[blobDigest] = out.UncompressedDigest
 	} else {
 		// Don’t identify layers by TOC if UncompressedDigest is available.
