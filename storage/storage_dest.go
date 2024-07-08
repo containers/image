@@ -330,6 +330,8 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 				out.CompressedDigest, blobDigest)
 		}
 		s.lockProtected.blobDiffIDs[blobDigest] = out.UncompressedDigest
+		// We trust ApplyDiffWithDiffer to validate or create both values correctly.
+		options.Cache.RecordDigestUncompressedPair(out.CompressedDigest, out.UncompressedDigest)
 	} else {
 		// Don’t identify layers by TOC if UncompressedDigest is available.
 		// - Using UncompressedDigest allows image reuse with non-partially-pulled layers
