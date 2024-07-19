@@ -523,7 +523,7 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 // the manifest is not of a type that we recognize, we return an empty value, indicating
 // that since we don't have a recommendation, a random ID should be used if one needs
 // to be allocated.
-func (s *storageImageDestination) computeID(m manifest.Manifest) string {
+func (s *storageImageDestination) computeID(m manifest.Manifest) (string, error) {
 	// This is outside of the scope of HasThreadSafePutBlob, so we don’t need to hold s.lock.
 
 	layerInfos := m.LayerInfos()
@@ -544,7 +544,7 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 			if !ok {
 				// this can, in principle, legitimately happen when a layer is reused by TOC.
 				logrus.Infof("error looking up diffID for layer %q", blobSum.String())
-				return ""
+				return "", nil
 			}
 			diffIDs = append(diffIDs, diffID)
 		}
@@ -552,7 +552,7 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 		// We know the ID calculation doesn't actually use the diffIDs, so we don't need to populate
 		// the diffID list.
 	default:
-		return ""
+		return "", nil
 	}
 
 	// We want to use the same ID for “the same” images, but without risking unwanted sharing / malicious image corruption.
@@ -571,7 +571,7 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 	// (skopeo copy --format v2s2 docker://…/zstd-chunked-image containers-storage:… ). So this is not happening only in the OCI case above.
 	ordinaryImageID, err := m.ImageID(diffIDs)
 	if err != nil {
-		return ""
+		return "", err
 	}
 	tocIDInput := ""
 	hasLayerPulledByTOC := false
@@ -586,13 +586,13 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 	}
 
 	if !hasLayerPulledByTOC {
-		return ordinaryImageID
+		return ordinaryImageID, nil
 	}
 	// ordinaryImageID is a digest of a config, which is a JSON value.
 	// To avoid the risk of collisions, start the input with @ so that the input is not a valid JSON.
 	tocImageID := digest.FromString("@With TOC:" + tocIDInput).Encoded()
 	logrus.Debugf("Ordinary storage image ID %s; a layer was looked up by TOC, so using image ID %s", ordinaryImageID, tocImageID)
-	return tocImageID
+	return tocImageID, nil
 }
 
 // getConfigBlob exists only to let us retrieve the configuration blob so that the manifest package can dig
@@ -1160,7 +1160,10 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	// Create the image record, pointing to the most-recently added layer.
 	intendedID := s.imageRef.id
 	if intendedID == "" {
-		intendedID = s.computeID(man)
+		intendedID, err = s.computeID(man)
+		if err != nil {
+			return err
+		}
 	}
 	oldNames := []string{}
 	img, err := s.imageRef.transport.store.CreateImage(intendedID, nil, lastLayer, "", options)
