@@ -522,26 +522,27 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 	// This is outside of the scope of HasThreadSafePutBlob, so we don’t need to hold s.lock.
 
+	layerInfos := m.LayerInfos()
+
 	// Build the diffID list.  We need the decompressed sums that we've been calculating to
 	// fill in the DiffIDs.  It's expected (but not enforced by us) that the number of
 	// diffIDs corresponds to the number of non-EmptyLayer entries in the history.
 	var diffIDs []digest.Digest
-	switch m := m.(type) {
+	switch m.(type) {
 	case *manifest.Schema1:
-		// Build a list of the diffIDs we've generated for the non-throwaway FS layers,
-		// in reverse of the order in which they were originally listed.
-		for i, compat := range m.ExtractedV1Compatibility {
-			if compat.ThrowAway {
+		// Build a list of the diffIDs we've generated for the non-throwaway FS layers
+		for _, li := range layerInfos {
+			if li.EmptyLayer {
 				continue
 			}
-			blobSum := m.FSLayers[i].BlobSum
+			blobSum := li.Digest
 			diffID, ok := s.lockProtected.blobDiffIDs[blobSum]
 			if !ok {
 				// this can, in principle, legitimately happen when a layer is reused by TOC.
 				logrus.Infof("error looking up diffID for layer %q", blobSum.String())
 				return ""
 			}
-			diffIDs = append([]digest.Digest{diffID}, diffIDs...)
+			diffIDs = append(diffIDs, diffID)
 		}
 	case *manifest.Schema2, *manifest.OCI1:
 		// We know the ID calculation doesn't actually use the diffIDs, so we don't need to populate
@@ -570,7 +571,7 @@ func (s *storageImageDestination) computeID(m manifest.Manifest) string {
 	}
 	tocIDInput := ""
 	hasLayerPulledByTOC := false
-	for i := range m.LayerInfos() {
+	for i := range layerInfos {
 		layerValue := ""                                     // An empty string is not a valid digest, so this is unambiguous with the TOC case.
 		tocDigest, ok := s.lockProtected.indexToTOCDigest[i] // "" if not a TOC
 		if ok {
