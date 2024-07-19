@@ -315,9 +315,21 @@ func createUncommittedImageDest(t *testing.T, ref types.ImageReference, cache ty
 		desc := layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
 		layerDescriptors = append(layerDescriptors, desc)
 	}
-	configDescriptor := manifest.Schema2Descriptor{} // might be good enough
+
+	var configDescriptor manifest.Schema2Descriptor
 	if config != nil {
 		configDescriptor = config.storeBlob(t, dest, cache, manifest.DockerV2Schema2ConfigMediaType)
+	} else {
+		// Use a random digest so that different calls to createUncommittedImageDest with config == nil don’t try to
+		// use the same image ID.
+		digestBytes := make([]byte, digest.Canonical.Size())
+		_, err := rand.Read(digestBytes)
+		require.NoError(t, err)
+		configDescriptor = manifest.Schema2Descriptor{
+			MediaType: manifest.DockerV2Schema2ConfigMediaType,
+			Size:      1,
+			Digest:    digest.NewDigestFromBytes(digest.Canonical, digestBytes),
+		}
 	}
 
 	manifest := manifest.Schema2FromComponents(configDescriptor, layerDescriptors)
