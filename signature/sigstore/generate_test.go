@@ -46,7 +46,7 @@ func TestGenerateKeyPair(t *testing.T) {
 	require.NoError(t, err)
 	publicKeys := []crypto.PublicKey{publicKey}
 
-	_, err = internal.VerifySigstorePayload(publicKeys, sig.UntrustedPayload(),
+	_, _, err = internal.VerifySigstorePayload(publicKeys, sig.UntrustedPayload(),
 		sig.UntrustedAnnotations()[signature.SigstoreSignatureAnnotationKey],
 		internal.SigstorePayloadAcceptanceRules{
 			ValidateSignedDockerReference: func(ref string) error {

@@ -238,7 +238,7 @@ func (pr *prSigstoreSigned) isSignatureAccepted(ctx context.Context, image priva
 		return sarRejected, fmt.Errorf("Internal inconsistency: publicKey not set before verifying sigstore payload")
 	}
 
-	signature, err := internal.VerifySigstorePayload(publicKeys, untrustedPayload, untrustedBase64Signature, internal.SigstorePayloadAcceptanceRules{
+	signature, signingKey, err := internal.VerifySigstorePayload(publicKeys, untrustedPayload, untrustedBase64Signature, internal.SigstorePayloadAcceptanceRules{
 		ValidateSignedDockerReference: func(ref string) error {
 			if !pr.SignedIdentity.matchesDockerReference(image, ref) {
 				return PolicyRequirementError(fmt.Sprintf("Signature for identity %q is not accepted", ref))
