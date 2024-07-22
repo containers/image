@@ -176,14 +176,15 @@ type SigstorePayloadAcceptanceRules struct {
 // match expected values, both as specified by rules, and returns it.
 // We return an *UntrustedSigstorePayload, although nothing actually uses it,
 // just to double-check against stupid typos.
-func VerifySigstorePayload(publicKeys []crypto.PublicKey, unverifiedPayload []byte, unverifiedBase64Signature string, rules SigstorePayloadAcceptanceRules) (*UntrustedSigstorePayload, error) {
+// Additionally, we return the PublicKey, with which the signature has been successfully verified.
+func VerifySigstorePayload(publicKeys []crypto.PublicKey, unverifiedPayload []byte, unverifiedBase64Signature string, rules SigstorePayloadAcceptanceRules) (*UntrustedSigstorePayload, crypto.PublicKey, error) {
 	if len(publicKeys) == 0 {
-		return nil, fmt.Errorf("Need at least one public key to verify the sigstore payload, but got 0")
+		return nil, nil, fmt.Errorf("Need at least one public key to verify the sigstore payload, but got 0")
 	}
 
 	unverifiedSignature, err := base64.StdEncoding.DecodeString(unverifiedBase64Signature)
 	if err != nil {
-		return nil, NewInvalidSignatureError(fmt.Sprintf("base64 decoding: %v", err))
+		return nil, nil, NewInvalidSignatureError(fmt.Sprintf("base64 decoding: %v", err))
 	}
 
 	var unmatchedPayload *UntrustedSigstorePayload = nil
@@ -196,7 +197,7 @@ func VerifySigstorePayload(publicKeys []crypto.PublicKey, unverifiedPayload []by
 		// out
 		verifier, err := sigstoreSignature.LoadVerifier(pk, sigstoreHarcodedHashAlgorithm)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// github.com/sigstore/cosign/pkg/cosign.verifyOCISignature uses signatureoptions.WithContext(),
@@ -211,7 +212,7 @@ func VerifySigstorePayload(publicKeys []crypto.PublicKey, unverifiedPayload []by
 		// Only perform the unmarshal in the first loop iteration
 		if unmatchedPayload == nil {
 			if err := json.Unmarshal(unverifiedPayload, &unmatchedPayload); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 
@@ -222,22 +223,22 @@ func VerifySigstorePayload(publicKeys []crypto.PublicKey, unverifiedPayload []by
 		// the user won't really care that one of the public keys didn't
 		// verify this signature.
 		if err := rules.ValidateSignedDockerManifestDigest(unmatchedPayload.untrustedDockerManifestDigest); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		if err := rules.ValidateSignedDockerReference(unmatchedPayload.untrustedDockerReference); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// SigstorePayloadAcceptanceRules have accepted this value.
-		return unmatchedPayload, nil
+		return unmatchedPayload, pk, nil
 	}
 
 	// at this point we must have failed to verify the signature with every key
 	// => there must be at least one error
 	if len(signatureErrMsgs) == 0 {
-		return nil, fmt.Errorf("Internal error: signature verification failed but no errors have been recorded")
+		return nil, nil, fmt.Errorf("Internal error: signature verification failed but no errors have been recorded")
 	}
 
-	return nil, NewInvalidSignatureError("cryptographic signature verification failed: " + strings.Join(signatureErrMsgs, ", "))
+	return nil, nil, NewInvalidSignatureError("cryptographic signature verification failed: " + strings.Join(signatureErrMsgs, ", "))
 }
