@@ -168,22 +168,22 @@ func TestCandidateWithLocation(t *testing.T) {
 	loc := types.BICLocationReference{Opaque: "opaque"}
 	time := time.Now()
 	res := template.CandidateWithLocation(loc, time)
-	assert.Equal(t, digestCompressedPrimary, res.Candidate.Digest)
-	assert.Equal(t, types.Compress, res.Candidate.CompressionOperation)
-	assert.Equal(t, compressiontypes.ZstdAlgorithmName, res.Candidate.CompressionAlgorithm.Name())
-	assert.Equal(t, false, res.Candidate.UnknownLocation)
-	assert.Equal(t, loc, res.Candidate.Location)
-	assert.Equal(t, time, res.LastSeen)
+	assert.Equal(t, digestCompressedPrimary, res.candidate.Digest)
+	assert.Equal(t, types.Compress, res.candidate.CompressionOperation)
+	assert.Equal(t, compressiontypes.ZstdAlgorithmName, res.candidate.CompressionAlgorithm.Name())
+	assert.Equal(t, false, res.candidate.UnknownLocation)
+	assert.Equal(t, loc, res.candidate.Location)
+	assert.Equal(t, time, res.lastSeen)
 }
 
 func TestCandidateWithUnknownLocation(t *testing.T) {
 	template := CandidateTemplateWithCompression(&blobinfocache.CandidateLocations2Options{}, digestCompressedPrimary, compressiontypes.ZstdAlgorithmName)
 	require.NotNil(t, template)
 	res := template.CandidateWithUnknownLocation()
-	assert.Equal(t, digestCompressedPrimary, res.Candidate.Digest)
-	assert.Equal(t, types.Compress, res.Candidate.CompressionOperation)
-	assert.Equal(t, compressiontypes.ZstdAlgorithmName, res.Candidate.CompressionAlgorithm.Name())
-	assert.Equal(t, true, res.Candidate.UnknownLocation)
+	assert.Equal(t, digestCompressedPrimary, res.candidate.Digest)
+	assert.Equal(t, types.Compress, res.candidate.CompressionOperation)
+	assert.Equal(t, compressiontypes.ZstdAlgorithmName, res.candidate.CompressionAlgorithm.Name())
+	assert.Equal(t, true, res.candidate.UnknownLocation)
 }
 
 func TestCandidateSortStateLess(t *testing.T) {
