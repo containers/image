@@ -77,7 +77,7 @@ func TestPrepareCopyInstancesforInstanceCopyClone(t *testing.T) {
 	// * Still copy gzip variants if they exist in the original
 	// * Not create new Zstd variants if they exist in the original.
 
-	// We crated a list of three instances `sourceInstances` and since in oci1.index.zstd-selection.json
+	// We created a list of three instances `sourceInstances` and since in oci1.index.zstd-selection.json
 	// amd64 already has a zstd instance i.e sourceInstance[1] so it should not create replication for
 	// `sourceInstance[0]` and `sourceInstance[1]` but should do it for `sourceInstance[2]` for `arm64`
 	// and still copy `sourceInstance[2]`.

@@ -116,7 +116,7 @@ func TestCreateSignatures(t *testing.T) {
 			successfullySignedIdentity: "docker.io/library/busybox:latest",
 		},
 		{
-			name:                       "docker:// with overidden identity",
+			name:                       "docker:// with overridden identity",
 			dest:                       dockerDest,
 			identity:                   "myregistry.io/myrepo:mytag",
 			successfullySignedIdentity: "myregistry.io/myrepo:mytag",
