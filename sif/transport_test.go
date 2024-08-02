@@ -50,7 +50,7 @@ func TestNewReference(t *testing.T) {
 func testNewReference(t *testing.T, fn func(string) (types.ImageReference, error)) {
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "image.sif")
-	err := os.WriteFile(tmpFile, nil, 0600)
+	err := os.WriteFile(tmpFile, nil, 0o600)
 	require.NoError(t, err)
 
 	for _, file := range []string{

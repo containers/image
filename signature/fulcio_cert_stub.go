@@ -22,7 +22,7 @@ func (f *fulcioTrustRoot) validate() error {
 
 func verifyRekorFulcio(rekorPublicKey *ecdsa.PublicKey, fulcioTrustRoot *fulcioTrustRoot, untrustedRekorSET []byte,
 	untrustedCertificateBytes []byte, untrustedIntermediateChainBytes []byte, untrustedBase64Signature string,
-	untrustedPayloadBytes []byte) (crypto.PublicKey, error) {
+	untrustedPayloadBytes []byte,
+) (crypto.PublicKey, error) {
 	return nil, errors.New("fulcio disabled at compile-time")
-
 }

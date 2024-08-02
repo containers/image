@@ -130,7 +130,7 @@ func refToTempOCI(t *testing.T) (types.ImageReference, string) {
 		]
 	}
 `
-	err := os.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
+	err := os.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0o644)
 	require.NoError(t, err)
 	ref, err := NewReference(tmpDir, "imageValue")
 	require.NoError(t, err)
@@ -159,7 +159,7 @@ func refToTempOCIArchive(t *testing.T) (ref types.ImageReference, tmpTarFile str
 		]
 	}
 `
-	err := os.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
+	err := os.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0o644)
 	require.NoError(t, err)
 	tarFile, err := os.CreateTemp("", "oci-transport-test.tar")
 	require.NoError(t, err)

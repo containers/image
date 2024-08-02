@@ -84,7 +84,8 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	}
 
 	// Unimplemented and invalid KeyType values
-	for _, keyType := range []sbKeyType{SBKeyTypeSignedByGPGKeys,
+	for _, keyType := range []sbKeyType{
+		SBKeyTypeSignedByGPGKeys,
 		SBKeyTypeX509Certificates,
 		SBKeyTypeSignedByX509CAs,
 		sbKeyType("This is invalid"),
@@ -213,7 +214,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 // fails.
 func createInvalidSigDir(t *testing.T) string {
 	dir := t.TempDir()
-	err := os.WriteFile(path.Join(dir, "manifest.json"), []byte("{}"), 0644)
+	err := os.WriteFile(path.Join(dir, "manifest.json"), []byte("{}"), 0o644)
 	require.NoError(t, err)
 	// Creating a 000-permissions file would work for unprivileged accounts, but root (in particular,
 	// in the Docker container we use for testing) would still have access.  So, create a symlink

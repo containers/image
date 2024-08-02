@@ -243,19 +243,24 @@ func testGenericCandidateLocations(t *testing.T, cache blobinfocache.BlobInfoCac
 
 		// With substitutions: The original digest is always preferred, then other compressed, then the uncompressed one.
 		assertCandidatesMatch(t, scopeName, []candidate{
-			{d: digestCompressedA, lr: "A1"}, {d: digestCompressedA, lr: "A2"},
-			{d: digestCompressedB, lr: "B1"}, {d: digestCompressedB, lr: "B2"},
+			{d: digestCompressedA, lr: "A1"},
+			{d: digestCompressedA, lr: "A2"},
+			{d: digestCompressedB, lr: "B1"},
+			{d: digestCompressedB, lr: "B2"},
 			{d: digestUncompressed, lr: "U1"}, // Beyond the replacementAttempts limit: {d: digestUncompressed, lr: "U2"},
 		}, cache.CandidateLocations(transport, scope, digestCompressedA, true))
 
 		assertCandidatesMatch(t, scopeName, []candidate{
-			{d: digestCompressedB, lr: "B1"}, {d: digestCompressedB, lr: "B2"},
-			{d: digestCompressedA, lr: "A1"}, {d: digestCompressedA, lr: "A2"},
+			{d: digestCompressedB, lr: "B1"},
+			{d: digestCompressedB, lr: "B2"},
+			{d: digestCompressedA, lr: "A1"},
+			{d: digestCompressedA, lr: "A2"},
 			{d: digestUncompressed, lr: "U1"}, // Beyond the replacementAttempts limit: {d: digestUncompressed, lr: "U2"},
 		}, cache.CandidateLocations(transport, scope, digestCompressedB, true))
 
 		assertCandidatesMatch(t, scopeName, []candidate{
-			{d: digestUncompressed, lr: "U1"}, {d: digestUncompressed, lr: "U2"},
+			{d: digestUncompressed, lr: "U1"},
+			{d: digestUncompressed, lr: "U2"},
 			// "1" entries were added after "2", and A/Bs are sorted in the reverse of digestNameSet order
 			{d: digestCompressedB, lr: "B1"},
 			{d: digestCompressedA, lr: "A1"},
@@ -333,7 +338,8 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 				CompressionAlgorithm: &compression.Bzip2,
 				UnknownLocation:      true,
 				Location:             types.BICLocationReference{Opaque: ""},
-			}}, res)
+			},
+		}, res)
 		// When another entry with scope and Location is set then it should be returned as it has higher
 		// priority.
 		cache.RecordKnownLocation(transport, scope, digestUnknownLocation, types.BICLocationReference{Opaque: "somelocation"})
@@ -347,7 +353,8 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 				CompressionAlgorithm: &compression.Bzip2,
 				UnknownLocation:      false,
 				Location:             types.BICLocationReference{Opaque: "somelocation"},
-			}}, res)
+			},
+		}, res)
 
 		// Tests of lookups / prioritization when compression is unknown
 		// -------------------------------------------------------------
@@ -385,8 +392,10 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 
 		// With substitutions: The original digest is always preferred, then other compressed, then the uncompressed one.
 		assertCandidatesMatch(t, scopeName, []candidate{
-			{d: digestCompressedA, lr: "A1"}, {d: digestCompressedA, lr: "A2"},
-			{d: digestCompressedB, lr: "B1"}, {d: digestCompressedB, lr: "B2"},
+			{d: digestCompressedA, lr: "A1"},
+			{d: digestCompressedA, lr: "A2"},
+			{d: digestCompressedB, lr: "B1"},
+			{d: digestCompressedB, lr: "B2"},
 			{d: digestUncompressed, lr: "U1"}, // Beyond the replacementAttempts limit: {d: digestUncompressed, cn: compressorNameCU, lr: "U2"},
 		}, cache.CandidateLocations(transport, scope, digestCompressedA, true))
 		// Unknown compression -> no candidates
@@ -396,8 +405,10 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		assertCandidatesMatch2(t, scopeName, []candidate{}, res)
 
 		assertCandidatesMatch(t, scopeName, []candidate{
-			{d: digestCompressedB, lr: "B1"}, {d: digestCompressedB, lr: "B2"},
-			{d: digestCompressedA, lr: "A1"}, {d: digestCompressedA, lr: "A2"},
+			{d: digestCompressedB, lr: "B1"},
+			{d: digestCompressedB, lr: "B2"},
+			{d: digestCompressedA, lr: "A1"},
+			{d: digestCompressedA, lr: "A2"},
 			{d: digestUncompressed, lr: "U1"}, // Beyond the replacementAttempts limit: {d: digestUncompressed, lr: "U2"},
 		}, cache.CandidateLocations(transport, scope, digestCompressedB, true))
 		// Unknown compression -> no candidates
@@ -407,7 +418,8 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		assertCandidatesMatch2(t, scopeName, []candidate{}, res)
 
 		assertCandidatesMatch(t, scopeName, []candidate{
-			{d: digestUncompressed, lr: "U1"}, {d: digestUncompressed, lr: "U2"},
+			{d: digestUncompressed, lr: "U1"},
+			{d: digestUncompressed, lr: "U2"},
 			// "1" entries were added after "2", and A/Bs are sorted in the reverse of digestNameSetPrioritization order
 			{d: digestCompressedB, lr: "B1"},
 			{d: digestCompressedA, lr: "A1"},
@@ -457,35 +469,44 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 
 		// With substitutions: The original digest is always preferred, then other compressed, then the uncompressed one.
 		assertCandidatesMatch(t, scopeName, []candidate{
-			{d: digestCompressedA, lr: "A1"}, {d: digestCompressedA, lr: "A2"},
-			{d: digestCompressedB, lr: "B1"}, {d: digestCompressedB, lr: "B2"},
+			{d: digestCompressedA, lr: "A1"},
+			{d: digestCompressedA, lr: "A2"},
+			{d: digestCompressedB, lr: "B1"},
+			{d: digestCompressedB, lr: "B2"},
 			{d: digestUncompressed, lr: "U1"}, // Beyond the replacementAttempts limit: {d: digestUncompressed, lr: "U2"},
 		}, cache.CandidateLocations(transport, scope, digestCompressedA, true))
 		res = cache.CandidateLocations2(transport, scope, digestCompressedA, blobinfocache.CandidateLocations2Options{
 			CanSubstitute: true,
 		})
 		assertCandidatesMatch2(t, scopeName, []candidate{
-			{d: digestCompressedA, cn: compressorNameA, lr: "A1"}, {d: digestCompressedA, cn: compressorNameA, lr: "A2"},
-			{d: digestCompressedB, cn: compressorNameB, lr: "B1"}, {d: digestCompressedB, cn: compressorNameB, lr: "B2"},
+			{d: digestCompressedA, cn: compressorNameA, lr: "A1"},
+			{d: digestCompressedA, cn: compressorNameA, lr: "A2"},
+			{d: digestCompressedB, cn: compressorNameB, lr: "B1"},
+			{d: digestCompressedB, cn: compressorNameB, lr: "B2"},
 			{d: digestUncompressed, cn: compressorNameU, lr: "U1"}, // Beyond the replacementAttempts limit: {d: digestUncompressed, cn: compressorNameCU, lr: "U2"},
 		}, res)
 
 		assertCandidatesMatch(t, scopeName, []candidate{
-			{d: digestCompressedB, lr: "B1"}, {d: digestCompressedB, lr: "B2"},
-			{d: digestCompressedA, lr: "A1"}, {d: digestCompressedA, lr: "A2"},
+			{d: digestCompressedB, lr: "B1"},
+			{d: digestCompressedB, lr: "B2"},
+			{d: digestCompressedA, lr: "A1"},
+			{d: digestCompressedA, lr: "A2"},
 			{d: digestUncompressed, lr: "U1"}, // Beyond the replacementAttempts limit: {d: digestUncompressed, lr: "U2"},
 		}, cache.CandidateLocations(transport, scope, digestCompressedB, true))
 		res = cache.CandidateLocations2(transport, scope, digestCompressedB, blobinfocache.CandidateLocations2Options{
 			CanSubstitute: true,
 		})
 		assertCandidatesMatch2(t, scopeName, []candidate{
-			{d: digestCompressedB, cn: compressorNameB, lr: "B1"}, {d: digestCompressedB, cn: compressorNameB, lr: "B2"},
-			{d: digestCompressedA, cn: compressorNameA, lr: "A1"}, {d: digestCompressedA, cn: compressorNameA, lr: "A2"},
+			{d: digestCompressedB, cn: compressorNameB, lr: "B1"},
+			{d: digestCompressedB, cn: compressorNameB, lr: "B2"},
+			{d: digestCompressedA, cn: compressorNameA, lr: "A1"},
+			{d: digestCompressedA, cn: compressorNameA, lr: "A2"},
 			{d: digestUncompressed, cn: compressorNameU, lr: "U1"}, // Beyond the replacementAttempts limit: {d: digestUncompressed, cn: compressorNameU, lr: "U2"},
 		}, res)
 
 		assertCandidatesMatch(t, scopeName, []candidate{
-			{d: digestUncompressed, lr: "U1"}, {d: digestUncompressed, lr: "U2"},
+			{d: digestUncompressed, lr: "U1"},
+			{d: digestUncompressed, lr: "U2"},
 			// "1" entries were added after "2", and A/Bs are sorted in the reverse of digestNameSetPrioritization order
 			{d: digestCompressedB, lr: "B1"},
 			{d: digestCompressedA, lr: "A1"},
@@ -496,7 +517,8 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 			CanSubstitute: true,
 		})
 		assertCandidatesMatch2(t, scopeName, []candidate{
-			{d: digestUncompressed, cn: compressorNameU, lr: "U1"}, {d: digestUncompressed, cn: compressorNameU, lr: "U2"},
+			{d: digestUncompressed, cn: compressorNameU, lr: "U1"},
+			{d: digestUncompressed, cn: compressorNameU, lr: "U2"},
 			// "1" entries were added after "2", and A/Bs are sorted in the reverse of digestNameSetPrioritization order
 			{d: digestCompressedB, cn: compressorNameB, lr: "B1"},
 			{d: digestCompressedA, cn: compressorNameA, lr: "A1"},

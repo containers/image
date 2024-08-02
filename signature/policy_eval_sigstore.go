@@ -106,7 +106,6 @@ func (pr *prSigstoreSigned) prepareTrustRoot() (*sigstoreSignedTrustRoot, error)
 		pkECDSA, ok := pk.(*ecdsa.PublicKey)
 		if !ok {
 			return nil, fmt.Errorf("Rekor public key is not using ECDSA")
-
 		}
 		res.rekorPublicKey = pkECDSA
 	}
@@ -154,7 +153,6 @@ func (pr *prSigstoreSigned) isSignatureAccepted(ctx context.Context, image priva
 				// Coverage: The key was loaded from a PEM format, so it’s unclear how this could fail.
 				// (PEM is not essential, MarshalPublicKeyToPEM can only fail if marshaling to ASN1.DER fails.)
 				return sarRejected, fmt.Errorf("re-marshaling public key to PEM: %w", err)
-
 			}
 			// We don’t care about the Rekor timestamp, just about log presence.
 			if _, err := internal.VerifyRekorSET(trustRoot.rekorPublicKey, []byte(untrustedSET), recreatedPublicKeyPEM, untrustedBase64Signature, untrustedPayload); err != nil {

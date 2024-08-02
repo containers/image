@@ -61,8 +61,10 @@ func (s *UntrustedRekorSET) strictUnmarshalJSON(data []byte) error {
 }
 
 // A compile-time check that UntrustedRekorSET and *UntrustedRekorSET implements json.Marshaler
-var _ json.Marshaler = UntrustedRekorSET{}
-var _ json.Marshaler = (*UntrustedRekorSET)(nil)
+var (
+	_ json.Marshaler = UntrustedRekorSET{}
+	_ json.Marshaler = (*UntrustedRekorSET)(nil)
+)
 
 // MarshalJSON implements the json.Marshaler interface.
 func (s UntrustedRekorSET) MarshalJSON() ([]byte, error) {
@@ -98,8 +100,10 @@ func (p *UntrustedRekorPayload) strictUnmarshalJSON(data []byte) error {
 }
 
 // A compile-time check that UntrustedRekorPayload and *UntrustedRekorPayload implements json.Marshaler
-var _ json.Marshaler = UntrustedRekorPayload{}
-var _ json.Marshaler = (*UntrustedRekorPayload)(nil)
+var (
+	_ json.Marshaler = UntrustedRekorPayload{}
+	_ json.Marshaler = (*UntrustedRekorPayload)(nil)
+)
 
 // MarshalJSON implements the json.Marshaler interface.
 func (p UntrustedRekorPayload) MarshalJSON() ([]byte, error) {
@@ -177,7 +181,6 @@ func VerifyRekorSET(publicKey *ecdsa.PublicKey, unverifiedRekorSET []byte, unver
 	}
 	if hashedRekordV001.Signature.PublicKey == nil {
 		return time.Time{}, NewInvalidSignatureError(`Missing "signature.publicKey" field in hashedrekord`)
-
 	}
 	rekorKeyOrCertPEM, rest := pem.Decode(hashedRekordV001.Signature.PublicKey.Content)
 	if rekorKeyOrCertPEM == nil {
@@ -232,7 +235,6 @@ func VerifyRekorSET(publicKey *ecdsa.PublicKey, unverifiedRekorSET []byte, unver
 	rekorPayloadHash, err := hex.DecodeString(*hashedRekordV001.Data.Hash.Value)
 	if err != nil {
 		return time.Time{}, NewInvalidSignatureError(fmt.Sprintf(`Invalid "data.hash.value" field in hashedrekord: %v`, err))
-
 	}
 	unverifiedPayloadHash := sha256.Sum256(unverifiedPayloadBytes)
 	if !bytes.Equal(rekorPayloadHash, unverifiedPayloadHash[:]) {

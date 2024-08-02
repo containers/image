@@ -72,7 +72,6 @@ func TestParseShortNameValue(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, named)
 	assert.Equal(t, "docker.io/library/fedora", named.String())
-
 }
 
 func TestValidateShortName(t *testing.T) {

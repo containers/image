@@ -74,7 +74,7 @@ type ostreeImageCloser struct {
 }
 
 func (t ostreeTransport) ParseReference(ref string) (types.ImageReference, error) {
-	var repo = ""
+	repo := ""
 	image, repoPart, gotRepoPart := strings.Cut(ref, "@/")
 	if !gotRepoPart {
 		repo = defaultOSTreeRepo

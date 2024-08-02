@@ -76,5 +76,4 @@ func TestReadWithEvent(t *testing.T) {
 	read, err := reader.Read(b)
 	assert.Equal(t, read, 5)
 	assert.Nil(t, err)
-
 }

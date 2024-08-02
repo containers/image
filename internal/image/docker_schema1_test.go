@@ -303,32 +303,37 @@ func TestManifestSchema1Inspect(t *testing.T) {
 				"sha256:62e48e39dc5b30b75a97f05bccc66efbae6058b860ee20a5c9a184b9d5e25788",
 				"sha256:e623934bca8d1a74f51014256445937714481e49343a31bda2bc5f534748184d",
 			},
-			LayersData: []types.ImageInspectLayer{{
-				MIMEType:    "",
-				Digest:      "sha256:9cadd93b16ff2a0c51ac967ea2abfadfac50cfa3af8b5bf983d89b8f8647f3e4",
-				Size:        -1,
-				Annotations: emptyAnnotations,
-			}, {
-				MIMEType:    "",
-				Digest:      "sha256:4aa565ad8b7a87248163ce7dba1dd3894821aac97e846b932ff6b8ef9a8a508a",
-				Size:        -1,
-				Annotations: emptyAnnotations,
-			}, {
-				MIMEType:    "",
-				Digest:      "sha256:f576d102e09b9eef0e305aaef705d2d43a11bebc3fd5810a761624bd5e11997e",
-				Size:        -1,
-				Annotations: emptyAnnotations,
-			}, {
-				MIMEType:    "",
-				Digest:      "sha256:9e92df2aea7dc0baf5f1f8d509678d6a6306de27ad06513f8e218371938c07a6",
-				Size:        -1,
-				Annotations: emptyAnnotations,
-			}, {
-				MIMEType:    "",
-				Digest:      "sha256:62e48e39dc5b30b75a97f05bccc66efbae6058b860ee20a5c9a184b9d5e25788",
-				Size:        -1,
-				Annotations: emptyAnnotations,
-			},
+			LayersData: []types.ImageInspectLayer{
+				{
+					MIMEType:    "",
+					Digest:      "sha256:9cadd93b16ff2a0c51ac967ea2abfadfac50cfa3af8b5bf983d89b8f8647f3e4",
+					Size:        -1,
+					Annotations: emptyAnnotations,
+				},
+				{
+					MIMEType:    "",
+					Digest:      "sha256:4aa565ad8b7a87248163ce7dba1dd3894821aac97e846b932ff6b8ef9a8a508a",
+					Size:        -1,
+					Annotations: emptyAnnotations,
+				},
+				{
+					MIMEType:    "",
+					Digest:      "sha256:f576d102e09b9eef0e305aaef705d2d43a11bebc3fd5810a761624bd5e11997e",
+					Size:        -1,
+					Annotations: emptyAnnotations,
+				},
+				{
+					MIMEType:    "",
+					Digest:      "sha256:9e92df2aea7dc0baf5f1f8d509678d6a6306de27ad06513f8e218371938c07a6",
+					Size:        -1,
+					Annotations: emptyAnnotations,
+				},
+				{
+					MIMEType:    "",
+					Digest:      "sha256:62e48e39dc5b30b75a97f05bccc66efbae6058b860ee20a5c9a184b9d5e25788",
+					Size:        -1,
+					Annotations: emptyAnnotations,
+				},
 				{
 					MIMEType:    "",
 					Digest:      "sha256:e623934bca8d1a74f51014256445937714481e49343a31bda2bc5f534748184d",

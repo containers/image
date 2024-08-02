@@ -54,7 +54,7 @@ location = "@REGISTRY@/with-mirror"
 	require.NoError(t, err)
 	defer registriesConf.Close()
 	defer os.Remove(registriesConf.Name())
-	err = os.WriteFile(registriesConf.Name(), []byte(mirrorConfiguration), 0600)
+	err = os.WriteFile(registriesConf.Name(), []byte(mirrorConfiguration), 0o600)
 	require.NoError(t, err)
 
 	for _, c := range []struct{ input, physical string }{

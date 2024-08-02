@@ -45,7 +45,8 @@ func TestSchema2ListEditInstances(t *testing.T) {
 		UpdateDigest:    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 		UpdateSize:      32,
 		UpdateMediaType: "something",
-		ListOperation:   ListOpUpdate})
+		ListOperation:   ListOpUpdate,
+	})
 	err = list.EditInstances(editInstances)
 	require.NoError(t, err)
 
@@ -72,13 +73,15 @@ func TestSchema2ListEditInstances(t *testing.T) {
 		AddSize:       32,
 		AddMediaType:  "application/vnd.oci.image.manifest.v1+json",
 		AddPlatform:   &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
-		ListOperation: ListOpAdd})
+		ListOperation: ListOpAdd,
+	})
 	editInstances = append(editInstances, ListEdit{
 		AddDigest:     "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
 		AddSize:       32,
 		AddMediaType:  "application/vnd.oci.image.manifest.v1+json",
 		AddPlatform:   &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
-		ListOperation: ListOpAdd})
+		ListOperation: ListOpAdd,
+	})
 	err = list.EditInstances(editInstances)
 	require.NoError(t, err)
 

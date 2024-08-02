@@ -221,8 +221,10 @@ func TestRefMatchingPrefix(t *testing.T) {
 		{"example.com/foo:bar2", "example.com/foo:bar", -1},
 		{"example.com", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", -1},
 		{"example.com/foo", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", -1},
-		{"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			len("example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")},
+		{
+			"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			len("example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+		},
 		{"example.com/foo@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", -1},
 		// Prefix is invalid, but we shouldn’t crash.
 		// (Note that this is necessary only because loadConfigFile doesn’t reject single-character values outright,
@@ -240,7 +242,7 @@ func TestNewConfigWrapper(t *testing.T) {
 	const variableReference = "$HOME"
 	const rootPrefix = "/root/prefix"
 	tempHome := t.TempDir()
-	var userRegistriesFile = filepath.FromSlash(".config/containers/registries.conf")
+	userRegistriesFile := filepath.FromSlash(".config/containers/registries.conf")
 	userRegistriesFilePath := filepath.Join(tempHome, userRegistriesFile)
 
 	for _, c := range []struct {
@@ -531,7 +533,7 @@ insecure = true
 
 [[registry]]
 location = "untrusted.registry.com"
-insecure = true`), 0600)
+insecure = true`), 0o600)
 	require.NoError(t, err)
 
 	ctx := &types.SystemContext{SystemRegistriesConfPath: configFile.Name()}
@@ -543,7 +545,7 @@ insecure = true`), 0600)
 
 	// empty the config, but use the same SystemContext to show that the
 	// previously specified registries are in the cache
-	err = os.WriteFile(configFile.Name(), []byte{}, 0600)
+	err = os.WriteFile(configFile.Name(), []byte{}, 0o600)
 	require.NoError(t, err)
 	registries, err = GetRegistries(ctx)
 	assert.Nil(t, err)
@@ -583,9 +585,11 @@ func TestRewriteReferenceSuccess(t *testing.T) {
 		{"example.com:5000/image", "example.com:5000", "example.com:5000", "example.com:5000/image"},
 		{"example.com:5000/image:latest", "example.com:5000", "example.com:5000", "example.com:5000/image:latest"},
 		// Separator test ('/', '@', ':')
-		{"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		{
+			"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			"example.com", "example.com",
-			"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+			"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		},
 		{"example.com/foo/image:latest", "example.com/foo", "example.com", "example.com/image:latest"},
 		{"example.com/foo/image:latest", "example.com/foo", "example.com/path", "example.com/path/image:latest"},
 		// Docker examples
@@ -604,8 +608,10 @@ func TestRewriteReferenceSuccess(t *testing.T) {
 		{"abc.internal.registry.com/foo:bar", "*.internal.registry.com", "", "abc.internal.registry.com/foo:bar"},
 		{"blah.foo.bar.com/omg:bbq", "*.com", "", "blah.foo.bar.com/omg:bbq"},
 		{"alien.vs.predator.foobar.io:5000/omg", "*.foobar.io", "", "alien.vs.predator.foobar.io:5000/omg"},
-		{"alien.vs.predator.foobar.io:5000/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "*.foobar.io", "",
-			"alien.vs.predator.foobar.io:5000/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		{
+			"alien.vs.predator.foobar.io:5000/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "*.foobar.io", "",
+			"alien.vs.predator.foobar.io:5000/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		},
 		{"alien.vs.predator.foobar.io:5000/omg:bbq", "*.foobar.io", "", "alien.vs.predator.foobar.io:5000/omg:bbq"},
 	} {
 		ref := toNamedRef(t, c.inputRef)
@@ -620,8 +626,10 @@ func TestRewriteReferenceFailedDuringParseNamed(t *testing.T) {
 	for _, c := range []struct{ inputRef, prefix, location string }{
 		// Invalid reference format
 		{"example.com/foo/image:latest", "example.com/foo", "example.com/path/"},
-		{"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			"example.com/foo", "example.com"},
+		{
+			"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"example.com/foo", "example.com",
+		},
 		{"example.com:5000/image:latest", "example.com", ""},
 		{"example.com:5000/image:latest", "example.com", "example.com:5000"},
 		// Malformed prefix
@@ -630,8 +638,10 @@ func TestRewriteReferenceFailedDuringParseNamed(t *testing.T) {
 		{"example.com/foo/image:latest", "example.com/foo/", "example.com"},
 		{"example.com/foo/image", "example.com/f", "example.com/foo"},
 		{"example.com/foo:latest", "example.com/f", "example.com/foo"},
-		{"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			"example.com/f", "example.com/foo"},
+		{
+			"example.com/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"example.com/f", "example.com/foo",
+		},
 		{"docker.io/library/image", "example.com", "example.com"},
 		{"docker.io/library/image", "*.com", "example.com"},
 		{"foo.docker.io/library/image", "*.example.com", "example.com/image"},
@@ -804,7 +814,6 @@ func TestInvalidMirrorConfig(t *testing.T) {
 		_, err := GetRegistries(tc.sys)
 		assert.ErrorContains(t, err, tc.expectErr)
 	}
-
 }
 
 func TestTryUpdatingCache(t *testing.T) {

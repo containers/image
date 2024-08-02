@@ -75,7 +75,7 @@ func TestNewGPGSigningMechanismInDirectory(t *testing.T) {
 	// the mechanism fails (with openpgp), or it succeeds (sadly, gpgme) and
 	// later verification fails.
 	unreadableDir := t.TempDir()
-	f, err := os.OpenFile(filepath.Join(unreadableDir, "pubring.gpg"), os.O_RDONLY|os.O_CREATE, 0000)
+	f, err := os.OpenFile(filepath.Join(unreadableDir, "pubring.gpg"), os.O_RDONLY|os.O_CREATE, 0o000)
 	require.NoError(t, err)
 	f.Close()
 	mech, err = newGPGSigningMechanismInDirectory(unreadableDir)

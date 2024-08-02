@@ -78,13 +78,16 @@ type pcImageReferenceMock struct {
 func (ref pcImageReferenceMock) Transport() types.ImageTransport {
 	return mocks.NameImageTransport(ref.transportName)
 }
+
 func (ref pcImageReferenceMock) StringWithinTransport() string {
 	// We use this in error messages, so sadly we must return something.
 	return "== StringWithinTransport mock"
 }
+
 func (ref pcImageReferenceMock) DockerReference() reference.Named {
 	return ref.ref
 }
+
 func (ref pcImageReferenceMock) PolicyConfigurationIdentity() string {
 	res, err := policyconfiguration.DockerReferenceIdentity(ref.ref)
 	if res == "" || err != nil {
@@ -92,6 +95,7 @@ func (ref pcImageReferenceMock) PolicyConfigurationIdentity() string {
 	}
 	return res
 }
+
 func (ref pcImageReferenceMock) PolicyConfigurationNamespaces() []string {
 	if ref.ref == nil {
 		panic("unexpected call to a mock function")
@@ -127,7 +131,6 @@ func TestPolicyContextRequirementsForImageRefNotRegisteredTransport(t *testing.T
 	reqs := pc.requirementsForImageRef(pcImageReferenceMock{transportName: "docker", ref: ref})
 	assert.True(t, &(reqs[0]) == &(pr[0]))
 	assert.True(t, len(reqs) == len(pr))
-
 }
 
 func TestPolicyContextRequirementsForImageRef(t *testing.T) {

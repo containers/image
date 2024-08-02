@@ -292,7 +292,8 @@ func TestNeedsNoRetry(t *testing.T) {
 		Proto:      "HTTP/1.1",
 		ProtoMajor: 1,
 		ProtoMinor: 1,
-		Header: map[string][]string{"Apptime": {"D=49722"},
+		Header: map[string][]string{
+			"Apptime":                         {"D=49722"},
 			"Content-Length":                  {"1683"},
 			"Content-Type":                    {"application/json; charset=utf-8"},
 			"Date":                            {"Fri, 26 Aug 2022 09:00:21 GMT"},

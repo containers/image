@@ -19,7 +19,7 @@ type pathResolvingTestCase struct {
 var testCases = []pathResolvingTestCase{
 	{ // A straightforward subdirectory hierarchy
 		func(t *testing.T, top string) string {
-			err := os.MkdirAll(filepath.Join(top, "dir1/dir2/dir3"), 0755)
+			err := os.MkdirAll(filepath.Join(top, "dir1/dir2/dir3"), 0o755)
 			require.NoError(t, err)
 			return "dir1/dir2/dir3"
 		},
@@ -33,7 +33,7 @@ var testCases = []pathResolvingTestCase{
 	},
 	{ // Symlink on the path
 		func(t *testing.T, top string) string {
-			err := os.MkdirAll(filepath.Join(top, "dir1/dir2"), 0755)
+			err := os.MkdirAll(filepath.Join(top, "dir1/dir2"), 0o755)
 			require.NoError(t, err)
 			err = os.Symlink("dir1", filepath.Join(top, "link1"))
 			require.NoError(t, err)
@@ -43,7 +43,7 @@ var testCases = []pathResolvingTestCase{
 	},
 	{ // Trailing symlink
 		func(t *testing.T, top string) string {
-			err := os.MkdirAll(filepath.Join(top, "dir1/dir2"), 0755)
+			err := os.MkdirAll(filepath.Join(top, "dir1/dir2"), 0o755)
 			require.NoError(t, err)
 			err = os.Symlink("dir2", filepath.Join(top, "dir1/link2"))
 			require.NoError(t, err)
@@ -69,7 +69,7 @@ var testCases = []pathResolvingTestCase{
 	},
 	{ // Relative components in a path
 		func(t *testing.T, top string) string {
-			err := os.MkdirAll(filepath.Join(top, "dir1/dir2/dir3"), 0755)
+			err := os.MkdirAll(filepath.Join(top, "dir1/dir2/dir3"), 0o755)
 			require.NoError(t, err)
 			return "dir1/./dir2/../dir2/dir3"
 		},
@@ -77,7 +77,7 @@ var testCases = []pathResolvingTestCase{
 	},
 	{ // Trailing relative components
 		func(t *testing.T, top string) string {
-			err := os.MkdirAll(filepath.Join(top, "dir1/dir2"), 0755)
+			err := os.MkdirAll(filepath.Join(top, "dir1/dir2"), 0o755)
 			require.NoError(t, err)
 			return "dir1/dir2/.."
 		},
@@ -85,7 +85,7 @@ var testCases = []pathResolvingTestCase{
 	},
 	{ // Relative components in symlink
 		func(t *testing.T, top string) string {
-			err := os.MkdirAll(filepath.Join(top, "dir1/dir2"), 0755)
+			err := os.MkdirAll(filepath.Join(top, "dir1/dir2"), 0o755)
 			require.NoError(t, err)
 			err = os.Symlink("../dir1/dir2", filepath.Join(top, "dir1/link2"))
 			require.NoError(t, err)
@@ -95,7 +95,7 @@ var testCases = []pathResolvingTestCase{
 	},
 	{ // Relative component pointing "into" a symlink
 		func(t *testing.T, top string) string {
-			err := os.MkdirAll(filepath.Join(top, "dir1/dir2/dir3"), 0755)
+			err := os.MkdirAll(filepath.Join(top, "dir1/dir2/dir3"), 0o755)
 			require.NoError(t, err)
 			err = os.Symlink("dir3", filepath.Join(top, "dir1/dir2/link3"))
 			require.NoError(t, err)
@@ -105,9 +105,9 @@ var testCases = []pathResolvingTestCase{
 	},
 	{ // Unreadable directory
 		func(t *testing.T, top string) string {
-			err := os.MkdirAll(filepath.Join(top, "unreadable/dir2"), 0755)
+			err := os.MkdirAll(filepath.Join(top, "unreadable/dir2"), 0o755)
 			require.NoError(t, err)
-			err = os.Chmod(filepath.Join(top, "unreadable"), 000)
+			err = os.Chmod(filepath.Join(top, "unreadable"), 0o00)
 			require.NoError(t, err)
 			return "unreadable/dir2"
 		},
@@ -127,7 +127,7 @@ func runPathResolvingTestCase(t *testing.T, f func(string) (string, error), c pa
 	topDir := t.TempDir()
 	defer func() {
 		// Clean up after the "Unreadable directory" case; os.RemoveAll just fails without this.
-		_ = os.Chmod(filepath.Join(topDir, "unreadable"), 0755) // Ignore errors, especially if this does not exist.
+		_ = os.Chmod(filepath.Join(topDir, "unreadable"), 0o755) // Ignore errors, especially if this does not exist.
 	}()
 
 	input := c.setup(t, topDir) + suffix // Do not call filepath.Join() on input, it calls filepath.Clean() internally!
