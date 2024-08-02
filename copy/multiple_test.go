@@ -93,8 +93,8 @@ func TestPrepareCopyInstancesforInstanceCopyClone(t *testing.T) {
 	actualResponse := convertInstanceCopyToSimplerInstanceCopy(instancesToCopy)
 	assert.Equal(t, expectedResponse, actualResponse)
 
-	// Test option with multiple copy request for same compression format
-	// above expection should stay same, if out ensureCompressionVariantsExist requests zstd twice
+	// Test option with multiple copy request for same compression format.
+	// The above expectation should stay the same, if ensureCompressionVariantsExist requests zstd twice.
 	ensureCompressionVariantsExist = []OptionCompressionVariant{{Algorithm: compression.Zstd}, {Algorithm: compression.Zstd}}
 	instancesToCopy, err = prepareInstanceCopies(list, sourceInstances, &Options{EnsureCompressionVariantsExist: ensureCompressionVariantsExist})
 	require.NoError(t, err)
