@@ -219,7 +219,7 @@ func fixFiles(selinuxHnd *C.struct_selabel_handle, root string, dir string, user
 
 		if entry.IsDir() {
 			if usermode {
-				if err := os.Chmod(fullpath, info.Mode()|0700); err != nil {
+				if err := os.Chmod(fullpath, info.Mode()|0o700); err != nil {
 					return err
 				}
 			}
@@ -228,7 +228,7 @@ func fixFiles(selinuxHnd *C.struct_selabel_handle, root string, dir string, user
 				return err
 			}
 		} else if usermode && (entry.Type().IsRegular()) {
-			if err := os.Chmod(fullpath, info.Mode()|0600); err != nil {
+			if err := os.Chmod(fullpath, info.Mode()|0o600); err != nil {
 				return err
 			}
 		}
@@ -306,7 +306,7 @@ func (d *ostreeImageDestination) importBlob(selinuxHnd *C.struct_selabel_handle,
 			return err
 		}
 	} else {
-		os.MkdirAll(destinationPath, 0755)
+		os.MkdirAll(destinationPath, 0o755)
 		if err := exec.Command("tar", "-C", destinationPath, "--no-same-owner", "--no-same-permissions", "--delay-directory-restore", "-xf", blob.BlobPath).Run(); err != nil {
 			return err
 		}
@@ -315,11 +315,12 @@ func (d *ostreeImageDestination) importBlob(selinuxHnd *C.struct_selabel_handle,
 			return err
 		}
 	}
-	return d.ostreeCommit(repo, ostreeBranch, destinationPath, []string{fmt.Sprintf("docker.size=%d", blob.Size),
+	return d.ostreeCommit(repo, ostreeBranch, destinationPath, []string{
+		fmt.Sprintf("docker.size=%d", blob.Size),
 		fmt.Sprintf("docker.uncompressed_size=%d", uncompressedSize),
 		fmt.Sprintf("docker.uncompressed_digest=%s", uncompressedDigest.String()),
-		fmt.Sprintf("tarsplit.output=%s", base64.StdEncoding.EncodeToString(tarSplitOutput.Bytes()))})
-
+		fmt.Sprintf("tarsplit.output=%s", base64.StdEncoding.EncodeToString(tarSplitOutput.Bytes())),
+	})
 }
 
 func (d *ostreeImageDestination) importConfig(repo *otbuiltin.Repo, blob *blobToImport) error {
@@ -404,7 +405,7 @@ func (d *ostreeImageDestination) PutManifest(ctx context.Context, manifestBlob [
 	}
 	d.digest = digest
 
-	return os.WriteFile(manifestPath, manifestBlob, 0644)
+	return os.WriteFile(manifestPath, manifestBlob, 0o644)
 }
 
 // PutSignaturesWithFormat writes a set of signatures to the destination.
@@ -427,7 +428,7 @@ func (d *ostreeImageDestination) PutSignaturesWithFormat(ctx context.Context, si
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(signaturePath, blob, 0644); err != nil {
+		if err := os.WriteFile(signaturePath, blob, 0o644); err != nil {
 			return err
 		}
 	}
@@ -504,9 +505,11 @@ func (d *ostreeImageDestination) Commit(context.Context, types.UnparsedImage) er
 
 	manifestPath := filepath.Join(d.tmpDirPath, "manifest")
 
-	metadata := []string{fmt.Sprintf("docker.manifest=%s", string(d.manifest)),
+	metadata := []string{
+		fmt.Sprintf("docker.manifest=%s", string(d.manifest)),
 		fmt.Sprintf("signatures=%d", d.signaturesLen),
-		fmt.Sprintf("docker.digest=%s", string(d.digest))}
+		fmt.Sprintf("docker.digest=%s", string(d.digest)),
+	}
 	if err := d.ostreeCommit(repo, fmt.Sprintf("ociimage/%s", d.ref.branchName), manifestPath, metadata); err != nil {
 		return err
 	}
@@ -517,7 +520,7 @@ func (d *ostreeImageDestination) Commit(context.Context, types.UnparsedImage) er
 
 func ensureDirectoryExists(path string) error {
 	if err := fileutils.Exists(path); err != nil && errors.Is(err, fs.ErrNotExist) {
-		if err := os.MkdirAll(path, 0755); err != nil {
+		if err := os.MkdirAll(path, 0o755); err != nil {
 			return err
 		}
 	}

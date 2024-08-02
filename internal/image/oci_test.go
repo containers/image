@@ -326,32 +326,33 @@ func TestManifestOCI1Inspect(t *testing.T) {
 				"sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
 				"sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
 			},
-			LayersData: []types.ImageInspectLayer{{
-				MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
-				Digest:      "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
-				Size:        51354364,
-				Annotations: emptyAnnotations,
-			}, {
-				MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
-				Digest:      "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
-				Size:        150,
-				Annotations: emptyAnnotations,
-			}, {
-				MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
-				Digest:      "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
-				Size:        11739507,
-				Annotations: emptyAnnotations,
-			}, {
-				MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
-				Digest:      "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
-				Size:        8841833,
-				Annotations: map[string]string{"test-annotation-2": "two"},
-			}, {
-				MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
-				Digest:      "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
-				Size:        291,
-				Annotations: emptyAnnotations,
-			},
+			LayersData: []types.ImageInspectLayer{
+				{
+					MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
+					Digest:      "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+					Size:        51354364,
+					Annotations: emptyAnnotations,
+				}, {
+					MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
+					Digest:      "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+					Size:        150,
+					Annotations: emptyAnnotations,
+				}, {
+					MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
+					Digest:      "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
+					Size:        11739507,
+					Annotations: emptyAnnotations,
+				}, {
+					MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
+					Digest:      "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
+					Size:        8841833,
+					Annotations: map[string]string{"test-annotation-2": "two"},
+				}, {
+					MIMEType:    "application/vnd.oci.image.layer.v1.tar+gzip",
+					Digest:      "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
+					Size:        291,
+					Annotations: emptyAnnotations,
+				},
 			},
 			Author: "",
 			Env: []string{
@@ -478,7 +479,8 @@ func TestManifestOCI1UpdatedImage(t *testing.T) {
 // successfulOCI1Conversion verifies that an edit of original with edits suceeeds, and and original continues to match originalClone.
 // It returns the resulting image, for more checks
 func successfulOCI1Conversion(t *testing.T, original genericManifest, originalClone genericManifest,
-	edits types.ManifestUpdateOptions) types.Image {
+	edits types.ManifestUpdateOptions,
+) types.Image {
 	res, err := original.UpdatedImage(context.Background(), edits)
 	require.NoError(t, err)
 

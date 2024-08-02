@@ -58,7 +58,7 @@ func TestSigstoreBlobChunk(t *testing.T) {
 }
 
 func TestSigstoreUntrustedPayload(t *testing.T) {
-	var payload = []byte("payload")
+	payload := []byte("payload")
 	sig := SigstoreFromComponents("mime-type", payload,
 		map[string]string{"a": "b", "c": "d"})
 	assert.Equal(t, payload, sig.UntrustedPayload())

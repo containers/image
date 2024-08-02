@@ -268,32 +268,33 @@ func TestManifestSchema2Inspect(t *testing.T) {
 			"sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
 			"sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
 		},
-		LayersData: []types.ImageInspectLayer{{
-			MIMEType:    "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			Digest:      "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
-			Size:        51354364,
-			Annotations: emptyAnnotations,
-		}, {
-			MIMEType:    "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			Digest:      "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
-			Size:        150,
-			Annotations: emptyAnnotations,
-		}, {
-			MIMEType:    "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			Digest:      "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
-			Size:        11739507,
-			Annotations: emptyAnnotations,
-		}, {
-			MIMEType:    "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			Digest:      "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
-			Size:        8841833,
-			Annotations: emptyAnnotations,
-		}, {
-			MIMEType:    "application/vnd.docker.image.rootfs.diff.tar.gzip",
-			Digest:      "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
-			Size:        291,
-			Annotations: emptyAnnotations,
-		},
+		LayersData: []types.ImageInspectLayer{
+			{
+				MIMEType:    "application/vnd.docker.image.rootfs.diff.tar.gzip",
+				Digest:      "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+				Size:        51354364,
+				Annotations: emptyAnnotations,
+			}, {
+				MIMEType:    "application/vnd.docker.image.rootfs.diff.tar.gzip",
+				Digest:      "sha256:1bbf5d58d24c47512e234a5623474acf65ae00d4d1414272a893204f44cc680c",
+				Size:        150,
+				Annotations: emptyAnnotations,
+			}, {
+				MIMEType:    "application/vnd.docker.image.rootfs.diff.tar.gzip",
+				Digest:      "sha256:8f5dc8a4b12c307ac84de90cdd9a7f3915d1be04c9388868ca118831099c67a9",
+				Size:        11739507,
+				Annotations: emptyAnnotations,
+			}, {
+				MIMEType:    "application/vnd.docker.image.rootfs.diff.tar.gzip",
+				Digest:      "sha256:bbd6b22eb11afce63cc76f6bc41042d99f10d6024c96b655dafba930b8d25909",
+				Size:        8841833,
+				Annotations: emptyAnnotations,
+			}, {
+				MIMEType:    "application/vnd.docker.image.rootfs.diff.tar.gzip",
+				Digest:      "sha256:960e52ecf8200cbd84e70eb2ad8678f4367e50d14357021872c10fa3fc5935fa",
+				Size:        291,
+				Annotations: emptyAnnotations,
+			},
 		},
 		Author: "",
 		Env: []string{
@@ -373,30 +374,39 @@ type memoryImageDest struct {
 func (d *memoryImageDest) Reference() types.ImageReference {
 	return refImageReferenceMock{ref: d.ref}
 }
+
 func (d *memoryImageDest) Close() error {
 	panic("Unexpected call to a mock function")
 }
+
 func (d *memoryImageDest) SupportedManifestMIMETypes() []string {
 	panic("Unexpected call to a mock function")
 }
+
 func (d *memoryImageDest) SupportsSignatures(ctx context.Context) error {
 	panic("Unexpected call to a mock function")
 }
+
 func (d *memoryImageDest) DesiredLayerCompression() types.LayerCompression {
 	panic("Unexpected call to a mock function")
 }
+
 func (d *memoryImageDest) AcceptsForeignLayerURLs() bool {
 	panic("Unexpected call to a mock function")
 }
+
 func (d *memoryImageDest) MustMatchRuntimeOS() bool {
 	panic("Unexpected call to a mock function")
 }
+
 func (d *memoryImageDest) IgnoresEmbeddedDockerReference() bool {
 	panic("Unexpected call to a mock function")
 }
+
 func (d *memoryImageDest) HasThreadSafePutBlob() bool {
 	panic("Unexpected call to a mock function")
 }
+
 func (d *memoryImageDest) PutBlob(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, cache types.BlobInfoCache, isConfig bool) (types.BlobInfo, error) {
 	if d.storedBlobs == nil {
 		d.storedBlobs = make(map[digest.Digest][]byte)
@@ -411,15 +421,19 @@ func (d *memoryImageDest) PutBlob(ctx context.Context, stream io.Reader, inputIn
 	d.storedBlobs[inputInfo.Digest] = contents
 	return types.BlobInfo{Digest: inputInfo.Digest, Size: int64(len(contents))}, nil
 }
+
 func (d *memoryImageDest) TryReusingBlob(context.Context, types.BlobInfo, types.BlobInfoCache, bool) (bool, types.BlobInfo, error) {
 	panic("Unexpected call to a mock function")
 }
+
 func (d *memoryImageDest) PutManifest(context.Context, []byte, *digest.Digest) error {
 	panic("Unexpected call to a mock function")
 }
+
 func (d *memoryImageDest) PutSignatures(ctx context.Context, signatures [][]byte, instanceDigest *digest.Digest) error {
 	panic("Unexpected call to a mock function")
 }
+
 func (d *memoryImageDest) Commit(context.Context, types.UnparsedImage) error {
 	panic("Unexpected call to a mock function")
 }

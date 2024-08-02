@@ -75,7 +75,8 @@ func testManifestFixturesAreRejected(t *testing.T, parser func([]byte) error, fi
 // Test that parser() rejects validManifest with an added top-level field with any of the provided field names.
 // Intended to help test callers of validateUnambiguousManifestFormat.
 func testValidManifestWithExtraFieldsIsRejected(t *testing.T, parser func([]byte) error,
-	validManifest []byte, fields []string) {
+	validManifest []byte, fields []string,
+) {
 	for _, field := range fields {
 		// end (the final '}') is not always at len(validManifest)-1 because the manifest can end with
 		// white space.

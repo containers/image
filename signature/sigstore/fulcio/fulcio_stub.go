@@ -22,7 +22,8 @@ func WithFulcioAndPreexistingOIDCIDToken(fulcioURL *url.URL, oidcIDToken string)
 //
 // interactiveOutput must be directly accessible to a human user in real time (i.e. not be just a log file).
 func WithFulcioAndDeviceAuthorizationGrantOIDC(fulcioURL *url.URL, oidcIssuerURL *url.URL, oidcClientID, oidcClientSecret string,
-	interactiveOutput io.Writer) internal.Option {
+	interactiveOutput io.Writer,
+) internal.Option {
 	return func(s *internal.SigstoreSigner) error {
 		return fmt.Errorf("fulcio disabled at compile time")
 	}
@@ -38,7 +39,8 @@ func WithFulcioAndDeviceAuthorizationGrantOIDC(fulcioURL *url.URL, oidcIssuerURL
 //
 // interactiveInput and interactiveOutput must both be directly operable by a human user in real time (i.e. not be just a log file).
 func WithFulcioAndInteractiveOIDC(fulcioURL *url.URL, oidcIssuerURL *url.URL, oidcClientID, oidcClientSecret string,
-	interactiveInput io.Reader, interactiveOutput io.Writer) internal.Option {
+	interactiveInput io.Reader, interactiveOutput io.Writer,
+) internal.Option {
 	return func(s *internal.SigstoreSigner) error {
 		return fmt.Errorf("fulcio disabled at compile time")
 	}

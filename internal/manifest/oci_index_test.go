@@ -96,7 +96,8 @@ func TestOCI1EditInstances(t *testing.T) {
 		AddSize:       32,
 		AddMediaType:  "application/vnd.oci.image.manifest.v1+json",
 		AddPlatform:   &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
-		ListOperation: ListOpAdd})
+		ListOperation: ListOpAdd,
+	})
 	// with zstd
 	editInstances = append(editInstances, ListEdit{
 		AddDigest:       "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
@@ -115,7 +116,8 @@ func TestOCI1EditInstances(t *testing.T) {
 		AddPlatform:              &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
 		AddCompressionAlgorithms: []compression.Algorithm{compression.Zstd},
 		AddAnnotations:           map[string]string{},
-		ListOperation:            ListOpAdd})
+		ListOperation:            ListOpAdd,
+	})
 	// with zstd but with compression, annotation must be added automatically and AddAnnotations is unset
 	editInstances = append(editInstances, ListEdit{
 		AddDigest:                "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
@@ -123,14 +125,16 @@ func TestOCI1EditInstances(t *testing.T) {
 		AddMediaType:             "application/vnd.oci.image.manifest.v1+json",
 		AddPlatform:              &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
 		AddCompressionAlgorithms: []compression.Algorithm{compression.Zstd},
-		ListOperation:            ListOpAdd})
+		ListOperation:            ListOpAdd,
+	})
 	// without zstd
 	editInstances = append(editInstances, ListEdit{
 		AddDigest:     "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
 		AddSize:       32,
 		AddMediaType:  "application/vnd.oci.image.manifest.v1+json",
 		AddPlatform:   &imgspecv1.Platform{Architecture: "amd64", OS: "linux", OSFeatures: []string{"sse4"}},
-		ListOperation: ListOpAdd})
+		ListOperation: ListOpAdd,
+	})
 	err = list.EditInstances(editInstances)
 	require.NoError(t, err)
 
@@ -156,7 +160,8 @@ func TestOCI1EditInstances(t *testing.T) {
 		UpdateMediaType:         "application/vnd.oci.image.manifest.v1+json",
 		UpdateAffectAnnotations: true,
 		UpdateAnnotations:       map[string]string{},
-		ListOperation:           ListOpUpdate})
+		ListOperation:           ListOpUpdate,
+	})
 	err = list.EditInstances(editInstances)
 	require.NoError(t, err)
 	// Digest `ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff` should be re-ordered on update.

@@ -492,7 +492,8 @@ func TestPolicyTransportScopesUnmarshalJSON(t *testing.T) {
 // Return the result of modifying validJSON with fn and unmarshaling it into *pts
 // using transport.
 func tryUnmarshalModifiedPTS(t *testing.T, pts *PolicyTransportScopes, transport types.ImageTransport,
-	validJSON []byte, modifyFn func(mSA)) error {
+	validJSON []byte, modifyFn func(mSA),
+) error {
 	var tmp mSA
 	err := json.Unmarshal(validJSON, &tmp)
 	require.NoError(t, err)

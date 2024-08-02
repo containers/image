@@ -270,7 +270,7 @@ func TestReferenceDeleteImage(t *testing.T) {
 
 	for i, suffix := range []string{"", ":some-reference", ":@0"} {
 		testFile := filepath.Join(tmpDir, fmt.Sprintf("file%d.tar", i))
-		err := os.WriteFile(testFile, []byte("nonempty"), 0644)
+		err := os.WriteFile(testFile, []byte("nonempty"), 0o644)
 		require.NoError(t, err, suffix)
 
 		ref, err := ParseReference(testFile + suffix)

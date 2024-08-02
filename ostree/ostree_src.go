@@ -175,6 +175,7 @@ func (o ostreeReader) Close() error {
 	C.g_object_unref(C.gpointer(o.stream))
 	return nil
 }
+
 func (o ostreeReader) Read(p []byte) (int, error) {
 	var cerr *C.GError
 	instanceCast := C.g_type_check_instance_cast((*C.GTypeInstance)(unsafe.Pointer(o.stream)), C.g_input_stream_get_type())

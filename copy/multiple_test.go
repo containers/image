@@ -31,16 +31,20 @@ func TestPrepareCopyInstancesforInstanceCopyCopy(t *testing.T) {
 	compare := []instanceCopy{}
 
 	for _, instance := range sourceInstances {
-		compare = append(compare, instanceCopy{op: instanceCopyCopy,
-			sourceDigest: instance, copyForceCompressionFormat: false})
+		compare = append(compare, instanceCopy{
+			op:           instanceCopyCopy,
+			sourceDigest: instance, copyForceCompressionFormat: false,
+		})
 	}
 	assert.Equal(t, instancesToCopy, compare)
 
 	// Test CopySpecificImages where selected instance is sourceInstances[1]
 	instancesToCopy, err = prepareInstanceCopies(list, sourceInstances, &Options{Instances: []digest.Digest{sourceInstances[1]}, ImageListSelection: CopySpecificImages})
 	require.NoError(t, err)
-	compare = []instanceCopy{{op: instanceCopyCopy,
-		sourceDigest: sourceInstances[1]}}
+	compare = []instanceCopy{{
+		op:           instanceCopyCopy,
+		sourceDigest: sourceInstances[1],
+	}}
 	assert.Equal(t, instancesToCopy, compare)
 
 	_, err = prepareInstanceCopies(list, sourceInstances, &Options{Instances: []digest.Digest{sourceInstances[1]}, ImageListSelection: CopySpecificImages, ForceCompressionFormat: true})
@@ -64,9 +68,11 @@ func TestPrepareCopyInstancesforInstanceCopyClone(t *testing.T) {
 	}
 
 	// CopySpecificImage must fail with error
-	_, err = prepareInstanceCopies(list, sourceInstances, &Options{EnsureCompressionVariantsExist: ensureCompressionVariantsExist,
-		Instances:          []digest.Digest{sourceInstances[1]},
-		ImageListSelection: CopySpecificImages})
+	_, err = prepareInstanceCopies(list, sourceInstances, &Options{
+		EnsureCompressionVariantsExist: ensureCompressionVariantsExist,
+		Instances:                      []digest.Digest{sourceInstances[1]},
+		ImageListSelection:             CopySpecificImages,
+	})
 	require.EqualError(t, err, "EnsureCompressionVariantsExist is not implemented for CopySpecificImages")
 
 	// Test copying all images with replication
@@ -83,8 +89,10 @@ func TestPrepareCopyInstancesforInstanceCopyClone(t *testing.T) {
 	// and still copy `sourceInstance[2]`.
 	expectedResponse := []simplerInstanceCopy{}
 	for _, instance := range sourceInstances {
-		expectedResponse = append(expectedResponse, simplerInstanceCopy{op: instanceCopyCopy,
-			sourceDigest: instance})
+		expectedResponse = append(expectedResponse, simplerInstanceCopy{
+			op:           instanceCopyCopy,
+			sourceDigest: instance,
+		})
 		// If its `arm64` and sourceDigest[2] , expect a clone to happen
 		if instance == sourceInstances[2] {
 			expectedResponse = append(expectedResponse, simplerInstanceCopy{op: instanceCopyClone, sourceDigest: instance, cloneCompressionVariant: "zstd", clonePlatform: "arm64-linux-"})
@@ -100,8 +108,10 @@ func TestPrepareCopyInstancesforInstanceCopyClone(t *testing.T) {
 	require.NoError(t, err)
 	expectedResponse = []simplerInstanceCopy{}
 	for _, instance := range sourceInstances {
-		expectedResponse = append(expectedResponse, simplerInstanceCopy{op: instanceCopyCopy,
-			sourceDigest: instance})
+		expectedResponse = append(expectedResponse, simplerInstanceCopy{
+			op:           instanceCopyCopy,
+			sourceDigest: instance,
+		})
 		// If its `arm64` and sourceDigest[2] , expect a clone to happen
 		if instance == sourceInstances[2] {
 			expectedResponse = append(expectedResponse, simplerInstanceCopy{op: instanceCopyClone, sourceDigest: instance, cloneCompressionVariant: "zstd", clonePlatform: "arm64-linux-"})

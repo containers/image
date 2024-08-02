@@ -20,7 +20,8 @@ type testCase struct {
 }
 
 func testDigester(t *testing.T, constructor func(io.Reader, types.BlobInfo) (Digester, io.Reader),
-	cases []testCase) {
+	cases []testCase,
+) {
 	for _, c := range cases {
 		stream := bytes.NewReader(testData)
 		digester, newStream := constructor(stream, types.BlobInfo{Digest: c.inputDigest})

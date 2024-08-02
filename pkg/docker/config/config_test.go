@@ -104,11 +104,11 @@ func TestGetAuth(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		configDir1 = filepath.Join(tmpHomeDir, ".config", "containers")
 	}
-	if err := os.MkdirAll(configDir1, 0700); err != nil {
+	if err := os.MkdirAll(configDir1, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	configDir2 := filepath.Join(tmpHomeDir, ".docker")
-	if err := os.MkdirAll(configDir2, 0700); err != nil {
+	if err := os.MkdirAll(configDir2, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	configPaths := [2]string{filepath.Join(configDir1, "auth.json"), filepath.Join(configDir2, "config.json")}
@@ -287,7 +287,7 @@ func TestGetAuth(t *testing.T) {
 						t.Fatal(err)
 					}
 
-					if err := os.WriteFile(configPath, contents, 0640); err != nil {
+					if err := os.WriteFile(configPath, contents, 0o640); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -350,7 +350,7 @@ func TestGetAuthFromLegacyFile(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := os.WriteFile(configPath, contents, 0640); err != nil {
+			if err := os.WriteFile(configPath, contents, 0o640); err != nil {
 				t.Fatal(err)
 			}
 
@@ -372,7 +372,7 @@ func TestGetAuthPreferNewConfig(t *testing.T) {
 	t.Logf("using temporary home directory: %q", tmpDir)
 
 	configDir := filepath.Join(tmpDir, ".docker")
-	if err := os.Mkdir(configDir, 0750); err != nil {
+	if err := os.Mkdir(configDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
@@ -394,7 +394,7 @@ func TestGetAuthPreferNewConfig(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := os.WriteFile(data.target, contents, 0640); err != nil {
+		if err := os.WriteFile(data.target, contents, 0o640); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -417,7 +417,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		configDir = filepath.Join(tmpHomeDir, ".config", "containers")
 	}
-	if err := os.MkdirAll(configDir, 0750); err != nil {
+	if err := os.MkdirAll(configDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 	configPath := filepath.Join(configDir, "auth.json")
@@ -429,7 +429,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	}
 	assert.Equal(t, types.DockerAuthConfig{}, auth)
 
-	if err := os.WriteFile(configPath, []byte("Json rocks! Unless it doesn't."), 0640); err != nil {
+	if err := os.WriteFile(configPath, []byte("Json rocks! Unless it doesn't."), 0o640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
 	_, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
@@ -445,7 +445,7 @@ func TestGetAuthFailsOnBadInput(t *testing.T) {
 	assert.Equal(t, types.DockerAuthConfig{}, auth)
 
 	configPath = filepath.Join(tmpHomeDir, ".dockercfg")
-	if err := os.WriteFile(configPath, []byte("I'm certainly not a json string."), 0640); err != nil {
+	if err := os.WriteFile(configPath, []byte("I'm certainly not a json string."), 0o640); err != nil {
 		t.Fatalf("failed to write file %q: %v", configPath, err)
 	}
 	_, err = getCredentialsWithHomeDir(nil, "index.docker.io", tmpHomeDir)
@@ -604,7 +604,7 @@ func TestGetAllCredentials(t *testing.T) {
 		},
 	} {
 		// Write the credentials to the authfile.
-		err := os.WriteFile(authFilePath, []byte{'{', '}'}, 0700)
+		err := os.WriteFile(authFilePath, []byte{'{', '}'}, 0o700)
 		require.NoError(t, err)
 
 		for _, d := range data {

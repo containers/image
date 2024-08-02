@@ -31,7 +31,6 @@ func TestBlobSimpleSigning(t *testing.T) {
 	fromBlobSimple, ok = fromBlob.(SimpleSigning)
 	require.True(t, ok)
 	assert.Equal(t, simpleSigData, fromBlobSimple.UntrustedSignature())
-
 }
 
 func TestBlobSigstore(t *testing.T) {

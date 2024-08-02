@@ -93,9 +93,9 @@ func TestSetupCertificates(t *testing.T) {
 	// Directory not accessible
 	unreadableDir := t.TempDir()
 	defer func() {
-		_ = os.Chmod(unreadableDir, 0700)
+		_ = os.Chmod(unreadableDir, 0o700)
 	}()
-	err = os.Chmod(unreadableDir, 000)
+	err = os.Chmod(unreadableDir, 0o00)
 	require.NoError(t, err)
 	tlsc = tls.Config{}
 	err = SetupCertificates(unreadableDir, &tlsc)

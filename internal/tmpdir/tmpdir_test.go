@@ -32,7 +32,6 @@ func TestCreateBigFileTemp(t *testing.T) {
 	sys.BigFilesTemporaryDir = "/tmp/bogus"
 	_, err = CreateBigFileTemp(&sys, "foobar1")
 	assert.Error(t, err)
-
 }
 
 func TestMkDirBigFileTemp(t *testing.T) {

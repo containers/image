@@ -766,7 +766,8 @@ func (c *dockerClient) setupRequestAuth(req *http.Request, extraScope *authScope
 }
 
 func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge challenge,
-	scopes []authScope) (*bearerToken, error) {
+	scopes []authScope,
+) (*bearerToken, error) {
 	realm, ok := challenge.Parameters["realm"]
 	if !ok {
 		return nil, errors.New("missing realm in bearer auth challenge")
@@ -810,7 +811,8 @@ func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge chall
 }
 
 func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
-	scopes []authScope) (*bearerToken, error) {
+	scopes []authScope,
+) (*bearerToken, error) {
 	realm, ok := challenge.Parameters["realm"]
 	if !ok {
 		return nil, errors.New("missing realm in bearer auth challenge")
