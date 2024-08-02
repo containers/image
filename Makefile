@@ -80,9 +80,6 @@ clean:
 test:
 	@go test $(BUILDFLAGS) -cover ./...
 
-fmt:
-	@gofmt -l -s -w $(SOURCE_DIRS)
-
 validate: lint
 	@BUILDTAGS="$(BUILDTAGS)" hack/validate.sh
 
