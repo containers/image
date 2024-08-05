@@ -200,11 +200,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 	dest := imagedestination.FromPublic(publicDest)
 	defer func() {
 		if err := dest.Close(); err != nil {
-			if retErr != nil {
-				retErr = fmt.Errorf(" (dest: %v): %w", err, retErr)
-			} else {
-				retErr = fmt.Errorf(" (dest: %v)", err)
-			}
+			retErr = errors.Join(retErr, fmt.Errorf("dest: %w", err))
 		}
 	}()
 
@@ -215,11 +211,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 	rawSource := imagesource.FromPublic(publicRawSource)
 	defer func() {
 		if err := rawSource.Close(); err != nil {
-			if retErr != nil {
-				retErr = fmt.Errorf(" (src: %v): %w", err, retErr)
-			} else {
-				retErr = fmt.Errorf(" (src: %v)", err)
-			}
+			retErr = errors.Join(retErr, fmt.Errorf("src: %w", err))
 		}
 	}()
 
