@@ -174,7 +174,7 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	assert.IsType(t, InvalidSignatureError{}, err)
 
 	// A valid signature with a rejected identity.
-	nonmatchingPRM, err := NewPRMExactReference("this/doesnt:match")
+	nonmatchingPRM, err := NewPRMExactReference("this/does-not:match")
 	require.NoError(t, err)
 	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key.gpg", nonmatchingPRM)
 	require.NoError(t, err)
