@@ -34,7 +34,7 @@ func NewWriter(sys *types.SystemContext, path string) (*Writer, error) {
 	// only in a different way. Either way, it’s up to the user to not have two writers to the same path.)
 	fh, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("opening file %q: %w", path, err)
+		return nil, err
 	}
 	succeeded := false
 	defer func() {

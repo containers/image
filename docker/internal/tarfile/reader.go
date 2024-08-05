@@ -30,7 +30,7 @@ type Reader struct {
 func NewReaderFromFile(sys *types.SystemContext, path string) (*Reader, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("opening file %q: %w", path, err)
+		return nil, err
 	}
 	defer file.Close()
 

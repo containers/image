@@ -165,7 +165,7 @@ func (br *bodyReader) Read(p []byte) (int, error) {
 		}
 		res, err := br.c.makeRequest(br.ctx, http.MethodGet, br.path, headers, nil, v2Auth, nil)
 		if err != nil {
-			return n, fmt.Errorf("%w (while reconnecting: %v)", originalErr, err)
+			return n, fmt.Errorf("%w (while reconnecting: %w)", originalErr, err)
 		}
 		consumedBody := false
 		defer func() {
@@ -179,7 +179,7 @@ func (br *bodyReader) Read(p []byte) (int, error) {
 			// The recipient of an invalid Content-Range MUST NOT attempt to recombine the received content with a stored representation.
 			first, last, completeLength, err := parseContentRange(res)
 			if err != nil {
-				return n, fmt.Errorf("%w (after reconnecting, invalid Content-Range header: %v)", originalErr, err)
+				return n, fmt.Errorf("%w (after reconnecting, invalid Content-Range header: %w)", originalErr, err)
 			}
 			// We don’t handle responses that start at an unrequested offset, nor responses that terminate before the end of the full blob.
 			if first != br.offset || (completeLength != -1 && last+1 != completeLength) {
@@ -190,7 +190,7 @@ func (br *bodyReader) Read(p []byte) (int, error) {
 			return n, fmt.Errorf("%w (after reconnecting, server did not process a Range: header, status %d)", originalErr, http.StatusOK)
 		default:
 			err := registryHTTPResponseToError(res)
-			return n, fmt.Errorf("%w (after reconnecting, fetching blob: %v)", originalErr, err)
+			return n, fmt.Errorf("%w (after reconnecting, fetching blob: %w)", originalErr, err)
 		}
 
 		logrus.Debugf("Successfully reconnected to %s", redactedURL)

@@ -64,7 +64,7 @@ func ParseFile(path string) (*SigningParameterFile, error) {
 	var res SigningParameterFile
 	source, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("reading %q: %w", path, err)
+		return nil, err
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(source))
 	dec.KnownFields(true)

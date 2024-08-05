@@ -42,7 +42,7 @@ type sifImageSource struct {
 func getBlobInfo(path string) (digest.Digest, int64, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return "", -1, fmt.Errorf("opening %q for reading: %w", path, err)
+		return "", -1, err
 	}
 	defer f.Close()
 
@@ -186,7 +186,7 @@ func (s *sifImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache
 	case s.layerDigest:
 		reader, err := os.Open(s.layerFile)
 		if err != nil {
-			return nil, -1, fmt.Errorf("opening %q: %w", s.layerFile, err)
+			return nil, -1, err
 		}
 		return reader, s.layerSize, nil
 	default:

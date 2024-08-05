@@ -239,7 +239,7 @@ func (s *storageImageDestination) putBlobToPendingFile(stream io.Reader, blobinf
 	filename := s.computeNextBlobCacheFile()
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY|os.O_EXCL, 0600)
 	if err != nil {
-		return private.UploadedBlob{}, fmt.Errorf("creating temporary file %q: %w", filename, err)
+		return private.UploadedBlob{}, err
 	}
 	defer file.Close()
 	counter := ioutils.NewWriteCounter(file)
@@ -714,9 +714,9 @@ func (s *storageImageDestination) getConfigBlob(info types.BlobInfo) ([]byte, er
 	}
 	// Assume it's a file, since we're only calling this from a place that expects to read files.
 	if filename, ok := s.lockProtected.filenames[info.Digest]; ok {
-		contents, err2 := os.ReadFile(filename)
-		if err2 != nil {
-			return nil, fmt.Errorf(`reading blob from file %q: %w`, filename, err2)
+		contents, err := os.ReadFile(filename)
+		if err != nil {
+			return nil, fmt.Errorf(`reading blob: %w`, err)
 		}
 		return contents, nil
 	}
@@ -1009,7 +1009,7 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY|os.O_EXCL, 0o600)
 		if err != nil {
 			diff.Close()
-			return nil, fmt.Errorf("creating temporary file %q: %w", filename, err)
+			return nil, err
 		}
 		// Copy the data to the file.
 		// TODO: This can take quite some time, and should ideally be cancellable using
@@ -1052,7 +1052,7 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 	// Read the cached blob and use it as a diff.
 	file, err := os.Open(filename)
 	if err != nil {
-		return nil, fmt.Errorf("opening file %q: %w", filename, err)
+		return nil, err
 	}
 	defer file.Close()
 	// Build the new layer using the diff, regardless of where it came from.

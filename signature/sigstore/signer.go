@@ -25,7 +25,7 @@ func WithPrivateKeyFile(file string, passphrase []byte) Option {
 
 		privateKeyPEM, err := os.ReadFile(file)
 		if err != nil {
-			return fmt.Errorf("reading private key from %s: %w", file, err)
+			return fmt.Errorf("reading private key: %w", err)
 		}
 		signerVerifier, err := loadPrivateKey(privateKeyPEM, passphrase)
 		if err != nil {
