@@ -295,12 +295,14 @@ func (bdc *cache) RecordTOCUncompressedPair(tocDigest digest.Digest, uncompresse
 	}) // FIXME? Log error (but throttle the log volume on repeated accesses)?
 }
 
-// RecordDigestCompressorName records that the blob with digest anyDigest was compressed with the specified
-// compressor, or is blobinfocache.Uncompressed.
-// WARNING: Only call this for LOCALLY VERIFIED data; don’t record a digest pair just because some remote author claims so (e.g.
-// because a manifest/config pair exists); otherwise the cache could be poisoned and allow substituting unexpected blobs.
-// (Eventually, the DiffIDs in image config could detect the substitution, but that may be too late, and not all image formats contain that data.)
-func (bdc *cache) RecordDigestCompressorName(anyDigest digest.Digest, compressorName string) {
+// RecordDigestCompressorData records data for the blob with the specified digest.
+// WARNING: Only call this with LOCALLY VERIFIED data:
+//   - don’t record a compressor for a digest just because some remote author claims so
+//     (e.g. because a manifest says so);
+//
+// otherwise the cache could be poisoned and cause us to make incorrect edits to type
+// information in a manifest.
+func (bdc *cache) RecordDigestCompressorData(anyDigest digest.Digest, data blobinfocache.DigestCompressorData) {
 	_ = bdc.update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(digestCompressorBucket)
 		if err != nil {
@@ -308,14 +310,14 @@ func (bdc *cache) RecordDigestCompressorName(anyDigest digest.Digest, compressor
 		}
 		key := []byte(anyDigest.String())
 		if previousBytes := b.Get(key); previousBytes != nil {
-			if string(previousBytes) != compressorName {
-				logrus.Warnf("Compressor for blob with digest %s previously recorded as %s, now %s", anyDigest, string(previousBytes), compressorName)
+			if string(previousBytes) != data.BaseVariantCompressor {
+				logrus.Warnf("Compressor for blob with digest %s previously recorded as %s, now %s", anyDigest, string(previousBytes), data.BaseVariantCompressor)
 			}
 		}
-		if compressorName == blobinfocache.UnknownCompression {
+		if data.BaseVariantCompressor == blobinfocache.UnknownCompression {
 			return b.Delete(key)
 		}
-		return b.Put(key, []byte(compressorName))
+		return b.Put(key, []byte(data.BaseVariantCompressor))
 	}) // FIXME? Log error (but throttle the log volume on repeated accesses)?
 }
 
@@ -367,8 +369,10 @@ func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 			compressorName = string(compressorNameValue)
 		}
 	}
-	ok, compressionOp, compressionAlgo := prioritize.CandidateCompression(v2Options, digest, compressorName)
-	if !ok {
+	template := prioritize.CandidateTemplateWithCompression(v2Options, digest, blobinfocache.DigestCompressorData{
+		BaseVariantCompressor: compressorName,
+	})
+	if template == nil {
 		return candidates
 	}
 
@@ -382,28 +386,11 @@ func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateW
 			if err := t.UnmarshalBinary(v); err != nil {
 				return err
 			}
-			candidates = append(candidates, prioritize.CandidateWithTime{
-				Candidate: blobinfocache.BICReplacementCandidate2{
-					Digest:               digest,
-					CompressionOperation: compressionOp,
-					CompressionAlgorithm: compressionAlgo,
-					Location:             types.BICLocationReference{Opaque: string(k)},
-				},
-				LastSeen: t,
-			})
+			candidates = append(candidates, template.CandidateWithLocation(types.BICLocationReference{Opaque: string(k)}, t))
 			return nil
 		}) // FIXME? Log error (but throttle the log volume on repeated accesses)?
 	} else if v2Options != nil {
-		candidates = append(candidates, prioritize.CandidateWithTime{
-			Candidate: blobinfocache.BICReplacementCandidate2{
-				Digest:               digest,
-				CompressionOperation: compressionOp,
-				CompressionAlgorithm: compressionAlgo,
-				UnknownLocation:      true,
-				Location:             types.BICLocationReference{Opaque: ""},
-			},
-			LastSeen: time.Time{},
-		})
+		candidates = append(candidates, template.CandidateWithUnknownLocation())
 	}
 	return candidates
 }
