@@ -561,40 +561,41 @@ func (sqc *cache) candidateLocations(transport types.ImageTransport, scope types
 			if err != nil {
 				return nil, err
 			}
-
-			// FIXME? We could integrate this with appendReplacementCandidates into a single join instead of N+1 queries.
-			// (In the extreme, we could turn _everything_ this function does into a single query.
-			// And going even further, even DestructivelyPrioritizeReplacementCandidates could be turned into SQL.)
-			// For now, we prioritize simplicity, and sharing both code and implementation structure with the other cache implementations.
-			rows, err := tx.Query("SELECT anyDigest FROM DigestUncompressedPairs WHERE uncompressedDigest = ?", uncompressedDigest.String())
-			if err != nil {
-				return nil, fmt.Errorf("querying for other digests: %w", err)
-			}
-			defer rows.Close()
-			for rows.Next() {
-				var otherDigestString string
-				if err := rows.Scan(&otherDigestString); err != nil {
-					return nil, fmt.Errorf("scanning other digest: %w", err)
-				}
-				otherDigest, err := digest.Parse(otherDigestString)
+			if uncompressedDigest != "" {
+				// FIXME? We could integrate this with appendReplacementCandidates into a single join instead of N+1 queries.
+				// (In the extreme, we could turn _everything_ this function does into a single query.
+				// And going even further, even DestructivelyPrioritizeReplacementCandidates could be turned into SQL.)
+				// For now, we prioritize simplicity, and sharing both code and implementation structure with the other cache implementations.
+				rows, err := tx.Query("SELECT anyDigest FROM DigestUncompressedPairs WHERE uncompressedDigest = ?", uncompressedDigest.String())
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("querying for other digests: %w", err)
 				}
-				if otherDigest != primaryDigest && otherDigest != uncompressedDigest {
-					res, err = sqc.appendReplacementCandidates(res, tx, transport, scope, otherDigest, v2Options)
+				defer rows.Close()
+				for rows.Next() {
+					var otherDigestString string
+					if err := rows.Scan(&otherDigestString); err != nil {
+						return nil, fmt.Errorf("scanning other digest: %w", err)
+					}
+					otherDigest, err := digest.Parse(otherDigestString)
 					if err != nil {
 						return nil, err
 					}
+					if otherDigest != primaryDigest && otherDigest != uncompressedDigest {
+						res, err = sqc.appendReplacementCandidates(res, tx, transport, scope, otherDigest, v2Options)
+						if err != nil {
+							return nil, err
+						}
+					}
 				}
-			}
-			if err := rows.Err(); err != nil {
-				return nil, fmt.Errorf("iterating through other digests: %w", err)
-			}
+				if err := rows.Err(); err != nil {
+					return nil, fmt.Errorf("iterating through other digests: %w", err)
+				}
 
-			if uncompressedDigest != primaryDigest {
-				res, err = sqc.appendReplacementCandidates(res, tx, transport, scope, uncompressedDigest, v2Options)
-				if err != nil {
-					return nil, err
+				if uncompressedDigest != primaryDigest {
+					res, err = sqc.appendReplacementCandidates(res, tx, transport, scope, uncompressedDigest, v2Options)
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
