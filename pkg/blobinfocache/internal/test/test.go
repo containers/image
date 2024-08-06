@@ -422,7 +422,7 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		})
 		assertCandidatesMatch2(t, scopeName, []candidate{}, res)
 
-		// Tests of lookups / prioritization when compression is unknown
+		// Tests of lookups / prioritization when compression is known
 		// -------------------------------------------------------------
 
 		// Set the "known" compression values
