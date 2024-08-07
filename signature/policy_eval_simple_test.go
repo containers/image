@@ -26,6 +26,7 @@ type nameOnlyImageReferenceMock struct {
 func (ref nameOnlyImageReferenceMock) Transport() types.ImageTransport {
 	return mocks.NameImageTransport("== Transport mock")
 }
+
 func (ref nameOnlyImageReferenceMock) StringWithinTransport() string {
 	return ref.s
 }

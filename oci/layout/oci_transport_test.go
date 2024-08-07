@@ -221,7 +221,7 @@ func refToTempOCI(t *testing.T) (types.ImageReference, string) {
 		]
 	}
 `
-	err := os.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0644)
+	err := os.WriteFile(filepath.Join(tmpDir, "index.json"), []byte(m), 0o644)
 	require.NoError(t, err)
 	ref, err := NewReference(tmpDir, "imageValue")
 	require.NoError(t, err)

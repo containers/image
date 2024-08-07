@@ -111,14 +111,18 @@ func TestTransportParseReference(t *testing.T) {
 		{"[thisisunknown@" + root + "suffix2]", "", "", ""},                // Unknown graph driver
 		{"[" + root + "suffix1]", "", "", ""},                              // A valid root path, but no run dir
 		{"[" + driver + "@" + root + "suffix3+relative/path]", "", "", ""}, // Non-absolute run dir
-		{"[" + driver + "@" + root + "suffix3+" + root + "suffix4]",
+		{
+			"[" + driver + "@" + root + "suffix3+" + root + "suffix4]",
 			driver,
 			root + "suffix3",
-			root + "suffix4"}, // A valid root@graph+run set
-		{"[" + driver + "@" + root + "suffix3+" + root + "suffix4:options,options,options]",
+			root + "suffix4",
+		}, // A valid root@graph+run set
+		{
+			"[" + driver + "@" + root + "suffix3+" + root + "suffix4:options,options,options]",
 			driver,
 			root + "suffix3",
-			root + "suffix4"}, // A valid root@graph+run+options set
+			root + "suffix4",
+		}, // A valid root@graph+run+options set
 	} {
 		t.Logf("parsing %q", c.prefix+"busybox")
 		ref, err := Transport.ParseReference(c.prefix + "busybox")

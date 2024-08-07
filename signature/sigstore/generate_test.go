@@ -29,7 +29,7 @@ func TestGenerateKeyPair(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	privateKeyFile := filepath.Join(tmpDir, "private.key")
-	err = os.WriteFile(privateKeyFile, keyPair.PrivateKey, 0600)
+	err = os.WriteFile(privateKeyFile, keyPair.PrivateKey, 0o600)
 	require.NoError(t, err)
 
 	signer, err := NewSigner(WithPrivateKeyFile(privateKeyFile, passphrase))

@@ -126,7 +126,8 @@ func TestDetermineManifestConversion(t *testing.T) {
 		},
 		// Conversion necessary, a preferred format is not acceptable
 		{
-			"s2→OCI", manifest.DockerV2Schema2MediaType, []string{v1.MediaTypeImageManifest},
+			"s2→OCI", manifest.DockerV2Schema2MediaType,
+			[]string{v1.MediaTypeImageManifest},
 			manifestConversionPlan{
 				preferredMIMEType:                v1.MediaTypeImageManifest,
 				preferredMIMETypeNeedsConversion: true,
@@ -135,7 +136,8 @@ func TestDetermineManifestConversion(t *testing.T) {
 		},
 		// text/plain is converted if the destination does not accept s1
 		{
-			"text→s2", "text/plain", []string{manifest.DockerV2Schema2MediaType},
+			"text→s2", "text/plain",
+			[]string{manifest.DockerV2Schema2MediaType},
 			manifestConversionPlan{
 				preferredMIMEType:                manifest.DockerV2Schema2MediaType,
 				preferredMIMETypeNeedsConversion: true,
@@ -162,7 +164,8 @@ func TestDetermineManifestConversion(t *testing.T) {
 			},
 		},
 		{
-			"special→OCI", manifest.DockerV2ListMediaType, []string{v1.MediaTypeImageManifest, "other options", "with lower priority"},
+			"special→OCI", manifest.DockerV2ListMediaType,
+			[]string{v1.MediaTypeImageManifest, "other options", "with lower priority"},
 			manifestConversionPlan{
 				preferredMIMEType:                v1.MediaTypeImageManifest,
 				preferredMIMETypeNeedsConversion: true,

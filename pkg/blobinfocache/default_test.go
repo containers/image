@@ -119,13 +119,13 @@ func TestDefaultCache(t *testing.T) {
 
 	// Error creating the parent directory:
 	unwritableDir := filepath.Join(tmpDir, "unwritable")
-	err = os.Mkdir(unwritableDir, 0700)
+	err = os.Mkdir(unwritableDir, 0o700)
 	require.NoError(t, err)
 	defer func() {
-		err = os.Chmod(unwritableDir, 0700) // To make it possible to remove it again
+		err = os.Chmod(unwritableDir, 0o700) // To make it possible to remove it again
 		require.NoError(t, err)
 	}()
-	err = os.Chmod(unwritableDir, 0500)
+	err = os.Chmod(unwritableDir, 0o500)
 	require.NoError(t, err)
 	st, _ := os.Stat(unwritableDir)
 	logrus.Errorf("%s: %#v", unwritableDir, st)

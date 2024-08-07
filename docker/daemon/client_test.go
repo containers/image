@@ -69,7 +69,7 @@ func TestTlsConfigFromCertPath(t *testing.T) {
 }
 
 func TestSkipTLSVerifyOnly(t *testing.T) {
-	//testDir := testDir(t)
+	// testDir := testDir(t)
 
 	ctx := &types.SystemContext{
 		DockerDaemonInsecureSkipTLSVerify: true,

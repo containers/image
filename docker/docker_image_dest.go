@@ -430,7 +430,8 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 			Digest:               candidate.Digest,
 			Size:                 size,
 			CompressionOperation: candidate.CompressionOperation,
-			CompressionAlgorithm: candidate.CompressionAlgorithm}, nil
+			CompressionAlgorithm: candidate.CompressionAlgorithm,
+		}, nil
 	}
 
 	return false, private.ReusedBlob{}, nil
@@ -662,7 +663,7 @@ func (d *dockerImageDestination) putOneSignature(sigURL *url.URL, sig signature.
 	switch sigURL.Scheme {
 	case "file":
 		logrus.Debugf("Writing to %s", sigURL.Path)
-		err := os.MkdirAll(filepath.Dir(sigURL.Path), 0755)
+		err := os.MkdirAll(filepath.Dir(sigURL.Path), 0o755)
 		if err != nil {
 			return err
 		}
@@ -670,7 +671,7 @@ func (d *dockerImageDestination) putOneSignature(sigURL *url.URL, sig signature.
 		if err != nil {
 			return err
 		}
-		err = os.WriteFile(sigURL.Path, blob, 0644)
+		err = os.WriteFile(sigURL.Path, blob, 0o644)
 		if err != nil {
 			return err
 		}
@@ -783,7 +784,8 @@ func (d *dockerImageDestination) putSignaturesToSigstoreAttachments(ctx context.
 }
 
 func layerMatchesSigstoreSignature(layer imgspecv1.Descriptor, mimeType string,
-	payloadBlob []byte, annotations map[string]string) bool {
+	payloadBlob []byte, annotations map[string]string,
+) bool {
 	if layer.MediaType != mimeType ||
 		layer.Size != int64(len(payloadBlob)) ||
 		// This is not quite correct, we should use the layer’s digest algorithm.

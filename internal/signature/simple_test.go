@@ -8,7 +8,7 @@ import (
 )
 
 func TestSimpleSigningFromBlob(t *testing.T) {
-	var data = []byte("some contents")
+	data := []byte("some contents")
 
 	sig := SimpleSigningFromBlob(data)
 	assert.Equal(t, SimpleSigning{untrustedSignature: data}, sig)
@@ -20,7 +20,7 @@ func TestSimpleSigningFormatID(t *testing.T) {
 }
 
 func TestSimpleSigningBlobChunk(t *testing.T) {
-	var data = []byte("some contents")
+	data := []byte("some contents")
 
 	sig := SimpleSigningFromBlob(data)
 	chunk, err := sig.blobChunk()
@@ -29,7 +29,7 @@ func TestSimpleSigningBlobChunk(t *testing.T) {
 }
 
 func TestSimpleSigningUntrustedSignature(t *testing.T) {
-	var data = []byte("some contents")
+	data := []byte("some contents")
 
 	sig := SimpleSigningFromBlob(data)
 	assert.Equal(t, data, sig.UntrustedSignature())

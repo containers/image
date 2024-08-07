@@ -110,6 +110,7 @@ type cache struct {
 func New(path string) types.BlobInfoCache {
 	return new2(path)
 }
+
 func new2(path string) *cache {
 	return &cache{path: path}
 }
@@ -136,7 +137,7 @@ func (bdc *cache) view(fn func(tx *bolt.Tx) error) (retErr error) {
 
 	lockPath(bdc.path)
 	defer unlockPath(bdc.path)
-	db, err := bolt.Open(bdc.path, 0600, &bolt.Options{ReadOnly: true})
+	db, err := bolt.Open(bdc.path, 0o600, &bolt.Options{ReadOnly: true})
 	if err != nil {
 		return err
 	}
@@ -153,7 +154,7 @@ func (bdc *cache) view(fn func(tx *bolt.Tx) error) (retErr error) {
 func (bdc *cache) update(fn func(tx *bolt.Tx) error) (retErr error) {
 	lockPath(bdc.path)
 	defer unlockPath(bdc.path)
-	db, err := bolt.Open(bdc.path, 0600, nil)
+	db, err := bolt.Open(bdc.path, 0o600, nil)
 	if err != nil {
 		return err
 	}
@@ -359,7 +360,8 @@ func (bdc *cache) RecordKnownLocation(transport types.ImageTransport, scope type
 // v2Options is not nil if the caller is CandidateLocations2: this allows including candidates with unknown location, and filters out candidates
 // with unknown compression.
 func (bdc *cache) appendReplacementCandidates(candidates []prioritize.CandidateWithTime, scopeBucket, compressionBucket *bolt.Bucket, digest digest.Digest,
-	v2Options *blobinfocache.CandidateLocations2Options) []prioritize.CandidateWithTime {
+	v2Options *blobinfocache.CandidateLocations2Options,
+) []prioritize.CandidateWithTime {
 	digestKey := []byte(digest.String())
 	compressorName := blobinfocache.UnknownCompression
 	if compressionBucket != nil {
@@ -405,7 +407,8 @@ func (bdc *cache) CandidateLocations2(transport types.ImageTransport, scope type
 // candidateLocations implements CandidateLocations / CandidateLocations2.
 // v2Options is not nil if the caller is CandidateLocations2.
 func (bdc *cache) candidateLocations(transport types.ImageTransport, scope types.BICTransportScope, primaryDigest digest.Digest, canSubstitute bool,
-	v2Options *blobinfocache.CandidateLocations2Options) []blobinfocache.BICReplacementCandidate2 {
+	v2Options *blobinfocache.CandidateLocations2Options,
+) []blobinfocache.BICReplacementCandidate2 {
 	res := []prioritize.CandidateWithTime{}
 	var uncompressedDigestValue digest.Digest // = ""
 	if err := bdc.view(func(tx *bolt.Tx) error {

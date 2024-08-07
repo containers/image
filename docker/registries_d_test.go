@@ -71,7 +71,7 @@ func TestRegistriesDirPath(t *testing.T) {
 	const variableReference = "$HOME"
 	const rootPrefix = "/root/prefix"
 	tempHome := t.TempDir()
-	var userRegistriesDir = filepath.FromSlash(".config/containers/registries.d")
+	userRegistriesDir := filepath.FromSlash(".config/containers/registries.d")
 	userRegistriesDirPath := filepath.Join(tempHome, userRegistriesDir)
 	for _, c := range []struct {
 		sys             *types.SystemContext
@@ -116,7 +116,7 @@ func TestRegistriesDirPath(t *testing.T) {
 		{&types.SystemContext{RegistriesDirPath: variableReference}, false, variableReference},
 	} {
 		if c.userFilePresent {
-			err := os.MkdirAll(userRegistriesDirPath, 0700)
+			err := os.MkdirAll(userRegistriesDirPath, 0o700)
 			require.NoError(t, err)
 		} else {
 			err := os.RemoveAll(userRegistriesDirPath)
@@ -137,7 +137,7 @@ func TestLoadAndMergeConfig(t *testing.T) {
 
 	// Empty registries.d directory
 	emptyDir := filepath.Join(tmpDir, "empty")
-	err = os.Mkdir(emptyDir, 0755)
+	err = os.Mkdir(emptyDir, 0o755)
 	require.NoError(t, err)
 	config, err = loadAndMergeConfig(emptyDir)
 	require.NoError(t, err)
@@ -145,40 +145,40 @@ func TestLoadAndMergeConfig(t *testing.T) {
 
 	// Unreadable registries.d directory
 	unreadableDir := filepath.Join(tmpDir, "unreadable")
-	err = os.Mkdir(unreadableDir, 0000)
+	err = os.Mkdir(unreadableDir, 0o000)
 	require.NoError(t, err)
 	_, err = loadAndMergeConfig(unreadableDir)
 	assert.Error(t, err)
 
 	// An unreadable file in a registries.d directory
 	unreadableFileDir := filepath.Join(tmpDir, "unreadableFile")
-	err = os.Mkdir(unreadableFileDir, 0755)
+	err = os.Mkdir(unreadableFileDir, 0o755)
 	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(unreadableFileDir, "0.yaml"), []byte("{}"), 0644)
+	err = os.WriteFile(filepath.Join(unreadableFileDir, "0.yaml"), []byte("{}"), 0o644)
 	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(unreadableFileDir, "1.yaml"), nil, 0000)
+	err = os.WriteFile(filepath.Join(unreadableFileDir, "1.yaml"), nil, 0o000)
 	require.NoError(t, err)
 	_, err = loadAndMergeConfig(unreadableFileDir)
 	assert.Error(t, err)
 
 	// Invalid YAML
 	invalidYAMLDir := filepath.Join(tmpDir, "invalidYAML")
-	err = os.Mkdir(invalidYAMLDir, 0755)
+	err = os.Mkdir(invalidYAMLDir, 0o755)
 	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(invalidYAMLDir, "0.yaml"), []byte("}"), 0644)
+	err = os.WriteFile(filepath.Join(invalidYAMLDir, "0.yaml"), []byte("}"), 0o644)
 	require.NoError(t, err)
 	_, err = loadAndMergeConfig(invalidYAMLDir)
 	assert.Error(t, err)
 
 	// Duplicate DefaultDocker
 	duplicateDefault := filepath.Join(tmpDir, "duplicateDefault")
-	err = os.Mkdir(duplicateDefault, 0755)
+	err = os.Mkdir(duplicateDefault, 0o755)
 	require.NoError(t, err)
 	err = os.WriteFile(filepath.Join(duplicateDefault, "0.yaml"),
-		[]byte("default-docker:\n lookaside: file:////tmp/something"), 0644)
+		[]byte("default-docker:\n lookaside: file:////tmp/something"), 0o644)
 	require.NoError(t, err)
 	err = os.WriteFile(filepath.Join(duplicateDefault, "1.yaml"),
-		[]byte("default-docker:\n lookaside: file:////tmp/different"), 0644)
+		[]byte("default-docker:\n lookaside: file:////tmp/different"), 0o644)
 	require.NoError(t, err)
 	_, err = loadAndMergeConfig(duplicateDefault)
 	assert.ErrorContains(t, err, "0.yaml")
@@ -186,13 +186,13 @@ func TestLoadAndMergeConfig(t *testing.T) {
 
 	// Duplicate DefaultDocker
 	duplicateNS := filepath.Join(tmpDir, "duplicateNS")
-	err = os.Mkdir(duplicateNS, 0755)
+	err = os.Mkdir(duplicateNS, 0o755)
 	require.NoError(t, err)
 	err = os.WriteFile(filepath.Join(duplicateNS, "0.yaml"),
-		[]byte("docker:\n example.com:\n  lookaside: file:////tmp/something"), 0644)
+		[]byte("docker:\n example.com:\n  lookaside: file:////tmp/something"), 0o644)
 	require.NoError(t, err)
 	err = os.WriteFile(filepath.Join(duplicateNS, "1.yaml"),
-		[]byte("docker:\n example.com:\n  lookaside: file:////tmp/different"), 0644)
+		[]byte("docker:\n example.com:\n  lookaside: file:////tmp/different"), 0o644)
 	require.NoError(t, err)
 	_, err = loadAndMergeConfig(duplicateNS)
 	assert.ErrorContains(t, err, "0.yaml")

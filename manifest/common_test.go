@@ -29,7 +29,8 @@ func testManifestFixturesAreRejected(t *testing.T, parser func([]byte) error, fi
 // Test that parser() rejects validManifest with an added top-level field with any of the provided field names.
 // Intended to help test callers of validateUnambiguousManifestFormat.
 func testValidManifestWithExtraFieldsIsRejected(t *testing.T, parser func([]byte) error,
-	validManifest []byte, fields []string) {
+	validManifest []byte, fields []string,
+) {
 	for _, field := range fields {
 		// end (the final '}') is not always at len(validManifest)-1 because the manifest can end with
 		// white space.
@@ -103,15 +104,23 @@ func TestCompressionVariantMIMEType(t *testing.T) {
 		algo     *compressiontypes.Algorithm
 		expected string
 	}{
-		{"AU", nil, "AU"}, {"AU", &compression.Gzip, "AG"}, {"AU", &compression.Zstd, ""},
-		{"AG", nil, "AU"}, {"AG", &compression.Gzip, "AG"}, {"AG", &compression.Zstd, ""},
+		{"AU", nil, "AU"},
+		{"AU", &compression.Gzip, "AG"},
+		{"AU", &compression.Zstd, ""},
+		{"AG", nil, "AU"},
+		{"AG", &compression.Gzip, "AG"},
+		{"AG", &compression.Zstd, ""},
 		{"BU", &compression.Zstd, ""},
 		{"BG", &compression.Zstd, ""},
-		{"CG", nil, ""}, {"CG", &compression.Zstd, "CZ"},
-		{"CZ", nil, ""}, {"CZ", &compression.Gzip, "CG"},
+		{"CG", nil, ""},
+		{"CG", &compression.Zstd, "CZ"},
+		{"CZ", nil, ""},
+		{"CZ", &compression.Gzip, "CG"},
 		{"DG", nil, ""},
-		{"unknown", nil, ""}, {"unknown", &compression.Gzip, ""},
-		{"", nil, ""}, {"", &compression.Gzip, ""},
+		{"unknown", nil, ""},
+		{"unknown", &compression.Gzip, ""},
+		{"", nil, ""},
+		{"", &compression.Gzip, ""},
 	} {
 		res, err := compressionVariantMIMEType(sets, c.input, c.algo)
 		if c.expected == "" {
