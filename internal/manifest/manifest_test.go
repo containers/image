@@ -192,6 +192,9 @@ func TestCandidateCompressionMatchesReuseConditions(t *testing.T) {
 	}{
 		// RequiredCompression restrictions
 		{&compression.Zstd, nil, &compression.Zstd, true},
+		{&compression.Zstd, nil, &compression.ZstdChunked, true},
+		{&compression.ZstdChunked, nil, &compression.Zstd, false},
+		{&compression.ZstdChunked, nil, &compression.ZstdChunked, true},
 		{&compression.Gzip, nil, &compression.Zstd, false},
 		{&compression.Zstd, nil, nil, false},
 		{nil, nil, &compression.Zstd, true},
