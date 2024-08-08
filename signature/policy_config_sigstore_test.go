@@ -20,7 +20,9 @@ func xNewPRSigstoreSigned(options ...PRSigstoreSignedOption) PolicyRequirement {
 
 func TestNewPRSigstoreSigned(t *testing.T) {
 	const testKeyPath = "/foo/bar"
+	const testKeyPath2 = "/baz/bar"
 	testKeyData := []byte("abc")
+	testKeyData2 := []byte("def")
 	testFulcio, err := NewPRSigstoreSignedFulcio(
 		PRSigstoreSignedFulcioWithCAPath("fixtures/fulcio_v1.crt.pem"),
 		PRSigstoreSignedFulcioWithOIDCIssuer("https://github.com/login/oauth"),
@@ -74,6 +76,31 @@ func TestNewPRSigstoreSigned(t *testing.T) {
 				KeyPath:        "",
 				KeyData:        nil,
 				Fulcio:         testFulcio,
+				SignedIdentity: testIdentity,
+			},
+		},
+		{
+			options: []PRSigstoreSignedOption{
+				PRSigstoreSignedWithKeyPaths([]string{testKeyPath, testKeyPath2}),
+				PRSigstoreSignedWithSignedIdentity(testIdentity),
+			},
+			expected: prSigstoreSigned{
+				prCommon:       prCommon{prTypeSigstoreSigned},
+				KeyPaths:       []string{testKeyPath, testKeyPath2},
+				Fulcio:         nil,
+				SignedIdentity: testIdentity,
+			},
+		},
+		{
+			options: []PRSigstoreSignedOption{
+				PRSigstoreSignedWithKeyDatas([][]byte{testKeyData, testKeyData2}),
+				PRSigstoreSignedWithSignedIdentity(testIdentity),
+			},
+			expected: prSigstoreSigned{
+				prCommon:       prCommon{prTypeSigstoreSigned},
+				KeyPath:        "",
+				KeyDatas:       [][]byte{testKeyData, testKeyData2},
+				Fulcio:         nil,
 				SignedIdentity: testIdentity,
 			},
 		},
@@ -182,10 +209,26 @@ func TestNewPRSigstoreSigned(t *testing.T) {
 		{ // Missing signedIdentity
 			PRSigstoreSignedWithKeyPath(testKeyPath),
 		},
-		{ // Duplicate signedIdentity}
+		{ // Duplicate signedIdentity
 			PRSigstoreSignedWithKeyPath(testKeyPath),
 			PRSigstoreSignedWithSignedIdentity(testIdentity),
 			PRSigstoreSignedWithSignedIdentity(newPRMMatchRepository()),
+		},
+		{ // empty keydatas
+			PRSigstoreSignedWithKeyDatas([][]byte{}),
+		},
+		{ // empty keypaths
+			PRSigstoreSignedWithKeyPaths([]string{}),
+		},
+		{ // keyPath & keyPaths both set
+			PRSigstoreSignedWithKeyPaths([]string{"foobar"}),
+			PRSigstoreSignedWithSignedIdentity(testIdentity),
+			PRSigstoreSignedWithKeyPath("foobar"),
+		},
+		{ // keyData & keyDatas both set
+			PRSigstoreSignedWithKeyDatas([][]byte{[]byte("foo")}),
+			PRSigstoreSignedWithKeyData([]byte("bar")),
+			PRSigstoreSignedWithSignedIdentity(testIdentity),
 		},
 	} {
 		_, err = newPRSigstoreSigned(c...)

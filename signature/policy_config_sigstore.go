@@ -11,6 +11,17 @@ import (
 // PRSigstoreSignedOption is way to pass values to NewPRSigstoreSigned
 type PRSigstoreSignedOption func(*prSigstoreSigned) error
 
+// PRSigstoreSignedWithKeyPaths specifies a value for the "keyPaths" field when calling NewPRSigstoreSigned.
+func PRSigstoreSignedWithKeyPaths(keyPaths []string) PRSigstoreSignedOption {
+	return func(pr *prSigstoreSigned) error {
+		if len(pr.KeyPaths) > 0 {
+			return errors.New(`"keyPaths" already specified`)
+		}
+		pr.KeyPaths = keyPaths
+		return nil
+	}
+}
+
 // PRSigstoreSignedWithKeyPath specifies a value for the "keyPath" field when calling NewPRSigstoreSigned.
 func PRSigstoreSignedWithKeyPath(keyPath string) PRSigstoreSignedOption {
 	return func(pr *prSigstoreSigned) error {
@@ -29,6 +40,17 @@ func PRSigstoreSignedWithKeyData(keyData []byte) PRSigstoreSignedOption {
 			return errors.New(`"keyData" already specified`)
 		}
 		pr.KeyData = keyData
+		return nil
+	}
+}
+
+// PRSigstoreSignedWithKeyDatas specifies a value for the "keyDatas" field when calling NewPRSigstoreSigned.
+func PRSigstoreSignedWithKeyDatas(keyDatas [][]byte) PRSigstoreSignedOption {
+	return func(pr *prSigstoreSigned) error {
+		if pr.KeyDatas != nil {
+			return errors.New(`"keyDatas" already specified`)
+		}
+		pr.KeyDatas = keyDatas
 		return nil
 	}
 }
@@ -98,8 +120,17 @@ func newPRSigstoreSigned(options ...PRSigstoreSignedOption) (*prSigstoreSigned, 
 	if res.Fulcio != nil {
 		keySources++
 	}
+
+	if len(res.KeyPaths) > 0 {
+		keySources++
+	}
+
+	if len(res.KeyDatas) > 0 {
+		keySources++
+	}
+
 	if keySources != 1 {
-		return nil, InvalidPolicyFormatError("exactly one of keyPath, keyData and fulcio must be specified")
+		return nil, InvalidPolicyFormatError("exactly one of keyPath, keyPaths, keyData, keyDatas and fulcio must be specified")
 	}
 
 	if res.RekorPublicKeyPath != "" && res.RekorPublicKeyData != nil {
@@ -129,10 +160,26 @@ func NewPRSigstoreSignedKeyPath(keyPath string, signedIdentity PolicyReferenceMa
 	)
 }
 
+// NewPRSigstoreSignedKeyPaths returns a new "sigstoreSigned" PolicyRequirement using KeyPaths
+func NewPRSigstoreSignedKeyPaths(keyPaths []string, signedIdentity PolicyReferenceMatch) (PolicyRequirement, error) {
+	return NewPRSigstoreSigned(
+		PRSigstoreSignedWithKeyPaths(keyPaths),
+		PRSigstoreSignedWithSignedIdentity(signedIdentity),
+	)
+}
+
 // NewPRSigstoreSignedKeyData returns a new "sigstoreSigned" PolicyRequirement using a KeyData
 func NewPRSigstoreSignedKeyData(keyData []byte, signedIdentity PolicyReferenceMatch) (PolicyRequirement, error) {
 	return NewPRSigstoreSigned(
 		PRSigstoreSignedWithKeyData(keyData),
+		PRSigstoreSignedWithSignedIdentity(signedIdentity),
+	)
+}
+
+// NewPRSigstoreSignedKeyDatas returns a new "sigstoreSigned" PolicyRequirement using KeyDatas
+func NewPRSigstoreSignedKeyDatas(keyDatas [][]byte, signedIdentity PolicyReferenceMatch) (PolicyRequirement, error) {
+	return NewPRSigstoreSigned(
+		PRSigstoreSignedWithKeyDatas(keyDatas),
 		PRSigstoreSignedWithSignedIdentity(signedIdentity),
 	)
 }

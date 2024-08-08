@@ -171,36 +171,67 @@ type SigstorePayloadAcceptanceRules struct {
 	ValidateSignedDockerManifestDigest func(digest.Digest) error
 }
 
-// VerifySigstorePayload verifies unverifiedBase64Signature of unverifiedPayload was correctly created by publicKey, and that its principal components
+// VerifySigstorePayload verifies unverifiedBase64Signature of unverifiedPayload was correctly created by any of the public keys in publicKeys, and that its principal components
 // match expected values, both as specified by rules, and returns it.
 // We return an *UntrustedSigstorePayload, although nothing actually uses it,
+// Additionally, we return the PublicKey, with which the signature has been successfully verified.
 // just to double-check against stupid typos.
-func VerifySigstorePayload(publicKey crypto.PublicKey, unverifiedPayload []byte, unverifiedBase64Signature string, rules SigstorePayloadAcceptanceRules) (*UntrustedSigstorePayload, error) {
-	verifier, err := sigstoreSignature.LoadVerifier(publicKey, sigstoreHarcodedHashAlgorithm)
-	if err != nil {
-		return nil, fmt.Errorf("creating verifier: %w", err)
+func VerifySigstorePayload(publicKeys []crypto.PublicKey, unverifiedPayload []byte, unverifiedBase64Signature string, rules SigstorePayloadAcceptanceRules) (*UntrustedSigstorePayload, crypto.PublicKey, error) {
+	if len(publicKeys) == 0 {
+		return nil, nil, fmt.Errorf("Need at least one public key to verify the sigstore payload, but got 0")
 	}
 
 	unverifiedSignature, err := base64.StdEncoding.DecodeString(unverifiedBase64Signature)
 	if err != nil {
-		return nil, NewInvalidSignatureError(fmt.Sprintf("base64 decoding: %v", err))
-	}
-	// github.com/sigstore/cosign/pkg/cosign.verifyOCISignature uses signatureoptions.WithContext(),
-	// which seems to be not used by anything. So we don’t bother.
-	if err := verifier.VerifySignature(bytes.NewReader(unverifiedSignature), bytes.NewReader(unverifiedPayload)); err != nil {
-		return nil, NewInvalidSignatureError(fmt.Sprintf("cryptographic signature verification failed: %v", err))
+		return nil, nil, NewInvalidSignatureError(fmt.Sprintf("base64 decoding: %v", err))
 	}
 
 	var unmatchedPayload UntrustedSigstorePayload
 	if err := json.Unmarshal(unverifiedPayload, &unmatchedPayload); err != nil {
-		return nil, NewInvalidSignatureError(err.Error())
+		return nil, nil, err
 	}
-	if err := rules.ValidateSignedDockerManifestDigest(unmatchedPayload.untrustedDockerManifestDigest); err != nil {
-		return nil, err
+
+	errs := make([]error, 0, len(publicKeys))
+
+	for _, pk := range publicKeys {
+		// loading a verifier indicates that something is really, really
+		// messed up with the public key, so we should probably error
+		// out
+		verifier, err := sigstoreSignature.LoadVerifier(pk, sigstoreHarcodedHashAlgorithm)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// github.com/sigstore/cosign/pkg/cosign.verifyOCISignature uses signatureoptions.WithContext(),
+		// which seems to be not used by anything. So we don’t bother.
+		if err := verifier.VerifySignature(bytes.NewReader(unverifiedSignature), bytes.NewReader(unverifiedPayload)); err != nil {
+			errs = append(errs, NewInvalidSignatureError(fmt.Sprintf("cryptographic signature verification failed: %v", err)))
+			continue
+		}
+
+		// At this point we know that the signature has verified and now
+		// we can check the sigstore rules.
+		// The rules are independent of the individual public keys, so
+		// if any of them fail, we just return their error directly as
+		// the user won't really care that one of the public keys didn't
+		// verify this signature.
+		if err := rules.ValidateSignedDockerManifestDigest(unmatchedPayload.untrustedDockerManifestDigest); err != nil {
+			return nil, nil, err
+		}
+
+		if err := rules.ValidateSignedDockerReference(unmatchedPayload.untrustedDockerReference); err != nil {
+			return nil, nil, err
+		}
+
+		// SigstorePayloadAcceptanceRules have accepted this value.
+		return &unmatchedPayload, pk, nil
 	}
-	if err := rules.ValidateSignedDockerReference(unmatchedPayload.untrustedDockerReference); err != nil {
-		return nil, err
+
+	// at this point we must have failed to verify the signature with every key
+	// => there must be at least one error
+	if len(errs) == 0 {
+		return nil, nil, fmt.Errorf("Internal error: signature verification failed but no errors have been recorded")
 	}
-	// SigstorePayloadAcceptanceRules have accepted this value.
-	return &unmatchedPayload, nil
+
+	return nil, nil, errors.Join(errs...)
 }
