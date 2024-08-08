@@ -77,7 +77,7 @@ func TestPrepareCopyInstancesforInstanceCopyClone(t *testing.T) {
 	// * Still copy gzip variants if they exist in the original
 	// * Not create new Zstd variants if they exist in the original.
 
-	// We crated a list of three instances `sourceInstances` and since in oci1.index.zstd-selection.json
+	// We created a list of three instances `sourceInstances` and since in oci1.index.zstd-selection.json
 	// amd64 already has a zstd instance i.e sourceInstance[1] so it should not create replication for
 	// `sourceInstance[0]` and `sourceInstance[1]` but should do it for `sourceInstance[2]` for `arm64`
 	// and still copy `sourceInstance[2]`.
@@ -93,8 +93,8 @@ func TestPrepareCopyInstancesforInstanceCopyClone(t *testing.T) {
 	actualResponse := convertInstanceCopyToSimplerInstanceCopy(instancesToCopy)
 	assert.Equal(t, expectedResponse, actualResponse)
 
-	// Test option with multiple copy request for same compression format
-	// above expection should stay same, if out ensureCompressionVariantsExist requests zstd twice
+	// Test option with multiple copy request for same compression format.
+	// The above expectation should stay the same, if ensureCompressionVariantsExist requests zstd twice.
 	ensureCompressionVariantsExist = []OptionCompressionVariant{{Algorithm: compression.Zstd}, {Algorithm: compression.Zstd}}
 	instancesToCopy, err = prepareInstanceCopies(list, sourceInstances, &Options{EnsureCompressionVariantsExist: ensureCompressionVariantsExist})
 	require.NoError(t, err)

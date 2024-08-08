@@ -490,7 +490,7 @@ func TestPRrSigstoreSignedIsSignatureAccepted(t *testing.T) {
 	assertRejected(sar, err)
 
 	// A valid signature with a rejected identity.
-	nonmatchingPRM, err := NewPRMExactReference("this/doesnt:match")
+	nonmatchingPRM, err := NewPRMExactReference("this/does-not:match")
 	require.NoError(t, err)
 	pr, err = newPRSigstoreSigned(
 		PRSigstoreSignedWithKeyPath("fixtures/cosign.pub"),
@@ -644,7 +644,7 @@ func TestPRSigstoreSignedIsRunningImageAllowed(t *testing.T) {
 	assertRunningAllowed(t, allowed, err)
 
 	// 2 invalid signajtures: use dir-img-cosign-valid-2, but a non-matching Docker reference
-	image = dirImageMock(t, "fixtures/dir-img-cosign-valid-2", "this/doesnt:match")
+	image = dirImageMock(t, "fixtures/dir-img-cosign-valid-2", "this/does-not:match")
 	pr, err = NewPRSigstoreSigned(
 		PRSigstoreSignedWithKeyPath("fixtures/cosign.pub"),
 		PRSigstoreSignedWithSignedIdentity(prm),

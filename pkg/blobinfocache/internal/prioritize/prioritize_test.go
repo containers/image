@@ -8,9 +8,11 @@ import (
 
 	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/pkg/compression"
+	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -52,6 +54,230 @@ var (
 		{Digest: digestUncompressed, UnknownLocation: true, Location: types.BICLocationReference{Opaque: ""}},
 	}
 )
+
+func TestCandidateTemplateWithCompression(t *testing.T) {
+	chunkedAnnotations := map[string]string{"a": "b"}
+	uncompressedData := blobinfocache.DigestCompressorData{
+		BaseVariantCompressor:      blobinfocache.Uncompressed,
+		SpecificVariantCompressor:  blobinfocache.UnknownCompression,
+		SpecificVariantAnnotations: nil,
+	}
+	gzipData := blobinfocache.DigestCompressorData{
+		BaseVariantCompressor:      compressiontypes.GzipAlgorithmName,
+		SpecificVariantCompressor:  blobinfocache.UnknownCompression,
+		SpecificVariantAnnotations: nil,
+	}
+	zstdData := blobinfocache.DigestCompressorData{
+		BaseVariantCompressor:      compressiontypes.ZstdAlgorithmName,
+		SpecificVariantCompressor:  blobinfocache.UnknownCompression,
+		SpecificVariantAnnotations: nil,
+	}
+	zstdChunkedData := blobinfocache.DigestCompressorData{
+		BaseVariantCompressor:      compressiontypes.ZstdAlgorithmName,
+		SpecificVariantCompressor:  compressiontypes.ZstdChunkedAlgorithmName,
+		SpecificVariantAnnotations: chunkedAnnotations,
+	}
+
+	for _, c := range []struct {
+		name                string
+		requiredCompression *compressiontypes.Algorithm
+		data                blobinfocache.DigestCompressorData
+		v2Matches           bool
+		// if v2Matches:
+		v2Op          types.LayerCompression
+		v2Algo        string
+		v2Annotations map[string]string
+	}{
+		{
+			name:                "unknown",
+			requiredCompression: nil,
+			data: blobinfocache.DigestCompressorData{
+				BaseVariantCompressor:      blobinfocache.UnknownCompression,
+				SpecificVariantCompressor:  blobinfocache.UnknownCompression,
+				SpecificVariantAnnotations: nil,
+			},
+			v2Matches: false,
+		},
+		{
+			name:                "uncompressed",
+			requiredCompression: nil,
+			data:                uncompressedData,
+			v2Matches:           true,
+			v2Op:                types.Decompress,
+			v2Algo:              "",
+			v2Annotations:       nil,
+		},
+		{
+			name:                "uncompressed, want gzip",
+			requiredCompression: &compression.Gzip,
+			data:                uncompressedData,
+			v2Matches:           false,
+		},
+		{
+			name:                "gzip",
+			requiredCompression: nil,
+			data:                gzipData,
+			v2Matches:           true,
+			v2Op:                types.Compress,
+			v2Algo:              compressiontypes.GzipAlgorithmName,
+			v2Annotations:       nil,
+		},
+		{
+			name:                "gzip, want zstd",
+			requiredCompression: &compression.Zstd,
+			data:                gzipData,
+			v2Matches:           false,
+		},
+		{
+			name:                "unknown base",
+			requiredCompression: nil,
+			data: blobinfocache.DigestCompressorData{
+				BaseVariantCompressor:      "this value is unknown",
+				SpecificVariantCompressor:  blobinfocache.UnknownCompression,
+				SpecificVariantAnnotations: nil,
+			},
+			v2Matches: false,
+		},
+		{
+			name:                "zstd",
+			requiredCompression: nil,
+			data:                zstdData,
+			v2Matches:           true,
+			v2Op:                types.Compress,
+			v2Algo:              compressiontypes.ZstdAlgorithmName,
+			v2Annotations:       nil,
+		},
+		{
+			name:                "zstd, want gzip",
+			requiredCompression: &compression.Gzip,
+			data:                zstdData,
+			v2Matches:           false,
+		},
+		{
+			name:                "zstd, want zstd",
+			requiredCompression: &compression.Zstd,
+			data:                zstdData,
+			v2Matches:           true,
+			v2Op:                types.Compress,
+			v2Algo:              compressiontypes.ZstdAlgorithmName,
+			v2Annotations:       nil,
+		},
+		{
+			name:                "zstd, want zstd:chunked",
+			requiredCompression: &compression.ZstdChunked,
+			data:                zstdData,
+			v2Matches:           false,
+		},
+		{
+			name:                "zstd:chunked",
+			requiredCompression: nil,
+			data:                zstdChunkedData,
+			v2Matches:           true,
+			v2Op:                types.Compress,
+			v2Algo:              compressiontypes.ZstdChunkedAlgorithmName,
+			v2Annotations:       chunkedAnnotations,
+		},
+		{
+			name:                "zstd:chunked, want gzip",
+			requiredCompression: &compression.Gzip,
+			data:                zstdChunkedData,
+			v2Matches:           false,
+		},
+		{
+			name:                "zstd:chunked, want zstd", // Note that we return the full chunked data in this case.
+			requiredCompression: &compression.Zstd,
+			data:                zstdChunkedData,
+			v2Matches:           true,
+			v2Op:                types.Compress,
+			v2Algo:              compressiontypes.ZstdChunkedAlgorithmName,
+			v2Annotations:       chunkedAnnotations,
+		},
+		{
+			name:                "zstd:chunked, want zstd:chunked",
+			requiredCompression: &compression.ZstdChunked,
+			data:                zstdChunkedData,
+			v2Matches:           true,
+			v2Op:                types.Compress,
+			v2Algo:              compressiontypes.ZstdChunkedAlgorithmName,
+			v2Annotations:       chunkedAnnotations,
+		},
+		{
+			name:                "zstd:unknown",
+			requiredCompression: nil,
+			data: blobinfocache.DigestCompressorData{
+				BaseVariantCompressor:      compressiontypes.ZstdAlgorithmName,
+				SpecificVariantCompressor:  "this value is unknown",
+				SpecificVariantAnnotations: chunkedAnnotations,
+			},
+			v2Matches:     true,
+			v2Op:          types.Compress,
+			v2Algo:        compressiontypes.ZstdAlgorithmName,
+			v2Annotations: nil,
+		},
+	} {
+		res := CandidateTemplateWithCompression(nil, digestCompressedPrimary, c.data)
+		assert.Equal(t, &CandidateTemplate{
+			digest:                 digestCompressedPrimary,
+			compressionOperation:   types.PreserveOriginal,
+			compressionAlgorithm:   nil,
+			compressionAnnotations: nil,
+		}, res, c.name)
+
+		// These tests only use RequiredCompression in CandidateLocations2Options for clarity;
+		// CandidateCompressionMatchesReuseConditions should have its own tests of handling the full set of options.
+		res = CandidateTemplateWithCompression(&blobinfocache.CandidateLocations2Options{
+			RequiredCompression: c.requiredCompression,
+		}, digestCompressedPrimary, c.data)
+		if !c.v2Matches {
+			assert.Nil(t, res, c.name)
+		} else {
+			require.NotNil(t, res, c.name)
+			assert.Equal(t, digestCompressedPrimary, res.digest, c.name)
+			assert.Equal(t, c.v2Op, res.compressionOperation, c.name)
+			if c.v2Algo == "" {
+				assert.Nil(t, res.compressionAlgorithm, c.name)
+			} else {
+				require.NotNil(t, res.compressionAlgorithm, c.name)
+				assert.Equal(t, c.v2Algo, res.compressionAlgorithm.Name())
+			}
+			assert.Equal(t, c.v2Annotations, res.compressionAnnotations, c.name)
+		}
+	}
+}
+
+func TestCandidateWithLocation(t *testing.T) {
+	template := CandidateTemplateWithCompression(&blobinfocache.CandidateLocations2Options{}, digestCompressedPrimary, blobinfocache.DigestCompressorData{
+		BaseVariantCompressor:      compressiontypes.ZstdAlgorithmName,
+		SpecificVariantCompressor:  compressiontypes.ZstdChunkedAlgorithmName,
+		SpecificVariantAnnotations: map[string]string{"a": "b"},
+	})
+	require.NotNil(t, template)
+	loc := types.BICLocationReference{Opaque: "opaque"}
+	time := time.Now()
+	res := template.CandidateWithLocation(loc, time)
+	assert.Equal(t, digestCompressedPrimary, res.candidate.Digest)
+	assert.Equal(t, types.Compress, res.candidate.CompressionOperation)
+	assert.Equal(t, compressiontypes.ZstdChunkedAlgorithmName, res.candidate.CompressionAlgorithm.Name())
+	assert.Equal(t, map[string]string{"a": "b"}, res.candidate.CompressionAnnotations)
+	assert.Equal(t, false, res.candidate.UnknownLocation)
+	assert.Equal(t, loc, res.candidate.Location)
+	assert.Equal(t, time, res.lastSeen)
+}
+
+func TestCandidateWithUnknownLocation(t *testing.T) {
+	template := CandidateTemplateWithCompression(&blobinfocache.CandidateLocations2Options{}, digestCompressedPrimary, blobinfocache.DigestCompressorData{
+		BaseVariantCompressor:      compressiontypes.ZstdAlgorithmName,
+		SpecificVariantCompressor:  compressiontypes.ZstdChunkedAlgorithmName,
+		SpecificVariantAnnotations: map[string]string{"a": "b"},
+	})
+	require.NotNil(t, template)
+	res := template.CandidateWithUnknownLocation()
+	assert.Equal(t, digestCompressedPrimary, res.candidate.Digest)
+	assert.Equal(t, types.Compress, res.candidate.CompressionOperation)
+	assert.Equal(t, compressiontypes.ZstdChunkedAlgorithmName, res.candidate.CompressionAlgorithm.Name())
+	assert.Equal(t, map[string]string{"a": "b"}, res.candidate.CompressionAnnotations)
+	assert.Equal(t, true, res.candidate.UnknownLocation)
+}
 
 func TestCandidateSortStateLess(t *testing.T) {
 	type p struct {
