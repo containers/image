@@ -1,6 +1,6 @@
 # See https://github.com/codespell-project/codespell#using-a-config-file
 [codespell]
-skip = .git,*.pdf,*.svg,.codespellrc,go.sum,system_registries_v2_test.go,Makefile,build,buildah,buildah.spec,imgtype,copy,AUTHORS,bin,vendor,CHANGELOG.md,changelog.txt,seccomp.json,.cirrus.yml,*.xz,*.gz,*.tar,*.tgz,*ico,*.png,*.1,*.5,*.orig,*.rej,*.gpg
-check-hidden = true
-ignore-regex = \b(isT|BU|this/doesnt:match)\b
-ignore-words-list = te,pathc
+skip = ./vendor,./.git,./go.sum,*.gpg
+
+# NOTE words added to the list below need to be lowercased.
+ignore-words-list = te,bu

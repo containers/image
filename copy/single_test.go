@@ -55,19 +55,39 @@ func TestUpdatedBlobInfoFromReuse(t *testing.T) {
 		},
 		{ // Reuse with substitution
 			reused: private.ReusedBlob{
-				Digest:               "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-				Size:                 513543640,
-				CompressionOperation: types.Decompress,
-				CompressionAlgorithm: nil,
+				Digest:                 "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				Size:                   513543640,
+				CompressionOperation:   types.Decompress,
+				CompressionAlgorithm:   nil,
+				CompressionAnnotations: map[string]string{"decompressed": "value"},
 			},
 			expected: types.BlobInfo{
 				Digest:               "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 				Size:                 513543640,
 				URLs:                 nil,
-				Annotations:          map[string]string{"test-annotation-2": "two"},
+				Annotations:          map[string]string{"test-annotation-2": "two", "decompressed": "value"},
 				MediaType:            imgspecv1.MediaTypeImageLayerGzip,
 				CompressionOperation: types.Decompress,
 				CompressionAlgorithm: nil,
+				// CryptoOperation is set to the zero value
+			},
+		},
+		{ // Reuse turning zstd into zstd:chunked
+			reused: private.ReusedBlob{
+				Digest:                 "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+				Size:                   51354364,
+				CompressionOperation:   types.Compress,
+				CompressionAlgorithm:   &compression.ZstdChunked,
+				CompressionAnnotations: map[string]string{"zstd-toc": "value"},
+			},
+			expected: types.BlobInfo{
+				Digest:               "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb",
+				Size:                 51354364,
+				URLs:                 nil,
+				Annotations:          map[string]string{"test-annotation-2": "two", "zstd-toc": "value"},
+				MediaType:            imgspecv1.MediaTypeImageLayerGzip,
+				CompressionOperation: types.Compress,
+				CompressionAlgorithm: &compression.ZstdChunked,
 				// CryptoOperation is set to the zero value
 			},
 		},

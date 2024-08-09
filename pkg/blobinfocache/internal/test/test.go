@@ -25,7 +25,7 @@ const (
 	compressorNameU           = blobinfocache.Uncompressed
 	compressorNameA           = compressiontypes.GzipAlgorithmName
 	compressorNameB           = compressiontypes.ZstdAlgorithmName
-	compressorNameCU          = compressiontypes.ZstdChunkedAlgorithmName
+	compressorNameCU          = compressiontypes.XzAlgorithmName
 
 	digestUnknownLocation       = digest.Digest("sha256:7777777777777777777777777777777777777777777777777777777777777777")
 	digestFilteringUncompressed = digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -43,6 +43,8 @@ func GenericCache(t *testing.T, newTestCache func(t *testing.T) blobinfocache.Bl
 	}{
 		{"UncompressedDigest", testGenericUncompressedDigest},
 		{"RecordDigestUncompressedPair", testGenericRecordDigestUncompressedPair},
+		{"UncompressedDigestForTOC", testGenericUncompressedDigestForTOC},
+		{"RecordTOCUncompressedPair", testGenericRecordTOCUncompressedPair},
 		{"RecordKnownLocations", testGenericRecordKnownLocations},
 		{"CandidateLocations", testGenericCandidateLocations},
 		{"CandidateLocations2", testGenericCandidateLocations2},
@@ -99,6 +101,28 @@ func testGenericRecordDigestUncompressedPair(t *testing.T, cache blobinfocache.B
 	}
 }
 
+func testGenericUncompressedDigestForTOC(t *testing.T, cache blobinfocache.BlobInfoCache2) {
+	// Nothing is known.
+	assert.Equal(t, digest.Digest(""), cache.UncompressedDigestForTOC(digestUnknown))
+
+	cache.RecordTOCUncompressedPair(digestCompressedA, digestUncompressed)
+	cache.RecordTOCUncompressedPair(digestCompressedB, digestUncompressed)
+	// Known TOC→uncompressed mapping
+	assert.Equal(t, digestUncompressed, cache.UncompressedDigestForTOC(digestCompressedA))
+	assert.Equal(t, digestUncompressed, cache.UncompressedDigestForTOC(digestCompressedB))
+}
+
+func testGenericRecordTOCUncompressedPair(t *testing.T, cache blobinfocache.BlobInfoCache2) {
+	for i := 0; i < 2; i++ { // Record the same data twice to ensure redundant writes don’t break things.
+		// Known TOC→uncompressed mapping
+		cache.RecordTOCUncompressedPair(digestCompressedA, digestUncompressed)
+		assert.Equal(t, digestUncompressed, cache.UncompressedDigestForTOC(digestCompressedA))
+		// Two mappings to the same uncompressed digest
+		cache.RecordTOCUncompressedPair(digestCompressedB, digestUncompressed)
+		assert.Equal(t, digestUncompressed, cache.UncompressedDigestForTOC(digestCompressedB))
+	}
+}
+
 func testGenericRecordKnownLocations(t *testing.T, cache blobinfocache.BlobInfoCache2) {
 	transport := mocks.NameImageTransport("==BlobInfocache transport mock")
 	for i := 0; i < 2; i++ { // Record the same data twice to ensure redundant writes don’t break things.
@@ -126,6 +150,7 @@ func testGenericRecordKnownLocations(t *testing.T, cache blobinfocache.BlobInfoC
 type candidate struct {
 	d  digest.Digest
 	cn string
+	ca map[string]string
 	lr string
 }
 
@@ -170,11 +195,12 @@ func assertCandidatesMatch2(t *testing.T, scopeName string, expected []candidate
 			algo = &algo_
 		}
 		e[i] = blobinfocache.BICReplacementCandidate2{
-			Digest:               ev.d,
-			CompressionOperation: op,
-			CompressionAlgorithm: algo,
-			UnknownLocation:      false,
-			Location:             types.BICLocationReference{Opaque: scopeName + ev.lr},
+			Digest:                 ev.d,
+			CompressionOperation:   op,
+			CompressionAlgorithm:   algo,
+			CompressionAnnotations: ev.ca,
+			UnknownLocation:        false,
+			Location:               types.BICLocationReference{Opaque: scopeName + ev.lr},
 		}
 	}
 	assertCandidatesMatch2Native(t, e, actual)
@@ -259,14 +285,16 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		{"B", digestCompressedB, compressorNameB},
 		{"CU", digestCompressedUnrelated, compressorNameCU},
 	}
+	chunkedAnnotations := map[string]string{"a": "b"}
 	digestNameSetFiltering := []struct { // Used primarily to test filtering in CandidateLocations2Options
-		n string
-		d digest.Digest
-		m string
+		n              string
+		d              digest.Digest
+		base, specific string
+		annotations    map[string]string
 	}{
-		{"gzip", digestGzip, compressiontypes.GzipAlgorithmName},
-		{"zstd", digestZstd, compressiontypes.ZstdAlgorithmName},
-		{"zstdChunked", digestZstdChunked, compressiontypes.ZstdChunkedAlgorithmName},
+		{"gzip", digestGzip, compressiontypes.GzipAlgorithmName, blobinfocache.UnknownCompression, nil},
+		{"zstd", digestZstd, compressiontypes.ZstdAlgorithmName, blobinfocache.UnknownCompression, nil},
+		{"zstdChunked", digestZstdChunked, compressiontypes.ZstdAlgorithmName, compressiontypes.ZstdChunkedAlgorithmName, chunkedAnnotations},
 	}
 	for _, e := range digestNameSetFiltering { // digestFilteringUncompressed exists only to allow the three entries to be considered as candidates
 		cache.RecordDigestUncompressedPair(e.d, digestFilteringUncompressed)
@@ -290,7 +318,11 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		// ----------------------------
 		// If a record exists with compression without Location then
 		// then return a record without location and with `UnknownLocation: true`
-		cache.RecordDigestCompressorName(digestUnknownLocation, compressiontypes.Bzip2AlgorithmName)
+		cache.RecordDigestCompressorData(digestUnknownLocation, blobinfocache.DigestCompressorData{
+			BaseVariantCompressor:      compressiontypes.Bzip2AlgorithmName,
+			SpecificVariantCompressor:  blobinfocache.UnknownCompression,
+			SpecificVariantAnnotations: nil,
+		})
 		res = cache.CandidateLocations2(transport, scope, digestUnknownLocation, blobinfocache.CandidateLocations2Options{
 			CanSubstitute: true,
 		})
@@ -331,7 +363,11 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		// that shouldn’t happen in real-world usage.
 		if scopeIndex != 0 {
 			for _, e := range digestNameSetPrioritization {
-				cache.RecordDigestCompressorName(e.d, blobinfocache.UnknownCompression)
+				cache.RecordDigestCompressorData(e.d, blobinfocache.DigestCompressorData{
+					BaseVariantCompressor:      blobinfocache.UnknownCompression,
+					SpecificVariantCompressor:  blobinfocache.UnknownCompression,
+					SpecificVariantAnnotations: nil,
+				})
 			}
 		}
 
@@ -394,12 +430,16 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 		})
 		assertCandidatesMatch2(t, scopeName, []candidate{}, res)
 
-		// Tests of lookups / prioritization when compression is unknown
+		// Tests of lookups / prioritization when compression is known
 		// -------------------------------------------------------------
 
 		// Set the "known" compression values
 		for _, e := range digestNameSetPrioritization {
-			cache.RecordDigestCompressorName(e.d, e.m)
+			cache.RecordDigestCompressorData(e.d, blobinfocache.DigestCompressorData{
+				BaseVariantCompressor:      e.m,
+				SpecificVariantCompressor:  blobinfocache.UnknownCompression,
+				SpecificVariantAnnotations: nil,
+			})
 		}
 
 		// No substitutions allowed:
@@ -481,7 +521,11 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 			cache.RecordKnownLocation(transport, scope, e.d, types.BICLocationReference{Opaque: scopeName + e.n})
 		}
 		for _, e := range digestNameSetFiltering {
-			cache.RecordDigestCompressorName(e.d, e.m)
+			cache.RecordDigestCompressorData(e.d, blobinfocache.DigestCompressorData{
+				BaseVariantCompressor:      e.base,
+				SpecificVariantCompressor:  e.specific,
+				SpecificVariantAnnotations: e.annotations,
+			})
 		}
 
 		// No filtering
@@ -489,9 +533,9 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 			CanSubstitute: true,
 		})
 		assertCandidatesMatch2(t, scopeName, []candidate{ // Sorted in the reverse of digestNameSetFiltering order
-			{d: digestZstdChunked, cn: compressiontypes.ZstdChunkedAlgorithmName, lr: "zstdChunked"},
-			{d: digestZstd, cn: compressiontypes.ZstdAlgorithmName, lr: "zstd"},
-			{d: digestGzip, cn: compressiontypes.GzipAlgorithmName, lr: "gzip"},
+			{d: digestZstdChunked, cn: compressiontypes.ZstdChunkedAlgorithmName, ca: chunkedAnnotations, lr: "zstdChunked"},
+			{d: digestZstd, cn: compressiontypes.ZstdAlgorithmName, ca: nil, lr: "zstd"},
+			{d: digestGzip, cn: compressiontypes.GzipAlgorithmName, ca: nil, lr: "gzip"},
 		}, res)
 
 		// Manifest format filters
@@ -500,16 +544,16 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 			PossibleManifestFormats: []string{manifest.DockerV2Schema2MediaType},
 		})
 		assertCandidatesMatch2(t, scopeName, []candidate{
-			{d: digestGzip, cn: compressiontypes.GzipAlgorithmName, lr: "gzip"},
+			{d: digestGzip, cn: compressiontypes.GzipAlgorithmName, ca: nil, lr: "gzip"},
 		}, res)
 		res = cache.CandidateLocations2(transport, scope, digestFilteringUncompressed, blobinfocache.CandidateLocations2Options{
 			CanSubstitute:           true,
 			PossibleManifestFormats: []string{imgspecv1.MediaTypeImageManifest},
 		})
 		assertCandidatesMatch2(t, scopeName, []candidate{ // Sorted in the reverse of digestNameSetFiltering order
-			{d: digestZstdChunked, cn: compressiontypes.ZstdChunkedAlgorithmName, lr: "zstdChunked"},
-			{d: digestZstd, cn: compressiontypes.ZstdAlgorithmName, lr: "zstd"},
-			{d: digestGzip, cn: compressiontypes.GzipAlgorithmName, lr: "gzip"},
+			{d: digestZstdChunked, cn: compressiontypes.ZstdChunkedAlgorithmName, ca: chunkedAnnotations, lr: "zstdChunked"},
+			{d: digestZstd, cn: compressiontypes.ZstdAlgorithmName, ca: nil, lr: "zstd"},
+			{d: digestGzip, cn: compressiontypes.GzipAlgorithmName, ca: nil, lr: "gzip"},
 		}, res)
 
 		// Compression algorithm filters
@@ -518,21 +562,37 @@ func testGenericCandidateLocations2(t *testing.T, cache blobinfocache.BlobInfoCa
 			RequiredCompression: &compression.Gzip,
 		})
 		assertCandidatesMatch2(t, scopeName, []candidate{
-			{d: digestGzip, cn: compressiontypes.GzipAlgorithmName, lr: "gzip"},
+			{d: digestGzip, cn: compressiontypes.GzipAlgorithmName, ca: nil, lr: "gzip"},
 		}, res)
 		res = cache.CandidateLocations2(transport, scope, digestFilteringUncompressed, blobinfocache.CandidateLocations2Options{
 			CanSubstitute:       true,
 			RequiredCompression: &compression.ZstdChunked,
 		})
-		// Right now, zstd:chunked requests never match a candidate, see CandidateCompressionMatchesReuseConditions().
-		assertCandidatesMatch2(t, scopeName, []candidate{}, res)
+		assertCandidatesMatch2(t, scopeName, []candidate{
+			{d: digestZstdChunked, cn: compressiontypes.ZstdChunkedAlgorithmName, ca: chunkedAnnotations, lr: "zstdChunked"},
+		}, res)
 		res = cache.CandidateLocations2(transport, scope, digestFilteringUncompressed, blobinfocache.CandidateLocations2Options{
 			CanSubstitute:       true,
 			RequiredCompression: &compression.Zstd,
 		})
-		assertCandidatesMatch2(t, scopeName, []candidate{ // When the user asks for zstd, zstd:chunked candidates are also acceptable.
-			{d: digestZstdChunked, cn: compressiontypes.ZstdChunkedAlgorithmName, lr: "zstdChunked"},
-			{d: digestZstd, cn: compressiontypes.ZstdAlgorithmName, lr: "zstd"},
+		assertCandidatesMatch2(t, scopeName, []candidate{ // When the user asks for zstd, zstd:chunked candidates are also acceptable, and include the chunked information.
+			{d: digestZstdChunked, cn: compressiontypes.ZstdChunkedAlgorithmName, ca: chunkedAnnotations, lr: "zstdChunked"},
+			{d: digestZstd, cn: compressiontypes.ZstdAlgorithmName, ca: nil, lr: "zstd"},
+		}, res)
+
+		// After RecordDigestCompressorData with zstd:chunked details, a later call with zstd-only does not drop the chunked details.
+		cache.RecordDigestCompressorData(digestZstdChunked, blobinfocache.DigestCompressorData{
+			BaseVariantCompressor:      compressiontypes.ZstdAlgorithmName,
+			SpecificVariantCompressor:  blobinfocache.UnknownCompression,
+			SpecificVariantAnnotations: nil,
+		})
+		res = cache.CandidateLocations2(transport, scope, digestFilteringUncompressed, blobinfocache.CandidateLocations2Options{
+			CanSubstitute: true,
+		})
+		assertCandidatesMatch2(t, scopeName, []candidate{ // Sorted in the reverse of digestNameSetFiltering order
+			{d: digestZstdChunked, cn: compressiontypes.ZstdChunkedAlgorithmName, ca: chunkedAnnotations, lr: "zstdChunked"},
+			{d: digestZstd, cn: compressiontypes.ZstdAlgorithmName, ca: nil, lr: "zstd"},
+			{d: digestGzip, cn: compressiontypes.GzipAlgorithmName, ca: nil, lr: "gzip"},
 		}, res)
 	}
 }
