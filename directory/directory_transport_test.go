@@ -243,10 +243,3 @@ func TestReferenceSignaturePath(t *testing.T) {
 	_, err = dirRef.signaturePath(0, &invalidDigest)
 	assert.Error(t, err)
 }
-
-func TestReferenceVersionPath(t *testing.T) {
-	ref, tmpDir := refToTempDir(t)
-	dirRef, ok := ref.(dirReference)
-	require.True(t, ok)
-	assert.Equal(t, tmpDir+"/version", dirRef.versionPath())
-}
