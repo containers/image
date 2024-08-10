@@ -1,6 +1,7 @@
 package directory
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"syscall"
 
 	"github.com/containers/image/v5/internal/imagedestination/impl"
 	"github.com/containers/image/v5/internal/imagedestination/stubs"
@@ -15,7 +17,6 @@ import (
 	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/types"
-	"github.com/containers/storage/pkg/fileutils"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 )
@@ -54,49 +55,40 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (private.Im
 	// If directory exists check if it is empty
 	// if not empty, check whether the contents match that of a container image directory and overwrite the contents
 	// if the contents don't match throw an error
-	dirExists, err := pathExists(ref.resolvedPath)
-	if err != nil {
-		return nil, fmt.Errorf("checking for path %q: %w", ref.resolvedPath, err)
-	}
-	if dirExists {
-		isEmpty, err := isDirEmpty(ref.resolvedPath)
-		if err != nil {
+	dir, err := os.OpenFile(ref.resolvedPath, syscall.O_DIRECTORY|syscall.O_NOFOLLOW|os.O_RDONLY, 0)
+	switch {
+	case err == nil: // Directory exists.
+		contents, err := dir.Readdirnames(-1)
+		_ = dir.Close()
+		if err != nil { // Unexpected error.
 			return nil, err
 		}
-
-		if !isEmpty {
-			versionExists, err := pathExists(ref.versionPath())
-			if err != nil {
-				return nil, fmt.Errorf("checking if path exists %q: %w", ref.versionPath(), err)
-			}
-			if versionExists {
-				contents, err := os.ReadFile(ref.versionPath())
-				if err != nil {
-					return nil, err
+		if len(contents) > 0 { // Not empty.
+			// Check if contents of version file is what we expect it to be.
+			ver, err := os.ReadFile(ref.versionPath())
+			if err == nil && bytes.Equal(ver, []byte(version)) {
+				// Definitely an image directory. Reuse by removing all the old contents.
+				logrus.Debugf("overwriting existing container image directory %q", ref.resolvedPath)
+				for _, name := range contents {
+					if os.RemoveAll(filepath.Join(ref.resolvedPath, name)) != nil {
+						return nil, err
+					}
 				}
-				// check if contents of version file is what we expect it to be
-				if string(contents) != version {
-					return nil, ErrNotContainerImageDir
-				}
-			} else {
-				return nil, ErrNotContainerImageDir
 			}
-			// delete directory contents so that only one image is in the directory at a time
-			if err = removeDirContents(ref.resolvedPath); err != nil {
-				return nil, fmt.Errorf("erasing contents in %q: %w", ref.resolvedPath, err)
-			}
-			logrus.Debugf("overwriting existing container image directory %q", ref.resolvedPath)
 		}
-	} else {
-		// create directory if it doesn't exist
-		if err := os.MkdirAll(ref.resolvedPath, 0755); err != nil {
-			return nil, fmt.Errorf("unable to create directory %q: %w", ref.resolvedPath, err)
+	case errors.Is(err, os.ErrNotExist): // Directory does not exist; create it.
+		if err := os.MkdirAll(ref.resolvedPath, 0o755); err != nil {
+			return nil, err
 		}
+	default:
+		// Unexpected error.
+		return nil, err
 	}
-	// create version file
-	err = os.WriteFile(ref.versionPath(), []byte(version), 0644)
+
+	// Create version file.
+	err = os.WriteFile(ref.versionPath(), []byte(version), 0o644)
 	if err != nil {
-		return nil, fmt.Errorf("creating version file %q: %w", ref.versionPath(), err)
+		return nil, err
 	}
 
 	d := &dirImageDestination{
@@ -259,41 +251,5 @@ func (d *dirImageDestination) PutSignaturesWithFormat(ctx context.Context, signa
 // - Uploaded data MAY be visible to others before Commit() is called
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 func (d *dirImageDestination) Commit(context.Context, types.UnparsedImage) error {
-	return nil
-}
-
-// returns true if path exists
-func pathExists(path string) (bool, error) {
-	err := fileutils.Exists(path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
-}
-
-// returns true if directory is empty
-func isDirEmpty(path string) (bool, error) {
-	files, err := os.ReadDir(path)
-	if err != nil {
-		return false, err
-	}
-	return len(files) == 0, nil
-}
-
-// deletes the contents of a directory
-func removeDirContents(path string) error {
-	files, err := os.ReadDir(path)
-	if err != nil {
-		return err
-	}
-
-	for _, file := range files {
-		if err := os.RemoveAll(filepath.Join(path, file.Name())); err != nil {
-			return err
-		}
-	}
 	return nil
 }
