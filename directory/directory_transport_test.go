@@ -181,7 +181,7 @@ func TestReferenceNewImageSource(t *testing.T) {
 func TestReferenceNewImageDestination(t *testing.T) {
 	ref, _ := refToTempDir(t)
 	dest, err := ref.NewImageDestination(context.Background(), nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer dest.Close()
 }
 
