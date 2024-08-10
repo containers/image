@@ -47,8 +47,10 @@ func NewUntrustedSigstorePayload(dockerManifestDigest digest.Digest, dockerRefer
 }
 
 // A compile-time check that UntrustedSigstorePayload and *UntrustedSigstorePayload implements json.Marshaler
-var _ json.Marshaler = UntrustedSigstorePayload{}
-var _ json.Marshaler = (*UntrustedSigstorePayload)(nil)
+var (
+	_ json.Marshaler = UntrustedSigstorePayload{}
+	_ json.Marshaler = (*UntrustedSigstorePayload)(nil)
+)
 
 // MarshalJSON implements the json.Marshaler interface.
 func (s UntrustedSigstorePayload) MarshalJSON() ([]byte, error) {
@@ -79,13 +81,7 @@ var _ json.Unmarshaler = (*UntrustedSigstorePayload)(nil)
 
 // UnmarshalJSON implements the json.Unmarshaler interface
 func (s *UntrustedSigstorePayload) UnmarshalJSON(data []byte) error {
-	err := s.strictUnmarshalJSON(data)
-	if err != nil {
-		if formatErr, ok := err.(JSONFormatError); ok {
-			err = NewInvalidSignatureError(formatErr.Error())
-		}
-	}
-	return err
+	return ConvertFormatError(s.strictUnmarshalJSON(data))
 }
 
 // strictUnmarshalJSON is UnmarshalJSON, except that it may return the internal JSONFormatError error type.

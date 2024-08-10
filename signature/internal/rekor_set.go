@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"time"
 
@@ -40,29 +41,30 @@ type UntrustedRekorPayload struct {
 // A compile-time check that UntrustedRekorSET implements json.Unmarshaler
 var _ json.Unmarshaler = (*UntrustedRekorSET)(nil)
 
-// UnmarshalJSON implements the json.Unmarshaler interface
-func (s *UntrustedRekorSET) UnmarshalJSON(data []byte) error {
-	err := s.strictUnmarshalJSON(data)
-	if err != nil {
-		if formatErr, ok := err.(JSONFormatError); ok {
-			err = NewInvalidSignatureError(formatErr.Error())
-		}
+// ConvertFormatError converts JSONFormatError to NewInvalidSignatureError.
+// All other errors are returned as is.
+func ConvertFormatError(err error) error {
+	var formatErr JSONFormatError
+	if errors.As(err, &formatErr) {
+		return NewInvalidSignatureError(formatErr.Error())
 	}
 	return err
 }
 
-// strictUnmarshalJSON is UnmarshalJSON, except that it may return the internal JSONFormatError error type.
-// Splitting it into a separate function allows us to do the JSONFormatError → InvalidSignatureError in a single place, the caller.
-func (s *UntrustedRekorSET) strictUnmarshalJSON(data []byte) error {
-	return ParanoidUnmarshalJSONObjectExactFields(data, map[string]any{
-		"SignedEntryTimestamp": &s.UntrustedSignedEntryTimestamp,
-		"Payload":              &s.UntrustedPayload,
-	})
+// UnmarshalJSON implements the json.Unmarshaler interface
+func (s *UntrustedRekorSET) UnmarshalJSON(data []byte) error {
+	return ConvertFormatError(ParanoidUnmarshalJSONObjectExactFields(data,
+		map[string]any{
+			"SignedEntryTimestamp": &s.UntrustedSignedEntryTimestamp,
+			"Payload":              &s.UntrustedPayload,
+		}))
 }
 
 // A compile-time check that UntrustedRekorSET and *UntrustedRekorSET implements json.Marshaler
-var _ json.Marshaler = UntrustedRekorSET{}
-var _ json.Marshaler = (*UntrustedRekorSET)(nil)
+var (
+	_ json.Marshaler = UntrustedRekorSET{}
+	_ json.Marshaler = (*UntrustedRekorSET)(nil)
+)
 
 // MarshalJSON implements the json.Marshaler interface.
 func (s UntrustedRekorSET) MarshalJSON() ([]byte, error) {
@@ -77,29 +79,20 @@ var _ json.Unmarshaler = (*UntrustedRekorPayload)(nil)
 
 // UnmarshalJSON implements the json.Unmarshaler interface
 func (p *UntrustedRekorPayload) UnmarshalJSON(data []byte) error {
-	err := p.strictUnmarshalJSON(data)
-	if err != nil {
-		if formatErr, ok := err.(JSONFormatError); ok {
-			err = NewInvalidSignatureError(formatErr.Error())
-		}
-	}
-	return err
-}
-
-// strictUnmarshalJSON is UnmarshalJSON, except that it may return the internal JSONFormatError error type.
-// Splitting it into a separate function allows us to do the JSONFormatError → InvalidSignatureError in a single place, the caller.
-func (p *UntrustedRekorPayload) strictUnmarshalJSON(data []byte) error {
-	return ParanoidUnmarshalJSONObjectExactFields(data, map[string]any{
-		"body":           &p.Body,
-		"integratedTime": &p.IntegratedTime,
-		"logIndex":       &p.LogIndex,
-		"logID":          &p.LogID,
-	})
+	return ConvertFormatError(ParanoidUnmarshalJSONObjectExactFields(data,
+		map[string]any{
+			"body":           &p.Body,
+			"integratedTime": &p.IntegratedTime,
+			"logIndex":       &p.LogIndex,
+			"logID":          &p.LogID,
+		}))
 }
 
 // A compile-time check that UntrustedRekorPayload and *UntrustedRekorPayload implements json.Marshaler
-var _ json.Marshaler = UntrustedRekorPayload{}
-var _ json.Marshaler = (*UntrustedRekorPayload)(nil)
+var (
+	_ json.Marshaler = UntrustedRekorPayload{}
+	_ json.Marshaler = (*UntrustedRekorPayload)(nil)
+)
 
 // MarshalJSON implements the json.Marshaler interface.
 func (p UntrustedRekorPayload) MarshalJSON() ([]byte, error) {
@@ -177,7 +170,6 @@ func VerifyRekorSET(publicKey *ecdsa.PublicKey, unverifiedRekorSET []byte, unver
 	}
 	if hashedRekordV001.Signature.PublicKey == nil {
 		return time.Time{}, NewInvalidSignatureError(`Missing "signature.publicKey" field in hashedrekord`)
-
 	}
 	rekorKeyOrCertPEM, rest := pem.Decode(hashedRekordV001.Signature.PublicKey.Content)
 	if rekorKeyOrCertPEM == nil {
@@ -232,7 +224,6 @@ func VerifyRekorSET(publicKey *ecdsa.PublicKey, unverifiedRekorSET []byte, unver
 	rekorPayloadHash, err := hex.DecodeString(*hashedRekordV001.Data.Hash.Value)
 	if err != nil {
 		return time.Time{}, NewInvalidSignatureError(fmt.Sprintf(`Invalid "data.hash.value" field in hashedrekord: %v`, err))
-
 	}
 	unverifiedPayloadHash := sha256.Sum256(unverifiedPayloadBytes)
 	if !bytes.Equal(rekorPayloadHash, unverifiedPayloadHash[:]) {
