@@ -61,7 +61,7 @@ func ParanoidUnmarshalJSONObject(data []byte, fieldResolver func(string) any) er
 			return JSONFormatError(err.Error())
 		}
 	}
-	if _, err := dec.Token(); err != io.EOF {
+	if _, err := dec.Token(); err != io.EOF { //nolint:errorlint // TODO remove this (https://github.com/polyfloyd/go-errorlint/pull/82).
 		return JSONFormatError("Unexpected data after JSON object")
 	}
 	return nil

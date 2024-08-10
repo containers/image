@@ -112,7 +112,7 @@ func DetectCompressionFormat(input io.Reader) (Algorithm, DecompressorFunc, io.R
 	buffer := [8]byte{}
 
 	n, err := io.ReadAtLeast(input, buffer[:], len(buffer))
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF { //nolint:errorlint // TODO remove this (https://github.com/polyfloyd/go-errorlint/pull/83).
 		// This is a “real” error. We could just ignore it this time, process the data we have, and hope that the source will report the same error again.
 		// Instead, fail immediately with the original error cause instead of a possibly secondary/misleading error returned later.
 		return Algorithm{}, nil, nil, err

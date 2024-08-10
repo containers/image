@@ -56,7 +56,7 @@ func httpResponseToError(res *http.Response, context string) error {
 func registryHTTPResponseToError(res *http.Response) error {
 	err := handleErrorResponse(res)
 	// len(errs) == 0 should never be returned by handleErrorResponse; if it does, we don't modify it and let the caller report it as is.
-	if errs, ok := err.(errcode.Errors); ok && len(errs) > 0 {
+	if errs, ok := err.(errcode.Errors); ok && len(errs) > 0 { //nolint:errorlint
 		// The docker/distribution registry implementation almost never returns
 		// more than one error in the HTTP body; it seems there is only one
 		// possible instance, where the second error reports a cleanup failure
@@ -81,7 +81,7 @@ func registryHTTPResponseToError(res *http.Response) error {
 		}
 		err = errs[0]
 	}
-	switch e := err.(type) {
+	switch e := err.(type) { //nolint:errorlint
 	case *unexpectedHTTPResponseError:
 		response := string(e.Response)
 		if len(response) > 50 {

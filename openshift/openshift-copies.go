@@ -285,7 +285,7 @@ func (config *directClientConfig) ConfirmUsable() error {
 	validationErrors = append(validationErrors, validateClusterInfo(config.getClusterName(), config.getCluster())...)
 	// when direct client config is specified, and our only error is that no server is defined, we should
 	// return a standard "no config" error
-	if len(validationErrors) == 1 && validationErrors[0] == errEmptyCluster {
+	if len(validationErrors) == 1 && validationErrors[0] == errEmptyCluster { //nolint:errorlint
 		return newErrConfigurationInvalid([]error{errEmptyConfig})
 	}
 	return newErrConfigurationInvalid(validationErrors)

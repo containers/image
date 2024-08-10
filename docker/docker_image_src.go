@@ -186,7 +186,7 @@ func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, logica
 			cmd.Stdin = bytes.NewReader(acfD)
 			if err := cmd.Run(); err != nil {
 				var stderr string
-				if ee, ok := err.(*exec.ExitError); ok {
+				if ee, ok := err.(*exec.ExitError); ok { //nolint:errorlint
 					stderr = string(ee.Stderr)
 				}
 				logrus.Warnf("Failed to call additional-layer-store-auth-helper (stderr:%s): %v", stderr, err)
@@ -357,7 +357,7 @@ var multipartByteRangesRe = regexp.Delayed("multipart/byteranges; boundary=([A-Z
 func parseMediaType(contentType string) (string, map[string]string, error) {
 	mediaType, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
-		if err == mime.ErrInvalidMediaParameter {
+		if err == mime.ErrInvalidMediaParameter { //nolint:errorlint // TODO remove this (https://github.com/polyfloyd/go-errorlint/pull/79).
 			// CloudFront returns an invalid MIME type, that contains an unquoted ":" in the boundary
 			// param, let's handle it here.
 			matches := multipartByteRangesRe.FindStringSubmatch(contentType)
@@ -798,7 +798,7 @@ func (n *bufferedNetworkReader) read(p []byte) (int, error) {
 	select {
 	case b = <-n.readyBuffer:
 		if b.err != nil {
-			if b.err != io.EOF {
+			if b.err != io.EOF { //nolint:errorlint
 				return b.len, b.err
 			}
 			n.gotEOF = true

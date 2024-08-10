@@ -99,7 +99,7 @@ func parseHTTPErrorResponse(statusCode int, r io.Reader) error {
 }
 
 func makeErrorList(err error) []error {
-	if errL, ok := err.(errcode.Errors); ok {
+	if errL, ok := err.(errcode.Errors); ok { //nolint:errorlint
 		return []error(errL)
 	}
 	return []error{err}
@@ -139,7 +139,7 @@ func handleErrorResponse(resp *http.Response) error {
 			}
 		}
 		err := parseHTTPErrorResponse(resp.StatusCode, resp.Body)
-		if uErr, ok := err.(*unexpectedHTTPResponseError); ok && resp.StatusCode == 401 {
+		if uErr, ok := err.(*unexpectedHTTPResponseError); ok && resp.StatusCode == 401 { //nolint:errorlint
 			return errcode.ErrorCodeUnauthorized.WithDetail(uErr.Response)
 		}
 		return err

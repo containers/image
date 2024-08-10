@@ -301,11 +301,10 @@ func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.Read
 		newChunks = append(newChunks, i)
 	}
 	rc, errs, err := f.chunkAccessor.GetBlobAt(f.ctx, f.blobInfo, newChunks)
-	if _, ok := err.(private.BadPartialRequestError); ok {
+	if _, ok := err.(private.BadPartialRequestError); ok { //nolint:errorlint
 		err = chunked.ErrBadRequest{}
 	}
 	return rc, errs, err
-
 }
 
 // PutBlobPartial attempts to create a blob using the data that is already present

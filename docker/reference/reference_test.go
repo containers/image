@@ -182,7 +182,7 @@ func TestReferenceParse(t *testing.T) {
 		if testcase.err != nil {
 			if err == nil {
 				failf("missing expected error: %v", testcase.err)
-			} else if testcase.err != err {
+			} else if testcase.err != err { //nolint:errorlint
 				failf("mismatched error: got %v, expected %v", err, testcase.err)
 			}
 			continue
@@ -392,7 +392,7 @@ func TestSerialization(t *testing.T) {
 			if testcase.err == nil {
 				failf("error unmarshaling: %v", err)
 			}
-			if err != testcase.err {
+			if err != testcase.err { //nolint:errorlint
 				failf("wrong error, expected %v, got %v", testcase.err, err)
 			}
 
@@ -639,7 +639,7 @@ func TestParseNamed(t *testing.T) {
 		} else if err == nil && testcase.err != nil {
 			failf("parsing succeeded: expected error %v", testcase.err)
 			continue
-		} else if err != testcase.err {
+		} else if err != testcase.err { //nolint:errorlint
 			failf("unexpected error %v, expected %v", err, testcase.err)
 			continue
 		} else if err != nil {
