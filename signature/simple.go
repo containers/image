@@ -143,7 +143,7 @@ func (s *untrustedSignature) strictUnmarshalJSON(data []byte) error {
 	if gotTimestamp {
 		intTimestamp := int64(timestamp)
 		if float64(intTimestamp) != timestamp {
-			return internal.NewInvalidSignatureError("Field optional.timestamp is not is not an integer")
+			return internal.NewInvalidSignatureError("Field optional.timestamp is not an integer")
 		}
 		s.untrustedTimestamp = &intTimestamp
 	}

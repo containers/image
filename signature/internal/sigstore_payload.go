@@ -120,7 +120,7 @@ func (s *UntrustedSigstorePayload) strictUnmarshalJSON(data []byte) error {
 	if gotTimestamp {
 		intTimestamp := int64(timestamp)
 		if float64(intTimestamp) != timestamp {
-			return NewInvalidSignatureError("Field optional.timestamp is not is not an integer")
+			return NewInvalidSignatureError("Field optional.timestamp is not an integer")
 		}
 		s.untrustedTimestamp = &intTimestamp
 	}
