@@ -79,13 +79,7 @@ var _ json.Unmarshaler = (*UntrustedSigstorePayload)(nil)
 
 // UnmarshalJSON implements the json.Unmarshaler interface
 func (s *UntrustedSigstorePayload) UnmarshalJSON(data []byte) error {
-	err := s.strictUnmarshalJSON(data)
-	if err != nil {
-		if formatErr, ok := err.(JSONFormatError); ok {
-			err = NewInvalidSignatureError(formatErr.Error())
-		}
-	}
-	return err
+	return JSONFormatToInvalidSignatureError(s.strictUnmarshalJSON(data))
 }
 
 // strictUnmarshalJSON is UnmarshalJSON, except that it may return the internal JSONFormatError error type.
