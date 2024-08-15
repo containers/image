@@ -163,14 +163,9 @@ func TestBlobCache(t *testing.T) {
 					t.Fatalf("error closing source image: %v", err)
 				}
 				// Check that the cache was populated.
-				cache, err := os.Open(cacheDir)
+				cachedNames, err := os.ReadDir(cacheDir)
 				if err != nil {
-					t.Fatalf("error opening cache directory %q: %v", cacheDir, err)
-				}
-				defer cache.Close()
-				cachedNames, err := cache.Readdirnames(-1)
-				if err != nil {
-					t.Fatalf("error reading contents of cache directory %q: %v", cacheDir, err)
+					t.Fatal(err)
 				}
 				// Expect a layer blob, a config blob, and the manifest.
 				expected := 3
@@ -182,12 +177,13 @@ func TestBlobCache(t *testing.T) {
 					t.Fatalf("expected %d items in cache directory %q, got %d: %v", expected, cacheDir, len(cachedNames), cachedNames)
 				}
 				// Check that the blobs were all correctly stored.
-				for _, cachedName := range cachedNames {
+				for _, de := range cachedNames {
+					cachedName := de.Name()
 					if digest.Digest(cachedName).Validate() == nil {
 						cacheMember := filepath.Join(cacheDir, cachedName)
 						cacheMemberBytes, err := os.ReadFile(cacheMember)
 						if err != nil {
-							t.Fatalf("error reading cache member %q: %v", cacheMember, err)
+							t.Fatal(err)
 						}
 						if digest.FromBytes(cacheMemberBytes).String() != cachedName {
 							t.Fatalf("cache member %q was stored incorrectly!", cacheMember)
@@ -196,16 +192,12 @@ func TestBlobCache(t *testing.T) {
 				}
 				// Clear out anything in the source directory that probably isn't a manifest, so that we'll
 				// have to depend on the cached copies of some of the blobs.
-				srcNameDir, err := os.Open(srcdir)
+				srcNames, err := os.ReadDir(srcdir)
 				if err != nil {
-					t.Fatalf("error opening source directory %q: %v", srcdir, err)
+					t.Fatal(err)
 				}
-				defer srcNameDir.Close()
-				srcNames, err := srcNameDir.Readdirnames(-1)
-				if err != nil {
-					t.Fatalf("error reading contents of source directory %q: %v", srcdir, err)
-				}
-				for _, name := range srcNames {
+				for _, de := range srcNames {
+					name := de.Name()
 					if !strings.HasPrefix(name, "manifest") {
 						os.Remove(filepath.Join(srcdir, name))
 					}
