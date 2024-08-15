@@ -47,7 +47,7 @@ validate_task:
     # The git-validation tool doesn't work well on branch or tag push,
     # under Cirrus-CI, due to challenges obtaining the starting commit ID.
     # Only do validation for PRs.
-    only_if: $CIRRUS_PR != ''
+    skip: $CIRRUS_PR == ''
     gce_instance: &debian_vm
         image_project: libpod-218412
         zone: "us-central1-f"
@@ -67,7 +67,7 @@ validate_task:
 
 
 cross_task:
-    only_if: &not_docs $CIRRUS_CHANGE_TITLE !=~ '.*CI:DOCS.*'
+    skip: &docs $CIRRUS_CHANGE_TITLE =~ '.*CI:DOCS.*'
     gce_instance: *debian_vm
     script: make cross
 
@@ -76,7 +76,7 @@ test_task:
     alias: test
     depends_on:
         - validate
-    only_if: *not_docs
+    skip: *docs
     gce_instance: *debian_vm
     matrix:
         - name: "Test"
@@ -95,7 +95,7 @@ test_task:
 #####
 test_skopeo_task:
     alias: test_skopeo
-    only_if: *not_docs
+    skip: *docs
     depends_on:
         - validate
     gce_instance:
