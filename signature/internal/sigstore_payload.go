@@ -165,24 +165,37 @@ type SigstorePayloadAcceptanceRules struct {
 	ValidateSignedDockerManifestDigest func(digest.Digest) error
 }
 
+// verifySigstorePayloadBlobSignature verifies unverifiedSignature of unverifiedPayload was correctly created
+// by publicKey.
+//
+// This is an internal implementation detail of VerifySigstorePayload and should have no other callers.
+// It is INSUFFICIENT alone to consider the signature acceptable.
+func verifySigstorePayloadBlobSignature(publicKey crypto.PublicKey, unverifiedPayload, unverifiedSignature []byte) error {
+	verifier, err := sigstoreSignature.LoadVerifier(publicKey, sigstoreHarcodedHashAlgorithm)
+	if err != nil {
+		return err
+	}
+
+	// github.com/sigstore/cosign/pkg/cosign.verifyOCISignature uses signatureoptions.WithContext(),
+	// which seems to be not used by anything. So we don’t bother.
+	if err := verifier.VerifySignature(bytes.NewReader(unverifiedSignature), bytes.NewReader(unverifiedPayload)); err != nil {
+		return NewInvalidSignatureError(fmt.Sprintf("cryptographic signature verification failed: %v", err))
+	}
+	return nil
+}
+
 // VerifySigstorePayload verifies unverifiedBase64Signature of unverifiedPayload was correctly created by publicKey, and that its principal components
 // match expected values, both as specified by rules, and returns it.
 // We return an *UntrustedSigstorePayload, although nothing actually uses it,
 // just to double-check against stupid typos.
 func VerifySigstorePayload(publicKey crypto.PublicKey, unverifiedPayload []byte, unverifiedBase64Signature string, rules SigstorePayloadAcceptanceRules) (*UntrustedSigstorePayload, error) {
-	verifier, err := sigstoreSignature.LoadVerifier(publicKey, sigstoreHarcodedHashAlgorithm)
-	if err != nil {
-		return nil, fmt.Errorf("creating verifier: %w", err)
-	}
-
 	unverifiedSignature, err := base64.StdEncoding.DecodeString(unverifiedBase64Signature)
 	if err != nil {
 		return nil, NewInvalidSignatureError(fmt.Sprintf("base64 decoding: %v", err))
 	}
-	// github.com/sigstore/cosign/pkg/cosign.verifyOCISignature uses signatureoptions.WithContext(),
-	// which seems to be not used by anything. So we don’t bother.
-	if err := verifier.VerifySignature(bytes.NewReader(unverifiedSignature), bytes.NewReader(unverifiedPayload)); err != nil {
-		return nil, NewInvalidSignatureError(fmt.Sprintf("cryptographic signature verification failed: %v", err))
+
+	if err := verifySigstorePayloadBlobSignature(publicKey, unverifiedPayload, unverifiedSignature); err != nil {
+		return nil, err
 	}
 
 	var unmatchedPayload UntrustedSigstorePayload
