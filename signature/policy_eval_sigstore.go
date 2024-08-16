@@ -99,9 +99,9 @@ func (f *prSigstoreSignedFulcio) prepareTrustRoot() (*fulcioTrustRoot, error) {
 
 // sigstoreSignedTrustRoot contains an already parsed version of the prSigstoreSigned policy
 type sigstoreSignedTrustRoot struct {
-	publicKeys     []crypto.PublicKey
-	fulcio         *fulcioTrustRoot
-	rekorPublicKey *ecdsa.PublicKey
+	publicKeys      []crypto.PublicKey
+	fulcio          *fulcioTrustRoot
+	rekorPublicKeys []*ecdsa.PublicKey
 }
 
 func (pr *prSigstoreSigned) prepareTrustRoot() (*sigstoreSignedTrustRoot, error) {
@@ -141,27 +141,29 @@ func (pr *prSigstoreSigned) prepareTrustRoot() (*sigstoreSignedTrustRoot, error)
 	rekorPublicKeyPEMs, err := loadBytesFromConfigSources(configBytesSources{
 		inconsistencyErrorMessage: `Internal inconsistency: both "rekorPublicKeyPath" and "rekorPublicKeyData" specified`,
 		path:                      pr.RekorPublicKeyPath,
+		paths:                     pr.RekorPublicKeyPaths,
 		data:                      pr.RekorPublicKeyData,
+		datas:                     pr.RekorPublicKeyDatas, // codespell:ignore datas
 	})
 	if err != nil {
 		return nil, err
 	}
 	if rekorPublicKeyPEMs != nil {
-		if len(rekorPublicKeyPEMs) != 1 {
-			// Coverage: This should never happen, we only provide single-element sources
-			// to loadBytesFromConfigSources, and at most one is allowed.
-			return nil, errors.New(`Internal inconsistency: got more than one element in "rekorPublicKeyPath" and "rekorPublicKeyData"`)
-		}
-		pk, err := cryptoutils.UnmarshalPEMToPublicKey(rekorPublicKeyPEMs[0])
-		if err != nil {
-			return nil, fmt.Errorf("parsing Rekor public key: %w", err)
-		}
-		pkECDSA, ok := pk.(*ecdsa.PublicKey)
-		if !ok {
-			return nil, fmt.Errorf("Rekor public key is not using ECDSA")
+		for index, pem := range rekorPublicKeyPEMs {
+			pk, err := cryptoutils.UnmarshalPEMToPublicKey(pem)
+			if err != nil {
+				return nil, fmt.Errorf("parsing Rekor public key %d: %w", index+1, err)
+			}
+			pkECDSA, ok := pk.(*ecdsa.PublicKey)
+			if !ok {
+				return nil, fmt.Errorf("Rekor public key %d is not using ECDSA", index+1)
 
+			}
+			res.rekorPublicKeys = append(res.rekorPublicKeys, pkECDSA)
 		}
-		res.rekorPublicKey = pkECDSA
+		if len(res.rekorPublicKeys) == 0 {
+			return nil, errors.New(`Internal inconsistency: "rekorPublicKeyPath", "rekorPublicKeyPaths", "rekorPublicKeyData" and "rekorPublicKeyDatas" produced no public keys`)
+		}
 	}
 
 	return &res, nil
@@ -195,7 +197,7 @@ func (pr *prSigstoreSigned) isSignatureAccepted(ctx context.Context, image priva
 		return sarRejected, errors.New("Internal inconsistency: Neither a public key nor a Fulcio CA specified")
 
 	case trustRoot.publicKeys != nil:
-		if trustRoot.rekorPublicKey != nil {
+		if trustRoot.rekorPublicKeys != nil {
 			untrustedSET, ok := untrustedAnnotations[signature.SigstoreSETAnnotationKey]
 			if !ok { // For user convenience; passing an empty []byte to VerifyRekorSet should work.
 				return sarRejected, fmt.Errorf("missing %s annotation", signature.SigstoreSETAnnotationKey)
@@ -212,7 +214,7 @@ func (pr *prSigstoreSigned) isSignatureAccepted(ctx context.Context, image priva
 					return sarRejected, fmt.Errorf("re-marshaling public key to PEM: %w", err)
 				}
 				// We don’t care about the Rekor timestamp, just about log presence.
-				_, err = internal.VerifyRekorSET(trustRoot.rekorPublicKey, []byte(untrustedSET), recreatedPublicKeyPEM, untrustedBase64Signature, untrustedPayload)
+				_, err = internal.VerifyRekorSET(trustRoot.rekorPublicKeys, []byte(untrustedSET), recreatedPublicKeyPEM, untrustedBase64Signature, untrustedPayload)
 				if err == nil {
 					publicKeys = append(publicKeys, candidatePublicKey)
 					break // The SET can only accept one public key entry, so if we found one, the rest either doesn’t match or is a duplicate
@@ -231,7 +233,7 @@ func (pr *prSigstoreSigned) isSignatureAccepted(ctx context.Context, image priva
 		}
 
 	case trustRoot.fulcio != nil:
-		if trustRoot.rekorPublicKey == nil { // newPRSigstoreSigned rejects such combinations.
+		if trustRoot.rekorPublicKeys == nil { // newPRSigstoreSigned rejects such combinations.
 			return sarRejected, errors.New("Internal inconsistency: Fulcio CA specified without a Rekor public key")
 		}
 		untrustedSET, ok := untrustedAnnotations[signature.SigstoreSETAnnotationKey]
@@ -246,7 +248,7 @@ func (pr *prSigstoreSigned) isSignatureAccepted(ctx context.Context, image priva
 		if untrustedIntermediateChain, ok := untrustedAnnotations[signature.SigstoreIntermediateCertificateChainAnnotationKey]; ok {
 			untrustedIntermediateChainBytes = []byte(untrustedIntermediateChain)
 		}
-		pk, err := verifyRekorFulcio(trustRoot.rekorPublicKey, trustRoot.fulcio,
+		pk, err := verifyRekorFulcio(trustRoot.rekorPublicKeys, trustRoot.fulcio,
 			[]byte(untrustedSET), []byte(untrustedCert), untrustedIntermediateChainBytes, untrustedBase64Signature, untrustedPayload)
 		if err != nil {
 			return sarRejected, err

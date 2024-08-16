@@ -134,10 +134,26 @@ func TestNewPRSigstoreSigned(t *testing.T) {
 			},
 			{
 				rekorOptions: []PRSigstoreSignedOption{
+					PRSigstoreSignedWithRekorPublicKeyPaths([]string{testRekorKeyPath, testKeyPath}),
+				},
+				rekorExpected: prSigstoreSigned{
+					RekorPublicKeyPaths: []string{testRekorKeyPath, testKeyPath},
+				},
+			},
+			{
+				rekorOptions: []PRSigstoreSignedOption{
 					PRSigstoreSignedWithRekorPublicKeyData(testRekorKeyData),
 				},
 				rekorExpected: prSigstoreSigned{
 					RekorPublicKeyData: testRekorKeyData,
+				},
+			},
+			{
+				rekorOptions: []PRSigstoreSignedOption{
+					PRSigstoreSignedWithRekorPublicKeyDatas([][]byte{testRekorKeyData, testKeyData}),
+				},
+				rekorExpected: prSigstoreSigned{
+					RekorPublicKeyDatas: [][]byte{testRekorKeyData, testKeyData},
 				},
 			},
 		} {
@@ -149,7 +165,9 @@ func TestNewPRSigstoreSigned(t *testing.T) {
 			require.NoError(t, err)
 			expected := c.expected // A shallow copy
 			expected.RekorPublicKeyPath = c2.rekorExpected.RekorPublicKeyPath
+			expected.RekorPublicKeyPaths = c2.rekorExpected.RekorPublicKeyPaths
 			expected.RekorPublicKeyData = c2.rekorExpected.RekorPublicKeyData
+			expected.RekorPublicKeyDatas = c2.rekorExpected.RekorPublicKeyDatas
 			assert.Equal(t, &expected, pr)
 		}
 	}
@@ -161,19 +179,19 @@ func TestNewPRSigstoreSigned(t *testing.T) {
 	)
 	require.NoError(t, err)
 	for _, c := range [][]PRSigstoreSignedOption{
-		{}, // None of keyPath nor keyData, fulcio specified
+		{}, // None of keyPath, keyPaths, keyData, keyDatas, fulcio specified
 		{ // Both keyPath and keyData specified
 			PRSigstoreSignedWithKeyPath(testKeyPath),
 			PRSigstoreSignedWithKeyData(testKeyData),
 			PRSigstoreSignedWithSignedIdentity(testIdentity),
 		},
-		{ // both keyPath and fulcio specified
+		{ // Both keyPath and fulcio specified
 			PRSigstoreSignedWithKeyPath(testKeyPath),
 			PRSigstoreSignedWithFulcio(testFulcio),
 			PRSigstoreSignedWithRekorPublicKeyPath(testRekorKeyPath),
 			PRSigstoreSignedWithSignedIdentity(testIdentity),
 		},
-		{ // both keyData and fulcio specified
+		{ // Both keyData and fulcio specified
 			PRSigstoreSignedWithKeyData(testKeyData),
 			PRSigstoreSignedWithFulcio(testFulcio),
 			PRSigstoreSignedWithRekorPublicKeyPath(testRekorKeyPath),
@@ -239,10 +257,44 @@ func TestNewPRSigstoreSigned(t *testing.T) {
 			PRSigstoreSignedWithRekorPublicKeyPath(testRekorKeyPath + "1"),
 			PRSigstoreSignedWithSignedIdentity(testIdentity),
 		},
+		{ // Both rekorKeyPath and rekorKeyPaths specified
+			PRSigstoreSignedWithKeyPath(testKeyPath),
+			PRSigstoreSignedWithRekorPublicKeyPath(testRekorKeyPath),
+			PRSigstoreSignedWithRekorPublicKeyPaths([]string{testRekorKeyPath, testKeyPath}),
+			PRSigstoreSignedWithSignedIdentity(testIdentity),
+		},
+		{ // Empty rekorKeyPaths
+			PRSigstoreSignedWithKeyPath(testKeyPath),
+			PRSigstoreSignedWithRekorPublicKeyPaths([]string{}),
+			PRSigstoreSignedWithSignedIdentity(testIdentity),
+		},
+		{ // Duplicate rekorKeyPaths
+			PRSigstoreSignedWithKeyPath(testKeyPath),
+			PRSigstoreSignedWithRekorPublicKeyPaths([]string{testRekorKeyPath, testKeyPath}),
+			PRSigstoreSignedWithRekorPublicKeyPaths([]string{testRekorKeyPath + "1", testKeyPath + "1"}),
+			PRSigstoreSignedWithSignedIdentity(testIdentity),
+		},
 		{ // Duplicate rekorKeyData
 			PRSigstoreSignedWithKeyPath(testKeyPath),
 			PRSigstoreSignedWithRekorPublicKeyData(testRekorKeyData),
 			PRSigstoreSignedWithRekorPublicKeyData([]byte("def")),
+			PRSigstoreSignedWithSignedIdentity(testIdentity),
+		},
+		{ // Both rekorKeyData and rekorKeyDatas specified
+			PRSigstoreSignedWithKeyPath(testKeyPath),
+			PRSigstoreSignedWithRekorPublicKeyData(testRekorKeyData),
+			PRSigstoreSignedWithRekorPublicKeyDatas([][]byte{testRekorKeyData, []byte("def")}),
+			PRSigstoreSignedWithSignedIdentity(testIdentity),
+		},
+		{ // Empty rekorKeyDatas
+			PRSigstoreSignedWithKeyPath(testKeyPath),
+			PRSigstoreSignedWithRekorPublicKeyDatas([][]byte{}),
+			PRSigstoreSignedWithSignedIdentity(testIdentity),
+		},
+		{ // Duplicate rekorKeyData
+			PRSigstoreSignedWithKeyPath(testKeyPath),
+			PRSigstoreSignedWithRekorPublicKeyDatas([][]byte{testRekorKeyData, testKeyData}),
+			PRSigstoreSignedWithRekorPublicKeyDatas([][]byte{[]byte("abc"), []byte("def")}),
 			PRSigstoreSignedWithSignedIdentity(testIdentity),
 		},
 		{ // Missing signedIdentity
@@ -355,9 +407,27 @@ func TestPRSigstoreSignedUnmarshalJSON(t *testing.T) {
 			},
 			// Invalid "rekorPublicKeyPath" field
 			func(v mSA) { v["rekorPublicKeyPath"] = 1 },
+			// Both "rekorKeyPath" and "rekorKeyPaths" is present
+			func(v mSA) {
+				v["rekorPublicKeyPath"] = "/foo/baz"
+				v["rekorPublicKeyPaths"] = []string{"/baz/a", "/baz/b"}
+			},
+			// Invalid "rekorPublicKeyPaths" field
+			func(v mSA) { v["rekorPublicKeyPaths"] = 1 },
+			func(v mSA) { v["rekorPublicKeyPaths"] = mSA{} },
+			func(v mSA) { v["rekorPublicKeyPaths"] = []string{} },
 			// Invalid "rekorPublicKeyData" field
 			func(v mSA) { v["rekorPublicKeyData"] = 1 },
 			func(v mSA) { v["rekorPublicKeyData"] = "this is invalid base64" },
+			// Both "rekorPublicKeyData" and "rekorPublicKeyDatas" is present
+			func(v mSA) {
+				v["rekorPublicKeyData"] = []byte("a")
+				v["rekorPublicKeyDatas"] = [][]byte{[]byte("a"), []byte("b")}
+			},
+			// Invalid "rekorPublicKeyDatas" field
+			func(v mSA) { v["rekorPublicKeyDatas"] = 1 },
+			func(v mSA) { v["rekorPublicKeyDatas"] = mSA{} },
+			func(v mSA) { v["rekorPublicKeyDatas"] = [][]byte{} },
 			// Invalid "signedIdentity" field
 			func(v mSA) { v["signedIdentity"] = "this is invalid" },
 			// "signedIdentity" an explicit nil
@@ -418,6 +488,19 @@ func TestPRSigstoreSignedUnmarshalJSON(t *testing.T) {
 		otherJSONParser: newPolicyRequirementFromJSON,
 		duplicateFields: []string{"type", "fulcio", "rekorPublicKeyPath", "signedIdentity"},
 	}.run(t)
+	// Test rekorPublicKeyPaths duplicate fields
+	policyJSONUmarshallerTests[PolicyRequirement]{
+		newDest: func() json.Unmarshaler { return &prSigstoreSigned{} },
+		newValidObject: func() (PolicyRequirement, error) {
+			return NewPRSigstoreSigned(
+				PRSigstoreSignedWithKeyPath("/foo/bar"),
+				PRSigstoreSignedWithRekorPublicKeyPaths([]string{"/baz/a", "/baz/b"}),
+				PRSigstoreSignedWithSignedIdentity(NewPRMMatchRepoDigestOrExact()),
+			)
+		},
+		otherJSONParser: newPolicyRequirementFromJSON,
+		duplicateFields: []string{"type", "keyPath", "rekorPublicKeyPaths", "signedIdentity"},
+	}.run(t)
 	// Test rekorPublicKeyData duplicate fields
 	policyJSONUmarshallerTests[PolicyRequirement]{
 		newDest: func() json.Unmarshaler { return &prSigstoreSigned{} },
@@ -430,6 +513,19 @@ func TestPRSigstoreSignedUnmarshalJSON(t *testing.T) {
 		},
 		otherJSONParser: newPolicyRequirementFromJSON,
 		duplicateFields: []string{"type", "keyPath", "rekorPublicKeyData", "signedIdentity"},
+	}.run(t)
+	// Test rekorPublicKeyDatas duplicate fields
+	policyJSONUmarshallerTests[PolicyRequirement]{
+		newDest: func() json.Unmarshaler { return &prSigstoreSigned{} },
+		newValidObject: func() (PolicyRequirement, error) {
+			return NewPRSigstoreSigned(
+				PRSigstoreSignedWithKeyPath("/foo/bar"),
+				PRSigstoreSignedWithRekorPublicKeyDatas([][]byte{[]byte("foo"), []byte("bar")}),
+				PRSigstoreSignedWithSignedIdentity(NewPRMMatchRepoDigestOrExact()),
+			)
+		},
+		otherJSONParser: newPolicyRequirementFromJSON,
+		duplicateFields: []string{"type", "keyPath", "rekorPublicKeyDatas", "signedIdentity"},
 	}.run(t)
 
 	var pr prSigstoreSigned
