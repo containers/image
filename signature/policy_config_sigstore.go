@@ -82,6 +82,20 @@ func PRSigstoreSignedWithRekorPublicKeyPath(rekorPublicKeyPath string) PRSigstor
 	}
 }
 
+// PRSigstoreSignedWithRekorPublicKeyPaths specifies a value for the rRekorPublickeyPaths" field when calling NewPRSigstoreSigned.
+func PRSigstoreSignedWithRekorPublicKeyPaths(rekorPublickeyPaths []string) PRSigstoreSignedOption {
+	return func(pr *prSigstoreSigned) error {
+		if pr.RekorPublicKeyPaths != nil {
+			return InvalidPolicyFormatError(`"rekorPublickeyPaths" already specified`)
+		}
+		if len(rekorPublickeyPaths) == 0 {
+			return InvalidPolicyFormatError(`"rekorPublickeyPaths" contains no entries`)
+		}
+		pr.RekorPublicKeyPaths = rekorPublickeyPaths
+		return nil
+	}
+}
+
 // PRSigstoreSignedWithRekorPublicKeyData specifies a value for the "rekorPublicKeyData" field when calling NewPRSigstoreSigned.
 func PRSigstoreSignedWithRekorPublicKeyData(rekorPublicKeyData []byte) PRSigstoreSignedOption {
 	return func(pr *prSigstoreSigned) error {
@@ -89,6 +103,20 @@ func PRSigstoreSignedWithRekorPublicKeyData(rekorPublicKeyData []byte) PRSigstor
 			return InvalidPolicyFormatError(`"rekorPublicKeyData" already specified`)
 		}
 		pr.RekorPublicKeyData = rekorPublicKeyData
+		return nil
+	}
+}
+
+// PRSigstoreSignedWithRekorPublicKeyDatas specifies a value for the "rekorPublickeyDatas" field when calling NewPRSigstoreSigned.
+func PRSigstoreSignedWithRekorPublicKeyDatas(rekorPublickeyDatas [][]byte) PRSigstoreSignedOption {
+	return func(pr *prSigstoreSigned) error {
+		if pr.RekorPublicKeyDatas != nil {
+			return InvalidPolicyFormatError(`"rekorPublickeyDatas" already specified`)
+		}
+		if len(rekorPublickeyDatas) == 0 {
+			return InvalidPolicyFormatError(`"rekorPublickeyDatas" contains no entries`)
+		}
+		pr.RekorPublicKeyDatas = rekorPublickeyDatas
 		return nil
 	}
 }
@@ -135,11 +163,24 @@ func newPRSigstoreSigned(options ...PRSigstoreSignedOption) (*prSigstoreSigned, 
 		return nil, InvalidPolicyFormatError("exactly one of keyPath, keyPaths, keyData, keyDatas and fulcio must be specified")
 	}
 
-	if res.RekorPublicKeyPath != "" && res.RekorPublicKeyData != nil {
-		return nil, InvalidPolicyFormatError("rekorPublickeyType and rekorPublickeyData cannot be used simultaneously")
+	rekorSources := 0
+	if res.RekorPublicKeyPath != "" {
+		rekorSources++
 	}
-	if res.Fulcio != nil && res.RekorPublicKeyPath == "" && res.RekorPublicKeyData == nil {
-		return nil, InvalidPolicyFormatError("At least one of RekorPublickeyPath and RekorPublickeyData must be specified if fulcio is used")
+	if res.RekorPublicKeyPaths != nil {
+		rekorSources++
+	}
+	if res.RekorPublicKeyData != nil {
+		rekorSources++
+	}
+	if res.RekorPublicKeyDatas != nil {
+		rekorSources++
+	}
+	if rekorSources > 1 {
+		return nil, InvalidPolicyFormatError("at most one of rekorPublickeyPath, rekorPublicKeyPaths, rekorPublickeyData and rekorPublicKeyDatas can be used simultaneously")
+	}
+	if res.Fulcio != nil && rekorSources == 0 {
+		return nil, InvalidPolicyFormatError("At least one of rekorPublickeyPath, rekorPublicKeyPaths, rekorPublickeyData and rekorPublicKeyDatas must be specified if fulcio is used")
 	}
 
 	if res.SignedIdentity == nil {
@@ -177,7 +218,8 @@ var _ json.Unmarshaler = (*prSigstoreSigned)(nil)
 func (pr *prSigstoreSigned) UnmarshalJSON(data []byte) error {
 	*pr = prSigstoreSigned{}
 	var tmp prSigstoreSigned
-	var gotKeyPath, gotKeyPaths, gotKeyData, gotKeyDatas, gotFulcio, gotRekorPublicKeyPath, gotRekorPublicKeyData bool
+	var gotKeyPath, gotKeyPaths, gotKeyData, gotKeyDatas, gotFulcio bool
+	var gotRekorPublicKeyPath, gotRekorPublicKeyPaths, gotRekorPublicKeyData, gotRekorPublicKeyDatas bool
 	var fulcio prSigstoreSignedFulcio
 	var signedIdentity json.RawMessage
 	if err := internal.ParanoidUnmarshalJSONObject(data, func(key string) any {
@@ -202,9 +244,15 @@ func (pr *prSigstoreSigned) UnmarshalJSON(data []byte) error {
 		case "rekorPublicKeyPath":
 			gotRekorPublicKeyPath = true
 			return &tmp.RekorPublicKeyPath
+		case "rekorPublicKeyPaths":
+			gotRekorPublicKeyPaths = true
+			return &tmp.RekorPublicKeyPaths
 		case "rekorPublicKeyData":
 			gotRekorPublicKeyData = true
 			return &tmp.RekorPublicKeyData
+		case "rekorPublicKeyDatas":
+			gotRekorPublicKeyDatas = true
+			return &tmp.RekorPublicKeyDatas
 		case "signedIdentity":
 			return &signedIdentity
 		default:
@@ -246,8 +294,14 @@ func (pr *prSigstoreSigned) UnmarshalJSON(data []byte) error {
 	if gotRekorPublicKeyPath {
 		opts = append(opts, PRSigstoreSignedWithRekorPublicKeyPath(tmp.RekorPublicKeyPath))
 	}
+	if gotRekorPublicKeyPaths {
+		opts = append(opts, PRSigstoreSignedWithRekorPublicKeyPaths(tmp.RekorPublicKeyPaths))
+	}
 	if gotRekorPublicKeyData {
 		opts = append(opts, PRSigstoreSignedWithRekorPublicKeyData(tmp.RekorPublicKeyData))
+	}
+	if gotRekorPublicKeyDatas {
+		opts = append(opts, PRSigstoreSignedWithRekorPublicKeyDatas(tmp.RekorPublicKeyDatas))
 	}
 	opts = append(opts, PRSigstoreSignedWithSignedIdentity(tmp.SignedIdentity))
 

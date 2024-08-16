@@ -125,13 +125,21 @@ type prSigstoreSigned struct {
 	Fulcio PRSigstoreSignedFulcio `json:"fulcio,omitempty"`
 
 	// RekorPublicKeyPath is a pathname to local file containing a public key of a Rekor server which must record acceptable signatures.
-	// If Fulcio is used, one of RekorPublicKeyPath or RekorPublicKeyData must be specified as well; otherwise it is optional
-	// (and Rekor inclusion is not required if a Rekor public key is not specified).
+	// If Fulcio is used, one of RekorPublicKeyPath, RekorPublicKeyPaths, RekorPublicKeyData and RekorPublicKeyDatas must be specified as well;
+	// otherwise it is optional (and Rekor inclusion is not required if a Rekor public key is not specified).
 	RekorPublicKeyPath string `json:"rekorPublicKeyPath,omitempty"`
+	// RekorPublicKeyPaths is a set of pathnames to local files, each containing a public key of a Rekor server. One of the keys must record acceptable signatures.
+	// If Fulcio is used, one of RekorPublicKeyPath, RekorPublicKeyPaths, RekorPublicKeyData and RekorPublicKeyDatas must be specified as well;
+	// otherwise it is optional (and Rekor inclusion is not required if a Rekor public key is not specified).
+	RekorPublicKeyPaths []string `json:"rekorPublicKeyPaths,omitempty"`
 	// RekorPublicKeyPath contain a base64-encoded public key of a Rekor server which must record acceptable signatures.
-	// If Fulcio is used, one of RekorPublicKeyPath or RekorPublicKeyData must be specified as well; otherwise it is optional
-	// (and Rekor inclusion is not required if a Rekor public key is not specified).
+	// If Fulcio is used, one of RekorPublicKeyPath, RekorPublicKeyPaths, RekorPublicKeyData and RekorPublicKeyDatas must be specified as well;
+	// otherwise it is optional (and Rekor inclusion is not required if a Rekor public key is not specified).
 	RekorPublicKeyData []byte `json:"rekorPublicKeyData,omitempty"`
+	// RekorPublicKeyDatas each contain a base64-encoded public key of a Rekor server. One of the keys must record acceptable signatures.
+	// If Fulcio is used, one of RekorPublicKeyPath, RekorPublicKeyPaths, RekorPublicKeyData and RekorPublicKeyDatas must be specified as well;
+	// otherwise it is optional (and Rekor inclusion is not required if a Rekor public key is not specified).
+	RekorPublicKeyDatas [][]byte `json:"rekorPublicKeyDatas,omitempty"`
 
 	// SignedIdentity specifies what image identity the signature must be claiming about the image.
 	// Defaults to "matchRepoDigestOrExact" if not specified.
