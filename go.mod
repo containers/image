@@ -3,7 +3,7 @@ module github.com/containers/image/v5
 go 1.21.0
 
 require (
-	dario.cat/mergo v1.0.0
+	dario.cat/mergo v1.0.1
 	github.com/BurntSushi/toml v1.4.0
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01
 	github.com/containers/ocicrypt v1.2.0
