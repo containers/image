@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/containers/image/v5/internal/multierr"
 	"github.com/containers/image/v5/internal/private"
@@ -20,37 +21,69 @@ import (
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
-// loadBytesFromDataOrPath ensures there is at most one of ${prefix}Data and ${prefix}Path set,
+// configBytesSources contains configuration fields which may result in one or more []byte values
+type configBytesSources struct {
+	inconsistencyErrorMessage string   // Error to return if more than one source is set
+	path                      string   // …Path: a path to a file containing the data, or ""
+	paths                     []string // …Paths: paths to files containing the data, or nil
+	data                      []byte   // …Data: a single instance ofhe raw data, or nil
+	datas                     [][]byte // …Datas: the raw data, or nil // codespell:ignore datas
+}
+
+// loadBytesFromConfigSources ensures at most one of the sources in src is set,
 // and returns the referenced data, or nil if neither is set.
-func loadBytesFromDataOrPath(prefix string, data []byte, path string) ([]byte, error) {
-	switch {
-	case data != nil && path != "":
-		return nil, fmt.Errorf(`Internal inconsistency: both "%sPath" and "%sData" specified`, prefix, prefix)
-	case path != "":
-		d, err := os.ReadFile(path)
+func loadBytesFromConfigSources(src configBytesSources) ([][]byte, error) {
+	sources := 0
+	var data [][]byte // = nil
+	if src.path != "" {
+		sources++
+		d, err := os.ReadFile(src.path)
 		if err != nil {
 			return nil, err
 		}
-		return d, nil
-	case data != nil:
-		return data, nil
-	default: // Nothing
-		return nil, nil
+		data = [][]byte{d}
 	}
+	if src.paths != nil {
+		sources++
+		data = [][]byte{}
+		for _, path := range src.paths {
+			d, err := os.ReadFile(path)
+			if err != nil {
+				return nil, err
+			}
+			data = append(data, d)
+		}
+	}
+	if src.data != nil {
+		sources++
+		data = [][]byte{src.data}
+	}
+	if src.datas != nil { // codespell:ignore datas
+		sources++
+		data = src.datas // codespell:ignore datas
+	}
+	if sources > 1 {
+		return nil, errors.New(src.inconsistencyErrorMessage)
+	}
+	return data, nil
 }
 
 // prepareTrustRoot creates a fulcioTrustRoot from the input data.
 // (This also prevents external implementations of this interface, ensuring that prSigstoreSignedFulcio is the only one.)
 func (f *prSigstoreSignedFulcio) prepareTrustRoot() (*fulcioTrustRoot, error) {
-	caCertBytes, err := loadBytesFromDataOrPath("fulcioCA", f.CAData, f.CAPath)
+	caCertPEMs, err := loadBytesFromConfigSources(configBytesSources{
+		inconsistencyErrorMessage: `Internal inconsistency: both "caPath" and "caData" specified`,
+		path:                      f.CAPath,
+		data:                      f.CAData,
+	})
 	if err != nil {
 		return nil, err
 	}
-	if caCertBytes == nil {
-		return nil, errors.New(`Internal inconsistency: Fulcio specified with neither "caPath" nor "caData"`)
+	if len(caCertPEMs) != 1 {
+		return nil, errors.New(`Internal inconsistency: Fulcio specified with not exactly one of "caPath" nor "caData"`)
 	}
 	certs := x509.NewCertPool()
-	if ok := certs.AppendCertsFromPEM(caCertBytes); !ok {
+	if ok := certs.AppendCertsFromPEM(caCertPEMs[0]); !ok {
 		return nil, errors.New("error loading Fulcio CA certificates")
 	}
 	fulcio := fulcioTrustRoot{
@@ -66,7 +99,7 @@ func (f *prSigstoreSignedFulcio) prepareTrustRoot() (*fulcioTrustRoot, error) {
 
 // sigstoreSignedTrustRoot contains an already parsed version of the prSigstoreSigned policy
 type sigstoreSignedTrustRoot struct {
-	publicKey      crypto.PublicKey
+	publicKeys     []crypto.PublicKey
 	fulcio         *fulcioTrustRoot
 	rekorPublicKey *ecdsa.PublicKey
 }
@@ -74,16 +107,27 @@ type sigstoreSignedTrustRoot struct {
 func (pr *prSigstoreSigned) prepareTrustRoot() (*sigstoreSignedTrustRoot, error) {
 	res := sigstoreSignedTrustRoot{}
 
-	publicKeyPEM, err := loadBytesFromDataOrPath("key", pr.KeyData, pr.KeyPath)
+	publicKeyPEMs, err := loadBytesFromConfigSources(configBytesSources{
+		inconsistencyErrorMessage: `Internal inconsistency: more than one of "keyPath", "keyPaths", "keyData", "keyDatas" specified`,
+		path:                      pr.KeyPath,
+		paths:                     pr.KeyPaths,
+		data:                      pr.KeyData,
+		datas:                     pr.KeyDatas, // codespell:ignore datas
+	})
 	if err != nil {
 		return nil, err
 	}
-	if publicKeyPEM != nil {
-		pk, err := cryptoutils.UnmarshalPEMToPublicKey(publicKeyPEM)
-		if err != nil {
-			return nil, fmt.Errorf("parsing public key: %w", err)
+	if publicKeyPEMs != nil {
+		for index, keyData := range publicKeyPEMs {
+			pk, err := cryptoutils.UnmarshalPEMToPublicKey(keyData)
+			if err != nil {
+				return nil, fmt.Errorf("parsing public key %d: %w", index+1, err)
+			}
+			res.publicKeys = append(res.publicKeys, pk)
 		}
-		res.publicKey = pk
+		if len(res.publicKeys) == 0 {
+			return nil, errors.New(`Internal inconsistency: "keyPath", "keyPaths", "keyData" and "keyDatas" produced no public keys`)
+		}
 	}
 
 	if pr.Fulcio != nil {
@@ -94,12 +138,21 @@ func (pr *prSigstoreSigned) prepareTrustRoot() (*sigstoreSignedTrustRoot, error)
 		res.fulcio = f
 	}
 
-	rekorPublicKeyPEM, err := loadBytesFromDataOrPath("rekorPublicKey", pr.RekorPublicKeyData, pr.RekorPublicKeyPath)
+	rekorPublicKeyPEMs, err := loadBytesFromConfigSources(configBytesSources{
+		inconsistencyErrorMessage: `Internal inconsistency: both "rekorPublicKeyPath" and "rekorPublicKeyData" specified`,
+		path:                      pr.RekorPublicKeyPath,
+		data:                      pr.RekorPublicKeyData,
+	})
 	if err != nil {
 		return nil, err
 	}
-	if rekorPublicKeyPEM != nil {
-		pk, err := cryptoutils.UnmarshalPEMToPublicKey(rekorPublicKeyPEM)
+	if rekorPublicKeyPEMs != nil {
+		if len(rekorPublicKeyPEMs) != 1 {
+			// Coverage: This should never happen, we only provide single-element sources
+			// to loadBytesFromConfigSources, and at most one is allowed.
+			return nil, errors.New(`Internal inconsistency: got more than one element in "rekorPublicKeyPath" and "rekorPublicKeyData"`)
+		}
+		pk, err := cryptoutils.UnmarshalPEMToPublicKey(rekorPublicKeyPEMs[0])
 		if err != nil {
 			return nil, fmt.Errorf("parsing Rekor public key: %w", err)
 		}
@@ -134,34 +187,48 @@ func (pr *prSigstoreSigned) isSignatureAccepted(ctx context.Context, image priva
 	}
 	untrustedPayload := sig.UntrustedPayload()
 
-	var publicKey crypto.PublicKey
+	var publicKeys []crypto.PublicKey
 	switch {
-	case trustRoot.publicKey != nil && trustRoot.fulcio != nil: // newPRSigstoreSigned rejects such combinations.
+	case trustRoot.publicKeys != nil && trustRoot.fulcio != nil: // newPRSigstoreSigned rejects such combinations.
 		return sarRejected, errors.New("Internal inconsistency: Both a public key and Fulcio CA specified")
-	case trustRoot.publicKey == nil && trustRoot.fulcio == nil: // newPRSigstoreSigned rejects such combinations.
+	case trustRoot.publicKeys == nil && trustRoot.fulcio == nil: // newPRSigstoreSigned rejects such combinations.
 		return sarRejected, errors.New("Internal inconsistency: Neither a public key nor a Fulcio CA specified")
 
-	case trustRoot.publicKey != nil:
+	case trustRoot.publicKeys != nil:
 		if trustRoot.rekorPublicKey != nil {
 			untrustedSET, ok := untrustedAnnotations[signature.SigstoreSETAnnotationKey]
 			if !ok { // For user convenience; passing an empty []byte to VerifyRekorSet should work.
 				return sarRejected, fmt.Errorf("missing %s annotation", signature.SigstoreSETAnnotationKey)
 			}
-			// We could use publicKeyPEM directly, but let’s re-marshal to avoid inconsistencies.
-			// FIXME: We could just generate DER instead of the full PEM text
-			recreatedPublicKeyPEM, err := cryptoutils.MarshalPublicKeyToPEM(trustRoot.publicKey)
-			if err != nil {
-				// Coverage: The key was loaded from a PEM format, so it’s unclear how this could fail.
-				// (PEM is not essential, MarshalPublicKeyToPEM can only fail if marshaling to ASN1.DER fails.)
-				return sarRejected, fmt.Errorf("re-marshaling public key to PEM: %w", err)
 
+			var rekorFailures []string
+			for _, candidatePublicKey := range trustRoot.publicKeys {
+				// We could use publicKeyPEM directly, but let’s re-marshal to avoid inconsistencies.
+				// FIXME: We could just generate DER instead of the full PEM text
+				recreatedPublicKeyPEM, err := cryptoutils.MarshalPublicKeyToPEM(candidatePublicKey)
+				if err != nil {
+					// Coverage: The key was loaded from a PEM format, so it’s unclear how this could fail.
+					// (PEM is not essential, MarshalPublicKeyToPEM can only fail if marshaling to ASN1.DER fails.)
+					return sarRejected, fmt.Errorf("re-marshaling public key to PEM: %w", err)
+				}
+				// We don’t care about the Rekor timestamp, just about log presence.
+				_, err = internal.VerifyRekorSET(trustRoot.rekorPublicKey, []byte(untrustedSET), recreatedPublicKeyPEM, untrustedBase64Signature, untrustedPayload)
+				if err == nil {
+					publicKeys = append(publicKeys, candidatePublicKey)
+					break // The SET can only accept one public key entry, so if we found one, the rest either doesn’t match or is a duplicate
+				}
+				rekorFailures = append(rekorFailures, err.Error())
 			}
-			// We don’t care about the Rekor timestamp, just about log presence.
-			if _, err := internal.VerifyRekorSET(trustRoot.rekorPublicKey, []byte(untrustedSET), recreatedPublicKeyPEM, untrustedBase64Signature, untrustedPayload); err != nil {
-				return sarRejected, err
+			if len(publicKeys) == 0 {
+				if len(rekorFailures) == 0 {
+					// Coverage: We have ensured that len(trustRoot.publicKeys) != 0, when nothing succeeds, there must be at least one failure.
+					return sarRejected, errors.New(`Internal inconsistency: Rekor SET did not match any key but we have no failures.`)
+				}
+				return sarRejected, internal.NewInvalidSignatureError(fmt.Sprintf("No public key verified against the RekorSET: %s", strings.Join(rekorFailures, ", ")))
 			}
+		} else {
+			publicKeys = trustRoot.publicKeys
 		}
-		publicKey = trustRoot.publicKey
 
 	case trustRoot.fulcio != nil:
 		if trustRoot.rekorPublicKey == nil { // newPRSigstoreSigned rejects such combinations.
@@ -184,14 +251,15 @@ func (pr *prSigstoreSigned) isSignatureAccepted(ctx context.Context, image priva
 		if err != nil {
 			return sarRejected, err
 		}
-		publicKey = pk
+		publicKeys = []crypto.PublicKey{pk}
 	}
 
-	if publicKey == nil {
-		// Coverage: This should never happen, we have already excluded the possibility in the switch above.
+	if len(publicKeys) == 0 {
+		// Coverage: This should never happen, we ensured that trustRoot.publicKeys is non-empty if set,
+		// and we have already excluded the possibility in the switch above.
 		return sarRejected, fmt.Errorf("Internal inconsistency: publicKey not set before verifying sigstore payload")
 	}
-	signature, err := internal.VerifySigstorePayload(publicKey, untrustedPayload, untrustedBase64Signature, internal.SigstorePayloadAcceptanceRules{
+	signature, err := internal.VerifySigstorePayload(publicKeys, untrustedPayload, untrustedBase64Signature, internal.SigstorePayloadAcceptanceRules{
 		ValidateSignedDockerReference: func(ref string) error {
 			if !pr.SignedIdentity.matchesDockerReference(image, ref) {
 				return PolicyRequirementError(fmt.Sprintf("Signature for identity %q is not accepted", ref))
