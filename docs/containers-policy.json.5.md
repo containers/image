@@ -320,7 +320,9 @@ This requirement requires an image to be signed using a sigstore signature with 
 {
     "type":    "sigstoreSigned",
     "keyPath": "/path/to/local/public/key/file",
+    "keyPaths": ["/path/to/first/public/key/one", "/path/to/first/public/key/two"],
     "keyData": "base64-encoded-public-key-data",
+    "keyDatas": ["base64-encoded-public-key-one-data", "base64-encoded-public-key-two-data"]
     "fulcio": {
         "caPath": "/path/to/local/CA/file",
         "caData": "base64-encoded-CA-data",
@@ -328,14 +330,19 @@ This requirement requires an image to be signed using a sigstore signature with 
         "subjectEmail", "expected-signing-user@example.com",
     },
     "rekorPublicKeyPath": "/path/to/local/public/key/file",
+    "rekorPublicKeyPaths": ["/path/to/local/public/key/one","/path/to/local/public/key/two"],
     "rekorPublicKeyData": "base64-encoded-public-key-data",
+    "rekorPublicKeyDatas": ["base64-encoded-public-key-one-data","base64-encoded-public-key-two-data"],
     "signedIdentity": identity_requirement
 }
 ```
-Exactly one of `keyPath`, `keyData` and `fulcio` must be present.
+Exactly one of `keyPath`, `keyPaths`, `keyData`, `keyDatas` and `fulcio` must be present.
 
 If `keyPath` or `keyData` is present, it contains a sigstore public key.
 Only signatures made by this key are accepted.
+
+If `keyPaths` or `keyDatas` is present, it contains sigstore public keys.
+Only signatures made by any key in the list are accepted.
 
 If `fulcio` is present, the signature must be based on a Fulcio-issued certificate.
 One of `caPath` and `caData` must be specified, containing the public key of the Fulcio instance.
@@ -343,13 +350,13 @@ Both `oidcIssuer` and `subjectEmail` are mandatory,
 exactly specifying the expected identity provider,
 and the identity of the user obtaining the Fulcio certificate.
 
-At most one of `rekorPublicKeyPath` and `rekorPublicKeyData` can be present;
+At most one of `rekorPublicKeyPath`, `rekorPublicKeyPaths`, `rekorPublicKeyData` and `rekorPublicKeyDatas` can be present;
 it is mandatory if `fulcio` is specified.
 If a Rekor public key is specified,
 the signature must have been uploaded to a Rekor server
 and the signature must contain an (offline-verifiable) “signed entry timestamp”
 proving the existence of the Rekor log record,
-signed by the provided public key.
+signed by one of the provided public keys.
 
 The `signedIdentity` field has the same semantics as in the `signedBy` requirement described above.
 Note that `cosign`-created signatures only contain a repository, so only `matchRepository` and `exactRepository` can be used to accept them (and that does not protect against substitution of a signed image with an unexpected tag).

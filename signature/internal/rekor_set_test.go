@@ -185,6 +185,7 @@ func TestVerifyRekorSET(t *testing.T) {
 	require.NoError(t, err)
 	cosignRekorKeyECDSA, ok := cosignRekorKey.(*ecdsa.PublicKey)
 	require.True(t, ok)
+	cosignRekorKeysECDSA := []*ecdsa.PublicKey{cosignRekorKeyECDSA}
 	cosignSETBytes, err := os.ReadFile("testdata/rekor-set")
 	require.NoError(t, err)
 	cosignCertBytes, err := os.ReadFile("testdata/rekor-cert")
@@ -193,25 +194,34 @@ func TestVerifyRekorSET(t *testing.T) {
 	require.NoError(t, err)
 	cosignPayloadBytes, err := os.ReadFile("testdata/rekor-payload")
 	require.NoError(t, err)
+	mismatchingKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader) // A key which did not sign anything
+	require.NoError(t, err)
 
 	// Successful verification
-	tm, err := VerifyRekorSET(cosignRekorKeyECDSA, cosignSETBytes, cosignCertBytes, string(cosignSigBase64), cosignPayloadBytes)
-	require.NoError(t, err)
-	assert.Equal(t, time.Unix(1670870899, 0), tm)
+	for _, acceptableKeys := range [][]*ecdsa.PublicKey{
+		{cosignRekorKeyECDSA},
+		{cosignRekorKeyECDSA, &mismatchingKey.PublicKey},
+		{&mismatchingKey.PublicKey, cosignRekorKeyECDSA},
+	} {
+		tm, err := VerifyRekorSET(acceptableKeys, cosignSETBytes, cosignCertBytes, string(cosignSigBase64), cosignPayloadBytes)
+		require.NoError(t, err)
+		assert.Equal(t, time.Unix(1670870899, 0), tm)
+	}
 
 	// For extra paranoia, test that we return a zero time on error.
 
 	// A completely invalid SET.
-	tm, err = VerifyRekorSET(cosignRekorKeyECDSA, []byte{}, cosignCertBytes, string(cosignSigBase64), cosignPayloadBytes)
+	tm, err := VerifyRekorSET(cosignRekorKeysECDSA, []byte{}, cosignCertBytes, string(cosignSigBase64), cosignPayloadBytes)
 	assert.Error(t, err)
 	assert.Zero(t, tm)
 
-	tm, err = VerifyRekorSET(cosignRekorKeyECDSA, []byte("invalid signature"), cosignCertBytes, string(cosignSigBase64), cosignPayloadBytes)
+	tm, err = VerifyRekorSET(cosignRekorKeysECDSA, []byte("invalid signature"), cosignCertBytes, string(cosignSigBase64), cosignPayloadBytes)
 	assert.Error(t, err)
 	assert.Zero(t, tm)
 
 	testKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
+	testPublicKeys := []*ecdsa.PublicKey{&testKey.PublicKey}
 	testSigner, err := sigstoreSignature.LoadECDSASigner(testKey, crypto.SHA256)
 	require.NoError(t, err)
 
@@ -227,14 +237,19 @@ func TestVerifyRekorSET(t *testing.T) {
 		UntrustedPayload:              json.RawMessage(invalidPayload),
 	})
 	require.NoError(t, err)
-	tm, err = VerifyRekorSET(&testKey.PublicKey, invalidSET, cosignCertBytes, string(cosignSigBase64), cosignPayloadBytes)
+	tm, err = VerifyRekorSET(testPublicKeys, invalidSET, cosignCertBytes, string(cosignSigBase64), cosignPayloadBytes)
 	assert.Error(t, err)
 	assert.Zero(t, tm)
 
 	// Cryptographic verification fails (a mismatched public key)
-	tm, err = VerifyRekorSET(&testKey.PublicKey, cosignSETBytes, cosignCertBytes, string(cosignSigBase64), cosignPayloadBytes)
-	assert.Error(t, err)
-	assert.Zero(t, tm)
+	for _, mismatchingKeys := range [][]*ecdsa.PublicKey{
+		{&testKey.PublicKey},
+		{&testKey.PublicKey, &mismatchingKey.PublicKey},
+	} {
+		tm, err := VerifyRekorSET(mismatchingKeys, cosignSETBytes, cosignCertBytes, string(cosignSigBase64), cosignPayloadBytes)
+		assert.Error(t, err)
+		assert.Zero(t, tm)
+	}
 
 	// Parsing UntrustedRekorPayload fails
 	invalidPayload = []byte(`{}`)
@@ -245,7 +260,7 @@ func TestVerifyRekorSET(t *testing.T) {
 		UntrustedPayload:              json.RawMessage(invalidPayload),
 	})
 	require.NoError(t, err)
-	tm, err = VerifyRekorSET(&testKey.PublicKey, invalidSET, cosignCertBytes, string(cosignSigBase64), cosignPayloadBytes)
+	tm, err = VerifyRekorSET(testPublicKeys, invalidSET, cosignCertBytes, string(cosignSigBase64), cosignPayloadBytes)
 	assert.Error(t, err)
 	assert.Zero(t, tm)
 
@@ -379,7 +394,7 @@ func TestVerifyRekorSET(t *testing.T) {
 			UntrustedPayload:              json.RawMessage(testPayload),
 		})
 		require.NoError(t, err)
-		tm, err = VerifyRekorSET(&testKey.PublicKey, testSET, cosignCertBytes, string(cosignSigBase64), cosignPayloadBytes)
+		tm, err = VerifyRekorSET(testPublicKeys, testSET, cosignCertBytes, string(cosignSigBase64), cosignPayloadBytes)
 		assert.Error(t, err)
 		assert.Zero(t, tm)
 	}
@@ -387,7 +402,7 @@ func TestVerifyRekorSET(t *testing.T) {
 	// Invalid unverifiedBase64Signature parameter
 	truncatedBase64 := cosignSigBase64
 	truncatedBase64 = truncatedBase64[:len(truncatedBase64)-1]
-	tm, err = VerifyRekorSET(cosignRekorKeyECDSA, cosignSETBytes, cosignCertBytes,
+	tm, err = VerifyRekorSET(cosignRekorKeysECDSA, cosignSETBytes, cosignCertBytes,
 		string(truncatedBase64), cosignPayloadBytes)
 	assert.Error(t, err)
 	assert.Zero(t, tm)
@@ -399,7 +414,7 @@ func TestVerifyRekorSET(t *testing.T) {
 		[]byte("this is not PEM"),
 		bytes.Repeat(cosignCertBytes, 2),
 	} {
-		tm, err = VerifyRekorSET(cosignRekorKeyECDSA, cosignSETBytes, c,
+		tm, err = VerifyRekorSET(cosignRekorKeysECDSA, cosignSETBytes, c,
 			string(cosignSigBase64), cosignPayloadBytes)
 		assert.Error(t, err)
 		assert.Zero(t, tm)
