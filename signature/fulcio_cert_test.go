@@ -442,6 +442,7 @@ func TestVerifyRekorFulcio(t *testing.T) {
 	require.NoError(t, err)
 	rekorKeyECDSA, ok := rekorKey.(*ecdsa.PublicKey)
 	require.True(t, ok)
+	rekorKeysECDSA := []*ecdsa.PublicKey{rekorKeyECDSA}
 	setBytes, err := os.ReadFile("fixtures/rekor-set")
 	require.NoError(t, err)
 	sigBase64, err := os.ReadFile("fixtures/rekor-sig")
@@ -450,7 +451,7 @@ func TestVerifyRekorFulcio(t *testing.T) {
 	require.NoError(t, err)
 
 	// Success
-	pk, err := verifyRekorFulcio(rekorKeyECDSA, &fulcioTrustRoot{
+	pk, err := verifyRekorFulcio(rekorKeysECDSA, &fulcioTrustRoot{
 		caCertificates: caCertificates,
 		oidcIssuer:     "https://github.com/login/oauth",
 		subjectEmail:   "mitr@redhat.com",
@@ -459,7 +460,7 @@ func TestVerifyRekorFulcio(t *testing.T) {
 	assertPublicKeyMatchesCert(t, certBytes, pk)
 
 	// Rekor failure
-	pk, err = verifyRekorFulcio(rekorKeyECDSA, &fulcioTrustRoot{
+	pk, err = verifyRekorFulcio(rekorKeysECDSA, &fulcioTrustRoot{
 		caCertificates: caCertificates,
 		oidcIssuer:     "https://github.com/login/oauth",
 		subjectEmail:   "mitr@redhat.com",
@@ -468,7 +469,7 @@ func TestVerifyRekorFulcio(t *testing.T) {
 	assert.Nil(t, pk)
 
 	// Fulcio failure
-	pk, err = verifyRekorFulcio(rekorKeyECDSA, &fulcioTrustRoot{
+	pk, err = verifyRekorFulcio(rekorKeysECDSA, &fulcioTrustRoot{
 		caCertificates: caCertificates,
 		oidcIssuer:     "https://github.com/login/oauth",
 		subjectEmail:   "this-does-not-match@example.com",
