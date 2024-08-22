@@ -2,8 +2,7 @@ package set
 
 import (
 	"iter"
-
-	"golang.org/x/exp/maps"
+	"maps"
 )
 
 // FIXME:
@@ -52,11 +51,5 @@ func (s *Set[E]) Empty() bool {
 }
 
 func (s *Set[E]) All() iter.Seq[E] {
-	return func(yield func(E) bool) {
-		for _, v := range maps.Keys(s.m) {
-			if !yield(v) {
-				return
-			}
-		}
-	}
+	return maps.Keys(s.m)
 }
