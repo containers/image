@@ -830,7 +830,7 @@ func makeBufferedNetworkReader(stream io.ReadCloser, nBuffers, bufferSize uint) 
 		handleBufferedNetworkReader(&br)
 	}()
 
-	for i := uint(0); i < nBuffers; i++ {
+	for range nBuffers {
 		b := bufferedNetworkReaderBuffer{
 			data: make([]byte, bufferSize),
 		}

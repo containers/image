@@ -87,7 +87,7 @@ func testGenericUncompressedDigest(t *testing.T, cache blobinfocache.BlobInfoCac
 }
 
 func testGenericRecordDigestUncompressedPair(t *testing.T, cache blobinfocache.BlobInfoCache2) {
-	for i := 0; i < 2; i++ { // Record the same data twice to ensure redundant writes don’t break things.
+	for range 2 { // Record the same data twice to ensure redundant writes don’t break things.
 		// Known compressed→uncompressed mapping
 		cache.RecordDigestUncompressedPair(digestCompressedA, digestUncompressed)
 		assert.Equal(t, digestUncompressed, cache.UncompressedDigest(digestCompressedA))
@@ -113,7 +113,7 @@ func testGenericUncompressedDigestForTOC(t *testing.T, cache blobinfocache.BlobI
 }
 
 func testGenericRecordTOCUncompressedPair(t *testing.T, cache blobinfocache.BlobInfoCache2) {
-	for i := 0; i < 2; i++ { // Record the same data twice to ensure redundant writes don’t break things.
+	for range 2 { // Record the same data twice to ensure redundant writes don’t break things.
 		// Known TOC→uncompressed mapping
 		cache.RecordTOCUncompressedPair(digestCompressedA, digestUncompressed)
 		assert.Equal(t, digestUncompressed, cache.UncompressedDigestForTOC(digestCompressedA))
@@ -125,7 +125,7 @@ func testGenericRecordTOCUncompressedPair(t *testing.T, cache blobinfocache.Blob
 
 func testGenericRecordKnownLocations(t *testing.T, cache blobinfocache.BlobInfoCache2) {
 	transport := mocks.NameImageTransport("==BlobInfocache transport mock")
-	for i := 0; i < 2; i++ { // Record the same data twice to ensure redundant writes don’t break things.
+	for range 2 { // Record the same data twice to ensure redundant writes don’t break things.
 		for _, scopeName := range []string{"A", "B"} { // Run the test in two different scopes to verify they don't affect each other.
 			scope := types.BICTransportScope{Opaque: scopeName}
 			for _, digest := range []digest.Digest{digestCompressedA, digestCompressedB} { // Two different digests should not affect each other either.
