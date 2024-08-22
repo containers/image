@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -479,8 +480,7 @@ func (c *dockerClient) resolveRequestURL(path string) (*url.URL, error) {
 // returns the required scope to be used for fetching a new token.
 func needsRetryWithUpdatedScope(res *http.Response) (bool, *authScope) {
 	if res.StatusCode == http.StatusUnauthorized {
-		challenges := parseAuthHeader(res.Header)
-		for _, challenge := range challenges {
+		for challenge := range iterateAuthHeader(res.Header) {
 			if challenge.Scheme == "bearer" {
 				if errmsg, ok := challenge.Parameters["error"]; ok && errmsg == "insufficient_scope" {
 					if scope, ok := challenge.Parameters["scope"]; ok && scope != "" {
@@ -928,7 +928,7 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
 			return registryHTTPResponseToError(resp)
 		}
-		c.challenges = parseAuthHeader(resp.Header)
+		c.challenges = slices.Collect(iterateAuthHeader(resp.Header))
 		c.scheme = scheme
 		c.supportsSignatures = resp.Header.Get("X-Registry-Supports-Signatures") == "1"
 		return nil
