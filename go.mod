@@ -1,6 +1,6 @@
 module github.com/containers/image/v5
 
-go 1.22.8
+go 1.23.0
 
 // Warning: Ensure the "go" and "toolchain" versions match exactly to prevent unwanted auto-updates.
 // That generally means there should be no toolchain directive present.
