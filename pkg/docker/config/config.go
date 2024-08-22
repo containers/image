@@ -124,7 +124,7 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 	// Now use `GetCredentials` to the specific auth configs for each
 	// previously listed registry.
 	allCreds := make(map[string]types.DockerAuthConfig)
-	for _, key := range allKeys.Values() {
+	for key := range allKeys.All() {
 		creds, err := GetCredentials(sys, key)
 		if err != nil {
 			// Note: we rely on the logging in `GetCredentials`.

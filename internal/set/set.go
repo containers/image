@@ -1,6 +1,10 @@
 package set
 
-import "golang.org/x/exp/maps"
+import (
+	"iter"
+
+	"golang.org/x/exp/maps"
+)
 
 // FIXME:
 // - Docstrings
@@ -47,6 +51,12 @@ func (s *Set[E]) Empty() bool {
 	return len(s.m) == 0
 }
 
-func (s *Set[E]) Values() []E {
-	return maps.Keys(s.m)
+func (s *Set[E]) All() iter.Seq[E] {
+	return func(yield func(E) bool) {
+		for _, v := range maps.Keys(s.m) {
+			if !yield(v) {
+				return
+			}
+		}
+	}
 }
