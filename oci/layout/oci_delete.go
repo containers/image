@@ -65,23 +65,25 @@ func (ref ociReference) getBlobsUsedInSingleImage(descriptor *imgspecv1.Descript
 }
 
 func (ref ociReference) getBlobsUsedInImageIndex(descriptor *imgspecv1.Descriptor, sharedBlobsDir string) (map[digest.Digest]int, error) {
-	blobPath, err := ref.blobPath(descriptor.Digest, sharedBlobsDir)
-	if err != nil {
-		return nil, err
-	}
-	index, err := parseIndex(blobPath)
-	if err != nil {
-		return nil, err
-	}
-
 	blobsUsedInImageRefIndex := make(map[digest.Digest]int)
-	err = ref.addBlobsUsedInIndex(blobsUsedInImageRefIndex, index, sharedBlobsDir)
-	if err != nil {
+	if err := ref.addBlobsUsedInNestedIndex(blobsUsedInImageRefIndex, descriptor, sharedBlobsDir); err != nil {
 		return nil, err
 	}
 	blobsUsedInImageRefIndex[descriptor.Digest]++ // Add the nested index in the list of blobs used by this reference
 
 	return blobsUsedInImageRefIndex, nil
+}
+
+func (ref ociReference) addBlobsUsedInNestedIndex(destination map[digest.Digest]int, descriptor *imgspecv1.Descriptor, sharedBlobsDir string) error {
+	blobPath, err := ref.blobPath(descriptor.Digest, sharedBlobsDir)
+	if err != nil {
+		return err
+	}
+	index, err := parseIndex(blobPath)
+	if err != nil {
+		return err
+	}
+	return ref.addBlobsUsedInIndex(destination, index, sharedBlobsDir)
 }
 
 // Updates a map of digest with the usage count, so a blob that is referenced three times will have 3 in the map
@@ -94,16 +96,7 @@ func (ref ociReference) addBlobsUsedInIndex(destination map[digest.Digest]int, i
 				return err
 			}
 		case imgspecv1.MediaTypeImageIndex:
-			blobPath, err := ref.blobPath(descriptor.Digest, sharedBlobsDir)
-			if err != nil {
-				return err
-			}
-			index, err := parseIndex(blobPath)
-			if err != nil {
-				return err
-			}
-			err = ref.addBlobsUsedInIndex(destination, index, sharedBlobsDir)
-			if err != nil {
+			if err := ref.addBlobsUsedInNestedIndex(destination, &descriptor, sharedBlobsDir); err != nil {
 				return err
 			}
 		default:
