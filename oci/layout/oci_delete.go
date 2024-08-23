@@ -55,12 +55,10 @@ func (ref ociReference) DeleteImage(ctx context.Context, sys *types.SystemContex
 }
 
 func (ref ociReference) getBlobsUsedInSingleImage(descriptor *imgspecv1.Descriptor, sharedBlobsDir string) (map[digest.Digest]int, error) {
-	manifest, err := ref.getManifest(descriptor, sharedBlobsDir)
-	if err != nil {
+	blobsUsedInManifest := make(map[digest.Digest]int)
+	if err := ref.addBlobsUsedInManifest(blobsUsedInManifest, descriptor, sharedBlobsDir); err != nil {
 		return nil, err
 	}
-	blobsUsedInManifest := make(map[digest.Digest]int)
-	ref.addBlobsUsedInManifest(blobsUsedInManifest, manifest)
 	blobsUsedInManifest[descriptor.Digest]++ // Add the current manifest to the list of blobs used by this reference
 
 	return blobsUsedInManifest, nil
@@ -92,11 +90,9 @@ func (ref ociReference) addBlobsUsedInIndex(destination map[digest.Digest]int, i
 		destination[descriptor.Digest]++
 		switch descriptor.MediaType {
 		case imgspecv1.MediaTypeImageManifest:
-			manifest, err := ref.getManifest(&descriptor, sharedBlobsDir)
-			if err != nil {
+			if err := ref.addBlobsUsedInManifest(destination, &descriptor, sharedBlobsDir); err != nil {
 				return err
 			}
-			ref.addBlobsUsedInManifest(destination, manifest)
 		case imgspecv1.MediaTypeImageIndex:
 			blobPath, err := ref.blobPath(descriptor.Digest, sharedBlobsDir)
 			if err != nil {
@@ -118,11 +114,17 @@ func (ref ociReference) addBlobsUsedInIndex(destination map[digest.Digest]int, i
 	return nil
 }
 
-func (ref ociReference) addBlobsUsedInManifest(destination map[digest.Digest]int, manifest *imgspecv1.Manifest) {
+func (ref ociReference) addBlobsUsedInManifest(destination map[digest.Digest]int, descriptor *imgspecv1.Descriptor, sharedBlobsDir string) error {
+	manifest, err := ref.getManifest(descriptor, sharedBlobsDir)
+	if err != nil {
+		return err
+	}
+
 	destination[manifest.Config.Digest]++
 	for _, layer := range manifest.Layers {
 		destination[layer.Digest]++
 	}
+	return nil
 }
 
 // This takes in a map of the digest and their usage count in the manifest to be deleted
