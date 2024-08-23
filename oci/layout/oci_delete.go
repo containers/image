@@ -28,18 +28,8 @@ func (ref ociReference) DeleteImage(ctx context.Context, sys *types.SystemContex
 	}
 
 	blobsUsedByImage := make(map[digest.Digest]int)
-	blobsUsedByImage[descriptor.Digest]++ // Add the current object to the list of blobs used by this reference
-	switch descriptor.MediaType {
-	case imgspecv1.MediaTypeImageManifest:
-		if err := ref.addBlobsUsedInManifest(blobsUsedByImage, &descriptor, sharedBlobsDir); err != nil {
-			return err
-		}
-	case imgspecv1.MediaTypeImageIndex:
-		if err := ref.addBlobsUsedInNestedIndex(blobsUsedByImage, &descriptor, sharedBlobsDir); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("unsupported mediaType in index: %q", descriptor.MediaType)
+	if err := ref.countBlobsForDescriptor(blobsUsedByImage, &descriptor, sharedBlobsDir); err != nil {
+		return err
 	}
 
 	blobsToDelete, err := ref.getBlobsToDelete(blobsUsedByImage, sharedBlobsDir)
@@ -53,6 +43,24 @@ func (ref ociReference) DeleteImage(ctx context.Context, sys *types.SystemContex
 	}
 
 	return ref.deleteReferenceFromIndex(descriptorIndex)
+}
+
+// countBlobsForDescriptor updates dest with usage counts of blobs required for descriptor, INCLUDING descriptor itself.
+func (ref ociReference) countBlobsForDescriptor(dest map[digest.Digest]int, descriptor *imgspecv1.Descriptor, sharedBlobsDir string) error {
+	dest[descriptor.Digest]++
+	switch descriptor.MediaType {
+	case imgspecv1.MediaTypeImageManifest:
+		if err := ref.addBlobsUsedInManifest(dest, descriptor, sharedBlobsDir); err != nil {
+			return err
+		}
+	case imgspecv1.MediaTypeImageIndex:
+		if err := ref.addBlobsUsedInNestedIndex(dest, descriptor, sharedBlobsDir); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unsupported mediaType in index: %q", descriptor.MediaType)
+	}
+	return nil
 }
 
 func (ref ociReference) addBlobsUsedInNestedIndex(destination map[digest.Digest]int, descriptor *imgspecv1.Descriptor, sharedBlobsDir string) error {
@@ -70,21 +78,10 @@ func (ref ociReference) addBlobsUsedInNestedIndex(destination map[digest.Digest]
 // Updates a map of digest with the usage count, so a blob that is referenced three times will have 3 in the map
 func (ref ociReference) addBlobsUsedInIndex(destination map[digest.Digest]int, index *imgspecv1.Index, sharedBlobsDir string) error {
 	for _, descriptor := range index.Manifests {
-		destination[descriptor.Digest]++
-		switch descriptor.MediaType {
-		case imgspecv1.MediaTypeImageManifest:
-			if err := ref.addBlobsUsedInManifest(destination, &descriptor, sharedBlobsDir); err != nil {
-				return err
-			}
-		case imgspecv1.MediaTypeImageIndex:
-			if err := ref.addBlobsUsedInNestedIndex(destination, &descriptor, sharedBlobsDir); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("unsupported mediaType in index: %q", descriptor.MediaType)
+		if err := ref.countBlobsForDescriptor(destination, &descriptor, sharedBlobsDir); err != nil {
+			return err
 		}
 	}
-
 	return nil
 }
 
