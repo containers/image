@@ -815,15 +815,10 @@ func findCredentialsInFile(key, registry string, path authPath) (types.DockerAut
 	// Support sub-registry namespaces in auth.
 	// (This is not a feature of ~/.docker/config.json; we support it even for
 	// those files as an extension.)
-	var keys []string
-	if !path.legacyFormat {
-		keys = authKeysForKey(key)
-	} else {
-		keys = []string{registry}
-	}
-
+	//
 	// Repo or namespace keys are only supported as exact matches. For registry
 	// keys we prefer exact matches as well.
+	keys := authKeyLookupOrder(key, registry, path.legacyFormat)
 	for _, key := range keys {
 		if val, exists := fileContents.AuthConfigs[key]; exists {
 			return decodeDockerAuth(path.path, key, val)
@@ -851,14 +846,20 @@ func findCredentialsInFile(key, registry string, path authPath) (types.DockerAut
 	return types.DockerAuthConfig{}, nil
 }
 
-// authKeysForKey returns the keys matching a provided auth file key, in order
-// from the best match to worst. For example,
+// authKeyLookupOrder returns a sequence for lookup keys matching (key or registry)
+// in file with legacyFormat, in order from the best match to worst.
+// For example, in a non-legacy file,
 // when given a repository key "quay.io/repo/ns/image", it returns
 // - quay.io/repo/ns/image
 // - quay.io/repo/ns
 // - quay.io/repo
 // - quay.io
-func authKeysForKey(key string) (res []string) {
+func authKeyLookupOrder(key, registry string, legacyFormat bool) []string {
+	if legacyFormat {
+		return []string{registry}
+	}
+
+	var res []string
 	for {
 		res = append(res, key)
 
