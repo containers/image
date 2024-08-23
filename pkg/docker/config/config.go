@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -93,9 +94,7 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 				// Credential helpers in the auth file have a
 				// direct mapping to a registry, so we can just
 				// walk the map.
-				for registry := range fileContents.CredHelpers {
-					allKeys.Add(registry)
-				}
+				allKeys.AddSeq(maps.Keys(fileContents.CredHelpers))
 				for key := range fileContents.AuthConfigs {
 					key := normalizeAuthFileKey(key, path.legacyFormat)
 					if key == normalizedDockerIORegistry {
@@ -115,9 +114,7 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 					return nil, err
 				}
 			}
-			for registry := range creds {
-				allKeys.Add(registry)
-			}
+			allKeys.AddSeq(maps.Keys(creds))
 		}
 	}
 

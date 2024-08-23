@@ -31,8 +31,8 @@ func (s *Set[E]) Add(v E) {
 	s.m[v] = struct{}{} // Possibly writing the same struct{}{} presence marker again.
 }
 
-func (s *Set[E]) AddSlice(slice []E) {
-	for _, v := range slice {
+func (s *Set[E]) AddSeq(seq iter.Seq[E]) {
+	for v := range seq {
 		s.Add(v)
 	}
 }
