@@ -284,7 +284,7 @@ func (m *Schema1) ToSchema2Config(diffIDs []digest.Digest) ([]byte, error) {
 	}
 	// Build the history.
 	convertedHistory := []Schema2History{}
-	for _, compat := range m.ExtractedV1Compatibility {
+	for _, compat := range slices.Backward(m.ExtractedV1Compatibility) {
 		hitem := Schema2History{
 			Created:    compat.Created,
 			CreatedBy:  strings.Join(compat.ContainerConfig.Cmd, " "),
@@ -292,7 +292,7 @@ func (m *Schema1) ToSchema2Config(diffIDs []digest.Digest) ([]byte, error) {
 			Comment:    compat.Comment,
 			EmptyLayer: compat.ThrowAway,
 		}
-		convertedHistory = append([]Schema2History{hitem}, convertedHistory...)
+		convertedHistory = append(convertedHistory, hitem)
 	}
 	// Build the rootfs information.  We need the decompressed sums that we've been
 	// calculating to fill in the DiffIDs.  It's expected (but not enforced by us)
