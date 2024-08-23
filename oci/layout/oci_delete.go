@@ -59,7 +59,8 @@ func (ref ociReference) getBlobsUsedInSingleImage(descriptor *imgspecv1.Descript
 	if err != nil {
 		return nil, err
 	}
-	blobsUsedInManifest := ref.getBlobsUsedInManifest(manifest)
+	blobsUsedInManifest := make(map[digest.Digest]int)
+	ref.addBlobsUsedInManifest(blobsUsedInManifest, manifest)
 	blobsUsedInManifest[descriptor.Digest]++ // Add the current manifest to the list of blobs used by this reference
 
 	return blobsUsedInManifest, nil
@@ -95,9 +96,7 @@ func (ref ociReference) addBlobsUsedInIndex(destination map[digest.Digest]int, i
 			if err != nil {
 				return err
 			}
-			for digest, count := range ref.getBlobsUsedInManifest(manifest) {
-				destination[digest] += count
-			}
+			ref.addBlobsUsedInManifest(destination, manifest)
 		case imgspecv1.MediaTypeImageIndex:
 			blobPath, err := ref.blobPath(descriptor.Digest, sharedBlobsDir)
 			if err != nil {
@@ -119,15 +118,11 @@ func (ref ociReference) addBlobsUsedInIndex(destination map[digest.Digest]int, i
 	return nil
 }
 
-func (ref ociReference) getBlobsUsedInManifest(manifest *imgspecv1.Manifest) map[digest.Digest]int {
-	blobsUsedInManifest := make(map[digest.Digest]int, 0)
-
-	blobsUsedInManifest[manifest.Config.Digest]++
+func (ref ociReference) addBlobsUsedInManifest(destination map[digest.Digest]int, manifest *imgspecv1.Manifest) {
+	destination[manifest.Config.Digest]++
 	for _, layer := range manifest.Layers {
-		blobsUsedInManifest[layer.Digest]++
+		destination[layer.Digest]++
 	}
-
-	return blobsUsedInManifest
 }
 
 // This takes in a map of the digest and their usage count in the manifest to be deleted
