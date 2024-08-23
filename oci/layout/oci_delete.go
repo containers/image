@@ -47,13 +47,14 @@ func (ref ociReference) DeleteImage(ctx context.Context, sys *types.SystemContex
 
 // countBlobsForDescriptor updates dest with usage counts of blobs required for descriptor, INCLUDING descriptor itself.
 func (ref ociReference) countBlobsForDescriptor(dest map[digest.Digest]int, descriptor *imgspecv1.Descriptor, sharedBlobsDir string) error {
+	blobPath, err := ref.blobPath(descriptor.Digest, sharedBlobsDir)
+	if err != nil {
+		return err
+	}
+
 	dest[descriptor.Digest]++
 	switch descriptor.MediaType {
 	case imgspecv1.MediaTypeImageManifest:
-		blobPath, err := ref.blobPath(descriptor.Digest, sharedBlobsDir)
-		if err != nil {
-			return err
-		}
 		manifest, err := parseJSON[imgspecv1.Manifest](blobPath)
 		if err != nil {
 			return err
@@ -63,10 +64,6 @@ func (ref ociReference) countBlobsForDescriptor(dest map[digest.Digest]int, desc
 			dest[layer.Digest]++
 		}
 	case imgspecv1.MediaTypeImageIndex:
-		blobPath, err := ref.blobPath(descriptor.Digest, sharedBlobsDir)
-		if err != nil {
-			return err
-		}
 		index, err := parseIndex(blobPath)
 		if err != nil {
 			return err
