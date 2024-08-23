@@ -68,7 +68,7 @@ func (ref ociReference) countBlobsForDescriptor(dest map[digest.Digest]int, desc
 		if err != nil {
 			return err
 		}
-		if err := ref.addBlobsUsedInIndex(dest, index, sharedBlobsDir); err != nil {
+		if err := ref.countBlobsReferencedByIndex(dest, index, sharedBlobsDir); err != nil {
 			return err
 		}
 	default:
@@ -77,8 +77,8 @@ func (ref ociReference) countBlobsForDescriptor(dest map[digest.Digest]int, desc
 	return nil
 }
 
-// Updates a map of digest with the usage count, so a blob that is referenced three times will have 3 in the map
-func (ref ociReference) addBlobsUsedInIndex(destination map[digest.Digest]int, index *imgspecv1.Index, sharedBlobsDir string) error {
+// countBlobsReferencedByIndex updates dest with usage counts of blobs required for index, EXCLUDING the index itself.
+func (ref ociReference) countBlobsReferencedByIndex(destination map[digest.Digest]int, index *imgspecv1.Index, sharedBlobsDir string) error {
 	for _, descriptor := range index.Manifests {
 		if err := ref.countBlobsForDescriptor(destination, &descriptor, sharedBlobsDir); err != nil {
 			return err
@@ -95,7 +95,7 @@ func (ref ociReference) getBlobsToDelete(blobsUsedByDescriptorToDelete map[diges
 		return nil, err
 	}
 	blobsUsedInRootIndex := make(map[digest.Digest]int)
-	err = ref.addBlobsUsedInIndex(blobsUsedInRootIndex, rootIndex, sharedBlobsDir)
+	err = ref.countBlobsReferencedByIndex(blobsUsedInRootIndex, rootIndex, sharedBlobsDir)
 	if err != nil {
 		return nil, err
 	}
