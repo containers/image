@@ -33,7 +33,11 @@ func (ref ociReference) DeleteImage(ctx context.Context, sys *types.SystemContex
 	case imgspecv1.MediaTypeImageManifest:
 		blobsUsedByImage, err = ref.getBlobsUsedInSingleImage(&descriptor, sharedBlobsDir)
 	case imgspecv1.MediaTypeImageIndex:
-		blobsUsedByImage, err = ref.getBlobsUsedInImageIndex(&descriptor, sharedBlobsDir)
+		blobsUsedByImage = make(map[digest.Digest]int)
+		if err := ref.addBlobsUsedInNestedIndex(blobsUsedByImage, &descriptor, sharedBlobsDir); err != nil {
+			return err
+		}
+		blobsUsedByImage[descriptor.Digest]++ // Add the nested index in the list of blobs used by this reference
 	default:
 		return fmt.Errorf("unsupported mediaType in index: %q", descriptor.MediaType)
 	}
@@ -62,16 +66,6 @@ func (ref ociReference) getBlobsUsedInSingleImage(descriptor *imgspecv1.Descript
 	blobsUsedInManifest[descriptor.Digest]++ // Add the current manifest to the list of blobs used by this reference
 
 	return blobsUsedInManifest, nil
-}
-
-func (ref ociReference) getBlobsUsedInImageIndex(descriptor *imgspecv1.Descriptor, sharedBlobsDir string) (map[digest.Digest]int, error) {
-	blobsUsedInImageRefIndex := make(map[digest.Digest]int)
-	if err := ref.addBlobsUsedInNestedIndex(blobsUsedInImageRefIndex, descriptor, sharedBlobsDir); err != nil {
-		return nil, err
-	}
-	blobsUsedInImageRefIndex[descriptor.Digest]++ // Add the nested index in the list of blobs used by this reference
-
-	return blobsUsedInImageRefIndex, nil
 }
 
 func (ref ociReference) addBlobsUsedInNestedIndex(destination map[digest.Digest]int, descriptor *imgspecv1.Descriptor, sharedBlobsDir string) error {
