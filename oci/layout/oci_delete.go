@@ -50,11 +50,14 @@ func (ref ociReference) countBlobsForDescriptor(dest map[digest.Digest]int, desc
 	dest[descriptor.Digest]++
 	switch descriptor.MediaType {
 	case imgspecv1.MediaTypeImageManifest:
-		manifest, err := ref.getManifest(descriptor, sharedBlobsDir)
+		blobPath, err := ref.blobPath(descriptor.Digest, sharedBlobsDir)
 		if err != nil {
 			return err
 		}
-
+		manifest, err := parseJSON[imgspecv1.Manifest](blobPath)
+		if err != nil {
+			return err
+		}
 		dest[manifest.Config.Digest]++
 		for _, layer := range manifest.Layers {
 			dest[layer.Digest]++
@@ -180,18 +183,4 @@ func saveJSON(path string, content any) error {
 	defer file.Close()
 
 	return json.NewEncoder(file).Encode(content)
-}
-
-func (ref ociReference) getManifest(descriptor *imgspecv1.Descriptor, sharedBlobsDir string) (*imgspecv1.Manifest, error) {
-	manifestPath, err := ref.blobPath(descriptor.Digest, sharedBlobsDir)
-	if err != nil {
-		return nil, err
-	}
-
-	manifest, err := parseJSON[imgspecv1.Manifest](manifestPath)
-	if err != nil {
-		return nil, err
-	}
-
-	return manifest, nil
 }
