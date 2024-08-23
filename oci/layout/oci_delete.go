@@ -27,21 +27,17 @@ func (ref ociReference) DeleteImage(ctx context.Context, sys *types.SystemContex
 		return err
 	}
 
-	var blobsUsedByImage map[digest.Digest]int
-
+	blobsUsedByImage := make(map[digest.Digest]int)
+	blobsUsedByImage[descriptor.Digest]++ // Add the current object to the list of blobs used by this reference
 	switch descriptor.MediaType {
 	case imgspecv1.MediaTypeImageManifest:
-		blobsUsedByImage = make(map[digest.Digest]int)
 		if err := ref.addBlobsUsedInManifest(blobsUsedByImage, &descriptor, sharedBlobsDir); err != nil {
 			return err
 		}
-		blobsUsedByImage[descriptor.Digest]++ // Add the current manifest to the list of blobs used by this reference
 	case imgspecv1.MediaTypeImageIndex:
-		blobsUsedByImage = make(map[digest.Digest]int)
 		if err := ref.addBlobsUsedInNestedIndex(blobsUsedByImage, &descriptor, sharedBlobsDir); err != nil {
 			return err
 		}
-		blobsUsedByImage[descriptor.Digest]++ // Add the nested index in the list of blobs used by this reference
 	default:
 		return fmt.Errorf("unsupported mediaType in index: %q", descriptor.MediaType)
 	}
