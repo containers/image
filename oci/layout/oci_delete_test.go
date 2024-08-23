@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/containers/image/v5/types"
@@ -92,6 +93,14 @@ func TestReferenceDeleteImage_sharedBlobDir(t *testing.T) {
 	require.Equal(t, 0, len(index.Manifests))
 }
 
+func assertRefNameIsMissing(t *testing.T, index *imgspecv1.Index, refName string) {
+	if slices.ContainsFunc(index.Manifests, func(desc imgspecv1.Descriptor) bool {
+		return desc.Annotations[imgspecv1.AnnotationRefName] == refName
+	}) {
+		assert.Failf(t, "index still contains refName %q after deletion", refName)
+	}
+}
+
 func TestReferenceDeleteImage_multipleImages(t *testing.T) {
 	tmpDir := loadFixture(t, "delete_image_multiple_images")
 
@@ -118,14 +127,7 @@ func TestReferenceDeleteImage_multipleImages(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 6, len(index.Manifests))
 	// .. Check that the image is not in the index anymore
-	for _, descriptor := range index.Manifests {
-		switch descriptor.Annotations[imgspecv1.AnnotationRefName] {
-		case "3.17.5":
-			assert.Fail(t, "image still present in the index after deletion")
-		default:
-			continue
-		}
-	}
+	assertRefNameIsMissing(t, index, "3.17.5")
 }
 
 func TestReferenceDeleteImage_multipleImages_blobsUsedByOtherImages(t *testing.T) {
@@ -154,14 +156,7 @@ func TestReferenceDeleteImage_multipleImages_blobsUsedByOtherImages(t *testing.T
 	require.NoError(t, err)
 	require.Equal(t, 6, len(index.Manifests))
 	// .. Check that the image is not in the index anymore
-	for _, descriptor := range index.Manifests {
-		switch descriptor.Annotations[imgspecv1.AnnotationRefName] {
-		case "1.0.0":
-			assert.Fail(t, "image still present in the index after deletion")
-		default:
-			continue
-		}
-	}
+	assertRefNameIsMissing(t, index, "1.0.0")
 }
 
 func TestReferenceDeleteImage_multipleImages_imageDoesNotExist(t *testing.T) {
@@ -214,14 +209,7 @@ func TestReferenceDeleteImage_multipleImages_nestedIndexImage(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 6, len(index.Manifests))
 	// .. Check that the image is not in the index anymore
-	for _, descriptor := range index.Manifests {
-		switch descriptor.Annotations[imgspecv1.AnnotationRefName] {
-		case "3.16.7":
-			assert.Fail(t, "image still present in the index after deletion")
-		default:
-			continue
-		}
-	}
+	assertRefNameIsMissing(t, index, "3.16.7")
 }
 
 func TestReferenceDeleteImage_multipleImages_nestedIndexImage_refWithSameContent(t *testing.T) {
