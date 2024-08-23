@@ -116,10 +116,10 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 		// Don’t just build a string, try to preserve the typed error.
 		primary := &attempts[len(attempts)-1]
 		extras := []string{}
-		for i := 0; i < len(attempts)-1; i++ {
+		for _, attempt := range attempts[:len(attempts)-1] {
 			// This is difficult to fit into a single-line string, when the error can contain arbitrary strings including any metacharacters we decide to use.
 			// The paired [] at least have some chance of being unambiguous.
-			extras = append(extras, fmt.Sprintf("[%s: %v]", attempts[i].ref.String(), attempts[i].err))
+			extras = append(extras, fmt.Sprintf("[%s: %v]", attempt.ref.String(), attempt.err))
 		}
 		return nil, fmt.Errorf("(Mirrors also failed: %s): %s: %w", strings.Join(extras, "\n"), primary.ref.String(), primary.err)
 	}
