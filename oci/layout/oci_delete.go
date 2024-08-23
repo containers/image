@@ -50,11 +50,25 @@ func (ref ociReference) countBlobsForDescriptor(dest map[digest.Digest]int, desc
 	dest[descriptor.Digest]++
 	switch descriptor.MediaType {
 	case imgspecv1.MediaTypeImageManifest:
-		if err := ref.addBlobsUsedInManifest(dest, descriptor, sharedBlobsDir); err != nil {
+		manifest, err := ref.getManifest(descriptor, sharedBlobsDir)
+		if err != nil {
 			return err
 		}
+
+		dest[manifest.Config.Digest]++
+		for _, layer := range manifest.Layers {
+			dest[layer.Digest]++
+		}
 	case imgspecv1.MediaTypeImageIndex:
-		if err := ref.addBlobsUsedInNestedIndex(dest, descriptor, sharedBlobsDir); err != nil {
+		blobPath, err := ref.blobPath(descriptor.Digest, sharedBlobsDir)
+		if err != nil {
+			return err
+		}
+		index, err := parseIndex(blobPath)
+		if err != nil {
+			return err
+		}
+		if err := ref.addBlobsUsedInIndex(dest, index, sharedBlobsDir); err != nil {
 			return err
 		}
 	default:
@@ -63,37 +77,12 @@ func (ref ociReference) countBlobsForDescriptor(dest map[digest.Digest]int, desc
 	return nil
 }
 
-func (ref ociReference) addBlobsUsedInNestedIndex(destination map[digest.Digest]int, descriptor *imgspecv1.Descriptor, sharedBlobsDir string) error {
-	blobPath, err := ref.blobPath(descriptor.Digest, sharedBlobsDir)
-	if err != nil {
-		return err
-	}
-	index, err := parseIndex(blobPath)
-	if err != nil {
-		return err
-	}
-	return ref.addBlobsUsedInIndex(destination, index, sharedBlobsDir)
-}
-
 // Updates a map of digest with the usage count, so a blob that is referenced three times will have 3 in the map
 func (ref ociReference) addBlobsUsedInIndex(destination map[digest.Digest]int, index *imgspecv1.Index, sharedBlobsDir string) error {
 	for _, descriptor := range index.Manifests {
 		if err := ref.countBlobsForDescriptor(destination, &descriptor, sharedBlobsDir); err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-func (ref ociReference) addBlobsUsedInManifest(destination map[digest.Digest]int, descriptor *imgspecv1.Descriptor, sharedBlobsDir string) error {
-	manifest, err := ref.getManifest(descriptor, sharedBlobsDir)
-	if err != nil {
-		return err
-	}
-
-	destination[manifest.Config.Digest]++
-	for _, layer := range manifest.Layers {
-		destination[layer.Digest]++
 	}
 	return nil
 }
