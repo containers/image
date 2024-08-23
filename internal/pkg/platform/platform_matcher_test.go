@@ -54,8 +54,7 @@ func TestWantedPlatforms(t *testing.T) {
 		},
 	} {
 		testName := fmt.Sprintf("%q/%q/%q", c.ctx.ArchitectureChoice, c.ctx.OSChoice, c.ctx.VariantChoice)
-		platforms, err := WantedPlatforms(&c.ctx)
-		assert.Nil(t, err, testName)
+		platforms := WantedPlatforms(&c.ctx)
 		assert.Equal(t, c.expected, platforms, testName)
 	}
 }
