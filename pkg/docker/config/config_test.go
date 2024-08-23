@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -693,10 +694,10 @@ func TestAuthKeyLookupOrder(t *testing.T) {
 		} else {
 			registry = tc.input
 		}
-		result := authKeyLookupOrder(tc.input, registry, false)
+		result := slices.Collect(authKeyLookupOrder(tc.input, registry, false))
 		assert.Equal(t, tc.expected, result, tc.name)
 
-		result = authKeyLookupOrder(tc.input, registry, true)
+		result = slices.Collect(authKeyLookupOrder(tc.input, registry, true))
 		assert.Equal(t, []string{registry}, result, tc.name)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"iter"
 	"maps"
 	"os"
 	"os/exec"
@@ -818,8 +819,7 @@ func findCredentialsInFile(key, registry string, path authPath) (types.DockerAut
 	//
 	// Repo or namespace keys are only supported as exact matches. For registry
 	// keys we prefer exact matches as well.
-	keys := authKeyLookupOrder(key, registry, path.legacyFormat)
-	for _, key := range keys {
+	for key := range authKeyLookupOrder(key, registry, path.legacyFormat) {
 		if val, exists := fileContents.AuthConfigs[key]; exists {
 			return decodeDockerAuth(path.path, key, val)
 		}
@@ -854,23 +854,25 @@ func findCredentialsInFile(key, registry string, path authPath) (types.DockerAut
 // - quay.io/repo/ns
 // - quay.io/repo
 // - quay.io
-func authKeyLookupOrder(key, registry string, legacyFormat bool) []string {
-	if legacyFormat {
-		return []string{registry}
-	}
-
-	var res []string
-	for {
-		res = append(res, key)
-
-		lastSlash := strings.LastIndex(key, "/")
-		if lastSlash == -1 {
-			break
+func authKeyLookupOrder(key, registry string, legacyFormat bool) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		if legacyFormat {
+			_ = yield(registry) // We stop in any case
+			return
 		}
-		key = key[:lastSlash]
-	}
 
-	return res
+		for {
+			if !yield(key) {
+				return
+			}
+
+			lastSlash := strings.LastIndex(key, "/")
+			if lastSlash == -1 {
+				break
+			}
+			key = key[:lastSlash]
+		}
+	}
 }
 
 // decodeDockerAuth decodes the username and password from conf,
