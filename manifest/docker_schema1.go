@@ -133,12 +133,12 @@ func (m *Schema1) ConfigInfo() types.BlobInfo {
 // The Digest field is guaranteed to be provided; Size may be -1.
 // WARNING: The list may contain duplicates, and they are semantically relevant.
 func (m *Schema1) LayerInfos() []LayerInfo {
-	layers := make([]LayerInfo, len(m.FSLayers))
-	for i, layer := range m.FSLayers { // NOTE: This includes empty layers (where m.History.V1Compatibility->ThrowAway)
-		layers[(len(m.FSLayers)-1)-i] = LayerInfo{
+	layers := make([]LayerInfo, 0, len(m.FSLayers))
+	for i, layer := range slices.Backward(m.FSLayers) { // NOTE: This includes empty layers (where m.History.V1Compatibility->ThrowAway)
+		layers = append(layers, LayerInfo{
 			BlobInfo:   types.BlobInfo{Digest: layer.BlobSum, Size: -1},
 			EmptyLayer: m.ExtractedV1Compatibility[i].ThrowAway,
-		}
+		})
 	}
 	return layers
 }
