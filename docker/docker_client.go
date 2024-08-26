@@ -986,7 +986,8 @@ func (c *dockerClient) fetchManifest(ctx context.Context, ref dockerReference, t
 	if err != nil {
 		return nil, "", err
 	}
-	logrus.Debugf("Content-Type from manifest GET is %q", res.Header.Get("Content-Type"))
+	contentType := res.Header.Get("Content-Type")
+	logrus.Debugf("Content-Type from manifest GET is %q", contentType)
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		return nil, "", fmt.Errorf("reading manifest %s in %s: %w", tagOrDigest, ref.ref.Name(), registryHTTPResponseToError(res))
@@ -996,7 +997,18 @@ func (c *dockerClient) fetchManifest(ctx context.Context, ref dockerReference, t
 	if err != nil {
 		return nil, "", err
 	}
-	return manblob, simplifyContentType(res.Header.Get("Content-Type")), nil
+	// Extra check for the content type in the manifest
+	if contentType == "text/plain" {
+		man := make(map[string]any)
+		if err := json.Unmarshal(manblob, &man); err != nil {
+			return nil, "", fmt.Errorf("decoding manifest %s in %s: %w", tagOrDigest, ref.ref.Name(), err)
+		}
+		if mediaType, ok := man["mediaType"]; ok {
+			contentType = mediaType.(string)
+			logrus.Debugf("Content-Type from manifest JSON is %q", contentType)
+		}
+	}
+	return manblob, simplifyContentType(contentType), nil
 }
 
 // getExternalBlob returns the reader of the first available blob URL from urls, which must not be empty.
