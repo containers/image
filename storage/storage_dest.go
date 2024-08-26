@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -125,8 +126,9 @@ type storageImageDestinationLockProtected struct {
 
 // addedLayerInfo records data about a layer to use in this image.
 type addedLayerInfo struct {
-	digest     digest.Digest // Mandatory, the digest of the layer.
-	emptyLayer bool          // The layer is an “empty”/“throwaway” one, and may or may not be physically represented in various transport / storage systems.  false if the manifest type does not have the concept.
+	digest        digest.Digest // Mandatory, the digest of the layer.
+	emptyLayer    bool          // The layer is an “empty”/“throwaway” one, and may or may not be physically represented in various transport / storage systems.  false if the manifest type does not have the concept.
+	layerFilename *string
 }
 
 // newImageDestination sets us up to write a new image, caching blobs in a temporary directory until
@@ -218,9 +220,18 @@ func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream
 		return info, nil
 	}
 
+	layerFilename := func() *string {
+		if strings.HasPrefix(blobinfo.MediaType, manifest.OllamaImageLayerMediaTypePrefix) {
+			filename := strings.TrimPrefix(blobinfo.MediaType, manifest.OllamaImageLayerMediaTypePrefix)
+			return &filename
+		}
+		return nil
+	}()
+
 	return info, s.queueOrCommit(*options.LayerIndex, addedLayerInfo{
-		digest:     info.Digest,
-		emptyLayer: options.EmptyLayer,
+		digest:        info.Digest,
+		emptyLayer:    options.EmptyLayer,
+		layerFilename: layerFilename,
 	})
 }
 
@@ -817,7 +828,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	if index != 0 {
 		prev, ok := s.indexToStorageID[index-1]
 		if !ok {
-			return false, fmt.Errorf("Internal error: commitLayer called with previous layer %d not committed yet", index-1)
+			return false, fmt.Errorf("internal error: commitLayer called with previous layer %d not committed yet", index-1)
 		}
 		parentLayer = prev
 	}
@@ -873,7 +884,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 		return false, nil
 	}
 
-	layer, err := s.createNewLayer(index, info.digest, parentLayer, id)
+	layer, err := s.createNewLayer(index, info.digest, parentLayer, id, info.layerFilename)
 	if err != nil {
 		return false, err
 	}
@@ -886,7 +897,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 
 // createNewLayer creates a new layer newLayerID for (index, layerDigest) on top of parentLayer (which may be "").
 // If the layer cannot be committed yet, the function returns (nil, nil).
-func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.Digest, parentLayer, newLayerID string) (*storage.Layer, error) {
+func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.Digest, parentLayer, newLayerID string, layerFilename *string) (*storage.Layer, error) {
 	s.lock.Lock()
 	diffOutput, ok := s.lockProtected.diffOutputs[index]
 	s.lock.Unlock()
@@ -1061,6 +1072,7 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		OriginalDigest: trustedOriginalDigest,
 		// This might be "" if trusted.layerIdentifiedByTOC; in that case PutLayer will compute the value from the stream.
 		UncompressedDigest: trusted.diffID,
+		LayerFilename:      layerFilename,
 	}, file)
 	if err != nil && !errors.Is(err, storage.ErrDuplicateID) {
 		return nil, fmt.Errorf("adding layer with blob %q/%q/%q: %w", trusted.blobDigest, trusted.tocDigest, trusted.diffID, err)

@@ -32,6 +32,27 @@ const (
 	DockerV2Schema2ForeignLayerMediaType = manifest.DockerV2Schema2ForeignLayerMediaType
 	// DockerV2Schema2ForeignLayerMediaType is the MIME type used for gzipped schema 2 foreign layers.
 	DockerV2Schema2ForeignLayerMediaTypeGzip = manifest.DockerV2Schema2ForeignLayerMediaTypeGzip
+
+	// OllamaImageLayerMediaTypePrefix is the prefix for all Ollama image layer media types.
+	OllamaImageLayerMediaTypePrefix = manifest.OllamaImageLayerMediaTypePrefix
+	// OllamaImageModelLayerMediaType is the media type used for model layers.
+	OllamaImageModelLayerMediaType = manifest.OllamaImageModelLayerMediaType
+	// OllamaImageAdapterLayerMediaType is the media type used for adapter layers.
+	OllamaImageAdapterLayerMediaType = manifest.OllamaImageAdapterLayerMediaType
+	// OllamaImageProjectorLayerMediaType is the media type used for projector layers.
+	OllamaImageProjectorLayerMediaType = manifest.OllamaImageProjectorLayerMediaType
+	// OllamaImagePromptLayerMediaType is the media type used for prompt layers.
+	OllamaImagePromptLayerMediaType = manifest.OllamaImagePromptLayerMediaType
+	//	OllamaImageTemplateLayerMediaType is the media type used for template layers.
+	OllamaImageTemplateLayerMediaType = manifest.OllamaImageTemplateLayerMediaType
+	// OllamaImageSystemLayerMediaType is the media type used for system layers.
+	OllamaImageSystemLayerMediaType = manifest.OllamaImageSystemLayerMediaType
+	// OllamaImageParamsLayerMediaType is the media type used for params layers.
+	OllamaImageParamsLayerMediaType = manifest.OllamaImageParamsLayerMediaType
+	// OllamaImageMessagesLayerMediaType is the media type used for messages layers.
+	OllamaImageMessagesLayerMediaType = manifest.OllamaImageMessagesLayerMediaType
+	// OllamaImageLicenseLayerMediaType is the media type used for license layers.
+	OllamaImageLicenseLayerMediaType = manifest.OllamaImageLicenseLayerMediaType
 )
 
 // NonImageArtifactError (detected via errors.As) is used when asking for an image-specific operation
@@ -42,6 +63,8 @@ type NonImageArtifactError = manifest.NonImageArtifactError
 func SupportedSchema2MediaType(m string) error {
 	switch m {
 	case DockerV2ListMediaType, DockerV2Schema1MediaType, DockerV2Schema1SignedMediaType, DockerV2Schema2ConfigMediaType, DockerV2Schema2ForeignLayerMediaType, DockerV2Schema2ForeignLayerMediaTypeGzip, DockerV2Schema2LayerMediaType, DockerV2Schema2MediaType, DockerV2SchemaLayerMediaTypeUncompressed:
+		return nil
+	case OllamaImageModelLayerMediaType, OllamaImageAdapterLayerMediaType, OllamaImageProjectorLayerMediaType, OllamaImagePromptLayerMediaType, OllamaImageTemplateLayerMediaType, OllamaImageSystemLayerMediaType, OllamaImageParamsLayerMediaType, OllamaImageMessagesLayerMediaType, OllamaImageLicenseLayerMediaType:
 		return nil
 	default:
 		return fmt.Errorf("unsupported docker v2s2 media type: %q", m)
