@@ -10,6 +10,7 @@ import (
 )
 
 func TestReadAtMost(t *testing.T) {
+	rng := rand.New(rand.NewSource(0))
 	for _, c := range []struct {
 		input, limit  int
 		shouldSucceed bool
@@ -23,7 +24,7 @@ func TestReadAtMost(t *testing.T) {
 		{bytes.MinRead*5 + 1, bytes.MinRead * 5, false},
 	} {
 		input := make([]byte, c.input)
-		_, err := rand.Read(input)
+		_, err := rng.Read(input)
 		require.NoError(t, err)
 		result, err := ReadAtMost(bytes.NewReader(input), c.limit)
 		if c.shouldSucceed {
