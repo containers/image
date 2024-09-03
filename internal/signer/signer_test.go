@@ -72,7 +72,8 @@ func TestSignImageManifest(t *testing.T) {
 	testManifest := []byte("some manifest")
 	testDR, err := reference.ParseNormalizedNamed("busybox")
 	require.NoError(t, err)
-	testContext := context.WithValue(context.Background(), struct{}{}, "make this context unique")
+	type contextKeyType struct{}
+	testContext := context.WithValue(context.Background(), contextKeyType{}, "make this context unique")
 	testSig := signature.SigstoreFromComponents(signature.SigstoreSignatureMIMEType, []byte("payload"), nil)
 	testErr := errors.New("some unique error")
 	si.signImageManifest = func(ctx context.Context, m []byte, dockerReference reference.Named) (signature.Signature, error) {

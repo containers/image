@@ -64,7 +64,7 @@ func TestGetPutManifest(t *testing.T) {
 func TestGetPutBlob(t *testing.T) {
 	computedBlob := []byte("test-blob")
 	providedBlob := []byte("provided-blob")
-	providedDigest := digest.Digest("sha256:provided-test-digest")
+	providedDigest := digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	ref, _ := refToTempDir(t)
 	cache := memory.New()
@@ -113,12 +113,13 @@ func (fn readerFromFunc) Read(p []byte) (int, error) {
 // TestPutBlobDigestFailure simulates behavior on digest verification failure.
 func TestPutBlobDigestFailure(t *testing.T) {
 	const digestErrorString = "Simulated digest error"
-	const blobDigest = digest.Digest("sha256:test-digest")
+	const blobDigest = digest.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	ref, _ := refToTempDir(t)
 	dirRef, ok := ref.(dirReference)
 	require.True(t, ok)
-	blobPath := dirRef.layerPath(blobDigest)
+	blobPath, err := dirRef.layerPath(blobDigest)
+	require.NoError(t, err)
 	cache := memory.New()
 
 	firstRead := true

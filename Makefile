@@ -61,7 +61,7 @@ tools: .install.gitvalidation .install.golangci-lint .install.golint
 .install.golint:
 	# Note, golint is only needed for Skopeo's tests.
 	if [ ! -x "$(GOBIN)/golint" ]; then \
-		GO111MODULE="off" go get -u $(BUILDFLAGS) golang.org/x/lint/golint; \
+		go install $(BUILDFLAGS) golang.org/x/lint/golint@master; \
 	fi
 
 clean:
