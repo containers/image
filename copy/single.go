@@ -323,10 +323,7 @@ func checkImageDestinationForCurrentRuntime(ctx context.Context, sys *types.Syst
 		if err != nil {
 			return fmt.Errorf("parsing image configuration: %w", err)
 		}
-		wantedPlatforms, err := platform.WantedPlatforms(sys)
-		if err != nil {
-			return fmt.Errorf("getting current platform information %#v: %w", sys, err)
-		}
+		wantedPlatforms := platform.WantedPlatforms(sys)
 
 		options := newOrderedSet()
 		match := false
