@@ -32,7 +32,7 @@ import (
 // systemDefaultPolicyPath is the policy path used for DefaultPolicy().
 // You can override this at build time with
 // -ldflags '-X github.com/containers/image/v5/signature.systemDefaultPolicyPath=$your_path'
-var systemDefaultPolicyPath = builtinDefaultPolicyPath
+var systemDefaultPolicyPath = BuiltinDefaultPolicyPath
 
 // userPolicyFile is the path to the per user policy path.
 var userPolicyFile = filepath.FromSlash(".config/containers/policy.json")
