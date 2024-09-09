@@ -482,6 +482,9 @@ func TestGetCredentialsInteroperability(t *testing.T) {
 		if serverAddress == "" {
 			serverAddress = registry.IndexServer
 		}
+		if serverAddress != registry.IndexServer {
+			serverAddress = credentials.ConvertToHostname(serverAddress)
+		}
 		configFile, err := config.Load(configDir)
 		require.NoError(t, err)
 		err = configFile.GetCredentialsStore(serverAddress).Store(configtypes.AuthConfig{
