@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -118,4 +119,32 @@ func validateScopeNonWindows(scope string) error {
 	}
 
 	return nil
+}
+
+// parseOCIReferenceName parses the image from the oci reference.
+func parseOCIReferenceName(image string) (img string, index int, err error) {
+	index = -1
+	if strings.HasPrefix(image, "@") {
+		idx, err := strconv.Atoi(image[1:])
+		if err != nil {
+			return "", index, fmt.Errorf("Invalid source index @%s: not an integer: %w", image[1:], err)
+		}
+		if idx < 0 {
+			return "", index, fmt.Errorf("Invalid source index @%d: must not be negative", idx)
+		}
+		index = idx
+	} else {
+		img = image
+	}
+	return img, index, nil
+}
+
+// ParseReferenceIntoElements splits the oci reference into location, image name and source index if exists
+func ParseReferenceIntoElements(reference string) (string, string, int, error) {
+	dir, image := SplitPathAndImage(reference)
+	image, index, err := parseOCIReferenceName(image)
+	if err != nil {
+		return "", "", -1, err
+	}
+	return dir, image, index, nil
 }
