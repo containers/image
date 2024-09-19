@@ -1,5 +1,3 @@
-.PHONY: all tools test validate lint .gitvalidation fmt
-
 export GOPROXY=https://proxy.golang.org
 
 
@@ -38,8 +36,10 @@ GOLANGCI_LINT_VERSION := 1.64.6
 
 export PATH := $(PATH):${GOBIN}
 
+.PHONY: all
 all: tools test validate .gitvalidation
 
+.PHONY: build
 build:
 	go build $(BUILDFLAGS) ./...
 
@@ -48,56 +48,70 @@ $(MANPAGES): %: %.md
 
 docs: $(MANPAGES)
 
+.PHONY: install-docs
 install-docs: docs
 	install -d -m 755 ${MANINSTALLDIR}/man5
 	install -m 644 docs/*.5 ${MANINSTALLDIR}/man5/
 
+.PHONY: install
 install: install-docs
 	install -d -m 755 ${DESTDIR}${CONTAINERSCONFDIR}
 	install -m 644 default-policy.json ${DESTDIR}${CONTAINERSCONFDIR}/policy.json
 	install -d -m 755 ${DESTDIR}${REGISTRIESDDIR}
 	install -m 644 default.yaml ${DESTDIR}${REGISTRIESDDIR}/default.yaml
 
+.PHONY: cross
 cross:
 	GOOS=windows $(MAKE) build BUILDTAGS="$(BUILDTAGS) $(BUILD_TAGS_WINDOWS_CROSS)"
 	GOOS=darwin $(MAKE) build BUILDTAGS="$(BUILDTAGS) $(BUILD_TAGS_DARWIN_CROSS)"
 
+.PHONY: tools
 tools: .install.gitvalidation .install.golangci-lint
 
+.PHONY: .install.gitvalidation
 .install.gitvalidation:
 	if [ ! -x "$(GOBIN)/git-validation" ]; then \
 		go install github.com/vbatts/git-validation@latest; \
 	fi
 
+.PHONY: .install.golangci-lint
 .install.golangci-lint:
 	if [ ! -x "$(GOBIN)/golangci-lint" ]; then \
 		curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(GOBIN) v$(GOLANGCI_LINT_VERSION) ; \
 	fi
 
+.PHONY: clean
 clean:
 	rm -rf $(MANPAGES)
 
+.PHONY: test
 test:
 	@go test $(BUILDFLAGS) -cover ./...
 
+.PHONY: fmt
 fmt:
 	@gofmt -l -s -w $(SOURCE_DIRS)
 
+.PHONY: validate
 validate: lint
 	@BUILDTAGS="$(BUILDTAGS)" hack/validate.sh
 
+.PHONY: lint
 lint:
 	$(GOBIN)/golangci-lint run --build-tags "$(BUILDTAGS)"
 
 # When this is running in CI, it will only check the CI commit range
+.PHONY: .gitvalidation
 .gitvalidation:
 	@which $(GOBIN)/git-validation > /dev/null 2>/dev/null || (echo "ERROR: git-validation not found. Consider 'make clean && make tools'" && false)
 	git fetch -q "https://github.com/containers/image.git" "refs/heads/main"
 	upstream="$$(git rev-parse --verify FETCH_HEAD)" ; \
 		$(GOBIN)/git-validation -q -run DCO,short-subject,dangling-whitespace -range $$upstream..HEAD
 
+.PHONY: vendor-in-container
 vendor-in-container:
 	podman run --privileged --rm --env HOME=/root -v `pwd`:/src -w /src golang go mod tidy
 
+.PHONY: codespell
 codespell:
 	codespell -w
