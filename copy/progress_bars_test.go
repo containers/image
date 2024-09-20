@@ -20,5 +20,5 @@ func TestCustomPartialBlobDecorFunc(t *testing.T) {
 	// Almost complete, but no reuse
 	s.Current = int64(float64(s.Total) * 0.95)
 	s.Refill = 0
-	assert.Equal(t, "7.5MiB / 7.9MiB (skipped: 0.0b = 0.00%)", customPartialBlobDecorFunc(s))
+	assert.Equal(t, "7.5MiB / 7.9MiB", customPartialBlobDecorFunc(s))
 }
