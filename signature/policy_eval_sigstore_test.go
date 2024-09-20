@@ -87,6 +87,146 @@ func TestPRSigstoreSignedFulcioPrepareTrustRoot(t *testing.T) {
 	}
 }
 
+func TestPRSigstoreSignedPKIPrepareTrustRoot(t *testing.T) {
+	const testCARootsPath = "fixtures/pki_root_crts.pem"
+	const testCAIntermediatesPath = "fixtures/pki_intermediate_crts.pem"
+	testCARootsData, err := os.ReadFile(testCARootsPath)
+	require.NoError(t, err)
+	testCAIntermediatesData, err := os.ReadFile(testCAIntermediatesPath)
+	require.NoError(t, err)
+	testSubjectEmail := "test@example.com"
+	testSubjectHostname := "myhost.example.com"
+
+	// Success
+	for _, c := range []struct {
+		option          []PRSigstoreSignedPKIOption
+		intermediates   bool
+		subjectEmail    string
+		subjectHostname string
+	}{
+		{
+			option: []PRSigstoreSignedPKIOption{
+				PRSigstoreSignedPKIWithCARootsPath(testCARootsPath),
+				PRSigstoreSignedPKIWithSubjectEmail(testSubjectEmail),
+				PRSigstoreSignedPKIWithSubjectHostname(testSubjectHostname),
+			},
+			subjectEmail:    testSubjectEmail,
+			subjectHostname: testSubjectHostname,
+		},
+		{
+			option: []PRSigstoreSignedPKIOption{
+				PRSigstoreSignedPKIWithCARootsData(testCARootsData),
+				PRSigstoreSignedPKIWithSubjectEmail(testSubjectEmail),
+				PRSigstoreSignedPKIWithSubjectHostname(testSubjectHostname),
+			},
+			subjectEmail:    testSubjectEmail,
+			subjectHostname: testSubjectHostname,
+		},
+		{
+			option: []PRSigstoreSignedPKIOption{
+				PRSigstoreSignedPKIWithCARootsPath(testCARootsPath),
+				PRSigstoreSignedPKIWithCAIntermediatesPath(testCAIntermediatesPath),
+				PRSigstoreSignedPKIWithSubjectEmail(testSubjectEmail),
+				PRSigstoreSignedPKIWithSubjectHostname(testSubjectHostname),
+			},
+			intermediates:   true,
+			subjectEmail:    testSubjectEmail,
+			subjectHostname: testSubjectHostname,
+		},
+		{
+			option: []PRSigstoreSignedPKIOption{
+				PRSigstoreSignedPKIWithCARootsPath(testCARootsPath),
+				PRSigstoreSignedPKIWithCAIntermediatesData(testCAIntermediatesData),
+				PRSigstoreSignedPKIWithSubjectEmail(testSubjectEmail),
+				PRSigstoreSignedPKIWithSubjectHostname(testSubjectHostname),
+			},
+			intermediates:   true,
+			subjectEmail:    testSubjectEmail,
+			subjectHostname: testSubjectHostname,
+		},
+		{
+			option: []PRSigstoreSignedPKIOption{
+				PRSigstoreSignedPKIWithCARootsData(testCARootsData),
+				PRSigstoreSignedPKIWithSubjectEmail(testSubjectEmail),
+			},
+			subjectEmail: testSubjectEmail,
+		},
+		{
+			option: []PRSigstoreSignedPKIOption{
+				PRSigstoreSignedPKIWithCARootsData(testCARootsData),
+				PRSigstoreSignedPKIWithSubjectHostname(testSubjectHostname),
+			},
+			subjectHostname: testSubjectHostname,
+		},
+	} {
+		pki, err := newPRSigstoreSignedPKI(c.option...)
+		require.NoError(t, err)
+		res, err := pki.prepareTrustRoot()
+		require.NoError(t, err)
+		assert.NotNil(t, res.caRootsCertificates)
+		if c.intermediates {
+			assert.NotNil(t, res.caIntermediateCertificates)
+		}
+		assert.Equal(t, c.subjectEmail, res.subjectEmail)
+		assert.Equal(t, c.subjectHostname, res.subjectHostname)
+	}
+
+	// Failure
+	for _, pki := range []prSigstoreSignedPKI{ // Use a prSigstoreSignedPKI because these configurations should be rejected by NewPRSigstoreSignedPKI.
+		{ // Neither CARootsPath nor CARootsData specified
+			SubjectEmail:    testSubjectEmail,
+			SubjectHostname: testSubjectHostname,
+		},
+		{ // Both CARootsPath and CARootsData specified
+			CARootsPath:     testCARootsPath,
+			CARootsData:     testCARootsData,
+			SubjectEmail:    testSubjectEmail,
+			SubjectHostname: testSubjectHostname,
+		},
+		{ // Both CAIntermediatesPath and CAIntermediatesData specified
+			CARootsPath:         testCARootsPath,
+			CAIntermediatesPath: testCAIntermediatesPath,
+			CAIntermediatesData: testCAIntermediatesData,
+			SubjectEmail:        testSubjectEmail,
+			SubjectHostname:     testSubjectHostname,
+		},
+		{ // Invalid CARootsPath
+			CARootsPath:  "fixtures/image.signature",
+			SubjectEmail: testSubjectEmail,
+		},
+		{ // Invalid CAIntermediatesPath
+			CARootsPath:         testCARootsPath,
+			CAIntermediatesPath: "fixtures/image.signature",
+			SubjectEmail:        testSubjectEmail,
+		},
+		{ // Unusable CARootsPath
+			CARootsPath:  "fixtures/this/does/not/exist",
+			SubjectEmail: testSubjectEmail,
+		},
+		{ // Unusable CAIntermediatesPath
+			CARootsPath:         testCARootsPath,
+			CAIntermediatesPath: "fixtures/this/does/not/exist",
+			SubjectEmail:        testSubjectEmail,
+		},
+		{ // Invalid CARootsData
+			CARootsData:  []byte("invalid"),
+			SubjectEmail: testSubjectEmail,
+		},
+		{ // Invalid CAIntermediatesData
+			CARootsData:         testCARootsData,
+			CAIntermediatesData: []byte("invalid"),
+			SubjectEmail:        testSubjectEmail,
+		},
+		{ // Neither SubjectEmail nor SubjectHostname specified
+			CARootsPath:         testCARootsPath,
+			CAIntermediatesPath: testCAIntermediatesPath,
+		},
+	} {
+		_, err := pki.prepareTrustRoot()
+		assert.Error(t, err)
+	}
+}
+
 func TestPRSigstoreSignedPrepareTrustRoot(t *testing.T) {
 	const testKeyPath = "fixtures/cosign.pub"
 	const testKeyPath2 = "fixtures/cosign2.pub"
@@ -102,6 +242,13 @@ func TestPRSigstoreSignedPrepareTrustRoot(t *testing.T) {
 	require.NoError(t, err)
 	const testRekorPublicKeyPath = "fixtures/rekor.pub"
 	testRekorPublicKeyData, err := os.ReadFile(testRekorPublicKeyPath)
+	require.NoError(t, err)
+	testPKI, err := NewPRSigstoreSignedPKI(
+		PRSigstoreSignedPKIWithCARootsPath("fixtures/pki_root_crts.pem"),
+		PRSigstoreSignedPKIWithCAIntermediatesPath("fixtures/pki_intermediate_crts.pem"),
+		PRSigstoreSignedPKIWithSubjectEmail("qiwan@redhat.com"),
+		PRSigstoreSignedPKIWithSubjectHostname("myhost.example.com"),
+	)
 	require.NoError(t, err)
 	testIdentity := newPRMMatchRepoDigestOrExact()
 	testIdentityOption := PRSigstoreSignedWithSignedIdentity(testIdentity)
@@ -124,6 +271,7 @@ func TestPRSigstoreSignedPrepareTrustRoot(t *testing.T) {
 		assert.Len(t, res.publicKeys, c.numKeys)
 		assert.Nil(t, res.fulcio)
 		assert.Nil(t, res.rekorPublicKeys)
+		assert.Nil(t, res.pki)
 	}
 	// Success with Fulcio
 	pr, err := newPRSigstoreSigned(
@@ -136,6 +284,7 @@ func TestPRSigstoreSignedPrepareTrustRoot(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, res.publicKeys)
 	assert.NotNil(t, res.fulcio)
+	assert.Nil(t, res.pki)
 	assert.Len(t, res.rekorPublicKeys, 1)
 	// Success with Rekor public key
 	for _, keyOption := range []PRSigstoreSignedOption{
@@ -159,9 +308,22 @@ func TestPRSigstoreSignedPrepareTrustRoot(t *testing.T) {
 			require.NoError(t, err)
 			assert.NotNil(t, res.publicKeys)
 			assert.Nil(t, res.fulcio)
+			assert.Nil(t, res.pki)
 			assert.Len(t, res.rekorPublicKeys, rekor.numKeys)
 		}
 	}
+	// Success with PKI
+	pr, err = newPRSigstoreSigned(
+		PRSigstoreSignedWithPKI(testPKI),
+		testIdentityOption,
+	)
+	require.NoError(t, err)
+	res, err = pr.prepareTrustRoot()
+	require.NoError(t, err)
+	assert.Nil(t, res.publicKeys)
+	assert.Nil(t, res.fulcio)
+	assert.Nil(t, res.rekorPublicKeys)
+	assert.NotNil(t, res.pki)
 
 	// Failure
 	for _, pr := range []prSigstoreSigned{ // Use a prSigstoreSigned because these configurations should be rejected by NewPRSigstoreSigned.
@@ -292,6 +454,10 @@ func TestPRSigstoreSignedPrepareTrustRoot(t *testing.T) {
 			RekorPublicKeyPath: "fixtures/some-rsa-key.pub",
 			SignedIdentity:     testIdentity,
 		},
+		{ // Invalid PKI configuration
+			PKI:            &prSigstoreSignedPKI{},
+			SignedIdentity: testIdentity,
+		},
 	} {
 		_, err = pr.prepareTrustRoot()
 		assert.Error(t, err)
@@ -361,6 +527,8 @@ func TestPRrSigstoreSignedIsSignatureAccepted(t *testing.T) {
 	testKeyRekorImageSig := sigstoreSignatureFromFile(t, "fixtures/dir-img-cosign-key-rekor-valid/signature-1")
 	testFulcioRekorImage := dirImageMock(t, "fixtures/dir-img-cosign-fulcio-rekor-valid", "192.168.64.2:5000/cosign-signed/fulcio-rekor-1")
 	testFulcioRekorImageSig := sigstoreSignatureFromFile(t, "fixtures/dir-img-cosign-fulcio-rekor-valid/signature-1")
+	testPKIImage := dirImageMock(t, "fixtures/dir-img-cosign-pki-valid", "localhost:5000/test")
+	testPKIImageSig := sigstoreSignatureFromFile(t, "fixtures/dir-img-cosign-pki-valid/signature-1")
 	keyData, err := os.ReadFile("fixtures/cosign.pub")
 	require.NoError(t, err)
 	keyData2, err := os.ReadFile("fixtures/cosign2.pub")
@@ -387,7 +555,7 @@ func TestPRrSigstoreSignedIsSignatureAccepted(t *testing.T) {
 		signature.SigstoreFromComponents(testKeyImageSig.UntrustedMIMEType(), testKeyImageSig.UntrustedPayload(), nil))
 	assertRejected(sar, err)
 
-	// Neither a public key nor Fulcio is specified
+	// None of the public key, Fulcio, or PKI is specified
 	pr = &prSigstoreSigned{
 		SignedIdentity: prm,
 	}
@@ -406,6 +574,32 @@ func TestPRrSigstoreSignedIsSignatureAccepted(t *testing.T) {
 		KeyPath:        "fixtures/cosign.pub",
 		Fulcio:         fulcio,
 		SignedIdentity: prm,
+	}
+	// Pass a nil pointer to, kind of, test that the return value does not depend on the image.
+	sar, err = pr.isSignatureAccepted(context.Background(), nil, testKeyImageSig)
+	assertRejected(sar, err)
+
+	// Both Fulcio and PKI is specified
+	pki, err := NewPRSigstoreSignedPKI(
+		PRSigstoreSignedPKIWithCARootsPath("fixtures/pki_root_crts.pem"),
+		PRSigstoreSignedPKIWithCAIntermediatesPath("fixtures/pki_intermediate_crts.pem"),
+		PRSigstoreSignedPKIWithSubjectEmail("qiwan@redhat.com"),
+	)
+	require.NoError(t, err)
+	pr = &prSigstoreSigned{
+		Fulcio:         fulcio,
+		PKI:            pki,
+		SignedIdentity: prm,
+	}
+	// Pass a nil pointer to, kind of, test that the return value does not depend on the image.
+	sar, err = pr.isSignatureAccepted(context.Background(), nil, testKeyImageSig)
+	assertRejected(sar, err)
+
+	// Both PKI and Rekor public key is specified
+	pr = &prSigstoreSigned{
+		PKI:                pki,
+		RekorPublicKeyPath: "fixtures/rekor.pub",
+		SignedIdentity:     prm,
 	}
 	// Pass a nil pointer to, kind of, test that the return value does not depend on the image.
 	sar, err = pr.isSignatureAccepted(context.Background(), nil, testKeyImageSig)
@@ -532,7 +726,7 @@ func TestPRrSigstoreSignedIsSignatureAccepted(t *testing.T) {
 		sigstoreSignatureWithoutAnnotation(t, testFulcioRekorImageSig, signature.SigstoreIntermediateCertificateChainAnnotationKey))
 	assertRejected(sar, err)
 	// … but a signature without the intermediate annotation is fine if the issuer is directly trusted
-	// (which we handle by trusing the intermediates)
+	// (which we handle by trusting the intermediates)
 	fulcio2, err := NewPRSigstoreSignedFulcio(
 		PRSigstoreSignedFulcioWithCAData([]byte(testFulcioRekorImageSig.UntrustedAnnotations()[signature.SigstoreIntermediateCertificateChainAnnotationKey])),
 		PRSigstoreSignedFulcioWithOIDCIssuer("https://github.com/login/oauth"),
@@ -586,6 +780,46 @@ func TestPRrSigstoreSignedIsSignatureAccepted(t *testing.T) {
 	require.NoError(t, err)
 	// Pass a nil pointer to, kind of, test that the return value does not depend on the image.
 	sar, err = pr2.isSignatureAccepted(context.Background(), nil, testFulcioRekorImageSig)
+	assertRejected(sar, err)
+
+	// Successful PKI certificate use
+	pki, err = NewPRSigstoreSignedPKI(
+		PRSigstoreSignedPKIWithCARootsPath("fixtures/pki_root_crts.pem"),
+		PRSigstoreSignedPKIWithCAIntermediatesPath("fixtures/pki_intermediate_crts.pem"),
+		PRSigstoreSignedPKIWithSubjectEmail("qiwan@redhat.com"),
+		PRSigstoreSignedPKIWithSubjectHostname("myhost.example.com"),
+	)
+	require.NoError(t, err)
+	pr, err = newPRSigstoreSigned(
+		PRSigstoreSignedWithPKI(pki),
+		PRSigstoreSignedWithSignedIdentity(prm),
+	)
+	require.NoError(t, err)
+	sar, err = pr.isSignatureAccepted(context.Background(), testPKIImage, testPKIImageSig)
+	assertAccepted(sar, err)
+	// PKI, missing certificate annotation causes the Cosign-issued signature to be rejected
+	sar, err = pr.isSignatureAccepted(context.Background(), nil,
+		sigstoreSignatureWithoutAnnotation(t, testPKIImageSig, signature.SigstoreCertificateAnnotationKey))
+	assertRejected(sar, err)
+	// PKI, missing certificate chain annotation is fine if the issuer is directly trusted
+	sar, err = pr.isSignatureAccepted(context.Background(), testPKIImage,
+		sigstoreSignatureWithoutAnnotation(t, testPKIImageSig, signature.SigstoreIntermediateCertificateChainAnnotationKey))
+	assertAccepted(sar, err)
+
+	// PKI, missing certificate chain annotation causes the Cosign-issued signature to be rejected
+	pki2, err := NewPRSigstoreSignedPKI(
+		PRSigstoreSignedPKIWithCARootsPath("fixtures/pki_root_crts.pem"),
+		PRSigstoreSignedPKIWithSubjectEmail("qiwan@redhat.com"),
+		PRSigstoreSignedPKIWithSubjectHostname("myhost.example.com"),
+	)
+	require.NoError(t, err)
+	pr2, err = newPRSigstoreSigned(
+		PRSigstoreSignedWithPKI(pki2),
+		PRSigstoreSignedWithSignedIdentity(prm),
+	)
+	require.NoError(t, err)
+	sar, err = pr2.isSignatureAccepted(context.Background(), nil,
+		sigstoreSignatureWithoutAnnotation(t, testPKIImageSig, signature.SigstoreIntermediateCertificateChainAnnotationKey))
 	assertRejected(sar, err)
 
 	// Successful validation, with KeyPath/KeyPaths/KeyData/KeyDatas
