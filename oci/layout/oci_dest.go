@@ -18,10 +18,12 @@ import (
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/types"
+	reflinkCopy "github.com/containers/storage/drivers/copy"
 	"github.com/containers/storage/pkg/fileutils"
 	digest "github.com/opencontainers/go-digest"
 	imgspec "github.com/opencontainers/image-spec/specs-go"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
 )
 
 type ociImageDestination struct {
@@ -162,7 +164,7 @@ func (d *ociImageDestination) PutBlobWithOptions(ctx context.Context, stream io.
 		return private.UploadedBlob{}, err
 	}
 
-	// need to explicitly close the file, since a rename won't otherwise not work on Windows
+	// need to explicitly close the file, since a rename won't otherwise work on Windows
 	blobFile.Close()
 	explicitClosed = true
 	if err := os.Rename(blobFile.Name(), blobPath); err != nil {
@@ -300,6 +302,102 @@ func (d *ociImageDestination) CommitWithOptions(ctx context.Context, options pri
 		return err
 	}
 	return os.WriteFile(d.ref.indexPath(), indexJSON, 0644)
+}
+
+// tryReflinkLocalFile attempts to reflink the specified file and digest it.
+// If relinking does not work, reset to doing a verbatim copy of the file.
+func tryReflinkLocalFile(dest *ociImageDestination, file string) (private.UploadedBlob, bool, error) {
+	fInfo, err := os.Stat(file)
+	if err != nil {
+		return private.UploadedBlob{}, false, err
+	}
+
+	blobFile, err := os.CreateTemp(dest.ref.dir, "oci-put-blob")
+	if err != nil {
+		return private.UploadedBlob{}, false, err
+	}
+	blobName := blobFile.Name()
+
+	copyRange := false
+	copyClone := true
+	err = reflinkCopy.CopyRegularToFile(file, blobFile, fInfo, &copyRange, &copyClone)
+	if err != nil {
+		return private.UploadedBlob{}, false, err
+	}
+
+	_, err = blobFile.Seek(0, 0)
+	if err != nil {
+		return private.UploadedBlob{}, false, err
+	}
+
+	blobFile, err = os.Open(blobName)
+	if err != nil {
+		return private.UploadedBlob{}, false, err
+	}
+	blobDigest, err := digest.FromReader(blobFile)
+	if err != nil {
+		blobFile.Close()
+		return private.UploadedBlob{}, false, err
+	}
+	blobPath, err := dest.ref.blobPath(blobDigest, dest.sharedBlobDir)
+	if err != nil {
+		return private.UploadedBlob{}, false, err
+	}
+	if err := ensureParentDirectoryExists(blobPath); err != nil {
+		return private.UploadedBlob{}, false, err
+	}
+
+	// need to explicitly close the file, since a rename won't otherwise work on Windows
+	blobFile.Close()
+	if err := os.Rename(blobName, blobPath); err != nil {
+		return private.UploadedBlob{}, false, err
+	}
+
+	fileInfo, err := os.Stat(blobPath)
+	if err != nil {
+		return private.UploadedBlob{}, false, err
+	}
+	return private.UploadedBlob{Digest: blobDigest, Size: fileInfo.Size()}, false, nil
+}
+
+// PutBlobFromLocalFileOptions is unused but may receive functionality in the future.
+type PutBlobFromLocalFileOptions struct{}
+
+// PutBlobFromLocalFile arranges the data from path to be used as blob with digest.
+// It computes, and returns, the digest and size of the used file.
+//
+// This function can be used instead of dest.PutBlob() where the ImageDestination requires PutBlob() to be called.
+func PutBlobFromLocalFile(ctx context.Context, dest types.ImageDestination, file string, options *PutBlobFromLocalFileOptions) (digest.Digest, int64, error) {
+	d, ok := dest.(*ociImageDestination)
+	if !ok {
+		return "", -1, errors.New("internal error: PutBlobFromLocalFile called with a non-oci: destination")
+	}
+
+	uploaded, fallback, err := tryReflinkLocalFile(d, file)
+	if err == nil {
+		return uploaded.Digest, uploaded.Size, nil
+	} else if fallback {
+		logrus.Debugf("Falling back to copying. Error trying to hardlink file: %v", err)
+	} else {
+		return "", -1, fmt.Errorf("trying to hardlink file: %w", err)
+	}
+
+	// Fallback to copying the file
+	reader, err := os.Open(file)
+	if err != nil {
+		return "", -1, fmt.Errorf("opening %q: %w", file, err)
+	}
+	defer reader.Close()
+
+	// This makes a full copy; instead, if possible, we could only digest the file and reflink (hard link?)
+	uploaded, err = d.PutBlobWithOptions(ctx, reader, types.BlobInfo{
+		Digest: "",
+		Size:   -1,
+	}, private.PutBlobOptions{})
+	if err != nil {
+		return "", -1, err
+	}
+	return uploaded.Digest, uploaded.Size, nil
 }
 
 func ensureDirectoryExists(path string) error {
