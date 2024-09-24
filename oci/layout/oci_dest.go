@@ -305,6 +305,33 @@ func (d *ociImageDestination) Commit(context.Context, types.UnparsedImage) error
 	return os.WriteFile(d.ref.indexPath(), indexJSON, 0644)
 }
 
+// PutBlobFromLocalFile arranges the data from path to be used as blob with digest.
+// It computes, and returns, the digest and size of the used file.
+//
+// This function can be used instead of dest.PutBlob() where the ImageDestination requires PutBlob() to be called.
+func PutBlobFromLocalFile(ctx context.Context, dest types.ImageDestination, file string) (digest.Digest, int64, error) {
+	d, ok := dest.(*ociImageDestination)
+	if !ok {
+		return "", -1, errors.New("internal error: PutBlobFromLocalFile called with a non-oci: destination")
+	}
+
+	reader, err := os.Open(file)
+	if err != nil {
+		return "", -1, fmt.Errorf("opening %q: %w", file, err)
+	}
+	defer reader.Close()
+
+	// This makes a full copy; instead, if possible, we could only digest the file and reflink (hard link?)
+	uploaded, err := d.PutBlobWithOptions(ctx, reader, types.BlobInfo{
+		Digest: "",
+		Size:   -1,
+	}, private.PutBlobOptions{})
+	if err != nil {
+		return "", -1, err
+	}
+	return uploaded.Digest, uploaded.Size, nil
+}
+
 func ensureDirectoryExists(path string) error {
 	if err := fileutils.Exists(path); err != nil && errors.Is(err, fs.ErrNotExist) {
 		if err := os.MkdirAll(path, 0755); err != nil {
