@@ -178,3 +178,41 @@ func putTestManifest(t *testing.T, ociRef ociReference, tmpDir string) {
 	digest := digest.FromBytes(data).Encoded()
 	assert.Contains(t, paths, filepath.Join(tmpDir, "blobs", "sha256", digest), "The OCI directory does not contain the new manifest data")
 }
+
+func TestPutblobFromLocalFile(t *testing.T) {
+	ref, _ := refToTempOCI(t, false)
+	dest, err := ref.NewImageDestination(context.Background(), nil)
+	require.NoError(t, err)
+	defer dest.Close()
+	ociDest, ok := dest.(*ociImageDestination)
+	require.True(t, ok)
+
+	for _, test := range []struct {
+		path   string
+		size   int64
+		digest string
+	}{
+		{path: "fixtures/files/a.txt", size: 31, digest: "sha256:c8a3f498ce6aaa13c803fa3a6a0d5fd6b5d75be5781f98f56c0f960efcc53174"},
+		{path: "fixtures/files/b.txt", size: 25, digest: "sha256:8c1e9b03116b95e6dfac68c588190d56bfc82b9cc550ada726e882e138a3b93b"},
+		{path: "fixtures/files/b.txt", size: 25, digest: "sha256:8c1e9b03116b95e6dfac68c588190d56bfc82b9cc550ada726e882e138a3b93b"}, // Must not fail
+	} {
+		digest, size, err := PutBlobFromLocalFile(context.Background(), dest, test.path)
+		require.NoError(t, err)
+		require.Equal(t, test.size, size)
+		require.Equal(t, test.digest, digest.String())
+
+		blobPath, err := ociDest.ref.blobPath(digest, ociDest.sharedBlobDir)
+		require.NoError(t, err)
+		require.FileExists(t, blobPath)
+
+		expectedContent, err := os.ReadFile(test.path)
+		require.NoError(t, err)
+		require.NotEmpty(t, expectedContent)
+		blobContent, err := os.ReadFile(blobPath)
+		require.NoError(t, err)
+		require.Equal(t, expectedContent, blobContent)
+	}
+
+	err = ociDest.CommitWithOptions(context.Background(), private.CommitOptions{})
+	require.NoError(t, err)
+}
