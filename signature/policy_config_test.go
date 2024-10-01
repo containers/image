@@ -152,35 +152,41 @@ func TestDefaultPolicyPath(t *testing.T) {
 	const rootPrefix = "/root/prefix"
 	tempHome := t.TempDir()
 	userDefaultPolicyPath := filepath.Join(tempHome, userPolicyFile)
-
+	tempsystemdefaultpath := filepath.Join(tempHome, systemDefaultPolicyPath)
 	for _, c := range []struct {
-		sys             *types.SystemContext
-		userfilePresent bool
-		expected        string
+		sys               *types.SystemContext
+		userfilePresent   bool
+		systemfilePresent bool
+		expected          string
+		expectedError     string
 	}{
 		// The common case
-		{nil, false, systemDefaultPolicyPath},
+		{nil, false, true, tempsystemdefaultpath, ""},
 		// There is a context, but it does not override the path.
-		{&types.SystemContext{}, false, systemDefaultPolicyPath},
+		{&types.SystemContext{}, false, true, tempsystemdefaultpath, ""},
 		// Path overridden
-		{&types.SystemContext{SignaturePolicyPath: nondefaultPath}, false, nondefaultPath},
+		{&types.SystemContext{SignaturePolicyPath: nondefaultPath}, false, true, nondefaultPath, ""},
 		// Root overridden
 		{
 			&types.SystemContext{RootForImplicitAbsolutePaths: rootPrefix},
 			false,
-			filepath.Join(rootPrefix, systemDefaultPolicyPath),
+			true,
+			filepath.Join(rootPrefix, tempsystemdefaultpath),
+			"",
 		},
 		// Empty context and user policy present
-		{&types.SystemContext{}, true, userDefaultPolicyPath},
+		{&types.SystemContext{}, true, true, userDefaultPolicyPath, ""},
 		// Only user policy present
-		{nil, true, userDefaultPolicyPath},
+		{nil, true, true, userDefaultPolicyPath, ""},
 		// Context signature path and user policy present
 		{
 			&types.SystemContext{
 				SignaturePolicyPath: nondefaultPath,
 			},
 			true,
+			true,
 			nondefaultPath,
+			"",
 		},
 		// Root and user policy present
 		{
@@ -188,7 +194,9 @@ func TestDefaultPolicyPath(t *testing.T) {
 				RootForImplicitAbsolutePaths: rootPrefix,
 			},
 			true,
+			true,
 			userDefaultPolicyPath,
+			"",
 		},
 		// Context and user policy file preset simultaneously
 		{
@@ -197,7 +205,9 @@ func TestDefaultPolicyPath(t *testing.T) {
 				SignaturePolicyPath:          nondefaultPath,
 			},
 			true,
+			true,
 			nondefaultPath,
+			"",
 		},
 		// Root and path overrides present simultaneously,
 		{
@@ -206,22 +216,41 @@ func TestDefaultPolicyPath(t *testing.T) {
 				SignaturePolicyPath:          nondefaultPath,
 			},
 			false,
+			true,
 			nondefaultPath,
+			"",
 		},
 		// No environment expansion happens in the overridden paths
-		{&types.SystemContext{SignaturePolicyPath: variableReference}, false, variableReference},
+		{&types.SystemContext{SignaturePolicyPath: variableReference}, false, true, variableReference, ""},
+		// No policy.json file is present in userfilePath and systemfilePath
+		{nil, false, false, "", fmt.Sprintf("no policy.json file found at any of the following: %q, %q", userDefaultPolicyPath, tempsystemdefaultpath)},
 	} {
-		if c.userfilePresent {
-			err := os.MkdirAll(filepath.Dir(userDefaultPolicyPath), os.ModePerm)
-			require.NoError(t, err)
-			f, err := os.Create(userDefaultPolicyPath)
-			require.NoError(t, err)
-			f.Close()
-		} else {
-			os.Remove(userDefaultPolicyPath)
+		paths := []struct {
+			condition bool
+			path      string
+		}{
+			{c.userfilePresent, userDefaultPolicyPath},
+			{c.systemfilePresent, tempsystemdefaultpath},
 		}
-		path := defaultPolicyPathWithHomeDir(c.sys, tempHome)
-		assert.Equal(t, c.expected, path)
+		for _, p := range paths {
+			if p.condition {
+				err := os.MkdirAll(filepath.Dir(p.path), os.ModePerm)
+				require.NoError(t, err)
+				f, err := os.Create(p.path)
+				require.NoError(t, err)
+				f.Close()
+			} else {
+				os.Remove(p.path)
+			}
+		}
+		path, err := defaultPolicyPathWithHomeDir(c.sys, tempHome, tempsystemdefaultpath)
+		if c.expectedError != "" {
+			assert.Empty(t, path)
+			assert.EqualError(t, err, c.expectedError)
+		} else {
+			require.NoError(t, err)
+			assert.Equal(t, c.expected, path)
+		}
 	}
 }
 
