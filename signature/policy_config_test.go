@@ -165,7 +165,7 @@ func TestDefaultPolicyPath(t *testing.T) {
 		// There is a context, but it does not override the path.
 		{&types.SystemContext{}, false, true, tempsystemdefaultpath, ""},
 		// Path overridden
-		{&types.SystemContext{SignaturePolicyPath: nondefaultPath}, false, false, nondefaultPath, ""},
+		{&types.SystemContext{SignaturePolicyPath: nondefaultPath}, false, true, nondefaultPath, ""},
 		// Root overridden
 		{
 			&types.SystemContext{RootForImplicitAbsolutePaths: rootPrefix},
