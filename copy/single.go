@@ -124,9 +124,6 @@ func (c *copier) copySingleImage(ctx context.Context, unparsedImage *image.Unpar
 	// If we can, set to the empty string. If we can't, set to the reason why.
 	// Compare, and perhaps keep in sync with, the version in copyMultipleImages.
 	cannotModifyManifestReason := ""
-	if len(sigs) > 0 {
-		cannotModifyManifestReason = "Would invalidate signatures"
-	}
 	if destIsDigestedReference {
 		cannotModifyManifestReason = "Destination specifies a digest"
 	}

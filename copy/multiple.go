@@ -197,9 +197,6 @@ func (c *copier) copyMultipleImages(ctx context.Context) (copiedManifest []byte,
 	// If we can, set to the empty string. If we can't, set to the reason why.
 	// Compare, and perhaps keep in sync with, the version in copySingleImage.
 	cannotModifyManifestListReason := ""
-	if len(sigs) > 0 {
-		cannotModifyManifestListReason = "Would invalidate signatures"
-	}
 	if destIsDigestedReference {
 		cannotModifyManifestListReason = "Destination specifies a digest"
 	}
