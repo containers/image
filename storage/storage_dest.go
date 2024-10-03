@@ -314,12 +314,19 @@ func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.Read
 // Even if SupportsPutBlobPartial() returns true, the call can fail.
 // If the call fails with ErrFallbackToOrdinaryLayerDownload, the caller can fall back to PutBlobWithOptions.
 // The fallback _must not_ be done otherwise.
-func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, options private.PutBlobPartialOptions) (private.UploadedBlob, error) {
+func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, options private.PutBlobPartialOptions) (_ private.UploadedBlob, retErr error) {
 	fetcher := zstdFetcher{
 		chunkAccessor: chunkAccessor,
 		ctx:           ctx,
 		blobInfo:      srcInfo,
 	}
+
+	defer func() {
+		var perr chunked.ErrFallbackToOrdinaryLayerDownload
+		if errors.As(retErr, &perr) {
+			retErr = private.NewErrFallbackToOrdinaryLayerDownload(retErr)
+		}
+	}()
 
 	differ, err := chunked.GetDiffer(ctx, s.imageRef.transport.store, srcInfo.Digest, srcInfo.Size, srcInfo.Annotations, &fetcher)
 	if err != nil {
