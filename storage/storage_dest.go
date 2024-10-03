@@ -311,8 +311,9 @@ func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.Read
 // PutBlobPartial attempts to create a blob using the data that is already present
 // at the destination. chunkAccessor is accessed in a non-sequential way to retrieve the missing chunks.
 // It is available only if SupportsPutBlobPartial().
-// Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
-// should fall back to PutBlobWithOptions.
+// Even if SupportsPutBlobPartial() returns true, the call can fail.
+// If the call fails with ErrFallbackToOrdinaryLayerDownload, the caller can fall back to PutBlobWithOptions.
+// The fallback _must not_ be done otherwise.
 func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, options private.PutBlobPartialOptions) (private.UploadedBlob, error) {
 	fetcher := zstdFetcher{
 		chunkAccessor: chunkAccessor,
