@@ -2,6 +2,7 @@
     "extra-string-field": "string",
     "extra-object": {"foo":"bar"},
     "architecture": "amd64",
+    "comment": "test comment",
     "config": {
         "Hostname": "383850eeb47b",
         "Domainname": "",
