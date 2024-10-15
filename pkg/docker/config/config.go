@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/rootless"
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/homedir"
@@ -56,7 +57,7 @@ var (
 type authPath struct {
 	path         string
 	legacyFormat bool
-	// requireUserOnly will cause the file to be ignored if it is readable by group or other
+	// requireUserOnly will cause a fatal error if the file is readable by group or other
 	requireUserOnly bool
 }
 
@@ -221,7 +222,7 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 // by tests.
 func getAuthFilePaths(sys *types.SystemContext, homeDir string) []authPath {
 	runningInSystemd := os.Getenv("INVOCATION_ID") != ""
-	runningAsRoot := os.Getuid() == 0
+	runningAsRoot := rootless.GetRootlessEUID() == 0
 	runningSystemdPrivileged := runningInSystemd && runningAsRoot
 
 	paths := []authPath{}
@@ -548,7 +549,7 @@ func getPathToAuthWithOS(sys *types.SystemContext, goOS string) (authPath, error
 			return authPath{path: sys.LegacyFormatAuthFilePath, legacyFormat: true}, nil
 		}
 		if sys.RootForImplicitAbsolutePaths != "" {
-			return newAuthPathDefault(filepath.Join(sys.RootForImplicitAbsolutePaths, fmt.Sprintf(defaultPerUIDPathFormat, os.Getuid()))), nil
+			return newAuthPathDefault(filepath.Join(sys.RootForImplicitAbsolutePaths, fmt.Sprintf(defaultPerUIDPathFormat, rootless.GetRootlessEUID()))), nil
 		}
 	}
 	if goOS == "windows" || goOS == "darwin" {
@@ -568,7 +569,7 @@ func getPathToAuthWithOS(sys *types.SystemContext, goOS string) (authPath, error
 		} // else ignore err and let the caller fail accessing xdgRuntimeDirPath.
 		return newAuthPathDefault(filepath.Join(runtimeDir, xdgRuntimeDirPath)), nil
 	}
-	return newAuthPathDefault(fmt.Sprintf(defaultPerUIDPathFormat, os.Getuid())), nil
+	return newAuthPathDefault(fmt.Sprintf(defaultPerUIDPathFormat, rootless.GetRootlessEUID())), nil
 }
 
 // parse unmarshals the authentications stored in the auth.json file and returns it
@@ -592,7 +593,7 @@ func (path authPath) parse() (dockerConfigFile, error) {
 			return dockerConfigFile{}, fmt.Errorf("stat %s: %w", path.path, err)
 		}
 		perms := st.Mode().Perm()
-		if (perms & 044) > 0 {
+		if (perms & 044) != 0 {
 			return dockerConfigFile{}, fmt.Errorf("refusing to process %s with group or world read permissions", path.path)
 		}
 	}

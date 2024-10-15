@@ -15,7 +15,7 @@ When running as a user and searching for the credential for a registry, the foll
 first reading the primary (read/write) file, or the explicit override using an option of the calling application.
 If credentials are not present, search in `${XDG_CONFIG_HOME}/containers/auth.json` (usually `~/.config/containers/auth.json`), `$HOME/.docker/config.json`, `$HOME/.dockercfg`.
 
-If the current process is not running in systemd, but is running as root, the system global path will be read last.
+If the current process is not running in systemd, but is running as root, the system-global `/etc/containers/auth.json` path will be read last.
 
 Except the primary (read/write) file, other files are read-only, unless the user use an option of the calling application explicitly points at it as an override.
 
