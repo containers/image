@@ -26,7 +26,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.0
-	github.com/opencontainers/selinux v1.11.0
+	github.com/opencontainers/selinux v1.11.1
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f
 	github.com/proglottis/gpgme v0.1.3
 	github.com/secure-systems-lab/go-securesystemslib v0.8.0
