@@ -32,6 +32,27 @@ const (
 	DockerV2Schema2ForeignLayerMediaType = "application/vnd.docker.image.rootfs.foreign.diff.tar"
 	// DockerV2Schema2ForeignLayerMediaType is the MIME type used for gzipped schema 2 foreign layers.
 	DockerV2Schema2ForeignLayerMediaTypeGzip = "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip"
+
+	// OllamaImageLayerMediaTypePrefix is the prefix for Ollama image layer media types.
+	OllamaImageLayerMediaTypePrefix = "application/vnd.ollama.image."
+	// OllamaImageLayerMediaType is the media type used for Ollama image model layers.
+	OllamaImageModelLayerMediaType = OllamaImageLayerMediaTypePrefix + "model"
+	// OllamaImageAdapterLayerMediaType is the media type used for Ollama image adapter layers.
+	OllamaImageAdapterLayerMediaType = OllamaImageLayerMediaTypePrefix + "adapter"
+	// OllamaImageProjectorLayerMediaType is the media type used for Ollama image projector layers.
+	OllamaImageProjectorLayerMediaType = OllamaImageLayerMediaTypePrefix + "projector"
+	// OllamaImagePromptLayerMediaType is the media type used for Ollama image prompt layers.
+	OllamaImagePromptLayerMediaType = OllamaImageLayerMediaTypePrefix + "prompt"
+	// OllamaImageTemplateLayerMediaType is the media type used for Ollama image template layers.
+	OllamaImageTemplateLayerMediaType = OllamaImageLayerMediaTypePrefix + "template"
+	// OllamaImageSystemLayerMediaType is the media type used for Ollama image system layers.
+	OllamaImageSystemLayerMediaType = OllamaImageLayerMediaTypePrefix + "system"
+	// OllamaImageParamsLayerMediaType is the media type used for Ollama image params layers.
+	OllamaImageParamsLayerMediaType = OllamaImageLayerMediaTypePrefix + "params"
+	// OllamaImageMessagesLayerMediaType is the media type used for Ollama image messages layers.
+	OllamaImageMessagesLayerMediaType = OllamaImageLayerMediaTypePrefix + "messages"
+	// OllamaImageLicenseLayerMediaType is the media type used for Ollama image license layers.
+	OllamaImageLicenseLayerMediaType = OllamaImageLayerMediaTypePrefix + "license"
 )
 
 // GuessMIMEType guesses MIME type of a manifest and returns it _if it is recognized_, or "" if unknown or unrecognized.
