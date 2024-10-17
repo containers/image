@@ -335,6 +335,11 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 
 	out, err := s.imageRef.transport.store.PrepareStagedLayer(nil, differ)
 	if err != nil {
+		// Special-case the error message
+		var perr chunked.ErrFallbackToOrdinaryLayerDownload
+		if errors.Is(err, storage.ErrNotSupported) && !errors.As(err, &perr) {
+			err = fmt.Errorf("partial layer pull is not supported by the graph driver, and fallback is not allowed: %w", err)
+		}
 		return private.UploadedBlob{}, err
 	}
 	succeeded := false
