@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/containers/image/v5/docker/reference"
@@ -38,7 +39,10 @@ type dockerConfigFile struct {
 }
 
 // systemPath is the global auth path preferred for systemd services.
+// systemDir is the global auth directory with drop-ins preferred for systemd services.
+// These paths are also considered when the process is running as root ( not in systemd).
 var systemPath = authPath{path: filepath.FromSlash("/etc/containers/auth.json"), legacyFormat: false, requireUserOnly: true}
+var systemDir = filepath.FromSlash("/etc/containers/auth.d")
 var (
 	defaultPerUIDPathFormat = filepath.FromSlash("/run/containers/%d/auth.json")
 	xdgConfigHomePath       = filepath.FromSlash("containers/auth.json")
@@ -156,11 +160,41 @@ func getAuthFilePaths(sys *types.SystemContext, homeDir string) []authPath {
 	paths := []authPath{}
 	pathToAuth, userSpecifiedPath, err := getPathToAuth(sys)
 
-	// If we're in systemd, prefer the global auth path first.
+	// If we're in systemd, prefer the global auth with drop-ins first.
 	insertedGlobalPath := false
 	if !userSpecifiedPath && runningSystemdPrivileged {
+		// append global system path
 		paths = append(paths, systemPath)
 		insertedGlobalPath = true
+		_, err := os.Stat(systemDir)
+		if err != nil {
+			filepath.WalkDir(systemDir,
+				// WalkFunc to read additional configs
+				func(path string, d fs.DirEntry, err error) error {
+					switch {
+					case err != nil:
+						// return error (could be a permission problem)
+						return err
+					case d.IsDir():
+						if path != systemDir {
+							// make sure to not recurse into sub-directories
+							return filepath.SkipDir
+						}
+						// ignore directories
+						return nil
+					default:
+						// only add *.conf files
+						if strings.HasSuffix(path, ".json") {
+							systemDropinPath := authPath{path: filepath.FromSlash(path), legacyFormat: false, requireUserOnly: true}
+							paths = append(paths, systemDropinPath)
+						}
+						return nil
+					}
+				},
+			)
+			// reverse the order so latest appended file from drop-ins has precedence
+			slices.Reverse(paths)
+		}
 	}
 
 
@@ -192,7 +226,38 @@ func getAuthFilePaths(sys *types.SystemContext, homeDir string) []authPath {
 		// This will ensure the same semantics for code executed as systemd units and run
 		// from an interactive shell (as root) as long as there's no user-root owned configs.
 		if !insertedGlobalPath && runningAsRoot {
-			paths = append(paths, systemPath)
+			rootpaths := []authPath{}
+			rootpaths = append(rootpaths, systemPath)
+			_, err := os.Stat(systemDir)
+			if err != nil {
+				filepath.WalkDir(systemDir,
+					// WalkFunc to read additional configs
+					func(path string, d fs.DirEntry, err error) error {
+						switch {
+						case err != nil:
+							// return error (could be a permission problem)
+							return err
+						case d.IsDir():
+							if path != systemDir {
+								// make sure to not recurse into sub-directories
+								return filepath.SkipDir
+							}
+							// ignore directories
+							return nil
+						default:
+							// only add *.conf files
+							if strings.HasSuffix(path, ".json") {
+								systemDropinPath := authPath{path: filepath.FromSlash(path), legacyFormat: false, requireUserOnly: true}
+								rootpaths = append(rootpaths, systemDropinPath)
+							}
+							return nil
+						}
+					},
+				)
+				// reverse the order so latest appended file from drop-ins has precedence
+				slices.Reverse(rootpaths)
+			}
+			paths = append(paths, rootpaths...)
 		}
 	}
 	return paths
