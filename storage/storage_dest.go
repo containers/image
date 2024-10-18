@@ -1190,10 +1190,10 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 
 	// If one of those blobs was a configuration blob, then we can try to dig out the date when the image
 	// was originally created, in case we're just copying it.  If not, no harm done.
-	options := &storage.ImageOptions{}
+	imgOptions := &storage.ImageOptions{}
 	if inspect, err := man.Inspect(s.getConfigBlob); err == nil && inspect.Created != nil {
 		logrus.Debugf("setting image creation date to %s", inspect.Created)
-		options.CreationDate = *inspect.Created
+		imgOptions.CreationDate = *inspect.Created
 	}
 
 	// Set up to save the non-layer blobs as data items.  Since we only share layers, they should all be in files, so
@@ -1210,7 +1210,7 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		if err != nil {
 			return fmt.Errorf("copying non-layer blob %q to image: %w", blob, err)
 		}
-		options.BigData = append(options.BigData, storage.ImageBigDataOption{
+		imgOptions.BigData = append(imgOptions.BigData, storage.ImageBigDataOption{
 			Key:    blob.String(),
 			Data:   v,
 			Digest: digest.Canonical.FromBytes(v),
@@ -1227,7 +1227,7 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		if err != nil {
 			return err
 		}
-		options.BigData = append(options.BigData, storage.ImageBigDataOption{
+		imgOptions.BigData = append(imgOptions.BigData, storage.ImageBigDataOption{
 			Key:    key,
 			Data:   toplevelManifest,
 			Digest: manifestDigest,
@@ -1240,19 +1240,19 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 	if err != nil {
 		return err
 	}
-	options.BigData = append(options.BigData, storage.ImageBigDataOption{
+	imgOptions.BigData = append(imgOptions.BigData, storage.ImageBigDataOption{
 		Key:    key,
 		Data:   s.manifest,
 		Digest: s.manifestDigest,
 	})
-	options.BigData = append(options.BigData, storage.ImageBigDataOption{
+	imgOptions.BigData = append(imgOptions.BigData, storage.ImageBigDataOption{
 		Key:    storage.ImageDigestBigDataKey,
 		Data:   s.manifest,
 		Digest: s.manifestDigest,
 	})
 	// Set up to save the signatures, if we have any.
 	if len(s.signatures) > 0 {
-		options.BigData = append(options.BigData, storage.ImageBigDataOption{
+		imgOptions.BigData = append(imgOptions.BigData, storage.ImageBigDataOption{
 			Key:    "signatures",
 			Data:   s.signatures,
 			Digest: digest.Canonical.FromBytes(s.signatures),
@@ -1263,7 +1263,7 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		if err != nil {
 			return err
 		}
-		options.BigData = append(options.BigData, storage.ImageBigDataOption{
+		imgOptions.BigData = append(imgOptions.BigData, storage.ImageBigDataOption{
 			Key:    key,
 			Data:   signatures,
 			Digest: digest.Canonical.FromBytes(signatures),
@@ -1276,7 +1276,7 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		return fmt.Errorf("encoding metadata for image: %w", err)
 	}
 	if len(metadata) != 0 {
-		options.Metadata = string(metadata)
+		imgOptions.Metadata = string(metadata)
 	}
 
 	// Create the image record, pointing to the most-recently added layer.
@@ -1288,7 +1288,7 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		}
 	}
 	oldNames := []string{}
-	img, err := s.imageRef.transport.store.CreateImage(intendedID, nil, lastLayer, "", options)
+	img, err := s.imageRef.transport.store.CreateImage(intendedID, nil, lastLayer, "", imgOptions)
 	if err != nil {
 		if !errors.Is(err, storage.ErrDuplicateID) {
 			logrus.Debugf("error creating image: %q", err)
@@ -1309,21 +1309,21 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		// sizes (tracked in the metadata) which might have already
 		// been present with new values, when ideally we'd find a way
 		// to merge them since they all apply to the same image
-		for _, data := range options.BigData {
+		for _, data := range imgOptions.BigData {
 			if err := s.imageRef.transport.store.SetImageBigData(img.ID, data.Key, data.Data, manifest.Digest); err != nil {
 				logrus.Debugf("error saving big data %q for image %q: %v", data.Key, img.ID, err)
 				return fmt.Errorf("saving big data %q for image %q: %w", data.Key, img.ID, err)
 			}
 		}
-		if options.Metadata != "" {
-			if err := s.imageRef.transport.store.SetMetadata(img.ID, options.Metadata); err != nil {
+		if imgOptions.Metadata != "" {
+			if err := s.imageRef.transport.store.SetMetadata(img.ID, imgOptions.Metadata); err != nil {
 				logrus.Debugf("error saving metadata for image %q: %v", img.ID, err)
 				return fmt.Errorf("saving metadata for image %q: %w", img.ID, err)
 			}
-			logrus.Debugf("saved image metadata %q", options.Metadata)
+			logrus.Debugf("saved image metadata %q", imgOptions.Metadata)
 		}
 	} else {
-		logrus.Debugf("created new image ID %q with metadata %q", img.ID, options.Metadata)
+		logrus.Debugf("created new image ID %q with metadata %q", img.ID, imgOptions.Metadata)
 	}
 
 	// Clean up the unfinished image on any error.
