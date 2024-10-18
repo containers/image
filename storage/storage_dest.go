@@ -1124,26 +1124,23 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 	return s.untrustedDiffIDValues[layerIndex], nil
 }
 
-// Commit marks the process of storing the image as successful and asks for the image to be persisted.
-// unparsedToplevel contains data about the top-level manifest of the source (which may be a single-arch image or a manifest list
-// if PutManifest was only called for the single-arch image with instanceDigest == nil), primarily to allow lookups by the
-// original manifest list digest, if desired.
+// CommitWithOptions marks the process of storing the image as successful and asks for the image to be persisted.
 // WARNING: This does not have any transactional semantics:
-// - Uploaded data MAY be visible to others before Commit() is called
-// - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
-func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {
+// - Uploaded data MAY be visible to others before CommitWithOptions() is called
+// - Uploaded data MAY be removed or MAY remain around if Close() is called without CommitWithOptions() (i.e. rollback is allowed but not guaranteed)
+func (s *storageImageDestination) CommitWithOptions(ctx context.Context, options private.CommitOptions) error {
 	// This function is outside of the scope of HasThreadSafePutBlob, so we don’t need to hold s.lock.
 
 	if len(s.manifest) == 0 {
-		return errors.New("Internal error: storageImageDestination.Commit() called without PutManifest()")
+		return errors.New("Internal error: storageImageDestination.CommitWithOptions() called without PutManifest()")
 	}
-	toplevelManifest, _, err := unparsedToplevel.Manifest(ctx)
+	toplevelManifest, _, err := options.UnparsedToplevel.Manifest(ctx)
 	if err != nil {
 		return fmt.Errorf("retrieving top-level manifest: %w", err)
 	}
 	// If the name we're saving to includes a digest, then check that the
 	// manifests that we're about to save all either match the one from the
-	// unparsedToplevel, or match the digest in the name that we're using.
+	// options.UnparsedToplevel, or match the digest in the name that we're using.
 	if s.imageRef.named != nil {
 		if digested, ok := s.imageRef.named.(reference.Digested); ok {
 			matches, err := manifest.MatchesDigest(s.manifest, digested.Digest())
@@ -1176,14 +1173,14 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 		}, blob.Size); err != nil {
 			return err
 		} else if stopQueue {
-			return fmt.Errorf("Internal error: storageImageDestination.Commit(): commitLayer() not ready to commit for layer %q", blob.Digest)
+			return fmt.Errorf("Internal error: storageImageDestination.CommitWithOptions(): commitLayer() not ready to commit for layer %q", blob.Digest)
 		}
 	}
 	var lastLayer string
 	if len(layerBlobs) > 0 { // Zero-layer images rarely make sense, but it is technically possible, and may happen for non-image artifacts.
 		prev, ok := s.indexToStorageID[len(layerBlobs)-1]
 		if !ok {
-			return fmt.Errorf("Internal error: storageImageDestination.Commit(): previous layer %d hasn't been committed (lastLayer == nil)", len(layerBlobs)-1)
+			return fmt.Errorf("Internal error: storageImageDestination.CommitWithOptions(): previous layer %d hasn't been committed (lastLayer == nil)", len(layerBlobs)-1)
 		}
 		lastLayer = prev
 	}
@@ -1216,7 +1213,7 @@ func (s *storageImageDestination) Commit(ctx context.Context, unparsedToplevel t
 			Digest: digest.Canonical.FromBytes(v),
 		})
 	}
-	// Set up to save the unparsedToplevel's manifest if it differs from
+	// Set up to save the options.UnparsedToplevel's manifest if it differs from
 	// the per-platform one, which is saved below.
 	if len(toplevelManifest) != 0 && !bytes.Equal(toplevelManifest, s.manifest) {
 		manifestDigest, err := manifest.Digest(toplevelManifest)

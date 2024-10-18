@@ -337,7 +337,9 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		}
 	}
 
-	if err := c.dest.Commit(ctx, c.unparsedToplevel); err != nil {
+	if err := c.dest.CommitWithOptions(ctx, private.CommitOptions{
+		UnparsedToplevel: c.unparsedToplevel,
+	}); err != nil {
 		return nil, fmt.Errorf("committing the finished image: %w", err)
 	}
 
