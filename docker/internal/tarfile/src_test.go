@@ -28,7 +28,7 @@ func TestSourcePrepareLayerData(t *testing.T) {
 		ctx := context.Background()
 
 		writer := NewWriter(&tarfileBuffer)
-		dest := NewDestination(nil, writer, "transport name", nil)
+		dest := NewDestination(nil, writer, "transport name", nil, nil)
 		// No layers
 		configInfo, err := dest.PutBlob(ctx, strings.NewReader(c.config),
 			types.BlobInfo{Size: -1}, cache, true)
