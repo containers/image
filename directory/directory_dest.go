@@ -1,6 +1,7 @@
 package directory
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -15,12 +16,9 @@ import (
 	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/types"
-	"github.com/containers/storage/pkg/fileutils"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 )
-
-const version = "Directory Transport Version: 1.1\n"
 
 // ErrNotContainerImageDir indicates that the directory doesn't match the expected contents of a directory created
 // using the 'dir' transport
@@ -51,52 +49,8 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (private.Im
 		}
 	}
 
-	// If directory exists check if it is empty
-	// if not empty, check whether the contents match that of a container image directory and overwrite the contents
-	// if the contents don't match throw an error
-	dirExists, err := pathExists(ref.resolvedPath)
-	if err != nil {
-		return nil, fmt.Errorf("checking for path %q: %w", ref.resolvedPath, err)
-	}
-	if dirExists {
-		isEmpty, err := isDirEmpty(ref.resolvedPath)
-		if err != nil {
-			return nil, err
-		}
-
-		if !isEmpty {
-			versionExists, err := pathExists(ref.versionPath())
-			if err != nil {
-				return nil, fmt.Errorf("checking if path exists %q: %w", ref.versionPath(), err)
-			}
-			if versionExists {
-				contents, err := os.ReadFile(ref.versionPath())
-				if err != nil {
-					return nil, err
-				}
-				// check if contents of version file is what we expect it to be
-				if string(contents) != version {
-					return nil, ErrNotContainerImageDir
-				}
-			} else {
-				return nil, ErrNotContainerImageDir
-			}
-			// delete directory contents so that only one image is in the directory at a time
-			if err = removeDirContents(ref.resolvedPath); err != nil {
-				return nil, fmt.Errorf("erasing contents in %q: %w", ref.resolvedPath, err)
-			}
-			logrus.Debugf("overwriting existing container image directory %q", ref.resolvedPath)
-		}
-	} else {
-		// create directory if it doesn't exist
-		if err := os.MkdirAll(ref.resolvedPath, 0755); err != nil {
-			return nil, fmt.Errorf("unable to create directory %q: %w", ref.resolvedPath, err)
-		}
-	}
-	// create version file
-	err = os.WriteFile(ref.versionPath(), []byte(version), 0644)
-	if err != nil {
-		return nil, fmt.Errorf("creating version file %q: %w", ref.versionPath(), err)
+	if err := initDestDir(ref.resolvedPath); err != nil {
+		return nil, err
 	}
 
 	d := &dirImageDestination{
@@ -114,6 +68,63 @@ func newImageDestination(sys *types.SystemContext, ref dirReference) (private.Im
 	}
 	d.Compat = impl.AddCompat(d)
 	return d, nil
+}
+
+func initDestDir(dir string) error {
+	const versionContents = "Directory Transport Version: 1.1\n"
+	versionFile := filepath.Join(dir, "version")
+
+	// If dir exists, checks if it is empty.
+	// If not empty, check whether the contents match that of a container
+	// image directory and overwrite the contents.
+	// If the contents don't match, throw ErrNotContainerImageDir.
+	fd, err := os.Open(dir)
+	switch {
+	case err == nil: // Directory exists.
+		contents, err := fd.Readdirnames(-1)
+		_ = fd.Close()
+		if err != nil { // Unexpected error.
+			return fmt.Errorf("%q: %w", dir, err)
+		}
+		if len(contents) == 0 {
+			break
+		}
+		// Check if contents of version file is what we expect it to be.
+		ver, err := os.ReadFile(versionFile)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return ErrNotContainerImageDir
+			}
+			return fmt.Errorf("%q: %w", versionFile, err)
+		}
+		if !bytes.Equal(ver, []byte(versionContents)) {
+			return ErrNotContainerImageDir
+		}
+		// Indeed an image directory. Reuse by removing all the old contents
+		// (including the versionFile, which will be recreated below).
+		logrus.Debugf("overwriting existing container image directory %q", dir)
+		for _, name := range contents {
+			rm := filepath.Join(dir, name)
+			err := os.RemoveAll(rm)
+			if err != nil {
+				return fmt.Errorf("%q: %w", rm, err)
+			}
+		}
+	case errors.Is(err, os.ErrNotExist): // Directory does not exist; create it.
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("%q: %w", dir, err)
+		}
+	default:
+		// Unexpected error.
+		return fmt.Errorf("%q: %w", dir, err)
+	}
+
+	err = os.WriteFile(versionFile, []byte(versionContents), 0o644)
+	if err != nil {
+		return fmt.Errorf("%q: %w", versionFile, err)
+	}
+
+	return nil
 }
 
 // Reference returns the reference used to set up this destination.  Note that this should directly correspond to user's intent,
@@ -259,41 +270,5 @@ func (d *dirImageDestination) PutSignaturesWithFormat(ctx context.Context, signa
 // - Uploaded data MAY be visible to others before Commit() is called
 // - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
 func (d *dirImageDestination) Commit(context.Context, types.UnparsedImage) error {
-	return nil
-}
-
-// returns true if path exists
-func pathExists(path string) (bool, error) {
-	err := fileutils.Exists(path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
-}
-
-// returns true if directory is empty
-func isDirEmpty(path string) (bool, error) {
-	files, err := os.ReadDir(path)
-	if err != nil {
-		return false, err
-	}
-	return len(files) == 0, nil
-}
-
-// deletes the contents of a directory
-func removeDirContents(path string) error {
-	files, err := os.ReadDir(path)
-	if err != nil {
-		return err
-	}
-
-	for _, file := range files {
-		if err := os.RemoveAll(filepath.Join(path, file.Name())); err != nil {
-			return err
-		}
-	}
 	return nil
 }
