@@ -1343,6 +1343,13 @@ func (s *storageImageDestination) CommitWithOptions(ctx context.Context, options
 		}
 		logrus.Debugf("added name %q to image %q", name, img.ID)
 	}
+	if options.ReportResolvedReference != nil {
+		resolved, err := newReference(s.imageRef.transport, s.imageRef.named, intendedID)
+		if err != nil {
+			return fmt.Errorf("creating a resolved reference for (%s, %s): %w", s.imageRef.StringWithinTransport(), intendedID, err)
+		}
+		*options.ReportResolvedReference = resolved
+	}
 
 	commitSucceeded = true
 	return nil

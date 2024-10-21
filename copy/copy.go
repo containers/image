@@ -137,6 +137,16 @@ type Options struct {
 	// DestinationCtx.CompressionFormat is used exclusively, and blobs of other
 	// compression algorithms are not reused.
 	ForceCompressionFormat bool
+
+	// ReportResolvedReference, if set, asks the destination transport to store
+	// a “resolved” (more detailed) reference to the created image
+	// into the value this option points to.
+	// What “resolved” means is transport-specific.
+	// Most transports don’t support this, and cause the value to be set to nil.
+	//
+	// For the containers-storage: transport, the reference contains an image ID,
+	// so that storage.ResolveReference returns exactly the created image.
+	ReportResolvedReference *types.ImageReference
 }
 
 // OptionCompressionVariant allows to supply information about
@@ -337,8 +347,12 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		}
 	}
 
+	if options.ReportResolvedReference != nil {
+		*options.ReportResolvedReference = nil // The default outcome, if not specifically supported by the transport.
+	}
 	if err := c.dest.CommitWithOptions(ctx, private.CommitOptions{
-		UnparsedToplevel: c.unparsedToplevel,
+		UnparsedToplevel:        c.unparsedToplevel,
+		ReportResolvedReference: options.ReportResolvedReference,
 	}); err != nil {
 		return nil, fmt.Errorf("committing the finished image: %w", err)
 	}
