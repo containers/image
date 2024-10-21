@@ -158,6 +158,11 @@ type CommitOptions struct {
 	// if PutManifest was only called for the single-arch image with instanceDigest == nil), primarily to allow lookups by the
 	// original manifest list digest, if desired.
 	UnparsedToplevel types.UnparsedImage
+	// ReportResolvedReference, if set, asks the transport to store a “resolved” (more detailed) reference to the created image
+	// into the value this option points to.
+	// What “resolved” means is transport-specific.
+	// Transports which don’t support reporting resolved references can ignore the field; the generic copy code writes "nil" into the value.
+	ReportResolvedReference *types.ImageReference
 }
 
 // ImageSourceChunk is a portion of a blob.
