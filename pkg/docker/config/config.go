@@ -5,16 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/multierr"
 	"github.com/containers/image/v5/internal/set"
+	"github.com/containers/image/v5/internal/rootless"
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/fileutils"
@@ -35,6 +38,11 @@ type dockerConfigFile struct {
 	CredHelpers map[string]string           `json:"credHelpers,omitempty"`
 }
 
+// systemPath is the global auth path preferred for systemd services.
+// systemDir is the global auth directory with drop-ins preferred for systemd services.
+// These paths are also considered when the process is running as root ( not in systemd).
+var systemPath = authPath{path: filepath.FromSlash("/etc/containers/auth.json"), legacyFormat: false, requireUserOnly: true}
+var systemDir = filepath.FromSlash("/etc/containers/auth.d")
 var (
 	defaultPerUIDPathFormat = filepath.FromSlash("/run/containers/%d/auth.json")
 	xdgConfigHomePath       = filepath.FromSlash("containers/auth.json")
@@ -56,6 +64,8 @@ var (
 type authPath struct {
 	path         string
 	legacyFormat bool
+	// requireUserOnly will cause a fatal error if the file is readable by group or other
+	requireUserOnly bool
 }
 
 // newAuthPathDefault constructs an authPath in non-legacy format.
@@ -143,8 +153,22 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 // The homeDir parameter should always be homedir.Get(), and is only intended to be overridden
 // by tests.
 func getAuthFilePaths(sys *types.SystemContext, homeDir string) []authPath {
+	runningInSystemd := os.Getenv("INVOCATION_ID") != ""
+	runningAsRoot := rootless.GetRootlessEUID() == 0
+	runningSystemdPrivileged := runningInSystemd && runningAsRoot
+
 	paths := []authPath{}
 	pathToAuth, userSpecifiedPath, err := getPathToAuth(sys)
+
+	// If we're in systemd, prefer the system global auth with drop-ins first.
+	insertedGlobalPath := false
+	if !userSpecifiedPath && runningSystemdPrivileged {
+		rootpaths := walkAuthDir()
+		paths = append(paths, rootpaths...)
+		insertedGlobalPath = true
+	}
+
+
 	if err == nil {
 		paths = append(paths, pathToAuth)
 	} else {
@@ -169,6 +193,54 @@ func getAuthFilePaths(sys *types.SystemContext, homeDir string) []authPath {
 		paths = append(paths,
 			authPath{path: filepath.Join(homeDir, dockerLegacyHomePath), legacyFormat: true},
 		)
+		// If we didn't already insert the global path and drop-in files from the auth.d dir,
+		// do it at the end if we're running as root.
+		// This will ensure the same semantics for code executed as systemd units and run
+		// from an interactive shell (as root) as long as there's no user-root owned configs.
+		if !insertedGlobalPath && runningAsRoot {
+			rootpaths := walkAuthDir()
+			paths = append(paths, rootpaths...)
+		}
+	}
+	return paths
+}
+
+// Walk the /etc/containers/auth.d/ directory and return the drop-in paths with global system path /etc/containers/auth.json.
+// Drop-ins always have higher precedence than the configuration file they refer to and are sorted in the lexicographic order.
+// The drop-ins that are later in this order have higher precedence.
+func walkAuthDir() []authPath {
+	paths := []authPath{}
+	// append global system path
+	paths = append(paths, systemPath)
+
+	_, err := os.Stat(systemDir)
+	if err == nil {
+		filepath.WalkDir(systemDir,
+			// WalkFunc to read additional configs
+			func(path string, d fs.DirEntry, err error) error {
+				switch {
+				case err != nil:
+					// return error (could be a permission problem)
+					return err
+				case d.IsDir():
+					if path != systemDir {
+						// make sure to not recurse into sub-directories
+						return filepath.SkipDir
+					}
+					// ignore directories
+					return nil
+				default:
+					// only add *.json files
+					if strings.HasSuffix(path, ".json") {
+						systemDropinPath := authPath{path: filepath.FromSlash(path), legacyFormat: false, requireUserOnly: true}
+						paths = append(paths, systemDropinPath)
+					}
+					return nil
+				}
+			},
+		)
+		// reverse the order so latest appended file from drop-ins has precedence
+		slices.Reverse(paths)
 	}
 	return paths
 }
@@ -567,7 +639,7 @@ func getPathToAuthWithOS(sys *types.SystemContext, goOS string) (authPath, bool,
 		}
 		// Note: RootForImplicitAbsolutePaths should not affect paths starting with $HOME
 		if sys.RootForImplicitAbsolutePaths != "" && goOS == "linux" {
-			return newAuthPathDefault(filepath.Join(sys.RootForImplicitAbsolutePaths, fmt.Sprintf(defaultPerUIDPathFormat, os.Getuid()))), false, nil
+			return newAuthPathDefault(filepath.Join(sys.RootForImplicitAbsolutePaths, fmt.Sprintf(defaultPerUIDPathFormat, rootless.GetRootlessEUID()))), false, nil
 		}
 	}
 	if goOS != "linux" {
@@ -587,7 +659,7 @@ func getPathToAuthWithOS(sys *types.SystemContext, goOS string) (authPath, bool,
 		} // else ignore err and let the caller fail accessing xdgRuntimeDirPath.
 		return newAuthPathDefault(filepath.Join(runtimeDir, xdgRuntimeDirPath)), false, nil
 	}
-	return newAuthPathDefault(fmt.Sprintf(defaultPerUIDPathFormat, os.Getuid())), false, nil
+	return newAuthPathDefault(fmt.Sprintf(defaultPerUIDPathFormat, rootless.GetRootlessEUID())), false, nil
 }
 
 // parse unmarshals the credentials stored in the auth.json file and returns it
@@ -596,13 +668,28 @@ func getPathToAuthWithOS(sys *types.SystemContext, goOS string) (authPath, bool,
 func (path authPath) parse() (dockerConfigFile, error) {
 	var fileContents dockerConfigFile
 
-	raw, err := os.ReadFile(path.path)
+	f, err := os.Open(path.path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			fileContents.AuthConfigs = map[string]dockerAuthConfig{}
 			return fileContents, nil
 		}
 		return dockerConfigFile{}, err
+	}
+	defer f.Close()
+	if path.requireUserOnly {
+		st, err := f.Stat()
+		if err != nil {
+			return dockerConfigFile{}, fmt.Errorf("stat %s: %w", path.path, err)
+		}
+		perms := st.Mode().Perm()
+		if (perms & 044) != 0 {
+			return dockerConfigFile{}, fmt.Errorf("refusing to process %s with group or world read permissions", path.path)
+		}
+	}
+	raw, err := io.ReadAll(f)
+	if err != nil {
+		return dockerConfigFile{}, fmt.Errorf("reading %s: %w", path.path, err)
 	}
 
 	if path.legacyFormat {
