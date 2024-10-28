@@ -83,6 +83,7 @@ const (
 	listOpInvalid ListOp = iota
 	ListOpAdd
 	ListOpUpdate
+	ListOpRemove
 )
 
 // ListEdit includes the fields which a List's EditInstances() method will modify.

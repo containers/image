@@ -26,6 +26,7 @@ type instanceCopyKind int
 const (
 	instanceCopyCopy instanceCopyKind = iota
 	instanceCopyClone
+	instanceCopyDelete
 )
 
 type instanceCopy struct {
@@ -60,8 +61,9 @@ func platformV1ToPlatformComparable(platform *imgspecv1.Platform) platformCompar
 	}
 	osFeatures := slices.Clone(platform.OSFeatures)
 	sort.Strings(osFeatures)
-	return platformComparable{architecture: platform.Architecture,
-		os: platform.OS,
+	return platformComparable{
+		architecture: platform.Architecture,
+		os:           platform.OS,
 		// This is strictly speaking ambiguous, fields of OSFeatures can contain a ','. Probably good enough for now.
 		osFeatures: strings.Join(osFeatures, ","),
 		osVersion:  platform.OSVersion,
@@ -98,8 +100,64 @@ func validateCompressionVariantExists(input []OptionCompressionVariant) error {
 	return nil
 }
 
+func getInstanceDigestForPlatform(list internalManifest.List, platform manifest.Schema2PlatformSpec) (digest.Digest, error) {
+	for _, instanceDigest := range list.Instances() {
+		instance, err := list.Instance(instanceDigest)
+		if err != nil {
+			return "", err
+		}
+
+		if instance.ReadOnly.Platform == nil {
+			continue
+		}
+
+		if instance.ReadOnly.Platform.OS == platform.OS &&
+			instance.ReadOnly.Platform.Architecture == platform.Architecture {
+			return instanceDigest, nil
+		}
+	}
+
+	return "", fmt.Errorf("no instance found for platform %s/%s", platform.OS, platform.Architecture)
+}
+
+func filterInstancesByPlatforms(list internalManifest.List, platforms []manifest.Schema2PlatformSpec) ([]digest.Digest, error) {
+	if len(platforms) == 0 {
+		return list.Instances(), nil
+	}
+
+	missingPlatforms := []manifest.Schema2PlatformSpec{}
+	supportedInstance := set.New[digest.Digest]()
+	// Check each requested platform
+	for _, platform := range platforms {
+		if digest, err := getInstanceDigestForPlatform(list, platform); err != nil {
+			missingPlatforms = append(missingPlatforms, platform)
+		} else {
+			supportedInstance.Add(digest)
+		}
+	}
+
+	if len(missingPlatforms) > 0 {
+		var platformStrings []string
+		for _, p := range missingPlatforms {
+			platformStr := fmt.Sprintf("%s/%s", p.OS, p.Architecture)
+			if p.Variant != "" {
+				platformStr += "/" + p.Variant
+			}
+			platformStrings = append(platformStrings, platformStr)
+		}
+		return nil, fmt.Errorf("requested platforms not found in image: %s", strings.Join(platformStrings, ", "))
+	}
+
+	return supportedInstance.Values(), nil
+}
+
 // prepareInstanceCopies prepares a list of instances which needs to copied to the manifest list.
 func prepareInstanceCopies(list internalManifest.List, instanceDigests []digest.Digest, options *Options) ([]instanceCopy, error) {
+	filteredInstanceDigests, err := filterInstancesByPlatforms(list, options.ImageListPlatforms)
+	if err != nil {
+		return nil, err
+	}
+
 	res := []instanceCopy{}
 	if options.ImageListSelection == CopySpecificImages && len(options.EnsureCompressionVariantsExist) > 0 {
 		// List can already contain compressed instance for a compression selected in `EnsureCompressionVariantsExist`
@@ -109,7 +167,8 @@ func prepareInstanceCopies(list internalManifest.List, instanceDigests []digest.
 		// We might define the semantics and implement this in the future.
 		return res, fmt.Errorf("EnsureCompressionVariantsExist is not implemented for CopySpecificImages")
 	}
-	err := validateCompressionVariantExists(options.EnsureCompressionVariantsExist)
+
+	err = validateCompressionVariantExists(options.EnsureCompressionVariantsExist)
 	if err != nil {
 		return res, err
 	}
@@ -117,12 +176,24 @@ func prepareInstanceCopies(list internalManifest.List, instanceDigests []digest.
 	if err != nil {
 		return nil, err
 	}
+
 	for i, instanceDigest := range instanceDigests {
 		if options.ImageListSelection == CopySpecificImages &&
 			!slices.Contains(options.Instances, instanceDigest) {
 			logrus.Debugf("Skipping instance %s (%d/%d)", instanceDigest, i+1, len(instanceDigests))
 			continue
 		}
+
+		if options.ImageListSelection == CopyCustomArchImages &&
+			!slices.Contains(filteredInstanceDigests, instanceDigest) {
+			logrus.Debugf("Skipping instance %s (%d/%d)", instanceDigest, i+1, len(instanceDigests))
+			res = append(res, instanceCopy{
+				op:           instanceCopyDelete,
+				sourceDigest: instanceDigest,
+			})
+			continue
+		}
+
 		instanceDetails, err := list.Instance(instanceDigest)
 		if err != nil {
 			return res, fmt.Errorf("getting details for instance %s: %w", instanceDigest, err)
@@ -232,6 +303,7 @@ func (c *copier) copyMultipleImages(ctx context.Context) (copiedManifest []byte,
 	if err != nil {
 		return nil, fmt.Errorf("preparing instances for copy: %w", err)
 	}
+
 	c.Printf("Copying %d images generated from %d images in list\n", len(instanceCopyList), len(instanceDigests))
 	for i, instance := range instanceCopyList {
 		// Update instances to be edited by their `ListOperation` and
@@ -252,7 +324,8 @@ func (c *copier) copyMultipleImages(ctx context.Context) (copiedManifest []byte,
 				UpdateDigest:                updated.manifestDigest,
 				UpdateSize:                  int64(len(updated.manifest)),
 				UpdateCompressionAlgorithms: updated.compressionAlgorithms,
-				UpdateMediaType:             updated.manifestMIMEType})
+				UpdateMediaType:             updated.manifestMIMEType,
+			})
 		case instanceCopyClone:
 			logrus.Debugf("Replicating instance %s (%d/%d)", instance.sourceDigest, i+1, len(instanceCopyList))
 			c.Printf("Replicating image %s (%d/%d)\n", instance.sourceDigest, i+1, len(instanceCopyList))
@@ -260,7 +333,8 @@ func (c *copier) copyMultipleImages(ctx context.Context) (copiedManifest []byte,
 			updated, err := c.copySingleImage(ctx, unparsedInstance, &instanceCopyList[i].sourceDigest, copySingleImageOptions{
 				requireCompressionFormatMatch: true,
 				compressionFormat:             &instance.cloneCompressionVariant.Algorithm,
-				compressionLevel:              instance.cloneCompressionVariant.Level})
+				compressionLevel:              instance.cloneCompressionVariant.Level,
+			})
 			if err != nil {
 				return nil, fmt.Errorf("replicating image %d/%d from manifest list: %w", i+1, len(instanceCopyList), err)
 			}
@@ -274,6 +348,13 @@ func (c *copier) copyMultipleImages(ctx context.Context) (copiedManifest []byte,
 				AddPlatform:              instance.clonePlatform,
 				AddAnnotations:           instance.cloneAnnotations,
 				AddCompressionAlgorithms: updated.compressionAlgorithms,
+			})
+		case instanceCopyDelete:
+			logrus.Debugf("Deleting instance %s (%d/%d)", instance.sourceDigest, i+1, len(instanceCopyList))
+			c.Printf("Deleting image %s (%d/%d)\n", instance.sourceDigest, i+1, len(instanceCopyList))
+			instanceEdits = append(instanceEdits, internalManifest.ListEdit{
+				ListOperation:   internalManifest.ListOpRemove,
+				UpdateOldDigest: instance.sourceDigest,
 			})
 		default:
 			return nil, fmt.Errorf("copying image: invalid copy operation %d", instance.op)

@@ -82,7 +82,8 @@ func (index *Schema2ListPublic) UpdateInstances(updates []ListUpdate) error {
 			UpdateDigest:    instance.Digest,
 			UpdateSize:      instance.Size,
 			UpdateMediaType: instance.MediaType,
-			ListOperation:   ListOpUpdate})
+			ListOperation:   ListOpUpdate,
+		})
 	}
 	return index.editInstances(editInstances)
 }
@@ -128,6 +129,14 @@ func (index *Schema2ListPublic) editInstances(editInstances []ListEdit) error {
 				},
 				schema2PlatformSpecFromOCIPlatform(*editInstance.AddPlatform),
 			})
+		case ListOpRemove:
+			targetIndex := slices.IndexFunc(index.Manifests, func(m Schema2ManifestDescriptor) bool {
+				return m.Digest == editInstance.UpdateOldDigest
+			})
+			if targetIndex == -1 {
+				return fmt.Errorf("Schema2List.EditInstances: digest %s not found", editInstance.UpdateOldDigest)
+			}
+			index.Manifests = slices.Delete(index.Manifests, targetIndex, targetIndex+1)
 		default:
 			return fmt.Errorf("internal error: invalid operation: %d", editInstance.ListOperation)
 		}

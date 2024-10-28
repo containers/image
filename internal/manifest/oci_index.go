@@ -79,7 +79,8 @@ func (index *OCI1IndexPublic) UpdateInstances(updates []ListUpdate) error {
 			UpdateDigest:    instance.Digest,
 			UpdateSize:      instance.Size,
 			UpdateMediaType: instance.MediaType,
-			ListOperation:   ListOpUpdate})
+			ListOperation:   ListOpUpdate,
+		})
 	}
 	return index.editInstances(editInstances)
 }
@@ -166,6 +167,16 @@ func (index *OCI1IndexPublic) editInstances(editInstances []ListEdit) error {
 				Platform:     editInstance.AddPlatform,
 				Annotations:  annotations,
 			})
+		case ListOpRemove:
+			targetIndex := slices.IndexFunc(index.Manifests, func(m imgspecv1.Descriptor) bool {
+				return m.Digest == editInstance.UpdateOldDigest
+			})
+
+			if targetIndex == -1 {
+				return fmt.Errorf("OCI1Index.EditInstances: digest %s not found", editInstance.UpdateOldDigest)
+			}
+
+			index.Manifests = slices.Delete(index.Manifests, targetIndex, targetIndex+1)
 		default:
 			return fmt.Errorf("internal error: invalid operation: %d", editInstance.ListOperation)
 		}
