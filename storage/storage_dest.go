@@ -1344,7 +1344,15 @@ func (s *storageImageDestination) CommitWithOptions(ctx context.Context, options
 		logrus.Debugf("added name %q to image %q", name, img.ID)
 	}
 	if options.ReportResolvedReference != nil {
-		resolved, err := newReference(s.imageRef.transport, s.imageRef.named, intendedID)
+		// FIXME? This is using nil for the named reference.
+		// It would be better to also  use s.imageRef.named, because that allows us to resolve to the right
+		// digest / manifest (and corresponding signatures).
+		// The problem with that is that resolving such a reference fails if the s.imageRef.named name is moved to a different image
+		// (because it is a tag that moved, or because we have pulled “the same” image for a different architecture).
+		// Right now (2024-11), ReportResolvedReference is only used in c/common/libimage, where the caller only extracts the image ID,
+		// so the name does not matter; to give us options, copy.Options.ReportResolvedReference is explicitly refusing to document
+		// whether the value contains a name.
+		resolved, err := newReference(s.imageRef.transport, nil, intendedID)
 		if err != nil {
 			return fmt.Errorf("creating a resolved reference for (%s, %s): %w", s.imageRef.StringWithinTransport(), intendedID, err)
 		}

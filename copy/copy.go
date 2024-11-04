@@ -146,6 +146,7 @@ type Options struct {
 	//
 	// For the containers-storage: transport, the reference contains an image ID,
 	// so that storage.ResolveReference returns exactly the created image.
+	// WARNING: It is unspecified whether the reference also contains a reference.Named element.
 	ReportResolvedReference *types.ImageReference
 }
 
