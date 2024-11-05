@@ -6,6 +6,7 @@ import (
 
 	internal "github.com/containers/image/v5/docker/internal/tarfile"
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
 )
@@ -25,10 +26,11 @@ func NewDestination(dest io.Writer, ref reference.NamedTagged) *Destination {
 // NewDestinationWithContext returns a tarfile.Destination for the specified io.Writer.
 func NewDestinationWithContext(sys *types.SystemContext, dest io.Writer, ref reference.NamedTagged) *Destination {
 	archive := internal.NewWriter(dest)
-	return &Destination{
-		internal: internal.NewDestination(sys, archive, "[An external docker/tarfile caller]", ref),
-		archive:  archive,
+	d := &Destination{
+		archive: archive,
 	}
+	d.internal = internal.NewDestination(sys, archive, "[An external docker/tarfile caller]", ref, d.commitWithOptions)
+	return d
 }
 
 // AddRepoTags adds the specified tags to the destination's repoTags.
@@ -116,4 +118,12 @@ func (d *Destination) PutSignatures(ctx context.Context, signatures [][]byte, in
 // It is the caller's responsibility to close it, if necessary.
 func (d *Destination) Commit(ctx context.Context) error {
 	return d.archive.Close()
+}
+
+// commitWithOptions marks the process of storing the image as successful and asks for the image to be persisted.
+// WARNING: This does not have any transactional semantics:
+// - Uploaded data MAY be visible to others before CommitWithOptions() is called
+// - Uploaded data MAY be removed or MAY remain around if Close() is called without CommitWithOptions() (i.e. rollback is allowed but not guaranteed)
+func (d *Destination) commitWithOptions(ctx context.Context, options private.CommitOptions) error {
+	return d.Commit(ctx)
 }
