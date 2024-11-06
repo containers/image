@@ -1,18 +1,42 @@
 package reference
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/opencontainers/go-digest"
 )
 
-var (
+const (
+	// legacyDefaultDomain is the legacy domain for Docker Hub (which was
+	// originally named "the Docker Index"). This domain is still used for
+	// authentication and image search, which were part of the "v1" Docker
+	// registry specification.
+	//
+	// This domain will continue to be supported, but there are plans to consolidate
+	// legacy domains to new "canonical" domains. Once those domains are decided
+	// on, we must update the normalization functions, but preserve compatibility
+	// with existing installs, clients, and user configuration.
 	legacyDefaultDomain = "index.docker.io"
-	defaultDomain       = "docker.io"
-	officialRepoName    = "library"
-	defaultTag          = "latest"
+
+	// defaultDomain is the default domain used for images on Docker Hub.
+	// It is used to normalize "familiar" names to canonical names, for example,
+	// to convert "ubuntu" to "docker.io/library/ubuntu:latest".
+	//
+	// Note that actual domain of Docker Hub's registry is registry-1.docker.io.
+	// This domain will continue to be supported, but there are plans to consolidate
+	// legacy domains to new "canonical" domains. Once those domains are decided
+	// on, we must update the normalization functions, but preserve compatibility
+	// with existing installs, clients, and user configuration.
+	defaultDomain = "docker.io"
+
+	// officialRepoPrefix is the namespace used for official images on Docker Hub.
+	// It is used to normalize "familiar" names to canonical names, for example,
+	// to convert "ubuntu" to "docker.io/library/ubuntu:latest".
+	officialRepoPrefix = "library/"
+
+	// defaultTag is the default tag if no tag is provided.
+	defaultTag = "latest"
 )
 
 // normalizedNamed represents a name which has been
@@ -25,23 +49,33 @@ type normalizedNamed interface {
 	Familiar() Named
 }
 
-// ParseNormalizedNamed parses a string into a named reference
-// transforming a familiar name from Docker UI to a fully
-// qualified reference. If the value may be an identifier
-// use ParseAnyReference.
+// ParseNormalizedNamed parses a string into a [Named] reference transforming a
+// familiar name from Docker UI to a fully qualified reference. If the value may
+// be an identifier, use [ParseAnyReference] instead. It returns a nil reference
+// if an error occurs.
+//
+// An error is returned when parsing a reference that contains a digest with an
+// algorithm that is not registered. Implementations must register the algorithm
+// by importing the appropriate implementation.
+//
+// For example, to register the sha256 algorithm implementation from Go's stdlib:
+//
+//	import (
+//		_ "crypto/sha256"
+//	)
 func ParseNormalizedNamed(s string) (Named, error) {
 	if ok := anchoredIdentifierRegexp.MatchString(s); ok {
 		return nil, fmt.Errorf("invalid repository name (%s), cannot specify 64-byte hexadecimal strings", s)
 	}
 	domain, remainder := splitDockerDomain(s)
-	var remoteName string
+	var remote string
 	if tagSep := strings.IndexRune(remainder, ':'); tagSep > -1 {
-		remoteName = remainder[:tagSep]
+		remote = remainder[:tagSep]
 	} else {
-		remoteName = remainder
+		remote = remainder
 	}
-	if strings.ToLower(remoteName) != remoteName {
-		return nil, errors.New("invalid reference format: repository name must be lowercase")
+	if strings.ToLower(remote) != remote {
+		return nil, fmt.Errorf("invalid reference format: repository name (%s) must be lowercase", remote)
 	}
 
 	ref, err := Parse(domain + "/" + remainder)
@@ -55,52 +89,105 @@ func ParseNormalizedNamed(s string) (Named, error) {
 	return named, nil
 }
 
-// ParseDockerRef normalizes the image reference following the docker convention. This is added
-// mainly for backward compatibility.
-// The reference returned can only be either tagged or digested. For reference contains both tag
-// and digest, the function returns digested reference, e.g. docker.io/library/busybox:latest@
-// sha256:7cc4b5aefd1d0cadf8d97d4350462ba51c694ebca145b08d7d41b41acc8db5aa will be returned as
-// docker.io/library/busybox@sha256:7cc4b5aefd1d0cadf8d97d4350462ba51c694ebca145b08d7d41b41acc8db5aa.
+// namedTaggedDigested is a reference that has both a tag and a digest.
+type namedTaggedDigested interface {
+	NamedTagged
+	Digested
+}
+
+// ParseDockerRef normalizes the image reference following the docker convention,
+// which allows for references to contain both a tag and a digest. It returns a
+// reference that is either tagged or digested. For references containing both
+// a tag and a digest, it returns a digested reference. For example, the following
+// reference:
+//
+//	docker.io/library/busybox:latest@sha256:7cc4b5aefd1d0cadf8d97d4350462ba51c694ebca145b08d7d41b41acc8db5aa
+//
+// Is returned as a digested reference (with the ":latest" tag removed):
+//
+//	docker.io/library/busybox@sha256:7cc4b5aefd1d0cadf8d97d4350462ba51c694ebca145b08d7d41b41acc8db5aa
+//
+// References that are already "tagged" or "digested" are returned unmodified:
+//
+//	// Already a digested reference
+//	docker.io/library/busybox@sha256:7cc4b5aefd1d0cadf8d97d4350462ba51c694ebca145b08d7d41b41acc8db5aa
+//
+//	// Already a named reference
+//	docker.io/library/busybox:latest
+//
+// An error is returned when parsing a reference that contains a digest with an
+// algorithm that is not registered. Implementations must register the algorithm
+// by importing the appropriate implementation.
+//
+// For example, to register the sha256 algorithm implementation from Go's stdlib:
+//
+//	import (
+//		_ "crypto/sha256"
+//	)
 func ParseDockerRef(ref string) (Named, error) {
 	named, err := ParseNormalizedNamed(ref)
 	if err != nil {
 		return nil, err
 	}
-	if _, ok := named.(NamedTagged); ok {
-		if canonical, ok := named.(Canonical); ok {
-			// The reference is both tagged and digested, only
-			// return digested.
-			newNamed, err := WithName(canonical.Name())
-			if err != nil {
-				return nil, err
-			}
-			newCanonical, err := WithDigest(newNamed, canonical.Digest())
-			if err != nil {
-				return nil, err
-			}
-			return newCanonical, nil
+	if canonical, ok := named.(namedTaggedDigested); ok {
+		// The reference is both tagged and digested; only return digested.
+		newNamed, err := WithName(canonical.Name())
+		if err != nil {
+			return nil, err
 		}
+		return WithDigest(newNamed, canonical.Digest())
 	}
 	return TagNameOnly(named), nil
 }
 
-// splitDockerDomain splits a repository name to domain and remotename string.
+// splitDockerDomain splits a repository name to domain and remote-name.
 // If no valid domain is found, the default domain is used. Repository name
 // needs to be already validated before.
-func splitDockerDomain(name string) (domain, remainder string) {
-	i := strings.IndexRune(name, '/')
-	if i == -1 || (!strings.ContainsAny(name[:i], ".:") && name[:i] != "localhost") {
-		domain, remainder = defaultDomain, name
-	} else {
-		domain, remainder = name[:i], name[i+1:]
+func splitDockerDomain(name string) (domain, remoteName string) {
+	maybeDomain, maybeRemoteName, ok := strings.Cut(name, "/")
+	if !ok {
+		// Fast-path for single element ("familiar" names), such as "ubuntu"
+		// or "ubuntu:latest". Familiar names must be handled separately, to
+		// prevent them from being handled as "hostname:port".
+		//
+		// Canonicalize them as "docker.io/library/name[:tag]"
+
+		// FIXME(thaJeztah): account for bare "localhost" or "example.com" names, which SHOULD be considered a domain.
+		return defaultDomain, officialRepoPrefix + name
 	}
-	if domain == legacyDefaultDomain {
-		domain = defaultDomain
+
+	switch {
+	case maybeDomain == localhost:
+		// localhost is a reserved namespace and always considered a domain.
+		domain, remoteName = maybeDomain, maybeRemoteName
+	case maybeDomain == legacyDefaultDomain:
+		// canonicalize the Docker Hub and legacy "Docker Index" domains.
+		domain, remoteName = defaultDomain, maybeRemoteName
+	case strings.ContainsAny(maybeDomain, ".:"):
+		// Likely a domain or IP-address:
+		//
+		// - contains a "." (e.g., "example.com" or "127.0.0.1")
+		// - contains a ":" (e.g., "example:5000", "::1", or "[::1]:5000")
+		domain, remoteName = maybeDomain, maybeRemoteName
+	case strings.ToLower(maybeDomain) != maybeDomain:
+		// Uppercase namespaces are not allowed, so if the first element
+		// is not lowercase, we assume it to be a domain-name.
+		domain, remoteName = maybeDomain, maybeRemoteName
+	default:
+		// None of the above: it's not a domain, so use the default, and
+		// use the name input the remote-name.
+		domain, remoteName = defaultDomain, name
 	}
-	if domain == defaultDomain && !strings.ContainsRune(remainder, '/') {
-		remainder = officialRepoName + "/" + remainder
+
+	if domain == defaultDomain && !strings.ContainsRune(remoteName, '/') {
+		// Canonicalize "familiar" names, but only on Docker Hub, not
+		// on other domains:
+		//
+		// "docker.io/ubuntu[:tag]" => "docker.io/library/ubuntu[:tag]"
+		remoteName = officialRepoPrefix + remoteName
 	}
-	return
+
+	return domain, remoteName
 }
 
 // familiarizeName returns a shortened version of the name familiar
@@ -118,8 +205,15 @@ func familiarizeName(named namedRepository) repository {
 	if repo.domain == defaultDomain {
 		repo.domain = ""
 		// Handle official repositories which have the pattern "library/<official repo name>"
-		if split := strings.Split(repo.path, "/"); len(split) == 2 && split[0] == officialRepoName {
-			repo.path = split[1]
+		if strings.HasPrefix(repo.path, officialRepoPrefix) {
+			// TODO(thaJeztah): this check may be too strict, as it assumes the
+			//  "library/" namespace does not have nested namespaces. While this
+			//  is true (currently), technically it would be possible for Docker
+			//  Hub to use those (e.g. "library/distros/ubuntu:latest").
+			//  See https://github.com/distribution/distribution/pull/3769#issuecomment-1302031785.
+			if remainder := strings.TrimPrefix(repo.path, officialRepoPrefix); !strings.ContainsRune(remainder, '/') {
+				repo.path = remainder
+			}
 		}
 	}
 	return repo
@@ -169,6 +263,16 @@ func TagNameOnly(ref Named) Named {
 
 // ParseAnyReference parses a reference string as a possible identifier,
 // full digest, or familiar name.
+//
+// An error is returned when parsing a reference that contains a digest with an
+// algorithm that is not registered. Implementations must register the algorithm
+// by importing the appropriate implementation.
+//
+// For example, to register the sha256 algorithm implementation from Go's stdlib:
+//
+//	import (
+//		_ "crypto/sha256"
+//	)
 func ParseAnyReference(ref string) (Reference, error) {
 	if ok := anchoredIdentifierRegexp.MatchString(ref); ok {
 		return digestReference("sha256:" + ref), nil
