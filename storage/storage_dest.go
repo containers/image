@@ -628,89 +628,6 @@ func (s *storageImageDestination) trustedLayerIdentityDataLocked(layerIndex int,
 	return res, true
 }
 
-// computeID computes a recommended image ID based on information we have so far.  If
-// the manifest is not of a type that we recognize, we return an empty value, indicating
-// that since we don't have a recommendation, a random ID should be used if one needs
-// to be allocated.
-func (s *storageImageDestination) computeID(m manifest.Manifest) (string, error) {
-	// This is outside of the scope of HasThreadSafePutBlob, so we don’t need to hold s.lock.
-
-	layerInfos := m.LayerInfos()
-
-	// Build the diffID list.  We need the decompressed sums that we've been calculating to
-	// fill in the DiffIDs.  It's expected (but not enforced by us) that the number of
-	// diffIDs corresponds to the number of non-EmptyLayer entries in the history.
-	var diffIDs []digest.Digest
-	switch m.(type) {
-	case *manifest.Schema1:
-		// Build a list of the diffIDs we've generated for the non-throwaway FS layers
-		for i, li := range layerInfos {
-			if li.EmptyLayer {
-				continue
-			}
-			trusted, ok := s.trustedLayerIdentityDataLocked(i, li.Digest)
-			if !ok { // We have already committed all layers if we get to this point, so the data must have been available.
-				return "", fmt.Errorf("internal inconsistency: layer (%d, %q) not found", i, li.Digest)
-			}
-			if trusted.diffID == "" {
-				if trusted.layerIdentifiedByTOC {
-					logrus.Infof("v2s1 image uses a layer identified by TOC with unknown diffID; choosing a random image ID")
-					return "", nil
-				}
-				return "", fmt.Errorf("internal inconsistency: layer (%d, %q) is not identified by TOC and has no diffID", i, li.Digest)
-			}
-			diffIDs = append(diffIDs, trusted.diffID)
-		}
-	case *manifest.Schema2, *manifest.OCI1:
-		// We know the ID calculation doesn't actually use the diffIDs, so we don't need to populate
-		// the diffID list.
-	default:
-		return "", nil
-	}
-
-	// We want to use the same ID for “the same” images, but without risking unwanted sharing / malicious image corruption.
-	//
-	// Traditionally that means the same ~config digest, as computed by m.ImageID;
-	// but if we identify a layer by TOC, we verify the layer against neither the (compressed) blob digest in the manifest,
-	// nor against the config’s RootFS.DiffIDs. We don’t really want to do either, to allow partial layer pulls where we never see
-	// most of the data.
-	//
-	// So, if a layer is identified by TOC (and we do validate against the TOC), the fact that we used the TOC, and the value of the TOC,
-	// must enter into the image ID computation.
-	// But for images where no TOC was used, continue to use IDs computed the traditional way, to maximize image reuse on upgrades,
-	// and to introduce the changed behavior only when partial pulls are used.
-	//
-	// Note that it’s not 100% guaranteed that an image pulled by TOC uses an OCI manifest; consider
-	// (skopeo copy --format v2s2 docker://…/zstd-chunked-image containers-storage:… ). So this is not happening only in the OCI case above.
-	ordinaryImageID, err := m.ImageID(diffIDs)
-	if err != nil {
-		return "", err
-	}
-	tocIDInput := ""
-	hasLayerPulledByTOC := false
-	for i, li := range layerInfos {
-		trusted, ok := s.trustedLayerIdentityDataLocked(i, li.Digest)
-		if !ok { // We have already committed all layers if we get to this point, so the data must have been available.
-			return "", fmt.Errorf("internal inconsistency: layer (%d, %q) not found", i, li.Digest)
-		}
-		layerValue := "" // An empty string is not a valid digest, so this is unambiguous with the TOC case.
-		if trusted.layerIdentifiedByTOC {
-			hasLayerPulledByTOC = true
-			layerValue = trusted.tocDigest.String()
-		}
-		tocIDInput += layerValue + "|" // "|" can not be present in a TOC digest, so this is an unambiguous separator.
-	}
-
-	if !hasLayerPulledByTOC {
-		return ordinaryImageID, nil
-	}
-	// ordinaryImageID is a digest of a config, which is a JSON value.
-	// To avoid the risk of collisions, start the input with @ so that the input is not a valid JSON.
-	tocImageID := digest.FromString("@With TOC:" + tocIDInput).Encoded()
-	logrus.Debugf("Ordinary storage image ID %s; a layer was looked up by TOC, so using image ID %s", ordinaryImageID, tocImageID)
-	return tocImageID, nil
-}
-
 // getConfigBlob exists only to let us retrieve the configuration blob so that the manifest package can dig
 // information out of it for Inspect().
 func (s *storageImageDestination) getConfigBlob(info types.BlobInfo) ([]byte, error) {
@@ -1279,10 +1196,7 @@ func (s *storageImageDestination) CommitWithOptions(ctx context.Context, options
 	// Create the image record, pointing to the most-recently added layer.
 	intendedID := s.imageRef.id
 	if intendedID == "" {
-		intendedID, err = s.computeID(man)
-		if err != nil {
-			return err
-		}
+		intendedID = s.manifestDigest.Encoded()
 	}
 	oldNames := []string{}
 	img, err := s.imageRef.transport.store.CreateImage(intendedID, nil, lastLayer, "", imgOptions)
@@ -1295,6 +1209,9 @@ func (s *storageImageDestination) CommitWithOptions(ctx context.Context, options
 		if err != nil {
 			return fmt.Errorf("reading image %q: %w", intendedID, err)
 		}
+		// FIXME: With intendedID typically based on s.manifestDigest, this will fail if we ever fetch the same layer two different ways (with two different layer IDs
+		// per trustedLayerIdentityData), e.g. if we see the layer/images across graph drivers which do/don’t support partial pulls.
+		// The only way to recover would be to remove the other image, and that might not be possible.
 		if img.TopLayer != lastLayer {
 			logrus.Debugf("error creating image: image with ID %q exists, but uses different layers", intendedID)
 			return fmt.Errorf("image with ID %q already exists, but uses a different top layer: %w", intendedID, storage.ErrDuplicateID)
