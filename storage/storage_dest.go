@@ -207,6 +207,14 @@ func (s *storageImageDestination) computeNextBlobCacheFile() string {
 	return filepath.Join(s.directory, fmt.Sprintf("%d", s.nextTempFileID.Add(1)))
 }
 
+// NoteOriginalOCIConfig provides the config of the image, as it exists on the source, BUT converted to OCI format,
+// or an error obtaining that value (e.g. if the image is an artifact and not a container image).
+// The destination can use it in its TryReusingBlob/PutBlob implementations
+// (otherwise it only obtains the final config after all layers are written).
+func (s *storageImageDestination) NoteOriginalOCIConfig(ociConfig *imgspecv1.Image, configErr error) error {
+	return nil
+}
+
 // PutBlobWithOptions writes contents of stream and returns data representing the result.
 // inputInfo.Digest can be optionally provided if known; if provided, and stream is read to the end without error, the digest MUST match the stream contents.
 // inputInfo.Size is the expected length of stream, if known.
