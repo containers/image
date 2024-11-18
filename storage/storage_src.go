@@ -35,13 +35,14 @@ type storageImageSource struct {
 	impl.PropertyMethodsInitialize
 	stubs.NoGetBlobAtInitialize
 
-	imageRef              storageReference
-	image                 *storage.Image
-	systemContext         *types.SystemContext // SystemContext used in GetBlob() to create temporary files
-	metadata              storageImageMetadata
-	cachedManifest        []byte     // A cached copy of the manifest, if already known, or nil
-	getBlobMutex          sync.Mutex // Mutex to sync state for parallel GetBlob executions
-	getBlobMutexProtected getBlobMutexProtected
+	imageRef               storageReference
+	image                  *storage.Image
+	systemContext          *types.SystemContext // SystemContext used in GetBlob() to create temporary files
+	metadata               storageImageMetadata
+	cachedManifest         []byte     // A cached copy of the manifest, if already known, or nil
+	cachedManifestMIMEType string     // Valid if cachedManifest != nil
+	getBlobMutex           sync.Mutex // Mutex to sync state for parallel GetBlob executions
+	getBlobMutexProtected  getBlobMutexProtected
 }
 
 // getBlobMutexProtected contains storageImageSource data protected by getBlobMutex.
@@ -274,8 +275,9 @@ func (s *storageImageSource) GetManifest(ctx context.Context, instanceDigest *di
 			}
 			s.cachedManifest = cachedBlob
 		}
+		s.cachedManifestMIMEType = manifest.GuessMIMEType(s.cachedManifest)
 	}
-	return s.cachedManifest, manifest.GuessMIMEType(s.cachedManifest), err
+	return s.cachedManifest, s.cachedManifestMIMEType, err
 }
 
 // LayerInfosForCopy() returns the list of layer blobs that make up the root filesystem of
