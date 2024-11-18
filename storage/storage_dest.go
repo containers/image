@@ -212,6 +212,10 @@ func (s *storageImageDestination) computeNextBlobCacheFile() string {
 // The destination can use it in its TryReusingBlob/PutBlob implementations
 // (otherwise it only obtains the final config after all layers are written).
 func (s *storageImageDestination) NoteOriginalOCIConfig(ociConfig *imgspecv1.Image, configErr error) error {
+	if configErr != nil {
+		return fmt.Errorf("writing to c/storage without a valid image config: %w", configErr)
+	}
+	s.setUntrustedDiffIDValuesFromOCIConfig(ociConfig)
 	return nil
 }
 
@@ -1172,14 +1176,20 @@ func (u *uncommittedImageSource) GetBlob(ctx context.Context, info types.BlobInf
 // If the value is not yet available (but it can be available after s.manifets is set), it returns ("", nil).
 // WARNING: We don’t validate the DiffID value against the layer contents; it must not be used for any deduplication.
 func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.Digest, error) {
-	// At this point, we are either inside the multi-threaded scope of HasThreadSafePutBlob, and
-	// nothing is writing to s.manifest yet, or PutManifest has been called and s.manifest != nil.
+	// At this point, we are either inside the multi-threaded scope of HasThreadSafePutBlob,
+	// nothing is writing to s.manifest yet, and s.untrustedDiffIDValues might have been set
+	// by NoteOriginalOCIConfig and are not being updated any more;
+	// or PutManifest has been called and s.manifest != nil.
 	// Either way this function does not need the protection of s.lock.
-	if s.manifest == nil {
-		return "", nil
-	}
 
 	if s.untrustedDiffIDValues == nil {
+		// Typically, we expect untrustedDiffIDValues to be set by the generic copy code
+		// via NoteOriginalOCIConfig; this is a compatibility fallback for external callers
+		// of the public types.ImageDestination.
+		if s.manifest == nil {
+			return "", nil
+		}
+
 		ctx := context.Background() // This is all happening in memory, no need to worry about cancellation.
 		unparsed := image.UnparsedInstance(newUncommittedImageSource(s), nil)
 		sourced, err := image.FromUnparsedImage(ctx, nil, unparsed)
@@ -1191,11 +1201,9 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 			return "", fmt.Errorf("obtaining config of image to be committed: %w", err)
 		}
 
-		s.untrustedDiffIDValues = slices.Clone(configOCI.RootFS.DiffIDs)
-		if s.untrustedDiffIDValues == nil { // Unlikely but possible in theory…
-			s.untrustedDiffIDValues = []digest.Digest{}
-		}
+		s.setUntrustedDiffIDValuesFromOCIConfig(configOCI)
 	}
+
 	if layerIndex >= len(s.untrustedDiffIDValues) {
 		return "", fmt.Errorf("image config has only %d DiffID values, but a layer with index %d exists", len(s.untrustedDiffIDValues), layerIndex)
 	}
@@ -1214,6 +1222,15 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 		return "", fmt.Errorf("DiffID value for layer %d is unknown or explicitly empty", layerIndex)
 	}
 	return res, nil
+}
+
+// setUntrustedDiffIDValuesFromOCIConfig updates s.untrustedDiffIDvalues from config.
+// The caller must ensure s.lock does not need to be held.
+func (s *storageImageDestination) setUntrustedDiffIDValuesFromOCIConfig(config *imgspecv1.Image) {
+	s.untrustedDiffIDValues = slices.Clone(config.RootFS.DiffIDs)
+	if s.untrustedDiffIDValues == nil { // Unlikely but possible in theory…
+		s.untrustedDiffIDValues = []digest.Digest{}
+	}
 }
 
 // CommitWithOptions marks the process of storing the image as successful and asks for the image to be persisted.
