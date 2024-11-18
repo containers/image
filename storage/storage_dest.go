@@ -56,8 +56,8 @@ type storageImageDestination struct {
 	imageRef              storageReference
 	directory             string                   // Temporary directory where we store blobs until Commit() time
 	nextTempFileID        atomic.Int32             // A counter that we use for computing filenames to assign to blobs
-	manifest              []byte                   // Manifest contents, temporary
-	manifestDigest        digest.Digest            // Valid if len(manifest) != 0
+	manifest              []byte                   // (Per-instance) manifest contents, or nil if not yet known.
+	manifestDigest        digest.Digest            // Valid if manifest != nil
 	untrustedDiffIDValues []digest.Digest          // From config’s RootFS.DiffIDs (not even validated to be valid digest.Digest!); or nil if not read yet
 	signatures            []byte                   // Signature contents, temporary
 	signatureses          map[digest.Digest][]byte // Instance signature contents, temporary
@@ -1166,7 +1166,7 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 func (s *storageImageDestination) CommitWithOptions(ctx context.Context, options private.CommitOptions) error {
 	// This function is outside of the scope of HasThreadSafePutBlob, so we don’t need to hold s.lock.
 
-	if len(s.manifest) == 0 {
+	if s.manifest == nil {
 		return errors.New("Internal error: storageImageDestination.CommitWithOptions() called without PutManifest()")
 	}
 	toplevelManifest, _, err := options.UnparsedToplevel.Manifest(ctx)
@@ -1397,6 +1397,9 @@ func (s *storageImageDestination) PutManifest(ctx context.Context, manifestBlob 
 		return err
 	}
 	s.manifest = bytes.Clone(manifestBlob)
+	if s.manifest == nil { // Make sure PutManifest can never succeed with s.manifest == nil
+		s.manifest = []byte{}
+	}
 	s.manifestDigest = digest
 	return nil
 }
@@ -1419,7 +1422,7 @@ func (s *storageImageDestination) PutSignaturesWithFormat(ctx context.Context, s
 	if instanceDigest == nil {
 		s.signatures = sigblob
 		s.metadata.SignatureSizes = sizes
-		if len(s.manifest) > 0 {
+		if s.manifest != nil {
 			manifestDigest := s.manifestDigest
 			instanceDigest = &manifestDigest
 		}
