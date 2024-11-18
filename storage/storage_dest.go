@@ -1242,7 +1242,7 @@ func (s *storageImageDestination) CommitWithOptions(ctx context.Context, options
 	}
 	// Set up to save the options.UnparsedToplevel's manifest if it differs from
 	// the per-platform one, which is saved below.
-	if len(toplevelManifest) != 0 && !bytes.Equal(toplevelManifest, s.manifest) {
+	if !bytes.Equal(toplevelManifest, s.manifest) {
 		manifestDigest, err := manifest.Digest(toplevelManifest)
 		if err != nil {
 			return fmt.Errorf("digesting top-level manifest: %w", err)
