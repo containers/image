@@ -21,7 +21,128 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/docker/distribution/registry/api/errcode"
 )
+
+func TestHandleErrorResponse401InvalidTokenChallenge(t *testing.T) {
+	json := []byte(`{"errors":[{"code":"UNKNOWN","message":"some unknown error"}]}`)
+	challenge := `Bearer realm="example.io",
+error="invalid_token",
+error_description="The access token expired"`
+	response := &http.Response{
+		Status:     "401 Unauthorized",
+		StatusCode: 401,
+		Body:       io.NopCloser(bytes.NewReader(json)),
+		Header: http.Header{
+			http.CanonicalHeaderKey("WWW-Authenticate"): []string{challenge},
+		},
+	}
+	err := handleErrorResponse(response)
+	if err == nil {
+		t.Fatal("Expected handleErrorResponse to return error, got nil.")
+	}
+
+	expectedMsg := "unauthorized: The access token expired"
+	if !strings.Contains(err.Error(), expectedMsg) {
+		t.Errorf("Expected \"%s\", got: \"%s\"", expectedMsg, err.Error())
+	}
+}
+
+func TestHandleErrorResponse401InsufficientScopeChallenge(t *testing.T) {
+	json := []byte(`{"errors":[{"code":"UNKNOWN","message":"some unknown error"}]}`)
+	challenge := `Bearer realm="example.io",
+error="insufficient_scope",
+error_description="Insufficient permission"`
+	response := &http.Response{
+		Status:     "401 Unauthorized",
+		StatusCode: 401,
+		Body:       io.NopCloser(bytes.NewReader(json)),
+		Header: http.Header{
+			http.CanonicalHeaderKey("WWW-Authenticate"): []string{challenge},
+		},
+	}
+	err := handleErrorResponse(response)
+	if err == nil {
+		t.Fatal("Expected handleErrorResponse to return error, got nil.")
+	}
+
+	expectedMsg := "denied: Insufficient permission"
+	if !strings.Contains(err.Error(), expectedMsg) {
+		t.Errorf("Expected \"%s\", got: \"%s\"", expectedMsg, err.Error())
+	}
+}
+
+func TestHandleErrorResponse401InvalidTokenWithoutDescription(t *testing.T) {
+	json := []byte(`{"errors":[{"code":"UNKNOWN","message":"some unknown error"}]}`)
+	challenge := `Bearer realm="example.io",
+error="invalid_token"`
+	response := &http.Response{
+		Status:     "401 Unauthorized",
+		StatusCode: 401,
+		Body:       io.NopCloser(bytes.NewReader(json)),
+		Header: http.Header{
+			http.CanonicalHeaderKey("WWW-Authenticate"): []string{challenge},
+		},
+	}
+	err := handleErrorResponse(response)
+	if err == nil {
+		t.Fatal("Expected handleErrorResponse to return error, got nil.")
+	}
+
+	expectedMsg := errcode.ErrorCodeUnauthorized.Message()
+	if !strings.Contains(err.Error(), expectedMsg) {
+		t.Errorf("Expected \"%s\", got: \"%s\"", expectedMsg, err.Error())
+	}
+}
+
+func TestHandleErrorResponse401UnexpectedChallenge(t *testing.T) {
+	json := []byte(`{"errors":[{"code":"UNKNOWN","message":"some unknown error"}]}`)
+	challenge := `Bearer realm="example.io",
+error="invalid_request",
+error_description="The request is missing a required parameter"`
+	response := &http.Response{
+		Status:     "401 Unauthorized",
+		StatusCode: 401,
+		Body:       io.NopCloser(bytes.NewReader(json)),
+		Header: http.Header{
+			http.CanonicalHeaderKey("WWW-Authenticate"): []string{challenge},
+		},
+	}
+	err := handleErrorResponse(response)
+	if err == nil {
+		t.Fatal("Expected handleErrorResponse to return error, got nil.")
+	}
+
+	expectedMsg := "unknown: some unknown error"
+	if err.Error() != expectedMsg {
+		t.Errorf("Expected \"%s\", got: \"%s\"", expectedMsg, err.Error())
+	}
+}
+
+func TestHandleErrorResponse403InsufficientScopeChallenge(t *testing.T) {
+	json := []byte(`{"errors":[{"code":"UNKNOWN","message":"some unknown error"}]}`)
+	challenge := `Bearer realm="example.io",
+error="insufficient_scope",
+error_description="Insufficient permission"`
+	response := &http.Response{
+		Status:     "403 Forbidden",
+		StatusCode: 403,
+		Body:       io.NopCloser(bytes.NewReader(json)),
+		Header: http.Header{
+			http.CanonicalHeaderKey("WWW-Authenticate"): []string{challenge},
+		},
+	}
+	err := handleErrorResponse(response)
+	if err == nil {
+		t.Fatal("Expected handleErrorResponse to return error, got nil.")
+	}
+
+	expectedMsg := "unknown: some unknown error"
+	if err.Error() != expectedMsg {
+		t.Errorf("Expected \"%s\", got: \"%s\"", expectedMsg, err.Error())
+	}
+}
 
 func TestHandleErrorResponse401ValidBody(t *testing.T) {
 	json := []byte("{\"errors\":[{\"code\":\"UNAUTHORIZED\",\"message\":\"action requires authentication\"}]}")
