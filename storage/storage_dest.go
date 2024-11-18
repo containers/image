@@ -17,8 +17,11 @@ import (
 	"sync/atomic"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/image"
 	"github.com/containers/image/v5/internal/imagedestination/impl"
 	"github.com/containers/image/v5/internal/imagedestination/stubs"
+	srcImpl "github.com/containers/image/v5/internal/imagesource/impl"
+	srcStubs "github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/internal/signature"
@@ -1112,6 +1115,51 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 	return layer, nil
 }
 
+// uncommittedImageSource allows accessing an image’s metadata (not layers) before it has been committed,
+// to allow using image.FromUnparsedImage.
+type uncommittedImageSource struct {
+	srcImpl.Compat
+	srcImpl.PropertyMethodsInitialize
+	srcImpl.NoSignatures
+	srcImpl.DoesNotAffectLayerInfosForCopy
+	srcStubs.NoGetBlobAtInitialize
+
+	d *storageImageDestination
+}
+
+func newUncommittedImageSource(d *storageImageDestination) *uncommittedImageSource {
+	s := &uncommittedImageSource{
+		PropertyMethodsInitialize: srcImpl.PropertyMethods(srcImpl.Properties{
+			HasThreadSafeGetBlob: true,
+		}),
+		NoGetBlobAtInitialize: srcStubs.NoGetBlobAt(d.Reference()),
+
+		d: d,
+	}
+	s.Compat = srcImpl.AddCompat(s)
+	return s
+}
+
+func (u *uncommittedImageSource) Reference() types.ImageReference {
+	return u.d.Reference()
+}
+
+func (u *uncommittedImageSource) Close() error {
+	return nil
+}
+
+func (u *uncommittedImageSource) GetManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error) {
+	return u.d.manifest, u.d.manifestMIMEType, nil
+}
+
+func (u *uncommittedImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
+	blob, err := u.d.getConfigBlob(info)
+	if err != nil {
+		return nil, -1, err
+	}
+	return io.NopCloser(bytes.NewReader(blob)), int64(len(blob)), nil
+}
+
 // untrustedLayerDiffID returns a DiffID value for layerIndex from the image’s config.
 // If the value is not yet available (but it can be available after s.manifets is set), it returns ("", nil).
 // WARNING: We don’t validate the DiffID value against the layer contents; it must not be used for any deduplication.
@@ -1124,30 +1172,17 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 	}
 
 	if s.untrustedDiffIDValues == nil {
-		if s.manifestMIMEType != imgspecv1.MediaTypeImageManifest {
-			// We could, in principle, build an ImageSource, support arbitrary image formats using image.FromUnparsedImage,
-			// and then use types.Image.OCIConfig so that we can parse the image.
-			//
-			// In practice, this should, right now, only matter for pulls of OCI images (this code path implies that a layer has annotation),
-			// while converting to a non-OCI formats, using a manual (skopeo copy) or something similar, not (podman pull).
-			// So it is not implemented yet.
-			return "", fmt.Errorf("determining DiffID for manifest type %q is not yet supported", s.manifestMIMEType)
-		}
-		man, err := manifest.FromBlob(s.manifest, s.manifestMIMEType)
+		ctx := context.Background() // This is all happening in memory, no need to worry about cancellation.
+		unparsed := image.UnparsedInstance(newUncommittedImageSource(s), nil)
+		sourced, err := image.FromUnparsedImage(ctx, nil, unparsed)
 		if err != nil {
-			return "", fmt.Errorf("parsing manifest: %w", err)
+			return "", fmt.Errorf("parsing image to be committed: %w", err)
+		}
+		configOCI, err := sourced.OCIConfig(ctx)
+		if err != nil {
+			return "", fmt.Errorf("obtaining config of image to be committed: %w", err)
 		}
 
-		cb, err := s.getConfigBlob(man.ConfigInfo())
-		if err != nil {
-			return "", err
-		}
-
-		// retrieve the expected uncompressed digest from the config blob.
-		configOCI := &imgspecv1.Image{}
-		if err := json.Unmarshal(cb, configOCI); err != nil {
-			return "", err
-		}
 		s.untrustedDiffIDValues = slices.Clone(configOCI.RootFS.DiffIDs)
 		if s.untrustedDiffIDValues == nil { // Unlikely but possible in theory…
 			s.untrustedDiffIDValues = []digest.Digest{}
@@ -1156,7 +1191,21 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 	if layerIndex >= len(s.untrustedDiffIDValues) {
 		return "", fmt.Errorf("image config has only %d DiffID values, but a layer with index %d exists", len(s.untrustedDiffIDValues), layerIndex)
 	}
-	return s.untrustedDiffIDValues[layerIndex], nil
+	res := s.untrustedDiffIDValues[layerIndex]
+	if res == "" {
+		// In practice, this should, right now, only matter for pulls of OCI images
+		// (this code path implies that we did a partial pull because a layer has an annotation),
+		// So, DiffIDs should always be set.
+		//
+		// It is, though, reachable by pulling an OCI image while converting to schema1,
+		// using a manual (skopeo copy) or something similar, not (podman pull).
+		//
+		// Our schema1.OCIConfig code produces non-empty DiffID arrays of empty values.
+		// The current semantics of this function are that ("", nil) means "try again later",
+		// which is not what we want to happen; for now, turn that into an explicit error.
+		return "", fmt.Errorf("DiffID value for layer %d is unknown or explicitly empty", layerIndex)
+	}
+	return res, nil
 }
 
 // CommitWithOptions marks the process of storing the image as successful and asks for the image to be persisted.
