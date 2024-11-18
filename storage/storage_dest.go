@@ -57,6 +57,7 @@ type storageImageDestination struct {
 	directory             string                   // Temporary directory where we store blobs until Commit() time
 	nextTempFileID        atomic.Int32             // A counter that we use for computing filenames to assign to blobs
 	manifest              []byte                   // (Per-instance) manifest contents, or nil if not yet known.
+	manifestMIMEType      string                   // Valid if manifest != nil
 	manifestDigest        digest.Digest            // Valid if manifest != nil
 	untrustedDiffIDValues []digest.Digest          // From config’s RootFS.DiffIDs (not even validated to be valid digest.Digest!); or nil if not read yet
 	signatures            []byte                   // Signature contents, temporary
@@ -1123,17 +1124,16 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 	}
 
 	if s.untrustedDiffIDValues == nil {
-		mt := manifest.GuessMIMEType(s.manifest)
-		if mt != imgspecv1.MediaTypeImageManifest {
+		if s.manifestMIMEType != imgspecv1.MediaTypeImageManifest {
 			// We could, in principle, build an ImageSource, support arbitrary image formats using image.FromUnparsedImage,
 			// and then use types.Image.OCIConfig so that we can parse the image.
 			//
 			// In practice, this should, right now, only matter for pulls of OCI images (this code path implies that a layer has annotation),
 			// while converting to a non-OCI formats, using a manual (skopeo copy) or something similar, not (podman pull).
 			// So it is not implemented yet.
-			return "", fmt.Errorf("determining DiffID for manifest type %q is not yet supported", mt)
+			return "", fmt.Errorf("determining DiffID for manifest type %q is not yet supported", s.manifestMIMEType)
 		}
-		man, err := manifest.FromBlob(s.manifest, mt)
+		man, err := manifest.FromBlob(s.manifest, s.manifestMIMEType)
 		if err != nil {
 			return "", fmt.Errorf("parsing manifest: %w", err)
 		}
@@ -1194,7 +1194,7 @@ func (s *storageImageDestination) CommitWithOptions(ctx context.Context, options
 		}
 	}
 	// Find the list of layer blobs.
-	man, err := manifest.FromBlob(s.manifest, manifest.GuessMIMEType(s.manifest))
+	man, err := manifest.FromBlob(s.manifest, s.manifestMIMEType)
 	if err != nil {
 		return fmt.Errorf("parsing manifest: %w", err)
 	}
@@ -1400,6 +1400,7 @@ func (s *storageImageDestination) PutManifest(ctx context.Context, manifestBlob 
 	if s.manifest == nil { // Make sure PutManifest can never succeed with s.manifest == nil
 		s.manifest = []byte{}
 	}
+	s.manifestMIMEType = manifest.GuessMIMEType(s.manifest)
 	s.manifestDigest = digest
 	return nil
 }
