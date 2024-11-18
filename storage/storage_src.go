@@ -247,7 +247,7 @@ func (s *storageImageSource) GetManifest(ctx context.Context, instanceDigest *di
 		}
 		return blob, manifest.GuessMIMEType(blob), err
 	}
-	if len(s.cachedManifest) == 0 {
+	if s.cachedManifest == nil {
 		// The manifest is stored as a big data item.
 		// Prefer the manifest corresponding to the user-specified digest, if available.
 		if s.imageRef.named != nil {
@@ -267,7 +267,7 @@ func (s *storageImageSource) GetManifest(ctx context.Context, instanceDigest *di
 		}
 		// If the user did not specify a digest, or this is an old image stored before manifestBigDataKey was introduced, use the default manifest.
 		// Note that the manifest may not match the expected digest, and that is likely to fail eventually, e.g. in c/image/image/UnparsedImage.Manifest().
-		if len(s.cachedManifest) == 0 {
+		if s.cachedManifest == nil {
 			cachedBlob, err := s.imageRef.transport.store.ImageBigData(s.image.ID, storage.ImageDigestBigDataKey)
 			if err != nil {
 				return nil, "", err
