@@ -277,11 +277,11 @@ func makeLayer(t *testing.T, compression archive.Compression) testBlob {
 	}
 }
 
-func (l testBlob) storeBlob(t *testing.T, dest types.ImageDestination, cache types.BlobInfoCache, mimeType string) manifest.Schema2Descriptor {
+func (l testBlob) storeBlob(t *testing.T, dest types.ImageDestination, cache types.BlobInfoCache, mimeType string, isConfig bool) manifest.Schema2Descriptor {
 	_, err := dest.PutBlob(context.Background(), bytes.NewReader(l.data), types.BlobInfo{
 		Size:   l.compressedSize,
 		Digest: l.compressedDigest,
-	}, cache, false)
+	}, cache, isConfig)
 	require.NoError(t, err)
 	return manifest.Schema2Descriptor{
 		MediaType: mimeType,
@@ -312,13 +312,13 @@ func createUncommittedImageDest(t *testing.T, ref types.ImageReference, cache ty
 
 	layerDescriptors := []manifest.Schema2Descriptor{}
 	for _, layer := range layers {
-		desc := layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
+		desc := layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType, false)
 		layerDescriptors = append(layerDescriptors, desc)
 	}
 
 	var configDescriptor manifest.Schema2Descriptor
 	if config != nil {
-		configDescriptor = config.storeBlob(t, dest, cache, manifest.DockerV2Schema2ConfigMediaType)
+		configDescriptor = config.storeBlob(t, dest, cache, manifest.DockerV2Schema2ConfigMediaType, true)
 	} else {
 		// Use a random digest so that different calls to createUncommittedImageDest with config == nil don’t try to
 		// use the same image ID.
@@ -441,9 +441,9 @@ func TestWriteRead(t *testing.T) {
 			compression = archive.Gzip
 		}
 		layer := makeLayer(t, compression)
-		_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType)
+		_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType, false)
 		t.Logf("Wrote randomly-generated layer %q (%d/%d bytes) to destination", layer.compressedDigest, layer.compressedSize, layer.uncompressedSize)
-		_ = config.storeBlob(t, dest, cache, manifest.DockerV2Schema2ConfigMediaType)
+		_ = config.storeBlob(t, dest, cache, manifest.DockerV2Schema2ConfigMediaType, true)
 
 		manifest := strings.ReplaceAll(manifestFmt, "%lh", layer.compressedDigest.String())
 		manifest = strings.ReplaceAll(manifest, "%ch", config.compressedDigest.String())
