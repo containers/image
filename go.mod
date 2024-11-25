@@ -34,7 +34,7 @@ require (
 	github.com/sigstore/rekor v1.3.6
 	github.com/sigstore/sigstore v1.8.10
 	github.com/sirupsen/logrus v1.9.3
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/sylabs/sif/v2 v2.20.0
 	github.com/ulikunitz/xz v0.5.12
 	github.com/vbatts/tar-split v0.11.6
