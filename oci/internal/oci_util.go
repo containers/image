@@ -98,7 +98,7 @@ func ValidateScope(scope string) error {
 }
 
 func validateScopeWindows(scope string) error {
-	matched, _ := regexp.Match(`^[a-zA-Z]:\\`, []byte(scope))
+	matched, _ := regexp.MatchString(`^[a-zA-Z]:\\`, scope)
 	if !matched {
 		return fmt.Errorf("Invalid scope '%s'. Must be an absolute path", scope)
 	}
