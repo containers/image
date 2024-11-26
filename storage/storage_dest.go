@@ -419,6 +419,8 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 		// c/storage can also be configured, on this code path, to consume the full blob (primarily to allow composefs conversion),
 		// and in that case it always consumes the full blob and always computes the uncompressed digest.
 		if out.UncompressedDigest != "" {
+			// This is centrally enforced later, in commitLayer, but because we have the value available,
+			// we might just as well check immediately.
 			if out.UncompressedDigest != untrustedDiffID {
 				return fmt.Errorf("uncompressed digest of layer %q is %q, config claims %q", srcInfo.Digest.String(),
 					out.UncompressedDigest.String(), untrustedDiffID.String())
@@ -935,6 +937,30 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 		}
 	}
 
+	// Ensure that we always see the same “view” of a layer, as identified by the layer’s uncompressed digest,
+	// unless the user has explicitly opted out of this in storage.conf: see the more detailed explanation in PutBlobPartial.
+	if trusted.diffID != "" {
+		untrustedDiffID, err := s.untrustedLayerDiffID(index)
+		if err != nil {
+			if errors.Is(err, errUntrustedLayerDiffIDNotYetAvailable) {
+				logrus.Debugf("Skipping commit for layer %q, manifest not yet available for DiffID check", index)
+				return true, nil
+			}
+			var e untrustedLayerDiffIDUnknownError
+			if !errors.As(err, &e) {
+				return false, err
+			}
+			// If untrustedLayerDiffIDUnknownError, the input image is schema1 and we should not have done a partial pull or a TOC-based match.
+			// FIXME: review tryReusingBlob… and PutBlobPartial to verify
+			if trusted.layerIdentifiedByTOC {
+				return false, fmt.Errorf("internal error: layer %d for blob %s was identified by TOC, but we don't have a DiffID in config",
+					index, trusted.logString())
+			}
+		} else if trusted.diffID != untrustedDiffID {
+			return false, fmt.Errorf("layer %d (blob %s) does not match config's DiffID %q", index, trusted.logString(), untrustedDiffID)
+		}
+	}
+
 	id := layerID(parentLayer, trusted)
 
 	if layer, err2 := s.imageRef.transport.store.Layer(id); layer != nil && err2 == nil {
@@ -980,10 +1006,11 @@ func (s *storageImageDestination) createNewLayer(index int, trusted trustedLayer
 	diffOutput, ok := s.lockProtected.diffOutputs[index]
 	s.lock.Unlock()
 	if ok {
-		// If we know a trusted DiffID value (e.g. from a BlobInfoCache), set it in diffOutput.
+		// Typically, we compute a trusted DiffID value to authenticate the layer contents, see the detailed explanation
+		// in PutBlobPartial.  If the user has opted out of that, but we know a trusted DiffID value
+		// (e.g. from a BlobInfoCache), set it in diffOutput.
 		// That way it will be persisted in storage even if the cache is deleted; also
-		// we can use the value below to avoid the untrustedUncompressedDigest logic (and notably
-		// the costly commit delay until a manifest is available).
+		// we can use the value below to avoid the untrustedUncompressedDigest logic.
 		if diffOutput.UncompressedDigest == "" && trusted.diffID != "" {
 			diffOutput.UncompressedDigest = trusted.diffID
 		}
@@ -995,6 +1022,13 @@ func (s *storageImageDestination) createNewLayer(index int, trusted trustedLayer
 				if errors.Is(err, errUntrustedLayerDiffIDNotYetAvailable) {
 					logrus.Debugf("Skipping commit for layer %q, manifest not yet available", newLayerID)
 					return nil, nil
+				}
+				var e untrustedLayerDiffIDUnknownError
+				if errors.As(err, &e) {
+					// If untrustedLayerDiffIDUnknownError, the input image is schema1 and we should not have done a partial pull or a TOC-based match.
+					// FIXME: review tryReusingBlob… and PutBlobPartial to verify
+					return nil, fmt.Errorf("internal error: layer %d for blob %s was partially-pulled, but we don't have a DiffID in config",
+						index, trusted.logString())
 				}
 				return nil, err
 			}
@@ -1234,7 +1268,8 @@ func (e untrustedLayerDiffIDUnknownError) Error() string {
 // untrustedLayerDiffID returns a DiffID value for layerIndex from the image’s config.
 // It may return two special errors, errUntrustedLayerDiffIDNotYetAvailable or untrustedLayerDiffIDUnknownError.
 //
-// WARNING: We don’t validate the DiffID value against the layer contents; it must not be used for any deduplication.
+// WARNING: This function does not even validate that the returned digest has a valid format.
+// WARNING: We don’t _always_ validate this DiffID value against the layer contents; it must not be used for any deduplication.
 func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.Digest, error) {
 	// At this point, we are either inside the multi-threaded scope of HasThreadSafePutBlob,
 	// nothing is writing to s.manifest yet, and s.untrustedDiffIDValues might have been set
@@ -1269,12 +1304,7 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 	}
 	res := s.untrustedDiffIDValues[layerIndex]
 	if res == "" {
-		// In practice, this should, right now, only matter for pulls of OCI images
-		// (this code path implies that we did a partial pull because a layer has an annotation),
-		// So, DiffIDs should always be set.
-		//
-		// It is, though, reachable by pulling an OCI image while converting to schema1,
-		// using a manual (skopeo copy) or something similar, not (podman pull).
+		// schema1 images don’t have DiffID values in the config.
 		//
 		// Our schema1.OCIConfig code produces non-empty DiffID arrays of empty values.
 		return "", untrustedLayerDiffIDUnknownError{
