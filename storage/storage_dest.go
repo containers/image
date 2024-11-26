@@ -343,6 +343,39 @@ func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.Read
 // If the call fails with ErrFallbackToOrdinaryLayerDownload, the caller can fall back to PutBlobWithOptions.
 // The fallback _must not_ be done otherwise.
 func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, options private.PutBlobPartialOptions) (_ private.UploadedBlob, retErr error) {
+	// The identity of partially-pulled layers is, as long as we keep compatibility with tar-like consumers,
+	// unfixably ambiguous: there are two possible “views” of the same file (same compressed digest),
+	// the traditional “view” that decompresses the primary stream and consumes a tar file,
+	// and the partial-pull “view” that starts with the TOC.
+	// The two “views” have two separate metadata sets and may refer to different parts of the blob for file contents;
+	// the direct way to ensure they are consistent would be to read the full primary stream (and authenticate it against
+	// the compressed digest), and ensure the metadata and layer contents exactly match the partially-pulled contents -
+	// making the partial pull completely pointless.
+	//
+	// Instead, we require the image to “commit” to uncompressed layer digest values via the config's RootFS.DiffIDs array:
+	// they are already naturally computed for traditionally-pulled layers, and for partially-pulled layers we
+	// do the optimal partial pull, and then reconstruct the uncompressed tar stream just to (expensively) compute this digest.
+	//
+	// So, if the input image doesn't have RootFS.DiffIDs (i.e. is schema1), don't bother with partial pulls at all,
+	// and always use the traditional “view”.
+	// (Hypothetically, the user can opt out of the DiffID commitment by a c/storage option, giving up security for performance,
+	// but schema1 images don't support layer annotations anyway, so neither zstd:chunked nor estargz layers can
+	// benefit from partial pulls anyway — so this is not giving up on partial pull functionality; OTOH it may
+	// interfere with composefs conversion, which currently only happens on the partial pull code path.)
+	untrustedDiffID, err := s.untrustedLayerDiffID(options.LayerIndex)
+	if err != nil {
+		if errors.Is(err, errUntrustedLayerDiffIDNotYetAvailable) {
+			// PutBlobPartial is a private API, so all callers are within c/image, and should have called
+			// NoteOriginalOCIConfig first.
+			return private.UploadedBlob{}, fmt.Errorf("internal error: in PutBlobPartial, untrustedLayerDiffID returned errUntrustedLayerDiffIDNotYetAvailable")
+		}
+		var e untrustedLayerDiffIDUnknownError
+		if errors.As(err, &e) {
+			return private.UploadedBlob{}, private.NewErrFallbackToOrdinaryLayerDownload(err)
+		}
+		return private.UploadedBlob{}, err
+	}
+
 	fetcher := zstdFetcher{
 		chunkAccessor: chunkAccessor,
 		ctx:           ctx,
@@ -382,7 +415,15 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	if err := func() error { // A scope for defer
 		defer s.lock.Unlock()
 
+		// For true partial pulls, c/storage decides whether to compute the uncompressed digest based on an option in storage.conf.
+		// c/storage can also be configured, on this code path, to consume the full blob (primarily to allow composefs conversion),
+		// and in that case it always consumes the full blob and always computes the uncompressed digest.
 		if out.UncompressedDigest != "" {
+			if out.UncompressedDigest != untrustedDiffID {
+				return fmt.Errorf("uncompressed digest of layer %q is %q, config claims %q", srcInfo.Digest.String(),
+					out.UncompressedDigest.String(), untrustedDiffID.String())
+			}
+
 			s.lockProtected.indexToDiffID[options.LayerIndex] = out.UncompressedDigest
 			if out.TOCDigest != "" {
 				s.lockProtected.indexToTOCDigest[options.LayerIndex] = out.TOCDigest
