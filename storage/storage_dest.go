@@ -346,6 +346,56 @@ func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.Read
 // If the call fails with ErrFallbackToOrdinaryLayerDownload, the caller can fall back to PutBlobWithOptions.
 // The fallback _must not_ be done otherwise.
 func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, options private.PutBlobPartialOptions) (_ private.UploadedBlob, retErr error) {
+	inputTOCDigest, err := toc.GetTOCDigest(srcInfo.Annotations)
+	if err != nil {
+		return private.UploadedBlob{}, err
+	}
+
+	// The identity of partially-pulled layers is, as long as we keep compatibility with tar-like consumers,
+	// unfixably ambiguous: there are two possible “views” of the same file (same compressed digest),
+	// the traditional “view” that decompresses the primary stream and consumes a tar file,
+	// and the partial-pull “view” that starts with the TOC.
+	// The two “views” have two separate metadata sets and may refer to different parts of the blob for file contents;
+	// the direct way to ensure they are consistent would be to read the full primary stream (and authenticate it against
+	// the compressed digest), and ensure the metadata and layer contents exactly match the partially-pulled contents -
+	// making the partial pull completely pointless.
+	//
+	// Instead, for partial-pull-capable layers (with inputTOCDigest set), we require the image to “commit”
+	// to uncompressed layer digest values via the config's RootFS.DiffIDs array:
+	// they are already naturally computed for traditionally-pulled layers, and for partially-pulled layers we
+	// do the optimal partial pull, and then reconstruct the uncompressed tar stream just to (expensively) compute this digest.
+	//
+	// Layers which don’t support partial pulls (inputTOCDigest == "", incl. all schema1 layers) can be let through:
+	// the partial pull code will either not engage, or consume the full layer; and the rules of indexToTOCDigest / layerIdentifiedByTOC
+	// ensure the layer is identified by DiffID, i.e. using the traditional “view”.
+	//
+	// But if inputTOCDigest is set and the input image doesn't have RootFS.DiffIDs (the config is invalid for schema2/OCI),
+	// don't allow a partial pull, and fall back to PutBlobWithOptions.
+	//
+	// (The user can opt out of the DiffID commitment checking by a c/storage option, giving up security for performance,
+	// but we will still trigger the fall back here, and we will still enforce a DiffID match, so that the set of accepted images
+	// is the same in both cases, and so that users are not tempted to set the c/storage option to allow accepting some invalid images.)
+	var untrustedDiffID digest.Digest // "" if unknown
+	udid, err := s.untrustedLayerDiffID(options.LayerIndex)
+	if err != nil {
+		var diffIDUnknownErr untrustedLayerDiffIDUnknownError
+		switch {
+		case errors.Is(err, errUntrustedLayerDiffIDNotYetAvailable):
+			// PutBlobPartial is a private API, so all callers are within c/image, and should have called
+			// NoteOriginalOCIConfig first.
+			return private.UploadedBlob{}, fmt.Errorf("internal error: in PutBlobPartial, untrustedLayerDiffID returned errUntrustedLayerDiffIDNotYetAvailable")
+		case errors.As(err, &diffIDUnknownErr):
+			if inputTOCDigest != nil {
+				return private.UploadedBlob{}, private.NewErrFallbackToOrdinaryLayerDownload(err)
+			}
+			untrustedDiffID = "" // A schema1 image or a non-TOC layer with no ambiguity, let it through
+		default:
+			return private.UploadedBlob{}, err
+		}
+	} else {
+		untrustedDiffID = udid
+	}
+
 	fetcher := zstdFetcher{
 		chunkAccessor: chunkAccessor,
 		ctx:           ctx,
@@ -385,7 +435,16 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	if err := func() error { // A scope for defer
 		defer s.lock.Unlock()
 
+		// For true partial pulls, c/storage decides whether to compute the uncompressed digest based on an option in storage.conf
+		// (defaults to true, to avoid ambiguity.)
+		// c/storage can also be configured, to consume a layer not prepared for partial pulls (primarily to allow composefs conversion),
+		// and in that case it always consumes the full blob and always computes the uncompressed digest.
 		if out.UncompressedDigest != "" {
+			if untrustedDiffID != "" && out.UncompressedDigest != untrustedDiffID {
+				return fmt.Errorf("uncompressed digest of layer %q is %q, config claims %q", srcInfo.Digest.String(),
+					out.UncompressedDigest.String(), untrustedDiffID.String())
+			}
+
 			s.lockProtected.indexToDiffID[options.LayerIndex] = out.UncompressedDigest
 			if out.TOCDigest != "" {
 				s.lockProtected.indexToTOCDigest[options.LayerIndex] = out.TOCDigest
@@ -405,11 +464,7 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 			}
 		} else {
 			// Sanity-check the defined rules for indexToTOCDigest.
-			toc, err := toc.GetTOCDigest(srcInfo.Annotations)
-			if err != nil {
-				return err
-			}
-			if toc == nil {
+			if inputTOCDigest == nil {
 				return fmt.Errorf("internal error: PrepareStagedLayer returned a TOC-only identity for layer %q with no TOC digest", srcInfo.Digest.String())
 			}
 
@@ -461,9 +516,28 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 	if err := blobDigest.Validate(); err != nil {
 		return false, private.ReusedBlob{}, fmt.Errorf("Can not check for a blob with invalid digest: %w", err)
 	}
-	if options.TOCDigest != "" {
+	useTOCDigest := false // If set, (options.TOCDigest != "" && options.LayerIndex != nil) AND we can use options.TOCDigest safely.
+	if options.TOCDigest != "" && options.LayerIndex != nil {
 		if err := options.TOCDigest.Validate(); err != nil {
 			return false, private.ReusedBlob{}, fmt.Errorf("Can not check for a blob with invalid digest: %w", err)
+		}
+		// Only consider using TOCDigest if we can avoid ambiguous image “views”, see the detailed comment in PutBlobPartial.
+		_, err := s.untrustedLayerDiffID(*options.LayerIndex)
+		if err != nil {
+			var diffIDUnknownErr untrustedLayerDiffIDUnknownError
+			switch {
+			case errors.Is(err, errUntrustedLayerDiffIDNotYetAvailable):
+				// options.TOCDigest is a private API, so all callers are within c/image, and should have called
+				// NoteOriginalOCIConfig first.
+				return false, private.ReusedBlob{}, fmt.Errorf("internal error: in TryReusingBlobWithOptions, untrustedLayerDiffID returned errUntrustedLayerDiffIDNotYetAvailable")
+			case errors.As(err, &diffIDUnknownErr):
+				logrus.Debugf("Not using TOC %q to look for layer reuse: %v", options.TOCDigest, err)
+				// But don’t abort entirely, keep useTOCDigest = false, try a blobDigest match.
+			default:
+				return false, private.ReusedBlob{}, err
+			}
+		} else {
+			useTOCDigest = true
 		}
 	}
 
@@ -471,7 +545,7 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if options.SrcRef != nil && options.TOCDigest != "" && options.LayerIndex != nil {
+	if options.SrcRef != nil && useTOCDigest {
 		// Check if we have the layer in the underlying additional layer store.
 		aLayer, err := s.imageRef.transport.store.LookupAdditionalLayer(options.TOCDigest, options.SrcRef.String())
 		if err != nil && !errors.Is(err, storage.ErrLayerUnknown) {
@@ -555,7 +629,7 @@ func (s *storageImageDestination) tryReusingBlobAsPending(blobDigest digest.Dige
 		}
 	}
 
-	if options.TOCDigest != "" && options.LayerIndex != nil {
+	if useTOCDigest {
 		// Check if we know which which UncompressedDigest the TOC digest resolves to, and we have a match for that.
 		// Prefer this over LayersByTOCDigest because we can identify the layer using UncompressedDigest, maximizing reuse.
 		uncompressedDigest := options.Cache.UncompressedDigestForTOC(options.TOCDigest)
@@ -1248,13 +1322,7 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 	// and fail hard on missing entries. This tries to account for completely naive image producers who just don’t fill DiffID,
 	// while still detecting incorrectly-built / confused images.
 	//
-	// In practice, this should, right now, only matter for pulls of OCI images
-	// (this code path implies that we did a partial pull because a layer has an annotation),
-	// So, DiffIDs should always be set.
-	//
-	// It is, though, reachable by pulling an OCI image while converting to schema1,
-	// using a manual (skopeo copy) or something similar, not (podman pull).
-	//
+	// schema1 images don’t have DiffID values in the config.
 	// Our schema1.OCIConfig code produces non-empty DiffID arrays of empty values, so treat arrays of all-empty
 	// values as “DiffID unknown”.
 	// For schema 1, it is important to exit here, before the layerIndex >= len(s.untrustedDiffIDValues)
