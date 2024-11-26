@@ -960,11 +960,11 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		if diffOutput.UncompressedDigest == "" {
 			d, err := s.untrustedLayerDiffID(index)
 			if err != nil {
+				if errors.Is(err, errUntrustedLayerDiffIDNotYetAvailable) {
+					logrus.Debugf("Skipping commit for layer %q, manifest not yet available", newLayerID)
+					return nil, nil
+				}
 				return nil, err
-			}
-			if d == "" {
-				logrus.Debugf("Skipping commit for layer %q, manifest not yet available", newLayerID)
-				return nil, nil
 			}
 
 			untrustedUncompressedDigest = d
@@ -1185,8 +1185,27 @@ func (u *uncommittedImageSource) GetBlob(ctx context.Context, info types.BlobInf
 	return io.NopCloser(bytes.NewReader(blob)), int64(len(blob)), nil
 }
 
+// errUntrustedLayerDiffIDNotYetAvailable is returned by untrustedLayerDiffID
+// if the value is not yet available (but it can be available after s.manifests is set).
+// This should only happen for external callers of the transport, not for c/image/copy.
+//
+// Callers of untrustedLayerDiffID before PutManifest must handle this error specially;
+// callers after PutManifest can use the default, reporting an internal error.
+var errUntrustedLayerDiffIDNotYetAvailable = errors.New("internal error: untrustedLayerDiffID has no value available and fallback was not implemented")
+
+// untrustedLayerDiffIDUnknownError is returned by untrustedLayerDiffID
+// if the image’s format does not provide DiffIDs.
+type untrustedLayerDiffIDUnknownError struct {
+	layerIndex int
+}
+
+func (e untrustedLayerDiffIDUnknownError) Error() string {
+	return fmt.Sprintf("DiffID value for layer %d is unknown or explicitly empty", e.layerIndex)
+}
+
 // untrustedLayerDiffID returns a DiffID value for layerIndex from the image’s config.
-// If the value is not yet available (but it can be available after s.manifets is set), it returns ("", nil).
+// It may return two special errors, errUntrustedLayerDiffIDNotYetAvailable or untrustedLayerDiffIDUnknownError.
+//
 // WARNING: We don’t validate the DiffID value against the layer contents; it must not be used for any deduplication.
 func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.Digest, error) {
 	// At this point, we are either inside the multi-threaded scope of HasThreadSafePutBlob,
@@ -1200,7 +1219,7 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 		// via NoteOriginalOCIConfig; this is a compatibility fallback for external callers
 		// of the public types.ImageDestination.
 		if s.manifest == nil {
-			return "", nil
+			return "", errUntrustedLayerDiffIDNotYetAvailable
 		}
 
 		ctx := context.Background() // This is all happening in memory, no need to worry about cancellation.
@@ -1217,24 +1236,33 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 		s.setUntrustedDiffIDValuesFromOCIConfig(configOCI)
 	}
 
+	// Let entirely empty / missing diffIDs through; but if the array does exist, expect it to contain an entry for every layer,
+	// and fail hard on missing entries. This tries to account for completely naive image producers who just don’t fill DiffID,
+	// while still detecting incorrectly-built / confused images.
+	//
+	// In practice, this should, right now, only matter for pulls of OCI images
+	// (this code path implies that we did a partial pull because a layer has an annotation),
+	// So, DiffIDs should always be set.
+	//
+	// It is, though, reachable by pulling an OCI image while converting to schema1,
+	// using a manual (skopeo copy) or something similar, not (podman pull).
+	//
+	// Our schema1.OCIConfig code produces non-empty DiffID arrays of empty values, so treat arrays of all-empty
+	// values as “DiffID unknown”.
+	// For schema 1, it is important to exit here, before the layerIndex >= len(s.untrustedDiffIDValues)
+	// check, because the format conversion from schema1 to OCI used to compute untrustedDiffIDValues
+	// changes the number of layres (drops items with Schema1V1Compatibility.ThrowAway).
+	if !slices.ContainsFunc(s.untrustedDiffIDValues, func(d digest.Digest) bool {
+		return d != ""
+	}) {
+		return "", untrustedLayerDiffIDUnknownError{
+			layerIndex: layerIndex,
+		}
+	}
 	if layerIndex >= len(s.untrustedDiffIDValues) {
 		return "", fmt.Errorf("image config has only %d DiffID values, but a layer with index %d exists", len(s.untrustedDiffIDValues), layerIndex)
 	}
-	res := s.untrustedDiffIDValues[layerIndex]
-	if res == "" {
-		// In practice, this should, right now, only matter for pulls of OCI images
-		// (this code path implies that we did a partial pull because a layer has an annotation),
-		// So, DiffIDs should always be set.
-		//
-		// It is, though, reachable by pulling an OCI image while converting to schema1,
-		// using a manual (skopeo copy) or something similar, not (podman pull).
-		//
-		// Our schema1.OCIConfig code produces non-empty DiffID arrays of empty values.
-		// The current semantics of this function are that ("", nil) means "try again later",
-		// which is not what we want to happen; for now, turn that into an explicit error.
-		return "", fmt.Errorf("DiffID value for layer %d is unknown or explicitly empty", layerIndex)
-	}
-	return res, nil
+	return s.untrustedDiffIDValues[layerIndex], nil
 }
 
 // setUntrustedDiffIDValuesFromOCIConfig updates s.untrustedDiffIDvalues from config.
