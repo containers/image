@@ -928,16 +928,15 @@ func (s *storageImageDestination) queueOrCommit(index int, info addedLayerInfo) 
 // must guarantee that, at any given time, at most one goroutine may execute
 // `commitLayer()`.
 func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, size int64) (bool, error) {
-	// Already committed?  Return early.
 	if _, alreadyCommitted := s.indexToStorageID[index]; alreadyCommitted {
 		return false, nil
 	}
 
-	// Start with an empty string or the previous layer ID.  Note that
-	// `s.indexToStorageID` can only be accessed by *one* goroutine at any
-	// given time. Hence, we don't need to lock accesses.
-	var parentLayer string
+	var parentLayer string // "" if no parent
 	if index != 0 {
+		// s.indexToStorageID can only be written by this function, and our caller
+		// is responsible for ensuring it can be only be called by *one* goroutine at any
+		// given time. Hence, we don't need to lock accesses.
 		prev, ok := s.indexToStorageID[index-1]
 		if !ok {
 			return false, fmt.Errorf("Internal error: commitLayer called with previous layer %d not committed yet", index-1)
@@ -945,19 +944,17 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 		parentLayer = prev
 	}
 
-	// Carry over the previous ID for empty non-base layers.
 	if info.emptyLayer {
 		s.indexToStorageID[index] = parentLayer
 		return false, nil
 	}
 
-	// Check if there's already a layer with the ID that we'd give to the result of applying
-	// this layer blob to its parent, if it has one, or the blob's hex value otherwise.
+	// Collect trusted parameters of the layer.
 	s.lock.Lock()
 	trusted, ok := s.trustedLayerIdentityDataLocked(index, info.digest)
 	s.lock.Unlock()
 	if !ok {
-		// Check if it's elsewhere and the caller just forgot to pass it to us in a PutBlob() / TryReusingBlob() / …
+		// Check if the layer exists already and the caller just (incorrectly) forgot to pass it to us in a PutBlob() / TryReusingBlob() / …
 		//
 		// Use none.NoCache to avoid a repeated DiffID lookup in the BlobInfoCache: a caller
 		// that relies on using a blob digest that has never been seen by the store had better call
