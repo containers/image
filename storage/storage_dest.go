@@ -612,6 +612,13 @@ type trustedLayerIdentityData struct {
 	blobDigest digest.Digest // A digest of the (possibly-compressed) layer as presented, or "" if unknown/untrusted.
 }
 
+// logString() prints a representation of trusted suitable identifying a layer in logs and errors.
+// The string is already quoted to expose malicious input and does not need to be quoted again.
+// Note that it does not include _all_ of the contents.
+func (trusted trustedLayerIdentityData) logString() string {
+	return fmt.Sprintf("%q/%q/%q", trusted.blobDigest, trusted.tocDigest, trusted.diffID)
+}
+
 // trustedLayerIdentityDataLocked returns a _consistent_ set of information for a layer with (layerIndex, blobDigest).
 // blobDigest is the (possibly-compressed) layer digest referenced in the manifest.
 // It returns (trusted, true) if the layer was found, or (_, false) if insufficient data is available.
@@ -1039,7 +1046,7 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 			}
 		}
 		if layer == nil {
-			return nil, fmt.Errorf("layer for blob %q/%q/%q not found", trusted.blobDigest, trusted.tocDigest, trusted.diffID)
+			return nil, fmt.Errorf("layer for blob %s not found", trusted.logString())
 		}
 
 		// Read the layer's contents.
@@ -1049,7 +1056,7 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		}
 		diff, err2 := s.imageRef.transport.store.Diff("", layer.ID, diffOptions)
 		if err2 != nil {
-			return nil, fmt.Errorf("reading layer %q for blob %q/%q/%q: %w", layer.ID, trusted.blobDigest, trusted.tocDigest, trusted.diffID, err2)
+			return nil, fmt.Errorf("reading layer %q for blob %s: %w", layer.ID, trusted.logString(), err2)
 		}
 		// Copy the layer diff to a file.  Diff() takes a lock that it holds
 		// until the ReadCloser that it returns is closed, and PutLayer() wants
@@ -1128,7 +1135,7 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		UncompressedDigest: trusted.diffID,
 	}, file)
 	if err != nil && !errors.Is(err, storage.ErrDuplicateID) {
-		return nil, fmt.Errorf("adding layer with blob %q/%q/%q: %w", trusted.blobDigest, trusted.tocDigest, trusted.diffID, err)
+		return nil, fmt.Errorf("adding layer with blob %s: %w", trusted.logString(), err)
 	}
 	return layer, nil
 }
