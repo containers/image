@@ -893,12 +893,9 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 			return false, fmt.Errorf("we have blob %q, but don't know its layer ID", info.digest.String())
 		}
 	}
-	// The layerID refers either to the DiffID or the digest of the TOC.
-	layerIDComponent, layerIDComponentStandalone := trusted.singleLayerIDComponent()
-	id := layerIDComponent
-	if !layerIDComponentStandalone || parentLayer != "" {
-		id = digest.Canonical.FromString(parentLayer + "+" + layerIDComponent).Encoded()
-	}
+
+	id := layerID(parentLayer, trusted)
+
 	if layer, err2 := s.imageRef.transport.store.Layer(id); layer != nil && err2 == nil {
 		// There's already a layer that should have the right contents, just reuse it.
 		s.indexToStorageID[index] = layer.ID
@@ -916,13 +913,21 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	return false, nil
 }
 
-// singleLayerIDComponent returns a single layer’s the input to computing a layer (chain) ID,
-// and an indication whether the input already has the shape of a layer ID.
-func (trusted trustedLayerIdentityData) singleLayerIDComponent() (string, bool) {
+// layerID computes a layer (“chain”) ID for (a possibly-empty parentLayer, trusted)
+func layerID(parentLayer string, trusted trustedLayerIdentityData) string {
+	var layerIDComponent string
 	if trusted.layerIdentifiedByTOC {
-		return "@TOC=" + trusted.tocDigest.Encoded(), false // "@" is not a valid start of a digest.Digest, so this is unambiguous.
+		// "@" is not a valid start of a digest.Digest.Encoded(), so this is unambiguous with the !layerIdentifiedByTOC case.
+		// But we _must_ hash this below to get a Digest.Encoded()-formatted value.
+		layerIDComponent = "@TOC=" + trusted.tocDigest.Encoded()
+	} else {
+		layerIDComponent = trusted.diffID.Encoded() // This looks like chain IDs, and it uses the traditional value.
 	}
-	return trusted.diffID.Encoded(), true // This looks like chain IDs, and it uses the traditional value.
+	id := layerIDComponent
+	if trusted.layerIdentifiedByTOC || parentLayer != "" {
+		id = digest.Canonical.FromString(parentLayer + "+" + layerIDComponent).Encoded()
+	}
+	return id
 }
 
 // createNewLayer creates a new layer newLayerID for (index, layerDigest) on top of parentLayer (which may be "").
