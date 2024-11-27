@@ -909,7 +909,7 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 		return false, nil
 	}
 
-	layer, err := s.createNewLayer(index, info.digest, parentLayer, id)
+	layer, err := s.createNewLayer(index, trusted, parentLayer, id)
 	if err != nil {
 		return false, err
 	}
@@ -939,9 +939,9 @@ func layerID(parentID string, trusted trustedLayerIdentityData) string {
 	return digest.Canonical.FromString(parentID + "+" + component).Encoded()
 }
 
-// createNewLayer creates a new layer newLayerID for (index, layerDigest) on top of parentLayer (which may be "").
+// createNewLayer creates a new layer newLayerID for (index, trusted) on top of parentLayer (which may be "").
 // If the layer cannot be committed yet, the function returns (nil, nil).
-func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.Digest, parentLayer, newLayerID string) (*storage.Layer, error) {
+func (s *storageImageDestination) createNewLayer(index int, trusted trustedLayerIdentityData, parentLayer, newLayerID string) (*storage.Layer, error) {
 	s.lock.Lock()
 	diffOutput, ok := s.lockProtected.diffOutputs[index]
 	s.lock.Unlock()
@@ -950,11 +950,9 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		// That way it will be persisted in storage even if the cache is deleted; also
 		// we can use the value below to avoid the untrustedUncompressedDigest logic (and notably
 		// the costly commit delay until a manifest is available).
-		s.lock.Lock()
-		if d, ok := s.lockProtected.indexToDiffID[index]; ok {
-			diffOutput.UncompressedDigest = d
+		if diffOutput.UncompressedDigest == "" && trusted.diffID != "" {
+			diffOutput.UncompressedDigest = trusted.diffID
 		}
-		s.lock.Unlock()
 
 		var untrustedUncompressedDigest digest.Digest
 		if diffOutput.UncompressedDigest == "" {
@@ -1012,14 +1010,10 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 	// then we need to read the desired contents from a layer.
 	var filename string
 	var gotFilename bool
-	s.lock.Lock()
-	trusted, ok := s.trustedLayerIdentityDataLocked(index, layerDigest)
-	if ok && trusted.blobDigest != "" {
+	if trusted.blobDigest != "" {
+		s.lock.Lock()
 		filename, gotFilename = s.lockProtected.filenames[trusted.blobDigest]
-	}
-	s.lock.Unlock()
-	if !ok { // We have already determined newLayerID, so the data must have been available.
-		return nil, fmt.Errorf("internal inconsistency: layer (%d, %q) not found", index, layerDigest)
+		s.lock.Unlock()
 	}
 	var trustedOriginalDigest digest.Digest // For storage.LayerOptions
 	var trustedOriginalSize *int64
