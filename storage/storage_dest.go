@@ -824,15 +824,7 @@ func (s *storageImageDestination) queueOrCommit(index int, info addedLayerInfo) 
 
 // singleLayerIDComponent returns a single layer’s the input to computing a layer (chain) ID,
 // and an indication whether the input already has the shape of a layer ID.
-// It returns ("", false) if the layer is not found at all (which should never happen)
-func (s *storageImageDestination) singleLayerIDComponent(layerIndex int, blobDigest digest.Digest) (string, bool) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	trusted, ok := s.trustedLayerIdentityDataLocked(layerIndex, blobDigest)
-	if !ok {
-		return "", false
-	}
+func (trusted trustedLayerIdentityData) singleLayerIDComponent() (string, bool) {
 	if trusted.layerIdentifiedByTOC {
 		return "@TOC=" + trusted.tocDigest.Encoded(), false // "@" is not a valid start of a digest.Digest, so this is unambiguous.
 	}
@@ -875,9 +867,10 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 
 	// Check if there's already a layer with the ID that we'd give to the result of applying
 	// this layer blob to its parent, if it has one, or the blob's hex value otherwise.
-	// The layerID refers either to the DiffID or the digest of the TOC.
-	layerIDComponent, layerIDComponentStandalone := s.singleLayerIDComponent(index, info.digest)
-	if layerIDComponent == "" {
+	s.lock.Lock()
+	trusted, ok := s.trustedLayerIdentityDataLocked(index, info.digest)
+	s.lock.Unlock()
+	if !ok {
 		// Check if it's elsewhere and the caller just forgot to pass it to us in a PutBlob() / TryReusingBlob() / …
 		//
 		// Use none.NoCache to avoid a repeated DiffID lookup in the BlobInfoCache: a caller
@@ -902,12 +895,15 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 			return false, fmt.Errorf("error determining uncompressed digest for blob %q", info.digest.String())
 		}
 
-		layerIDComponent, layerIDComponentStandalone = s.singleLayerIDComponent(index, info.digest)
-		if layerIDComponent == "" {
+		s.lock.Lock()
+		trusted, ok = s.trustedLayerIdentityDataLocked(index, info.digest)
+		s.lock.Unlock()
+		if !ok {
 			return false, fmt.Errorf("we have blob %q, but don't know its layer ID", info.digest.String())
 		}
 	}
-
+	// The layerID refers either to the DiffID or the digest of the TOC.
+	layerIDComponent, layerIDComponentStandalone := trusted.singleLayerIDComponent()
 	id := layerIDComponent
 	if !layerIDComponentStandalone || parentLayer != "" {
 		id = digest.Canonical.FromString(parentLayer + "+" + layerIDComponent).Encoded()
