@@ -189,14 +189,18 @@ func TestParseWithGraphDriverOptions(t *testing.T) {
 
 // makeLayerGoroutine writes to pwriter, and on success, updates uncompressedCount
 // before it terminates.
-func makeLayerGoroutine(pwriter io.Writer, uncompressedCount *int64, compression archive.Compression) error {
+func makeLayerGoroutine(pwriter io.Writer, uncompressedCount *int64, compression archive.Compression) (retErr error) {
 	var uncompressed *ioutils.WriteCounter
 	if compression != archive.Uncompressed {
 		compressor, err := archive.CompressStream(pwriter, compression)
 		if err != nil {
 			return fmt.Errorf("compressing layer: %w", err)
 		}
-		defer compressor.Close()
+		defer func() {
+			if err := compressor.Close(); err != nil && retErr == nil {
+				retErr = err
+			}
+		}()
 		uncompressed = ioutils.NewWriteCounter(compressor)
 	} else {
 		uncompressed = ioutils.NewWriteCounter(pwriter)
