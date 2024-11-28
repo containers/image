@@ -190,8 +190,3 @@ func (ref dirReference) signaturePath(index int, instanceDigest *digest.Digest) 
 	}
 	return filepath.Join(ref.path, fmt.Sprintf("signature-%d", index+1)), nil
 }
-
-// versionPath returns a path for the version file within a directory using our conventions.
-func (ref dirReference) versionPath() string {
-	return filepath.Join(ref.path, "version")
-}
