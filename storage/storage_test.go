@@ -9,6 +9,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -187,12 +188,11 @@ func TestParseWithGraphDriverOptions(t *testing.T) {
 	}
 }
 
-// makeLayerGoroutine writes to pwriter, and on success, updates uncompressedCount
+// makeLayerGoroutine writes to dest, and on success, updates uncompressedCount and uncompressedDigest
 // before it terminates.
-func makeLayerGoroutine(pwriter io.Writer, uncompressedCount *int64, compression archive.Compression) (retErr error) {
-	var uncompressed *ioutils.WriteCounter
+func makeLayerGoroutine(dest io.Writer, uncompressedCount *int64, uncompressedDigest *digest.Digest, compression archive.Compression) (retErr error) {
 	if compression != archive.Uncompressed {
-		compressor, err := archive.CompressStream(pwriter, compression)
+		compressor, err := archive.CompressStream(dest, compression)
 		if err != nil {
 			return fmt.Errorf("compressing layer: %w", err)
 		}
@@ -201,11 +201,12 @@ func makeLayerGoroutine(pwriter io.Writer, uncompressedCount *int64, compression
 				retErr = err
 			}
 		}()
-		uncompressed = ioutils.NewWriteCounter(compressor)
-	} else {
-		uncompressed = ioutils.NewWriteCounter(pwriter)
+		dest = compressor
 	}
-	twriter := tar.NewWriter(uncompressed)
+
+	uncompressedCounter := ioutils.NewWriteCounter(dest)
+	uncompressedDigester := digest.Canonical.Digester()
+	twriter := tar.NewWriter(io.MultiWriter(uncompressedCounter, uncompressedDigester.Hash()))
 	// 	defer twriter.Close()
 	// should be called here to correctly terminate the archive.
 	// We do not do that, to workaround https://github.com/containers/storage/issues/1729 :
@@ -248,36 +249,40 @@ func makeLayerGoroutine(pwriter io.Writer, uncompressedCount *int64, compression
 	if err := twriter.Flush(); err != nil {
 		return fmt.Errorf("Error flushing output to tar archive: %w", err)
 	}
-	*uncompressedCount = uncompressed.Count
+	*uncompressedCount = uncompressedCounter.Count
+	*uncompressedDigest = uncompressedDigester.Digest()
 	return nil
 }
 
 type testBlob struct {
-	compressedDigest digest.Digest
-	uncompressedSize int64
-	compressedSize   int64
-	data             []byte
+	uncompressedDigest digest.Digest
+	compressedDigest   digest.Digest
+	uncompressedSize   int64
+	compressedSize     int64
+	data               []byte
 }
 
 func makeLayer(t *testing.T, compression archive.Compression) testBlob {
 	preader, pwriter := io.Pipe()
 	var uncompressedCount int64
+	var uncompressedDigest digest.Digest
 	go func() {
 		err := errors.New("Internal error: unexpected panic in makeLayer")
 		defer func() { // Note that this is not the same as {defer pipeWriter.CloseWithError(err)}; we need err to be evaluated lazily.
 			_ = pwriter.CloseWithError(err)
 		}()
-		err = makeLayerGoroutine(pwriter, &uncompressedCount, compression)
+		err = makeLayerGoroutine(pwriter, &uncompressedCount, &uncompressedDigest, compression)
 	}()
 
 	tbuffer := bytes.Buffer{}
 	_, err := io.Copy(&tbuffer, preader)
 	require.NoError(t, err)
 	return testBlob{
-		compressedDigest: digest.SHA256.FromBytes(tbuffer.Bytes()),
-		uncompressedSize: uncompressedCount,
-		compressedSize:   int64(tbuffer.Len()),
-		data:             tbuffer.Bytes(),
+		uncompressedDigest: uncompressedDigest,
+		compressedDigest:   digest.SHA256.FromBytes(tbuffer.Bytes()),
+		uncompressedSize:   uncompressedCount,
+		compressedSize:     int64(tbuffer.Len()),
+		data:               tbuffer.Bytes(),
 	}
 }
 
@@ -309,6 +314,40 @@ func ensureTestCanCreateImages(t *testing.T) {
 	}
 }
 
+// configForLayers returns a minimally-plausible config for layers
+func configForLayers(t *testing.T, layers []testBlob) testBlob {
+	rootFS := manifest.Schema2RootFS{
+		Type:    "layers",
+		DiffIDs: []digest.Digest{},
+	}
+	for _, l := range layers {
+		rootFS.DiffIDs = append(rootFS.DiffIDs, l.uncompressedDigest)
+	}
+	// Add a unique label so that different calls to configForLayers don’t try to use the same image ID.
+	randomBytes := make([]byte, digest.Canonical.Size())
+	_, err := rand.Read(randomBytes)
+	require.NoError(t, err)
+	config := manifest.Schema2Image{
+		Schema2V1Image: manifest.Schema2V1Image{
+			Config: &manifest.Schema2Config{
+				Labels: map[string]string{"unique": fmt.Sprintf("%x", randomBytes)},
+			},
+			Created: time.Now(),
+		},
+		RootFS: &rootFS,
+	}
+	configBytes, err := json.Marshal(config)
+	require.NoError(t, err)
+	configDigest := digest.Canonical.FromBytes(configBytes)
+	return testBlob{
+		uncompressedDigest: configDigest,
+		compressedDigest:   configDigest,
+		uncompressedSize:   int64(len(configBytes)),
+		compressedSize:     int64(len(configBytes)),
+		data:               configBytes,
+	}
+}
+
 func createUncommittedImageDest(t *testing.T, ref types.ImageReference, cache types.BlobInfoCache,
 	layers []testBlob, config *testBlob) (types.ImageDestination, types.UnparsedImage) {
 	dest, err := ref.NewImageDestination(context.Background(), nil)
@@ -320,21 +359,11 @@ func createUncommittedImageDest(t *testing.T, ref types.ImageReference, cache ty
 		layerDescriptors = append(layerDescriptors, desc)
 	}
 
-	var configDescriptor manifest.Schema2Descriptor
-	if config != nil {
-		configDescriptor = config.storeBlob(t, dest, cache, manifest.DockerV2Schema2ConfigMediaType, true)
-	} else {
-		// Use a random digest so that different calls to createUncommittedImageDest with config == nil don’t try to
-		// use the same image ID.
-		digestBytes := make([]byte, digest.Canonical.Size())
-		_, err := rand.Read(digestBytes)
-		require.NoError(t, err)
-		configDescriptor = manifest.Schema2Descriptor{
-			MediaType: manifest.DockerV2Schema2ConfigMediaType,
-			Size:      1,
-			Digest:    digest.NewDigestFromBytes(digest.Canonical, digestBytes),
-		}
+	if config == nil {
+		cd := configForLayers(t, layers)
+		config = &cd
 	}
+	configDescriptor := config.storeBlob(t, dest, cache, manifest.DockerV2Schema2ConfigMediaType, true)
 
 	manifest := manifest.Schema2FromComponents(configDescriptor, layerDescriptors)
 	manifestBytes, err := manifest.Serialize()
@@ -361,14 +390,6 @@ func createImage(t *testing.T, ref types.ImageReference, cache types.BlobInfoCac
 
 func TestWriteRead(t *testing.T) {
 	ensureTestCanCreateImages(t)
-
-	configBytes := []byte(`{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`)
-	config := testBlob{
-		compressedDigest: digest.SHA256.FromBytes(configBytes),
-		uncompressedSize: int64(len(configBytes)),
-		compressedSize:   int64(len(configBytes)),
-		data:             configBytes,
-	}
 
 	manifests := []string{
 		//`{
@@ -447,6 +468,7 @@ func TestWriteRead(t *testing.T) {
 		layer := makeLayer(t, compression)
 		_ = layer.storeBlob(t, dest, cache, manifest.DockerV2Schema2LayerMediaType, false)
 		t.Logf("Wrote randomly-generated layer %q (%d/%d bytes) to destination", layer.compressedDigest, layer.compressedSize, layer.uncompressedSize)
+		config := configForLayers(t, []testBlob{layer})
 		_ = config.storeBlob(t, dest, cache, manifest.DockerV2Schema2ConfigMediaType, true)
 
 		manifest := strings.ReplaceAll(manifestFmt, "%lh", layer.compressedDigest.String())
@@ -639,18 +661,13 @@ func TestSize(t *testing.T) {
 
 	layer1 := makeLayer(t, archive.Gzip)
 	layer2 := makeLayer(t, archive.Gzip)
-	configBytes := []byte(`{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`)
-	config := testBlob{
-		compressedDigest: digest.SHA256.FromBytes(configBytes),
-		uncompressedSize: int64(len(configBytes)),
-		compressedSize:   int64(len(configBytes)),
-		data:             configBytes,
-	}
+	layerBlobs := []testBlob{layer1, layer2}
+	config := configForLayers(t, layerBlobs)
 
 	ref, err := Transport.ParseReference("test")
 	require.NoError(t, err)
 
-	createImage(t, ref, cache, []testBlob{layer1, layer2}, &config)
+	createImage(t, ref, cache, layerBlobs, &config)
 
 	img, err := ref.NewImage(context.Background(), nil)
 	require.NoError(t, err)
@@ -677,15 +694,9 @@ func TestDuplicateBlob(t *testing.T) {
 
 	layer1 := makeLayer(t, archive.Gzip)
 	layer2 := makeLayer(t, archive.Gzip)
-	configBytes := []byte(`{"config":{"labels":{}},"created":"2006-01-02T15:04:05Z"}`)
-	config := testBlob{
-		compressedDigest: digest.SHA256.FromBytes(configBytes),
-		uncompressedSize: int64(len(configBytes)),
-		compressedSize:   int64(len(configBytes)),
-		data:             configBytes,
-	}
-
-	createImage(t, ref, cache, []testBlob{layer1, layer2, layer1, layer2}, &config)
+	layerBlobs := []testBlob{layer1, layer2, layer1, layer2}
+	config := configForLayers(t, layerBlobs)
+	createImage(t, ref, cache, layerBlobs, &config)
 
 	img, err := ref.NewImage(context.Background(), nil)
 	require.NoError(t, err)
