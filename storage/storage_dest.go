@@ -17,8 +17,11 @@ import (
 	"sync/atomic"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/image"
 	"github.com/containers/image/v5/internal/imagedestination/impl"
 	"github.com/containers/image/v5/internal/imagedestination/stubs"
+	srcImpl "github.com/containers/image/v5/internal/imagesource/impl"
+	srcStubs "github.com/containers/image/v5/internal/imagesource/stubs"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/internal/putblobdigest"
 	"github.com/containers/image/v5/internal/signature"
@@ -56,8 +59,9 @@ type storageImageDestination struct {
 	imageRef              storageReference
 	directory             string                   // Temporary directory where we store blobs until Commit() time
 	nextTempFileID        atomic.Int32             // A counter that we use for computing filenames to assign to blobs
-	manifest              []byte                   // Manifest contents, temporary
-	manifestDigest        digest.Digest            // Valid if len(manifest) != 0
+	manifest              []byte                   // (Per-instance) manifest contents, or nil if not yet known.
+	manifestMIMEType      string                   // Valid if manifest != nil
+	manifestDigest        digest.Digest            // Valid if manifest != nil
 	untrustedDiffIDValues []digest.Digest          // From config’s RootFS.DiffIDs (not even validated to be valid digest.Digest!); or nil if not read yet
 	signatures            []byte                   // Signature contents, temporary
 	signatureses          map[digest.Digest][]byte // Instance signature contents, temporary
@@ -201,6 +205,18 @@ func (s *storageImageDestination) Close() error {
 
 func (s *storageImageDestination) computeNextBlobCacheFile() string {
 	return filepath.Join(s.directory, fmt.Sprintf("%d", s.nextTempFileID.Add(1)))
+}
+
+// NoteOriginalOCIConfig provides the config of the image, as it exists on the source, BUT converted to OCI format,
+// or an error obtaining that value (e.g. if the image is an artifact and not a container image).
+// The destination can use it in its TryReusingBlob/PutBlob implementations
+// (otherwise it only obtains the final config after all layers are written).
+func (s *storageImageDestination) NoteOriginalOCIConfig(ociConfig *imgspecv1.Image, configErr error) error {
+	if configErr != nil {
+		return fmt.Errorf("writing to c/storage without a valid image config: %w", configErr)
+	}
+	s.setUntrustedDiffIDValuesFromOCIConfig(ociConfig)
+	return nil
 }
 
 // PutBlobWithOptions writes contents of stream and returns data representing the result.
@@ -1111,52 +1127,110 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 	return layer, nil
 }
 
+// uncommittedImageSource allows accessing an image’s metadata (not layers) before it has been committed,
+// to allow using image.FromUnparsedImage.
+type uncommittedImageSource struct {
+	srcImpl.Compat
+	srcImpl.PropertyMethodsInitialize
+	srcImpl.NoSignatures
+	srcImpl.DoesNotAffectLayerInfosForCopy
+	srcStubs.NoGetBlobAtInitialize
+
+	d *storageImageDestination
+}
+
+func newUncommittedImageSource(d *storageImageDestination) *uncommittedImageSource {
+	s := &uncommittedImageSource{
+		PropertyMethodsInitialize: srcImpl.PropertyMethods(srcImpl.Properties{
+			HasThreadSafeGetBlob: true,
+		}),
+		NoGetBlobAtInitialize: srcStubs.NoGetBlobAt(d.Reference()),
+
+		d: d,
+	}
+	s.Compat = srcImpl.AddCompat(s)
+	return s
+}
+
+func (u *uncommittedImageSource) Reference() types.ImageReference {
+	return u.d.Reference()
+}
+
+func (u *uncommittedImageSource) Close() error {
+	return nil
+}
+
+func (u *uncommittedImageSource) GetManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error) {
+	return u.d.manifest, u.d.manifestMIMEType, nil
+}
+
+func (u *uncommittedImageSource) GetBlob(ctx context.Context, info types.BlobInfo, cache types.BlobInfoCache) (io.ReadCloser, int64, error) {
+	blob, err := u.d.getConfigBlob(info)
+	if err != nil {
+		return nil, -1, err
+	}
+	return io.NopCloser(bytes.NewReader(blob)), int64(len(blob)), nil
+}
+
 // untrustedLayerDiffID returns a DiffID value for layerIndex from the image’s config.
 // If the value is not yet available (but it can be available after s.manifets is set), it returns ("", nil).
 // WARNING: We don’t validate the DiffID value against the layer contents; it must not be used for any deduplication.
 func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.Digest, error) {
-	// At this point, we are either inside the multi-threaded scope of HasThreadSafePutBlob, and
-	// nothing is writing to s.manifest yet, or PutManifest has been called and s.manifest != nil.
+	// At this point, we are either inside the multi-threaded scope of HasThreadSafePutBlob,
+	// nothing is writing to s.manifest yet, and s.untrustedDiffIDValues might have been set
+	// by NoteOriginalOCIConfig and are not being updated any more;
+	// or PutManifest has been called and s.manifest != nil.
 	// Either way this function does not need the protection of s.lock.
-	if s.manifest == nil {
-		return "", nil
-	}
 
 	if s.untrustedDiffIDValues == nil {
-		mt := manifest.GuessMIMEType(s.manifest)
-		if mt != imgspecv1.MediaTypeImageManifest {
-			// We could, in principle, build an ImageSource, support arbitrary image formats using image.FromUnparsedImage,
-			// and then use types.Image.OCIConfig so that we can parse the image.
-			//
-			// In practice, this should, right now, only matter for pulls of OCI images (this code path implies that a layer has annotation),
-			// while converting to a non-OCI formats, using a manual (skopeo copy) or something similar, not (podman pull).
-			// So it is not implemented yet.
-			return "", fmt.Errorf("determining DiffID for manifest type %q is not yet supported", mt)
-		}
-		man, err := manifest.FromBlob(s.manifest, mt)
-		if err != nil {
-			return "", fmt.Errorf("parsing manifest: %w", err)
+		// Typically, we expect untrustedDiffIDValues to be set by the generic copy code
+		// via NoteOriginalOCIConfig; this is a compatibility fallback for external callers
+		// of the public types.ImageDestination.
+		if s.manifest == nil {
+			return "", nil
 		}
 
-		cb, err := s.getConfigBlob(man.ConfigInfo())
+		ctx := context.Background() // This is all happening in memory, no need to worry about cancellation.
+		unparsed := image.UnparsedInstance(newUncommittedImageSource(s), nil)
+		sourced, err := image.FromUnparsedImage(ctx, nil, unparsed)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("parsing image to be committed: %w", err)
+		}
+		configOCI, err := sourced.OCIConfig(ctx)
+		if err != nil {
+			return "", fmt.Errorf("obtaining config of image to be committed: %w", err)
 		}
 
-		// retrieve the expected uncompressed digest from the config blob.
-		configOCI := &imgspecv1.Image{}
-		if err := json.Unmarshal(cb, configOCI); err != nil {
-			return "", err
-		}
-		s.untrustedDiffIDValues = slices.Clone(configOCI.RootFS.DiffIDs)
-		if s.untrustedDiffIDValues == nil { // Unlikely but possible in theory…
-			s.untrustedDiffIDValues = []digest.Digest{}
-		}
+		s.setUntrustedDiffIDValuesFromOCIConfig(configOCI)
 	}
+
 	if layerIndex >= len(s.untrustedDiffIDValues) {
 		return "", fmt.Errorf("image config has only %d DiffID values, but a layer with index %d exists", len(s.untrustedDiffIDValues), layerIndex)
 	}
-	return s.untrustedDiffIDValues[layerIndex], nil
+	res := s.untrustedDiffIDValues[layerIndex]
+	if res == "" {
+		// In practice, this should, right now, only matter for pulls of OCI images
+		// (this code path implies that we did a partial pull because a layer has an annotation),
+		// So, DiffIDs should always be set.
+		//
+		// It is, though, reachable by pulling an OCI image while converting to schema1,
+		// using a manual (skopeo copy) or something similar, not (podman pull).
+		//
+		// Our schema1.OCIConfig code produces non-empty DiffID arrays of empty values.
+		// The current semantics of this function are that ("", nil) means "try again later",
+		// which is not what we want to happen; for now, turn that into an explicit error.
+		return "", fmt.Errorf("DiffID value for layer %d is unknown or explicitly empty", layerIndex)
+	}
+	return res, nil
+}
+
+// setUntrustedDiffIDValuesFromOCIConfig updates s.untrustedDiffIDvalues from config.
+// The caller must ensure s.lock does not need to be held.
+func (s *storageImageDestination) setUntrustedDiffIDValuesFromOCIConfig(config *imgspecv1.Image) {
+	s.untrustedDiffIDValues = slices.Clone(config.RootFS.DiffIDs)
+	if s.untrustedDiffIDValues == nil { // Unlikely but possible in theory…
+		s.untrustedDiffIDValues = []digest.Digest{}
+	}
 }
 
 // CommitWithOptions marks the process of storing the image as successful and asks for the image to be persisted.
@@ -1166,7 +1240,7 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 func (s *storageImageDestination) CommitWithOptions(ctx context.Context, options private.CommitOptions) error {
 	// This function is outside of the scope of HasThreadSafePutBlob, so we don’t need to hold s.lock.
 
-	if len(s.manifest) == 0 {
+	if s.manifest == nil {
 		return errors.New("Internal error: storageImageDestination.CommitWithOptions() called without PutManifest()")
 	}
 	toplevelManifest, _, err := options.UnparsedToplevel.Manifest(ctx)
@@ -1194,7 +1268,7 @@ func (s *storageImageDestination) CommitWithOptions(ctx context.Context, options
 		}
 	}
 	// Find the list of layer blobs.
-	man, err := manifest.FromBlob(s.manifest, manifest.GuessMIMEType(s.manifest))
+	man, err := manifest.FromBlob(s.manifest, s.manifestMIMEType)
 	if err != nil {
 		return fmt.Errorf("parsing manifest: %w", err)
 	}
@@ -1242,7 +1316,7 @@ func (s *storageImageDestination) CommitWithOptions(ctx context.Context, options
 	}
 	// Set up to save the options.UnparsedToplevel's manifest if it differs from
 	// the per-platform one, which is saved below.
-	if len(toplevelManifest) != 0 && !bytes.Equal(toplevelManifest, s.manifest) {
+	if !bytes.Equal(toplevelManifest, s.manifest) {
 		manifestDigest, err := manifest.Digest(toplevelManifest)
 		if err != nil {
 			return fmt.Errorf("digesting top-level manifest: %w", err)
@@ -1397,6 +1471,10 @@ func (s *storageImageDestination) PutManifest(ctx context.Context, manifestBlob 
 		return err
 	}
 	s.manifest = bytes.Clone(manifestBlob)
+	if s.manifest == nil { // Make sure PutManifest can never succeed with s.manifest == nil
+		s.manifest = []byte{}
+	}
+	s.manifestMIMEType = manifest.GuessMIMEType(s.manifest)
 	s.manifestDigest = digest
 	return nil
 }
@@ -1419,7 +1497,7 @@ func (s *storageImageDestination) PutSignaturesWithFormat(ctx context.Context, s
 	if instanceDigest == nil {
 		s.signatures = sigblob
 		s.metadata.SignatureSizes = sizes
-		if len(s.manifest) > 0 {
+		if s.manifest != nil {
 			manifestDigest := s.manifestDigest
 			instanceDigest = &manifestDigest
 		}

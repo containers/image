@@ -27,6 +27,7 @@ import (
 type ociImageDestination struct {
 	impl.Compat
 	impl.PropertyMethodsInitialize
+	stubs.IgnoresOriginalOCIConfig
 	stubs.NoPutBlobPartialInitialize
 	stubs.NoSignaturesInitialize
 
