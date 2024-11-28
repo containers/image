@@ -363,35 +363,41 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	blobDigest := srcInfo.Digest
 
 	s.lock.Lock()
-	if out.UncompressedDigest != "" {
-		s.lockProtected.indexToDiffID[options.LayerIndex] = out.UncompressedDigest
-		if out.TOCDigest != "" {
-			options.Cache.RecordTOCUncompressedPair(out.TOCDigest, out.UncompressedDigest)
-		}
-		// Don’t set indexToTOCDigest on this path:
-		// - Using UncompressedDigest allows image reuse with non-partially-pulled layers, so we want to set indexToDiffID.
-		// - If UncompressedDigest has been computed, that means the layer was read completely, and the TOC has been created from scratch.
-		//   That TOC is quite unlikely to match any other TOC value.
+	if err := func() error { // A scope for defer
+		defer s.lock.Unlock()
 
-		// The computation of UncompressedDigest means the whole layer has been consumed; while doing that, chunked.GetDiffer is
-		// responsible for ensuring blobDigest has been validated.
-		if out.CompressedDigest != blobDigest {
-			return private.UploadedBlob{}, fmt.Errorf("internal error: PrepareStagedLayer returned CompressedDigest %q not matching expected %q",
-				out.CompressedDigest, blobDigest)
+		if out.UncompressedDigest != "" {
+			s.lockProtected.indexToDiffID[options.LayerIndex] = out.UncompressedDigest
+			if out.TOCDigest != "" {
+				options.Cache.RecordTOCUncompressedPair(out.TOCDigest, out.UncompressedDigest)
+			}
+			// Don’t set indexToTOCDigest on this path:
+			// - Using UncompressedDigest allows image reuse with non-partially-pulled layers, so we want to set indexToDiffID.
+			// - If UncompressedDigest has been computed, that means the layer was read completely, and the TOC has been created from scratch.
+			//   That TOC is quite unlikely to match any other TOC value.
+
+			// The computation of UncompressedDigest means the whole layer has been consumed; while doing that, chunked.GetDiffer is
+			// responsible for ensuring blobDigest has been validated.
+			if out.CompressedDigest != blobDigest {
+				return fmt.Errorf("internal error: PrepareStagedLayer returned CompressedDigest %q not matching expected %q",
+					out.CompressedDigest, blobDigest)
+			}
+			// So, record also information about blobDigest, that might benefit reuse.
+			// We trust PrepareStagedLayer to validate or create both values correctly.
+			s.lockProtected.blobDiffIDs[blobDigest] = out.UncompressedDigest
+			options.Cache.RecordDigestUncompressedPair(out.CompressedDigest, out.UncompressedDigest)
+		} else {
+			// Use diffID for layer identity if it is known.
+			if uncompressedDigest := options.Cache.UncompressedDigestForTOC(out.TOCDigest); uncompressedDigest != "" {
+				s.lockProtected.indexToDiffID[options.LayerIndex] = uncompressedDigest
+			}
+			s.lockProtected.indexToTOCDigest[options.LayerIndex] = out.TOCDigest
 		}
-		// So, record also information about blobDigest, that might benefit reuse.
-		// We trust PrepareStagedLayer to validate or create both values correctly.
-		s.lockProtected.blobDiffIDs[blobDigest] = out.UncompressedDigest
-		options.Cache.RecordDigestUncompressedPair(out.CompressedDigest, out.UncompressedDigest)
-	} else {
-		// Use diffID for layer identity if it is known.
-		if uncompressedDigest := options.Cache.UncompressedDigestForTOC(out.TOCDigest); uncompressedDigest != "" {
-			s.lockProtected.indexToDiffID[options.LayerIndex] = uncompressedDigest
-		}
-		s.lockProtected.indexToTOCDigest[options.LayerIndex] = out.TOCDigest
+		s.lockProtected.diffOutputs[options.LayerIndex] = out
+		return nil
+	}(); err != nil {
+		return private.UploadedBlob{}, err
 	}
-	s.lockProtected.diffOutputs[options.LayerIndex] = out
-	s.lock.Unlock()
 
 	succeeded = true
 	return private.UploadedBlob{
