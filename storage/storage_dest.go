@@ -913,21 +913,23 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	return false, nil
 }
 
-// layerID computes a layer (“chain”) ID for (a possibly-empty parentLayer, trusted)
-func layerID(parentLayer string, trusted trustedLayerIdentityData) string {
-	var layerIDComponent string
+// layerID computes a layer (“chain”) ID for (a possibly-empty parentID, trusted)
+func layerID(parentID string, trusted trustedLayerIdentityData) string {
+	var component string
+	mustHash := false
 	if trusted.layerIdentifiedByTOC {
 		// "@" is not a valid start of a digest.Digest.Encoded(), so this is unambiguous with the !layerIdentifiedByTOC case.
 		// But we _must_ hash this below to get a Digest.Encoded()-formatted value.
-		layerIDComponent = "@TOC=" + trusted.tocDigest.Encoded()
+		component = "@TOC=" + trusted.tocDigest.Encoded()
+		mustHash = true
 	} else {
-		layerIDComponent = trusted.diffID.Encoded() // This looks like chain IDs, and it uses the traditional value.
+		component = trusted.diffID.Encoded() // This looks like chain IDs, and it uses the traditional value.
 	}
-	id := layerIDComponent
-	if trusted.layerIdentifiedByTOC || parentLayer != "" {
-		id = digest.Canonical.FromString(parentLayer + "+" + layerIDComponent).Encoded()
+
+	if parentID == "" && !mustHash {
+		return component
 	}
-	return id
+	return digest.Canonical.FromString(parentID + "+" + component).Encoded()
 }
 
 // createNewLayer creates a new layer newLayerID for (index, layerDigest) on top of parentLayer (which may be "").
