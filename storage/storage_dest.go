@@ -358,6 +358,9 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	//
 	// So, if the input image doesn't have RootFS.DiffIDs (i.e. is schema1), don't bother with partial pulls at all,
 	// and always use the traditional “view”.
+	// FIXME FIXME: Can we proceed (and allow convert_images) for schema1 here? We “just” need to ensure that there is no TOC digest
+	// on the input (and sanity-check that there is none on the output as well?).
+
 	// (Hypothetically, the user can opt out of the DiffID commitment by a c/storage option, giving up security for performance,
 	// but schema1 images don't support layer annotations anyway, so neither zstd:chunked nor estargz layers can
 	// benefit from partial pulls anyway — so this is not giving up on partial pull functionality; OTOH it may
@@ -950,8 +953,14 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 			if !errors.As(err, &e) {
 				return false, err
 			}
-			// If untrustedLayerDiffIDUnknownError, the input image is schema1 and we should not have done a partial pull or a TOC-based match.
-			// FIXME: review tryReusingBlob… and PutBlobPartial to verify
+			// If untrustedLayerDiffIDUnknownError, the input image is schema1, has no TOC annotations,
+			// so we could not have reused a TOC-identified layer nor have done a TOC-identified partial pull,
+			// i.e. there is no other “view” to worry about.  Sanity-check that we really see the only expected view.
+			//
+			// Or, maybe, the input image is OCI, and has invalid/missing DiffID values in config. In that case
+			// we _must_ fail if we used a TOC-identified layer - but PutBlobPartial should have already
+			// refused to do a partial pull, so we are in an inconsistent state.
+			// FIXME: except when users opted out of c/storage computing the digest, document better
 			if trusted.layerIdentifiedByTOC {
 				return false, fmt.Errorf("internal error: layer %d for blob %s was identified by TOC, but we don't have a DiffID in config",
 					index, trusted.logString())
@@ -1025,9 +1034,16 @@ func (s *storageImageDestination) createNewLayer(index int, trusted trustedLayer
 				}
 				var e untrustedLayerDiffIDUnknownError
 				if errors.As(err, &e) {
-					// If untrustedLayerDiffIDUnknownError, the input image is schema1 and we should not have done a partial pull or a TOC-based match.
-					// FIXME: review tryReusingBlob… and PutBlobPartial to verify
-					return nil, fmt.Errorf("internal error: layer %d for blob %s was partially-pulled, but we don't have a DiffID in config",
+					// If untrustedLayerDiffIDUnknownError, the input image is schema1, has no TOC annotations,
+					// so we could not have reused a TOC-identified layer nor have done a TOC-identified partial pull.
+					//
+					// We might have used the PutBlobPartial code path consuming the whole layer ("convert_images" in storage.conf)
+					// but in that case diffOutput.UncompressedDigest should have beren set.
+					//
+					// Or, maybe, the input image is OCI, and has invalid/missing DiffID values in config. In that case
+					// commitLayer should have already refused this image when dealing with the “view” ambiguity.
+					// FIXME: except when users opted out of c/storage computing the digest, document better
+					return nil, fmt.Errorf("internal error: layer %d for blob %s was partially-pulled with unknown UncompressedDigest, but we don't have a DiffID in config",
 						index, trusted.logString())
 				}
 				return nil, err
