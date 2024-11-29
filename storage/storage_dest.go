@@ -822,15 +822,6 @@ func (s *storageImageDestination) queueOrCommit(index int, info addedLayerInfo) 
 	return nil
 }
 
-// singleLayerIDComponent returns a single layer’s the input to computing a layer (chain) ID,
-// and an indication whether the input already has the shape of a layer ID.
-func (trusted trustedLayerIdentityData) singleLayerIDComponent() (string, bool) {
-	if trusted.layerIdentifiedByTOC {
-		return "@TOC=" + trusted.tocDigest.Encoded(), false // "@" is not a valid start of a digest.Digest, so this is unambiguous.
-	}
-	return trusted.diffID.Encoded(), true // This looks like chain IDs, and it uses the traditional value.
-}
-
 // commitLayer commits the specified layer with the given index to the storage.
 // size can usually be -1; it can be provided if the layer is not known to be already present in blobDiffIDs.
 //
@@ -923,6 +914,15 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	}
 	s.indexToStorageID[index] = layer.ID
 	return false, nil
+}
+
+// singleLayerIDComponent returns a single layer’s the input to computing a layer (chain) ID,
+// and an indication whether the input already has the shape of a layer ID.
+func (trusted trustedLayerIdentityData) singleLayerIDComponent() (string, bool) {
+	if trusted.layerIdentifiedByTOC {
+		return "@TOC=" + trusted.tocDigest.Encoded(), false // "@" is not a valid start of a digest.Digest, so this is unambiguous.
+	}
+	return trusted.diffID.Encoded(), true // This looks like chain IDs, and it uses the traditional value.
 }
 
 // createNewLayer creates a new layer newLayerID for (index, layerDigest) on top of parentLayer (which may be "").
