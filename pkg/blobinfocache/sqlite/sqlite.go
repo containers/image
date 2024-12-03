@@ -12,7 +12,11 @@ import (
 	"github.com/containers/image/v5/internal/blobinfocache"
 	"github.com/containers/image/v5/pkg/blobinfocache/internal/prioritize"
 	"github.com/containers/image/v5/types"
-	_ "github.com/mattn/go-sqlite3" // Registers the "sqlite3" backend backend for database/sql
+
+	// Registers the "sqlite3" backend backend for database/sql
+	_ "github.com/ncruces/go-sqlite3/driver"
+	_ "github.com/ncruces/go-sqlite3/embed"
+
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 )
