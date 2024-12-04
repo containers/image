@@ -698,3 +698,178 @@ func TestPRSigstoreSignedFulcioUnmarshalJSON(t *testing.T) {
 		duplicateFields: []string{"caData", "oidcIssuer", "subjectEmail"},
 	}.run(t)
 }
+
+func TestNewPRSigstoreSignedPKI(t *testing.T) {
+	const testCARootsPath = "/foo/bar"
+	testCARootsData := []byte("abc")
+	const testCAIntermediatesPath = "/foo/baz"
+	testCAIntermediatesData := []byte("def")
+	const testSubjectHostname = "https://example.com"
+	const testSubjectEmail = "test@example.com"
+
+	// Success:
+	for _, c := range []struct {
+		options  []PRSigstoreSignedPKIOption
+		expected prSigstoreSignedPKI
+	}{
+		{
+			options: []PRSigstoreSignedPKIOption{
+				PRSigstoreSignedPKIWithCARootsPath(testCARootsPath),
+				PRSigstoreSignedPKIWithSubjectHostname(testSubjectHostname),
+				PRSigstoreSignedPKIWithSubjectEmail(testSubjectEmail),
+			},
+			expected: prSigstoreSignedPKI{
+				CARootsPath:     testCARootsPath,
+				SubjectHostname: testSubjectHostname,
+				SubjectEmail:    testSubjectEmail,
+			},
+		},
+		{
+			options: []PRSigstoreSignedPKIOption{
+				PRSigstoreSignedPKIWithCARootsData(testCARootsData),
+				PRSigstoreSignedPKIWithSubjectHostname(testSubjectHostname),
+				PRSigstoreSignedPKIWithSubjectEmail(testSubjectEmail),
+			},
+			expected: prSigstoreSignedPKI{
+				CARootsData:     testCARootsData,
+				SubjectHostname: testSubjectHostname,
+				SubjectEmail:    testSubjectEmail,
+			},
+		},
+		{
+			options: []PRSigstoreSignedPKIOption{
+				PRSigstoreSignedPKIWithCARootsData(testCARootsData),
+				PRSigstoreSignedPKIWithCAIntermediatesData(testCAIntermediatesData),
+				PRSigstoreSignedPKIWithSubjectHostname(testSubjectHostname),
+				PRSigstoreSignedPKIWithSubjectEmail(testSubjectEmail),
+			},
+			expected: prSigstoreSignedPKI{
+				CARootsData:         testCARootsData,
+				CAIntermediatesData: testCAIntermediatesData,
+				SubjectHostname:     testSubjectHostname,
+				SubjectEmail:        testSubjectEmail,
+			},
+		},
+		{
+			options: []PRSigstoreSignedPKIOption{
+				PRSigstoreSignedPKIWithCARootsData(testCARootsData),
+				PRSigstoreSignedPKIWithCAIntermediatesPath(testCAIntermediatesPath),
+				PRSigstoreSignedPKIWithSubjectHostname(testSubjectHostname),
+				PRSigstoreSignedPKIWithSubjectEmail(testSubjectEmail),
+			},
+			expected: prSigstoreSignedPKI{
+				CARootsData:         testCARootsData,
+				CAIntermediatesPath: testCAIntermediatesPath,
+				SubjectHostname:     testSubjectHostname,
+				SubjectEmail:        testSubjectEmail,
+			},
+		},
+	} {
+		pr, err := newPRSigstoreSignedPKI(c.options...)
+		require.NoError(t, err)
+		assert.Equal(t, &c.expected, pr)
+	}
+
+	for _, c := range [][]PRSigstoreSignedPKIOption{
+		{ // Neither caRootsPath nor caRootsData specified
+			PRSigstoreSignedPKIWithSubjectHostname(testSubjectHostname),
+		},
+		{ // Both caRootsPath and caRootsData specified
+			PRSigstoreSignedPKIWithCARootsPath(testCARootsPath),
+			PRSigstoreSignedPKIWithCARootsData(testCARootsData),
+			PRSigstoreSignedPKIWithSubjectHostname(testSubjectHostname),
+		},
+		{ // Both caIntermediatesPath and caIntermediatesData specified
+			PRSigstoreSignedPKIWithCAIntermediatesPath(testCAIntermediatesPath),
+			PRSigstoreSignedPKIWithCAIntermediatesData(testCAIntermediatesData),
+			PRSigstoreSignedPKIWithSubjectHostname(testSubjectHostname),
+		},
+		{ // Duplicate caRootsPath
+			PRSigstoreSignedPKIWithCARootsPath(testCARootsPath),
+			PRSigstoreSignedPKIWithCARootsPath(testCARootsPath + "1"),
+			PRSigstoreSignedPKIWithSubjectEmail(testSubjectEmail),
+		},
+		{ // Duplicate caRootsData
+			PRSigstoreSignedPKIWithCARootsData(testCARootsData),
+			PRSigstoreSignedPKIWithCARootsData([]byte("def")),
+			PRSigstoreSignedPKIWithSubjectEmail(testSubjectEmail),
+		},
+		{ // Missing subjectEmail and subjectHostname
+			PRSigstoreSignedPKIWithCARootsPath(testCARootsPath),
+		},
+		{ // Duplicate subjectHostname
+			PRSigstoreSignedPKIWithCARootsPath(testCARootsPath),
+			PRSigstoreSignedPKIWithSubjectHostname(testSubjectHostname),
+			PRSigstoreSignedPKIWithSubjectHostname(testSubjectHostname + "1"),
+		},
+		{ // Duplicate subjectEmail
+			PRSigstoreSignedPKIWithCARootsPath(testCARootsPath),
+			PRSigstoreSignedPKIWithSubjectEmail(testSubjectEmail),
+			PRSigstoreSignedPKIWithSubjectEmail("1" + testSubjectEmail),
+		},
+	} {
+		_, err := newPRSigstoreSignedPKI(c...)
+		logrus.Errorf("%#v", err)
+		assert.Error(t, err)
+	}
+}
+
+func TestPRSigstoreSignedPKIUnmarshalJSON(t *testing.T) {
+	policyJSONUmarshallerTests[PRSigstoreSignedPKI]{
+		newDest: func() json.Unmarshaler { return &prSigstoreSignedPKI{} },
+		newValidObject: func() (PRSigstoreSignedPKI, error) {
+			return NewPRSigstoreSignedPKI(
+				PRSigstoreSignedPKIWithCARootsPath("fixtures/pki_roots_crt.pem"),
+				PRSigstoreSignedPKIWithCAIntermediatesPath("fixtures/pki_intermediates_crt.pem"),
+				PRSigstoreSignedPKIWithSubjectHostname("myhost.example.com"),
+				PRSigstoreSignedPKIWithSubjectEmail("qiwan@redhat.com"),
+			)
+		},
+		otherJSONParser: nil,
+		breakFns: []func(mSA){
+			// Extra top-level sub-object
+			func(v mSA) { v["unexpected"] = 1 },
+			// Both of "caRootsPath" and "caRootsData" are missing
+			func(v mSA) { delete(v, "caRootsPath") },
+			// Both "caPath" and "caData" is present
+			func(v mSA) { v["caRootsData"] = "" },
+			// Invalid "caPath" field
+			func(v mSA) { v["caRootsPath"] = 1 },
+			// Invalid "caIntermediatesPath" field
+			func(v mSA) { v["caIntermediatesPath"] = 1 },
+			// Invalid "subjectHostname" field
+			func(v mSA) { v["subjectHostname"] = 1 },
+			// Invalid "subjectEmail" field
+			func(v mSA) { v["subjectEmail"] = 1 },
+			// Both "subjectHostname" and "subjectEmail" are missing
+			func(v mSA) {
+				delete(v, "subjectHostname")
+				delete(v, "subjectEmail")
+			},
+		},
+		duplicateFields: []string{"caRootsPath", "caIntermediatesPath", "subjectHostname", "subjectEmail"},
+	}.run(t)
+
+	// Test caRootsData specifics
+	policyJSONUmarshallerTests[PRSigstoreSignedPKI]{
+		newDest: func() json.Unmarshaler { return &prSigstoreSignedPKI{} },
+		newValidObject: func() (PRSigstoreSignedPKI, error) {
+			return NewPRSigstoreSignedPKI(
+				PRSigstoreSignedPKIWithCARootsData([]byte("abc")),
+				PRSigstoreSignedPKIWithCAIntermediatesData([]byte("def")),
+				PRSigstoreSignedPKIWithSubjectHostname("myhost.example.com"),
+				PRSigstoreSignedPKIWithSubjectEmail("qiwan@redhat.com"),
+			)
+		},
+		otherJSONParser: nil,
+		breakFns: []func(mSA){
+			// Invalid "caRootsData" field
+			func(v mSA) { v["caRootsData"] = 1 },
+			func(v mSA) { v["caRootsData"] = "this is invalid base64" },
+			// Invalid "caIntermediatesData" field
+			func(v mSA) { v["caIntermediatesData"] = 1 },
+			func(v mSA) { v["caIntermediatesData"] = "this is invalid base64" },
+		},
+		duplicateFields: []string{"caRootsData", "caIntermediatesData", "subjectHostname", "subjectEmail"},
+	}.run(t)
+}
