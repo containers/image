@@ -343,6 +343,42 @@ func (f *zstdFetcher) GetBlobAt(chunks []chunked.ImageSourceChunk) (chan io.Read
 // If the call fails with ErrFallbackToOrdinaryLayerDownload, the caller can fall back to PutBlobWithOptions.
 // The fallback _must not_ be done otherwise.
 func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, options private.PutBlobPartialOptions) (_ private.UploadedBlob, retErr error) {
+	// The identity of partially-pulled layers is, as long as we keep compatibility with tar-like consumers,
+	// unfixably ambiguous: there are two possible “views” of the same file (same compressed digest),
+	// the traditional “view” that decompresses the primary stream and consumes a tar file,
+	// and the partial-pull “view” that starts with the TOC.
+	// The two “views” have two separate metadata sets and may refer to different parts of the blob for file contents;
+	// the direct way to ensure they are consistent would be to read the full primary stream (and authenticate it against
+	// the compressed digest), and ensure the metadata and layer contents exactly match the partially-pulled contents -
+	// making the partial pull completely pointless.
+	//
+	// Instead, we require the image to “commit” to uncompressed layer digest values via the config's RootFS.DiffIDs array:
+	// they are already naturally computed for traditionally-pulled layers, and for partially-pulled layers we
+	// do the optimal partial pull, and then reconstruct the uncompressed tar stream just to (expensively) compute this digest.
+	//
+	// So, if the input image doesn't have RootFS.DiffIDs (i.e. is schema1), don't bother with partial pulls at all,
+	// and always use the traditional “view”.
+	// FIXME FIXME: Can we proceed (and allow convert_images) for schema1 here? We “just” need to ensure that there is no TOC digest
+	// on the input (and sanity-check that there is none on the output as well?).
+
+	// (Hypothetically, the user can opt out of the DiffID commitment by a c/storage option, giving up security for performance,
+	// but schema1 images don't support layer annotations anyway, so neither zstd:chunked nor estargz layers can
+	// benefit from partial pulls anyway — so this is not giving up on partial pull functionality; OTOH it may
+	// interfere with composefs conversion, which currently only happens on the partial pull code path.)
+	untrustedDiffID, err := s.untrustedLayerDiffID(options.LayerIndex)
+	if err != nil {
+		if errors.Is(err, errUntrustedLayerDiffIDNotYetAvailable) {
+			// PutBlobPartial is a private API, so all callers are within c/image, and should have called
+			// NoteOriginalOCIConfig first.
+			return private.UploadedBlob{}, fmt.Errorf("internal error: in PutBlobPartial, untrustedLayerDiffID returned errUntrustedLayerDiffIDNotYetAvailable")
+		}
+		var e untrustedLayerDiffIDUnknownError
+		if errors.As(err, &e) {
+			return private.UploadedBlob{}, private.NewErrFallbackToOrdinaryLayerDownload(err)
+		}
+		return private.UploadedBlob{}, err
+	}
+
 	fetcher := zstdFetcher{
 		chunkAccessor: chunkAccessor,
 		ctx:           ctx,
@@ -382,26 +418,35 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 	if err := func() error { // A scope for defer
 		defer s.lock.Unlock()
 
+		// For true partial pulls, c/storage decides whether to compute the uncompressed digest based on an option in storage.conf.
+		// c/storage can also be configured, on this code path, to consume the full blob (primarily to allow composefs conversion),
+		// and in that case it always consumes the full blob and always computes the uncompressed digest.
 		if out.UncompressedDigest != "" {
+			// This is centrally enforced later, in commitLayer, but because we have the value available,
+			// we might just as well check immediately.
+			if out.UncompressedDigest != untrustedDiffID {
+				return fmt.Errorf("uncompressed digest of layer %q is %q, config claims %q", srcInfo.Digest.String(),
+					out.UncompressedDigest.String(), untrustedDiffID.String())
+			}
+
 			s.lockProtected.indexToDiffID[options.LayerIndex] = out.UncompressedDigest
 			if out.TOCDigest != "" {
+				s.lockProtected.indexToTOCDigest[options.LayerIndex] = out.TOCDigest
 				options.Cache.RecordTOCUncompressedPair(out.TOCDigest, out.UncompressedDigest)
 			}
-			// Don’t set indexToTOCDigest on this path:
-			// - Using UncompressedDigest allows image reuse with non-partially-pulled layers, so we want to set indexToDiffID.
-			// - If UncompressedDigest has been computed, that means the layer was read completely, and the TOC has been created from scratch.
-			//   That TOC is quite unlikely to match any other TOC value.
 
-			// The computation of UncompressedDigest means the whole layer has been consumed; while doing that, chunked.GetDiffer is
+			// If the whole layer has been consumed, chunked.GetDiffer is
 			// responsible for ensuring blobDigest has been validated.
-			if out.CompressedDigest != blobDigest {
-				return fmt.Errorf("internal error: PrepareStagedLayer returned CompressedDigest %q not matching expected %q",
-					out.CompressedDigest, blobDigest)
+			if out.CompressedDigest != "" {
+				if out.CompressedDigest != blobDigest {
+					return fmt.Errorf("internal error: PrepareStagedLayer returned CompressedDigest %q not matching expected %q",
+						out.CompressedDigest, blobDigest)
+				}
+				// So, record also information about blobDigest, that might benefit reuse.
+				// We trust PrepareStagedLayer to validate or create both values correctly.
+				s.lockProtected.blobDiffIDs[blobDigest] = out.UncompressedDigest
+				options.Cache.RecordDigestUncompressedPair(out.CompressedDigest, out.UncompressedDigest)
 			}
-			// So, record also information about blobDigest, that might benefit reuse.
-			// We trust PrepareStagedLayer to validate or create both values correctly.
-			s.lockProtected.blobDiffIDs[blobDigest] = out.UncompressedDigest
-			options.Cache.RecordDigestUncompressedPair(out.CompressedDigest, out.UncompressedDigest)
 		} else {
 			// Use diffID for layer identity if it is known.
 			if uncompressedDigest := options.Cache.UncompressedDigestForTOC(out.TOCDigest); uncompressedDigest != "" {
@@ -607,6 +652,13 @@ type trustedLayerIdentityData struct {
 	diffID     digest.Digest // A digest of the uncompressed full contents of the layer, or "" if unknown; must be set if !layerIdentifiedByTOC
 	tocDigest  digest.Digest // A digest of the TOC digest, or "" if unknown; must be set if layerIdentifiedByTOC
 	blobDigest digest.Digest // A digest of the (possibly-compressed) layer as presented, or "" if unknown/untrusted.
+}
+
+// logString() prints a representation of trusted suitable identifying a layer in logs and errors.
+// The string is already quoted to expose malicious input and does not need to be quoted again.
+// Note that it does not include _all_ of the contents.
+func (trusted trustedLayerIdentityData) logString() string {
+	return fmt.Sprintf("%q/%q/%q", trusted.blobDigest, trusted.tocDigest, trusted.diffID)
 }
 
 // trustedLayerIdentityDataLocked returns a _consistent_ set of information for a layer with (layerIndex, blobDigest).
@@ -819,23 +871,6 @@ func (s *storageImageDestination) queueOrCommit(index int, info addedLayerInfo) 
 	return nil
 }
 
-// singleLayerIDComponent returns a single layer’s the input to computing a layer (chain) ID,
-// and an indication whether the input already has the shape of a layer ID.
-// It returns ("", false) if the layer is not found at all (which should never happen)
-func (s *storageImageDestination) singleLayerIDComponent(layerIndex int, blobDigest digest.Digest) (string, bool) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	trusted, ok := s.trustedLayerIdentityDataLocked(layerIndex, blobDigest)
-	if !ok {
-		return "", false
-	}
-	if trusted.layerIdentifiedByTOC {
-		return "@TOC=" + trusted.tocDigest.Encoded(), false // "@" is not a valid start of a digest.Digest, so this is unambiguous.
-	}
-	return trusted.diffID.Encoded(), true // This looks like chain IDs, and it uses the traditional value.
-}
-
 // commitLayer commits the specified layer with the given index to the storage.
 // size can usually be -1; it can be provided if the layer is not known to be already present in blobDiffIDs.
 //
@@ -847,16 +882,15 @@ func (s *storageImageDestination) singleLayerIDComponent(layerIndex int, blobDig
 // must guarantee that, at any given time, at most one goroutine may execute
 // `commitLayer()`.
 func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, size int64) (bool, error) {
-	// Already committed?  Return early.
 	if _, alreadyCommitted := s.indexToStorageID[index]; alreadyCommitted {
 		return false, nil
 	}
 
-	// Start with an empty string or the previous layer ID.  Note that
-	// `s.indexToStorageID` can only be accessed by *one* goroutine at any
-	// given time. Hence, we don't need to lock accesses.
-	var parentLayer string
+	var parentLayer string // "" if no parent
 	if index != 0 {
+		// s.indexToStorageID can only be written by this function, and the our caller
+		// is responsible for ensuring it can be only be called by *one* goroutine at any
+		// given time. Hence, we don't need to lock accesses.
 		prev, ok := s.indexToStorageID[index-1]
 		if !ok {
 			return false, fmt.Errorf("Internal error: commitLayer called with previous layer %d not committed yet", index-1)
@@ -864,18 +898,17 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 		parentLayer = prev
 	}
 
-	// Carry over the previous ID for empty non-base layers.
 	if info.emptyLayer {
 		s.indexToStorageID[index] = parentLayer
 		return false, nil
 	}
 
-	// Check if there's already a layer with the ID that we'd give to the result of applying
-	// this layer blob to its parent, if it has one, or the blob's hex value otherwise.
-	// The layerID refers either to the DiffID or the digest of the TOC.
-	layerIDComponent, layerIDComponentStandalone := s.singleLayerIDComponent(index, info.digest)
-	if layerIDComponent == "" {
-		// Check if it's elsewhere and the caller just forgot to pass it to us in a PutBlob() / TryReusingBlob() / …
+	// Collect trusted parameters of the layer.
+	s.lock.Lock()
+	trusted, ok := s.trustedLayerIdentityDataLocked(index, info.digest)
+	s.lock.Unlock()
+	if !ok {
+		// Check if the layer exists already and the caller just (incorrectly) forgot to pass it to us in a PutBlob() / TryReusingBlob() / …
 		//
 		// Use none.NoCache to avoid a repeated DiffID lookup in the BlobInfoCache: a caller
 		// that relies on using a blob digest that has never been seen by the store had better call
@@ -899,23 +932,53 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 			return false, fmt.Errorf("error determining uncompressed digest for blob %q", info.digest.String())
 		}
 
-		layerIDComponent, layerIDComponentStandalone = s.singleLayerIDComponent(index, info.digest)
-		if layerIDComponent == "" {
+		s.lock.Lock()
+		trusted, ok = s.trustedLayerIdentityDataLocked(index, info.digest)
+		s.lock.Unlock()
+		if !ok {
 			return false, fmt.Errorf("we have blob %q, but don't know its layer ID", info.digest.String())
 		}
 	}
 
-	id := layerIDComponent
-	if !layerIDComponentStandalone || parentLayer != "" {
-		id = digest.Canonical.FromString(parentLayer + "+" + layerIDComponent).Encoded()
+	// Ensure that we always see the same “view” of a layer, as identified by the layer’s uncompressed digest,
+	// unless the user has explicitly opted out of this in storage.conf: see the more detailed explanation in PutBlobPartial.
+	if trusted.diffID != "" {
+		untrustedDiffID, err := s.untrustedLayerDiffID(index)
+		if err != nil {
+			if errors.Is(err, errUntrustedLayerDiffIDNotYetAvailable) {
+				logrus.Debugf("Skipping commit for layer %q, manifest not yet available for DiffID check", index)
+				return true, nil
+			}
+			var e untrustedLayerDiffIDUnknownError
+			if !errors.As(err, &e) {
+				return false, err
+			}
+			// If untrustedLayerDiffIDUnknownError, the input image is schema1, has no TOC annotations,
+			// so we could not have reused a TOC-identified layer nor have done a TOC-identified partial pull,
+			// i.e. there is no other “view” to worry about.  Sanity-check that we really see the only expected view.
+			//
+			// Or, maybe, the input image is OCI, and has invalid/missing DiffID values in config. In that case
+			// we _must_ fail if we used a TOC-identified layer - but PutBlobPartial should have already
+			// refused to do a partial pull, so we are in an inconsistent state.
+			// FIXME: except when users opted out of c/storage computing the digest, document better
+			if trusted.layerIdentifiedByTOC {
+				return false, fmt.Errorf("internal error: layer %d for blob %s was identified by TOC, but we don't have a DiffID in config",
+					index, trusted.logString())
+			}
+		} else if trusted.diffID != untrustedDiffID {
+			return false, fmt.Errorf("layer %d (blob %s) does not match config's DiffID %q", index, trusted.logString(), untrustedDiffID)
+		}
 	}
+
+	id := layerID(parentLayer, trusted)
+
 	if layer, err2 := s.imageRef.transport.store.Layer(id); layer != nil && err2 == nil {
 		// There's already a layer that should have the right contents, just reuse it.
 		s.indexToStorageID[index] = layer.ID
 		return false, nil
 	}
 
-	layer, err := s.createNewLayer(index, info.digest, parentLayer, id)
+	layer, err := s.createNewLayer(index, trusted, parentLayer, id)
 	if err != nil {
 		return false, err
 	}
@@ -926,32 +989,64 @@ func (s *storageImageDestination) commitLayer(index int, info addedLayerInfo, si
 	return false, nil
 }
 
-// createNewLayer creates a new layer newLayerID for (index, layerDigest) on top of parentLayer (which may be "").
+// layerID computes a layer (“chain”) ID for (a possibly-empty parentID, trusted)
+func layerID(parentID string, trusted trustedLayerIdentityData) string {
+	var component string
+	mustHash := false
+	if trusted.layerIdentifiedByTOC {
+		// "@" is not a valid start of a digest.Digest.Encoded(), so this is unambiguous with the !layerIdentifiedByTOC case.
+		// But we _must_ hash this below to get a Digest.Encoded()-formatted value.
+		component = "@TOC=" + trusted.tocDigest.Encoded()
+		mustHash = true
+	} else {
+		component = trusted.diffID.Encoded() // This looks like chain IDs, and it uses the traditional value.
+	}
+
+	if parentID == "" && !mustHash {
+		return component
+	}
+	return digest.Canonical.FromString(parentID + "+" + component).Encoded()
+}
+
+// createNewLayer creates a new layer newLayerID for (index, trusted) on top of parentLayer (which may be "").
 // If the layer cannot be committed yet, the function returns (nil, nil).
-func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.Digest, parentLayer, newLayerID string) (*storage.Layer, error) {
+func (s *storageImageDestination) createNewLayer(index int, trusted trustedLayerIdentityData, parentLayer, newLayerID string) (*storage.Layer, error) {
 	s.lock.Lock()
 	diffOutput, ok := s.lockProtected.diffOutputs[index]
 	s.lock.Unlock()
 	if ok {
-		// If we know a trusted DiffID value (e.g. from a BlobInfoCache), set it in diffOutput.
+		// Typically, we compute a trusted DiffID value to authenticate the layer contents, see the detailed explanation
+		// in PutBlobPartial.  If the user has opted out of that, but we know a trusted DiffID value
+		// (e.g. from a BlobInfoCache), set it in diffOutput.
 		// That way it will be persisted in storage even if the cache is deleted; also
-		// we can use the value below to avoid the untrustedUncompressedDigest logic (and notably
-		// the costly commit delay until a manifest is available).
-		s.lock.Lock()
-		if d, ok := s.lockProtected.indexToDiffID[index]; ok {
-			diffOutput.UncompressedDigest = d
+		// we can use the value below to avoid the untrustedUncompressedDigest logic.
+		if diffOutput.UncompressedDigest == "" && trusted.diffID != "" {
+			diffOutput.UncompressedDigest = trusted.diffID
 		}
-		s.lock.Unlock()
 
 		var untrustedUncompressedDigest digest.Digest
 		if diffOutput.UncompressedDigest == "" {
 			d, err := s.untrustedLayerDiffID(index)
 			if err != nil {
+				if errors.Is(err, errUntrustedLayerDiffIDNotYetAvailable) {
+					logrus.Debugf("Skipping commit for layer %q, manifest not yet available", newLayerID)
+					return nil, nil
+				}
+				var e untrustedLayerDiffIDUnknownError
+				if errors.As(err, &e) {
+					// If untrustedLayerDiffIDUnknownError, the input image is schema1, has no TOC annotations,
+					// so we could not have reused a TOC-identified layer nor have done a TOC-identified partial pull.
+					//
+					// We might have used the PutBlobPartial code path consuming the whole layer ("convert_images" in storage.conf)
+					// but in that case diffOutput.UncompressedDigest should have beren set.
+					//
+					// Or, maybe, the input image is OCI, and has invalid/missing DiffID values in config. In that case
+					// commitLayer should have already refused this image when dealing with the “view” ambiguity.
+					// FIXME: except when users opted out of c/storage computing the digest, document better
+					return nil, fmt.Errorf("internal error: layer %d for blob %s was partially-pulled with unknown UncompressedDigest, but we don't have a DiffID in config",
+						index, trusted.logString())
+				}
 				return nil, err
-			}
-			if d == "" {
-				logrus.Debugf("Skipping commit for layer %q, manifest not yet available", newLayerID)
-				return nil, nil
 			}
 
 			untrustedUncompressedDigest = d
@@ -999,14 +1094,10 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 	// then we need to read the desired contents from a layer.
 	var filename string
 	var gotFilename bool
-	s.lock.Lock()
-	trusted, ok := s.trustedLayerIdentityDataLocked(index, layerDigest)
-	if ok && trusted.blobDigest != "" {
+	if trusted.blobDigest != "" {
+		s.lock.Lock()
 		filename, gotFilename = s.lockProtected.filenames[trusted.blobDigest]
-	}
-	s.lock.Unlock()
-	if !ok { // We have already determined newLayerID, so the data must have been available.
-		return nil, fmt.Errorf("internal inconsistency: layer (%d, %q) not found", index, layerDigest)
+		s.lock.Unlock()
 	}
 	var trustedOriginalDigest digest.Digest // For storage.LayerOptions
 	var trustedOriginalSize *int64
@@ -1033,7 +1124,7 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 			}
 		}
 		if layer == nil {
-			return nil, fmt.Errorf("layer for blob %q/%q/%q not found", trusted.blobDigest, trusted.tocDigest, trusted.diffID)
+			return nil, fmt.Errorf("layer for blob %s not found", trusted.logString())
 		}
 
 		// Read the layer's contents.
@@ -1043,7 +1134,7 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		}
 		diff, err2 := s.imageRef.transport.store.Diff("", layer.ID, diffOptions)
 		if err2 != nil {
-			return nil, fmt.Errorf("reading layer %q for blob %q/%q/%q: %w", layer.ID, trusted.blobDigest, trusted.tocDigest, trusted.diffID, err2)
+			return nil, fmt.Errorf("reading layer %q for blob %s: %w", layer.ID, trusted.logString(), err2)
 		}
 		// Copy the layer diff to a file.  Diff() takes a lock that it holds
 		// until the ReadCloser that it returns is closed, and PutLayer() wants
@@ -1122,7 +1213,7 @@ func (s *storageImageDestination) createNewLayer(index int, layerDigest digest.D
 		UncompressedDigest: trusted.diffID,
 	}, file)
 	if err != nil && !errors.Is(err, storage.ErrDuplicateID) {
-		return nil, fmt.Errorf("adding layer with blob %q/%q/%q: %w", trusted.blobDigest, trusted.tocDigest, trusted.diffID, err)
+		return nil, fmt.Errorf("adding layer with blob %s: %w", trusted.logString(), err)
 	}
 	return layer, nil
 }
@@ -1172,9 +1263,29 @@ func (u *uncommittedImageSource) GetBlob(ctx context.Context, info types.BlobInf
 	return io.NopCloser(bytes.NewReader(blob)), int64(len(blob)), nil
 }
 
+// errUntrustedLayerDiffIDNotYetAvailable is returned by untrustedLayerDiffID
+// if the value is not yet available (but it can be available after s.manifests is set).
+// This should only happen for external callers of the transport, not for c/image/copy.
+//
+// Callers of untrustedLayerDiffID before PutManifest must handle this error specially;
+// callers after PutManifest can use the default, reporting an internal error.
+var errUntrustedLayerDiffIDNotYetAvailable = errors.New("internal error: untrustedLayerDiffID has no value available and fallback was not implemented")
+
+// untrustedLayerDiffIDUnknownError is returned by untrustedLayerDiffID
+// if the image’s format does not provide DiffIDs.
+type untrustedLayerDiffIDUnknownError struct {
+	layerIndex int
+}
+
+func (e untrustedLayerDiffIDUnknownError) Error() string {
+	return fmt.Sprintf("DiffID value for layer %d is unknown or explicitly empty", e.layerIndex)
+}
+
 // untrustedLayerDiffID returns a DiffID value for layerIndex from the image’s config.
-// If the value is not yet available (but it can be available after s.manifets is set), it returns ("", nil).
-// WARNING: We don’t validate the DiffID value against the layer contents; it must not be used for any deduplication.
+// It may return two special errors, errUntrustedLayerDiffIDNotYetAvailable or untrustedLayerDiffIDUnknownError.
+//
+// WARNING: This function does not even validate that the returned digest has a valid format.
+// WARNING: We don’t _always_ validate this DiffID value against the layer contents; it must not be used for any deduplication.
 func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.Digest, error) {
 	// At this point, we are either inside the multi-threaded scope of HasThreadSafePutBlob,
 	// nothing is writing to s.manifest yet, and s.untrustedDiffIDValues might have been set
@@ -1187,7 +1298,7 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 		// via NoteOriginalOCIConfig; this is a compatibility fallback for external callers
 		// of the public types.ImageDestination.
 		if s.manifest == nil {
-			return "", nil
+			return "", errUntrustedLayerDiffIDNotYetAvailable
 		}
 
 		ctx := context.Background() // This is all happening in memory, no need to worry about cancellation.
@@ -1209,17 +1320,12 @@ func (s *storageImageDestination) untrustedLayerDiffID(layerIndex int) (digest.D
 	}
 	res := s.untrustedDiffIDValues[layerIndex]
 	if res == "" {
-		// In practice, this should, right now, only matter for pulls of OCI images
-		// (this code path implies that we did a partial pull because a layer has an annotation),
-		// So, DiffIDs should always be set.
-		//
-		// It is, though, reachable by pulling an OCI image while converting to schema1,
-		// using a manual (skopeo copy) or something similar, not (podman pull).
+		// schema1 images don’t have DiffID values in the config.
 		//
 		// Our schema1.OCIConfig code produces non-empty DiffID arrays of empty values.
-		// The current semantics of this function are that ("", nil) means "try again later",
-		// which is not what we want to happen; for now, turn that into an explicit error.
-		return "", fmt.Errorf("DiffID value for layer %d is unknown or explicitly empty", layerIndex)
+		return "", untrustedLayerDiffIDUnknownError{
+			layerIndex: layerIndex,
+		}
 	}
 	return res, nil
 }
