@@ -3,6 +3,7 @@ package daemon
 import (
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/containers/image/v5/types"
 	dockerclient "github.com/docker/docker/client"
@@ -82,6 +83,11 @@ func tlsConfig(sys *types.SystemContext) (*http.Client, error) {
 		Transport: &http.Transport{
 			Proxy:           http.ProxyFromEnvironment,
 			TLSClientConfig: tlsc,
+			// In general we want to follow docker/daemon/client.defaultHTTPClient , as long as it doesn’t affect compatibility.
+			// These idle connection limits really only apply to long-running clients, which is not our case here;
+			// we include the same values purely for symmetry.
+			MaxIdleConns:    6,
+			IdleConnTimeout: 30 * time.Second,
 		},
 		CheckRedirect: dockerclient.CheckRedirect,
 	}, nil
@@ -92,6 +98,11 @@ func httpConfig() *http.Client {
 		Transport: &http.Transport{
 			Proxy:           http.ProxyFromEnvironment,
 			TLSClientConfig: nil,
+			// In general we want to follow docker/daemon/client.defaultHTTPClient , as long as it doesn’t affect compatibility.
+			// These idle connection limits really only apply to long-running clients, which is not our case here;
+			// we include the same values purely for symmetry.
+			MaxIdleConns:    6,
+			IdleConnTimeout: 30 * time.Second,
 		},
 		CheckRedirect: dockerclient.CheckRedirect,
 	}
