@@ -33,6 +33,7 @@ import (
 	graphdriver "github.com/containers/storage/drivers"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/containers/storage/pkg/chunked"
+	"github.com/containers/storage/pkg/chunked/toc"
 	"github.com/containers/storage/pkg/ioutils"
 	digest "github.com/opencontainers/go-digest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -111,8 +112,10 @@ type storageImageDestinationLockProtected struct {
 	//
 	// Ideally we wouldn’t have blobDiffIDs, and we would just keep records by index, but the public API does not require the caller
 	// to provide layer indices; and configs don’t have layer indices. blobDiffIDs needs to exist for those cases.
-	indexToDiffID    map[int]digest.Digest           // Mapping from layer index to DiffID
-	indexToTOCDigest map[int]digest.Digest           // Mapping from layer index to a TOC Digest
+	indexToDiffID map[int]digest.Digest // Mapping from layer index to DiffID
+	// Mapping from layer index to a TOC Digest.
+	// If this is set, then either c/storage/pkg/chunked/toc.GetTOCDigest must have returned a value, or indexToDiffID must be set as well.
+	indexToTOCDigest map[int]digest.Digest
 	blobDiffIDs      map[digest.Digest]digest.Digest // Mapping from layer blobsums to their corresponding DiffIDs. CAREFUL: See the WARNING above.
 
 	// Layer data: Before commitLayer is called, either at least one of (diffOutputs, indexToAdditionalLayer, filenames)
@@ -401,6 +404,15 @@ func (s *storageImageDestination) PutBlobPartial(ctx context.Context, chunkAcces
 				options.Cache.RecordDigestUncompressedPair(out.CompressedDigest, out.UncompressedDigest)
 			}
 		} else {
+			// Sanity-check the defined rules for indexToTOCDigest.
+			toc, err := toc.GetTOCDigest(srcInfo.Annotations)
+			if err != nil {
+				return err
+			}
+			if toc == nil {
+				return fmt.Errorf("internal error: PrepareStagedLayer returned a TOC-only identity for layer %q with no TOC digest", srcInfo.Digest.String())
+			}
+
 			// Use diffID for layer identity if it is known.
 			if uncompressedDigest := options.Cache.UncompressedDigestForTOC(out.TOCDigest); uncompressedDigest != "" {
 				s.lockProtected.indexToDiffID[options.LayerIndex] = uncompressedDigest
@@ -605,7 +617,9 @@ func reusedBlobFromLayerLookup(layers []storage.Layer, blobDigest digest.Digest,
 
 // trustedLayerIdentityData is a _consistent_ set of information known about a single layer.
 type trustedLayerIdentityData struct {
-	layerIdentifiedByTOC bool // true if we decided the layer should be identified by tocDigest, false if by diffID
+	// true if we decided the layer should be identified by tocDigest, false if by diffID
+	// This can only be true if c/storage/pkg/chunked/toc.GetTOCDigest returns a value.
+	layerIdentifiedByTOC bool
 
 	diffID     digest.Digest // A digest of the uncompressed full contents of the layer, or "" if unknown; must be set if !layerIdentifiedByTOC
 	tocDigest  digest.Digest // A digest of the TOC digest, or "" if unknown; must be set if layerIdentifiedByTOC
