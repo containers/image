@@ -48,6 +48,7 @@ func newDockerClient(sys *types.SystemContext) (*dockerclient.Client, error) {
 	}
 	switch serverURL.Scheme {
 	case "unix": // Nothing
+	case "npipe": // Nothing
 	case "http":
 		hc := httpConfig()
 		opts = append(opts, dockerclient.WithHTTPClient(hc))
