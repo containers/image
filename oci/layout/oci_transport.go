@@ -219,7 +219,7 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, int, erro
 	}
 
 	switch {
-	case ref.image != "" && ref.sourceIndex != -1:
+	case ref.image != "" && ref.sourceIndex != -1: // Coverage: newReference refuses to create such references.
 		return imgspecv1.Descriptor{}, -1, fmt.Errorf("Internal error: Cannot have both ref %s and source index @%d",
 			ref.image, ref.sourceIndex)
 
