@@ -11,6 +11,8 @@ file for container image registries. The file format is TOML.
 
 Container engines will use the `$HOME/.config/containers/registries.conf` if it exists, otherwise they will use `/etc/containers/registries.conf`
 
+If you are using Podman Machine (e.g., on MacOS or Windows), registries.conf is read on the server-side only.  Changing the configuration implies changing the files inside the Podman Machine which you can do via `podman machine ssh`.  Make sure to not add registries.conf to a non-root user's home directory and only configure the system-wide settings in `/etc/containers` to make sure the default settings of Podman Machine continue being applied.
+
 ### GLOBAL SETTINGS
 
 `unqualified-search-registries`
