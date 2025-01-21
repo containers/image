@@ -37,7 +37,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/sylabs/sif/v2 v2.20.2
 	github.com/ulikunitz/xz v0.5.12
-	github.com/vbatts/tar-split v0.11.6
+	github.com/vbatts/tar-split v0.11.7
 	github.com/vbauerster/mpb/v8 v8.9.1
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.11
