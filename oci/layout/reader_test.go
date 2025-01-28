@@ -35,14 +35,16 @@ func TestList(t *testing.T) {
 		},
 		{
 			path: "fixtures/name_lookups",
-			num:  4,
+			num:  6,
 			digests: []string{
 				"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 				"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 				"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
 				"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+				"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+				"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
 			},
-			names: map[int]string{0: "a", 1: "b", 2: "invalid-mime", 3: "invalid-mime"},
+			names: map[int]string{0: "a", 1: "b", 2: "c", 3: "d", 4: "e", 5: "invalid-mime"},
 		},
 	} {
 		results, err := List(test.path)
