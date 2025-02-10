@@ -358,6 +358,7 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 		return nil, fmt.Errorf("committing the finished image: %w", err)
 	}
 
+	logrus.Debugf("Copied manifest(s): %q", string(copiedManifest))
 	return copiedManifest, nil
 }
 
