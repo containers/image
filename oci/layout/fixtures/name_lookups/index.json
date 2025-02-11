@@ -3,7 +3,7 @@
     "mediaType": "application/vnd.oci.image.index.v1+json",
     "manifests": [
         {
-            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "mediaType": "application/vnd.oci.image.index.v1+json",
             "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "size": 1,
             "annotations": {
@@ -19,17 +19,25 @@
             }
         },
         {
-            "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
             "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             "size": 3,
             "annotations": {
-                "org.opencontainers.image.ref.name": "invalid-mime"
+                "org.opencontainers.image.ref.name": "c"
+            }
+        },
+        {
+            "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "size": 4,
+            "annotations": {
+                "org.opencontainers.image.ref.name": "d"
             }
         },
         {
             "mediaType": "x-completely-unknown",
-            "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-            "size": 4,
+            "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "size": 6,
             "annotations": {
                 "org.opencontainers.image.ref.name": "invalid-mime"
             }
