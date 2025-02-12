@@ -53,7 +53,7 @@ func TestGetManifestDescriptor(t *testing.T) {
 			dir:   "fixtures/name_lookups",
 			image: "a",
 			expectedDescriptor: &imgspecv1.Descriptor{
-				MediaType:   "application/vnd.oci.image.manifest.v1+json",
+				MediaType:   "application/vnd.oci.image.index.v1+json",
 				Digest:      "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 				Size:        1,
 				Annotations: map[string]string{"org.opencontainers.image.ref.name": "a"},
@@ -70,6 +70,28 @@ func TestGetManifestDescriptor(t *testing.T) {
 				Annotations: map[string]string{"org.opencontainers.image.ref.name": "b"},
 			},
 			expectedIndex: 1,
+		},
+		{ // A valid reference in a multi-manifest directory
+			dir:   "fixtures/name_lookups",
+			image: "c",
+			expectedDescriptor: &imgspecv1.Descriptor{
+				MediaType:   "application/vnd.docker.distribution.manifest.list.v2+json",
+				Digest:      "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+				Size:        3,
+				Annotations: map[string]string{"org.opencontainers.image.ref.name": "c"},
+			},
+			expectedIndex: 2,
+		},
+		{ // A valid reference in a multi-manifest directory
+			dir:   "fixtures/name_lookups",
+			image: "d",
+			expectedDescriptor: &imgspecv1.Descriptor{
+				MediaType:   "application/vnd.docker.distribution.manifest.v2+json",
+				Digest:      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+				Size:        4,
+				Annotations: map[string]string{"org.opencontainers.image.ref.name": "d"},
+			},
+			expectedIndex: 3,
 		},
 		{ // No entry found
 			dir:                "fixtures/name_lookups",
