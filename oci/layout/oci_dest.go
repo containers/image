@@ -326,7 +326,7 @@ type PutBlobFromLocalFileOption struct{}
 func PutBlobFromLocalFile(ctx context.Context, dest types.ImageDestination, file string, options ...PutBlobFromLocalFileOption) (digest.Digest, int64, error) {
 	d, ok := dest.(*ociImageDestination)
 	if !ok {
-		return "", -1, errors.New("internal error: PutBlobFromLocalFile called with a non-oci: destination")
+		return "", -1, errors.New("caller error: PutBlobFromLocalFile called with a non-oci: destination")
 	}
 
 	succeeded := false
