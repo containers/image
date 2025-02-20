@@ -316,7 +316,7 @@ func TestVerifySigstorePayload(t *testing.T) {
 	for _, invalidSig := range [][]byte{
 		{}, // Empty signature
 		[]byte("invalid signature"),
-		append(bytes.Clone(validSignatureBytes), validSignatureBytes...),
+		bytes.Repeat(validSignatureBytes, 2),
 	} {
 		recorded = acceptanceData{}
 		res, err = VerifySigstorePayload(singlePublicKey, sigstoreSig.UntrustedPayload(), base64.StdEncoding.EncodeToString(invalidSig), recordingRules)
