@@ -82,12 +82,17 @@ func New(path string) (types.BlobInfoCache, error) {
 	return new2(path)
 }
 
-func new2(path string) (*cache, error) {
+func new2(path string) (_ *cache, retErr error) {
 	db, err := rawOpen(path)
 	if err != nil {
 		return nil, fmt.Errorf("initializing blob info cache at %q: %w", path, err)
 	}
-	defer db.Close()
+	defer func() {
+		closeErr := db.Close()
+		if retErr == nil {
+			retErr = closeErr
+		}
+	}()
 
 	// We don’t check the schema before every operation, because that would be costly
 	// and because we assume schema changes will be handled by using a different path.
@@ -147,25 +152,30 @@ func (sqc *cache) Close() {
 type void struct{} // So that we don’t have to write struct{}{} all over the place
 
 // transaction calls fn within a read-write transaction in sqc.
-func transaction[T any](sqc *cache, fn func(tx *sql.Tx) (T, error)) (T, error) {
-	db, closeDB, err := func() (*sql.DB, func(), error) { // A scope for defer
+func transaction[T any](sqc *cache, fn func(tx *sql.Tx) (T, error)) (_ T, retErr error) {
+	db, closeDB, err := func() (*sql.DB, func() error, error) { // A scope for defer
 		sqc.lock.Lock()
 		defer sqc.lock.Unlock()
 
 		if sqc.db != nil {
-			return sqc.db, func() {}, nil
+			return sqc.db, func() error { return nil }, nil
 		}
 		db, err := rawOpen(sqc.path)
 		if err != nil {
 			return nil, nil, fmt.Errorf("opening blob info cache at %q: %w", sqc.path, err)
 		}
-		return db, func() { db.Close() }, nil
+		return db, db.Close, nil
 	}()
 	if err != nil {
 		var zeroRes T // A zero value of T
 		return zeroRes, err
 	}
-	defer closeDB()
+	defer func() {
+		closeErr := closeDB()
+		if retErr == nil {
+			retErr = closeErr
+		}
+	}()
 
 	return dbTransaction(db, fn)
 }

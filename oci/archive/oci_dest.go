@@ -176,7 +176,7 @@ func (d *ociArchiveImageDestination) CommitWithOptions(ctx context.Context, opti
 }
 
 // tar converts the directory at src and saves it to dst
-func tarDirectory(src, dst string) error {
+func tarDirectory(src, dst string) (retErr error) {
 	// input is a stream of bytes from the archive of the directory at path
 	input, err := archive.TarWithOptions(src, &archive.TarOptions{
 		Compression: archive.Uncompressed,
@@ -193,7 +193,14 @@ func tarDirectory(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("creating tar file %q: %w", dst, err)
 	}
-	defer outFile.Close()
+
+	// since we are writing to this file, make sure we handle errors
+	defer func() {
+		closeErr := outFile.Close()
+		if retErr == nil {
+			retErr = closeErr
+		}
+	}()
 
 	// copies the contents of the directory to the tar file
 	// TODO: This can take quite some time, and should ideally be cancellable using a context.Context.
