@@ -20,7 +20,7 @@ func TestTarDirectory(t *testing.T) {
 	require.NoError(t, err)
 
 	dest := filepath.Join(t.TempDir(), "file.tar")
-	err = tarDirectory(srcDir, dest)
+	err = tarDirectory(srcDir, dest, nil)
 	require.NoError(t, err)
 
 	f, err := os.Open(dest)

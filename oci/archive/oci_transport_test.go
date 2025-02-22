@@ -1,10 +1,13 @@
 package archive
 
 import (
+	"archive/tar"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	_ "github.com/containers/image/v5/internal/testing/explicitfilepath-tmpdir"
 	"github.com/containers/image/v5/types"
@@ -139,7 +142,7 @@ func refToTempOCI(t *testing.T) (types.ImageReference, string) {
 
 // refToTempOCIArchive creates a temporary directory, copies the contents of that directory
 // to a temporary tar file and returns a reference to the temporary tar file
-func refToTempOCIArchive(t *testing.T) (ref types.ImageReference, tmpTarFile string) {
+func refToTempOCIArchive(t *testing.T, tarEntryTimestamp *time.Time) (ref types.ImageReference, tmpTarFile string) {
 	tmpDir := t.TempDir()
 	m := `{
 		"schemaVersion": 2,
@@ -163,7 +166,7 @@ func refToTempOCIArchive(t *testing.T) (ref types.ImageReference, tmpTarFile str
 	require.NoError(t, err)
 	tarFile, err := os.CreateTemp("", "oci-transport-test.tar")
 	require.NoError(t, err)
-	err = tarDirectory(tmpDir, tarFile.Name())
+	err = tarDirectory(tmpDir, tarFile.Name(), tarEntryTimestamp)
 	require.NoError(t, err)
 	ref, err = NewReference(tarFile.Name(), "")
 	require.NoError(t, err)
@@ -253,11 +256,36 @@ func TestReferenceNewImage(t *testing.T) {
 }
 
 func TestReferenceNewImageSource(t *testing.T) {
-	ref, tmpTarFile := refToTempOCIArchive(t)
+	ref, tmpTarFile := refToTempOCIArchive(t, nil)
 	defer os.RemoveAll(tmpTarFile)
 	src, err := ref.NewImageSource(context.Background(), nil)
 	assert.NoError(t, err)
 	defer src.Close()
+}
+
+func TestTimestampEntriesPassedThrough(t *testing.T) {
+	// set target time to a bit in the future, but rounded
+	targetTime := time.Now().Add(time.Hour).Truncate(time.Second)
+
+	_, tmpTarFile := refToTempOCIArchive(t, &targetTime)
+	defer os.RemoveAll(tmpTarFile)
+
+	f, err := os.Open(tmpTarFile)
+	assert.NoError(t, err)
+	defer f.Close()
+
+	numEntries := 0
+	tr := tar.NewReader(f)
+	for {
+		th, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		assert.NoError(t, err)
+		assert.Equal(t, targetTime, th.ModTime) // access time and change time are ignored by Go's tar.Writer unless the creator explicitly sets a non-default header format, so just check mod time
+		numEntries++
+	}
+	assert.NotEqual(t, 0, numEntries)
 }
 
 func TestReferenceNewImageDestination(t *testing.T) {
