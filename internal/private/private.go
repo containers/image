@@ -3,6 +3,7 @@ package private
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/blobinfocache"
@@ -170,6 +171,9 @@ type CommitOptions struct {
 	// What “resolved” means is transport-specific.
 	// Transports which don’t support reporting resolved references can ignore the field; the generic copy code writes "nil" into the value.
 	ReportResolvedReference *types.ImageReference
+	// SourceDateEpoch, if set, and if applicable for destination, will override any creation/modified/access timestamps
+	// useful for oci-archive outputs
+	SourceDateEpoch *time.Time
 }
 
 // ImageSourceChunk is a portion of a blob.
