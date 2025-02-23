@@ -257,7 +257,7 @@ func (s *storageImageDestination) PutBlobWithOptions(ctx context.Context, stream
 
 // putBlobToPendingFile implements ImageDestination.PutBlobWithOptions, storing stream into an on-disk file.
 // The caller must arrange the blob to be eventually committed using s.commitLayer().
-func (s *storageImageDestination) putBlobToPendingFile(stream io.Reader, blobinfo types.BlobInfo, options *private.PutBlobOptions) (private.UploadedBlob, error) {
+func (s *storageImageDestination) putBlobToPendingFile(stream io.Reader, blobinfo types.BlobInfo, options *private.PutBlobOptions) (_ private.UploadedBlob, retErr error) {
 	// Stores a layer or data blob in our temporary directory, checking that any information
 	// in the blobinfo matches the incoming data.
 	if blobinfo.Digest != "" {
@@ -272,7 +272,13 @@ func (s *storageImageDestination) putBlobToPendingFile(stream io.Reader, blobinf
 	if err != nil {
 		return private.UploadedBlob{}, fmt.Errorf("creating temporary file %q: %w", filename, err)
 	}
-	defer file.Close()
+	// since we are writing to this file, make sure we handle err on Close()
+	defer func() {
+		closeErr := file.Close()
+		if retErr == nil {
+			retErr = closeErr
+		}
+	}()
 	counter := ioutils.NewWriteCounter(file)
 	stream = io.TeeReader(stream, counter)
 	digester, stream := putblobdigest.DigestIfUnknown(stream, blobinfo)

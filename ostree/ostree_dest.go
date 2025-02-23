@@ -137,7 +137,7 @@ func (d *ostreeImageDestination) Close() error {
 // WARNING: The contents of stream are being verified on the fly.  Until stream.Read() returns io.EOF, the contents of the data SHOULD NOT be available
 // to any other readers for download using the supplied digest.
 // If stream.Read() at any time, ESPECIALLY at end of input, returns an error, PutBlob MUST 1) fail, and 2) delete any data stored so far.
-func (d *ostreeImageDestination) PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options private.PutBlobOptions) (private.UploadedBlob, error) {
+func (d *ostreeImageDestination) PutBlobWithOptions(ctx context.Context, stream io.Reader, inputInfo types.BlobInfo, options private.PutBlobOptions) (_ private.UploadedBlob, retErr error) {
 	tmpDir, err := os.MkdirTemp(d.tmpDirPath, "blob")
 	if err != nil {
 		return private.UploadedBlob{}, err
@@ -148,8 +148,13 @@ func (d *ostreeImageDestination) PutBlobWithOptions(ctx context.Context, stream 
 	if err != nil {
 		return private.UploadedBlob{}, err
 	}
-	defer blobFile.Close()
-
+	// since we are writing to this file, make sure we handle errors
+	defer func() {
+		closeErr := blobFile.Close()
+		if retErr == nil {
+			retErr = closeErr
+		}
+	}()
 	digester, stream := putblobdigest.DigestIfCanonicalUnknown(stream, inputInfo)
 	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
 	size, err := io.Copy(blobFile, stream)
@@ -247,9 +252,15 @@ func (d *ostreeImageDestination) ostreeCommit(repo *otbuiltin.Repo, branch strin
 	return err
 }
 
-func generateTarSplitMetadata(output *bytes.Buffer, file string) (digest.Digest, int64, error) {
+func generateTarSplitMetadata(output *bytes.Buffer, file string) (_ digest.Digest, _ int64, retErr error) {
 	mfz := pgzip.NewWriter(output)
-	defer mfz.Close()
+	// since we are writing to this, make sure we handle errors
+	defer func() {
+		closeErr := mfz.Close()
+		if retErr == nil {
+			retErr = closeErr
+		}
+	}()
 	metaPacker := storage.NewJSONPacker(mfz)
 
 	stream, err := os.OpenFile(file, os.O_RDONLY, 0)
