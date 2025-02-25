@@ -29,6 +29,7 @@ import (
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/regexp"
 	digest "github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 )
 
@@ -630,23 +631,31 @@ func (s *dockerImageSource) appendSignaturesFromSigstoreAttachments(ctx context.
 		return err
 	}
 
-	ociManifest, err := s.c.getSigstoreAttachmentManifest(ctx, s.physicalRef, manifestDigest)
+	genManifest, err := s.c.getSigstoreAttachmentManifest(ctx, s.physicalRef, manifestDigest)
 	if err != nil {
 		return err
 	}
-	if ociManifest == nil {
+	if genManifest == nil {
 		return nil
 	}
 
-	logrus.Debugf("Found a sigstore attachment manifest with %d layers", len(ociManifest.Layers))
-	for layerIndex, layer := range ociManifest.Layers {
+	layers := genManifest.LayerInfos()
+	numLayers := len(layers)
+	logrus.Debugf("Found a sigstore attachment manifest with %d layers", numLayers)
+	for layerIndex, layer := range layers {
 		// Note that this copies all kinds of attachments: attestations, and whatever else is there,
 		// not just signatures. We leave the signature consumers to decide based on the MIME type.
-		logrus.Debugf("Fetching sigstore attachment %d/%d: %s", layerIndex+1, len(ociManifest.Layers), layer.Digest.String())
+		logrus.Debugf("Fetching sigstore attachment %d/%d: %s", layerIndex+1, numLayers, layer.Digest.String())
 		// We don’t benefit from a real BlobInfoCache here because we never try to reuse/mount attachment payloads.
 		// That might eventually need to change if payloads grow to be not just signatures, but something
 		// significantly large.
-		payload, err := s.c.getOCIDescriptorContents(ctx, s.physicalRef, layer, iolimits.MaxSignatureBodySize,
+		descriptor := imgspecv1.Descriptor{
+			MediaType:   layer.MediaType,
+			Digest:      layer.Digest,
+			Size:        layer.Size,
+			Annotations: layer.Annotations,
+		}
+		payload, err := s.c.getOCIDescriptorContents(ctx, s.physicalRef, descriptor, iolimits.MaxSignatureBodySize,
 			none.NoCache)
 		if err != nil {
 			return err
