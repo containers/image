@@ -15,7 +15,7 @@ require (
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v28.0.0+incompatible
 	github.com/docker/distribution v2.8.3+incompatible
-	github.com/docker/docker v28.0.0+incompatible
+	github.com/docker/docker v28.0.1+incompatible
 	github.com/docker/docker-credential-helpers v0.8.2
 	github.com/docker/go-connections v0.5.0
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect; CVE-2025-27144
