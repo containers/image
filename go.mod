@@ -39,7 +39,7 @@ require (
 	github.com/sylabs/sif/v2 v2.20.2
 	github.com/ulikunitz/xz v0.5.12
 	github.com/vbatts/tar-split v0.12.1
-	github.com/vbauerster/mpb/v8 v8.9.2
+	github.com/vbauerster/mpb/v8 v8.9.3
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.11
 	golang.org/x/crypto v0.33.0
