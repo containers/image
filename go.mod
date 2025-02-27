@@ -18,6 +18,7 @@ require (
 	github.com/docker/docker v28.0.0+incompatible
 	github.com/docker/docker-credential-helpers v0.8.2
 	github.com/docker/go-connections v0.5.0
+	github.com/go-jose/go-jose/v4 v4.0.5 // indirect; CVE-2025-27144
 	github.com/go-openapi/strfmt v0.23.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/klauspost/compress v1.18.0
@@ -73,7 +74,6 @@ require (
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
-	github.com/go-jose/go-jose/v4 v4.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/analysis v0.23.0 // indirect
