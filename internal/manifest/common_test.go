@@ -53,7 +53,7 @@ func TestValidateUnambiguousManifestFormat(t *testing.T) {
 
 	// Every single field is allowed by its bit, and rejected by any other bit
 	for bit, fieldName := range fields {
-		json := []byte(fmt.Sprintf(`{"%s":[]}`, fieldName))
+		json := fmt.Appendf(nil, `{"%s":[]}`, fieldName)
 		err := ValidateUnambiguousManifestFormat(json, mt, bit)
 		assert.NoError(t, err, fieldName)
 		err = ValidateUnambiguousManifestFormat(json, mt, allAllowedFields^bit)
