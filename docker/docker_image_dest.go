@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -701,34 +702,49 @@ func (d *dockerImageDestination) putSignaturesToSigstoreAttachments(ctx context.
 		return errors.New("writing sigstore attachments is disabled by configuration")
 	}
 
-	ociManifest, err := d.c.getSigstoreAttachmentManifest(ctx, d.ref, manifestDigest)
+	genManifest, err := d.c.getSigstoreAttachmentManifest(ctx, d.ref, manifestDigest)
 	if err != nil {
 		return err
 	}
 	var ociConfig imgspecv1.Image // Most fields empty by default
-	if ociManifest == nil {
-		ociManifest = manifest.OCI1FromComponents(imgspecv1.Descriptor{
+	if genManifest == nil {
+		genManifest = manifest.OCI1FromComponents(imgspecv1.Descriptor{
 			MediaType: imgspecv1.MediaTypeImageConfig,
 			Digest:    "", // We will fill this in later.
 			Size:      0,
 		}, nil)
 		ociConfig.RootFS.Type = "layers"
 	} else {
-		logrus.Debugf("Fetching sigstore attachment config %s", ociManifest.Config.Digest.String())
+		blobInfo := genManifest.ConfigInfo()
+		logrus.Debugf("Fetching sigstore attachment config %s", blobInfo.Digest.String())
+		descriptor := imgspecv1.Descriptor{
+			MediaType:   blobInfo.MediaType,
+			Digest:      blobInfo.Digest,
+			Size:        blobInfo.Size,
+			Annotations: blobInfo.Annotations,
+		}
 		// We don’t benefit from a real BlobInfoCache here because we never try to reuse/mount configs.
-		configBlob, err := d.c.getOCIDescriptorContents(ctx, d.ref, ociManifest.Config, iolimits.MaxConfigBodySize,
+		configBlob, err := d.c.getOCIDescriptorContents(ctx, d.ref, descriptor, iolimits.MaxConfigBodySize,
 			none.NoCache)
 		if err != nil {
 			return err
 		}
 		if err := json.Unmarshal(configBlob, &ociConfig); err != nil {
-			return fmt.Errorf("parsing sigstore attachment config %s in %s: %w", ociManifest.Config.Digest.String(),
+			return fmt.Errorf("parsing sigstore attachment config %s in %s: %w", blobInfo.Digest.String(),
 				d.ref.ref.Name(), err)
 		}
 	}
 
-	// To make sure we can safely append to the slices of ociManifest, without adding a remote dependency on the code that creates it.
-	ociManifest.Layers = slices.Clone(ociManifest.Layers)
+	// To make sure we can safely append to the slices of Manifest, without adding a remote dependency on the code that creates it.
+	switch v := genManifest.(type) {
+	case *manifest.OCI1:
+		v.Layers = slices.Clone(v.Layers)
+	case *manifest.Schema2:
+		v.LayersDescriptors = slices.Clone(v.LayersDescriptors)
+	default:
+		return fmt.Errorf("sigstore attachment manifest has the wrong type %s", reflect.TypeOf(genManifest).Name())
+	}
+
 	// We don’t need to ^^^ for ociConfig.RootFS.DiffIDs because we have created it empty ourselves, and json.Unmarshal is documented to append() to
 	// the slice in the original object (or in a newly allocated object).
 	for _, sig := range signatures {
@@ -737,8 +753,14 @@ func (d *dockerImageDestination) putSignaturesToSigstoreAttachments(ctx context.
 		annotations := sig.UntrustedAnnotations()
 
 		alreadyOnRegistry := false
-		for _, layer := range ociManifest.Layers {
-			if layerMatchesSigstoreSignature(layer, mimeType, payloadBlob, annotations) {
+		for _, layer := range genManifest.LayerInfos() {
+			descriptor := imgspecv1.Descriptor{
+				MediaType:   layer.MediaType,
+				Digest:      layer.Digest,
+				Size:        layer.Size,
+				Annotations: layer.Annotations,
+			}
+			if layerMatchesSigstoreSignature(descriptor, mimeType, payloadBlob, annotations) {
 				logrus.Debugf("Signature with digest %s already exists on the registry", layer.Digest.String())
 				alreadyOnRegistry = true
 				break
@@ -761,7 +783,17 @@ func (d *dockerImageDestination) putSignaturesToSigstoreAttachments(ctx context.
 			return err
 		}
 		sigDesc.Annotations = annotations
-		ociManifest.Layers = append(ociManifest.Layers, sigDesc)
+		switch v := genManifest.(type) {
+		case *manifest.OCI1:
+			v.Layers = append(v.Layers, sigDesc)
+		case *manifest.Schema2:
+			v.LayersDescriptors = append(v.LayersDescriptors, manifest.Schema2Descriptor{
+				MediaType: sigDesc.MediaType,
+				Size:      sigDesc.Size,
+				Digest:    sigDesc.Digest,
+				URLs:      sigDesc.URLs,
+			})
+		}
 		ociConfig.RootFS.DiffIDs = append(ociConfig.RootFS.DiffIDs, sigDesc.Digest)
 		logrus.Debugf("Adding new signature, digest %s", sigDesc.Digest.String())
 	}
@@ -781,9 +813,20 @@ func (d *dockerImageDestination) putSignaturesToSigstoreAttachments(ctx context.
 	if err != nil {
 		return err
 	}
-	ociManifest.Config = configDesc
 
-	manifestBlob, err := ociManifest.Serialize()
+	switch v := genManifest.(type) {
+	case *manifest.OCI1:
+		v.Config = configDesc
+	case *manifest.Schema2:
+		v.ConfigDescriptor = manifest.Schema2Descriptor{
+			MediaType: configDesc.MediaType,
+			Size:      configDesc.Size,
+			Digest:    configDesc.Digest,
+			URLs:      configDesc.URLs,
+		}
+	}
+
+	manifestBlob, err := genManifest.Serialize()
 	if err != nil {
 		return err
 	}
