@@ -181,7 +181,7 @@ func TestReferenceNewImageSource(t *testing.T) {
 func TestReferenceNewImageDestination(t *testing.T) {
 	ref, _ := refToTempDir(t)
 	dest, err := ref.NewImageDestination(context.Background(), nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer dest.Close()
 }
 
@@ -242,11 +242,4 @@ func TestReferenceSignaturePath(t *testing.T) {
 	invalidDigest := digest.Digest("sha256:../hello")
 	_, err = dirRef.signaturePath(0, &invalidDigest)
 	assert.Error(t, err)
-}
-
-func TestReferenceVersionPath(t *testing.T) {
-	ref, tmpDir := refToTempDir(t)
-	dirRef, ok := ref.(dirReference)
-	require.True(t, ok)
-	assert.Equal(t, tmpDir+"/version", dirRef.versionPath())
 }
