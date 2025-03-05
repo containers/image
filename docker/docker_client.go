@@ -907,6 +907,10 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 	}
 	tr := tlsclientconfig.NewTransport()
 	tr.TLSClientConfig = c.tlsClientConfig
+	// if set DockerProxyURL explicitly, use the DockerProxyURL instead of system proxy
+	if c.sys != nil && c.sys.DockerProxyURL != nil {
+		tr.Proxy = http.ProxyURL(c.sys.DockerProxyURL)
+	}
 	c.client = &http.Client{Transport: tr}
 
 	ping := func(scheme string) error {
