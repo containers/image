@@ -63,7 +63,8 @@ func testParseReference(t *testing.T, fn func(string) (types.ImageReference, err
 		{"busybox@" + sha256digest, "", "docker.io/library/busybox@" + sha256digest}, // Explicit digest
 		// A github.com/distribution/reference value can have a tag and a digest at the same time!
 		// Most versions of docker/reference do not handle that (ignoring the tag), so we reject such input.
-		{"busybox:latest@" + sha256digest, "", ""},                                   // Both tag and digest
+		{"busybox:latest@" + sha256digest, "", ""}, // Both tag and digest
+		{"", "", ""}, // Empty input
 		{"docker.io/library/busybox:latest", "", "docker.io/library/busybox:latest"}, // All implied values explicitly specified
 	} {
 		ref, err := fn(c.input)
@@ -134,6 +135,9 @@ func TestNewReference(t *testing.T) {
 	parsed, err := reference.ParseNormalizedNamed("busybox:latest")
 	require.NoError(t, err)
 	_, err = NewReference(id, parsed)
+	assert.Error(t, err)
+	// Neither provided
+	_, err = NewReference("", nil)
 	assert.Error(t, err)
 
 	// A reference with neither a tag nor digest
