@@ -77,7 +77,6 @@ An image in a directory structure compliant with the "Open Container Image Layou
 
 The _path_ value terminates at the first `:` character; any further `:` characters are not separators, but a part of _reference_.
 The _reference_ is used to set, or match, the `org.opencontainers.image.ref.name` annotation in the top-level index.
-If _reference_ is not specified when reading an image, the directory must contain exactly one image.
 For reading images, @_source-index_ is a zero-based index in manifest (to access untagged images).
 If neither reference nor @_source_index is specified when reading an image, the path must contain exactly one image.
 
