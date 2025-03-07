@@ -52,7 +52,7 @@ func (t ociArchiveTransport) ValidatePolicyConfigurationScope(scope string) erro
 	return internal.ValidateScope(scope)
 }
 
-// ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an OCI ImageReference.
+// ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an OCI archive ImageReference.
 func ParseReference(reference string) (types.ImageReference, error) {
 	file, image := internal.SplitPathAndImage(reference)
 	return NewReference(file, image)
