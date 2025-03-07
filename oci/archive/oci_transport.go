@@ -58,7 +58,7 @@ func ParseReference(reference string) (types.ImageReference, error) {
 	return NewReference(file, image)
 }
 
-// NewReference returns an OCI reference for a file and a image.
+// NewReference returns an OCI archive reference for a file and an optional image name annotation (if not "").
 func NewReference(file, image string) (types.ImageReference, error) {
 	resolved, err := explicitfilepath.ResolvePathToFullyExplicit(file)
 	if err != nil {
