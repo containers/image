@@ -117,7 +117,7 @@ func NewIndexReference(dir string, sourceIndex int) (types.ImageReference, error
 	return newReference(dir, "", sourceIndex)
 }
 
-// NewReference returns an OCI reference for a directory and a image.
+// NewReference returns an OCI reference for a directory and an optional image name annotation (if not "").
 //
 // We do not expose an API supplying the resolvedDir; we could, but recomputing it
 // is generally cheap enough that we prefer being confident about the properties of resolvedDir.
