@@ -111,6 +111,9 @@ func newReference(dir, image string, sourceIndex int) (types.ImageReference, err
 
 // NewIndexReference returns an OCI reference for a path and a zero-based source manifest index.
 func NewIndexReference(dir string, sourceIndex int) (types.ImageReference, error) {
+	if sourceIndex < 0 {
+		return nil, fmt.Errorf("invalid call to NewIndexReference with negative index %d", sourceIndex)
+	}
 	return newReference(dir, "", sourceIndex)
 }
 

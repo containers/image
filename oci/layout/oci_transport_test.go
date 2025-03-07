@@ -284,7 +284,8 @@ func TestNewIndexReference(t *testing.T) {
 		index int
 	}{
 		{tmpDir + "/thisparentdoesnotexist/something", 10},
-		{tmpDir, -3}, // sourceIndex cannot be less than -1
+		{tmpDir, -1},
+		{tmpDir, -3},
 		{tmpDir + "/has:colon", 99},
 	} {
 		_, err = NewIndexReference(c.dir, c.index)
@@ -293,6 +294,8 @@ func TestNewIndexReference(t *testing.T) {
 
 	// Test private newReference
 	_, err = newReference(tmpDir, imageValue, 1)
+	assert.Error(t, err)
+	_, err = newReference(tmpDir, "", -3)
 	assert.Error(t, err)
 }
 
