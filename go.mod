@@ -10,7 +10,7 @@ require (
 	github.com/BurntSushi/toml v1.4.0
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01
 	github.com/containers/ocicrypt v1.2.1
-	github.com/containers/storage v1.57.2-0.20250228100055-700b765b2111
+	github.com/containers/storage v1.57.3-0.20250310120440-ab85543c3c6a
 	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v28.0.1+incompatible
@@ -110,7 +110,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/opencontainers/runtime-spec v1.2.0 // indirect
+	github.com/opencontainers/runtime-spec v1.2.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
