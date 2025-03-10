@@ -1110,7 +1110,7 @@ func isManifestUnknownError(err error) bool {
 // getSigstoreAttachmentManifest loads and parses the manifest for sigstore attachments for
 // digest in ref.
 // It returns (nil, nil) if the manifest does not exist.
-func (c *dockerClient) getSigstoreAttachmentManifest(ctx context.Context, ref dockerReference, digest digest.Digest) (*manifest.OCI1, error) {
+func (c *dockerClient) getSigstoreAttachmentManifest(ctx context.Context, ref dockerReference, digest digest.Digest) (manifest.Manifest, error) {
 	tag, err := sigstoreAttachmentTag(digest)
 	if err != nil {
 		return nil, err
@@ -1132,12 +1132,17 @@ func (c *dockerClient) getSigstoreAttachmentManifest(ctx context.Context, ref do
 		logrus.Debugf("Fetching sigstore attachment manifest failed: %v", err)
 		return nil, err
 	}
-	if mimeType != imgspecv1.MediaTypeImageManifest {
+	var res manifest.Manifest
+	switch mimeType {
+	case imgspecv1.MediaTypeImageManifest:
+		res, err = manifest.OCI1FromManifest(manifestBlob)
+	case manifest.DockerV2Schema2MediaType:
+		res, err = manifest.Schema2FromManifest(manifestBlob)
+	default:
 		// FIXME: Try anyway??
 		return nil, fmt.Errorf("unexpected MIME type for sigstore attachment manifest %s: %q",
 			sigstoreRef.String(), mimeType)
 	}
-	res, err := manifest.OCI1FromManifest(manifestBlob)
 	if err != nil {
 		return nil, fmt.Errorf("parsing manifest %s: %w", sigstoreRef.String(), err)
 	}
