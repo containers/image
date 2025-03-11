@@ -135,6 +135,8 @@ func TestNewReference(t *testing.T) {
 	ntRef := namedTaggedRef(t, "busybox:latest")
 	_, err = newReference("path", ntRef, 0, nil, nil)
 	assert.Error(t, err)
+	_, err = newReference("path", nil, -2, nil, nil)
+	assert.Error(t, err)
 }
 
 func TestNewIndexReference(t *testing.T) {
@@ -145,7 +147,7 @@ func TestNewIndexReference(t *testing.T) {
 		}{
 			{0, true},
 			{9999990, true},
-			{-1, true},
+			{-1, false},
 			{-2, false},
 		} {
 			res, err := NewIndexReference(path, c.index)

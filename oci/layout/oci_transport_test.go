@@ -279,18 +279,23 @@ func TestNewIndexReference(t *testing.T) {
 	assert.Equal(t, "", ociRef.image)
 	assert.Equal(t, 9999, ociRef.sourceIndex)
 
-	_, err = NewIndexReference(tmpDir+"/thisparentdoesnotexist/something", 10)
-	assert.Error(t, err)
-
-	// sourceIndex cannot be less than -1
-	_, err = NewIndexReference(tmpDir, -3)
-	assert.Error(t, err)
-
-	_, err = NewIndexReference(tmpDir+"/has:colon", 99)
-	assert.Error(t, err)
+	for _, c := range []struct {
+		dir   string
+		index int
+	}{
+		{tmpDir + "/thisparentdoesnotexist/something", 10},
+		{tmpDir, -1},
+		{tmpDir, -3},
+		{tmpDir + "/has:colon", 99},
+	} {
+		_, err = NewIndexReference(c.dir, c.index)
+		assert.Error(t, err)
+	}
 
 	// Test private newReference
 	_, err = newReference(tmpDir, imageValue, 1)
+	assert.Error(t, err)
+	_, err = newReference(tmpDir, "", -3)
 	assert.Error(t, err)
 }
 
