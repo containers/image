@@ -10,9 +10,9 @@ import (
 
 	"github.com/containers/image/v5/version"
 	"github.com/opencontainers/go-digest"
+	"github.com/santhosh-tekuri/jsonschema/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/xeipuuv/gojsonschema"
 )
 
 func TestNewUntrustedSignature(t *testing.T) {
@@ -89,30 +89,36 @@ func modifiedJSON(t *testing.T, validJSON []byte, modifyFn func(mSA)) []byte {
 }
 
 // Verify that input can be unmarshaled as an untrustedSignature, and that it passes JSON schema validation, and return the unmarshaled untrustedSignature.
-func successfullyUnmarshalUntrustedSignature(t *testing.T, schemaLoader gojsonschema.JSONLoader, input []byte) untrustedSignature {
+func successfullyUnmarshalUntrustedSignature(t *testing.T, schema *jsonschema.Schema, input []byte) untrustedSignature {
 	inputString := string(input)
 
 	var s untrustedSignature
 	err := json.Unmarshal(input, &s)
 	require.NoError(t, err, inputString)
 
-	res, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewStringLoader(inputString))
-	assert.True(t, err == nil, inputString)
-	assert.True(t, res.Valid(), inputString)
+	var rawInput any
+	err = json.Unmarshal(input, &rawInput)
+	require.NoError(t, err, inputString)
+	err = schema.Validate(rawInput)
+	assert.NoError(t, err, inputString)
 
 	return s
 }
 
 // Verify that input can't be unmarshaled as an untrusted signature, and that it fails JSON schema validation.
-func assertUnmarshalUntrustedSignatureFails(t *testing.T, schemaLoader gojsonschema.JSONLoader, input []byte) {
+func assertUnmarshalUntrustedSignatureFails(t *testing.T, schema *jsonschema.Schema, input []byte) {
 	inputString := string(input)
 
 	var s untrustedSignature
 	err := json.Unmarshal(input, &s)
 	assert.Error(t, err, inputString)
 
-	res, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewStringLoader(inputString))
-	assert.True(t, err != nil || !res.Valid(), inputString)
+	var rawInput any
+	err = json.Unmarshal(input, &rawInput)
+	if err == nil {
+		err := schema.Validate(rawInput)
+		assert.Error(t, err, inputString)
+	}
 }
 
 func TestUnmarshalJSON(t *testing.T) {
@@ -123,17 +129,19 @@ func TestUnmarshalJSON(t *testing.T) {
 	// they are testing that the schema follows the behavior of the code!
 	schemaPath, err := filepath.Abs("../docs/atomic-signature-embedded-json.json")
 	require.NoError(t, err)
-	schemaLoader := gojsonschema.NewReferenceLoader("file://" + schemaPath)
+
+	schema, err := jsonschema.Compile("file://" + schemaPath)
+	require.NoError(t, err)
 
 	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
 	// UnmarshalJSON implementation; so test that first, then test our error handling for completeness.
-	assertUnmarshalUntrustedSignatureFails(t, schemaLoader, []byte("&"))
+	assertUnmarshalUntrustedSignatureFails(t, schema, []byte("&"))
 	var s untrustedSignature
 	err = s.UnmarshalJSON([]byte("&"))
 	assert.Error(t, err)
 
 	// Not an object
-	assertUnmarshalUntrustedSignatureFails(t, schemaLoader, []byte("1"))
+	assertUnmarshalUntrustedSignatureFails(t, schema, []byte("1"))
 
 	// Start with a valid JSON.
 	validSig := newUntrustedSignature(testDigest, "reference#@!")
@@ -141,7 +149,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	require.NoError(t, err)
 
 	// Success
-	s = successfullyUnmarshalUntrustedSignature(t, schemaLoader, validJSON)
+	s = successfullyUnmarshalUntrustedSignature(t, schema, validJSON)
 	assert.Equal(t, validSig, s)
 
 	// Various ways to corrupt the JSON
@@ -185,7 +193,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	}
 	for _, fn := range breakFns {
 		testJSON := modifiedJSON(t, validJSON, fn)
-		assertUnmarshalUntrustedSignatureFails(t, schemaLoader, testJSON)
+		assertUnmarshalUntrustedSignatureFails(t, schema, testJSON)
 	}
 
 	// Modifications to unrecognized fields in "optional" are allowed and ignored
@@ -195,7 +203,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	}
 	for _, fn := range allowedModificationFns {
 		testJSON := modifiedJSON(t, validJSON, fn)
-		s := successfullyUnmarshalUntrustedSignature(t, schemaLoader, testJSON)
+		s := successfullyUnmarshalUntrustedSignature(t, schema, testJSON)
 		assert.Equal(t, validSig, s)
 	}
 
@@ -208,7 +216,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	}
 	validJSON, err = validSig.MarshalJSON()
 	require.NoError(t, err)
-	s = successfullyUnmarshalUntrustedSignature(t, schemaLoader, validJSON)
+	s = successfullyUnmarshalUntrustedSignature(t, schema, validJSON)
 	assert.Equal(t, validSig, s)
 }
 
