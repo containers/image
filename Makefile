@@ -32,7 +32,7 @@ REGISTRIESDDIR ?= ${CONTAINERSCONFDIR}/registries.d
 # N/B: This value is managed by Renovate, manual changes are
 # possible, as long as they don't disturb the formatting
 # (i.e. DO NOT ADD A 'v' prefix!)
-GOLANGCI_LINT_VERSION := 1.64.6
+GOLANGCI_LINT_VERSION := 1.64.7
 
 export PATH := $(PATH):${GOBIN}
 
