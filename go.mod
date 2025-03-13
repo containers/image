@@ -43,7 +43,7 @@ require (
 	go.etcd.io/bbolt v1.3.11
 	golang.org/x/crypto v0.35.0
 	golang.org/x/oauth2 v0.26.0
-	golang.org/x/sync v0.11.0
+	golang.org/x/sync v0.12.0
 	golang.org/x/term v0.30.0
 	gopkg.in/yaml.v3 v3.0.1
 )
