@@ -2,6 +2,7 @@ package layout
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +25,9 @@ func List(dir string) ([]ListResult, error) {
 	var res []ListResult
 
 	indexJSON, err := os.ReadFile(filepath.Join(dir, imgspecv1.ImageIndexFile))
+	if errors.Is(err, os.ErrNotExist) {
+		return []ListResult{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
