@@ -74,10 +74,7 @@ func TestSetupCertificates(t *testing.T) {
 	require.Len(t, tlsc.Certificates, 2)
 	names := []string{}
 	for _, c := range tlsc.Certificates {
-		require.Len(t, c.Certificate, 1)
-		parsed, err := x509.ParseCertificate(c.Certificate[0])
-		require.NoError(t, err)
-		names = append(names, parsed.Subject.CommonName)
+		names = append(names, c.Leaf.Subject.CommonName)
 	}
 	assert.ElementsMatch(t, []string{
 		"containers/image test client certificate 1",

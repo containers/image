@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/containers/image/v5/docker/reference"
@@ -633,7 +635,7 @@ func TestGetAllCredentials(t *testing.T) {
 	}
 }
 
-func TestAuthKeysForKey(t *testing.T) {
+func TestAuthKeyLookupOrder(t *testing.T) {
 	for _, tc := range []struct {
 		name, input string
 		expected    []string
@@ -686,8 +688,17 @@ func TestAuthKeysForKey(t *testing.T) {
 			},
 		},
 	} {
-		result := authKeysForKey(tc.input)
-		require.Equal(t, tc.expected, result, tc.name)
+		var registry string
+		if firstSlash := strings.IndexRune(tc.input, '/'); firstSlash != -1 {
+			registry = tc.input[:firstSlash]
+		} else {
+			registry = tc.input
+		}
+		result := slices.Collect(authKeyLookupOrder(tc.input, registry, false))
+		assert.Equal(t, tc.expected, result, tc.name)
+
+		result = slices.Collect(authKeyLookupOrder(tc.input, registry, true))
+		assert.Equal(t, []string{registry}, result, tc.name)
 	}
 }
 
