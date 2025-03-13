@@ -40,7 +40,7 @@ require (
 	github.com/ulikunitz/xz v0.5.12
 	github.com/vbatts/tar-split v0.12.1
 	github.com/vbauerster/mpb/v8 v8.9.3
-	go.etcd.io/bbolt v1.3.11
+	go.etcd.io/bbolt v1.4.0
 	golang.org/x/crypto v0.36.0
 	golang.org/x/oauth2 v0.28.0
 	golang.org/x/sync v0.12.0
