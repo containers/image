@@ -41,7 +41,7 @@ require (
 	github.com/vbatts/tar-split v0.12.1
 	github.com/vbauerster/mpb/v8 v8.9.3
 	go.etcd.io/bbolt v1.3.11
-	golang.org/x/crypto v0.35.0
+	golang.org/x/crypto v0.36.0
 	golang.org/x/oauth2 v0.26.0
 	golang.org/x/sync v0.12.0
 	golang.org/x/term v0.30.0
@@ -138,7 +138,7 @@ require (
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/net v0.36.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241209162323-e6fa225c2576 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f // indirect
 	google.golang.org/grpc v1.70.0 // indirect
