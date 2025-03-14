@@ -1,6 +1,7 @@
 package signature
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"os"
@@ -10,7 +11,7 @@ import (
 
 	"github.com/containers/image/v5/version"
 	"github.com/opencontainers/go-digest"
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -96,8 +97,7 @@ func successfullyUnmarshalUntrustedSignature(t *testing.T, schema *jsonschema.Sc
 	err := json.Unmarshal(input, &s)
 	require.NoError(t, err, inputString)
 
-	var rawInput any
-	err = json.Unmarshal(input, &rawInput)
+	rawInput, err := jsonschema.UnmarshalJSON(bytes.NewReader(input))
 	require.NoError(t, err, inputString)
 	err = schema.Validate(rawInput)
 	assert.NoError(t, err, inputString)
@@ -113,8 +113,7 @@ func assertUnmarshalUntrustedSignatureFails(t *testing.T, schema *jsonschema.Sch
 	err := json.Unmarshal(input, &s)
 	assert.Error(t, err, inputString)
 
-	var rawInput any
-	err = json.Unmarshal(input, &rawInput)
+	rawInput, err := jsonschema.UnmarshalJSON(bytes.NewReader(input))
 	if err == nil {
 		err := schema.Validate(rawInput)
 		assert.Error(t, err, inputString)
@@ -130,7 +129,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	schemaPath, err := filepath.Abs("../docs/atomic-signature-embedded-json.json")
 	require.NoError(t, err)
 
-	schema, err := jsonschema.Compile("file://" + schemaPath)
+	schema, err := jsonschema.NewCompiler().Compile("file://" + schemaPath)
 	require.NoError(t, err)
 
 	// Invalid input. Note that json.Unmarshal is guaranteed to validate input before calling our
