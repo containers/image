@@ -7,7 +7,7 @@ go 1.23.3
 
 require (
 	dario.cat/mergo v1.0.1
-	github.com/BurntSushi/toml v1.4.0
+	github.com/BurntSushi/toml v1.5.0
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01
 	github.com/containers/ocicrypt v1.2.1
 	github.com/containers/storage v1.57.3-0.20250310120440-ab85543c3c6a
