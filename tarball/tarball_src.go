@@ -82,19 +82,19 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 			}
 		}
 
-		// Default to assuming the layer is compressed.
-		layerType := imgspecv1.MediaTypeImageLayerGzip
-
 		// Set up to digest the file as it is.
 		blobIDdigester := digest.Canonical.Digester()
 		reader = io.TeeReader(reader, blobIDdigester.Hash())
 
+		var layerType string
+		var diffIDdigester digest.Digester
 		// Set up to digest the file after we maybe decompress it.
-		diffIDdigester := digest.Canonical.Digester()
 		uncompressed, err := pgzip.NewReader(reader)
 		if err == nil {
 			// It is compressed, so the diffID is the digest of the uncompressed version
+			diffIDdigester = digest.Canonical.Digester()
 			reader = io.TeeReader(uncompressed, diffIDdigester.Hash())
+			layerType = imgspecv1.MediaTypeImageLayerGzip
 		} else {
 			// It is not compressed, so the diffID and the blobID are going to be the same
 			diffIDdigester = blobIDdigester
