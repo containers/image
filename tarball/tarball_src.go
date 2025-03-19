@@ -14,8 +14,9 @@ import (
 
 	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/imagesource/stubs"
+	"github.com/containers/image/v5/pkg/compression"
+	compressionTypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
-	"github.com/klauspost/pgzip"
 	digest "github.com/opencontainers/go-digest"
 	imgspecs "github.com/opencontainers/image-spec/specs-go"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -88,15 +89,29 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 
 		var layerType string
 		var diffIDdigester digest.Digester
-		// Set up to digest the file after we maybe decompress it.
+		// If necessary, digest the file after we decompress it.
 		if err := func() error { // A scope for defer
-			uncompressed, err := pgzip.NewReader(reader)
-			if err == nil {
+			format, decompressor, reader, err := compression.DetectCompressionFormat(reader)
+			if err != nil {
+				return err
+			}
+			if decompressor != nil {
+				uncompressed, err := decompressor(reader)
+				if err != nil {
+					return err
+				}
 				defer uncompressed.Close()
 				// It is compressed, so the diffID is the digest of the uncompressed version
 				diffIDdigester = digest.Canonical.Digester()
 				reader = io.TeeReader(uncompressed, diffIDdigester.Hash())
-				layerType = imgspecv1.MediaTypeImageLayerGzip
+				switch format.Name() {
+				case compressionTypes.GzipAlgorithmName:
+					layerType = imgspecv1.MediaTypeImageLayerGzip
+				case compressionTypes.ZstdAlgorithmName:
+					layerType = imgspecv1.MediaTypeImageLayerZstd
+				default: // This is incorrect, but we have no good options, and it is what this transport was historically doing.
+					layerType = imgspecv1.MediaTypeImageLayerGzip
+				}
 			} else {
 				// It is not compressed, so the diffID and the blobID are going to be the same
 				diffIDdigester = blobIDdigester
