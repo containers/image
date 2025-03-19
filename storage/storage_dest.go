@@ -1571,7 +1571,7 @@ func (s *storageImageDestination) CommitWithOptions(ctx context.Context, options
 		if err != nil {
 			return fmt.Errorf("reading image %q: %w", intendedID, err)
 		}
-		if img.TopLayer != lastLayer {
+		if img.TopLayer != lastLayer && !slices.Contains(img.MappedTopLayers, lastLayer) {
 			logrus.Debugf("error creating image: image with ID %q exists, but uses different layers", intendedID)
 			return fmt.Errorf("image with ID %q already exists, but uses a different top layer: %w", intendedID, storage.ErrDuplicateID)
 		}
