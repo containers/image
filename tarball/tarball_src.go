@@ -89,24 +89,26 @@ func (r *tarballReference) NewImageSource(ctx context.Context, sys *types.System
 		var layerType string
 		var diffIDdigester digest.Digester
 		// Set up to digest the file after we maybe decompress it.
-		uncompressed, err := pgzip.NewReader(reader)
-		if err == nil {
-			// It is compressed, so the diffID is the digest of the uncompressed version
-			diffIDdigester = digest.Canonical.Digester()
-			reader = io.TeeReader(uncompressed, diffIDdigester.Hash())
-			layerType = imgspecv1.MediaTypeImageLayerGzip
-		} else {
-			// It is not compressed, so the diffID and the blobID are going to be the same
-			diffIDdigester = blobIDdigester
-			layerType = imgspecv1.MediaTypeImageLayer
-			uncompressed = nil
-		}
-		// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
-		if _, err := io.Copy(io.Discard, reader); err != nil {
-			return nil, fmt.Errorf("error reading %q: %w", filename, err)
-		}
-		if uncompressed != nil {
-			uncompressed.Close()
+		if err := func() error { // A scope for defer
+			uncompressed, err := pgzip.NewReader(reader)
+			if err == nil {
+				defer uncompressed.Close()
+				// It is compressed, so the diffID is the digest of the uncompressed version
+				diffIDdigester = digest.Canonical.Digester()
+				reader = io.TeeReader(uncompressed, diffIDdigester.Hash())
+				layerType = imgspecv1.MediaTypeImageLayerGzip
+			} else {
+				// It is not compressed, so the diffID and the blobID are going to be the same
+				diffIDdigester = blobIDdigester
+				layerType = imgspecv1.MediaTypeImageLayer
+			}
+			// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
+			if _, err := io.Copy(io.Discard, reader); err != nil {
+				return fmt.Errorf("error reading %q: %w", filename, err)
+			}
+			return nil
+		}(); err != nil {
+			return nil, err
 		}
 
 		// Grab our uncompressed and possibly-compressed digests and sizes.
