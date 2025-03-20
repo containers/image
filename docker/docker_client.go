@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/httpdump"
 	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/internal/multierr"
 	"github.com/containers/image/v5/internal/set"
@@ -614,7 +615,7 @@ func (c *dockerClient) makeRequestToResolvedURLOnce(ctx context.Context, method 
 		}
 	}
 	logrus.Debugf("%s %s", method, resolvedURL.Redacted())
-	res, err := c.client.Do(req)
+	res, err := httpdump.DoRequest(c.client, req)
 	if err != nil {
 		return nil, err
 	}
@@ -796,7 +797,7 @@ func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge chall
 	authReq.Header.Add("User-Agent", c.userAgent)
 	authReq.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	logrus.Debugf("%s %s", authReq.Method, authReq.URL.Redacted())
-	res, err := c.client.Do(authReq)
+	res, err := httpdump.DoRequest(c.client, authReq)
 	if err != nil {
 		return nil, err
 	}
@@ -843,7 +844,7 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
 	authReq.Header.Add("User-Agent", c.userAgent)
 
 	logrus.Debugf("%s %s", authReq.Method, authReq.URL.Redacted())
-	res, err := c.client.Do(authReq)
+	res, err := httpdump.DoRequest(c.client, authReq)
 	if err != nil {
 		return nil, err
 	}
