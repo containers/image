@@ -34,7 +34,11 @@ func TestRegistryHTTPResponseToError(t *testing.T) {
 				"\r\n" +
 				"Body of the request\r\n",
 			errorString: "received unexpected HTTP status: 333 HTTP status out of range",
-			errorType:   &unexpectedHTTPStatusError{},
+			errorType:   UnexpectedHTTPStatusError{},
+			fn: func(t *testing.T, err error) {
+				expected := err.(UnexpectedHTTPStatusError)
+				assert.Equal(t, 333, expected.StatusCode)
+			},
 		},
 		{
 			name: "HTTP body not in expected format",
