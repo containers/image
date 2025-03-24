@@ -44,6 +44,13 @@ func (e UnexpectedHTTPStatusError) Error() string {
 	return fmt.Sprintf("received unexpected HTTP status: %s", e.status)
 }
 
+func newUnexpectedHTTPStatusError(resp *http.Response) UnexpectedHTTPStatusError {
+	return UnexpectedHTTPStatusError{
+		StatusCode: resp.StatusCode,
+		status:     resp.Status,
+	}
+}
+
 // unexpectedHTTPResponseError is returned when an expected HTTP status code
 // is returned, but the content was unexpected and failed to be parsed.
 type unexpectedHTTPResponseError struct {
@@ -150,5 +157,5 @@ func handleErrorResponse(resp *http.Response) error {
 		}
 		return err
 	}
-	return UnexpectedHTTPStatusError{StatusCode: resp.StatusCode, status: resp.Status}
+	return newUnexpectedHTTPStatusError(resp)
 }
