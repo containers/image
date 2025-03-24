@@ -1048,14 +1048,10 @@ func TestSetGetCredentials(t *testing.T) {
 		sys := &types.SystemContext{}
 		if tc.useLegacyFormat {
 			sys.LegacyFormatAuthFilePath = tmpFile.Name()
-			_, err = tmpFile.WriteString(fmt.Sprintf(
-				`{"%s":{"auth":"dXNlcm5hbWU6cGFzc3dvcmQ="}}`, tc.set,
-			))
+			_, err = fmt.Fprintf(tmpFile, `{"%s":{"auth":"dXNlcm5hbWU6cGFzc3dvcmQ="}}`, tc.set)
 		} else {
 			sys.AuthFilePath = tmpFile.Name()
-			_, err = tmpFile.WriteString(fmt.Sprintf(
-				`{"auths":{"%s":{"auth":"dXNlcm5hbWU6cGFzc3dvcmQ="}}}`, tc.set,
-			))
+			_, err = fmt.Fprintf(tmpFile, `{"auths":{"%s":{"auth":"dXNlcm5hbWU6cGFzc3dvcmQ="}}}`, tc.set)
 		}
 		require.NoError(t, err)
 
