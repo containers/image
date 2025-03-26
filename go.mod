@@ -13,7 +13,7 @@ require (
 	github.com/containers/storage v1.57.3-0.20250310120440-ab85543c3c6a
 	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467
 	github.com/distribution/reference v0.6.0
-	github.com/docker/cli v28.0.2+incompatible
+	github.com/docker/cli v28.0.4+incompatible
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/docker/docker v28.0.4+incompatible
 	github.com/docker/docker-credential-helpers v0.9.3
