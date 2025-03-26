@@ -1,16 +1,18 @@
----
-run:
-  concurrency: 6
-  timeout: 5m
-
+version: "2"
 linters:
   enable:
     - errorlint
-
-linters-settings:
-  errorlint:
-    # See https://golangci-lint.run/usage/linters/#errorlint.
-    # Only allow warnings about not using %w.
-    errorf-multi: false
-    asserts: false
-    comparison: false
+  settings:
+    errorlint:
+      # See https://golangci-lint.run/usage/linters/#errorlint.
+      # Only allow warnings about not using %w.
+      errorf-multi: false
+      asserts: false
+      comparison: false
+    staticcheck:
+      checks: ["all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022", "-ST1005", "-QF1008"] # golangci-lint's default, we add -ST1005 and -QF1008
+  exclusions:
+    presets:
+      - comments
+      - common-false-positives
+      - std-error-handling
