@@ -97,8 +97,10 @@ validate: lint
 	@BUILDTAGS="$(BUILDTAGS)" hack/validate.sh
 
 .PHONY: lint
+lint: EXTRA_TAGS=containers_image_docker_daemon_stub,containers_image_fulcio_stub,containers_image_openpgp,containers_image_rekor_stub,containers_image_storage_stub
 lint:
 	$(GOBIN)/golangci-lint run --build-tags "$(BUILDTAGS)"
+	$(GOBIN)/golangci-lint run --build-tags "$(EXTRA_TAGS)"
 
 # When this is running in CI, it will only check the CI commit range
 .PHONY: .gitvalidation
