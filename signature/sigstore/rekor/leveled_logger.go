@@ -1,3 +1,5 @@
+//go:build !containers_image_rekor_stub
+
 package rekor
 
 import (
