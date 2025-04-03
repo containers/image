@@ -1,6 +1,8 @@
 package signature
 
 import (
+	"bytes"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -58,6 +60,25 @@ func TestPKITrustRootValidate(t *testing.T) {
 		err := tr.validate()
 		assert.NoError(t, err)
 	}
+}
+
+func TestParseLeafCertFromPEM(t *testing.T) {
+	fulcioCertBytes, err := os.ReadFile("fixtures/fulcio-cert")
+	require.NoError(t, err)
+	// Invalid leaf certificate
+	for _, c := range [][]byte{
+		[]byte("not a certificate"),
+		{},                               // Empty
+		bytes.Repeat(fulcioCertBytes, 2), // More than one certificate
+	} {
+		pk, err := parseLeafCertFromPEM(c)
+		assert.Error(t, err)
+		assert.Nil(t, pk)
+	}
+	// Valid leaf certificate
+	cert, err := parseLeafCertFromPEM(fulcioCertBytes)
+	require.NoError(t, err)
+	assert.NotNil(t, cert)
 }
 
 func TestPKIVerify(t *testing.T) {
@@ -271,4 +292,17 @@ func TestPKIVerify(t *testing.T) {
 			assert.Nil(t, pk, c.name)
 		}
 	}
+}
+
+// assert that crypto.PublicKey matches the on in certPEM.
+func assertPublicKeyMatchesCert(t *testing.T, certPEM []byte, pk crypto.PublicKey) {
+	pkInterface, ok := pk.(interface {
+		Equal(x crypto.PublicKey) bool
+	})
+	require.True(t, ok)
+	certs, err := cryptoutils.UnmarshalCertificatesFromPEM(certPEM)
+	require.NoError(t, err)
+	require.Len(t, certs, 1)
+	equal := pkInterface.Equal(certs[0].PublicKey)
+	assert.True(t, equal)
 }

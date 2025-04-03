@@ -25,6 +25,21 @@ func (p *pkiTrustRoot) validate() error {
 	return nil
 }
 
+func parseLeafCertFromPEM(untrustedCertificateBytes []byte) (*x509.Certificate, error) {
+	untrustedLeafCerts, err := cryptoutils.UnmarshalCertificatesFromPEM(untrustedCertificateBytes)
+	if err != nil {
+		return nil, internal.NewInvalidSignatureError(fmt.Sprintf("parsing leaf certificate: %v", err))
+	}
+	switch len(untrustedLeafCerts) {
+	case 0:
+		return nil, internal.NewInvalidSignatureError("no certificate found in signature certificate data")
+	case 1: // OK
+		return untrustedLeafCerts[0], nil
+	default:
+		return nil, internal.NewInvalidSignatureError("unexpected multiple certificates present in signature certificate data")
+	}
+}
+
 func verifyPKI(pkiTrustRoot *pkiTrustRoot, untrustedCertificateBytes []byte, untrustedIntermediateChainBytes []byte) (crypto.PublicKey, error) {
 	var untrustedIntermediatePool *x509.CertPool
 	if pkiTrustRoot.caIntermediateCertificates != nil {

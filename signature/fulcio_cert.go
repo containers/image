@@ -185,21 +185,6 @@ func (f *fulcioTrustRoot) verifyFulcioCertificateAtTime(relevantTime time.Time, 
 	return untrustedCertificate.PublicKey, nil
 }
 
-func parseLeafCertFromPEM(untrustedCertificateBytes []byte) (*x509.Certificate, error) {
-	untrustedLeafCerts, err := cryptoutils.UnmarshalCertificatesFromPEM(untrustedCertificateBytes)
-	if err != nil {
-		return nil, internal.NewInvalidSignatureError(fmt.Sprintf("parsing leaf certificate: %v", err))
-	}
-	switch len(untrustedLeafCerts) {
-	case 0:
-		return nil, internal.NewInvalidSignatureError("no certificate found in signature certificate data")
-	case 1: // OK
-		return untrustedLeafCerts[0], nil
-	default:
-		return nil, internal.NewInvalidSignatureError("unexpected multiple certificates present in signature certificate data")
-	}
-}
-
 func verifyRekorFulcio(rekorPublicKeys []*ecdsa.PublicKey, fulcioTrustRoot *fulcioTrustRoot, untrustedRekorSET []byte,
 	untrustedCertificateBytes []byte, untrustedIntermediateChainBytes []byte, untrustedBase64Signature string,
 	untrustedPayloadBytes []byte) (crypto.PublicKey, error) {
