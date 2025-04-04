@@ -1,6 +1,7 @@
 package signature
 
 import (
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -271,4 +272,17 @@ func TestPKIVerify(t *testing.T) {
 			assert.Nil(t, pk, c.name)
 		}
 	}
+}
+
+// assert that crypto.PublicKey matches the on in certPEM.
+func assertPublicKeyMatchesCert(t *testing.T, certPEM []byte, pk crypto.PublicKey) {
+	pkInterface, ok := pk.(interface {
+		Equal(x crypto.PublicKey) bool
+	})
+	require.True(t, ok)
+	certs, err := cryptoutils.UnmarshalCertificatesFromPEM(certPEM)
+	require.NoError(t, err)
+	require.Len(t, certs, 1)
+	equal := pkInterface.Equal(certs[0].PublicKey)
+	assert.True(t, equal)
 }
