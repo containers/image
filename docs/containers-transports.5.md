@@ -91,11 +91,6 @@ The _path_ value terminates at the first `:` character; any further `:` characte
 The _reference_ is used to set, or match, the `org.opencontainers.image.ref.name` annotation in the top-level index.
 If _reference_ is not specified when reading an archive, the archive must contain exactly one image.
 
-### **ostree:**_docker-reference_[`@`_/absolute/repo/path_]
-
-An image in the local ostree(1) repository.
-_/absolute/repo/path_ defaults to `/ostree/repo`.
-
 ### **sif:**_path_
 
 An image using the Singularity image format at _path_.
@@ -138,7 +133,7 @@ $ skopeo copy docker://docker.io/library/alpine:latest containers-storage:alpine
 
 ## SEE ALSO
 
-docker-login(1), docker-save(1), ostree(1), podman-login(1), skopeo-copy(1), skopeo-inspect(1), tar(1), container-registries.conf(5), containers-storage.conf(5)
+docker-login(1), docker-save(1), podman-login(1), skopeo-copy(1), skopeo-inspect(1), tar(1), container-registries.conf(5), containers-storage.conf(5)
 
 ## AUTHORS
 
