@@ -47,7 +47,7 @@ your choosing).
 
 This library also depends on some C libraries. Either install them:
 ```sh
-Fedora$ dnf install gpgme-devel libassuan-devel # potentially also ostree-devel
+Fedora$ dnf install gpgme-devel libassuan-devel
 macOS$ brew install gpgme
 ```
 or use the build tags described below to avoid the dependencies (e.g. using `go build -tags …`)
@@ -60,8 +60,6 @@ or use the build tags described below to avoid the dependencies (e.g. using `go 
 - `containers_image_docker_daemon_stub`: Don’t import the `docker-daemon:` transport in `github.com/containers/image/transports/alltransports`, to decrease the amount of required dependencies.  Use a stub which reports that the transport is not supported instead.
 - `containers_image_openpgp`: Use a Golang-only OpenPGP implementation for signature verification instead of the default cgo/gpgme-based implementation;
 the primary downside is that creating new signatures with the Golang-only implementation is not supported.
-- `containers_image_ostree`: Import `ostree:` transport in `github.com/containers/image/transports/alltransports`. This builds the library requiring the `libostree` development libraries. Otherwise a stub which reports that the transport is not supported gets used. The `github.com/containers/image/ostree` package is completely disabled
-and impossible to import when this build tag is not in use.
 - `containers_image_storage_stub`: Don’t import the `containers-storage:` transport in `github.com/containers/image/transports/alltransports`, to decrease the amount of required dependencies.  Use a stub which reports that the transport is not supported instead.
 - `containers_image_fulcio_stub`: Don't import sigstore/fulcio code, all fulcio operations will return an error code
 - `containers_image_rekor_stub`: Don't import sigstore/reckor code, all rekor operations will return an error code
