@@ -33,7 +33,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0
 	github.com/sigstore/fulcio v1.6.6
 	github.com/sigstore/rekor v1.3.9
-	github.com/sigstore/sigstore v1.9.2
+	github.com/sigstore/sigstore v1.9.3
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	github.com/sylabs/sif/v2 v2.21.1
