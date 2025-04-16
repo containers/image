@@ -96,8 +96,6 @@ test_task:
 test_skopeo_task:
     alias: test_skopeo
     only_if: *not_docs
-    depends_on:
-        - validate
     gce_instance:
         image_project: libpod-218412
         zone: "us-central1-f"
