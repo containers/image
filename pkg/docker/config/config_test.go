@@ -896,7 +896,7 @@ func TestSetCredentialsInteroperability(t *testing.T) {
 		configDir := t.TempDir()
 		configPath := filepath.Join(configDir, config.ConfigFileName)
 
-		// The credential lookups are intended to match github.com/docker/cli/command/image.RunPull .
+		// The credential lookups are intended to match github.com/docker/cli/command/image.runPull .
 		dockerRef, err := dockerReference.ParseNormalizedNamed(c.queryRepo)
 		require.NoError(t, err)
 		dockerRef = dockerReference.TagNameOnly(dockerRef)
