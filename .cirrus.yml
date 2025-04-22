@@ -62,6 +62,9 @@ validate_task:
     go_modules_cache: &go_modules_cache
         fingerprint_script: cat go.sum
         folder: $GOPATH/pkg/mod
+    go_build_cache: &go_build_cache
+        fingerprint_script: cat go.sum
+        folder: $GOCACHE
     golangci-lint_cache:
         folder: /root/.cache/golangci-lint
         reupload_on_changes: true
@@ -79,6 +82,7 @@ cross_task:
     only_if: &not_docs $CIRRUS_CHANGE_TITLE !=~ '.*CI:DOCS.*'
     gce_instance: *debian_vm
     go_modules_cache: *go_modules_cache
+    go_build_cache: *go_build_cache
     script: make cross
 
 
@@ -89,6 +93,7 @@ test_task:
     only_if: *not_docs
     gce_instance: *debian_vm
     go_modules_cache: *go_modules_cache # FIXME: this doesn’t work — runs sshed as user
+    # go_build_cache: *go_build_cache  # FIXME: this doesn’t work either, for the same reason
     matrix:
         - name: "Test"
           env:
