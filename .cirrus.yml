@@ -59,6 +59,9 @@ validate_task:
         image_name: ${DEBIAN_CACHE_IMAGE_NAME}
     env:
         HOME: "/root"  # default unset, needed by golangci-lint.
+    go_modules_cache: &go_modules_cache
+        fingerprint_script: cat go.sum
+        folder: $GOPATH/pkg/mod
     golangci-lint_cache:
         folder: /root/.cache/golangci-lint
         reupload_on_changes: true
@@ -75,6 +78,7 @@ validate_task:
 cross_task:
     only_if: &not_docs $CIRRUS_CHANGE_TITLE !=~ '.*CI:DOCS.*'
     gce_instance: *debian_vm
+    go_modules_cache: *go_modules_cache
     script: make cross
 
 
@@ -84,6 +88,7 @@ test_task:
         - validate
     only_if: *not_docs
     gce_instance: *debian_vm
+    go_modules_cache: *go_modules_cache
     matrix:
         - name: "Test"
           env:
