@@ -88,7 +88,7 @@ test_task:
         - validate
     only_if: *not_docs
     gce_instance: *debian_vm
-    go_modules_cache: *go_modules_cache
+    go_modules_cache: *go_modules_cache # FIXME: this doesn’t work — runs sshed as user
     matrix:
         - name: "Test"
           env:
