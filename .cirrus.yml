@@ -93,7 +93,7 @@ test_task:
     only_if: *not_docs
     gce_instance: *debian_vm
     go_modules_cache: *go_modules_cache # FIXME: this doesn’t work — runs sshed as user
-    # go_build_cache: *go_build_cache  # FIXME: this doesn’t work either, for the same reason
+    # go_build_cache: *go_build_cache # FIXME: this doesn’t work either, for the same reason
     matrix:
         - name: "Test"
           env:
