@@ -59,6 +59,7 @@ validate_task:
         image_name: ${DEBIAN_CACHE_IMAGE_NAME}
     env:
         HOME: "/root"  # default unset, needed by golangci-lint.
+    # TO DO: maintain only one copy of fingerprint_script?
     validate_go_modules_cache:
         fingerprint_script: cat go.sum
         folder: $GOPATH/pkg/mod
