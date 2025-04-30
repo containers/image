@@ -31,7 +31,7 @@ require (
 	github.com/proglottis/gpgme v0.1.4
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0
-	github.com/sigstore/fulcio v1.6.6
+	github.com/sigstore/fulcio v1.7.1
 	github.com/sigstore/rekor v1.3.10
 	github.com/sigstore/sigstore v1.9.3
 	github.com/sirupsen/logrus v1.9.3
