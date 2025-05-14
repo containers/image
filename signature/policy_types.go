@@ -168,6 +168,8 @@ type prSigstoreSignedFulcio struct {
 	OIDCIssuer string `json:"oidcIssuer,omitempty"`
 	// SubjectEmail specifies the expected email address of the authenticated OIDC identity, recorded by Fulcio into the generated certificates.
 	SubjectEmail string `json:"subjectEmail,omitempty"`
+	// URI specifies the expected URI of the authenticated OIDC identity, recorded by Fulcio into the generated certificates.
+	URI string `json:"URI,omitempty"`
 }
 
 // PRSigstoreSignedPKI contains PKI configuration options for a "sigstoreSigned" PolicyRequirement.
