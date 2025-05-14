@@ -20,7 +20,7 @@ fi
 export "PATH=$PATH:$GOPATH/bin"
 
 _run_setup() {
-    req_env_vars SKOPEO_PATH SKOPEO_CI_BRANCH GOSRC BUILDTAGS
+    req_env_vars SKOPEO_PATH SKOPEO_CI_BRANCH GOSRC
 
     project_module=$(go list .)
 
