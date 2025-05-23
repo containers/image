@@ -29,7 +29,7 @@ require (
 	github.com/opencontainers/selinux v1.12.0
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f
 	github.com/proglottis/gpgme v0.1.4
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0
 	github.com/sigstore/fulcio v1.6.6
 	github.com/sigstore/rekor v1.3.10
