@@ -55,7 +55,7 @@ tools: .install.gitvalidation .install.golangci-lint
 
 .install.gitvalidation:
 	if [ ! -x "$(GOBIN)/git-validation" ]; then \
-		GO111MODULE="off" go get $(BUILDFLAGS) github.com/vbatts/git-validation; \
+		go install github.com/vbatts/git-validation@latest; \
 	fi
 
 .install.golangci-lint:
