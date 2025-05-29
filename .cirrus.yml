@@ -59,6 +59,19 @@ validate_task:
         image_name: ${DEBIAN_CACHE_IMAGE_NAME}
     env:
         HOME: "/root"  # default unset, needed by golangci-lint.
+    # TO DO: maintain only one copy of fingerprint_script?
+    validate_go_modules_cache:
+        fingerprint_script: cat go.sum
+        folder: $GOPATH/pkg/mod
+    validate_go_build_cache:
+        fingerprint_script: cat go.sum
+        folder: $GOCACHE
+    golangci-lint_cache:
+        folder: /root/.cache/golangci-lint
+        reupload_on_changes: true
+        fingerprint_script:
+            - go version
+            - grep GOLANGCI_LINT_VERSION Makefile | head -1
     script: |
         git remote update
         make tools
@@ -69,6 +82,12 @@ validate_task:
 cross_task:
     only_if: &not_docs $CIRRUS_CHANGE_TITLE !=~ '.*CI:DOCS.*'
     gce_instance: *debian_vm
+    cross_go_modules_cache:
+        fingerprint_script: cat go.sum
+        folder: $GOPATH/pkg/mod
+    cross_go_build_cache:
+        fingerprint_script: cat go.sum
+        folder: $GOCACHE
     script: make cross
 
 
@@ -78,6 +97,8 @@ test_task:
         - validate
     only_if: *not_docs
     gce_instance: *debian_vm
+    # go_modules_cache: *go_modules_cache # FIXME: this doesn’t work — runs sshed as user
+    # go_build_cache: *go_build_cache # FIXME: this doesn’t work either, for the same reason
     matrix:
         - name: "Test"
           env:
