@@ -160,16 +160,6 @@ The _reference_ annotation value, if any, is not used.
 - The top-level scope `"/"` is forbidden; use the transport default scope `""`,
   for consistency with other transports.
 
-### `ostree`:
-
-Supported scopes have the form _repo-path_`:`_image-scope_; _repo_path_ is the path to the OSTree repository.
-
-_image-scope_ is the _docker_reference_ part of the reference, with with a `:latest` tag implied if no tag is present,
-and parent namespaces of the _docker_reference_ value (by omitting the tag, or a prefix specifying a higher-level namespace).
-
-*Note:*
-- The _repo_path_ must be absolute and contain no symlinks. Paths violating these requirements may be silently ignored.
-
 ### `sif:`
 
 Supported scopes are paths to Singularity images, and their parent directories
