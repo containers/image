@@ -59,6 +59,12 @@ validate_task:
         image_name: ${DEBIAN_CACHE_IMAGE_NAME}
     env:
         HOME: "/root"  # default unset, needed by golangci-lint.
+    golangci-lint_cache:
+        folder: /root/.cache/golangci-lint
+        reupload_on_changes: true
+        fingerprint_script:
+            - go version
+            - grep GOLANGCI_LINT_VERSION Makefile | head -1
     script: |
         git remote update
         make tools
