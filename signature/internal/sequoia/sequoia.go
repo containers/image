@@ -10,8 +10,16 @@ import "C"
 
 import (
 	"errors"
+	"fmt"
+	"path/filepath"
+	"runtime"
 	"unsafe"
 )
+
+// sequoiaLibraryDir is the path to the directory registries.d, used for locating lookaside Docker signature storage.
+// You can override this at build time with
+// -ldflags '-X github.com/containers/image/v5/signature/sequoia.sequoiaLibraryDir=$your_path'
+var sequoiaLibraryDir = ""
 
 type SigningMechanism struct {
 	mechanism *C.SequoiaMechanism
@@ -147,9 +155,21 @@ func (m *SigningMechanism) SupportsSigning() error {
 }
 
 func Init() error {
-	if C.go_sequoia_ensure_library(C.CString("libimage_sequoia.so.0"),
+	var soName string
+	switch runtime.GOOS {
+	case "linux":
+		soName = "libimage_sequoia.so.0"
+	case "darwin":
+		soName = "libimage_sequoia.dylib"
+	default:
+		return fmt.Errorf("Unhandled OS %q in sequoia initialization", runtime.GOOS)
+	}
+	if sequoiaLibraryDir != "" {
+		soName = filepath.Join(sequoiaLibraryDir, soName)
+	}
+	if C.go_sequoia_ensure_library(C.CString(soName),
 		C.RTLD_NOW|C.RTLD_GLOBAL) < 0 {
-		return errors.New("unable to load libimage_sequoia.so.0")
+		return fmt.Errorf("unable to load %q", soName)
 	}
 	return nil
 }
