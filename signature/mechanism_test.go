@@ -143,7 +143,7 @@ func TestNewEphemeralGPGSigningMechanism(t *testing.T) {
 	mech, keyIdentities, err = NewEphemeralGPGSigningMechanism(bytes.Join([][]byte{keyBlob, keyBlob}, nil))
 	require.NoError(t, err)
 	defer mech.Close()
-	assert.Equal(t, []string{TestKeyFingerprint, TestKeyFingerprintWithPassphrase, TestKeyFingerprint, TestKeyFingerprintWithPassphrase}, keyIdentities)
+	assert.Equal(t, []string{TestKeyFingerprintWithPassphrase, TestKeyFingerprint, TestKeyFingerprintWithPassphrase, TestKeyFingerprint}, keyIdentities)
 
 	// Two keys from two blobs:
 	keyBlob1, err := os.ReadFile("./fixtures/public-key-1.gpg")
@@ -325,6 +325,6 @@ func TestGPGSigningMechanismUntrustedSignatureContents(t *testing.T) {
 		content, shortKeyID, err := mech.UntrustedSignatureContents(signature)
 		require.NoError(t, err, version)
 		assert.Equal(t, []byte(`{"critical":{"identity":{"docker-reference":"testing/manifest"},"image":{"docker-manifest-digest":"sha256:20bf21ed457b390829cdbeec8795a7bea1626991fda603e0d01b4e7f60427e55"},"type":"atomic container signature"},"optional":{"creator":"atomic 0.1.13-dev","timestamp":1464633474}}`), content, version)
-		assert.Equal(t, "BB75E91990DF8F7E", shortKeyID, version)
+		assert.Equal(t, "5F9470E3BC6C3B55", shortKeyID, version)
 	}
 }
