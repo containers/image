@@ -19,7 +19,7 @@ require (
 	github.com/docker/docker-credential-helpers v0.9.3
 	github.com/docker/go-connections v0.5.0
 	github.com/go-openapi/strfmt v0.23.1-0.20250509134642-64a09ef0e084
-	github.com/hashicorp/go-retryablehttp v0.7.7
+	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/klauspost/compress v1.18.0
 	github.com/klauspost/pgzip v1.2.6
 	github.com/manifoldco/promptui v0.9.0
