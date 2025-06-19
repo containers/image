@@ -95,8 +95,13 @@ _run_image_tests() {
     msg "Setup known_hosts for root"
     ssh-keyscan localhost > /root/.ssh/known_hosts \
 
+    msg "Start rekor server as $ROOTLESS_USER"
+    showrun ssh $ROOTLESS_USER@localhost $GOSRC/signature/sigstore/rekor/testdata/start-rekor.sh ci
+    # remove rekor server on function exit
+    trap "ssh $ROOTLESS_USER@localhost $GOSRC/signature/sigstore/rekor/testdata/start-rekor.sh ci remove" RETURN
+
     msg "Executing tests as $ROOTLESS_USER"
-    showrun ssh $ROOTLESS_USER@localhost make -C $GOSRC test "BUILDTAGS='$BUILDTAGS'" "TESTFLAGS=-v"
+    showrun ssh $ROOTLESS_USER@localhost make -C $GOSRC test "BUILDTAGS='$BUILDTAGS'" "TESTFLAGS=-v" "REKOR_SERVER_URL='http://127.0.0.1:3000'"
 }
 
 req_env_vars GOSRC
