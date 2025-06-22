@@ -51,6 +51,24 @@ func SignDockerManifest(m []byte, dockerReference string, mech SigningMechanism,
 // using mech.
 func VerifyDockerManifestSignature(unverifiedSignature, unverifiedManifest []byte,
 	expectedDockerReference string, mech SigningMechanism, expectedKeyIdentity string) (*Signature, error) {
+	_, signerKeyIdentity, err := mech.Verify(unverifiedSignature)
+	if err != nil {
+		return nil, err
+	}
+
+	// If signerKeyIdentity is different from expectedKeyIdentity, check if it's a valid subkey
+	if signerKeyIdentity != expectedKeyIdentity {
+		// Implementation depends on mechanism-specific functionality to verify subkey relationships
+		// This could be a new method on the SigningMechanism interface or mechanism-specific implementation
+		isValidSubkey, err := isKeyOrValidSubkey(mech, signerKeyIdentity, expectedKeyIdentity)
+		if err != nil {
+			return nil, err
+		}
+		if !isValidSubkey {
+			return nil, fmt.Errorf("signature by key %s does not match expected key %s",
+				signerKeyIdentity, expectedKeyIdentity)
+		}
+	}
 	sig, _, err := VerifyImageManifestSignatureUsingKeyIdentityList(unverifiedSignature, unverifiedManifest, expectedDockerReference, mech, []string{expectedKeyIdentity})
 	return sig, err
 }
