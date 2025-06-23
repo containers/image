@@ -6,6 +6,8 @@ package sequoia
 // #include "gosequoia.h"
 // #include <dlfcn.h>
 // #include <limits.h>
+// typedef void (*sequoia_logger_consumer_t) (enum SequoiaLogLevel level, char *message);
+// extern void sequoia_logrus_logger (enum SequoiaLogLevel level, char *message);
 import "C"
 
 import (
@@ -15,6 +17,8 @@ import (
 	"runtime"
 	"sync"
 	"unsafe"
+
+	"github.com/sirupsen/logrus"
 )
 
 // sequoiaLibraryDir is the path to the directory where libpodman_sequoia is installed,
@@ -163,6 +167,28 @@ func (m *SigningMechanism) Close() error {
 	return nil
 }
 
+//export sequoia_logrus_logger
+func sequoia_logrus_logger(level C.enum_SequoiaLogLevel, message *C.char) {
+	var logrusLevel logrus.Level
+	switch level {
+	case C.SEQUOIA_LOG_LEVEL_ERROR:
+		logrusLevel = logrus.ErrorLevel
+	case C.SEQUOIA_LOG_LEVEL_WARN:
+		logrusLevel = logrus.WarnLevel
+	case C.SEQUOIA_LOG_LEVEL_INFO:
+		logrusLevel = logrus.InfoLevel
+	case C.SEQUOIA_LOG_LEVEL_DEBUG:
+		logrusLevel = logrus.DebugLevel
+	case C.SEQUOIA_LOG_LEVEL_TRACE:
+		logrusLevel = logrus.TraceLevel
+	case C.SEQUOIA_LOG_LEVEL_UNKNOWN:
+		fallthrough
+	default:
+		logrusLevel = logrus.ErrorLevel // Should never happen
+	}
+	logrus.StandardLogger().Log(logrusLevel, C.GoString(message))
+}
+
 // initOnce should only be called by Init.
 func initOnce() error {
 	var soName string
@@ -182,6 +208,12 @@ func initOnce() error {
 	if C.go_sequoia_ensure_library(cSOName,
 		C.RTLD_NOW|C.RTLD_GLOBAL) < 0 {
 		return fmt.Errorf("unable to load %q", soName)
+	}
+
+	var cerr *C.SequoiaError
+	if C.go_sequoia_set_logger_consumer(C.sequoia_logger_consumer_t(C.sequoia_logrus_logger), &cerr) != 0 {
+		defer C.go_sequoia_error_free(cerr)
+		return fmt.Errorf("initializing logging: %s", C.GoString(cerr.message))
 	}
 	return nil
 }
