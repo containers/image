@@ -19,8 +19,19 @@ use std::path::Path;
 use std::ptr;
 use std::slice;
 use std::sync::Arc;
+use std::sync::Once;
 
 use crate::{set_error_from, SequoiaError};
+
+static LOGGING_INIT: Once = Once::new();
+
+fn init_logging() {
+    LOGGING_INIT.call_once(|| {
+        env_logger::Builder::new()
+            .filter(None, log::LevelFilter::Debug)
+            .init()
+    })
+}
 
 pub struct SequoiaMechanism<'a> {
     keystore: sequoia_keystore::Keystore,
@@ -30,6 +41,7 @@ pub struct SequoiaMechanism<'a> {
 
 impl<'a> SequoiaMechanism<'a> {
     fn from_directory(dir: impl AsRef<Path>) -> Result<Self, anyhow::Error> {
+        init_logging();
         let home_dir = dir.as_ref().to_path_buf();
 
         let keystore_dir = home_dir.join("data").join("keystore");
@@ -52,6 +64,7 @@ impl<'a> SequoiaMechanism<'a> {
     }
 
     fn ephemeral() -> Result<Self, anyhow::Error> {
+        init_logging();
         let context = sequoia_keystore::Context::configure().ephemeral().build()?;
         let certstore = Arc::new(sequoia_cert_store::CertStore::empty());
         let policy = crypto_policy()?;

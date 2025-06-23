@@ -1885,6 +1885,7 @@ dependencies = [
  "cdylib-link-lines",
  "dirs 5.0.1",
  "dlwrap",
+ "env_logger",
  "libc",
  "log",
  "regex",
