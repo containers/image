@@ -42,9 +42,7 @@ impl<'a> SequoiaMechanism<'a> {
         fs::create_dir_all(&certstore_dir)?;
         let certstore = sequoia_cert_store::CertStore::open(&certstore_dir)?;
 
-        let mut policy = ConfiguredStandardPolicy::new();
-        policy.parse_default_config()?;
-        let policy = policy.build();
+        let policy = crypto_policy()?;
 
         Ok(Self {
             keystore,
@@ -56,9 +54,7 @@ impl<'a> SequoiaMechanism<'a> {
     fn ephemeral() -> Result<Self, anyhow::Error> {
         let context = sequoia_keystore::Context::configure().ephemeral().build()?;
         let certstore = Arc::new(sequoia_cert_store::CertStore::empty());
-        let mut policy = ConfiguredStandardPolicy::new();
-        policy.parse_default_config()?;
-        let policy = policy.build();
+        let policy = crypto_policy()?;
         Ok(Self {
             keystore: sequoia_keystore::Keystore::connect(&context)?,
             certstore,
@@ -161,11 +157,8 @@ impl<'a> SequoiaMechanism<'a> {
             certstore: self.certstore.clone(),
             signer: Default::default(),
         };
-        let mut policy = ConfiguredStandardPolicy::new();
-        policy.parse_default_config()?;
-        let policy = policy.build();
 
-        let mut v = VerifierBuilder::from_bytes(signature)?.with_policy(&policy, None, h)?;
+        let mut v = VerifierBuilder::from_bytes(signature)?.with_policy(&self.policy, None, h)?;
         let mut content = Vec::new();
         v.read_to_end(&mut content)?;
 
@@ -223,6 +216,13 @@ impl<'a> VerificationHelper for Helper<'a> {
         }
         Err(anyhow::anyhow!("No valid signature"))
     }
+}
+
+/// Creates a StandardPolicy with the policy we desire, primarily based on the system’s configuration.
+fn crypto_policy<'a>() -> Result<StandardPolicy<'a>, anyhow::Error> {
+    let mut policy = ConfiguredStandardPolicy::new();
+    policy.parse_default_config()?;
+    Ok(policy.build())
 }
 
 pub struct SequoiaSignature {
