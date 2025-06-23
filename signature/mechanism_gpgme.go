@@ -1,4 +1,4 @@
-//go:build !containers_image_openpgp
+//go:build !containers_image_openpgp && !containers_image_sequoia
 
 package signature
 
