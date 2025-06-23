@@ -1,0 +1,40 @@
+[package]
+name = "image-sequoia"
+version = "0.1.0"
+edition = "2021"
+license = "LGPL-2.0-or-later"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow = "1"
+dirs = "5"
+libc = "0.2"
+log = "0.4"
+sequoia-cert-store = "0.7"
+sequoia-keystore = { version = "0.7", default-features = false, features = ["softkeys"] }
+sequoia-openpgp = { version = "2", default-features = false, features = ["compression"] }
+sequoia-policy-config = "0.8"
+
+[build-dependencies]
+anyhow = "1"
+cbindgen = "0.24.0"
+cdylib-link-lines = "0.1.4"
+dlwrap = "0.3.7"
+regex = "1"
+
+[features]
+# To use a different cryptographic backend, e.g., OpenSSL, do:
+#
+#   cargo build --release --no-default-features --features crypto-openssl
+
+# We explicitly do not want to enable Sequoia's decompression support.
+# Hence we only select a crypto backend.
+default = ["crypto-openssl"]
+crypto-nettle = ["sequoia-openpgp/crypto-nettle"]
+crypto-rust = ["sequoia-openpgp/crypto-rust"]
+crypto-cng = ["sequoia-openpgp/crypto-cng"]
+crypto-openssl = ["sequoia-openpgp/crypto-openssl"]
+crypto-botan = ["sequoia-openpgp/crypto-botan"]
+crypto-botan2 = ["sequoia-openpgp/crypto-botan2"]
