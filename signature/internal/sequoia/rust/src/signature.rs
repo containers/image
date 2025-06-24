@@ -182,7 +182,7 @@ impl<'a> SequoiaMechanism<'a> {
                 content,
                 signer: CString::new(signer.fingerprint().to_hex().as_bytes()).unwrap(),
             }),
-            None => Err(anyhow::anyhow!("No valid signature")),
+            None => Err(anyhow::anyhow!("No valid signer")),
         }
     }
 }
@@ -205,6 +205,7 @@ impl<'a> VerificationHelper for Helper<'a> {
     }
 
     fn check(&mut self, structure: MessageStructure) -> openpgp::Result<()> {
+        let mut signature_errors: Vec<String> = Vec::new();
         for layer in structure {
             match layer {
                 MessageLayer::Compression { algo } => log::info!("Compressed using {}", algo),
@@ -219,15 +220,26 @@ impl<'a> VerificationHelper for Helper<'a> {
                     }
                 }
                 MessageLayer::SignatureGroup { ref results } => {
-                    let result = results.iter().find(|r| r.is_ok());
-                    if let Some(result) = result {
-                        self.signer = Some(result.as_ref().unwrap().ka.cert().to_owned());
-                        return Ok(());
+                    for result in results {
+                        match result {
+                            Ok(good_checksum) => {
+                                self.signer = Some(good_checksum.ka.cert().to_owned());
+                                return Ok(());
+                            }
+                            Err(verification_error) => {
+                                signature_errors.push(verification_error.to_string());
+                            }
+                        }
                     }
                 }
             }
         }
-        Err(anyhow::anyhow!("No valid signature"))
+        let err = match signature_errors.len() {
+        0 => anyhow::anyhow!("No valid signature"),
+        1 => anyhow::anyhow!("{}", &signature_errors[0]),
+        _ => anyhow::anyhow!("Multiple signature errors: [{}]", signature_errors.join(", ")),
+        };
+        Err(err)
     }
 }
 
