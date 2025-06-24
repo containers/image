@@ -8,15 +8,15 @@ const (
 	// TestImageSignatureReference is the Docker image reference signed in "image.signature"
 	TestImageSignatureReference = "testing/manifest"
 	// TestKeyFingerprint is the fingerprint of the private key in this directory.
-	TestKeyFingerprint = "1D8230F6CDB6A06716E414C1DB72F2188BB46CC8"
+	TestKeyFingerprint = "08CD26E446E2E95249B7A405E932F44B23E8DD43"
 	// TestOtherFingerprint1 is a random fingerprint.
 	TestOtherFingerprint1 = "0123456789ABCDEF0123456789ABCDEF01234567"
 	// TestOtherFingerprint2 is a random fingerprint.
 	TestOtherFingerprint2 = "DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF"
 	// TestKeyShortID is the short ID of the private key in this directory.
-	TestKeyShortID = "DB72F2188BB46CC8"
+	TestKeyShortID = "E932F44B23E8DD43"
 	// TestKeyFingerprintWithPassphrase is the fingerprint of the private key with passphrase in this directory.
-	TestKeyFingerprintWithPassphrase = "E3EB7611D815211F141946B5B0CDE60B42557346"
+	TestKeyFingerprintWithPassphrase = "F2B501009F78B0B340221A12A3CD242DA6028093"
 	// TestPassphrase is the passphrase for TestKeyFingerprintWithPassphrase.
 	TestPassphrase = "WithPassphrase123"
 )
