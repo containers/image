@@ -4,64 +4,23 @@ package sequoia_test
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
-	"io"
 	"os"
 	"os/exec"
-	"regexp"
 	"testing"
 
 	"github.com/containers/image/v5/signature/internal/sequoia"
+	"github.com/containers/image/v5/signature/internal/sequoia/testcli"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func checkCliVersion(version string) error {
-	return exec.Command("sq", "--cli-version", version, "version").Run()
-}
-
-func generateKey(dir string, email string) (string, error) {
-	cmd := exec.Command("sq", "--home", dir, "key", "generate", "--userid", fmt.Sprintf("<%s>", email), "--own-key", "--without-password")
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return "", err
-	}
-
-	if err := cmd.Start(); err != nil {
-		return "", err
-	}
-
-	output, err := io.ReadAll(stderr)
-	if err != nil {
-		return "", err
-	}
-
-	if err := cmd.Wait(); err != nil {
-		return "", err
-	}
-
-	re := regexp.MustCompile("(?m)^ *Fingerprint: ([0-9A-F]+)")
-	matches := re.FindSubmatch(output)
-	if matches == nil {
-		return "", errors.New("unable to extract fingerprint")
-	}
-	fingerprint := string(matches[1][:])
-	return fingerprint, nil
-}
 
 func exportKey(dir string, fingerprint string) ([]byte, error) {
 	cmd := exec.Command("sq", "--home", dir, "key", "export", "--cert", fingerprint)
 	return cmd.Output()
 }
 
-func exportCert(dir string, fingerprint string) ([]byte, error) {
-	cmd := exec.Command("sq", "--home", dir, "cert", "export", "--cert", fingerprint)
-	return cmd.Output()
-}
-
 func TestNewMechanismFromDirectory(t *testing.T) {
-	if err := checkCliVersion("1.3.0"); err != nil {
+	if err := testcli.CheckCliVersion("1.3.0"); err != nil {
 		t.Skipf("sq not usable: %v", err)
 	}
 	dir := t.TempDir()
@@ -69,7 +28,7 @@ func TestNewMechanismFromDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to initialize a mechanism: %v", err)
 	}
-	_, err = generateKey(dir, "foo@example.org")
+	_, err = testcli.GenerateKey(dir, "foo@example.org")
 	if err != nil {
 		t.Fatalf("unable to generate key: %v", err)
 	}
@@ -80,15 +39,15 @@ func TestNewMechanismFromDirectory(t *testing.T) {
 }
 
 func TestNewEphemeralMechanism(t *testing.T) {
-	if err := checkCliVersion("1.3.0"); err != nil {
+	if err := testcli.CheckCliVersion("1.3.0"); err != nil {
 		t.Skipf("sq not usable: %v", err)
 	}
 	dir := t.TempDir()
-	fingerprint, err := generateKey(dir, "foo@example.org")
+	fingerprint, err := testcli.GenerateKey(dir, "foo@example.org")
 	if err != nil {
 		t.Fatalf("unable to generate key: %v", err)
 	}
-	output, err := exportCert(dir, fingerprint)
+	output, err := testcli.ExportCert(dir, fingerprint)
 	if err != nil {
 		t.Fatalf("unable to export cert: %v", err)
 	}
@@ -107,11 +66,11 @@ func TestNewEphemeralMechanism(t *testing.T) {
 }
 
 func TestGenerateSignVerify(t *testing.T) {
-	if err := checkCliVersion("1.3.0"); err != nil {
+	if err := testcli.CheckCliVersion("1.3.0"); err != nil {
 		t.Skipf("sq not usable: %v", err)
 	}
 	dir := t.TempDir()
-	fingerprint, err := generateKey(dir, "foo@example.org")
+	fingerprint, err := testcli.GenerateKey(dir, "foo@example.org")
 	if err != nil {
 		t.Fatalf("unable to generate key: %v", err)
 	}
@@ -137,11 +96,11 @@ func TestGenerateSignVerify(t *testing.T) {
 }
 
 func TestImportSignVerify(t *testing.T) {
-	if err := checkCliVersion("1.3.0"); err != nil {
+	if err := testcli.CheckCliVersion("1.3.0"); err != nil {
 		t.Skipf("sq not usable: %v", err)
 	}
 	dir := t.TempDir()
-	fingerprint, err := generateKey(dir, "foo@example.org")
+	fingerprint, err := testcli.GenerateKey(dir, "foo@example.org")
 	if err != nil {
 		t.Fatalf("unable to generate key: %v", err)
 	}
@@ -180,11 +139,11 @@ func TestImportSignVerify(t *testing.T) {
 }
 
 func TestImportSignVerifyEphemeral(t *testing.T) {
-	if err := checkCliVersion("1.3.0"); err != nil {
+	if err := testcli.CheckCliVersion("1.3.0"); err != nil {
 		t.Skipf("sq not usable: %v", err)
 	}
 	dir := t.TempDir()
-	fingerprint, err := generateKey(dir, "foo@example.org")
+	fingerprint, err := testcli.GenerateKey(dir, "foo@example.org")
 	if err != nil {
 		t.Fatalf("unable to generate key: %v", err)
 	}
@@ -222,13 +181,13 @@ func TestImportSignVerifyEphemeral(t *testing.T) {
 }
 
 func TestSignThenVerifyEphemeral(t *testing.T) {
-	if err := checkCliVersion("1.3.0"); err != nil {
+	if err := testcli.CheckCliVersion("1.3.0"); err != nil {
 		t.Skipf("sq not usable: %v", err)
 	}
 	dir := t.TempDir()
-	fingerprint, err := generateKey(dir, "foo@example.org")
+	fingerprint, err := testcli.GenerateKey(dir, "foo@example.org")
 	require.NoError(t, err)
-	publicKey, err := exportCert(dir, fingerprint)
+	publicKey, err := testcli.ExportCert(dir, fingerprint)
 	require.NoError(t, err)
 	m1, err := sequoia.NewMechanismFromDirectory(dir)
 	require.NoError(t, err)
