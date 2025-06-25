@@ -11,6 +11,9 @@ import (
 	"os/exec"
 	"regexp"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func checkCliVersion(version string) error {
@@ -125,6 +128,40 @@ func TestGenerateSignVerify(t *testing.T) {
 	if keyIdentity != fingerprint {
 		t.Fatalf("keyIdentity differ from the original")
 	}
+}
+
+func TestSignThenVerifyEphemeral(t *testing.T) {
+	if err := checkCliVersion("1.3.0"); err != nil {
+		t.Skipf("sq not usable: %v", err)
+	}
+	dir := t.TempDir()
+	fingerprint, err := generateKey(dir, "foo@example.org")
+	require.NoError(t, err)
+	publicKey, err := exportCert(dir, fingerprint)
+	require.NoError(t, err)
+	m1, err := NewMechanismFromDirectory(dir)
+	require.NoError(t, err)
+	defer m1.Close()
+
+	input := []byte("Hello, world!")
+	sig, err := m1.Sign(input, fingerprint)
+	require.NoError(t, err)
+
+	m2, err := NewEphemeralMechanism()
+	require.NoError(t, err)
+	defer m2.Close()
+
+	_, _, err = m2.Verify(sig) // With no public key, verification should fail
+	assert.Error(t, err)
+
+	keyIdentities, err := m2.ImportKeys(publicKey)
+	require.NoError(t, err)
+	require.Len(t, keyIdentities, 1)
+	require.Equal(t, fingerprint, keyIdentities[0])
+	contents, keyIdentity, err := m2.Verify(sig)
+	require.NoError(t, err)
+	assert.Equal(t, input, contents)
+	assert.Equal(t, keyIdentity, fingerprint)
 }
 
 func TestMain(m *testing.M) {
