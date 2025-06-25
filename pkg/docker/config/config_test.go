@@ -459,6 +459,13 @@ func TestGetCredentialsInteroperability(t *testing.T) {
 	const testUser = "some-user"
 	const testPassword = "some-password"
 
+	// Unset DOCKER_AUTH_CONFIG, which is read by github.com/docker/cli/cli/config/configfile.ConfigFile.GetCredentialsStore
+	// and might interfere with the test.
+	// Use t.Setenv() to ensure DOCKER_AUTH_CONFIG is restored to the original value after the test;
+	// (Sadly there isn’t a t.Unsetenv() as of Go 1.17.)
+	t.Setenv("DOCKER_AUTH_CONFIG", "")
+	os.Unsetenv("DOCKER_AUTH_CONFIG")
+
 	for _, c := range []struct {
 		loginKey string // or "" for Docker's default. We must special-case that because (docker login docker.io) works, but (docker logout docker.io) doesn't!
 		queryKey string
