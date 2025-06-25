@@ -1,3 +1,5 @@
+//go:build !containers_image_sequoia
+
 package simplesequoia
 
 import (
