@@ -60,7 +60,7 @@ _run_image_tests() {
     test_filter=$(git grep -h --show-function ensureTestCanCreateImages |
                     sed -n 's/func \(Test[[:alnum:]]*\)(.*/^\1\$\$/p' |
                     paste -sd "|" -)
-    showrun make test "BUILDTAGS='$BUILDTAGS'" "TESTFLAGS=-run '$test_filter'"
+    showrun make test "BUILDTAGS='$BUILDTAGS'" "TESTFLAGS=-v -run '$test_filter'"
 
     # Most tests in this repo are intended to run as a regular user.
     ROOTLESS_USER="testuser$RANDOM"
@@ -96,7 +96,7 @@ _run_image_tests() {
     ssh-keyscan localhost > /root/.ssh/known_hosts \
 
     msg "Executing tests as $ROOTLESS_USER"
-    showrun ssh $ROOTLESS_USER@localhost make -C $GOSRC test "BUILDTAGS='$BUILDTAGS'"
+    showrun ssh $ROOTLESS_USER@localhost make -C $GOSRC test "BUILDTAGS='$BUILDTAGS'" "TESTFLAGS=-v"
 }
 
 req_env_vars GOSRC
