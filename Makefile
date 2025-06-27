@@ -13,6 +13,9 @@ BUILD_TAGS_DARWIN_CROSS = containers_image_openpgp
 BUILDTAGS =
 BUILDFLAGS := -tags "$(BUILDTAGS)"
 
+# Extra flags passed to go test
+TESTFLAGS :=
+
 PACKAGES := $(shell go list $(BUILDFLAGS) ./...)
 SOURCE_DIRS = $(shell echo $(PACKAGES) | awk 'BEGIN{FS="/"; RS=" "}{print $$4}' | uniq)
 
@@ -86,7 +89,7 @@ clean:
 
 .PHONY: test
 test:
-	@go test $(BUILDFLAGS) -cover ./...
+	@go test $(BUILDFLAGS) $(TESTFLAGS) -cover ./...
 
 .PHONY: fmt
 fmt:
