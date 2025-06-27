@@ -1,5 +1,3 @@
-//go:build !containers_image_rekor_stub
-
 package internal
 
 import (

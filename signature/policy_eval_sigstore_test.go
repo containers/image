@@ -1,5 +1,3 @@
-//go:build !containers_image_fulcio_stub
-
 // Policy evaluation for prCosignSigned.
 
 package signature
