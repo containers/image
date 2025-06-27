@@ -28,7 +28,7 @@ require (
 	github.com/proglottis/gpgme v0.1.4
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0
-	github.com/sigstore/fulcio v1.6.6
+	github.com/sigstore/fulcio v1.7.1
 	github.com/sigstore/sigstore v1.9.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
