@@ -1,6 +1,6 @@
 //go:build containers_image_sequoia
 
-package sequoia_test
+package sequoia
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/containers/image/v5/signature/internal/sequoia"
 	"github.com/containers/image/v5/signature/internal/sequoia/testcli"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +23,7 @@ func TestNewMechanismFromDirectory(t *testing.T) {
 		t.Skipf("sq not usable: %v", err)
 	}
 	dir := t.TempDir()
-	_, err := sequoia.NewMechanismFromDirectory(dir)
+	_, err := NewMechanismFromDirectory(dir)
 	if err != nil {
 		t.Fatalf("unable to initialize a mechanism: %v", err)
 	}
@@ -32,7 +31,7 @@ func TestNewMechanismFromDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to generate key: %v", err)
 	}
-	_, err = sequoia.NewMechanismFromDirectory(dir)
+	_, err = NewMechanismFromDirectory(dir)
 	if err != nil {
 		t.Fatalf("unable to initialize a mechanism: %v", err)
 	}
@@ -51,7 +50,7 @@ func TestNewEphemeralMechanism(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to export cert: %v", err)
 	}
-	m, err := sequoia.NewEphemeralMechanism()
+	m, err := NewEphemeralMechanism()
 	if err != nil {
 		t.Fatalf("unable to initialize a mechanism: %v", err)
 	}
@@ -74,7 +73,7 @@ func TestGenerateSignVerify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to generate key: %v", err)
 	}
-	m, err := sequoia.NewMechanismFromDirectory(dir)
+	m, err := NewMechanismFromDirectory(dir)
 	if err != nil {
 		t.Fatalf("unable to initialize a mechanism: %v", err)
 	}
@@ -109,7 +108,7 @@ func TestImportSignVerify(t *testing.T) {
 		t.Fatalf("unable to export key: %v", err)
 	}
 	newDir := t.TempDir()
-	m, err := sequoia.NewMechanismFromDirectory(newDir)
+	m, err := NewMechanismFromDirectory(newDir)
 	if err != nil {
 		t.Fatalf("unable to initialize a mechanism: %v", err)
 	}
@@ -151,7 +150,7 @@ func TestImportSignVerifyEphemeral(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to export key: %v", err)
 	}
-	m, err := sequoia.NewEphemeralMechanism()
+	m, err := NewEphemeralMechanism()
 	if err != nil {
 		t.Fatalf("unable to initialize a mechanism: %v", err)
 	}
@@ -189,14 +188,14 @@ func TestSignThenVerifyEphemeral(t *testing.T) {
 	require.NoError(t, err)
 	publicKey, err := testcli.ExportCert(dir, fingerprint)
 	require.NoError(t, err)
-	m1, err := sequoia.NewMechanismFromDirectory(dir)
+	m1, err := NewMechanismFromDirectory(dir)
 	require.NoError(t, err)
 
 	input := []byte("Hello, world!")
 	sig, err := m1.Sign(input, fingerprint)
 	require.NoError(t, err)
 
-	m2, err := sequoia.NewEphemeralMechanism()
+	m2, err := NewEphemeralMechanism()
 	require.NoError(t, err)
 
 	_, _, err = m2.Verify(sig) // With no public key, verification should fail
@@ -213,7 +212,7 @@ func TestSignThenVerifyEphemeral(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	err := sequoia.Init()
+	err := Init()
 	if err != nil {
 		panic(err)
 	}
