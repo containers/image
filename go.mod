@@ -35,7 +35,7 @@ require (
 	github.com/sylabs/sif/v2 v2.21.1
 	github.com/ulikunitz/xz v0.5.12
 	github.com/vbauerster/mpb/v8 v8.10.2
-	go.etcd.io/bbolt v1.4.1
+	go.etcd.io/bbolt v1.4.2
 	golang.org/x/crypto v0.39.0
 	golang.org/x/oauth2 v0.30.0
 	golang.org/x/sync v0.15.0
