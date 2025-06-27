@@ -1,6 +1,6 @@
 //go:build containers_image_sequoia
 
-package sequoia_test
+package sequoia
 
 import (
 	"bytes"
@@ -11,8 +11,6 @@ import (
 	"os/exec"
 	"regexp"
 	"testing"
-
-	"github.com/containers/image/v5/signature/internal/sequoia"
 )
 
 func checkCliVersion(version string) error {
@@ -58,7 +56,7 @@ func TestNewMechanismFromDirectory(t *testing.T) {
 		t.Skipf("sq not usable: %v", err)
 	}
 	dir := t.TempDir()
-	_, err := sequoia.NewMechanismFromDirectory(dir)
+	_, err := NewMechanismFromDirectory(dir)
 	if err != nil {
 		t.Fatalf("unable to initialize a mechanism: %v", err)
 	}
@@ -66,7 +64,7 @@ func TestNewMechanismFromDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to generate key: %v", err)
 	}
-	_, err = sequoia.NewMechanismFromDirectory(dir)
+	_, err = NewMechanismFromDirectory(dir)
 	if err != nil {
 		t.Fatalf("unable to initialize a mechanism: %v", err)
 	}
@@ -85,7 +83,7 @@ func TestNewEphemeralMechanism(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to export cert: %v", err)
 	}
-	m, err := sequoia.NewEphemeralMechanism()
+	m, err := NewEphemeralMechanism()
 	if err != nil {
 		t.Fatalf("unable to initialize a mechanism: %v", err)
 	}
@@ -108,7 +106,7 @@ func TestGenerateSignVerify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to generate key: %v", err)
 	}
-	m, err := sequoia.NewMechanismFromDirectory(dir)
+	m, err := NewMechanismFromDirectory(dir)
 	if err != nil {
 		t.Fatalf("unable to initialize a mechanism: %v", err)
 	}
@@ -130,7 +128,7 @@ func TestGenerateSignVerify(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	err := sequoia.Init()
+	err := Init()
 	if err != nil {
 		panic(err)
 	}
