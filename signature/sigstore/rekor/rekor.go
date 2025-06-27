@@ -14,6 +14,7 @@ import (
 
 	"github.com/containers/image/v5/signature/internal"
 	signerInternal "github.com/containers/image/v5/signature/sigstore/internal"
+	"github.com/hashicorp/go-cleanhttp"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/sirupsen/logrus"
 )
@@ -44,6 +45,7 @@ type rekorClient struct {
 // newRekorClient creates a rekorClient for rekorURL.
 func newRekorClient(rekorURL *url.URL) *rekorClient {
 	retryableClient := retryablehttp.NewClient()
+	retryableClient.HTTPClient = cleanhttp.DefaultClient()
 	retryableClient.RetryMax = defaultRetryCount
 	retryableClient.Logger = leveledLoggerForLogrus(logrus.StandardLogger())
 	basePath := rekorURL.Path
