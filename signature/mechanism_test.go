@@ -1,6 +1,6 @@
 package signature
 
-// These tests are expected to pass unmodified for _both_ mechanism_gpgme.go and mechanism_openpgp.go.
+// These tests are expected to pass unmodified for _all_ of mechanism_sequoia.go, mechanism_gpgme.go, and mechanism_openpgp.go.
 
 import (
 	"bytes"
