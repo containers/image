@@ -8,10 +8,15 @@ import (
 )
 
 func TestValidateReferenceName(t *testing.T) {
+	t.Parallel()
 	validRepoNames := []string{
 		"docker/docker",
 		"library/debian",
 		"debian",
+		"localhost/library/debian",
+		"localhost/debian",
+		"LOCALDOMAIN/library/debian",
+		"LOCALDOMAIN/debian",
 		"docker.io/docker/docker",
 		"docker.io/library/debian",
 		"docker.io/debian",
@@ -21,12 +26,21 @@ func TestValidateReferenceName(t *testing.T) {
 		"127.0.0.1:5000/docker/docker",
 		"127.0.0.1:5000/library/debian",
 		"127.0.0.1:5000/debian",
+		"192.168.0.1",
+		"192.168.0.1:80",
+		"192.168.0.1:8/debian",
+		"192.168.0.2:25000/debian",
 		"thisisthesongthatneverendsitgoesonandonandonthisisthesongthatnev",
+		"[fc00::1]:5000/docker",
+		"[fc00::1]:5000/docker/docker",
+		"[fc00:1:2:3:4:5:6:7]:5000/library/debian",
 
 		// This test case was moved from invalid to valid since it is valid input
 		// when specified with a hostname, it removes the ambiguity from about
 		// whether the value is an identifier or repository name
 		"docker.io/1a3f5e7d9c1b3a5f7e9d1c3b5a7f9e1d3c5b7a9f1e3d5d7c9b1a3f5e7d9c1b3a",
+		"Docker/docker",
+		"DOCKER/docker",
 	}
 	invalidRepoNames := []string{
 		"https://github.com/docker/docker",
@@ -37,6 +51,11 @@ func TestValidateReferenceName(t *testing.T) {
 		"docker///docker",
 		"docker.io/docker/Docker",
 		"docker.io/docker///docker",
+		"[fc00::1]",
+		"[fc00::1]:5000",
+		"fc00::1:5000/debian",
+		"[fe80::1%eth0]:5000/debian",
+		"[2001:db8:3:4::192.0.2.33]:5000/debian",
 		"1a3f5e7d9c1b3a5f7e9d1c3b5a7f9e1d3c5b7a9f1e3d5d7c9b1a3f5e7d9c1b3a",
 	}
 
@@ -56,6 +75,7 @@ func TestValidateReferenceName(t *testing.T) {
 }
 
 func TestValidateRemoteName(t *testing.T) {
+	t.Parallel()
 	validRepositoryNames := []string{
 		// Sanity check.
 		"docker/docker",
@@ -115,7 +135,7 @@ func TestValidateRemoteName(t *testing.T) {
 		"docker/",
 
 		// namespace too long
-		"this_is_not_a_valid_namespace_because_its_length_is_greater_than_255_this_is_not_a_valid_namespace_because_its_length_is_greater_than_255_this_is_not_a_valid_namespace_because_its_length_is_greater_than_255_this_is_not_a_valid_namespace_because_its_length_is_greater_than_255/docker",
+		"this_is_not_a_valid_namespace_because_its_lenth_is_greater_than_255_this_is_not_a_valid_namespace_because_its_lenth_is_greater_than_255_this_is_not_a_valid_namespace_because_its_lenth_is_greater_than_255_this_is_not_a_valid_namespace_because_its_lenth_is_greater_than_255/docker",
 	}
 	for _, repositoryName := range invalidRepositoryNames {
 		if _, err := ParseNormalizedNamed(repositoryName); err == nil {
@@ -125,11 +145,40 @@ func TestValidateRemoteName(t *testing.T) {
 }
 
 func TestParseRepositoryInfo(t *testing.T) {
+	t.Parallel()
 	type tcase struct {
 		RemoteName, FamiliarName, FullName, AmbiguousName, Domain string
 	}
 
-	tcases := []tcase{
+	tests := []tcase{
+		{
+			RemoteName:    "fooo",
+			FamiliarName:  "localhost/fooo",
+			FullName:      "localhost/fooo",
+			AmbiguousName: "localhost/fooo",
+			Domain:        "localhost",
+		},
+		{
+			RemoteName:    "fooo/bar",
+			FamiliarName:  "localhost/fooo/bar",
+			FullName:      "localhost/fooo/bar",
+			AmbiguousName: "localhost/fooo/bar",
+			Domain:        "localhost",
+		},
+		{
+			RemoteName:    "fooo",
+			FamiliarName:  "LOCALDOMAIN/fooo",
+			FullName:      "LOCALDOMAIN/fooo",
+			AmbiguousName: "LOCALDOMAIN/fooo",
+			Domain:        "LOCALDOMAIN",
+		},
+		{
+			RemoteName:    "fooo/bar",
+			FamiliarName:  "LOCALDOMAIN/fooo/bar",
+			FullName:      "LOCALDOMAIN/fooo/bar",
+			AmbiguousName: "LOCALDOMAIN/fooo/bar",
+			Domain:        "LOCALDOMAIN",
+		},
 		{
 			RemoteName:    "fooo/bar",
 			FamiliarName:  "fooo/bar",
@@ -228,41 +277,64 @@ func TestParseRepositoryInfo(t *testing.T) {
 			AmbiguousName: "",
 			Domain:        "docker.io",
 		},
+		{
+			RemoteName:    "bar",
+			FamiliarName:  "Foo/bar",
+			FullName:      "Foo/bar",
+			AmbiguousName: "",
+			Domain:        "Foo",
+		},
+		{
+			RemoteName:    "bar",
+			FamiliarName:  "FOO/bar",
+			FullName:      "FOO/bar",
+			AmbiguousName: "",
+			Domain:        "FOO",
+		},
 	}
 
-	for _, tcase := range tcases {
-		refStrings := []string{tcase.FamiliarName, tcase.FullName}
-		if tcase.AmbiguousName != "" {
-			refStrings = append(refStrings, tcase.AmbiguousName)
+	for i, tc := range tests {
+		tc := tc
+		refStrings := []string{tc.FamiliarName, tc.FullName}
+		if tc.AmbiguousName != "" {
+			refStrings = append(refStrings, tc.AmbiguousName)
 		}
 
-		var refs []Named
 		for _, r := range refStrings {
-			named, err := ParseNormalizedNamed(r)
-			if err != nil {
-				t.Fatal(err)
-			}
-			refs = append(refs, named)
-		}
-
-		for _, r := range refs {
-			if expected, actual := tcase.FamiliarName, FamiliarName(r); expected != actual {
-				t.Fatalf("Invalid normalized reference for %q. Expected %q, got %q", r, expected, actual)
-			}
-			if expected, actual := tcase.FullName, r.String(); expected != actual {
-				t.Fatalf("Invalid canonical reference for %q. Expected %q, got %q", r, expected, actual)
-			}
-			if expected, actual := tcase.Domain, Domain(r); expected != actual {
-				t.Fatalf("Invalid domain for %q. Expected %q, got %q", r, expected, actual)
-			}
-			if expected, actual := tcase.RemoteName, Path(r); expected != actual {
-				t.Fatalf("Invalid remoteName for %q. Expected %q, got %q", r, expected, actual)
-			}
+			r := r
+			t.Run(strconv.Itoa(i)+"/"+r, func(t *testing.T) {
+				t.Parallel()
+				named, err := ParseNormalizedNamed(r)
+				if err != nil {
+					t.Fatalf("ref=%s: %v", r, err)
+				}
+				t.Run("FamiliarName", func(t *testing.T) {
+					if expected, actual := tc.FamiliarName, FamiliarName(named); expected != actual {
+						t.Errorf("Invalid familiar name for %q. Expected %q, got %q", named, expected, actual)
+					}
+				})
+				t.Run("FullName", func(t *testing.T) {
+					if expected, actual := tc.FullName, named.String(); expected != actual {
+						t.Errorf("Invalid canonical reference for %q. Expected %q, got %q", named, expected, actual)
+					}
+				})
+				t.Run("Domain", func(t *testing.T) {
+					if expected, actual := tc.Domain, Domain(named); expected != actual {
+						t.Errorf("Invalid domain for %q. Expected %q, got %q", named, expected, actual)
+					}
+				})
+				t.Run("RemoteName", func(t *testing.T) {
+					if expected, actual := tc.RemoteName, Path(named); expected != actual {
+						t.Errorf("Invalid remoteName for %q. Expected %q, got %q", named, expected, actual)
+					}
+				})
+			})
 		}
 	}
 }
 
 func TestParseReferenceWithTagAndDigest(t *testing.T) {
+	t.Parallel()
 	shortRef := "busybox:latest@sha256:86e0e091d0da6bde2456dbb48306f3956bbeb2eae1b5b9a43045843f69fe4aaa"
 	ref, err := ParseNormalizedNamed(shortRef)
 	if err != nil {
@@ -284,6 +356,7 @@ func TestParseReferenceWithTagAndDigest(t *testing.T) {
 }
 
 func TestInvalidReferenceComponents(t *testing.T) {
+	t.Parallel()
 	if _, err := ParseNormalizedNamed("-foo"); err == nil {
 		t.Fatal("Expected WithName to detect invalid name")
 	}
@@ -326,7 +399,8 @@ func equalReference(r1, r2 Reference) bool {
 }
 
 func TestParseAnyReference(t *testing.T) {
-	tcases := []struct {
+	t.Parallel()
+	tests := []struct {
 		Reference  string
 		Equivalent string
 		Expected   Reference
@@ -385,115 +459,124 @@ func TestParseAnyReference(t *testing.T) {
 			Reference:  "dbcc1c35ac38df41fd2f5e4130b32ffdb93ebae8b3dbe638c23575912276fc9",
 			Equivalent: "docker.io/library/dbcc1c35ac38df41fd2f5e4130b32ffdb93ebae8b3dbe638c23575912276fc9",
 		},
+		{
+			Reference:  "dbcc1",
+			Equivalent: "docker.io/library/dbcc1",
+		},
 	}
 
-	for _, tcase := range tcases {
-		var ref Reference
-		var err error
-		ref, err = ParseAnyReference(tcase.Reference)
-		if err != nil {
-			t.Fatalf("Error parsing reference %s: %v", tcase.Reference, err)
-		}
-		if ref.String() != tcase.Equivalent {
-			t.Fatalf("Unexpected string: %s, expected %s", ref.String(), tcase.Equivalent)
-		}
-
-		expected := tcase.Expected
-		if expected == nil {
-			expected, err = Parse(tcase.Equivalent)
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.Reference, func(t *testing.T) {
+			t.Parallel()
+			var ref Reference
+			var err error
+			ref, err = ParseAnyReference(tc.Reference)
 			if err != nil {
-				t.Fatalf("Error parsing reference %s: %v", tcase.Equivalent, err)
+				t.Fatalf("Error parsing reference %s: %v", tc.Reference, err)
 			}
-		}
-		if !equalReference(ref, expected) {
-			t.Errorf("Unexpected reference %#v, expected %#v", ref, expected)
-		}
+			if ref.String() != tc.Equivalent {
+				t.Fatalf("Unexpected string: %s, expected %s", ref.String(), tc.Equivalent)
+			}
+
+			expected := tc.Expected
+			if expected == nil {
+				expected, err = Parse(tc.Equivalent)
+				if err != nil {
+					t.Fatalf("Error parsing reference %s: %v", tc.Equivalent, err)
+				}
+			}
+			if !equalReference(ref, expected) {
+				t.Errorf("Unexpected reference %#v, expected %#v", ref, expected)
+			}
+		})
 	}
 }
 
 func TestNormalizedSplitHostname(t *testing.T) {
-	testcases := []struct {
+	t.Parallel()
+	tests := []struct {
 		input  string
 		domain string
-		name   string
+		path   string
 	}{
 		{
 			input:  "test.com/foo",
 			domain: "test.com",
-			name:   "foo",
+			path:   "foo",
 		},
 		{
 			input:  "test_com/foo",
 			domain: "docker.io",
-			name:   "test_com/foo",
+			path:   "test_com/foo",
 		},
 		{
 			input:  "docker/migrator",
 			domain: "docker.io",
-			name:   "docker/migrator",
+			path:   "docker/migrator",
 		},
 		{
 			input:  "test.com:8080/foo",
 			domain: "test.com:8080",
-			name:   "foo",
+			path:   "foo",
 		},
 		{
 			input:  "test-com:8080/foo",
 			domain: "test-com:8080",
-			name:   "foo",
+			path:   "foo",
 		},
 		{
 			input:  "foo",
 			domain: "docker.io",
-			name:   "library/foo",
+			path:   "library/foo",
 		},
 		{
 			input:  "xn--n3h.com/foo",
 			domain: "xn--n3h.com",
-			name:   "foo",
+			path:   "foo",
 		},
 		{
 			input:  "xn--n3h.com:18080/foo",
 			domain: "xn--n3h.com:18080",
-			name:   "foo",
+			path:   "foo",
 		},
 		{
 			input:  "docker.io/foo",
 			domain: "docker.io",
-			name:   "library/foo",
+			path:   "library/foo",
 		},
 		{
 			input:  "docker.io/library/foo",
 			domain: "docker.io",
-			name:   "library/foo",
+			path:   "library/foo",
 		},
 		{
 			input:  "docker.io/library/foo/bar",
 			domain: "docker.io",
-			name:   "library/foo/bar",
+			path:   "library/foo/bar",
 		},
 	}
-	for _, testcase := range testcases {
-		failf := func(format string, v ...interface{}) {
-			t.Logf(strconv.Quote(testcase.input)+": "+format, v...)
-			t.Fail()
-		}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.input, func(t *testing.T) {
+			t.Parallel()
+			named, err := ParseNormalizedNamed(tc.input)
+			if err != nil {
+				t.Errorf("error parsing name: %s", err)
+			}
 
-		named, err := ParseNormalizedNamed(testcase.input)
-		if err != nil {
-			failf("error parsing name: %s", err)
-		}
-		domain, name := SplitHostname(named)
-		if domain != testcase.domain {
-			failf("unexpected domain: got %q, expected %q", domain, testcase.domain)
-		}
-		if name != testcase.name {
-			failf("unexpected name: got %q, expected %q", name, testcase.name)
-		}
+			if domain := Domain(named); domain != tc.domain {
+				t.Errorf("unexpected domain: got %q, expected %q", domain, tc.domain)
+			}
+			if path := Path(named); path != tc.path {
+				t.Errorf("unexpected name: got %q, expected %q", path, tc.path)
+			}
+		})
 	}
 }
 
 func TestMatchError(t *testing.T) {
+	t.Parallel()
 	named, err := ParseAnyReference("foo")
 	if err != nil {
 		t.Fatal(err)
@@ -505,7 +588,8 @@ func TestMatchError(t *testing.T) {
 }
 
 func TestMatch(t *testing.T) {
-	matchCases := []struct {
+	t.Parallel()
+	tests := []struct {
 		reference string
 		pattern   string
 		expected  bool
@@ -556,23 +640,28 @@ func TestMatch(t *testing.T) {
 			expected:  true,
 		},
 	}
-	for _, c := range matchCases {
-		named, err := ParseAnyReference(c.reference)
-		if err != nil {
-			t.Fatal(err)
-		}
-		actual, err := FamiliarMatch(c.pattern, named)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if actual != c.expected {
-			t.Fatalf("expected %s match %s to be %v, was %v", c.reference, c.pattern, c.expected, actual)
-		}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.reference, func(t *testing.T) {
+			t.Parallel()
+			named, err := ParseAnyReference(tc.reference)
+			if err != nil {
+				t.Fatal(err)
+			}
+			actual, err := FamiliarMatch(tc.pattern, named)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if actual != tc.expected {
+				t.Fatalf("expected %s match %s to be %v, was %v", tc.reference, tc.pattern, tc.expected, actual)
+			}
+		})
 	}
 }
 
 func TestParseDockerRef(t *testing.T) {
-	testcases := []struct {
+	t.Parallel()
+	tests := []struct {
 		name     string
 		input    string
 		expected string
@@ -633,15 +722,17 @@ func TestParseDockerRef(t *testing.T) {
 			expected: "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 		},
 	}
-	for _, test := range testcases {
-		t.Run(test.name, func(t *testing.T) {
-			normalized, err := ParseDockerRef(test.input)
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			normalized, err := ParseDockerRef(tc.input)
 			if err != nil {
 				t.Fatal(err)
 			}
 			output := normalized.String()
-			if output != test.expected {
-				t.Fatalf("expected %q to be parsed as %v, got %v", test.input, test.expected, output)
+			if output != tc.expected {
+				t.Fatalf("expected %q to be parsed as %v, got %v", tc.input, tc.expected, output)
 			}
 			_, err = Parse(output)
 			if err != nil {
