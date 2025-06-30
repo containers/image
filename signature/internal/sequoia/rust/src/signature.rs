@@ -9,6 +9,7 @@ use openpgp::policy::StandardPolicy;
 use openpgp::serialize::stream::{LiteralWriter, Message, Signer};
 use openpgp::KeyHandle;
 use sequoia_cert_store::{Store as _, StoreUpdate as _};
+use sequoia_directories;
 use sequoia_openpgp as openpgp;
 use sequoia_policy_config::ConfiguredStandardPolicy;
 use std::ffi::{CStr, CString, OsStr};
@@ -42,15 +43,15 @@ pub struct SequoiaMechanism<'a> {
 impl<'a> SequoiaMechanism<'a> {
     fn from_directory(dir: impl AsRef<Path>) -> Result<Self, anyhow::Error> {
         init_logging();
-        let home_dir = dir.as_ref().to_path_buf();
+        let sequoia_home = sequoia_directories::Home::new(dir.as_ref().to_path_buf())?;
 
-        let keystore_dir = home_dir.join("data").join("keystore");
+        let keystore_dir = sequoia_home.data_dir(sequoia_directories::Component::Keystore);
         let context = sequoia_keystore::Context::configure()
             .home(&keystore_dir)
             .build()?;
         let keystore = sequoia_keystore::Keystore::connect(&context)?;
 
-        let certstore_dir = home_dir.join("data").join("pgp.cert.d");
+        let certstore_dir = sequoia_home.data_dir(sequoia_directories::Component::CertD);
         fs::create_dir_all(&certstore_dir)?;
         let certstore = sequoia_cert_store::CertStore::open(&certstore_dir)?;
 

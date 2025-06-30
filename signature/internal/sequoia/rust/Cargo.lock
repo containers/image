@@ -1890,6 +1890,7 @@ dependencies = [
  "log",
  "regex",
  "sequoia-cert-store",
+ "sequoia-directories",
  "sequoia-keystore",
  "sequoia-openpgp",
  "sequoia-policy-config",
