@@ -78,20 +78,6 @@ impl<'a> SequoiaMechanism<'a> {
     }
 
     fn import_keys(&mut self, blob: &[u8]) -> Result<SequoiaImportResult, anyhow::Error> {
-        let mut softkeys = None;
-        for mut backend in self.keystore.backends()?.into_iter() {
-            if backend.id()? == "softkeys" {
-                softkeys = Some(backend);
-                break;
-            }
-        }
-
-        let mut softkeys = if let Some(softkeys) = softkeys {
-            softkeys
-        } else {
-            return Err(anyhow::anyhow!("softkeys backend is not configured."));
-        };
-
         let mut key_handles = vec![];
         for r in CertParser::from_bytes(blob)? {
             let cert = match r {
@@ -101,8 +87,6 @@ impl<'a> SequoiaMechanism<'a> {
                     continue;
                 }
             };
-
-            let _ = softkeys.import(&cert)?;
 
             key_handles.push(CString::new(cert.fingerprint().to_hex().as_bytes()).unwrap());
             self.certstore
