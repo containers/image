@@ -78,6 +78,9 @@ func NewSigner(opts ...Option) (*signer.Signer, error) {
 		return nil, errors.New("no key identity provided for simple signing")
 	}
 
+	if err := sequoia.Init(); err != nil {
+		return nil, err
+	}
 	mech, err := sequoia.NewMechanismFromDirectory(s.sequoiaHome)
 	if err != nil {
 		return nil, fmt.Errorf("initializing Sequoia: %w", err)
@@ -124,11 +127,3 @@ func (s *simpleSequoiaSigner) SignImageManifest(ctx context.Context, m []byte, d
 func (s *simpleSequoiaSigner) Close() error {
 	return s.mech.Close()
 }
-
-// FIXME: this should only be called once per process
-// func init() {
-// 	err := sequoia.Init()
-// 	if err != nil {
-// 		panic("sequoia cannot be loaded: " + err.Error())
-// 	}
-// }

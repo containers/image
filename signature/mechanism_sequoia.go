@@ -19,6 +19,10 @@ type sequoiaEphemeralSigningMechanism struct {
 // of these keys.
 // The caller must call .Close() on the returned SigningMechanism.
 func newEphemeralGPGSigningMechanism(blobs [][]byte) (signingMechanismWithPassphrase, []string, error) {
+	if err := sequoia.Init(); err != nil {
+		return nil, nil, err
+	}
+
 	mech, err := sequoia.NewEphemeralMechanism()
 	if err != nil {
 		return nil, nil, err
@@ -74,11 +78,4 @@ func (m *sequoiaEphemeralSigningMechanism) Verify(unverifiedSignature []byte) (c
 // the values may have no recognizable relationship if the public key is not available.
 func (m *sequoiaEphemeralSigningMechanism) UntrustedSignatureContents(untrustedSignature []byte) (untrustedContents []byte, shortKeyIdentifier string, err error) {
 	return gpgUntrustedSignatureContents(untrustedSignature)
-}
-
-func init() {
-	err := sequoia.Init()
-	if err != nil {
-		panic("sequoia cannot be loaded: " + err.Error())
-	}
 }
