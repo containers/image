@@ -18,6 +18,10 @@ type sequoiaSigningMechanism struct {
 // newGPGSigningMechanismInDirectory returns a new GPG/OpenPGP signing mechanism, using optionalDir if not empty.
 // The caller must call .Close() on the returned SigningMechanism.
 func newGPGSigningMechanismInDirectory(optionalDir string) (signingMechanismWithPassphrase, error) {
+	if err := sequoia.Init(); err != nil {
+		return nil, err
+	}
+
 	// For compatibility reasons, we allow both sequoiaHome and
 	// gpgHome to be the same directory as designated by
 	// optionalDir or GNUPGHOME.
@@ -70,6 +74,10 @@ func newGPGSigningMechanismInDirectory(optionalDir string) (signingMechanismWith
 // of these keys.
 // The caller must call .Close() on the returned SigningMechanism.
 func newEphemeralGPGSigningMechanism(blobs [][]byte) (signingMechanismWithPassphrase, []string, error) {
+	if err := sequoia.Init(); err != nil {
+		return nil, nil, err
+	}
+
 	mech, err := sequoia.NewEphemeralMechanism()
 	if err != nil {
 		return nil, nil, err
@@ -124,11 +132,4 @@ func (m *sequoiaSigningMechanism) Verify(unverifiedSignature []byte) (contents [
 // the values may have no recognizable relationship if the public key is not available.
 func (m *sequoiaSigningMechanism) UntrustedSignatureContents(untrustedSignature []byte) (untrustedContents []byte, shortKeyIdentifier string, err error) {
 	return gpgUntrustedSignatureContents(untrustedSignature)
-}
-
-func init() {
-	err := sequoia.Init()
-	if err != nil {
-		panic("sequoia cannot be loaded: " + err.Error())
-	}
 }

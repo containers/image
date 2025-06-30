@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"unsafe"
 )
 
@@ -157,7 +158,8 @@ func (m *SigningMechanism) Close() error {
 	return nil
 }
 
-func Init() error {
+// initOnce should only be called by Init.
+func initOnce() error {
 	var soName string
 	switch runtime.GOOS {
 	case "linux":
@@ -178,3 +180,7 @@ func Init() error {
 	}
 	return nil
 }
+
+// Init ensures the libpodman_sequoia library is available.
+// It is safe to call from arbitrary goroutines.
+var Init = sync.OnceValue(initOnce)
