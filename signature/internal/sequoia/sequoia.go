@@ -27,12 +27,17 @@ type SigningMechanism struct {
 	mechanism *C.SequoiaMechanism
 }
 
+// NewMechanismFromDirectory initializes a mechanism using (user-managed) Sequoia state
+// in dir, which can be "" to indicate the default (using $SEQUOIA_HOME or the default home directory location).
 func NewMechanismFromDirectory(
 	dir string,
 ) (*SigningMechanism, error) {
 	var cerr *C.SequoiaError
-	cDir := C.CString(dir)
-	defer C.free(unsafe.Pointer(cDir))
+	var cDir *C.char
+	if dir != "" {
+		cDir = C.CString(dir)
+		defer C.free(unsafe.Pointer(cDir))
+	}
 	cMechanism := C.go_sequoia_mechanism_new_from_directory(cDir, &cerr)
 	if cMechanism == nil {
 		defer C.go_sequoia_error_free(cerr)
