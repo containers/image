@@ -41,9 +41,10 @@ pub struct SequoiaMechanism<'a> {
 }
 
 impl<'a> SequoiaMechanism<'a> {
-    fn from_directory(dir: impl AsRef<Path>) -> Result<Self, anyhow::Error> {
+    fn from_directory(dir: Option<impl AsRef<Path>>) -> Result<Self, anyhow::Error> {
         init_logging();
-        let sequoia_home = sequoia_directories::Home::new(dir.as_ref().to_path_buf())?;
+        let home_path = dir.map(|s| s.as_ref().to_path_buf());
+        let sequoia_home = sequoia_directories::Home::new(home_path)?;
 
         let keystore_dir = sequoia_home.data_dir(sequoia_directories::Component::Keystore);
         let context = sequoia_keystore::Context::configure()
@@ -270,8 +271,12 @@ pub unsafe extern "C" fn sequoia_mechanism_new_from_directory<'a>(
     dir_ptr: *const c_char,
     err_ptr: *mut *mut SequoiaError,
 ) -> *mut SequoiaMechanism<'a> {
-    let c_dir = CStr::from_ptr(dir_ptr);
-    let os_dir = OsStr::from_bytes(c_dir.to_bytes());
+    let c_dir = if dir_ptr.is_null() {
+        None
+    } else {
+        Some(CStr::from_ptr(dir_ptr))
+    };
+    let os_dir = c_dir.map(|s| OsStr::from_bytes(s.to_bytes()));
     match SequoiaMechanism::from_directory(os_dir) {
         Ok(mechanism) => Box::into_raw(Box::new(mechanism)),
         Err(e) => {

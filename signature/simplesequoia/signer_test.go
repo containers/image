@@ -43,10 +43,6 @@ func TestNewSigner(t *testing.T) {
 	_, err = NewSigner(WithSequoiaHome(homeDir), WithKeyFingerprint(fingerprint), WithPassphrase("\n"))
 	assert.Error(t, err)
 
-	// WithSequoiaHome is missing
-	_, err = NewSigner(WithKeyFingerprint(fingerprint), WithPassphrase("something"))
-	assert.Error(t, err)
-
 	// WithKeyFingerprint is missing
 	_, err = NewSigner(WithSequoiaHome(homeDir), WithPassphrase("something"))
 	assert.Error(t, err)

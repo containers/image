@@ -71,9 +71,6 @@ func NewSigner(opts ...Option) (*signer.Signer, error) {
 			return nil, err
 		}
 	}
-	if s.sequoiaHome == "" {
-		return nil, errors.New("FIXME: using the default Sequoia home is not currently implemented")
-	}
 	if s.keyFingerprint == "" {
 		return nil, errors.New("no key identity provided for simple signing")
 	}
@@ -81,7 +78,7 @@ func NewSigner(opts ...Option) (*signer.Signer, error) {
 	if err := sequoia.Init(); err != nil {
 		return nil, err
 	}
-	mech, err := sequoia.NewMechanismFromDirectory(s.sequoiaHome)
+	mech, err := sequoia.NewMechanismFromDirectory(s.sequoiaHome) // FIXME: test this with ""
 	if err != nil {
 		return nil, fmt.Errorf("initializing Sequoia: %w", err)
 	}
