@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,7 +10,7 @@ import (
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/private"
 	"github.com/containers/image/v5/types"
-	"github.com/docker/docker/client"
+	dockerclient "github.com/fsouza/go-dockerclient"
 	"github.com/sirupsen/logrus"
 )
 
@@ -39,7 +38,7 @@ func newImageDestination(ctx context.Context, sys *types.SystemContext, ref daem
 	}
 
 	var mustMatchRuntimeOS = true
-	if sys != nil && sys.DockerDaemonHost != client.DefaultDockerHost {
+	if sys != nil /*&& sys.DockerDaemonHost != client.DefaultDockerHost*/ {
 		mustMatchRuntimeOS = false
 	}
 
@@ -70,8 +69,8 @@ func newImageDestination(ctx context.Context, sys *types.SystemContext, ref daem
 }
 
 // imageLoadGoroutine accepts tar stream on reader, sends it to c, and reports error or success by writing to statusChannel
-func imageLoadGoroutine(ctx context.Context, c *client.Client, reader *io.PipeReader, statusChannel chan<- error) {
-	defer c.Close()
+func imageLoadGoroutine(ctx context.Context, c *dockerclient.Client, reader *io.PipeReader, statusChannel chan<- error) {
+	//defer c.Close()
 	err := errors.New("Internal error: unexpected panic in imageLoadGoroutine")
 	defer func() {
 		logrus.Debugf("docker-daemon: sending done, status %v", err)
@@ -91,36 +90,8 @@ func imageLoadGoroutine(ctx context.Context, c *client.Client, reader *io.PipeRe
 }
 
 // imageLoad accepts tar stream on reader and sends it to c
-func imageLoad(ctx context.Context, c *client.Client, reader *io.PipeReader) error {
-	resp, err := c.ImageLoad(ctx, reader, client.ImageLoadWithQuiet(true))
-	if err != nil {
-		return fmt.Errorf("starting a load operation in docker engine: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// jsonError and jsonMessage are small subsets of docker/docker/pkg/jsonmessage.JSONError and JSONMessage,
-	// copied here to minimize dependencies.
-	type jsonError struct {
-		Message string `json:"message,omitempty"`
-	}
-	type jsonMessage struct {
-		Error *jsonError `json:"errorDetail,omitempty"`
-	}
-
-	dec := json.NewDecoder(resp.Body)
-	for {
-		var msg jsonMessage
-		if err := dec.Decode(&msg); err != nil {
-			if err == io.EOF {
-				break
-			}
-			return fmt.Errorf("parsing docker load progress: %w", err)
-		}
-		if msg.Error != nil {
-			return fmt.Errorf("docker engine reported: %q", msg.Error.Message)
-		}
-	}
-	return nil // No error reported = success
+func imageLoad(ctx context.Context, c *dockerclient.Client, reader *io.PipeReader) error {
+	return c.LoadImage(dockerclient.LoadImageOptions{Context: ctx, InputStream: reader})
 }
 
 // DesiredLayerCompression indicates if layers must be compressed, decompressed or preserved
