@@ -28,6 +28,15 @@ type Reader struct {
 // NewReaderFromFile returns a Reader for the specified path.
 // The caller should call .Close() on the returned archive when done.
 func NewReaderFromFile(sys *types.SystemContext, path string) (*Reader, error) {
+	return newReaderFromFile(sys, path, false)
+}
+
+// NewReaderFromFileWithRemove is like NewReaderFromFile but removes the file when Close() is called.
+func NewReaderFromFileWithRemove(sys *types.SystemContext, path string) (*Reader, error) {
+	return newReaderFromFile(sys, path, true)
+}
+
+func newReaderFromFile(sys *types.SystemContext, path string, removeFile bool) (*Reader, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("opening file %q: %w", path, err)
@@ -45,7 +54,7 @@ func NewReaderFromFile(sys *types.SystemContext, path string) (*Reader, error) {
 		defer decompressed.Close()
 		stream = decompressed
 		if !isCompressed {
-			return newReader(path, false)
+			return newReader(path, removeFile)
 		}
 	}
 	return NewReaderFromStream(sys, stream)

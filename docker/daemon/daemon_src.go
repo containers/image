@@ -3,10 +3,13 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/containers/image/v5/docker/internal/tarfile"
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/tmpdir"
 	"github.com/containers/image/v5/types"
+	dockerclient "github.com/fsouza/go-dockerclient"
 )
 
 type daemonImageSource struct {
@@ -28,21 +31,32 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref daemonRef
 	if err != nil {
 		return nil, fmt.Errorf("initializing docker engine client: %w", err)
 	}
-	defer c.Close()
+
+	tarCopyFile, err := tmpdir.CreateBigFileTemp(sys, "docker-tar")
+	if err != nil {
+		return nil, fmt.Errorf("creating temporary file: %w", err)
+	}
+	succeeded := false
+	defer func() {
+		tarCopyFile.Close()
+		if !succeeded {
+			os.Remove(tarCopyFile.Name())
+		}
+	}()
 
 	// Per NewReference(), ref.StringWithinTransport() is either an image ID (config digest), or a !reference.NameOnly() reference.
 	// Either way ImageSave should create a tarball with exactly one image.
-	inputStream, err := c.ImageSave(ctx, []string{ref.StringWithinTransport()})
+	err = c.ExportImage(dockerclient.ExportImageOptions{Context: ctx, Name: ref.StringWithinTransport(), OutputStream: tarCopyFile})
 	if err != nil {
 		return nil, fmt.Errorf("loading image from docker engine: %w", err)
 	}
-	defer inputStream.Close()
 
-	archive, err := tarfile.NewReaderFromStream(sys, inputStream)
+	archive, err := tarfile.NewReaderFromFileWithRemove(sys, tarCopyFile.Name())
 	if err != nil {
 		return nil, err
 	}
 	src := tarfile.NewSource(archive, true, ref.Transport().Name(), nil, -1)
+	succeeded = true
 	return &daemonImageSource{
 		ref:    ref,
 		Source: src,
