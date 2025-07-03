@@ -101,13 +101,13 @@ impl<'a> SequoiaMechanism<'a> {
         password: Option<&str>,
         data: &[u8],
     ) -> Result<Vec<u8>, anyhow::Error> {
-        let primary_key_handle: KeyHandle = key_handle.parse()?;
+        let primary_key_handle: KeyHandle = key_handle.parse()?; // FIXME: For gpgme, allow lookup by user ID? grep_userid, or what is the compatible semantics?
         let certs = self
             .certstore
             .lookup_by_cert_or_subkey(&primary_key_handle)
             .with_context(|| format!("Failed to load {} from certificate store", key_handle))?
             .into_iter()
-            .filter_map(|cert| match cert.to_cert() {
+            .filter_map(|cert| match cert.to_cert() { // FIXME: Should this report the error?
                 Ok(cert) => Some(cert.clone()),
                 Err(_) => None,
             })
@@ -115,6 +115,7 @@ impl<'a> SequoiaMechanism<'a> {
 
         let mut signing_key_handles: Vec<KeyHandle> = vec![];
         for cert in certs {
+            // FIXME: read from here on
             for ka in cert.keys().with_policy(&self.policy, None).for_signing() {
                 signing_key_handles.push(ka.key().fingerprint().into());
             }
