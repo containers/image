@@ -84,6 +84,9 @@ test_task:
         - name: "Test w/ opengpg"
           env:
               BUILDTAGS: &withopengpg 'containers_image_openpgp'
+        - name: "Test w/ Sequoia"
+          env:
+              BUILDTAGS: &withsequoia 'containers_image_sequoia'
     script: ${GOSRC}/${SCRIPT_BASE}/runner.sh image_tests
 
 
