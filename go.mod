@@ -15,7 +15,7 @@ require (
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v28.3.0+incompatible
 	github.com/docker/distribution v2.8.3+incompatible
-	github.com/docker/docker v28.3.0+incompatible
+	github.com/docker/docker v28.3.1+incompatible
 	github.com/docker/docker-credential-helpers v0.9.3
 	github.com/docker/go-connections v0.5.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
@@ -117,6 +117,7 @@ require (
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
+	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250303144028-a0af3efb3deb // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250313205543-e70fdf4c4cb4 // indirect
 	google.golang.org/grpc v1.72.2 // indirect
