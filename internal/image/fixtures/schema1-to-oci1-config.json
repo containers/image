@@ -65,7 +65,8 @@
         },
         {
             "created": "2018-01-25T00:37:48.268558Z",
-            "created_by": "/bin/sh -c #(nop)  USER [nova]"
+            "created_by": "/bin/sh -c #(nop)  USER [nova]",
+            "comment": "test comment"
         }
     ],
     "rootfs": {
