@@ -30,8 +30,14 @@ env:
     SKOPEO_PR:
 
     # Google-cloud VM Images
-    IMAGE_SUFFIX: "c20250721t181111z-f42f41d13"
+    # If you are updating IMAGE_SUFFIX: We are currently using rawhide for
+    # the containers_image_sequoia tests because the rust-podman-sequoia
+    # package is not available in earlier releases; once we update to a future
+    # Fedora release (or if the package is backported), switch back from Rawhide
+    # to the latest Fedora release.
+    IMAGE_SUFFIX: "c20250812t173301z-f42f41d13"
     FEDORA_CACHE_IMAGE_NAME: "fedora-${IMAGE_SUFFIX}"
+    RAWHIDE_CACHE_IMAGE_NAME: "rawhide-${IMAGE_SUFFIX}"
 
     # Container FQIN's (include bleeding-edge development-level container deps.)
     FEDORA_CONTAINER_FQIN: "quay.io/libpod/fedora_podman:${IMAGE_SUFFIX}"
@@ -55,9 +61,12 @@ validate_task:
         # Required to be 200gig, do not modify - has i/o performance impact
         # according to gcloud CLI tool warning messages.
         disk: 200
-        image_name: ${FEDORA_CACHE_IMAGE_NAME}
+        # Eventually, hard-code FEDORA_CACHE_IMAGE_NAME here again and remove the
+        # VM_IMAGE_NAME parameter.
+        image_name: ${VM_IMAGE_NAME}
     env:
         HOME: "/root"  # default unset, needed by golangci-lint.
+        VM_IMAGE_NAME: ${FEDORA_CACHE_IMAGE_NAME}
     script: |
         git remote update
         make tools
@@ -68,6 +77,8 @@ validate_task:
 cross_task:
     only_if: &not_docs $CIRRUS_CHANGE_TITLE !=~ '.*CI:DOCS.*'
     gce_instance: *fedora_vm
+    env:
+        VM_IMAGE_NAME: ${FEDORA_CACHE_IMAGE_NAME}
     script: make cross
 
 
@@ -81,9 +92,15 @@ test_task:
         - name: "Test"
           env:
               BUILDTAGS: ''
+              VM_IMAGE_NAME: ${FEDORA_CACHE_IMAGE_NAME}
         - name: "Test w/ opengpg"
           env:
               BUILDTAGS: &withopengpg 'containers_image_openpgp'
+              VM_IMAGE_NAME: ${FEDORA_CACHE_IMAGE_NAME}
+        - name: "Test w/ Sequoia (currently Rawhide)"
+          env:
+              BUILDTAGS: &withsequoia 'containers_image_sequoia'
+              VM_IMAGE_NAME: ${RAWHIDE_CACHE_IMAGE_NAME}
     script: ${GOSRC}/${SCRIPT_BASE}/runner.sh image_tests
 
 
@@ -102,9 +119,15 @@ test_skopeo_task:
         - name: "Skopeo Test"
           env:
               BUILDTAGS: ''
+              VM_IMAGE_NAME: ${FEDORA_CACHE_IMAGE_NAME}
         - name: "Skopeo Test w/ opengpg"
           env:
               BUILDTAGS: *withopengpg
+              VM_IMAGE_NAME: ${FEDORA_CACHE_IMAGE_NAME}
+        - name: "Skopeo Test w/ Sequoia (currently Rawhide)"
+          env:
+              BUILDTAGS: *withsequoia
+              VM_IMAGE_NAME: ${RAWHIDE_CACHE_IMAGE_NAME}
     setup_script: >-
         "${GOSRC}/${SCRIPT_BASE}/runner.sh" setup
     vendor_script: >-
@@ -133,6 +156,7 @@ meta_task:
         # Space-separated list of images used by this repository state
         IMGNAMES: |
             ${FEDORA_CACHE_IMAGE_NAME}
+            ${RAWHIDE_CACHE_IMAGE_NAME}
         BUILDID: "${CIRRUS_BUILD_ID}"
         REPOREF: "${CIRRUS_REPO_NAME}"
         GCPJSON: ENCRYPTED[04306103eee1933f87deb8a5af6514a7e3164aa589d6079abc0451eb2360879430ed020d6e025ca64ef667138ce9d786]
