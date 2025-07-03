@@ -90,7 +90,7 @@ clean:
 
 .PHONY: test
 test:
-	@go test $(BUILDFLAGS) $(TESTFLAGS) -cover ./...
+	go test $(BUILDFLAGS) $(TESTFLAGS) -cover ./...
 
 .PHONY: fmt
 fmt:

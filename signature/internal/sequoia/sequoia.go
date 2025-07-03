@@ -15,6 +15,8 @@ import (
 	"runtime"
 	"sync"
 	"unsafe"
+
+	"github.com/sirupsen/logrus"
 )
 
 // sequoiaLibraryDir is the path to the directory registries.d, used for locating lookaside Docker signature storage.
@@ -171,9 +173,11 @@ func initOnce() error {
 	default:
 		return fmt.Errorf("Unhandled OS %q in sequoia initialization", runtime.GOOS)
 	}
+	logrus.Errorf("LOADING: dir=%q soName=%q", sequoiaLibraryDir, soName)
 	if sequoiaLibraryDir != "" {
 		soName = filepath.Join(sequoiaLibraryDir, soName)
 	}
+	logrus.Errorf("LOADING: trying soName=%q", soName)
 	if C.go_sequoia_ensure_library(C.CString(soName),
 		C.RTLD_NOW|C.RTLD_GLOBAL) < 0 {
 		return fmt.Errorf("unable to load %q", soName)
