@@ -14,5 +14,5 @@ linters:
   exclusions:
     presets:
       - comments
-      - common-false-positives
+      #      - common-false-positives
       - std-error-handling
