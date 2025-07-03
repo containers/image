@@ -77,6 +77,9 @@ test_task:
         - validate
     gce_instance: *fedora_vm
     matrix:
+        - name: "Test w/ Sequoia"
+          env:
+              BUILDTAGS: &withsequoia 'containers_image_sequoia'
     script: ${GOSRC}/${SCRIPT_BASE}/runner.sh image_tests
 
 
@@ -91,13 +94,13 @@ test_skopeo_task:
     depends_on:
         - validate
     gce_instance: *fedora_vm
-    matrix:
+    matrix: # FIXME: Eventually add Sequoia?
         - name: "Skopeo Test"
           env:
               BUILDTAGS: ''
-        - name: "Skopeo Test w/ opengpg"
+        - name: "Skopeo Test w/ Sequoia"
           env:
-              BUILDTAGS: *withopengpg
+              BUILDTAGS: *withsequoia
     setup_script: >-
         "${GOSRC}/${SCRIPT_BASE}/runner.sh" setup
     vendor_script: >-
