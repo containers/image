@@ -8,6 +8,7 @@ import (
 	"math"
 	"runtime"
 	"slices"
+	"strings"
 
 	platform "github.com/containers/image/v5/internal/pkg/platform"
 	compression "github.com/containers/image/v5/pkg/compression/types"
@@ -229,6 +230,26 @@ func (ic instanceCandidate) isPreferredOver(other *instanceCandidate, preferGzip
 	panic("internal error: invalid comparison between two candidates") // This should not be reachable because in all calls we make, the two candidates differ at least in manifestPosition.
 }
 
+func (index *OCI1IndexPublic) descOciPlatforms() string {
+	if len(index.Manifests) == 0 {
+		return "no platforms"
+	}
+
+	var b strings.Builder
+	for i, d := range index.Manifests {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		if d.Platform != nil {
+			imagePlatform := ociPlatformClone(*d.Platform)
+			b.WriteString(fmt.Sprintf("arch=%q os=%q variant=%q", imagePlatform.Architecture, imagePlatform.OS, imagePlatform.Variant))
+		} else {
+			b.WriteString("any")
+		}
+	}
+	return b.String()
+}
+
 // chooseInstance is a private equivalent to ChooseInstanceByCompression,
 // shared by ChooseInstance and ChooseInstanceByCompression.
 func (index *OCI1IndexPublic) chooseInstance(ctx *types.SystemContext, preferGzip types.OptionalBool) (digest.Digest, error) {
@@ -254,7 +275,8 @@ func (index *OCI1IndexPublic) chooseInstance(ctx *types.SystemContext, preferGzi
 	if bestMatch != nil {
 		return bestMatch.digest, nil
 	}
-	return "", fmt.Errorf("no image found in image index for architecture %q, variant %q, OS %q", wantedPlatforms[0].Architecture, wantedPlatforms[0].Variant, wantedPlatforms[0].OS)
+	return "", fmt.Errorf("no image found in image index for architecture %q, variant %q, OS %q; available platforms: %s", wantedPlatforms[0].Architecture, wantedPlatforms[0].Variant, wantedPlatforms[0].OS,
+		index.descOciPlatforms())
 }
 
 func (index *OCI1Index) ChooseInstanceByCompression(ctx *types.SystemContext, preferGzip types.OptionalBool) (digest.Digest, error) {
