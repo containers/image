@@ -46,7 +46,7 @@ validate_task:
     # The git-validation tool doesn't work well on branch or tag push,
     # under Cirrus-CI, due to challenges obtaining the starting commit ID.
     # Only do validation for PRs.
-    only_if: $CIRRUS_PR != ''
+    only_if: $CIRRUS_PR != $CIRRUS_PR
     gce_instance: &fedora_vm
         image_project: libpod-218412
         zone: "us-central1-f"
@@ -66,7 +66,7 @@ validate_task:
 
 
 cross_task:
-    only_if: &not_docs $CIRRUS_CHANGE_TITLE !=~ '.*CI:DOCS.*'
+    only_if: $CIRRUS_PR != $CIRRUS_PR
     gce_instance: *fedora_vm
     script: make cross
 
@@ -75,15 +75,9 @@ test_task:
     alias: test
     depends_on:
         - validate
-    only_if: *not_docs
+    only_if: &not_docs $CIRRUS_CHANGE_TITLE !=~ '.*CI:DOCS.*'
     gce_instance: *fedora_vm
     matrix:
-        - name: "Test"
-          env:
-              BUILDTAGS: ''
-        - name: "Test w/ opengpg"
-          env:
-              BUILDTAGS: &withopengpg 'containers_image_openpgp'
         - name: "Test w/ Sequoia"
           env:
               BUILDTAGS: &withsequoia 'containers_image_sequoia'
@@ -102,12 +96,6 @@ test_skopeo_task:
         - validate
     gce_instance: *fedora_vm
     matrix:
-        - name: "Skopeo Test"
-          env:
-              BUILDTAGS: ''
-        - name: "Skopeo Test w/ opengpg"
-          env:
-              BUILDTAGS: *withopengpg
         - name: "Skopeo Test w/ Sequoia"
           env:
               BUILDTAGS: *withsequoia
