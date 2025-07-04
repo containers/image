@@ -46,22 +46,6 @@ _run_setup() {
 _run_image_tests() {
     req_env_vars GOPATH GOSRC
 
-    # Hacky solution to find test that must be run as root.
-    # This looks for the ensureTestCanCreateImages() test function call and gets the
-    # function name where it is called via git grep,
-    # then trims the line to only show the actual function name and add "^$" around it
-    # since go test commands only accepts a single regex.
-    # Then join all names with "|" with paste to again build up a single regex string
-    # that matches all these names.
-    # With that we don't have to run everything twice and can just run the ones that
-    # actually need to be root.
-    # Note we must run git before we switch/chown to the user because it will error
-    # out otherwise since the file ownership doesn't match.
-    test_filter=$(git grep -h --show-function ensureTestCanCreateImages |
-                    sed -n 's/func \(Test[[:alnum:]]*\)(.*/^\1\$\$/p' |
-                    paste -sd "|" -)
-    showrun make test "BUILDTAGS='$BUILDTAGS'" "TESTFLAGS=-v -run '$test_filter'"
-
     # Most tests in this repo are intended to run as a regular user.
     ROOTLESS_USER="testuser$RANDOM"
     msg "Setting up rootless user '$ROOTLESS_USER'"
@@ -95,13 +79,40 @@ _run_image_tests() {
     msg "Setup known_hosts for root"
     ssh-keyscan localhost > /root/.ssh/known_hosts \
 
+    if [[ "$BUILDTAGS" =~ containers_image_sequoia ]]; then
+        # FIXME: All of this should be removed after libimage_sequoia is packaged; instead, install the RPM at image build time.
+        dnf install -y rustc cargo clang-devel capnproto
+        msg "Building libimage_sequoia"
+        showrun ssh $ROOTLESS_USER@localhost "cd $GOSRC/signature/internal/sequoia/rust; cargo build --release"
+    fi
+
     msg "Start rekor server as $ROOTLESS_USER"
     showrun ssh $ROOTLESS_USER@localhost $GOSRC/signature/sigstore/rekor/testdata/start-rekor.sh ci
     # remove rekor server on function exit
     trap "ssh $ROOTLESS_USER@localhost $GOSRC/signature/sigstore/rekor/testdata/start-rekor.sh ci remove" RETURN
+    # Hacky solution to find test that must be run as root.
+    # This looks for the ensureTestCanCreateImages() test function call and gets the
+    # function name where it is called via git grep,
+    # then trims the line to only show the actual function name and add "^$" around it
+    # since go test commands only accepts a single regex.
+    # Then join all names with "|" with paste to again build up a single regex string
+    # that matches all these names.
+    # With that we don't have to run everything twice and can just run the ones that
+    # actually need to be root.
+    # Note we must run git before we switch/chown to the user because it will error
+    # out otherwise since the file ownership doesn't match.
+    msg "IS THE LIBRARY THERE?"
+    ls -la "$GOSRC/signature/internal/sequoia/rust/target/release"
+    HOME=/root git config --global --add safe.directory "$GOSRC" # HOME=/root apparently not set for us, and we need this option to allow testuser-owned sources to be used.
+    test_filter=$(HOME=/root git grep -h --show-function ensureTestCanCreateImages |
+                    sed -n 's/func \(Test[[:alnum:]]*\)(.*/^\1\$\$/p' |
+                    paste -sd "|" -)
+    showrun make test "BUILDTAGS='$BUILDTAGS'" "TESTFLAGS=-v -run '$test_filter'" \
+        SEQUOIA_SONAME_DIR="$GOSRC/signature/internal/sequoia/rust/target/release"
 
     msg "Executing tests as $ROOTLESS_USER"
-    showrun ssh $ROOTLESS_USER@localhost make -C $GOSRC test "BUILDTAGS='$BUILDTAGS'" "TESTFLAGS=-v" "REKOR_SERVER_URL='http://127.0.0.1:3000'"
+    showrun ssh $ROOTLESS_USER@localhost make -C $GOSRC test "BUILDTAGS='$BUILDTAGS'" "TESTFLAGS=-v" "REKOR_SERVER_URL='http://127.0.0.1:3000'" \
+        SEQUOIA_SONAME_DIR="$GOSRC/signature/internal/sequoia/rust/target/release"
 }
 
 req_env_vars GOSRC
