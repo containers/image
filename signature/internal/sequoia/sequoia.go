@@ -148,6 +148,7 @@ func (m *SigningMechanism) ImportKeys(blob []byte) ([]string, error) {
 }
 
 func (m *SigningMechanism) Close() error {
+	C.go_sequoia_mechanism_free(m.mechanism)
 	return nil
 }
 
