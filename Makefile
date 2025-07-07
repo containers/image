@@ -15,6 +15,7 @@ BUILDFLAGS := -tags "$(BUILDTAGS)"
 
 # Extra flags passed to go test
 TESTFLAGS :=
+TEST_PACKAGES := ./...
 
 PACKAGES := $(shell go list $(BUILDFLAGS) ./...)
 SOURCE_DIRS = $(shell echo $(PACKAGES) | awk 'BEGIN{FS="/"; RS=" "}{print $$4}' | uniq)
@@ -89,7 +90,7 @@ clean:
 
 .PHONY: test
 test:
-	@go test $(BUILDFLAGS) $(TESTFLAGS) -cover ./...
+	@go test $(BUILDFLAGS) $(TESTFLAGS) -cover $(TEST_PACKAGES)
 
 .PHONY: fmt
 fmt:

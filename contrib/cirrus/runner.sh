@@ -57,10 +57,10 @@ _run_image_tests() {
     # actually need to be root.
     # Note we must run git before we switch/chown to the user because it will error
     # out otherwise since the file ownership doesn't match.
-    test_filter=$(git grep -h --show-function ensureTestCanCreateImages |
+    test_filter=$(git grep -h --show-function ensureTestCanCreateImages ./storage |
                     sed -n 's/func \(Test[[:alnum:]]*\)(.*/^\1\$\$/p' |
                     paste -sd "|" -)
-    showrun make test "BUILDTAGS='$BUILDTAGS'" "TESTFLAGS=-v -run '$test_filter'"
+    showrun make test "BUILDTAGS='$BUILDTAGS'" "TESTFLAGS=-v -run '$test_filter'" TEST_PACKAGES=./storage
 
     # Most tests in this repo are intended to run as a regular user.
     ROOTLESS_USER="testuser$RANDOM"
