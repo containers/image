@@ -157,10 +157,6 @@ func (m *SigningMechanism) Close() error {
 	return nil
 }
 
-func (m *SigningMechanism) SupportsSigning() error {
-	return nil
-}
-
 func Init() error {
 	var soName string
 	switch runtime.GOOS {
