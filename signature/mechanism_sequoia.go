@@ -94,7 +94,7 @@ func (m *sequoiaSigningMechanism) Close() error {
 
 // SupportsSigning returns nil if the mechanism supports signing, or a SigningNotSupportedError.
 func (m *sequoiaSigningMechanism) SupportsSigning() error {
-	return m.inner.SupportsSigning()
+	return nil
 }
 
 // Sign creates a (non-detached) signature of input using keyIdentity and passphrase.
