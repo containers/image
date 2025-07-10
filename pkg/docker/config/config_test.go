@@ -14,6 +14,7 @@ import (
 	"github.com/containers/image/v5/types"
 	dockerReference "github.com/distribution/reference"
 	"github.com/docker/cli/cli/config"
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/config/credentials"
 	configtypes "github.com/docker/cli/cli/config/types"
 	"github.com/docker/docker/registry"
@@ -459,12 +460,12 @@ func TestGetCredentialsInteroperability(t *testing.T) {
 	const testUser = "some-user"
 	const testPassword = "some-password"
 
-	// Unset DOCKER_AUTH_CONFIG, which is read by github.com/docker/cli/cli/config/configfile.ConfigFile.GetCredentialsStore
+	// Unset DockerEnvConfigKey, which is read by github.com/docker/cli/cli/config/configfile.ConfigFile.GetCredentialsStore
 	// and might interfere with the test.
-	// Use t.Setenv() to ensure DOCKER_AUTH_CONFIG is restored to the original value after the test;
+	// Use t.Setenv() to ensure DockerEnvConfigKey is restored to the original value after the test;
 	// (Sadly there isn’t a t.Unsetenv() as of Go 1.17.)
-	t.Setenv("DOCKER_AUTH_CONFIG", "")
-	os.Unsetenv("DOCKER_AUTH_CONFIG")
+	t.Setenv(configfile.DockerEnvConfigKey, "")
+	os.Unsetenv(configfile.DockerEnvConfigKey)
 
 	for _, c := range []struct {
 		loginKey string // or "" for Docker's default. We must special-case that because (docker login docker.io) works, but (docker logout docker.io) doesn't!
