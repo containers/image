@@ -147,9 +147,9 @@ func (m *SigningMechanism) SupportsSigning() error {
 }
 
 func Init() error {
-	if C.go_sequoia_ensure_library(C.CString("libimage_sequoia.so.0"),
+	if C.go_sequoia_ensure_library(C.CString("libpodman_sequoia.so.0"),
 		C.RTLD_NOW|C.RTLD_GLOBAL) < 0 {
-		return errors.New("unable to load libimage_sequoia.so.0")
+		return errors.New("unable to load libpodman_sequoia.so.0")
 	}
 	return nil
 }
