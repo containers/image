@@ -174,7 +174,9 @@ func Init() error {
 	if sequoiaLibraryDir != "" {
 		soName = filepath.Join(sequoiaLibraryDir, soName)
 	}
-	if C.go_sequoia_ensure_library(C.CString(soName),
+	cSOName := C.CString(soName)
+	defer C.free(unsafe.Pointer(cSOName))
+	if C.go_sequoia_ensure_library(cSOName,
 		C.RTLD_NOW|C.RTLD_GLOBAL) < 0 {
 		return fmt.Errorf("unable to load %q", soName)
 	}
