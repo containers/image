@@ -8,10 +8,19 @@
 #include <stdlib.h>
 
 typedef enum SequoiaErrorKind {
-  Unknown,
-  InvalidArgument,
-  IoError,
+  SEQUOIA_ERROR_KIND_UNKNOWN,
+  SEQUOIA_ERROR_KIND_INVALID_ARGUMENT,
+  SEQUOIA_ERROR_KIND_IO_ERROR,
 } SequoiaErrorKind;
+
+typedef enum SequoiaLogLevel {
+  SEQUOIA_LOG_LEVEL_UNKNOWN,
+  SEQUOIA_LOG_LEVEL_ERROR,
+  SEQUOIA_LOG_LEVEL_WARN,
+  SEQUOIA_LOG_LEVEL_INFO,
+  SEQUOIA_LOG_LEVEL_DEBUG,
+  SEQUOIA_LOG_LEVEL_TRACE,
+} SequoiaLogLevel;
 
 typedef struct SequoiaImportResult SequoiaImportResult;
 
@@ -23,7 +32,7 @@ typedef struct SequoiaVerificationResult SequoiaVerificationResult;
 
 typedef struct SequoiaError {
   enum SequoiaErrorKind kind;
-  const char *message;
+  char *message;
 } SequoiaError;
 
 void sequoia_error_free(struct SequoiaError *err_ptr);
@@ -71,3 +80,6 @@ struct SequoiaImportResult *sequoia_import_keys(struct SequoiaMechanism *mechani
                                                 const uint8_t *blob_ptr,
                                                 size_t blob_len,
                                                 struct SequoiaError **err_ptr);
+
+int sequoia_set_logger_consumer(void (*consumer)(enum SequoiaLogLevel level, const char *message),
+                                struct SequoiaError **err_ptr);
