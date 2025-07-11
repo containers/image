@@ -140,7 +140,12 @@ func (m *SigningMechanism) ImportKeys(blob []byte) ([]string, error) {
 	keyIdentities := []string{}
 	count := C.go_sequoia_import_result_get_count(result)
 	for i := C.size_t(0); i < count; i++ {
+		var cerr *C.SequoiaError
 		cKeyIdentity := C.go_sequoia_import_result_get_content(result, i, &cerr)
+		if cerr != nil {
+			defer C.go_sequoia_error_free(cerr)
+			return nil, errors.New(C.GoString(cerr.message))
+		}
 		keyIdentities = append(keyIdentities, C.GoString(cKeyIdentity))
 	}
 
