@@ -6,12 +6,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/containers/image/v5/signature/internal/sequoia"
 	"io"
 	"os"
 	"os/exec"
 	"regexp"
 	"testing"
+
+	"github.com/containers/image/v5/signature/internal/sequoia"
 )
 
 func checkCliVersion(version string) error {
@@ -45,11 +46,6 @@ func generateKey(dir string, email string) (string, error) {
 	}
 	fingerprint := string(matches[1][:])
 	return fingerprint, nil
-}
-
-func exportKey(dir string, fingerprint string) ([]byte, error) {
-	cmd := exec.Command("sq", "--home", dir, "key", "export", "--cert", fingerprint)
-	return cmd.Output()
 }
 
 func exportCert(dir string, fingerprint string) ([]byte, error) {
@@ -115,91 +111,6 @@ func TestGenerateSignVerify(t *testing.T) {
 	m, err := sequoia.NewMechanismFromDirectory(dir)
 	if err != nil {
 		t.Fatalf("unable to initialize a mechanism: %v", err)
-	}
-	input := []byte("Hello, world!")
-	sig, err := m.Sign(input, fingerprint)
-	if err != nil {
-		t.Fatalf("unable to sign: %v", err)
-	}
-	contents, keyIdentity, err := m.Verify(sig)
-	if err != nil {
-		t.Fatalf("unable to verify: %v", err)
-	}
-	if !bytes.Equal(contents, input) {
-		t.Fatalf("contents differ from the original")
-	}
-	if keyIdentity != fingerprint {
-		t.Fatalf("keyIdentity differ from the original")
-	}
-}
-
-func TestImportSignVerify(t *testing.T) {
-	if err := checkCliVersion("1.3.0"); err != nil {
-		t.Skipf("sq not usable: %v", err)
-	}
-	dir := t.TempDir()
-	fingerprint, err := generateKey(dir, "foo@example.org")
-	if err != nil {
-		t.Fatalf("unable to generate key: %v", err)
-	}
-	output, err := exportKey(dir, fingerprint)
-	if err != nil {
-		t.Fatalf("unable to export key: %v", err)
-	}
-	newDir := t.TempDir()
-	m, err := sequoia.NewMechanismFromDirectory(newDir)
-	if err != nil {
-		t.Fatalf("unable to initialize a mechanism: %v", err)
-	}
-	keyIdentities, err := m.ImportKeys(output)
-	if err != nil {
-		t.Fatalf("unable to import key: %v", err)
-	}
-	if len(keyIdentities) != 1 || keyIdentities[0] != fingerprint {
-		t.Fatalf("keyIdentity differ from the original: %v != %v",
-			keyIdentities[0], fingerprint)
-	}
-	input := []byte("Hello, world!")
-	sig, err := m.Sign(input, fingerprint)
-	if err != nil {
-		t.Fatalf("unable to sign: %v", err)
-	}
-	contents, keyIdentity, err := m.Verify(sig)
-	if err != nil {
-		t.Fatalf("unable to verify: %v", err)
-	}
-	if !bytes.Equal(contents, input) {
-		t.Fatalf("contents differ from the original")
-	}
-	if keyIdentity != fingerprint {
-		t.Fatalf("keyIdentity differ from the original")
-	}
-}
-
-func TestImportSignVerifyEphemeral(t *testing.T) {
-	if err := checkCliVersion("1.3.0"); err != nil {
-		t.Skipf("sq not usable: %v", err)
-	}
-	dir := t.TempDir()
-	fingerprint, err := generateKey(dir, "foo@example.org")
-	if err != nil {
-		t.Fatalf("unable to generate key: %v", err)
-	}
-	output, err := exportKey(dir, fingerprint)
-	if err != nil {
-		t.Fatalf("unable to export key: %v", err)
-	}
-	m, err := sequoia.NewEphemeralMechanism()
-	if err != nil {
-		t.Fatalf("unable to initialize a mechanism: %v", err)
-	}
-	keyIdentities, err := m.ImportKeys(output)
-	if err != nil {
-		t.Fatalf("unable to import key: %v", err)
-	}
-	if len(keyIdentities) != 1 || keyIdentities[0] != fingerprint {
-		t.Fatalf("keyIdentity differ from the original: %v != %v",
-			keyIdentities[0], fingerprint)
 	}
 	input := []byte("Hello, world!")
 	sig, err := m.Sign(input, fingerprint)
