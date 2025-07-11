@@ -9,9 +9,10 @@ endif
 # when cross compiling _for_ a Darwin or windows host, then we must use openpgp
 BUILD_TAGS_WINDOWS_CROSS = containers_image_openpgp
 BUILD_TAGS_DARWIN_CROSS = containers_image_openpgp
+SEQUOIA_SONAME_DIR =
 
 BUILDTAGS =
-BUILDFLAGS := -tags "$(BUILDTAGS)"
+BUILDFLAGS := -tags "$(BUILDTAGS)" -ldflags '-X github.com/containers/image/v5/signature/internal/sequoia.sequoiaLibraryDir='"$(SEQUOIA_SONAME_DIR)"
 
 # Extra flags passed to go test
 TESTFLAGS :=
