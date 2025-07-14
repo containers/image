@@ -27,7 +27,7 @@ env:
     # Normally set to an empty-string.
     # Temporarily set this to a containers/skopeo PR number to
     # test changes made there, in a PR in this repository.
-    SKOPEO_PR:
+    SKOPEO_PR: 2645
 
     # Google-cloud VM Images
     IMAGE_SUFFIX: "c20250721t181111z-f42f41d13"
@@ -108,6 +108,9 @@ test_skopeo_task:
         - name: "Skopeo Test w/ opengpg"
           env:
               BUILDTAGS: *withopengpg
+        - name: "Skopeo Test w/ Sequoia"
+          env:
+              BUILDTAGS: *withsequoia
     setup_script: >-
         "${GOSRC}/${SCRIPT_BASE}/runner.sh" setup
     vendor_script: >-
