@@ -20,13 +20,17 @@ func TestNewMechanismFromDirectory(t *testing.T) {
 	m, err := NewMechanismFromDirectory(dir)
 	require.NoError(t, err)
 	m.Close()
-	_, err = testcli.GenerateKey(dir, "foo@example.org")
+	_, err = testcli.GenerateKey(t, dir, "foo@example.org", "")
 	if err != nil {
 		t.Fatalf("unable to generate key: %v", err)
 	}
 	m, err = NewMechanismFromDirectory(dir)
 	require.NoError(t, err)
 	m.Close()
+
+	t.Setenv("SEQUOIA_CRYPTO_POLICY", "this/does/not/exist") // Both unreadable files, and relative paths, should cause an error.
+	_, err = NewMechanismFromDirectory(dir)
+	assert.Error(t, err)
 }
 
 func TestNewEphemeralMechanism(t *testing.T) {
@@ -34,7 +38,7 @@ func TestNewEphemeralMechanism(t *testing.T) {
 		t.Skipf("sq not usable: %v", err)
 	}
 	dir := t.TempDir()
-	fingerprint, err := testcli.GenerateKey(dir, "foo@example.org")
+	fingerprint, err := testcli.GenerateKey(t, dir, "foo@example.org", "")
 	if err != nil {
 		t.Fatalf("unable to generate key: %v", err)
 	}
@@ -53,36 +57,65 @@ func TestNewEphemeralMechanism(t *testing.T) {
 		t.Fatalf("keyIdentity differ from the original: %v != %v",
 			keyIdentities[0], fingerprint)
 	}
+
+	t.Setenv("SEQUOIA_CRYPTO_POLICY", "this/does/not/exist") // Both unreadable files, and relative paths, should cause an error.
+	_, err = NewEphemeralMechanism()
+	assert.Error(t, err)
+}
+
+func TestSignWithPassphrase(t *testing.T) {
+	if err := testcli.CheckCliVersion("1.3.0"); err != nil {
+		t.Skipf("sq not usable: %v", err)
+	}
+
+	// Success is tested in TestGenerateSignVerify and TestSignThenVerifyEphemeral
+
+	// Invalid passphrase
+	dir := t.TempDir()
+	fingerprint, err := testcli.GenerateKey(t, dir, "foo@example.org", "valid-passphrase")
+	require.NoError(t, err)
+	m, err := NewMechanismFromDirectory(dir)
+	require.NoError(t, err)
+	defer m.Close()
+	_, err = m.SignWithPassphrase([]byte("input"), fingerprint, "invalid-passphrase")
+	assert.Error(t, err)
 }
 
 func TestGenerateSignVerify(t *testing.T) {
 	if err := testcli.CheckCliVersion("1.3.0"); err != nil {
 		t.Skipf("sq not usable: %v", err)
 	}
-	dir := t.TempDir()
-	fingerprint, err := testcli.GenerateKey(dir, "foo@example.org")
-	if err != nil {
-		t.Fatalf("unable to generate key: %v", err)
-	}
-	m, err := NewMechanismFromDirectory(dir)
-	if err != nil {
-		t.Fatalf("unable to initialize a mechanism: %v", err)
-	}
-	defer m.Close()
-	input := []byte("Hello, world!")
-	sig, err := m.Sign(input, fingerprint)
-	if err != nil {
-		t.Fatalf("unable to sign: %v", err)
-	}
-	contents, keyIdentity, err := m.Verify(sig)
-	if err != nil {
-		t.Fatalf("unable to verify: %v", err)
-	}
-	if !bytes.Equal(contents, input) {
-		t.Fatalf("contents differ from the original")
-	}
-	if keyIdentity != fingerprint {
-		t.Fatalf("keyIdentity differ from the original")
+	for _, passphrase := range []string{"", "test-passphrase"} {
+		dir := t.TempDir()
+		fingerprint, err := testcli.GenerateKey(t, dir, "foo@example.org", passphrase)
+		if err != nil {
+			t.Fatalf("unable to generate key: %v", err)
+		}
+		m, err := NewMechanismFromDirectory(dir)
+		if err != nil {
+			t.Fatalf("unable to initialize a mechanism: %v", err)
+		}
+		defer m.Close()
+		input := []byte("Hello, world!")
+		var sig []byte
+		if passphrase != "" {
+			sig, err = m.SignWithPassphrase(input, fingerprint, passphrase)
+		} else {
+			sig, err = m.Sign(input, fingerprint)
+		}
+		if err != nil {
+			t.Fatalf("unable to sign: %v", err)
+		}
+		contents, keyIdentity, err := m.Verify(sig)
+		if err != nil {
+			t.Fatalf("unable to verify: %v", err)
+		}
+		if !bytes.Equal(contents, input) {
+			t.Fatalf("contents differ from the original")
+		}
+		if keyIdentity != fingerprint {
+			t.Fatalf("keyIdentity differ from the original")
+		}
 	}
 }
 
@@ -91,7 +124,7 @@ func TestSignThenVerifyEphemeral(t *testing.T) {
 		t.Skipf("sq not usable: %v", err)
 	}
 	dir := t.TempDir()
-	fingerprint, err := testcli.GenerateKey(dir, "foo@example.org")
+	fingerprint, err := testcli.GenerateKey(t, dir, "foo@example.org", "")
 	require.NoError(t, err)
 	publicKey, err := testcli.ExportCert(dir, fingerprint)
 	require.NoError(t, err)
@@ -118,6 +151,16 @@ func TestSignThenVerifyEphemeral(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, input, contents)
 	assert.Equal(t, keyIdentity, fingerprint)
+}
+
+func TestImportKeys(t *testing.T) {
+	// Success is tested in TestNewEphemeralMechanism and TestSignThenVerifyEphemeral
+	m, err := NewEphemeralMechanism()
+	require.NoError(t, err)
+	defer m.Close()
+
+	_, err = m.ImportKeys([]byte("This is not a key at all"))
+	assert.Error(t, err)
 }
 
 func TestMain(m *testing.M) {
