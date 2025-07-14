@@ -75,7 +75,7 @@ func newGPGSigningMechanismInDirectory(optionalDir string) (signingMechanismWith
 // The caller must call .Close() on the returned SigningMechanism.
 func newEphemeralGPGSigningMechanism(blobs [][]byte) (signingMechanismWithPassphrase, []string, error) {
 	if err := sequoia.Init(); err != nil {
-		return nil, nil, err
+		return nil, nil, err // Coverage: This is impractical to test in-process, with the static go_sequoia_dlhandle.
 	}
 
 	mech, err := sequoia.NewEphemeralMechanism()
