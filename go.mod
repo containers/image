@@ -10,7 +10,7 @@ require (
 	github.com/BurntSushi/toml v1.5.0
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01
 	github.com/containers/ocicrypt v1.2.1
-	github.com/containers/storage v1.58.1-0.20250625164029-83650abfa8de
+	github.com/containers/storage v1.59.0
 	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v28.3.2+incompatible
@@ -104,7 +104,7 @@ require (
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
 	github.com/smallstep/pkcs7 v0.1.1 // indirect
 	github.com/stefanberger/go-pkcs11uri v0.0.0-20230803200340-78284954bff6 // indirect
-	github.com/tchap/go-patricia/v2 v2.3.2 // indirect
+	github.com/tchap/go-patricia/v2 v2.3.3 // indirect
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	github.com/vbatts/tar-split v0.12.1 // indirect
 	go.opencensus.io v0.24.0 // indirect
