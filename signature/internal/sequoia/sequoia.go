@@ -95,7 +95,7 @@ func (m *SigningMechanism) SignWithPassphrase(
 	var size C.size_t
 	cData := C.go_sequoia_signature_get_data(sig, &size)
 	if size > C.size_t(C.INT_MAX) {
-		return nil, errors.New("overflow")
+		return nil, errors.New("overflow") // Coverage: This should not reasonably happen, and we don’t want to generate gigabytes of input to test this.
 	}
 	return C.GoBytes(unsafe.Pointer(cData), C.int(size)), nil
 }
@@ -125,7 +125,7 @@ func (m *SigningMechanism) Verify(
 	var size C.size_t
 	cContent := C.go_sequoia_verification_result_get_content(result, &size)
 	if size > C.size_t(C.INT_MAX) {
-		return nil, "", errors.New("overflow")
+		return nil, "", errors.New("overflow") // Coverage: This should not reasonably happen, and we don’t want to generate gigabytes of input to test this.
 	}
 	contents = C.GoBytes(unsafe.Pointer(cContent), C.int(size))
 	cSigner := C.go_sequoia_verification_result_get_signer(result)
@@ -153,7 +153,7 @@ func (m *SigningMechanism) ImportKeys(blob []byte) ([]string, error) {
 		var cerr *C.SequoiaError
 		cKeyIdentity := C.go_sequoia_import_result_get_content(result, i, &cerr)
 		if cerr != nil {
-			defer C.go_sequoia_error_free(cerr)
+			defer C.go_sequoia_error_free(cerr) // Coverage: this can fail only if i is out of range.
 			return nil, errors.New(C.GoString(cerr.message))
 		}
 		keyIdentities = append(keyIdentities, C.GoString(cKeyIdentity))
@@ -170,7 +170,7 @@ func (m *SigningMechanism) Close() error {
 //export sequoia_logrus_logger
 func sequoia_logrus_logger(level C.enum_SequoiaLogLevel, message *C.char) {
 	var logrusLevel logrus.Level
-	switch level {
+	switch level { // Coverage: We are not in control of whether / how the Rust code chooses to log things.
 	case C.SEQUOIA_LOG_LEVEL_ERROR:
 		logrusLevel = logrus.ErrorLevel
 	case C.SEQUOIA_LOG_LEVEL_WARN:
@@ -198,7 +198,7 @@ func initOnce() error {
 	case "darwin":
 		soName = "libpodman_sequoia.dylib"
 	default:
-		return fmt.Errorf("Unhandled OS %q in sequoia initialization", runtime.GOOS)
+		return fmt.Errorf("Unhandled OS %q in sequoia initialization", runtime.GOOS) // Coverage: This is ~by definition not reached in tests.
 	}
 	if sequoiaLibraryDir != "" {
 		soName = filepath.Join(sequoiaLibraryDir, soName)
@@ -207,12 +207,12 @@ func initOnce() error {
 	defer C.free(unsafe.Pointer(cSOName))
 	if C.go_sequoia_ensure_library(cSOName,
 		C.RTLD_NOW|C.RTLD_GLOBAL) < 0 {
-		return fmt.Errorf("unable to load %q", soName)
+		return fmt.Errorf("unable to load %q", soName) // Coverage: This is impractical to test in-process, with the static go_sequoia_dlhandle.
 	}
 
 	var cerr *C.SequoiaError
 	if C.go_sequoia_set_logger_consumer(C.sequoia_logger_consumer_t(C.sequoia_logrus_logger), &cerr) != 0 {
-		defer C.go_sequoia_error_free(cerr)
+		defer C.go_sequoia_error_free(cerr) // Coverage: This is impractical to test in-process, with the static go_sequoia_dlhandle.
 		return fmt.Errorf("initializing logging: %s", C.GoString(cerr.message))
 	}
 	return nil
