@@ -59,18 +59,16 @@ func TestNewMechanismFromDirectory(t *testing.T) {
 		t.Skipf("sq not usable: %v", err)
 	}
 	dir := t.TempDir()
-	_, err := NewMechanismFromDirectory(dir)
-	if err != nil {
-		t.Fatalf("unable to initialize a mechanism: %v", err)
-	}
+	m, err := NewMechanismFromDirectory(dir)
+	require.NoError(t, err)
+	m.Close()
 	_, err = generateKey(dir, "foo@example.org")
 	if err != nil {
 		t.Fatalf("unable to generate key: %v", err)
 	}
-	_, err = NewMechanismFromDirectory(dir)
-	if err != nil {
-		t.Fatalf("unable to initialize a mechanism: %v", err)
-	}
+	m, err = NewMechanismFromDirectory(dir)
+	require.NoError(t, err)
+	m.Close()
 }
 
 func TestNewEphemeralMechanism(t *testing.T) {
@@ -87,9 +85,8 @@ func TestNewEphemeralMechanism(t *testing.T) {
 		t.Fatalf("unable to export cert: %v", err)
 	}
 	m, err := NewEphemeralMechanism()
-	if err != nil {
-		t.Fatalf("unable to initialize a mechanism: %v", err)
-	}
+	require.NoError(t, err)
+	defer m.Close()
 	keyIdentities, err := m.ImportKeys(output)
 	if err != nil {
 		t.Fatalf("unable to import keys: %v", err)
@@ -113,6 +110,7 @@ func TestGenerateSignVerify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to initialize a mechanism: %v", err)
 	}
+	defer m.Close()
 	input := []byte("Hello, world!")
 	sig, err := m.Sign(input, fingerprint)
 	if err != nil {
