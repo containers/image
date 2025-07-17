@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/containers/image/v5/internal/multierr"
 	"github.com/containers/image/v5/internal/private"
@@ -52,8 +51,15 @@ func (pr *prSignedBy) isSignatureAuthorAccepted(ctx context.Context, image priva
 
 	signature, err := verifyAndExtractSignature(mech, sig, signatureAcceptanceRules{
 		validateKeyIdentity: func(keyIdentity string) error {
-			if slices.Contains(trustedIdentities, keyIdentity) {
-				return nil
+			// Iterate over the keys, validate if the provided keyIdentity is either the key itself or a valid
+			// subkey
+			for _, allowedKeyIdentity := range trustedIdentities {
+				if isValid, err := isKeyOrValidSubkey(mech, keyIdentity, allowedKeyIdentity); err != nil {
+					// Throwing an error shouldn't exit the program, we should just move to the next key
+					continue
+				} else if isValid {
+					return nil
+				}
 			}
 			// Coverage: We use a private GPG home directory and only import trusted keys, so this should
 			// not be reachable.

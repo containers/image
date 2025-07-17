@@ -166,7 +166,8 @@ func (m *openpgpSigningMechanism) Verify(unverifiedSignature []byte) (contents [
 	}
 
 	// Uppercase the fingerprint to be compatible with gpgme
-	return content, strings.ToUpper(fmt.Sprintf("%x", md.SignedBy.PublicKey.Fingerprint)), nil
+	keyIdentity = strings.ToUpper(fmt.Sprintf("%x", md.SignedBy.PublicKey.Fingerprint))
+	return content, keyIdentity, nil
 }
 
 // UntrustedSignatureContents returns UNTRUSTED contents of the signature WITHOUT ANY VERIFICATION,
@@ -176,4 +177,102 @@ func (m *openpgpSigningMechanism) Verify(unverifiedSignature []byte) (contents [
 // the values may have no recognizable relationship if the public key is not available.
 func (m *openpgpSigningMechanism) UntrustedSignatureContents(untrustedSignature []byte) (untrustedContents []byte, shortKeyIdentifier string, err error) {
 	return gpgUntrustedSignatureContents(untrustedSignature)
+}
+
+// isSubkeyOf checks if signerKeyIdentity is a subkey of expectedKeyIdentity
+func (m *openpgpSigningMechanism) isSubkeyOf(signerKeyIdentity, expectedKeyIdentity string) (bool, error) {
+	// Convert fingerprints to lowercase for comparison
+	signerFingerprint := strings.ToLower(signerKeyIdentity)
+	expectedFingerprint := strings.ToLower(expectedKeyIdentity)
+
+	// If they're the same, it's a match
+	if signerFingerprint == expectedFingerprint {
+		return true, nil
+	}
+
+	// Find the entity with the expected fingerprint
+	var expectedEntity *openpgp.Entity
+	var signerEntity *openpgp.Entity
+
+	for _, entity := range m.keyring {
+		// Check if this entity's primary key matches the expected fingerprint
+		if entity.PrimaryKey != nil {
+			primaryFingerprint := strings.ToLower(fmt.Sprintf("%x", entity.PrimaryKey.Fingerprint))
+			if primaryFingerprint == expectedFingerprint {
+				expectedEntity = entity
+			}
+			if primaryFingerprint == signerFingerprint {
+				signerEntity = entity
+			}
+		}
+
+		// Also check subkeys
+		for _, subkey := range entity.Subkeys {
+			if subkey.PublicKey != nil {
+				subkeyFingerprint := strings.ToLower(fmt.Sprintf("%x", subkey.PublicKey.Fingerprint))
+				if subkeyFingerprint == expectedFingerprint {
+					expectedEntity = entity
+				}
+				if subkeyFingerprint == signerFingerprint {
+					signerEntity = entity
+				}
+			}
+		}
+	}
+
+	// If we couldn't find either key, return false
+	if expectedEntity == nil || signerEntity == nil {
+		return false, nil
+	}
+
+	// Case 1: Both keys belong to the same entity - this is valid
+	if expectedEntity == signerEntity {
+		return true, nil
+	}
+
+	// Case 2: The signer is a subkey of the expected entity
+	if expectedEntity.PrimaryKey != nil {
+		expectedPrimaryFingerprint := strings.ToLower(fmt.Sprintf("%x", expectedEntity.PrimaryKey.Fingerprint))
+		if expectedPrimaryFingerprint == expectedFingerprint {
+			// The expected key is a primary key, check if signer is one of its subkeys
+			for _, subkey := range expectedEntity.Subkeys {
+				if subkey.PublicKey != nil {
+					subkeyFingerprint := strings.ToLower(fmt.Sprintf("%x", subkey.PublicKey.Fingerprint))
+					if subkeyFingerprint == signerFingerprint {
+						return true, nil
+					}
+				}
+			}
+		}
+	}
+
+	// Case 3: The expected key is a subkey, and the signer is the primary key of the same entity
+	for _, subkey := range signerEntity.Subkeys {
+		if subkey.PublicKey != nil {
+			subkeyFingerprint := strings.ToLower(fmt.Sprintf("%x", subkey.PublicKey.Fingerprint))
+			if subkeyFingerprint == expectedFingerprint {
+				// The expected key is a subkey of the signer's entity
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+// isKeyOrValidSubkey checks if the signerKeyIdentity is either the same as the expectedKeyIdentity, or is a valid
+// subkey of the expectedKeyIdentity
+func isKeyOrValidSubkey(mech SigningMechanism, signerKeyIdentity, expectedKeyIdentity string) (bool, error) {
+	// If they're the same, no need to check subkey relationship
+	if signerKeyIdentity == expectedKeyIdentity {
+		return true, nil
+	}
+
+	// For openpgp mechanism, check subkey relationships
+	if openpgpMech, ok := mech.(*openpgpSigningMechanism); ok {
+		return openpgpMech.isSubkeyOf(signerKeyIdentity, expectedKeyIdentity)
+	}
+
+	// For other mechanisms, only accept exact matches
+	return false, nil
 }

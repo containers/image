@@ -204,3 +204,59 @@ func (m *gpgmeSigningMechanism) Verify(unverifiedSignature []byte) (contents []b
 func (m *gpgmeSigningMechanism) UntrustedSignatureContents(untrustedSignature []byte) (untrustedContents []byte, shortKeyIdentifier string, err error) {
 	return gpgUntrustedSignatureContents(untrustedSignature)
 }
+
+// isSubkeyOf checks if signerKeyIdentity is a subkey of expectedKeyIdentity
+func (m *gpgmeSigningMechanism) isSubkeyOf(signerKeyIdentity, expectedKeyIdentity string) (bool, error) {
+	// Load the key for expectedKeyIdentity
+	key, err := m.ctx.GetKey(expectedKeyIdentity, false)
+	if err != nil {
+		return false, err
+	}
+
+	// Check if signerKeyIdentity is a subkey of the primary key
+	// Get the first subkey (which should be the primary key itself)
+	subkey := key.SubKeys()
+
+	// Skip the primary key if needed and iterate through all subkeys
+	for subkey != nil {
+		// Check if the current subkey's fingerprint matches the signer's identity
+		if subkey.Fingerprint() == signerKeyIdentity {
+			return true, nil
+		}
+
+		// Move to the next subkey
+		subkey = subkey.Next()
+	}
+
+	// If we didn't find it as a subkey, check if it might be the primary key itself
+	// (in case the expectedKeyIdentity is actually a subkey)
+	key, err = m.ctx.GetKey(signerKeyIdentity, false)
+	if err != nil {
+		return false, err
+	}
+
+	// Get the primary key fingerprint
+	primarySubkey := key.SubKeys()
+	if primarySubkey != nil && primarySubkey.Fingerprint() == expectedKeyIdentity {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// isKeyOrValidSubkey checks if the signerKeyIdentity is either the same as the expectedKeyIdentity, or is a valid
+// subkey of the expectedKeyIdentity
+func isKeyOrValidSubkey(mech SigningMechanism, signerKeyIdentity, expectedKeyIdentity string) (bool, error) {
+	// If they're the same, no need to check subkey relationship
+	if signerKeyIdentity == expectedKeyIdentity {
+		return true, nil
+	}
+
+	// For gpgme mechanism, check subkey relationships
+	if gpgmeMech, ok := mech.(*gpgmeSigningMechanism); ok {
+		return gpgmeMech.isSubkeyOf(signerKeyIdentity, expectedKeyIdentity)
+	}
+
+	// For other mechanisms, only accept exact matches
+	return false, nil
+}
