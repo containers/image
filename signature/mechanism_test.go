@@ -143,7 +143,7 @@ func TestNewEphemeralGPGSigningMechanism(t *testing.T) {
 	mech, keyIdentities, err = NewEphemeralGPGSigningMechanism(bytes.Join([][]byte{keyBlob, keyBlob}, nil))
 	require.NoError(t, err)
 	defer mech.Close()
-	assert.Equal(t, []string{TestKeyFingerprintWithPassphrase, TestKeyFingerprint, TestKeyFingerprintWithPassphrase, TestKeyFingerprint}, keyIdentities)
+	assert.Equal(t, []string{TestKeyFingerprintWithPassphrase, TestKeyFingerprint, TestKeyFingerprintWithSubkey, TestKeyFingerprintWithPassphrase, TestKeyFingerprint, TestKeyFingerprintWithSubkey}, keyIdentities)
 
 	// Two keys from two blobs:
 	keyBlob1, err := os.ReadFile("./fixtures/public-key-1.gpg")

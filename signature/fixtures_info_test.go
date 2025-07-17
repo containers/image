@@ -19,6 +19,8 @@ const (
 	TestKeyFingerprintWithPassphrase = "F2B501009F78B0B340221A12A3CD242DA6028093"
 	// TestPassphrase is the passphrase for TestKeyFingerprintWithPassphrase.
 	TestPassphrase = "WithPassphrase123"
+	// TestKeyFingerprintWithSubkey is the fingerpring of the private key with a signing subkey in this directory.
+	TestKeyFingerprintWithSubkey = "92697D73924E7ADC91C14A001065C1A47B86FD50"
 )
 
 var (
