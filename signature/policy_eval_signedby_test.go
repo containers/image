@@ -207,6 +207,15 @@ func TestPRSignedByIsSignatureAuthorAccepted(t *testing.T) {
 	require.NoError(t, err)
 	sar, parsedSig, err = pr.isSignatureAuthorAccepted(context.Background(), image, sig)
 	assertSARRejectedPolicyRequirement(t, sar, parsedSig, err)
+
+	// An invalid signature from a revoked signing subkey
+	image = dirImageMock(t, "fixtures/dir-img-rev-subkey", "testing/manifest:latest")
+	sig, err = os.ReadFile("fixtures/dir-img-rev-subkey/signature-1")
+	require.NoError(t, err)
+	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key-4.gpg", prm)
+	require.NoError(t, err)
+	sar, parsedSig, err = pr.isSignatureAuthorAccepted(context.Background(), image, sig)
+	assertSARRejected(t, sar, parsedSig, err)
 }
 
 // createInvalidSigDir creates a directory suitable for dirImageMock, in which image.Signatures()
