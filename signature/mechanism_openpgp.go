@@ -90,7 +90,7 @@ func (m *openpgpSigningMechanism) importKeysFromBytes(blob []byte) ([]string, er
 	if err != nil {
 		k, e2 := openpgp.ReadArmoredKeyRing(bytes.NewReader(blob))
 		if e2 != nil {
-			return nil, err // The original error  -- FIXME: is this better?
+			return nil, fmt.Errorf("reading public keys failed: %q / %q", err, e2)
 		}
 		keyring = k
 	}
