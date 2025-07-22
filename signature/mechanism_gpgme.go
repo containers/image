@@ -169,7 +169,10 @@ func (m *gpgmeSigningMechanism) Sign(input []byte, keyIdentity string) ([]byte, 
 	return m.SignWithPassphrase(input, keyIdentity, "")
 }
 
-// Verify parses unverifiedSignature and returns the content and the signer's identity
+// Verify parses unverifiedSignature and returns the content and the signer's identity.
+// For mechanisms created using NewEphemeralGPGSigningMechanism, the returned key identity
+// is expected to be one of the values returned by NewEphemeralGPGSigningMechanism,
+// or the mechanism should implement signingMechanismWithVerificationIdentityLookup.
 func (m *gpgmeSigningMechanism) Verify(unverifiedSignature []byte) (contents []byte, keyIdentity string, err error) {
 	signedBuffer := bytes.Buffer{}
 	signedData, err := gpgme.NewDataWriter(&signedBuffer)
@@ -194,6 +197,24 @@ func (m *gpgmeSigningMechanism) Verify(unverifiedSignature []byte) (contents []b
 		return nil, "", internal.NewInvalidSignatureError(fmt.Sprintf("Invalid GPG signature: %#v", sig))
 	}
 	return signedBuffer.Bytes(), sig.Fingerprint, nil
+}
+
+// keyIdentityForVerificationKeyIdentity re-checks the key identity returned by Verify
+// if it doesn't match an identity returned by NewEphemeralGPGSigningMechanism, trying to match it.
+// (To be more specific, for mechanisms which return a subkey fingerprint from Verify,
+// this converts the subkey fingerprint into the corresponding primary key fingerprint.)
+func (m *gpgmeSigningMechanism) keyIdentityForVerificationKeyIdentity(keyIdentity string) (string, error) {
+	// In theory, if keyIdentity refers to a subkey, the same subkey could be attached to different primary keys;
+	// in that case, GetKey fails with “ambiguous name”.
+	// We _could_ handle that, by using KeyList* (GetKey is internally just a helper for KeyList*), but sharing
+	// a subkey that way is very unexpected, so, for now, prefer the much simpler implementation.
+	key, err := m.ctx.GetKey(keyIdentity, false)
+	if err != nil {
+		return "", err
+	}
+	// In theory this value could be nil if (gpg --list-keys --with-colons) misses a "pub:" line
+	// or a "fpr:" line, but gpg (in recent enough versions) prints that unconditionally. // codespell:ignore fpr
+	return key.Fingerprint(), nil
 }
 
 // UntrustedSignatureContents returns UNTRUSTED contents of the signature WITHOUT ANY VERIFICATION,
