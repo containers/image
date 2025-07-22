@@ -21,6 +21,8 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+var _ signingMechanismWithVerificationIdentityLookup = &gpgmeSigningMechanism{}
+
 func TestGPGMESigningMechanismClose(t *testing.T) {
 	// Closing an ephemeral mechanism removes the directory.
 	// (The non-ephemeral case is tested in the common TestGPGSigningMechanismClose)
