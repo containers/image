@@ -319,12 +319,26 @@ func TestVerifyAndExtractSignature(t *testing.T) {
 		assert.Equal(t, TestKeyFingerprint, keyIdentity)
 		assert.Equal(t, signatureData, *recorded)
 	}
+	// Successful verification using a subkey
+	sig2, err := os.ReadFile("./fixtures/subkey.signature")
+	require.NoError(t, err)
+	sig2Data := tuple{
+		signedDockerReference:      "testing/manifest:latest",
+		signedDockerManifestDigest: TestImageManifestDigest,
+	}
+	recorded, recordingRules := setupRecording(sig2Data, TestKeyFingerprintPrimaryWithSubkey)
+	sig, keyIdentity, err := verifyAndExtractSignature(mech, sig2, recordingRules)
+	require.NoError(t, err)
+	assert.Equal(t, sig2Data.signedDockerReference, sig.DockerReference)
+	assert.Equal(t, sig2Data.signedDockerManifestDigest, sig.DockerManifestDigest)
+	assert.Equal(t, TestKeyFingerprintPrimaryWithSubkey, keyIdentity)
+	assert.Equal(t, sig2Data, *recorded)
 
 	// For extra paranoia, test that we return a nil signature object and a "" key identity on error.
 
 	// Completely invalid signature.
-	recorded, recordingRules := setupRecording(signatureData, TestKeyFingerprint)
-	sig, keyIdentity, err := verifyAndExtractSignature(mech, []byte{}, recordingRules)
+	recorded, recordingRules = setupRecording(signatureData, TestKeyFingerprint)
+	sig, keyIdentity, err = verifyAndExtractSignature(mech, []byte{}, recordingRules)
 	assert.Error(t, err)
 	assert.Nil(t, sig)
 	assert.Equal(t, "", keyIdentity)
@@ -340,6 +354,16 @@ func TestVerifyAndExtractSignature(t *testing.T) {
 	// No key accepted.
 	recorded, recordingRules = setupRecording(signatureData /*,  nothing */)
 	sig, keyIdentity, err = verifyAndExtractSignature(mech, signature, recordingRules)
+	assert.Error(t, err)
+	assert.Nil(t, sig)
+	assert.Equal(t, "", keyIdentity)
+	assert.Equal(t, tuple{}, *recorded)
+
+	// Valid signature with a revoked subkey
+	sig2, err = os.ReadFile("./fixtures/subkey-revoked.signature")
+	require.NoError(t, err)
+	recorded, recordingRules = setupRecording(sig2Data, TestKeyFingerprintPrimaryWithRevokedSubkey) // sig2Data describes subkey-revoked.signature as well.
+	sig, keyIdentity, err = verifyAndExtractSignature(mech, sig2, recordingRules)
 	assert.Error(t, err)
 	assert.Nil(t, sig)
 	assert.Equal(t, "", keyIdentity)

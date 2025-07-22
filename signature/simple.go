@@ -222,7 +222,21 @@ func verifyAndExtractSignature(mech SigningMechanism, unverifiedSignature []byte
 		return nil, "", err
 	}
 	if !slices.Contains(rules.acceptedKeyIdentities, keyIdentity) {
-		return nil, "", internal.NewInvalidSignatureError(fmt.Sprintf("signature by key %s is not accepted", keyIdentity))
+		withLookup, ok := mech.(signingMechanismWithVerificationIdentityLookup)
+		if !ok {
+			return nil, "", internal.NewInvalidSignatureError(fmt.Sprintf("signature by key %s is not accepted", keyIdentity))
+		}
+
+		primaryKey, err := withLookup.keyIdentityForVerificationKeyIdentity(keyIdentity)
+		if err != nil {
+			// Coverage: This only fails if lookup by keyIdentity fails, but we just found and used that key.
+			// Or maybe on some unexpected I/O error.
+			return nil, "", err
+		}
+		if !slices.Contains(rules.acceptedKeyIdentities, primaryKey) {
+			return nil, "", internal.NewInvalidSignatureError(fmt.Sprintf("signature by key %s of %s is not accepted", keyIdentity, primaryKey))
+		}
+		keyIdentity = primaryKey
 	}
 
 	var unmatchedSignature untrustedSignature
