@@ -6,12 +6,15 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/types"
 	dockerReference "github.com/distribution/reference"
 	"github.com/docker/cli/cli/config"
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/config/credentials"
 	configtypes "github.com/docker/cli/cli/config/types"
 	"github.com/docker/docker/registry"
@@ -457,6 +460,13 @@ func TestGetCredentialsInteroperability(t *testing.T) {
 	const testUser = "some-user"
 	const testPassword = "some-password"
 
+	// Unset DockerEnvConfigKey, which is read by github.com/docker/cli/cli/config/configfile.ConfigFile.GetCredentialsStore
+	// and might interfere with the test.
+	// Use t.Setenv() to ensure DockerEnvConfigKey is restored to the original value after the test;
+	// (Sadly there isn’t a t.Unsetenv() as of Go 1.17.)
+	t.Setenv(configfile.DockerEnvConfigKey, "")
+	os.Unsetenv(configfile.DockerEnvConfigKey)
+
 	for _, c := range []struct {
 		loginKey string // or "" for Docker's default. We must special-case that because (docker login docker.io) works, but (docker logout docker.io) doesn't!
 		queryKey string
@@ -633,7 +643,7 @@ func TestGetAllCredentials(t *testing.T) {
 	}
 }
 
-func TestAuthKeysForKey(t *testing.T) {
+func TestAuthKeyLookupOrder(t *testing.T) {
 	for _, tc := range []struct {
 		name, input string
 		expected    []string
@@ -686,8 +696,17 @@ func TestAuthKeysForKey(t *testing.T) {
 			},
 		},
 	} {
-		result := authKeysForKey(tc.input)
-		require.Equal(t, tc.expected, result, tc.name)
+		var registry string
+		if firstSlash := strings.IndexRune(tc.input, '/'); firstSlash != -1 {
+			registry = tc.input[:firstSlash]
+		} else {
+			registry = tc.input
+		}
+		result := slices.Collect(authKeyLookupOrder(tc.input, registry, false))
+		assert.Equal(t, tc.expected, result, tc.name)
+
+		result = slices.Collect(authKeyLookupOrder(tc.input, registry, true))
+		assert.Equal(t, []string{registry}, result, tc.name)
 	}
 }
 
@@ -885,7 +904,7 @@ func TestSetCredentialsInteroperability(t *testing.T) {
 		configDir := t.TempDir()
 		configPath := filepath.Join(configDir, config.ConfigFileName)
 
-		// The credential lookups are intended to match github.com/docker/cli/command/image.RunPull .
+		// The credential lookups are intended to match github.com/docker/cli/command/image.runPull .
 		dockerRef, err := dockerReference.ParseNormalizedNamed(c.queryRepo)
 		require.NoError(t, err)
 		dockerRef = dockerReference.TagNameOnly(dockerRef)
@@ -1037,14 +1056,10 @@ func TestSetGetCredentials(t *testing.T) {
 		sys := &types.SystemContext{}
 		if tc.useLegacyFormat {
 			sys.LegacyFormatAuthFilePath = tmpFile.Name()
-			_, err = tmpFile.WriteString(fmt.Sprintf(
-				`{"%s":{"auth":"dXNlcm5hbWU6cGFzc3dvcmQ="}}`, tc.set,
-			))
+			_, err = fmt.Fprintf(tmpFile, `{"%s":{"auth":"dXNlcm5hbWU6cGFzc3dvcmQ="}}`, tc.set)
 		} else {
 			sys.AuthFilePath = tmpFile.Name()
-			_, err = tmpFile.WriteString(fmt.Sprintf(
-				`{"auths":{"%s":{"auth":"dXNlcm5hbWU6cGFzc3dvcmQ="}}}`, tc.set,
-			))
+			_, err = fmt.Fprintf(tmpFile, `{"auths":{"%s":{"auth":"dXNlcm5hbWU6cGFzc3dvcmQ="}}}`, tc.set)
 		}
 		require.NoError(t, err)
 

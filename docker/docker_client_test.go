@@ -338,6 +338,41 @@ func TestParseRegistryWarningHeader(t *testing.T) {
 	}
 }
 
+func TestGetBlobSize(t *testing.T) {
+	for _, c := range []struct {
+		headers  []string
+		expected int64 // -1 if error expected
+	}{
+		{[]string{}, -1},
+		{[]string{"0"}, 0},
+		{[]string{"1"}, 1},
+		{[]string{"0777"}, 777},  // Not interpreted as octal
+		{[]string{"x"}, -1},      // Not a number: Go's response reader rejects such responses.
+		{[]string{"1", "2"}, -1}, // Ambiguous: Go's response reader rejects such responses.
+		{[]string{""}, -1},       // Empty header: Go's response reader rejects such responses.
+		{[]string{"-1"}, -1},     // Negative: Go's response reader rejects such responses.
+	} {
+		var buf bytes.Buffer
+		buf.WriteString("HTTP/1.1 200 OK\r\n")
+		for _, v := range c.headers {
+			buf.WriteString("Content-Length: " + v + "\r\n")
+		}
+		buf.WriteString("\r\n")
+		resp, err := http.ReadResponse(bufio.NewReader(&buf), nil)
+		if err != nil {
+			assert.Equal(t, int64(-1), c.expected)
+		} else {
+			res, err := getBlobSize(resp)
+			if c.expected == -1 {
+				assert.Error(t, err, c.headers)
+			} else {
+				require.NoError(t, err, c.headers)
+				assert.Equal(t, c.expected, res)
+			}
+		}
+	}
+}
+
 func TestIsManifestUnknownError(t *testing.T) {
 	// Mostly a smoke test; we can add more registries here if they need special handling.
 

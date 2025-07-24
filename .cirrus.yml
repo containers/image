@@ -30,9 +30,8 @@ env:
     SKOPEO_PR:
 
     # Google-cloud VM Images
-    IMAGE_SUFFIX: "c20241107t210000z-f41f40d13"
+    IMAGE_SUFFIX: "c20250721t181111z-f42f41d13"
     FEDORA_CACHE_IMAGE_NAME: "fedora-${IMAGE_SUFFIX}"
-    DEBIAN_CACHE_IMAGE_NAME: "debian-${IMAGE_SUFFIX}"
 
     # Container FQIN's (include bleeding-edge development-level container deps.)
     FEDORA_CONTAINER_FQIN: "quay.io/libpod/fedora_podman:${IMAGE_SUFFIX}"
@@ -48,7 +47,7 @@ validate_task:
     # under Cirrus-CI, due to challenges obtaining the starting commit ID.
     # Only do validation for PRs.
     only_if: $CIRRUS_PR != ''
-    gce_instance: &debian_vm
+    gce_instance: &fedora_vm
         image_project: libpod-218412
         zone: "us-central1-f"
         cpu: 2
@@ -56,7 +55,7 @@ validate_task:
         # Required to be 200gig, do not modify - has i/o performance impact
         # according to gcloud CLI tool warning messages.
         disk: 200
-        image_name: ${DEBIAN_CACHE_IMAGE_NAME}
+        image_name: ${FEDORA_CACHE_IMAGE_NAME}
     env:
         HOME: "/root"  # default unset, needed by golangci-lint.
     script: |
@@ -68,7 +67,7 @@ validate_task:
 
 cross_task:
     only_if: &not_docs $CIRRUS_CHANGE_TITLE !=~ '.*CI:DOCS.*'
-    gce_instance: *debian_vm
+    gce_instance: *fedora_vm
     script: make cross
 
 
@@ -77,14 +76,14 @@ test_task:
     depends_on:
         - validate
     only_if: *not_docs
-    gce_instance: *debian_vm
+    gce_instance: *fedora_vm
     matrix:
         - name: "Test"
           env:
-              BUILDTAGS: 'btrfs_noversion libdm_no_deferred_remove'
+              BUILDTAGS: ''
         - name: "Test w/ opengpg"
           env:
-              BUILDTAGS: &withopengpg 'btrfs_noversion libdm_no_deferred_remove containers_image_openpgp'
+              BUILDTAGS: &withopengpg 'containers_image_openpgp'
     script: ${GOSRC}/${SCRIPT_BASE}/runner.sh image_tests
 
 
@@ -98,19 +97,11 @@ test_skopeo_task:
     only_if: *not_docs
     depends_on:
         - validate
-    gce_instance:
-        image_project: libpod-218412
-        zone: "us-central1-f"
-        cpu: 2
-        memory: "4Gb"
-        # Required to be 200gig, do not modify - has i/o performance impact
-        # according to gcloud CLI tool warning messages.
-        disk: 200
-        image_name: ${FEDORA_CACHE_IMAGE_NAME}
+    gce_instance: *fedora_vm
     matrix:
         - name: "Skopeo Test"
           env:
-              BUILDTAGS: 'btrfs_noversion libdm_no_deferred_remove'
+              BUILDTAGS: ''
         - name: "Skopeo Test w/ opengpg"
           env:
               BUILDTAGS: *withopengpg
@@ -142,7 +133,6 @@ meta_task:
         # Space-separated list of images used by this repository state
         IMGNAMES: |
             ${FEDORA_CACHE_IMAGE_NAME}
-            ${DEBIAN_CACHE_IMAGE_NAME}
         BUILDID: "${CIRRUS_BUILD_ID}"
         REPOREF: "${CIRRUS_REPO_NAME}"
         GCPJSON: ENCRYPTED[04306103eee1933f87deb8a5af6514a7e3164aa589d6079abc0451eb2360879430ed020d6e025ca64ef667138ce9d786]

@@ -1,6 +1,3 @@
-//go:build !containers_image_fulcio_stub
-// +build !containers_image_fulcio_stub
-
 package signature
 
 import (
@@ -213,6 +210,25 @@ func TestFulcioIssuerInCertificate(t *testing.T) {
 	}
 }
 
+func TestParseLeafCertsFromPEM(t *testing.T) {
+	fulcioCertBytes, err := os.ReadFile("fixtures/fulcio-cert")
+	require.NoError(t, err)
+	// Invalid leaf certificate
+	for _, c := range [][]byte{
+		[]byte("not a certificate"),
+		{},                               // Empty
+		bytes.Repeat(fulcioCertBytes, 2), // More than one certificate
+	} {
+		pk, err := parseLeafCertFromPEM(c)
+		assert.Error(t, err)
+		assert.Nil(t, pk)
+	}
+	// Valid leaf certificate
+	cert, err := parseLeafCertFromPEM(fulcioCertBytes)
+	require.NoError(t, err)
+	assert.NotNil(t, cert)
+}
+
 func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 	fulcioCACertificates := x509.NewCertPool()
 	fulcioCABundlePEM, err := os.ReadFile("fixtures/fulcio_v1.crt.pem")
@@ -239,6 +255,11 @@ func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, pk)
 
+	// Invalid leaf certificate
+	pk, err = tr.verifyFulcioCertificateAtTime(time.Unix(1670870899, 0), []byte("not a certificate"), fulcioChainBytes)
+	assert.Error(t, err)
+	assert.Nil(t, pk)
+
 	// No intermediate certificates: verification fails as is …
 	pk, err = tr.verifyFulcioCertificateAtTime(time.Unix(1670870899, 0), fulcioCertBytes, []byte{})
 	assert.Error(t, err)
@@ -255,17 +276,6 @@ func TestFulcioTrustRootVerifyFulcioCertificateAtTime(t *testing.T) {
 	pk, err = trWithIntermediates.verifyFulcioCertificateAtTime(time.Unix(1670870899, 0), fulcioCertBytes, []byte{})
 	require.NoError(t, err)
 	assertPublicKeyMatchesCert(t, fulcioCertBytes, pk)
-
-	// Invalid leaf certificate
-	for _, c := range [][]byte{
-		[]byte("not a certificate"),
-		{},                               // Empty
-		bytes.Repeat(fulcioCertBytes, 2), // More than one certificate
-	} {
-		pk, err := tr.verifyFulcioCertificateAtTime(time.Unix(1670870899, 0), c, fulcioChainBytes)
-		assert.Error(t, err)
-		assert.Nil(t, pk)
-	}
 
 	// Unexpected relevantTime
 	for _, tm := range []time.Time{

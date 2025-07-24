@@ -18,6 +18,12 @@ type testDataScopeValidation struct {
 	errMessage string
 }
 
+type testOCIReference struct {
+	ref   string
+	image string
+	index int
+}
+
 func TestSplitReferenceIntoDirAndImageWindows(t *testing.T) {
 	tests := []testDataSplitReference{
 		{`C:\foo\bar:busybox:latest`, `C:\foo\bar`, "busybox:latest"},
@@ -59,5 +65,27 @@ func TestValidateScopeWindows(t *testing.T) {
 		} else {
 			assert.EqualError(t, err, test.errMessage, fmt.Sprintf("No error for scope '%s'", test.scope))
 		}
+	}
+}
+
+func TestParseOCIReferenceName(t *testing.T) {
+	validTests := []testOCIReference{
+		{"@0", "", 0},
+		{"notlatest@1", "notlatest@1", -1},
+	}
+	for _, test := range validTests {
+		img, idx, err := parseOCIReferenceName(test.ref)
+		assert.NoError(t, err)
+		assert.Equal(t, img, test.image)
+		assert.Equal(t, idx, test.index)
+	}
+
+	invalidTests := []string{
+		"@-5",
+		"@invalidIndex",
+	}
+	for _, test := range invalidTests {
+		_, _, err := parseOCIReferenceName(test)
+		assert.Error(t, err)
 	}
 }

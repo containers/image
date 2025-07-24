@@ -20,10 +20,10 @@ const (
 	// testImageManifestDigest is the Docker manifest digest of "image.manifest.json"
 	testImageManifestDigest = digest.Digest("sha256:20bf21ed457b390829cdbeec8795a7bea1626991fda603e0d01b4e7f60427e55")
 	testGPGHomeDirectory    = "./testdata"
-	// TestKeyFingerprint is the fingerprint of the private key in testGPGHomeDirectory.
-	testKeyFingerprint = "1D8230F6CDB6A06716E414C1DB72F2188BB46CC8"
+	// testKeyFingerprint is the fingerprint of the private key in testGPGHomeDirectory.
+	testKeyFingerprint = "08CD26E446E2E95249B7A405E932F44B23E8DD43"
 	// testKeyFingerprintWithPassphrase is the fingerprint of the private key with passphrase in testGPGHomeDirectory.
-	testKeyFingerprintWithPassphrase = "E3EB7611D815211F141946B5B0CDE60B42557346"
+	testKeyFingerprintWithPassphrase = "F2B501009F78B0B340221A12A3CD242DA6028093"
 	// testPassphrase is the passphrase for testKeyFingerprintWithPassphrase.
 	testPassphrase = "WithPassphrase123"
 )

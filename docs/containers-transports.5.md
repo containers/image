@@ -71,13 +71,14 @@ An image stored in the docker daemon's internal storage.
 The image must be specified as a _docker-reference_ or in an alternative _algo_`:`_digest_ format when being used as an image source.
 The _algo_`:`_digest_ refers to the image ID reported by docker-inspect(1).
 
-### **oci:**_path_[`:`_reference_]
+### **oci:**_path_[`:`{_reference_|`@`_source-index_}]
 
 An image in a directory structure compliant with the "Open Container Image Layout Specification" at _path_.
 
 The _path_ value terminates at the first `:` character; any further `:` characters are not separators, but a part of _reference_.
 The _reference_ is used to set, or match, the `org.opencontainers.image.ref.name` annotation in the top-level index.
-If _reference_ is not specified when reading an image, the directory must contain exactly one image.
+For reading images, @_source-index_ is a zero-based index in manifest (to access untagged images).
+If neither reference nor @_source_index is specified when reading an image, the path must contain exactly one image.
 
 ### **oci-archive:**_path_[`:`_reference_]
 
@@ -89,11 +90,6 @@ a write to an **oci-archive:** destination completely overwrites _path_, replaci
 The _path_ value terminates at the first `:` character; any further `:` characters are not separators, but a part of _reference_.
 The _reference_ is used to set, or match, the `org.opencontainers.image.ref.name` annotation in the top-level index.
 If _reference_ is not specified when reading an archive, the archive must contain exactly one image.
-
-### **ostree:**_docker-reference_[`@`_/absolute/repo/path_]
-
-An image in the local ostree(1) repository.
-_/absolute/repo/path_ defaults to `/ostree/repo`.
 
 ### **sif:**_path_
 
@@ -137,7 +133,7 @@ $ skopeo copy docker://docker.io/library/alpine:latest containers-storage:alpine
 
 ## SEE ALSO
 
-docker-login(1), docker-save(1), ostree(1), podman-login(1), skopeo-copy(1), skopeo-inspect(1), tar(1), container-registries.conf(5), containers-storage.conf(5)
+docker-login(1), docker-save(1), podman-login(1), skopeo-copy(1), skopeo-inspect(1), tar(1), container-registries.conf(5), containers-storage.conf(5)
 
 ## AUTHORS
 
