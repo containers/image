@@ -30,7 +30,7 @@ env:
     SKOPEO_PR:
 
     # Google-cloud VM Images
-    IMAGE_SUFFIX: "c20250422t130822z-f42f41d13"
+    IMAGE_SUFFIX: "c20250721t181111z-f42f41d13"
     FEDORA_CACHE_IMAGE_NAME: "fedora-${IMAGE_SUFFIX}"
 
     # Container FQIN's (include bleeding-edge development-level container deps.)
