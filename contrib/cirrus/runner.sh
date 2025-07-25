@@ -6,6 +6,8 @@
 
 set -e
 
+PODMAN_SEQUOIA_COMMIT=7dda4eaf22db19c487a6fbc01fa35838c888e0ab # FIXME: drop
+
 if [[ -r "/etc/automation_environment" ]]; then
     source /etc/automation_environment
     source $AUTOMATION_LIB_PATH/common_lib.sh
@@ -95,13 +97,24 @@ _run_image_tests() {
     msg "Setup known_hosts for root"
     ssh-keyscan localhost > /root/.ssh/known_hosts \
 
+    if [[ "$BUILDTAGS" =~ containers_image_sequoia ]]; then
+        # FIXME: All of this should be removed after libpodman_sequoia is packaged; instead, install the RPM at image build time.
+        dnf install -y rustc cargo clang-devel capnproto
+        git clone https://github.com/ueno/podman-sequoia
+        (cd podman-sequoia && git checkout $PODMAN_SEQUOIA_COMMIT)
+        chown -R $ROOTLESS_USER:$ROOTLESS_USER podman-sequoia
+        msg "Building libpodman_sequoia"
+        showrun ssh $ROOTLESS_USER@localhost "cd $GOSRC/podman-sequoia; cargo build --release"
+    fi
+
     msg "Start rekor server as $ROOTLESS_USER"
     showrun ssh $ROOTLESS_USER@localhost $GOSRC/signature/sigstore/rekor/testdata/start-rekor.sh ci
     # remove rekor server on function exit
     trap "ssh $ROOTLESS_USER@localhost $GOSRC/signature/sigstore/rekor/testdata/start-rekor.sh ci remove" RETURN
 
     msg "Executing tests as $ROOTLESS_USER"
-    showrun ssh $ROOTLESS_USER@localhost make -C $GOSRC test "BUILDTAGS='$BUILDTAGS'" "TESTFLAGS=-v" "REKOR_SERVER_URL='http://127.0.0.1:3000'"
+    showrun ssh $ROOTLESS_USER@localhost make -C $GOSRC test "BUILDTAGS='$BUILDTAGS'" "TESTFLAGS=-v" "REKOR_SERVER_URL='http://127.0.0.1:3000'" \
+        SEQUOIA_SONAME_DIR="$GOSRC/podman-sequoia/target/release"
 }
 
 req_env_vars GOSRC
