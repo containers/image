@@ -3,10 +3,11 @@
 package signature
 
 import (
-	"github.com/containers/image/v5/signature/internal/sequoia"
-	"github.com/containers/storage/pkg/homedir"
 	"os"
 	"path"
+
+	"github.com/containers/image/v5/signature/internal/sequoia"
+	"github.com/containers/storage/pkg/homedir"
 )
 
 // A GPG/OpenPGP signing mechanism, implemented using Sequoia.
@@ -108,7 +109,10 @@ func (m *sequoiaSigningMechanism) Sign(input []byte, keyIdentity string) ([]byte
 	return m.inner.Sign(input, keyIdentity)
 }
 
-// Verify parses unverifiedSignature and returns the content and the signer's identity
+// Verify parses unverifiedSignature and returns the content and the signer's identity.
+// For mechanisms created using NewEphemeralGPGSigningMechanism, the returned key identity
+// is expected to be one of the values returned by NewEphemeralGPGSigningMechanism,
+// or the mechanism should implement signingMechanismWithVerificationIdentityLookup.
 func (m *sequoiaSigningMechanism) Verify(unverifiedSignature []byte) (contents []byte, keyIdentity string, err error) {
 	return m.inner.Verify(unverifiedSignature)
 }
