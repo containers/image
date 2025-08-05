@@ -13,8 +13,11 @@ import (
 
 	"github.com/containers/image/v5/internal/imagesource/impl"
 	"github.com/containers/image/v5/internal/imagesource/stubs"
-	"github.com/containers/image/v5/internal/manifest"
+	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/signature"
+	"github.com/containers/image/v5/manifest"
+	"github.com/containers/image/v5/pkg/blobinfocache/none"
 	"github.com/containers/image/v5/pkg/tlsclientconfig"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/fileutils"
@@ -245,4 +248,55 @@ func GetLocalBlobPath(ctx context.Context, src types.ImageSource, digest digest.
 	}
 
 	return path, nil
+}
+
+func (s *ociImageSource) GetSignaturesWithFormat(ctx context.Context, instanceDigest *digest.Digest) ([]signature.Signature, error) {
+	if instanceDigest == nil {
+		if s.descriptor.Digest == "" {
+			return nil, errors.New("unknown manifest digest, can't add signatures")
+		}
+		instanceDigest = &s.descriptor.Digest
+	}
+	signTag, err := sigstoreAttachmentTag(*instanceDigest)
+	if err != nil {
+		return nil, err
+	}
+
+	var signDigest *digest.Digest
+	for _, m := range s.index.Manifests {
+		if m.Annotations[imgspecv1.AnnotationRefName] == signTag {
+			signDigest = &m.Digest
+			break
+		}
+	}
+	if signDigest == nil {
+		return nil, errors.New("no signature found for image")
+	}
+	signBlob, _, err := s.GetManifest(ctx, signDigest)
+	if err != nil {
+		return nil, err
+	}
+	ociManifest, err := manifest.OCI1FromManifest(signBlob)
+	if err != nil {
+		return nil, err
+	}
+
+	signatures := make([]signature.Signature, 0, len(ociManifest.Layers))
+	for _, layer := range ociManifest.Layers {
+		layerBlob, _, err := s.GetBlob(ctx, types.BlobInfo{Digest: layer.Digest}, none.NoCache)
+		if err != nil {
+			return nil, err
+		}
+		defer layerBlob.Close()
+		payload, err := iolimits.ReadAtMost(layerBlob, iolimits.MaxSignatureBodySize)
+		if err != nil {
+			return nil, fmt.Errorf("reading blob %s in %s: %w", layer.Digest.String(), signTag, err)
+		}
+		actualDigest := layer.Digest.Algorithm().FromBytes(payload)
+		if actualDigest != layer.Digest {
+			return nil, fmt.Errorf("digest mismatch, expected %q, got %q", layer.Digest.String(), actualDigest.String())
+		}
+		signatures = append(signatures, signature.SigstoreFromComponents(layer.MediaType, payload, layer.Annotations))
+	}
+	return signatures, nil
 }
