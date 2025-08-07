@@ -1,4 +1,4 @@
-//go:build !containers_image_openpgp
+//go:build !containers_image_openpgp && !containers_image_sequoia
 
 package signature
 
@@ -20,6 +20,8 @@ func TestMain(m *testing.M) {
 	}
 	os.Exit(code)
 }
+
+var _ signingMechanismWithVerificationIdentityLookup = &gpgmeSigningMechanism{}
 
 func TestGPGMESigningMechanismClose(t *testing.T) {
 	// Closing an ephemeral mechanism removes the directory.
