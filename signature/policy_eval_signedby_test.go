@@ -277,4 +277,11 @@ func TestPRSignedByIsRunningImageAllowed(t *testing.T) {
 	require.NoError(t, err)
 	allowed, err = pr.isRunningImageAllowed(context.Background(), image)
 	assertRunningRejectedPolicyRequirement(t, allowed, err)
+
+	// A valid signature using a subkey
+	image = dirImageMock(t, "fixtures/dir-img-valid-subkey", "testing/manifest:latest")
+	pr, err = NewPRSignedByKeyPath(ktGPG, "fixtures/public-key-with-subkey.gpg", prm)
+	require.NoError(t, err)
+	allowed, err = pr.isRunningImageAllowed(context.Background(), image)
+	assertRunningAllowed(t, allowed, err)
 }
