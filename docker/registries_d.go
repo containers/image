@@ -17,7 +17,7 @@ import (
 	"github.com/containers/storage/pkg/homedir"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // systemRegistriesDirPath is the path to registries.d, used for locating lookaside Docker signature storage.
