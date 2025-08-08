@@ -27,7 +27,9 @@ type SigningMechanism interface {
 	// Sign creates a (non-detached) signature of input using keyIdentity.
 	// Fails with a SigningNotSupportedError if the mechanism does not support signing.
 	Sign(input []byte, keyIdentity string) ([]byte, error)
-	// Verify parses unverifiedSignature and returns the content and the signer's identity
+	// Verify parses unverifiedSignature and returns the content and the signer's identity.
+	// For GPG signatures, the signer's identity is the fingerprint of the key or subkey
+	// that created the signature, not necessarily the primary key fingerprint.
 	Verify(unverifiedSignature []byte) (contents []byte, keyIdentity string, err error)
 	// UntrustedSignatureContents returns UNTRUSTED contents of the signature WITHOUT ANY VERIFICATION,
 	// along with a short identifier of the key used for signing.
