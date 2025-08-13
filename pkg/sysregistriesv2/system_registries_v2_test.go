@@ -240,8 +240,9 @@ func TestNewConfigWrapper(t *testing.T) {
 	const variableReference = "$HOME"
 	const rootPrefix = "/root/prefix"
 	tempHome := t.TempDir()
-	var userRegistriesFile = filepath.FromSlash(".config/containers/registries.conf")
-	userRegistriesFilePath := filepath.Join(tempHome, userRegistriesFile)
+	var userRegistriesFile = filepath.FromSlash("containers/registries.conf")
+	configHome := filepath.Join(tempHome, ".config")
+	userRegistriesFilePath := filepath.Join(configHome, userRegistriesFile)
 
 	for _, c := range []struct {
 		sys             *types.SystemContext
@@ -294,7 +295,7 @@ func TestNewConfigWrapper(t *testing.T) {
 		} else {
 			os.Remove(userRegistriesFilePath)
 		}
-		path := newConfigWrapperWithHomeDir(c.sys, tempHome).configPath
+		path := newConfigWrapperWithConfigHome(c.sys, configHome).configPath
 		assert.Equal(t, c.expected, path)
 	}
 }
