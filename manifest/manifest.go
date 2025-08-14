@@ -27,6 +27,7 @@ const (
 	// DockerV2SchemaLayerMediaTypeUncompressed is the mediaType used for uncompressed layers.
 	DockerV2SchemaLayerMediaTypeUncompressed = manifest.DockerV2SchemaLayerMediaTypeUncompressed
 	// DockerV2SchemaLayerMediaTypeZstd is the mediaType used for zstd layers.
+	// Warning: This mediaType is not officially supported in https://github.com/distribution/distribution/blob/main/docs/content/spec/manifest-v2-2.md but some images may exhibit it. Support is partial.
 	DockerV2SchemaLayerMediaTypeZstd = manifest.DockerV2SchemaLayerMediaTypeZstd
 	// DockerV2ListMediaType MIME type represents Docker manifest schema 2 list
 	DockerV2ListMediaType = manifest.DockerV2ListMediaType
