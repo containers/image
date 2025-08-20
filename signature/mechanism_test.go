@@ -1,11 +1,12 @@
 package signature
 
-// These tests are expected to pass unmodified for _both_ mechanism_gpgme.go and mechanism_openpgp.go.
+// These tests are expected to pass unmodified for _all_ of mechanism_sequoia.go, mechanism_gpgme.go, and mechanism_openpgp.go.
 
 import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -135,6 +136,29 @@ func TestNewEphemeralGPGSigningMechanism(t *testing.T) {
 		assert.Equal(t, TestKeyFingerprint, signingFingerprint, version)
 	}
 
+	// Import of a key with a subkey
+	for _, c := range []struct {
+		fixtureName         string
+		expectedKeyIdentity string
+	}{
+		{
+			fixtureName:         "public-key-with-subkey.gpg",
+			expectedKeyIdentity: TestKeyFingerprintPrimaryWithSubkey,
+		},
+		{
+			fixtureName:         "public-key-with-revoked-subkey.gpg",
+			expectedKeyIdentity: TestKeyFingerprintPrimaryWithRevokedSubkey,
+		},
+	} {
+		keyBlob, err := os.ReadFile(filepath.Join("fixtures", c.fixtureName))
+		require.NoError(t, err)
+		mech, keyIdentities, err := NewEphemeralGPGSigningMechanism(keyBlob)
+		require.NoError(t, err)
+		defer mech.Close()
+		// The primary key’s fingerprint should be returned, not any subkey.
+		assert.Equal(t, []string{c.expectedKeyIdentity}, keyIdentities)
+	}
+
 	// Two keys in a keyring: Read the binary-format pubring.gpg, and concatenate it twice.
 	// (Using two copies of public-key.gpg, in the ASCII-armored format, works with
 	// gpgmeSigningMechanism but not openpgpSigningMechanism.)
@@ -143,7 +167,8 @@ func TestNewEphemeralGPGSigningMechanism(t *testing.T) {
 	mech, keyIdentities, err = NewEphemeralGPGSigningMechanism(bytes.Join([][]byte{keyBlob, keyBlob}, nil))
 	require.NoError(t, err)
 	defer mech.Close()
-	assert.Equal(t, []string{TestKeyFingerprintWithPassphrase, TestKeyFingerprint, TestKeyFingerprintWithPassphrase, TestKeyFingerprint}, keyIdentities)
+	expected := []string{TestKeyFingerprintWithPassphrase, TestKeyFingerprint, TestKeyFingerprintPrimaryWithSubkey, TestKeyFingerprintPrimaryWithRevokedSubkey}
+	assert.Equal(t, slices.Concat(expected, expected), keyIdentities)
 
 	// Two keys from two blobs:
 	keyBlob1, err := os.ReadFile("./fixtures/public-key-1.gpg")
@@ -222,18 +247,56 @@ func TestGPGSigningMechanismVerify(t *testing.T) {
 		assert.Equal(t, []byte("This is not JSON\n"), content, variant)
 		assert.Equal(t, TestKeyFingerprint, signingFingerprint, variant)
 	}
+	// Successful verification of a signature using a subkey
+	signatures = fixtureVariants(t, "./fixtures/subkey.signature")
+	for variant, signature := range signatures {
+		content, signingFingerprint, err := mech.Verify(signature)
+		require.NoError(t, err, variant)
+		assert.Equal(t, []byte(`{"critical":{"identity":{"docker-reference":"testing/manifest:latest"},"image":{"docker-manifest-digest":"sha256:20bf21ed457b390829cdbeec8795a7bea1626991fda603e0d01b4e7f60427e55"},"type":"atomic container signature"},"optional":{}}`), content, variant)
+		if signingFingerprint != TestKeyFingerprintPrimaryWithSubkey {
+			assert.Equal(t, TestKeyFingerprintSubkeyWithSubkey, signingFingerprint, variant)
+			withLookup, ok := mech.(signingMechanismWithVerificationIdentityLookup)
+			require.True(t, ok, variant)
+
+			primaryKey, err := withLookup.keyIdentityForVerificationKeyIdentity(signingFingerprint)
+			require.NoError(t, err, variant)
+			signingFingerprint = primaryKey
+		}
+		assert.Equal(t, TestKeyFingerprintPrimaryWithSubkey, signingFingerprint, variant)
+	}
+	// Successful verification of a signature created using a Sequoia-PGP key with the default parameters / composition.
+	sequoiaPubKey, err := os.ReadFile("./fixtures/sequoia.pub")
+	require.NoError(t, err)
+	// FIXME: Just use testGPGHomeDirectory? And then we could reuse the subkey check above.
+	mech2, sequoiaIdentities, err := NewEphemeralGPGSigningMechanism(sequoiaPubKey)
+	require.NoError(t, err)
+	defer mech2.Close()
+	assert.Equal(t, []string{"50DDE898DF4E48755C8C2B7AF6F908B6FA48A229"}, sequoiaIdentities)
+	signature, err := os.ReadFile("./fixtures/sequoia.signature")
+	require.NoError(t, err)
+	content, signingFingerprint, err := mech2.Verify(signature)
+	require.NoError(t, err)
+	if !slices.Contains(sequoiaIdentities, signingFingerprint) {
+		if withLookup, ok := mech2.(signingMechanismWithVerificationIdentityLookup); ok {
+			primaryKey, err := withLookup.keyIdentityForVerificationKeyIdentity(signingFingerprint)
+			require.NoError(t, err)
+			signingFingerprint = primaryKey
+		}
+	}
+	assert.Contains(t, sequoiaIdentities, signingFingerprint) // This matches the requirement in prSignedBy.isSignatureAuthorAccepted
+	assert.Equal(t, []byte(`{"critical":{"identity":{"docker-reference":"example.com/testing/manifest:notlatest"},"image":{"docker-manifest-digest":"sha256:20bf21ed457b390829cdbeec8795a7bea1626991fda603e0d01b4e7f60427e55"},"type":"atomic container signature"},"optional":{"creator":"atomic 5.37.0-dev","timestamp":1753112968}}`), content)
 
 	// For extra paranoia, test that we return nil data on error.
 
 	// Completely invalid signature.
-	content, signingFingerprint, err := mech.Verify([]byte{})
+	content, signingFingerprint, err = mech.Verify([]byte{})
 	assertSigningError(t, content, signingFingerprint, err)
 
 	content, signingFingerprint, err = mech.Verify([]byte("invalid signature"))
 	assertSigningError(t, content, signingFingerprint, err)
 
 	// Literal packet, not a signature
-	signature, err := os.ReadFile("./fixtures/unsigned-literal.signature") // Not fixtureVariants, the “literal data” packet does not have V3/V4 versions.
+	signature, err = os.ReadFile("./fixtures/unsigned-literal.signature") // Not fixtureVariants, the “literal data” packet does not have V3/V4 versions.
 	require.NoError(t, err)
 	content, signingFingerprint, err = mech.Verify(signature)
 	assertSigningError(t, content, signingFingerprint, err)
@@ -266,7 +329,56 @@ func TestGPGSigningMechanismVerify(t *testing.T) {
 		assertSigningError(t, content, signingFingerprint, err, version)
 	}
 
+	// Valid signature with a revoked subkey
+	signatures = fixtureVariants(t, "./fixtures/subkey-revoked.signature")
+	for version, signature := range signatures {
+		content, signingFingerprint, err := mech.Verify(signature)
+		assertSigningError(t, content, signingFingerprint, err, version)
+	}
+
 	// The various GPG/GPGME failures cases are not obviously easy to reach.
+}
+
+func TestGPGSigningMechanismKeyIdentityForVerificationKeyIdentity(t *testing.T) {
+	mech_, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
+	require.NoError(t, err)
+	defer mech_.Close()
+	mech, ok := mech_.(signingMechanismWithVerificationIdentityLookup)
+	if !ok {
+		t.Skip("SigningMechanism does not implement signingMechanismWithVerificationIdentityLookup")
+	}
+
+	// Success
+	for _, c := range []struct {
+		primary, subkey string
+	}{
+		{
+			primary: TestKeyFingerprintPrimaryWithSubkey,
+			subkey:  TestKeyFingerprintSubkeyWithSubkey,
+		},
+		{
+			primary: TestKeyFingerprintPrimaryWithRevokedSubkey,
+			subkey:  TestKeyFingerprintSubkeyWithRevokedSubkey,
+		},
+	} {
+		// Primary fingerprint is mapped to itself.
+		res, err := mech.keyIdentityForVerificationKeyIdentity(c.primary)
+		require.NoError(t, err)
+		assert.Equal(t, c.primary, res)
+
+		// Subkey fingerprint is mapped to the primary fingerprint.
+		res, err = mech.keyIdentityForVerificationKeyIdentity(c.subkey)
+		require.NoError(t, err)
+		assert.Equal(t, c.primary, res)
+	}
+	// A no-subkey key is mapped to itself.
+	res, err := mech.keyIdentityForVerificationKeyIdentity(TestKeyFingerprint)
+	require.NoError(t, err)
+	assert.Equal(t, TestKeyFingerprint, res)
+
+	// Key identity not found
+	_, err = mech.keyIdentityForVerificationKeyIdentity("unexpected fingerprint")
+	assert.Error(t, err)
 }
 
 func TestGPGSigningMechanismUntrustedSignatureContents(t *testing.T) {
@@ -282,6 +394,12 @@ func TestGPGSigningMechanismUntrustedSignatureContents(t *testing.T) {
 		assert.Equal(t, []byte("This is not JSON\n"), content, version)
 		assert.Equal(t, TestKeyShortID, shortKeyID, version)
 	}
+	signature, err := os.ReadFile("./fixtures/sequoia.signature")
+	require.NoError(t, err)
+	content, shortKeyID, err := mech.UntrustedSignatureContents(signature)
+	require.NoError(t, err)
+	assert.Equal(t, []byte(`{"critical":{"identity":{"docker-reference":"example.com/testing/manifest:notlatest"},"image":{"docker-manifest-digest":"sha256:20bf21ed457b390829cdbeec8795a7bea1626991fda603e0d01b4e7f60427e55"},"type":"atomic container signature"},"optional":{"creator":"atomic 5.37.0-dev","timestamp":1753112968}}`), content)
+	assert.Equal(t, "7ADD16BD41D829B6", shortKeyID) // This is a subkey ID, we don’t generally have the primary public key so we can’t map it even if we wanted to.
 
 	// Completely invalid signature.
 	_, _, err = mech.UntrustedSignatureContents([]byte{})
@@ -291,7 +409,7 @@ func TestGPGSigningMechanismUntrustedSignatureContents(t *testing.T) {
 	assert.Error(t, err)
 
 	// Literal packet, not a signature
-	signature, err := os.ReadFile("./fixtures/unsigned-literal.signature") // Not fixtureVariants, the “literal data” packet does not have V3/V4 versions.
+	signature, err = os.ReadFile("./fixtures/unsigned-literal.signature") // Not fixtureVariants, the “literal data” packet does not have V3/V4 versions.
 	require.NoError(t, err)
 	_, _, err = mech.UntrustedSignatureContents(signature)
 	assert.Error(t, err)
@@ -305,7 +423,7 @@ func TestGPGSigningMechanismUntrustedSignatureContents(t *testing.T) {
 	// Expired signature
 	signature, err = os.ReadFile("./fixtures/expired.signature") // Not fixtureVariants, V3 signature packets don’t support expiration.
 	require.NoError(t, err)
-	content, shortKeyID, err := mech.UntrustedSignatureContents(signature)
+	content, shortKeyID, err = mech.UntrustedSignatureContents(signature)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("This signature is expired.\n"), content)
 	assert.Equal(t, TestKeyShortID, shortKeyID)
