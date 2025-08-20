@@ -236,13 +236,8 @@ func TestSign(t *testing.T) {
 	signature, err := sig.sign(mech, TestKeyFingerprint, "")
 	require.NoError(t, err)
 
-	verified, err := verifyAndExtractSignature(mech, signature, signatureAcceptanceRules{
-		validateKeyIdentity: func(keyIdentity string) error {
-			if keyIdentity != TestKeyFingerprint {
-				return errors.New("Unexpected keyIdentity")
-			}
-			return nil
-		},
+	verified, keyIdentity, err := verifyAndExtractSignature(mech, signature, signatureAcceptanceRules{
+		acceptedKeyIdentities: []string{TestKeyFingerprint},
 		validateSignedDockerReference: func(signedDockerReference string) error {
 			if signedDockerReference != sig.untrustedDockerReference {
 				return errors.New("Unexpected signedDockerReference")
@@ -257,9 +252,9 @@ func TestSign(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-
 	assert.Equal(t, sig.untrustedDockerManifestDigest, verified.DockerManifestDigest)
 	assert.Equal(t, sig.untrustedDockerReference, verified.DockerReference)
+	assert.Equal(t, TestKeyFingerprint, keyIdentity)
 
 	// Error creating blob to sign
 	_, err = untrustedSignature{}.sign(mech, TestKeyFingerprint, "")
@@ -275,108 +270,146 @@ func TestVerifyAndExtractSignature(t *testing.T) {
 	require.NoError(t, err)
 	defer mech.Close()
 
-	type triple struct {
-		keyIdentity                string
+	type tuple struct {
 		signedDockerReference      string
 		signedDockerManifestDigest digest.Digest
 	}
-	var wanted, recorded triple
-	// recordingRules are a plausible signatureAcceptanceRules implementations, but equally
-	// importantly record that we are passing the correct values to the rule callbacks.
-	recordingRules := signatureAcceptanceRules{
-		validateKeyIdentity: func(keyIdentity string) error {
-			recorded.keyIdentity = keyIdentity
-			if keyIdentity != wanted.keyIdentity {
-				return errors.New("keyIdentity mismatch")
-			}
-			return nil
-		},
-		validateSignedDockerReference: func(signedDockerReference string) error {
-			recorded.signedDockerReference = signedDockerReference
-			if signedDockerReference != wanted.signedDockerReference {
-				return errors.New("signedDockerReference mismatch")
-			}
-			return nil
-		},
-		validateSignedDockerManifestDigest: func(signedDockerManifestDigest digest.Digest) error {
-			recorded.signedDockerManifestDigest = signedDockerManifestDigest
-			if signedDockerManifestDigest != wanted.signedDockerManifestDigest {
-				return errors.New("signedDockerManifestDigest mismatch")
-			}
-			return nil
-		},
+	// setupRecording returns a signatureAcceptanceRules implementations for wanted, which also
+	// records the values passed to rule callbacks into the returned triple, to validate
+	// that we are passing the correct values to the rule callbacks.
+	setupRecording := func(wanted tuple, acceptedKeyIdentities ...string) (*tuple, signatureAcceptanceRules) {
+		recorded := tuple{}
+		return &recorded, signatureAcceptanceRules{
+			acceptedKeyIdentities: acceptedKeyIdentities,
+			validateSignedDockerReference: func(signedDockerReference string) error {
+				recorded.signedDockerReference = signedDockerReference
+				if signedDockerReference != wanted.signedDockerReference {
+					return errors.New("signedDockerReference mismatch")
+				}
+				return nil
+			},
+			validateSignedDockerManifestDigest: func(signedDockerManifestDigest digest.Digest) error {
+				recorded.signedDockerManifestDigest = signedDockerManifestDigest
+				if signedDockerManifestDigest != wanted.signedDockerManifestDigest {
+					return errors.New("signedDockerManifestDigest mismatch")
+				}
+				return nil
+			},
+		}
 	}
 
 	signature, err := os.ReadFile("./fixtures/image.signature")
 	require.NoError(t, err)
-	signatureData := triple{
-		keyIdentity:                TestKeyFingerprint,
+	signatureData := tuple{
 		signedDockerReference:      TestImageSignatureReference,
 		signedDockerManifestDigest: TestImageManifestDigest,
 	}
 
 	// Successful verification
-	wanted = signatureData
-	recorded = triple{}
-	sig, err := verifyAndExtractSignature(mech, signature, recordingRules)
+	for _, acceptedIdentities := range [][]string{
+		{TestKeyFingerprint},
+		{TestKeyFingerprint, "some other fingerprint"},
+		{"some other fingerprint", TestKeyFingerprint},
+	} {
+		recorded, recordingRules := setupRecording(signatureData, acceptedIdentities...)
+		sig, keyIdentity, err := verifyAndExtractSignature(mech, signature, recordingRules)
+		require.NoError(t, err)
+		assert.Equal(t, TestImageSignatureReference, sig.DockerReference)
+		assert.Equal(t, TestImageManifestDigest, sig.DockerManifestDigest)
+		assert.Equal(t, TestKeyFingerprint, keyIdentity)
+		assert.Equal(t, signatureData, *recorded)
+	}
+	// Successful verification using a subkey
+	sig2, err := os.ReadFile("./fixtures/subkey.signature")
 	require.NoError(t, err)
-	assert.Equal(t, TestImageSignatureReference, sig.DockerReference)
-	assert.Equal(t, TestImageManifestDigest, sig.DockerManifestDigest)
-	assert.Equal(t, signatureData, recorded)
+	sig2Data := tuple{
+		signedDockerReference:      "testing/manifest:latest",
+		signedDockerManifestDigest: TestImageManifestDigest,
+	}
+	recorded, recordingRules := setupRecording(sig2Data, TestKeyFingerprintPrimaryWithSubkey)
+	sig, keyIdentity, err := verifyAndExtractSignature(mech, sig2, recordingRules)
+	require.NoError(t, err)
+	assert.Equal(t, sig2Data.signedDockerReference, sig.DockerReference)
+	assert.Equal(t, sig2Data.signedDockerManifestDigest, sig.DockerManifestDigest)
+	assert.Equal(t, TestKeyFingerprintPrimaryWithSubkey, keyIdentity)
+	assert.Equal(t, sig2Data, *recorded)
 
-	// For extra paranoia, test that we return a nil signature object on error.
+	// For extra paranoia, test that we return a nil signature object and a "" key identity on error.
 
 	// Completely invalid signature.
-	recorded = triple{}
-	sig, err = verifyAndExtractSignature(mech, []byte{}, recordingRules)
+	recorded, recordingRules = setupRecording(signatureData, TestKeyFingerprint)
+	sig, keyIdentity, err = verifyAndExtractSignature(mech, []byte{}, recordingRules)
 	assert.Error(t, err)
 	assert.Nil(t, sig)
-	assert.Equal(t, triple{}, recorded)
+	assert.Equal(t, "", keyIdentity)
+	assert.Equal(t, tuple{}, *recorded)
 
-	recorded = triple{}
-	sig, err = verifyAndExtractSignature(mech, []byte("invalid signature"), recordingRules)
+	recorded, recordingRules = setupRecording(signatureData, TestKeyFingerprint)
+	sig, keyIdentity, err = verifyAndExtractSignature(mech, []byte("invalid signature"), recordingRules)
 	assert.Error(t, err)
 	assert.Nil(t, sig)
-	assert.Equal(t, triple{}, recorded)
+	assert.Equal(t, "", keyIdentity)
+	assert.Equal(t, tuple{}, *recorded)
 
-	// Valid signature of non-JSON: asked for keyIdentity, only
+	// No key accepted.
+	recorded, recordingRules = setupRecording(signatureData /*,  nothing */)
+	sig, keyIdentity, err = verifyAndExtractSignature(mech, signature, recordingRules)
+	assert.Error(t, err)
+	assert.Nil(t, sig)
+	assert.Equal(t, "", keyIdentity)
+	assert.Equal(t, tuple{}, *recorded)
+
+	// Valid signature with a revoked subkey
+	sig2, err = os.ReadFile("./fixtures/subkey-revoked.signature")
+	require.NoError(t, err)
+	recorded, recordingRules = setupRecording(sig2Data, TestKeyFingerprintPrimaryWithRevokedSubkey) // sig2Data describes subkey-revoked.signature as well.
+	sig, keyIdentity, err = verifyAndExtractSignature(mech, sig2, recordingRules)
+	assert.Error(t, err)
+	assert.Nil(t, sig)
+	assert.Equal(t, "", keyIdentity)
+	assert.Equal(t, tuple{}, *recorded)
+
+	// Valid signature of non-JSON: used acceptedKeyIdentities only
 	invalidBlobSignature, err := os.ReadFile("./fixtures/invalid-blob.signature")
 	require.NoError(t, err)
-	recorded = triple{}
-	sig, err = verifyAndExtractSignature(mech, invalidBlobSignature, recordingRules)
+	recorded, recordingRules = setupRecording(signatureData, TestKeyFingerprint)
+	sig, keyIdentity, err = verifyAndExtractSignature(mech, invalidBlobSignature, recordingRules)
 	assert.Error(t, err)
 	assert.Nil(t, sig)
-	assert.Equal(t, triple{keyIdentity: signatureData.keyIdentity}, recorded)
+	assert.Equal(t, "", keyIdentity)
+	assert.Equal(t, tuple{}, *recorded)
 
-	// Valid signature with a wrong key: asked for keyIdentity, only
-	wanted = signatureData
-	wanted.keyIdentity = "unexpected fingerprint"
-	recorded = triple{}
-	sig, err = verifyAndExtractSignature(mech, signature, recordingRules)
+	// Valid signature with a wrong key: used acceptedKeyIdentities only
+	recorded, recordingRules = setupRecording(signatureData, "unexpected fingerprint")
+	sig, keyIdentity, err = verifyAndExtractSignature(mech, signature, recordingRules)
 	assert.Error(t, err)
 	assert.Nil(t, sig)
-	assert.Equal(t, triple{keyIdentity: signatureData.keyIdentity}, recorded)
+	assert.Equal(t, "", keyIdentity)
+	assert.Equal(t, tuple{}, *recorded)
 
-	// Valid signature with a wrong manifest digest: asked for keyIdentity and signedDockerManifestDigest
-	wanted = signatureData
-	wanted.signedDockerManifestDigest = "invalid digest"
-	recorded = triple{}
-	sig, err = verifyAndExtractSignature(mech, signature, recordingRules)
+	// Valid signature with a wrong manifest digest: used acceptedKeyIdentities, asked for signedDockerManifestDigest only
+	recorded, recordingRules = setupRecording(tuple{
+		signedDockerReference:      signatureData.signedDockerReference,
+		signedDockerManifestDigest: "invalid digest",
+	}, TestKeyFingerprint)
+	sig, keyIdentity, err = verifyAndExtractSignature(mech, signature, recordingRules)
 	assert.Error(t, err)
 	assert.Nil(t, sig)
-	assert.Equal(t, triple{
-		keyIdentity:                signatureData.keyIdentity,
+	assert.Equal(t, "", keyIdentity)
+	assert.Equal(t, tuple{
 		signedDockerManifestDigest: signatureData.signedDockerManifestDigest,
-	}, recorded)
+	}, *recorded)
 
 	// Valid signature with a wrong image reference
-	wanted = signatureData
-	wanted.signedDockerReference = "unexpected docker reference"
-	recorded = triple{}
-	sig, err = verifyAndExtractSignature(mech, signature, recordingRules)
+	recorded, recordingRules = setupRecording(tuple{
+		signedDockerReference:      "unexpected docker reference",
+		signedDockerManifestDigest: signatureData.signedDockerManifestDigest,
+	}, TestKeyFingerprint)
+	sig, keyIdentity, err = verifyAndExtractSignature(mech, signature, recordingRules)
 	assert.Error(t, err)
 	assert.Nil(t, sig)
-	assert.Equal(t, signatureData, recorded)
+	assert.Equal(t, "", keyIdentity)
+	assert.Equal(t, signatureData, *recorded)
 }
 
 func TestGetUntrustedSignatureInformationWithoutVerifying(t *testing.T) {

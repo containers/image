@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -135,6 +136,29 @@ func TestNewEphemeralGPGSigningMechanism(t *testing.T) {
 		assert.Equal(t, TestKeyFingerprint, signingFingerprint, version)
 	}
 
+	// Import of a key with a subkey
+	for _, c := range []struct {
+		fixtureName         string
+		expectedKeyIdentity string
+	}{
+		{
+			fixtureName:         "public-key-with-subkey.gpg",
+			expectedKeyIdentity: TestKeyFingerprintPrimaryWithSubkey,
+		},
+		{
+			fixtureName:         "public-key-with-revoked-subkey.gpg",
+			expectedKeyIdentity: TestKeyFingerprintPrimaryWithRevokedSubkey,
+		},
+	} {
+		keyBlob, err := os.ReadFile(filepath.Join("fixtures", c.fixtureName))
+		require.NoError(t, err)
+		mech, keyIdentities, err := NewEphemeralGPGSigningMechanism(keyBlob)
+		require.NoError(t, err)
+		defer mech.Close()
+		// The primary key’s fingerprint should be returned, not any subkey.
+		assert.Equal(t, []string{c.expectedKeyIdentity}, keyIdentities)
+	}
+
 	// Two keys in a keyring: Read the binary-format pubring.gpg, and concatenate it twice.
 	// (Using two copies of public-key.gpg, in the ASCII-armored format, works with
 	// gpgmeSigningMechanism but not openpgpSigningMechanism.)
@@ -143,7 +167,8 @@ func TestNewEphemeralGPGSigningMechanism(t *testing.T) {
 	mech, keyIdentities, err = NewEphemeralGPGSigningMechanism(bytes.Join([][]byte{keyBlob, keyBlob}, nil))
 	require.NoError(t, err)
 	defer mech.Close()
-	assert.Equal(t, []string{TestKeyFingerprintWithPassphrase, TestKeyFingerprint, TestKeyFingerprintWithPassphrase, TestKeyFingerprint}, keyIdentities)
+	expected := []string{TestKeyFingerprintWithPassphrase, TestKeyFingerprint, TestKeyFingerprintPrimaryWithSubkey, TestKeyFingerprintPrimaryWithRevokedSubkey}
+	assert.Equal(t, slices.Concat(expected, expected), keyIdentities)
 
 	// Two keys from two blobs:
 	keyBlob1, err := os.ReadFile("./fixtures/public-key-1.gpg")
@@ -222,6 +247,23 @@ func TestGPGSigningMechanismVerify(t *testing.T) {
 		assert.Equal(t, []byte("This is not JSON\n"), content, variant)
 		assert.Equal(t, TestKeyFingerprint, signingFingerprint, variant)
 	}
+	// Successful verification of a signature using a subkey
+	signatures = fixtureVariants(t, "./fixtures/subkey.signature")
+	for variant, signature := range signatures {
+		content, signingFingerprint, err := mech.Verify(signature)
+		require.NoError(t, err, variant)
+		assert.Equal(t, []byte(`{"critical":{"identity":{"docker-reference":"testing/manifest:latest"},"image":{"docker-manifest-digest":"sha256:20bf21ed457b390829cdbeec8795a7bea1626991fda603e0d01b4e7f60427e55"},"type":"atomic container signature"},"optional":{}}`), content, variant)
+		if signingFingerprint != TestKeyFingerprintPrimaryWithSubkey {
+			assert.Equal(t, TestKeyFingerprintSubkeyWithSubkey, signingFingerprint, variant)
+			withLookup, ok := mech.(signingMechanismWithVerificationIdentityLookup)
+			require.True(t, ok, variant)
+
+			primaryKey, err := withLookup.keyIdentityForVerificationKeyIdentity(signingFingerprint)
+			require.NoError(t, err, variant)
+			signingFingerprint = primaryKey
+		}
+		assert.Equal(t, TestKeyFingerprintPrimaryWithSubkey, signingFingerprint, variant)
+	}
 
 	// For extra paranoia, test that we return nil data on error.
 
@@ -266,7 +308,56 @@ func TestGPGSigningMechanismVerify(t *testing.T) {
 		assertSigningError(t, content, signingFingerprint, err, version)
 	}
 
+	// Valid signature with a revoked subkey
+	signatures = fixtureVariants(t, "./fixtures/subkey-revoked.signature")
+	for version, signature := range signatures {
+		content, signingFingerprint, err := mech.Verify(signature)
+		assertSigningError(t, content, signingFingerprint, err, version)
+	}
+
 	// The various GPG/GPGME failures cases are not obviously easy to reach.
+}
+
+func TestGPGSigningMechanismKeyIdentityForVerificationKeyIdentity(t *testing.T) {
+	mech_, err := newGPGSigningMechanismInDirectory(testGPGHomeDirectory)
+	require.NoError(t, err)
+	defer mech_.Close()
+	mech, ok := mech_.(signingMechanismWithVerificationIdentityLookup)
+	if !ok {
+		t.Skip("SigningMechanism does not implement signingMechanismWithVerificationIdentityLookup")
+	}
+
+	// Success
+	for _, c := range []struct {
+		primary, subkey string
+	}{
+		{
+			primary: TestKeyFingerprintPrimaryWithSubkey,
+			subkey:  TestKeyFingerprintSubkeyWithSubkey,
+		},
+		{
+			primary: TestKeyFingerprintPrimaryWithRevokedSubkey,
+			subkey:  TestKeyFingerprintSubkeyWithRevokedSubkey,
+		},
+	} {
+		// Primary fingerprint is mapped to itself.
+		res, err := mech.keyIdentityForVerificationKeyIdentity(c.primary)
+		require.NoError(t, err)
+		assert.Equal(t, c.primary, res)
+
+		// Subkey fingerprint is mapped to the primary fingerprint.
+		res, err = mech.keyIdentityForVerificationKeyIdentity(c.subkey)
+		require.NoError(t, err)
+		assert.Equal(t, c.primary, res)
+	}
+	// A no-subkey key is mapped to itself.
+	res, err := mech.keyIdentityForVerificationKeyIdentity(TestKeyFingerprint)
+	require.NoError(t, err)
+	assert.Equal(t, TestKeyFingerprint, res)
+
+	// Key identity not found
+	_, err = mech.keyIdentityForVerificationKeyIdentity("unexpected fingerprint")
+	assert.Error(t, err)
 }
 
 func TestGPGSigningMechanismUntrustedSignatureContents(t *testing.T) {
