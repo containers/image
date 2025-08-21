@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/containers/image/v5/internal/private"
+	"github.com/containers/image/v5/internal/signature"
 	"github.com/containers/image/v5/pkg/blobinfocache/memory"
 	"github.com/containers/image/v5/types"
 	digest "github.com/opencontainers/go-digest"
@@ -215,4 +216,90 @@ func TestPutblobFromLocalFile(t *testing.T) {
 
 	err = ociDest.CommitWithOptions(context.Background(), private.CommitOptions{})
 	require.NoError(t, err)
+}
+
+// TestPutSignaturesWithFormat tests that sigstore signatures are properly stored in OCI layout
+func TestPutSignaturesWithFormat(t *testing.T) {
+	ref, tmpDir := refToTempOCI(t, false)
+	ociRef, ok := ref.(ociReference)
+	require.True(t, ok)
+	putTestManifest(t, ociRef, tmpDir)
+
+	dest, err := ref.NewImageDestination(context.Background(), nil)
+	require.NoError(t, err)
+	defer dest.Close()
+	ociDest, ok := dest.(*ociImageDestination)
+	require.True(t, ok)
+
+	desc, _, err := ociDest.ref.getManifestDescriptor()
+	require.NoError(t, err)
+	require.NotNil(t, desc)
+
+	sigstoreSign := signature.SigstoreFromComponents(
+		"application/vnd.dev.cosign.simplesigning.v1+json",
+		[]byte("test-payload"),
+		map[string]string{"dev.cosignproject.cosign/signature": "test-signature"},
+	)
+
+	err = ociDest.PutSignaturesWithFormat(context.Background(), []signature.Signature{sigstoreSign}, &desc.Digest)
+	require.NoError(t, err)
+
+	err = ociDest.Commit(context.Background(), nil)
+	require.NoError(t, err)
+
+	src, err := ref.NewImageSource(context.Background(), nil)
+	require.NoError(t, err)
+	ociSrc, ok := src.(*ociImageSource)
+	require.True(t, ok)
+	sign, err := ociSrc.GetSignaturesWithFormat(context.Background(), &desc.Digest)
+	require.NoError(t, err)
+	require.Len(t, sign, 1)
+	require.Equal(t, sigstoreSign, sign[0])
+}
+
+// TestPutSignaturesWithFormatNilDigest tests error handling when instanceDigest is nil
+func TestPutSignaturesWithFormatNilDigest(t *testing.T) {
+	ref, _ := refToTempOCI(t, false)
+
+	dest, err := ref.NewImageDestination(context.Background(), nil)
+	require.NoError(t, err)
+	defer dest.Close()
+
+	// Cast to ociImageDestination to access PutSignaturesWithFormat
+	ociDest, ok := dest.(*ociImageDestination)
+	require.True(t, ok)
+
+	// Create a test signature
+	testPayload := []byte(`{"test": "payload"}`)
+	testAnnotations := map[string]string{
+		"dev.cosignproject.cosign/signature": "test-signature",
+	}
+	sig := signature.SigstoreFromComponents("application/vnd.dev.cosign.simplesigning.v1+json", testPayload, testAnnotations)
+
+	// Test that PutSignaturesWithFormat fails when instanceDigest is nil
+	err = ociDest.PutSignaturesWithFormat(context.Background(), []signature.Signature{sig}, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unknown manifest digest, can't add signatures")
+}
+
+// TestPutSignaturesWithFormatNonSigstore tests error handling for non-sigstore signatures
+func TestPutSignaturesWithFormatNonSigstore(t *testing.T) {
+	ref, _ := refToTempOCI(t, false)
+
+	dest, err := ref.NewImageDestination(context.Background(), nil)
+	require.NoError(t, err)
+	defer dest.Close()
+
+	// Cast to ociImageDestination to access PutSignaturesWithFormat
+	ociDest, ok := dest.(*ociImageDestination)
+	require.True(t, ok)
+
+	// Create a non-sigstore signature (simple signing)
+	simpleSig := signature.SimpleSigningFromBlob([]byte("simple signature data"))
+	testDigest := digest.FromString("test-manifest")
+
+	// Test that PutSignaturesWithFormat fails for non-sigstore signatures
+	err = ociDest.PutSignaturesWithFormat(context.Background(), []signature.Signature{simpleSig}, &testDigest)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "OCI Layout only supports sigstoreSignatures")
 }
