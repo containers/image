@@ -8,7 +8,7 @@
     },
     "layers": [
        {
-          "mediaType": "application/vnd.docker.image.rootfs.diff.tar.zstd",
+          "mediaType": "application/vnd.docker.image.rootfs.diff.tar.invalid",
           "size": 51354364,
           "digest": "sha256:6a5a5368e0c2d3e5909184fa28ddfd56072e7ff3ee9a945876f7eee5896ef5bb"
        },
