@@ -1,6 +1,11 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/containers/image/v5.svg)](https://pkg.go.dev/github.com/containers/image/v5) [![Build Status](https://api.cirrus-ci.com/github/containers/image.svg)](https://cirrus-ci.com/github/containers/image)
 =
 
+> [!WARNING]
+> This package was moved; please update your references to use `go.podman.io/image/v5` instead.
+> New development of this project happens on https://github.com/containers/container-libs.
+> For more information, check https://blog.podman.io/2025/08/upcoming-migration-of-three-containers-repositories-to-monorepo/.
+
 `image` is a set of Go libraries aimed at working in various way with
 containers' images and container image registries.
 
