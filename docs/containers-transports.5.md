@@ -91,6 +91,8 @@ The _path_ value terminates at the first `:` character; any further `:` characte
 The _reference_ is used to set, or match, the `org.opencontainers.image.ref.name` annotation in the top-level index.
 If _reference_ is not specified when reading an archive, the archive must contain exactly one image.
 
+The _path_ can refer to a stream, e.g. `oci-archive:/dev/stdout`.
+
 ### **sif:**_path_
 
 An image using the Singularity image format at _path_.
