@@ -1,3 +1,4 @@
+// Deprecated: Use go.podman.io/image/v5 instead.
 module github.com/containers/image/v5
 
 go 1.23.3
