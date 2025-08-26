@@ -10,6 +10,6 @@ jobs:
   run:
     runs-on: ubuntu-latest
     steps:
-    - uses: superbrothers/close-pull-request@9c18513d320d7b2c7185fb93396d0c664d5d8448
+    - uses: superbrothers/close-pull-request@ee879b9fb4a35e8dbd1b2fa63c9c135b68af4be1
       with:
         comment: "This repository has been migrated to https://github.com/containers/container-libs. Please open your PR there."
