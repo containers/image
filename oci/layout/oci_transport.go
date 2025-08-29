@@ -302,3 +302,11 @@ func (ref ociReference) blobPath(digest digest.Digest, sharedBlobDir string) (st
 	}
 	return filepath.Join(blobDir, digest.Algorithm().String(), digest.Encoded()), nil
 }
+
+// sigstoreAttachmentTag returns a sigstore attachment tag for the specified digest.
+func sigstoreAttachmentTag(d digest.Digest) (string, error) {
+	if err := d.Validate(); err != nil { // Make sure d.String() doesn’t contain any unexpected characters
+		return "", err
+	}
+	return strings.Replace(d.String(), ":", "-", 1) + ".sig", nil
+}
