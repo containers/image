@@ -1,0 +1,16 @@
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  auto_close_issues:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+    - name: Close issue
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        REPO: ${{ github.repository }}
+        ISSUE: ${{ github.event.issue.number }}
+      run: gh issue close --repo "$REPO" --comment "This repository has been migrated to https://github.com/containers/container-libs. Please open your issue there." "$ISSUE"
