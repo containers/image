@@ -4,6 +4,7 @@ package signature
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -150,7 +151,7 @@ func TestNewEphemeralGPGSigningMechanism(t *testing.T) {
 	require.NoError(t, err)
 	keyBlob2, err := os.ReadFile("./fixtures/public-key-2.gpg")
 	require.NoError(t, err)
-	mech, keyIdentities, err = newEphemeralGPGSigningMechanism([][]byte{keyBlob1, keyBlob2})
+	mech, keyIdentities, err = newEphemeralGPGSigningMechanism([][]byte{keyBlob1, keyBlob2}, context.Background())
 	require.NoError(t, err)
 	defer mech.Close()
 	assert.Equal(t, []string{TestKeyFingerprint, TestKeyFingerprintWithPassphrase}, keyIdentities)
