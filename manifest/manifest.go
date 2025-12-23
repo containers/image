@@ -32,6 +32,10 @@ const (
 	DockerV2Schema2ForeignLayerMediaType = manifest.DockerV2Schema2ForeignLayerMediaType
 	// DockerV2Schema2ForeignLayerMediaType is the MIME type used for gzipped schema 2 foreign layers.
 	DockerV2Schema2ForeignLayerMediaTypeGzip = manifest.DockerV2Schema2ForeignLayerMediaTypeGzip
+	// NydusBootstrapLayerMediaType is the MIME type used for Nydus bootstrap layers.
+	NydusBootstrapLayerMediaType = manifest.NydusBootstrapLayerMediaType
+	// NydusBlobLayerMediaType is the MIME type used for Nydus data blob layers.
+	NydusBlobLayerMediaType = manifest.NydusBlobLayerMediaType
 )
 
 // NonImageArtifactError (detected via errors.As) is used when asking for an image-specific operation

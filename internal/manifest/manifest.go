@@ -32,6 +32,10 @@ const (
 	DockerV2Schema2ForeignLayerMediaType = "application/vnd.docker.image.rootfs.foreign.diff.tar"
 	// DockerV2Schema2ForeignLayerMediaType is the MIME type used for gzipped schema 2 foreign layers.
 	DockerV2Schema2ForeignLayerMediaTypeGzip = "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip"
+	// NydusBootstrapLayerMediaType is the MIME type used for Nydus bootstrap layers.
+	NydusBootstrapLayerMediaType = "application/vnd.containers.image.nydus.bootstrap.v1+json"
+	// NydusBlobLayerMediaType is the MIME type used for Nydus data blob layers.
+	NydusBlobLayerMediaType = "application/vnd.containers.image.nydus.blob.v1"
 )
 
 // GuessMIMEType guesses MIME type of a manifest and returns it _if it is recognized_, or "" if unknown or unrecognized.
