@@ -172,23 +172,47 @@ func (s *Source) prepareLayerData(tarManifest *ManifestItem, parsedConfig *manif
 		layerPath := path.Clean(h.Name)
 		// FIXME: Cache this data across images in Reader.
 		if li, ok := unknownLayerSizes[layerPath]; ok {
+			underlyingReader := io.Reader(t)
+			underlyingSize := h.Size
+			var underlyingCloser io.Closer
+
+			if h.FileInfo().Mode()&os.ModeType == os.ModeSymlink {
+				rc, resolvedHeader, err := s.archive.openTarComponentWithHeader(layerPath)
+				if err != nil {
+					return nil, fmt.Errorf("opening %q to determine its size: %w", layerPath, err)
+				}
+				underlyingReader = rc
+				underlyingSize = resolvedHeader.Size
+				underlyingCloser = rc
+			}
+
 			// Since GetBlob will decompress layers that are compressed we need
 			// to do the decompression here as well, otherwise we will
 			// incorrectly report the size. Pretty critical, since tools like
 			// umoci always compress layer blobs. Obviously we only bother with
 			// the slower method of checking if it's compressed.
-			uncompressedStream, isCompressed, err := compression.AutoDecompress(t)
+			uncompressedStream, isCompressed, err := compression.AutoDecompress(underlyingReader)
 			if err != nil {
+				if underlyingCloser != nil {
+					_ = underlyingCloser.Close()
+				}
 				return nil, fmt.Errorf("auto-decompressing %q to determine its size: %w", layerPath, err)
 			}
-			defer uncompressedStream.Close()
 
-			uncompressedSize := h.Size
+			uncompressedSize := underlyingSize
 			if isCompressed {
 				uncompressedSize, err = io.Copy(io.Discard, uncompressedStream)
 				if err != nil {
+					_ = uncompressedStream.Close()
+					if underlyingCloser != nil {
+						_ = underlyingCloser.Close()
+					}
 					return nil, fmt.Errorf("reading %q to find its size: %w", layerPath, err)
 				}
+			}
+			_ = uncompressedStream.Close()
+			if underlyingCloser != nil {
+				_ = underlyingCloser.Close()
 			}
 			li.size = uncompressedSize
 			delete(unknownLayerSizes, layerPath)

@@ -1,8 +1,10 @@
 package tarfile
 
 import (
+	"archive/tar"
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"strings"
 	"testing"
@@ -10,6 +12,7 @@ import (
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/pkg/blobinfocache/memory"
 	"github.com/containers/image/v5/types"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -63,4 +66,72 @@ func TestSourcePrepareLayerData(t *testing.T) {
 			assert.Error(t, err, c.config)
 		}
 	}
+}
+
+func TestSourceGetBlobSymlinkLayerSizeMatchesBytesReturned(t *testing.T) {
+	ctx := context.Background()
+	cache := memory.New()
+
+	layerBytes := []byte("not empty")
+	diffID := digest.FromBytes(layerBytes)
+	configBytes := []byte(`{"rootfs":{"type":"layers","diff_ids":["` + diffID.String() + `"]}}`)
+
+	manifestBytes, err := json.Marshal([]ManifestItem{
+		{
+			Config: "config.json",
+			Layers: []string{"layer-link.tar"},
+		},
+	})
+	require.NoError(t, err)
+
+	var tarfileBuffer bytes.Buffer
+	tw := tar.NewWriter(&tarfileBuffer)
+	require.NoError(t, tw.WriteHeader(&tar.Header{
+		Name: "manifest.json",
+		Mode: 0o644,
+		Size: int64(len(manifestBytes)),
+	}))
+	_, err = tw.Write(manifestBytes)
+	require.NoError(t, err)
+
+	require.NoError(t, tw.WriteHeader(&tar.Header{
+		Name: "config.json",
+		Mode: 0o644,
+		Size: int64(len(configBytes)),
+	}))
+	_, err = tw.Write(configBytes)
+	require.NoError(t, err)
+
+	require.NoError(t, tw.WriteHeader(&tar.Header{
+		Name: "layer.tar",
+		Mode: 0o644,
+		Size: int64(len(layerBytes)),
+	}))
+	_, err = tw.Write(layerBytes)
+	require.NoError(t, err)
+
+	require.NoError(t, tw.WriteHeader(&tar.Header{
+		Name:     "layer-link.tar",
+		Typeflag: tar.TypeSymlink,
+		Linkname: "layer.tar",
+		Mode:     0o777,
+	}))
+	require.NoError(t, tw.Close())
+
+	reader, err := NewReaderFromStream(nil, &tarfileBuffer)
+	require.NoError(t, err)
+	src := NewSource(reader, true, "transport name", nil, -1)
+	t.Cleanup(func() { _ = src.Close() })
+
+	layerStream, reportedSize, err := src.GetBlob(ctx, types.BlobInfo{
+		Digest: diffID,
+		Size:   -1,
+	}, cache)
+	require.NoError(t, err)
+	defer layerStream.Close()
+
+	readBytes, err := io.ReadAll(layerStream)
+	require.NoError(t, err)
+	assert.Equal(t, layerBytes, readBytes)
+	assert.Equal(t, int64(len(layerBytes)), reportedSize)
 }

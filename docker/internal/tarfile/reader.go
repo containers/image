@@ -184,21 +184,16 @@ func (t *tarReadCloser) Close() error {
 	return t.backingFile.Close()
 }
 
-// openTarComponent returns a ReadCloser for the specific file within the archive.
-// This is linear scan; we assume that the tar file will have a fairly small amount of files (~layers),
-// and that filesystem caching will make the repeated seeking over the (uncompressed) tarPath cheap enough.
-// It is safe to call this method from multiple goroutines simultaneously.
-// The caller should call .Close() on the returned stream.
-func (r *Reader) openTarComponent(componentPath string) (io.ReadCloser, error) {
+func (r *Reader) openTarComponentWithHeader(componentPath string) (io.ReadCloser, *tar.Header, error) {
 	// This is only a sanity check; if anyone did concurrently close ra, this access is technically
 	// racy against the write in .Close().
 	if r.path == "" {
-		return nil, errors.New("Internal error: trying to read an already closed tarfile.Reader")
+		return nil, nil, errors.New("Internal error: trying to read an already closed tarfile.Reader")
 	}
 
 	f, err := os.Open(r.path)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	succeeded := false
 	defer func() {
@@ -209,32 +204,41 @@ func (r *Reader) openTarComponent(componentPath string) (io.ReadCloser, error) {
 
 	tarReader, header, err := findTarComponent(f, componentPath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if header == nil {
-		return nil, os.ErrNotExist
+		return nil, nil, os.ErrNotExist
 	}
-	if header.FileInfo().Mode()&os.ModeType == os.ModeSymlink { // FIXME: untested
-		// We follow only one symlink; so no loops are possible.
+	if header.FileInfo().Mode()&os.ModeType == os.ModeSymlink { // We follow only one symlink; so no loops are possible.
 		if _, err := f.Seek(0, io.SeekStart); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		// The new path could easily point "outside" the archive, but we only compare it to existing tar headers without extracting the archive,
 		// so we don't care.
 		tarReader, header, err = findTarComponent(f, path.Join(path.Dir(componentPath), header.Linkname))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if header == nil {
-			return nil, os.ErrNotExist
+			return nil, nil, os.ErrNotExist
 		}
 	}
 
 	if !header.FileInfo().Mode().IsRegular() {
-		return nil, fmt.Errorf("Error reading tar archive component %q: not a regular file", header.Name)
+		return nil, nil, fmt.Errorf("Error reading tar archive component %q: not a regular file", header.Name)
 	}
 	succeeded = true
-	return &tarReadCloser{Reader: tarReader, backingFile: f}, nil
+	return &tarReadCloser{Reader: tarReader, backingFile: f}, header, nil
+}
+
+// openTarComponent returns a ReadCloser for the specific file within the archive.
+// This is linear scan; we assume that the tar file will have a fairly small amount of files (~layers),
+// and that filesystem caching will make the repeated seeking over the (uncompressed) tarPath cheap enough.
+// It is safe to call this method from multiple goroutines simultaneously.
+// The caller should call .Close() on the returned stream.
+func (r *Reader) openTarComponent(componentPath string) (io.ReadCloser, error) {
+	rc, _, err := r.openTarComponentWithHeader(componentPath)
+	return rc, err
 }
 
 // findTarComponent returns a header and a reader matching componentPath within inputFile,
