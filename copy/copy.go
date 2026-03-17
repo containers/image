@@ -149,6 +149,13 @@ type Options struct {
 	// WARNING: It is unspecified whether the reference also contains a reference.Named element.
 	ReportResolvedReference *types.ImageReference
 
+	// ReportResolvedSourceReference, if non-nil, will be populated by
+	// copy.Image with the source's "resolved" reference — the actual
+	// endpoint contacted, which may differ from the requested reference
+	// when registry mirrors are configured. It is left nil when the
+	// source transport does not report a resolved reference.
+	ReportResolvedSourceReference *types.ImageReference
+
 	// DestinationTimestamp, if set, will force timestamps of content created in the destination to this value.
 	// Most transports don't support this.
 	//
@@ -238,6 +245,13 @@ func Image(ctx context.Context, policyContext *signature.PolicyContext, destRef,
 	}
 	rawSource := imagesource.FromPublic(publicRawSource)
 	defer safeClose("src", rawSource)
+
+	if options.ReportResolvedSourceReference != nil {
+		*options.ReportResolvedSourceReference = nil
+		if resolver, ok := publicRawSource.(types.ResolvedImageSource); ok {
+			*options.ReportResolvedSourceReference = resolver.ResolvedReference()
+		}
+	}
 
 	// If reportWriter is not a TTY (e.g., when piping to a file), do not
 	// print the progress bars to avoid long and hard to parse output.

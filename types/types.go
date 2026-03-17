@@ -283,6 +283,16 @@ type ImageSource interface {
 	LayerInfosForCopy(ctx context.Context, instanceDigest *digest.Digest) ([]BlobInfo, error)
 }
 
+// ResolvedImageSource is an optional interface that ImageSource implementations
+// can satisfy to report the actual endpoint used when the source was resolved
+// through mirrors or redirects.
+type ResolvedImageSource interface {
+	// ResolvedReference returns the reference to the actual endpoint that
+	// was contacted, which may differ from Reference() when registry
+	// mirrors are configured.
+	ResolvedReference() ImageReference
+}
+
 // ImageDestination is a service, possibly remote (= slow), to store components of a single image.
 //
 // There is a specific required order for some of the calls:

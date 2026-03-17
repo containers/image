@@ -81,6 +81,12 @@ location = "@REGISTRY@/with-mirror"
 		require.True(t, ok, c.input)
 		assert.Equal(t, "//"+c.input, src2.logicalRef.StringWithinTransport(), c.input)
 		assert.Equal(t, "//"+c.physical, src2.physicalRef.StringWithinTransport(), c.input)
+
+		// Verify ResolvedReference() returns the physical ref through the public interface
+		resolver, ok := src.(types.ResolvedImageSource)
+		require.True(t, ok, c.input)
+		resolved := resolver.ResolvedReference()
+		assert.Equal(t, "//"+c.physical, resolved.StringWithinTransport(), c.input)
 	}
 }
 
