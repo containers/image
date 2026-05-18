@@ -32,7 +32,7 @@ func (w *wrapperZstdDecoder) WriteTo(wr io.Writer) (int64, error) {
 }
 
 func zstdReader(buf io.Reader) (io.ReadCloser, error) {
-	decoder, err := zstd.NewReader(buf)
+	decoder, err := zstd.NewReader(buf, zstd.WithDecoderConcurrency(0))
 	return &wrapperZstdDecoder{decoder: decoder}, err
 }
 
