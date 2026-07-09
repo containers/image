@@ -8,6 +8,7 @@ import (
 	"github.com/containers/image/v5/pkg/compression"
 	"github.com/containers/image/v5/types"
 	"github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,6 +35,11 @@ func TestSupportedSchema2MediaType(t *testing.T) {
 		{DockerV2ListMediaType, false},
 		{DockerV2Schema2ForeignLayerMediaType, false},
 		{DockerV2Schema2ForeignLayerMediaTypeGzip, false},
+		{imgspecv1.MediaTypeImageConfig, false},
+		{imgspecv1.MediaTypeImageLayer, false},
+		{imgspecv1.MediaTypeImageLayerGzip, false},
+		{imgspecv1.MediaTypeImageLayerNonDistributable, false},     //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
+		{imgspecv1.MediaTypeImageLayerNonDistributableGzip, false}, //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.
 		{"application/vnd.docker.image.rootfs.foreign.diff.unknown", true},
 	}
 	for _, d := range data {
