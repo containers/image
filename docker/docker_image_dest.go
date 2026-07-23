@@ -709,27 +709,24 @@ func (d *dockerImageDestination) putSignaturesToSigstoreAttachments(ctx context.
 	if err != nil {
 		return err
 	}
-	var ociConfig imgspecv1.Image // Most fields empty by default
-	if ociManifest == nil {
-		ociManifest = manifest.OCI1FromComponents(imgspecv1.Descriptor{
-			MediaType: imgspecv1.MediaTypeImageConfig,
-			Digest:    "", // We will fill this in later.
-			Size:      0,
-		}, nil)
-		ociConfig.RootFS.Type = "layers"
-	} else {
-		logrus.Debugf("Fetching sigstore attachment config %s", ociManifest.Config.Digest.String())
-		// We don’t benefit from a real BlobInfoCache here because we never try to reuse/mount configs.
-		configBlob, err := d.c.getOCIDescriptorContents(ctx, d.ref, ociManifest.Config, iolimits.MaxConfigBodySize,
-			none.NoCache)
-		if err != nil {
-			return err
-		}
-		if err := json.Unmarshal(configBlob, &ociConfig); err != nil {
-			return fmt.Errorf("parsing sigstore attachment config %s in %s: %w", ociManifest.Config.Digest.String(),
-				d.ref.ref.Name(), err)
-		}
-	}
+	
+    var configBlob []byte
+    if ociManifest == nil {
+        ociManifest = manifest.OCI1FromComponents(imgspecv1.Descriptor{
+            MediaType: imgspecv1.MediaTypeImageConfig,
+            Digest:    "", // We will fill this in later.
+            Size:      0,
+        }, nil)
+        configBlob = []byte("{}") // cosign standard: empty config
+    } else {
+        logrus.Debugf("Fetching sigstore attachment config %s", ociManifest.Config.Digest.String())
+        var err error
+        configBlob, err = d.c.getOCIDescriptorContents(ctx, d.ref, ociManifest.Config, iolimits.MaxConfigBodySize,
+            none.NoCache)
+        if err != nil {
+            return err
+        }
+    }
 
 	// To make sure we can safely append to the slices of ociManifest, without adding a remote dependency on the code that creates it.
 	ociManifest.Layers = slices.Clone(ociManifest.Layers)
@@ -766,14 +763,9 @@ func (d *dockerImageDestination) putSignaturesToSigstoreAttachments(ctx context.
 		}
 		sigDesc.Annotations = annotations
 		ociManifest.Layers = append(ociManifest.Layers, sigDesc)
-		ociConfig.RootFS.DiffIDs = append(ociConfig.RootFS.DiffIDs, sigDesc.Digest)
 		logrus.Debugf("Adding new signature, digest %s", sigDesc.Digest.String())
 	}
 
-	configBlob, err := json.Marshal(ociConfig)
-	if err != nil {
-		return err
-	}
 	logrus.Debugf("Uploading updated sigstore attachment config")
 	// We don’t benefit from a real BlobInfoCache here because we never try to reuse/mount configs.
 	configDesc, err := d.putBlobBytesAsOCI(ctx, configBlob, imgspecv1.MediaTypeImageConfig, private.PutBlobOptions{
