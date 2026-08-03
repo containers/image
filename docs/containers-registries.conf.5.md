@@ -113,11 +113,11 @@ the primary location specified by the `registry.location` field, or using the un
 user-specified reference, is tried last).
 
 Each TOML table in the `mirror` array can contain the following fields:
-- `location`： same semantics
+- `location`: same semantics
 as specified in the `[[registry]]` TOML table
-- `insecure`： same semantics
+- `insecure`: same semantics
 as specified in the `[[registry]]` TOML table
-- `pull-from-mirror`: `all`, `digest-only` or `tag-only`.  If "digest-only"， mirrors will only be used for digest pulls. Pulling images by tag can potentially yield different images, depending on which endpoint we pull from.  Restricting mirrors to pulls by digest avoids that issue.  If "tag-only", mirrors will only be used for tag pulls.  For a more up-to-date and expensive mirror that it is less likely to be out of sync if tags move, it should not be unnecessarily used for digest references.  Default is "all" (or left empty), mirrors will be used for both digest pulls and tag pulls unless the mirror-by-digest-only is set for the primary registry.
+- `pull-from-mirror`: `all`, `digest-only` or `tag-only`.  If "digest-only", mirrors will only be used for digest pulls. Pulling images by tag can potentially yield different images, depending on which endpoint we pull from.  Restricting mirrors to pulls by digest avoids that issue.  If "tag-only", mirrors will only be used for tag pulls.  For a more up-to-date and expensive mirror that it is less likely to be out of sync if tags move, it should not be unnecessarily used for digest references.  Default is "all" (or left empty), mirrors will be used for both digest pulls and tag pulls unless the mirror-by-digest-only is set for the primary registry.
 Note that this per-mirror setting is allowed only when `mirror-by-digest-only` is not configured for the primary registry.
 
 `mirror-by-digest-only`
